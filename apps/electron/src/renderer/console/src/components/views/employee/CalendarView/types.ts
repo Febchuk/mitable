@@ -47,6 +47,8 @@ export type DeliveryChannel = "slack" | "email" | "linear";
  */
 export type DeliveryStatus = "pending" | "sent" | "failed";
 
+export type WorkBlockSource = "session" | "granola";
+
 export interface WorkBlock {
   id: string;
   startTime: Date;
@@ -69,6 +71,11 @@ export interface WorkBlock {
   deliveredAt?: Date;
   rawActivitySummary?: string; // AI-generated raw summary
   finalSummary?: string; // User-edited final summary
+
+  // Source tracking (for integration blocks like Granola)
+  source?: WorkBlockSource;
+  subscriberName?: string; // Customer/subscriber name (from Granola attendee extraction)
+  participants?: { name: string; email: string }[];
 }
 
 export interface ActivityDay {

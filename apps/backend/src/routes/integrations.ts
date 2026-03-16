@@ -2730,4 +2730,431 @@ router.delete(
   }
 );
 
+// ============================================================================
+// GRANOLA INTEGRATION ROUTES (Per-user OAuth for meeting notes sync)
+// ============================================================================
+
+/**
+ * POST /api/integrations/granola/oauth/start
+ * Initiate Granola OAuth flow for the current user
+ * Returns the authorization URL for the user to visit
+ */
+router.post(
+  "/granola/oauth/start",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      const { granolaService } = await import("../services/granola.service.js");
+
+      if (!granolaService.isConfigured()) {
+        sendError(
+          res,
+          500,
+          "GRANOLA_NOT_CONFIGURED",
+          "Granola MCP integration not configured. Please set GRANOLA_MCP_BASE_URL."
+        );
+        return;
+      }
+
+      const authUrl = await granolaService.getAuthUrl(userId);
+
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Granola OAuth:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to initiate Granola OAuth",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/integrations/granola/callback
+ * Granola OAuth callback endpoint
+ * Granola redirects here after user approves the app
+ */
+router.get("/granola/callback", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code, state, error } = req.query;
+
+    if (error) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Granola Connection Failed</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+              h1 { color: #e01e5a; }
+            </style>
+          </head>
+          <body>
+            <h1>Granola Connection Failed</h1>
+            <p>You denied access or an error occurred.</p>
+            <p>Error: ${error}</p>
+            <p>You can close this window and try again.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    if (!code || !state) {
+      res.status(400).send(`
+        <html>
+          <head>
+            <title>Invalid Request</title>
+          </head>
+          <body>
+            <h1>Invalid OAuth callback</h1>
+            <p>Missing authorization code or state parameter.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    const userId = state as string;
+
+    const { granolaService } = await import("../services/granola.service.js");
+
+    // Exchange authorization code for access token
+    const tokenData = await granolaService.exchangeCodeForToken(code as string, userId);
+
+    // Calculate token expiration
+    const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+    // Encrypt tokens before storing
+    const encryptedAccessToken = encryptionService.encrypt(tokenData.access_token);
+    const encryptedRefreshToken = tokenData.refresh_token
+      ? encryptionService.encrypt(tokenData.refresh_token)
+      : null;
+
+    // Store tokens on user record
+    await db
+      .update(schema.users)
+      .set({
+        granolaAccessTokenEncrypted: encryptedAccessToken,
+        granolaRefreshTokenEncrypted: encryptedRefreshToken,
+        granolaTokenExpiresAt: tokenExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, userId));
+
+    console.log(`Granola connected for user: ${userId}`);
+
+    // Return success page
+    res.send(`
+      <html>
+        <head>
+          <title>Granola Connected</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              text-align: center;
+              padding: 50px;
+              background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+              color: white;
+            }
+            .container {
+              background: white;
+              color: #333;
+              border-radius: 10px;
+              padding: 40px;
+              max-width: 500px;
+              margin: 0 auto;
+              box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            }
+            h1 { color: #16213e; margin-bottom: 10px; }
+            p { font-size: 16px; line-height: 1.6; }
+            button {
+              margin-top: 20px;
+              padding: 12px 24px;
+              background: #16213e;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              font-size: 16px;
+              cursor: pointer;
+            }
+            button:hover { background: #1a1a2e; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Granola Connected Successfully!</h1>
+            <p>Your meeting notes will now sync to Mitable.</p>
+            <button onclick="window.close()">Close Window</button>
+          </div>
+          <script>
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("Granola OAuth callback error:", error);
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #e01e5a; }
+          </style>
+        </head>
+        <body>
+          <h1>Connection Error</h1>
+          <p>Failed to connect to Granola. Please try again.</p>
+          <p>Error: ${error instanceof Error ? error.message : "Unknown error"}</p>
+        </body>
+      </html>
+    `);
+  }
+});
+
+/**
+ * GET /api/integrations/granola/status
+ * Check if the current user has Granola connected
+ */
+router.get("/granola/status", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const [user] = await db
+      .select({
+        granolaAccessTokenEncrypted: schema.users.granolaAccessTokenEncrypted,
+        granolaTokenExpiresAt: schema.users.granolaTokenExpiresAt,
+        granolaUserEmail: schema.users.granolaUserEmail,
+        granolaLastSyncedAt: schema.users.granolaLastSyncedAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "Not Found", message: "User not found" });
+      return;
+    }
+
+    const isConnected = !!user.granolaAccessTokenEncrypted;
+    const isExpired = user.granolaTokenExpiresAt
+      ? new Date(user.granolaTokenExpiresAt) < new Date()
+      : false;
+
+    res.json({
+      connected: isConnected && !isExpired,
+      expired: isExpired,
+      email: user.granolaUserEmail || null,
+      lastSyncedAt: user.granolaLastSyncedAt || null,
+    });
+  } catch (error) {
+    console.error("Error checking Granola status:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to check Granola status",
+    });
+  }
+});
+
+/**
+ * DELETE /api/integrations/granola/disconnect
+ * Disconnect Granola for the current user
+ */
+router.delete(
+  "/granola/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      await db
+        .update(schema.users)
+        .set({
+          granolaAccessTokenEncrypted: null,
+          granolaRefreshTokenEncrypted: null,
+          granolaTokenExpiresAt: null,
+          granolaUserEmail: null,
+          granolaLastSyncedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      console.log(`Granola disconnected for user: ${userId}`);
+
+      res.json({ success: true, message: "Granola disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Granola:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect Granola",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/integrations/granola/sync
+ * Trigger a manual sync of Granola notes for the current user
+ */
+router.post("/granola/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const { granolaSyncService } = await import("../services/granola-sync.service.js");
+
+    const result = await granolaSyncService.syncUserMeetings(userId);
+
+    console.log(
+      `Granola sync for user ${userId}: ${result.meetingsProcessed} meetings, ` +
+        `${result.blocksCreated} created, ${result.blocksUpdated} updated`
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error syncing Granola notes:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to sync Granola notes",
+    });
+  }
+});
+
+/**
+ * GET /api/integrations/granola/notes
+ * List recent Granola notes for the current user (preview, not full sync)
+ */
+router.get("/granola/notes", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const [user] = await db
+      .select({
+        granolaAccessTokenEncrypted: schema.users.granolaAccessTokenEncrypted,
+        granolaRefreshTokenEncrypted: schema.users.granolaRefreshTokenEncrypted,
+        granolaTokenExpiresAt: schema.users.granolaTokenExpiresAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    if (!user?.granolaAccessTokenEncrypted) {
+      sendError(res, 400, "GRANOLA_NOT_CONNECTED", "Please connect your Granola account first");
+      return;
+    }
+
+    // Check token expiry
+    if (user.granolaTokenExpiresAt && new Date(user.granolaTokenExpiresAt) < new Date()) {
+      if (!user.granolaRefreshTokenEncrypted) {
+        sendError(
+          res,
+          401,
+          "TOKEN_EXPIRED",
+          "Your Granola connection has expired. Please reconnect."
+        );
+        return;
+      }
+
+      // Attempt refresh
+      try {
+        const { granolaService } = await import("../services/granola.service.js");
+        const refreshToken = encryptionService.decrypt(user.granolaRefreshTokenEncrypted);
+        const newTokenData = await granolaService.refreshToken(refreshToken);
+
+        const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
+        await db
+          .update(schema.users)
+          .set({
+            granolaAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
+            granolaRefreshTokenEncrypted: newTokenData.refresh_token
+              ? encryptionService.encrypt(newTokenData.refresh_token)
+              : user.granolaRefreshTokenEncrypted,
+            granolaTokenExpiresAt: tokenExpiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, userId));
+
+        // Use new token
+        const { granolaService: svc } = await import("../services/granola.service.js");
+        const meetings = await svc.listMeetings(newTokenData.access_token, "last_30_days");
+        res.json(meetings);
+        return;
+      } catch {
+        sendError(res, 401, "REFRESH_FAILED", "Failed to refresh Granola token. Please reconnect.");
+        return;
+      }
+    }
+
+    const accessToken = encryptionService.decrypt(user.granolaAccessTokenEncrypted);
+
+    const { granolaService } = await import("../services/granola.service.js");
+    const meetings = await granolaService.listMeetings(accessToken, "last_30_days");
+
+    res.json(meetings);
+  } catch (error) {
+    console.error("Error fetching Granola notes:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: error instanceof Error ? error.message : "Failed to fetch notes",
+    });
+  }
+});
+
+/**
+ * GET /api/integrations/granola/blocks
+ * Return Granola activity_blocks for the current user (for calendar view)
+ * Admins can pass ?userId=<id> to fetch blocks for any user
+ */
+router.get("/granola/blocks", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    let userId = req.userId!;
+
+    // Allow admins to query blocks for a specific user
+    if (req.query.userId && typeof req.query.userId === "string") {
+      const requestingUser = await db
+        .select({ role: schema.users.role })
+        .from(schema.users)
+        .where(eq(schema.users.id, req.userId!))
+        .limit(1);
+      if (requestingUser[0]?.role !== "admin") {
+        res.status(403).json({ error: "Only admins can query other users' blocks" });
+        return;
+      }
+      userId = req.query.userId;
+    }
+
+    const blocks = await db
+      .select({
+        id: schema.activityBlocks.id,
+        name: schema.activityBlocks.name,
+        startTime: schema.activityBlocks.startTime,
+        endTime: schema.activityBlocks.endTime,
+        durationMinutes: schema.activityBlocks.durationMinutes,
+        description: schema.activityBlocks.description,
+        category: schema.activityBlocks.category,
+        topicName: schema.activityBlocks.topicName,
+        subscriberName: schema.activityBlocks.subscriberName,
+        participants: schema.activityBlocks.participants,
+      })
+      .from(schema.activityBlocks)
+      .where(
+        and(
+          eq(schema.activityBlocks.userId, userId),
+          eq(schema.activityBlocks.blockType, "granola")
+        )
+      )
+      .orderBy(schema.activityBlocks.startTime);
+
+    res.json({ blocks });
+  } catch (error) {
+    console.error("Error fetching Granola blocks:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to fetch Granola blocks",
+    });
+  }
+});
+
 export default router;

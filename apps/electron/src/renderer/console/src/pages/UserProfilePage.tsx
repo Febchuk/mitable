@@ -23,6 +23,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
+import { GranolaIcon } from "../../../components/icons/integrations";
 import Button from "../components/ui/Button";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -69,6 +70,13 @@ interface NotionStatus {
   workspaceId: string | null;
 }
 
+interface GranolaStatus {
+  connected: boolean;
+  expired: boolean;
+  email: string | null;
+  lastSyncedAt: string | null;
+}
+
 export default function UserProfilePage() {
   const { user } = useUser();
   const { toast } = useToast();
@@ -97,6 +105,11 @@ export default function UserProfilePage() {
   const [isNotionLoading, setIsNotionLoading] = useState(true);
   const [isNotionConnecting, setIsNotionConnecting] = useState(false);
   const [isNotionDisconnecting, setIsNotionDisconnecting] = useState(false);
+
+  const [granolaStatus, setGranolaStatus] = useState<GranolaStatus | null>(null);
+  const [isGranolaLoading, setIsGranolaLoading] = useState(true);
+  const [isGranolaConnecting, setIsGranolaConnecting] = useState(false);
+  const [isGranolaDisconnecting, setIsGranolaDisconnecting] = useState(false);
 
   // About / Version state
   const [appVersion, setAppVersion] = useState<string>("");
@@ -200,6 +213,7 @@ export default function UserProfilePage() {
   const linearPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const gmailPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const notionPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const granolaPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup OAuth polling intervals on unmount
   useEffect(() => {
@@ -212,6 +226,9 @@ export default function UserProfilePage() {
       }
       if (notionPollIntervalRef.current) {
         clearInterval(notionPollIntervalRef.current);
+      }
+      if (granolaPollIntervalRef.current) {
+        clearInterval(granolaPollIntervalRef.current);
       }
     };
   }, []);
@@ -839,6 +856,7 @@ export default function UserProfilePage() {
     loadLinearStatus();
     loadGmailStatus();
     loadNotionStatus();
+    loadGranolaStatus();
     loadAppVersion();
     loadAudioPreferences(); // Load audio devices and preferences
     if (user?.id) {
@@ -1337,6 +1355,133 @@ export default function UserProfilePage() {
       });
     } finally {
       setIsNotionDisconnecting(false);
+    }
+  };
+
+  const loadGranolaStatus = async () => {
+    setIsGranolaLoading(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/granola/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGranolaStatus(data);
+      }
+    } catch (error) {
+      logger.error("Error loading Granola status:", error);
+    } finally {
+      setIsGranolaLoading(false);
+    }
+  };
+
+  const handleConnectGranola = async () => {
+    setIsGranolaConnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/granola/oauth/start`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start Granola OAuth");
+      }
+
+      const { authUrl } = await response.json();
+      window.open(authUrl, "_blank");
+
+      toast({
+        title: "Complete in Browser",
+        description: "Please complete the Granola authorization in your browser, then return here.",
+      });
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const token = authService.getAccessToken();
+          if (!token) return;
+
+          const resp = await fetch(`${API_BASE_URL}/api/integrations/granola/status`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            setGranolaStatus(data);
+            if (data.connected) {
+              clearInterval(pollInterval);
+              granolaPollIntervalRef.current = null;
+              toast({
+                title: "Granola Connected",
+                description: "Your Granola account has been connected successfully!",
+              });
+            }
+          }
+        } catch (err) {
+          logger.error("Polling error:", err);
+        }
+      }, 2000);
+
+      granolaPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        granolaPollIntervalRef.current = null;
+      }, 120000);
+    } catch (error) {
+      logger.error("Error connecting Granola:", error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to Granola. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGranolaConnecting(false);
+    }
+  };
+
+  const handleDisconnectGranola = async () => {
+    setIsGranolaDisconnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/granola/disconnect`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        setGranolaStatus({ connected: false, expired: false, email: null, lastSyncedAt: null });
+        toast({
+          title: "Granola Disconnected",
+          description: "Your Granola account has been disconnected.",
+        });
+      }
+    } catch (error) {
+      logger.error("Error disconnecting Granola:", error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Granola. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGranolaDisconnecting(false);
     }
   };
 
@@ -2707,6 +2852,69 @@ export default function UserProfilePage() {
                       <p className="text-sm text-yellow-400">
                         Your Gmail connection has expired. Please reconnect to continue sending
                         emails.
+                      </p>
+                    </div>
+                  )}
+                </Card>
+
+                {/* Granola Integration Card */}
+                <Card className="p-6 bg-background-elevated border-border-subtle">
+                  <div className="flex items-center gap-4">
+                    <GranolaIcon />
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-white">Granola</h3>
+                      <p className="text-sm text-text-tertiary">
+                        Connect your Granola account to sync meeting notes.
+                      </p>
+                      {granolaStatus?.connected && granolaStatus.email && (
+                        <p className="text-xs text-text-tertiary mt-1">{granolaStatus.email}</p>
+                      )}
+                    </div>
+
+                    {isGranolaLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                    ) : granolaStatus?.connected ? (
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-sm text-green-400">
+                          <Check className="w-4 h-4" />
+                          Connected
+                        </span>
+                        <ShadcnButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleDisconnectGranola}
+                          disabled={isGranolaDisconnecting}
+                          className="text-text-tertiary hover:text-red-400"
+                        >
+                          {isGranolaDisconnecting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Unlink className="w-4 h-4" />
+                          )}
+                        </ShadcnButton>
+                      </div>
+                    ) : (
+                      <ShadcnButton
+                        onClick={handleConnectGranola}
+                        disabled={isGranolaConnecting}
+                        className="bg-[#1E1E1E] hover:bg-[#333] text-white gap-2"
+                      >
+                        {isGranolaConnecting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Link2 className="w-4 h-4" />
+                        )}
+                        Connect
+                      </ShadcnButton>
+                    )}
+                  </div>
+
+                  {granolaStatus?.expired && (
+                    <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-sm text-yellow-400">
+                        Your Granola connection has expired. Please reconnect to continue syncing
+                        meeting notes.
                       </p>
                     </div>
                   )}

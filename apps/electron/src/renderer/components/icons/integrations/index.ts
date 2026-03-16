@@ -4,10 +4,11 @@ import { GitHubIcon } from "./GitHubIcon";
 import { GoogleDriveIcon } from "./GoogleDriveIcon";
 import { LinearIcon } from "./LinearIcon";
 import { GmailIcon } from "./GmailIcon";
+import { GranolaIcon } from "./GranolaIcon";
 import type { IntegrationProvider } from "../../../console/src/types";
 
 // Export individual icons
-export { SlackIcon, NotionIcon, GitHubIcon, GoogleDriveIcon, LinearIcon, GmailIcon };
+export { SlackIcon, NotionIcon, GitHubIcon, GoogleDriveIcon, LinearIcon, GmailIcon, GranolaIcon };
 
 // Icon mapping utility
 export const integrationIcons: Record<IntegrationProvider, React.ComponentType> = {
@@ -17,6 +18,7 @@ export const integrationIcons: Record<IntegrationProvider, React.ComponentType> 
   "google-drive": GoogleDriveIcon,
   linear: LinearIcon,
   gmail: GmailIcon,
+  granola: GranolaIcon,
 };
 
 // Helper function to get icon component by provider

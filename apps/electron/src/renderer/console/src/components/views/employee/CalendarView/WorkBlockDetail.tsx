@@ -55,8 +55,10 @@ import {
   Loader2,
   Send,
   Pause,
+  Users,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
+import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
 import TaskBreakdownSection from "../../../shared/TaskBreakdownSection";
 import { useBlockDetail } from "../../../../hooks/queries/calendar";
 import { useDeleteSession } from "../../../../hooks/queries/monitoring";
@@ -141,9 +143,9 @@ export default function WorkBlockDetail({
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Fetch full block details (includes summary) on demand
+  // Fetch full block details (includes summary) on demand — skip for Granola blocks (not monitoring sessions)
   const { data: blockDetail, isLoading: isLoadingDetail } = useBlockDetail(block.id, {
-    enabled: isExpanded,
+    enabled: isExpanded && block.source !== "granola",
   });
 
   // Delete mutation
@@ -210,9 +212,11 @@ export default function WorkBlockDetail({
         className={`
           rounded-xl border transition-all duration-200
           ${
-            block.isActive
-              ? "border-emerald/30 bg-gradient-to-br from-emerald/5 to-canvas-overlay"
-              : "border-stroke-subtle bg-canvas-overlay/50 hover:bg-canvas-overlay hover:border-stroke"
+            block.source === "granola"
+              ? "border-[#C8E64A]/30 bg-gradient-to-br from-[#C8E64A]/5 to-canvas-overlay hover:border-[#C8E64A]/50"
+              : block.isActive
+                ? "border-emerald/30 bg-gradient-to-br from-emerald/5 to-canvas-overlay"
+                : "border-stroke-subtle bg-canvas-overlay/50 hover:bg-canvas-overlay hover:border-stroke"
           }
         `}
       >
@@ -234,12 +238,22 @@ export default function WorkBlockDetail({
             {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
           </div>
 
-          {/* Block number and time */}
+          {/* Block number/icon and time */}
           <div className="flex-shrink-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                Block {blockNumber}
-              </span>
+              {block.source === "granola" ? (
+                <GranolaIcon size="sm" />
+              ) : (
+                <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                  Block {blockNumber}
+                </span>
+              )}
+
+              {block.source === "granola" && (
+                <span className="px-2 py-0.5 rounded-full bg-[#C8E64A]/15 text-[#C8E64A] text-[10px] font-semibold uppercase tracking-wider">
+                  Meeting
+                </span>
+              )}
 
               {block.isActive && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald/20 text-emerald text-[10px] font-semibold uppercase tracking-wider">
@@ -251,32 +265,59 @@ export default function WorkBlockDetail({
                 </span>
               )}
             </div>
-            <div className="text-sm text-ink-secondary mt-0.5 tabular-nums">{timeRange}</div>
+            {block.source !== "granola" && (
+              <div className="text-sm text-ink-secondary mt-0.5 tabular-nums">{timeRange}</div>
+            )}
           </div>
 
           {/* Summary preview */}
           <div className="flex-1 min-w-0">
-            {block.goal && (
-              <div className="flex items-center gap-1.5 mb-1">
-                <Target size={12} className="text-indigo" />
-                <span className="text-xs font-medium text-indigo">{block.goal}</span>
-              </div>
+            {block.source === "granola" ? (
+              <>
+                <p className="text-sm font-medium text-ink-primary line-clamp-1">
+                  {block.name || "Meeting"}
+                </p>
+                {block.participants && block.participants.length > 0 && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Users size={11} className="text-ink-tertiary" />
+                    <span className="text-xs text-ink-tertiary line-clamp-1">
+                      {block.participants.map((p) => p.name).join(", ")}
+                    </span>
+                  </div>
+                )}
+                {block.subscriberName && (
+                  <span className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded bg-[#C8E64A]/10 text-[10px] font-medium text-[#C8E64A]">
+                    {block.subscriberName}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                {block.goal && (
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Target size={12} className="text-indigo" />
+                    <span className="text-xs font-medium text-indigo">{block.goal}</span>
+                  </div>
+                )}
+                <p className="text-sm text-ink-primary line-clamp-2">
+                  {displaySummary ? extractPreview(displaySummary) : "No summary yet"}
+                </p>
+              </>
             )}
-            <p className="text-sm text-ink-primary line-clamp-2">
-              {displaySummary ? extractPreview(displaySummary) : "No summary yet"}
-            </p>
           </div>
 
-          {/* Duration */}
-          <div className="flex-shrink-0 flex items-center gap-1.5 text-ink-secondary">
-            <Clock size={14} />
-            <span className="text-sm font-medium tabular-nums">
-              {formatDuration(block.duration)}
-            </span>
-          </div>
+          {/* Duration — hide for Granola blocks (MCP doesn't provide real duration) */}
+          {block.source !== "granola" && (
+            <div className="flex-shrink-0 flex items-center gap-1.5 text-ink-secondary">
+              <Clock size={14} />
+              <span className="text-sm font-medium tabular-nums">
+                {formatDuration(block.duration)}
+              </span>
+            </div>
+          )}
 
-          {/* Status badge */}
-          {block.status && block.status !== "ended" && (
+          {/* Status badge — hide for Granola blocks */}
+          {block.source !== "granola" && block.status && block.status !== "ended" && (
             <div
               className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${getStatusColor(block.status).bg} ${getStatusColor(block.status).text}`}
             >
@@ -311,132 +352,212 @@ export default function WorkBlockDetail({
             </div>
           )}
 
-          {/* Block menu */}
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
-              className="p-1.5 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors opacity-0 group-hover:opacity-100"
-            >
-              <MoreVertical size={16} />
-            </button>
+          {/* Block menu — hide for Granola blocks */}
+          {block.source !== "granola" && (
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+                className="p-1.5 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors opacity-0 group-hover:opacity-100"
+              >
+                <MoreVertical size={16} />
+              </button>
 
-            {showMenu && (
-              <div className="absolute right-0 top-full mt-1 w-40 rounded-xl border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-50">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCreateRecap();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-canvas-muted transition-colors"
-                >
-                  <FileText size={14} className="text-indigo" />
-                  <span className="text-sm text-ink-primary">Create Recap</span>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete();
-                  }}
-                  disabled={deleteSession.isPending}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle text-rose disabled:opacity-50"
-                >
-                  {deleteSession.isPending ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                  <span className="text-sm">Delete Block</span>
-                </button>
-              </div>
-            )}
-          </div>
+              {showMenu && (
+                <div className="absolute right-0 top-full mt-1 w-40 rounded-xl border border-stroke-subtle bg-canvas-overlay shadow-xl overflow-hidden z-50">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCreateRecap();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-canvas-muted transition-colors"
+                  >
+                    <FileText size={14} className="text-indigo" />
+                    <span className="text-sm text-ink-primary">Create Recap</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete();
+                    }}
+                    disabled={deleteSession.isPending}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-canvas-muted transition-colors border-t border-stroke-subtle text-rose disabled:opacity-50"
+                  >
+                    {deleteSession.isPending ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                    <span className="text-sm">Delete Block</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Expanded content */}
         {isExpanded && (
           <div className="border-t border-stroke-subtle">
-            {/* Task Breakdown (structured) or fallback to markdown summary */}
-            {block.taskBreakdown && block.taskBreakdown.length > 0 ? (
-              <TaskBreakdownSection
-                tasks={block.taskBreakdown}
-                totalDuration={block.duration}
-                isLoading={isLoadingDetail}
-                className="border-b border-stroke-subtle"
-              />
-            ) : displaySummary || isLoadingDetail ? (
-              <div className="p-4 border-b border-stroke-subtle">
+            {block.source === "granola" ? (
+              /* Granola meeting expanded view */
+              <div className="p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <FileText size={14} className="text-ink-tertiary" />
+                  <GranolaIcon size="sm" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                    Summary
+                    Meeting Notes
                   </span>
-                  {isLoadingDetail && (
-                    <Loader2 size={12} className="text-ink-tertiary animate-spin" />
-                  )}
                 </div>
-                <div
-                  className="text-sm text-ink-secondary leading-relaxed prose prose-sm prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{
-                    __html: displaySummary ? renderedSummaryHtml : "<p>Loading...</p>",
-                  }}
-                />
-              </div>
-            ) : null}
+                {displaySummary ? (
+                  <div className="max-h-80 overflow-y-auto rounded-lg bg-canvas-muted/30 p-3 granola-notes">
+                    <div
+                      className="text-sm text-ink-secondary leading-relaxed max-w-none"
+                      dangerouslySetInnerHTML={{ __html: renderedSummaryHtml }}
+                    />
+                    <style>{`
+                      .granola-notes h3 {
+                        font-size: 0.8rem;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        color: var(--color-ink-primary, #e2e8f0);
+                        margin: 1rem 0 0.5rem;
+                        padding-bottom: 0.25rem;
+                        border-bottom: 1px solid rgba(255,255,255,0.08);
+                      }
+                      .granola-notes h3:first-child { margin-top: 0; }
+                      .granola-notes ul {
+                        list-style: disc;
+                        padding-left: 1.25rem;
+                        margin: 0.25rem 0;
+                      }
+                      .granola-notes ul ul {
+                        list-style: circle;
+                        margin: 0.125rem 0;
+                      }
+                      .granola-notes li {
+                        margin: 0.15rem 0;
+                        line-height: 1.5;
+                      }
+                      .granola-notes p { margin: 0.25rem 0; }
+                      .granola-notes strong { color: var(--color-ink-primary, #e2e8f0); }
+                    `}</style>
+                  </div>
+                ) : (
+                  <p className="text-sm text-ink-tertiary italic">No meeting notes available</p>
+                )}
 
-            {/* Create Recap action */}
-            {block.status !== "active" && block.status !== "paused" && (
-              <div className="px-4 py-3 border-b border-stroke-subtle">
-                <button
-                  onClick={handleCreateRecap}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo/30 bg-indigo/5 text-indigo text-sm font-medium hover:bg-indigo/10 transition-colors"
-                >
-                  <FileText size={14} />
-                  Create Recap from this block
-                </button>
-              </div>
-            )}
-
-            {/* App breakdown */}
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <BarChart3 size={14} className="text-ink-tertiary" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
-                  App Breakdown
-                </span>
-              </div>
-
-              {/* App bars */}
-              <div className="space-y-2">
-                {block.appBreakdown.map((app) => (
-                  <div key={app.app} className="flex items-center gap-3">
-                    {/* App indicator */}
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getAppColor(app.app)}`} />
-                    {/* App name */}
-                    <span className="w-20 flex-shrink-0 text-sm text-ink-secondary truncate">
-                      {app.app}
-                    </span>
-                    {/* Progress bar */}
-                    <div className="flex-1 h-2 bg-canvas-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${getAppColor(app.app)}`}
-                        style={{ width: `${app.percentage}%` }}
-                      />
+                {/* Participants list */}
+                {block.participants && block.participants.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-stroke-subtle">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users size={14} className="text-ink-tertiary" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                        Participants
+                      </span>
                     </div>
-                    {/* Duration */}
-                    <span className="w-14 flex-shrink-0 text-xs text-ink-tertiary text-right tabular-nums">
-                      {formatDuration(app.minutes)}
-                    </span>
-                    {/* Percentage */}
-                    <span className="w-10 flex-shrink-0 text-xs text-ink-tertiary text-right tabular-nums">
-                      {app.percentage}%
+                    <div className="flex flex-wrap gap-2">
+                      {block.participants.map((p, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center px-2 py-1 rounded-md bg-canvas-muted text-xs text-ink-secondary"
+                          title={p.email}
+                        >
+                          {p.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Standard session expanded view */
+              <>
+                {/* Task Breakdown (structured) or fallback to markdown summary */}
+                {block.taskBreakdown && block.taskBreakdown.length > 0 ? (
+                  <TaskBreakdownSection
+                    tasks={block.taskBreakdown}
+                    totalDuration={block.duration}
+                    isLoading={isLoadingDetail}
+                    className="border-b border-stroke-subtle"
+                  />
+                ) : displaySummary || isLoadingDetail ? (
+                  <div className="p-4 border-b border-stroke-subtle">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText size={14} className="text-ink-tertiary" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                        Summary
+                      </span>
+                      {isLoadingDetail && (
+                        <Loader2 size={12} className="text-ink-tertiary animate-spin" />
+                      )}
+                    </div>
+                    <div
+                      className="text-sm text-ink-secondary leading-relaxed prose prose-sm prose-invert max-w-none"
+                      dangerouslySetInnerHTML={{
+                        __html: displaySummary ? renderedSummaryHtml : "<p>Loading...</p>",
+                      }}
+                    />
+                  </div>
+                ) : null}
+
+                {/* Create Recap action */}
+                {block.status !== "active" && block.status !== "paused" && (
+                  <div className="px-4 py-3 border-b border-stroke-subtle">
+                    <button
+                      onClick={handleCreateRecap}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo/30 bg-indigo/5 text-indigo text-sm font-medium hover:bg-indigo/10 transition-colors"
+                    >
+                      <FileText size={14} />
+                      Create Recap from this block
+                    </button>
+                  </div>
+                )}
+
+                {/* App breakdown */}
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart3 size={14} className="text-ink-tertiary" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                      App Breakdown
                     </span>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  {/* App bars */}
+                  <div className="space-y-2">
+                    {block.appBreakdown.map((app) => (
+                      <div key={app.app} className="flex items-center gap-3">
+                        {/* App indicator */}
+                        <div
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${getAppColor(app.app)}`}
+                        />
+                        {/* App name */}
+                        <span className="w-20 flex-shrink-0 text-sm text-ink-secondary truncate">
+                          {app.app}
+                        </span>
+                        {/* Progress bar */}
+                        <div className="flex-1 h-2 bg-canvas-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${getAppColor(app.app)}`}
+                            style={{ width: `${app.percentage}%` }}
+                          />
+                        </div>
+                        {/* Duration */}
+                        <span className="w-14 flex-shrink-0 text-xs text-ink-tertiary text-right tabular-nums">
+                          {formatDuration(app.minutes)}
+                        </span>
+                        {/* Percentage */}
+                        <span className="w-10 flex-shrink-0 text-xs text-ink-tertiary text-right tabular-nums">
+                          {app.percentage}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

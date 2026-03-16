@@ -39,6 +39,13 @@ export const users = pgTable("users", {
   notionTokenExpiresAt: timestamp("notion_token_expires_at"),
   notionWorkspaceId: varchar("notion_workspace_id", { length: 100 }),
 
+  // Granola OAuth tokens (per-user meeting notes, encrypted)
+  granolaAccessTokenEncrypted: text("granola_access_token_encrypted"),
+  granolaRefreshTokenEncrypted: text("granola_refresh_token_encrypted"),
+  granolaTokenExpiresAt: timestamp("granola_token_expires_at"),
+  granolaUserEmail: varchar("granola_user_email", { length: 255 }),
+  granolaLastSyncedAt: timestamp("granola_last_synced_at"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

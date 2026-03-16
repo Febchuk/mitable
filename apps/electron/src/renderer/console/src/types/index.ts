@@ -146,6 +146,7 @@ export type IntegrationProvider =
   | "slack"
   | "notion"
   | "github"
+  | "granola"
   | "google-drive"
   | "linear"
   | "gmail";
