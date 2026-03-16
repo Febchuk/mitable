@@ -1115,7 +1115,7 @@ router.get(
           .where(
             and(
               inArray(schema.activityBlocks.dailyActivityId, dailyActivityIds),
-              sql`LOWER(REGEXP_REPLACE(${schema.activityBlocks.subscriberName}, '[^a-zA-Z0-9]+', '-', 'g')) = ${normalizedInput}`
+              sql`TRIM(BOTH '-' FROM LOWER(REGEXP_REPLACE(${schema.activityBlocks.subscriberName}, '[^a-zA-Z0-9]+', '-', 'g'))) = ${normalizedInput}`
             )
           );
       }
