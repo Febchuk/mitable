@@ -317,7 +317,17 @@ export const SUMMARIZE_CHUNK: RLMTool = {
       ? `\n\nAudio Transcripts:\n${env.fullTranscriptText}\n\nUse the audio transcripts to enrich the summary with verbal context (why, intent, decisions mentioned).`
       : "";
 
-    const prompt = `Summarize these activities concisely (2-4 sentences max). Focus on outcomes and meaningful work.
+    // Scale summary guidance with chunk size to avoid massive information loss
+    const sentenceGuidance =
+      activities.length <= 20
+        ? "2-4 sentences"
+        : activities.length <= 50
+          ? "4-6 sentences"
+          : activities.length <= 100
+            ? "6-10 sentences"
+            : "8-12 sentences";
+
+    const prompt = `Summarize these activities (${sentenceGuidance}). Focus on outcomes and meaningful work. Cover ALL distinct tasks/apps — do not collapse different activities into one.
 
 Activities:
 ${activitiesText}${transcriptSection}
@@ -337,7 +347,10 @@ Summary:`;
 
         const userPrompt = `${prompt}\n\nIMPORTANT: Only reference the specific apps, websites, and actions listed above. Do NOT add information not present in the activities. Write the user's own actions in first person. For activities starting with "Observed [Name]...", attribute them to that person (e.g. "Mark configured X"), NOT to "I".`;
 
-        const summary = await callSummarizationLLM(systemPrompt, userPrompt, 800);
+        // Scale output tokens with chunk size
+        const maxOutputTokens =
+          activities.length <= 20 ? 800 : activities.length <= 50 ? 1200 : 1600;
+        const summary = await callSummarizationLLM(systemPrompt, userPrompt, maxOutputTokens);
 
         // Cache the result
         env.setCache(cacheKey, { summary, cached: false });

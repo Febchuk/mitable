@@ -80,7 +80,7 @@ class BlockAnalyzerRLMService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
   private deepseek: OpenAI | null = null;
-  private maxIterations = 20;
+  private baseMaxIterations = 25; // Base safety limit — scaled up for large sessions
 
   constructor() {
     if (config.anthropic.apiKey) {
@@ -139,6 +139,17 @@ class BlockAnalyzerRLMService {
       input.subscriberHistory || []
     );
 
+    // Scale max iterations based on capture count:
+    // Captures are paginated at 30/page. LLM needs: overview + master story + page reads + emit calls.
+    // For 861 captures (~29 pages), it might read 15-20 pages + emit 5-10 blocks.
+    const capturePages = Math.ceil(input.captures.length / 30);
+    const maxIterations = Math.min(60, Math.max(this.baseMaxIterations, capturePages + 15));
+
+    logger.info(
+      { captureCount: input.captures.length, capturePages, maxIterations },
+      "Block Analyzer iteration budget"
+    );
+
     // Build conversation
     const systemPrompt = getBlockAnalyzerSystemPrompt(input.knownCustomers || [], input.orgName);
     const initialUserPrompt = getBlockAnalyzerUserPrompt();
@@ -149,8 +160,10 @@ class BlockAnalyzerRLMService {
 
     const toolCallHistory: ToolCallRecord[] = [];
     let iterations = 0;
+    let consecutiveBadResponses = 0;
+    let nudgeCount = 0;
 
-    while (iterations < this.maxIterations) {
+    while (iterations < maxIterations) {
       iterations++;
 
       try {
@@ -166,6 +179,8 @@ class BlockAnalyzerRLMService {
 
         // Execute the tool
         if (llmResponse.tool && llmResponse.parameters !== undefined) {
+          consecutiveBadResponses = 0;
+
           const toolResult = await this.executeTool(
             llmResponse.tool,
             llmResponse.parameters,
@@ -186,24 +201,53 @@ class BlockAnalyzerRLMService {
             "Block Analyzer tool call"
           );
 
+          // Track read vs emit calls to detect when LLM is stuck reading
+          const emitCalls = toolCallHistory.filter(
+            (t) => t.tool === "emit_work_block" || t.tool === "emit_meeting_block"
+          ).length;
+          const readCalls = toolCallHistory.filter(
+            (t) => t.tool === "get_captures" || t.tool === "get_captures_by_time"
+          ).length;
+          const shouldNudge = readCalls >= 8 && emitCalls === 0 && nudgeCount < 3;
+
+          const nudge = shouldNudge
+            ? `\n\nIMPORTANT: You have read ${readCalls} pages of captures but have not emitted any blocks yet. The master story already provides the high-level structure — you do NOT need to read every capture page. Start emitting blocks NOW using emit_work_block or emit_meeting_block. Use the master story for the activity structure and the captures you've already read for precise time boundaries.`
+            : "";
+          if (shouldNudge) nudgeCount++;
+
           // Append tool result as user message
           messages.push({
             role: "user",
-            content: `Tool "${llmResponse.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step of your analysis.`,
+            content: `Tool "${llmResponse.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step of your analysis.${nudge}`,
           });
         } else {
+          consecutiveBadResponses++;
           logger.warn(
-            { iteration: iterations },
-            "Block Analyzer: no tool or done signal — breaking"
+            { iteration: iterations, consecutiveBadResponses },
+            "Block Analyzer: no tool or done signal"
           );
-          break;
+
+          if (consecutiveBadResponses >= 3) {
+            logger.warn(
+              { iteration: iterations },
+              "Block Analyzer: 3 consecutive bad responses — breaking"
+            );
+            break;
+          }
+
+          // Nudge the LLM to emit blocks instead of hard-breaking
+          messages.push({
+            role: "user",
+            content:
+              'Your response was not a valid tool call or done signal. You must respond with a JSON object containing either a tool call or { "done": true }. If you have enough context from the master story and captures, start emitting blocks now with emit_work_block.',
+          });
         }
       } catch (error) {
         logger.error(
           { iteration: iterations, error: String(error) },
           "Block Analyzer iteration error"
         );
-        if (iterations >= this.maxIterations - 2) {
+        if (iterations >= maxIterations - 2) {
           break;
         }
       }

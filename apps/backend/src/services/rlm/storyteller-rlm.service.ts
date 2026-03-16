@@ -56,7 +56,7 @@ class StorytellerRLMService {
   private anthropic: Anthropic | null = null;
   private openai: OpenAI | null = null;
   private deepseek: OpenAI | null = null;
-  private maxIterations = 10; // Safety limit to prevent runaway tool calls
+  private baseMaxIterations = 25; // Base safety limit — scaled up for large sessions
 
   constructor() {
     if (config.anthropic.apiKey) {
@@ -96,6 +96,18 @@ class StorytellerRLMService {
       input.preferences
     );
 
+    // Scale max iterations based on timeline size:
+    // Small sessions (<50 activities): 10 iterations is plenty
+    // Large sessions: need ~(chunks + 4) iterations for stats + chunk + summarize_each + merge
+    const activityCount = input.timeline.length;
+    const estimatedChunks = Math.ceil(activityCount / 100);
+    const maxIterations = Math.min(50, Math.max(this.baseMaxIterations, estimatedChunks + 8));
+
+    logger.info(
+      { activityCount, estimatedChunks, maxIterations },
+      "Storyteller RLM iteration budget"
+    );
+
     // Build conversation — accumulated across iterations so LLM sees its own reasoning
     const systemPrompt = getStorytellerSystemPrompt();
     const initialUserPrompt = getStorytellerUserPrompt("start", [], environment);
@@ -110,7 +122,7 @@ class StorytellerRLMService {
     let iterations = 0;
     let finalSummary = "";
 
-    while (iterations < this.maxIterations) {
+    while (iterations < maxIterations) {
       iterations++;
 
       // Get LLM decision using accumulated conversation
@@ -148,9 +160,13 @@ class StorytellerRLMService {
       }
     }
 
-    if (!finalSummary && iterations >= this.maxIterations) {
+    if (!finalSummary && iterations >= maxIterations) {
       // Fallback: try to extract any summary from tool history
-      finalSummary = this.extractFallbackSummary(toolCallHistory);
+      logger.warn(
+        { iterations, maxIterations, toolCallCount: toolCallHistory.length },
+        "Storyteller RLM hit iteration limit — using fallback"
+      );
+      finalSummary = await this.extractFallbackSummary(toolCallHistory, environment);
     }
 
     const totalTime = timer.elapsed();
@@ -453,8 +469,11 @@ class StorytellerRLMService {
   /**
    * Fallback: Extract summary from tool history if LLM didn't complete
    */
-  private extractFallbackSummary(toolCallHistory: ToolCallRecord[]): string {
-    // Look for merge_summaries result
+  private async extractFallbackSummary(
+    toolCallHistory: ToolCallRecord[],
+    environment: StorytellerEnvironment
+  ): Promise<string> {
+    // Look for merge_summaries result first
     const mergeResult = toolCallHistory
       .slice()
       .reverse()
@@ -464,14 +483,34 @@ class StorytellerRLMService {
       return mergeResult.result;
     }
 
-    // Look for any summarize_chunk result
-    const summarizeResult = toolCallHistory
-      .slice()
-      .reverse()
-      .find((t) => t.tool === "summarize_chunk");
+    // Collect ALL chunk summaries and merge them
+    const chunkSummaries = toolCallHistory
+      .filter((t) => t.tool === "summarize_chunk" && t.result?.summary)
+      .map((t) => t.result.summary as string);
 
-    if (summarizeResult && summarizeResult.result?.summary) {
-      return summarizeResult.result.summary;
+    if (chunkSummaries.length > 1) {
+      // Merge all available chunk summaries via the merge tool
+      logger.info({ count: chunkSummaries.length }, "Fallback: merging all chunk summaries");
+      try {
+        const mergeTool = getToolByName("merge_summaries");
+        if (mergeTool) {
+          const merged = await mergeTool.execute({ summaries: chunkSummaries }, environment);
+          if (typeof merged === "string" && merged.length > 0) {
+            return merged;
+          }
+        }
+      } catch (mergeErr) {
+        logger.warn(
+          { error: mergeErr instanceof Error ? mergeErr.message : String(mergeErr) },
+          "Fallback merge failed, concatenating"
+        );
+      }
+      // If merge tool fails, concatenate
+      return chunkSummaries.join("\n\n");
+    }
+
+    if (chunkSummaries.length === 1) {
+      return chunkSummaries[0];
     }
 
     return "Summary generation incomplete";
