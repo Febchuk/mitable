@@ -350,6 +350,19 @@ export const LIST_BLOCKS: BlockAnalyzerTool = {
 };
 
 /**
+ * Tool: Check Subscriber History
+ * Query the user's past subscriber attributions to see what clients they've
+ * worked for, what topics/apps are associated with each, and how recently.
+ */
+export const CHECK_SUBSCRIBER_HISTORY: BlockAnalyzerTool = {
+  name: "check_subscriber_history",
+  description:
+    "Check this user's past subscriber attributions from recent activity blocks. Returns which clients/customers the user has worked for, total minutes per subscriber, associated topics and apps, and when they last worked for each. Use this to: (1) reuse exact existing subscriber names for consistency, (2) determine if an app or system belongs to a known client (e.g., 'IPDF' → 'Entergy'), (3) distinguish real client work from casual browsing.",
+  parameters: [],
+  execute: (_params, env) => env.getSubscriberHistory(),
+};
+
+/**
  * All Block Analyzer tools
  */
 export const BLOCK_ANALYZER_TOOLS: BlockAnalyzerTool[] = [
@@ -358,6 +371,7 @@ export const BLOCK_ANALYZER_TOOLS: BlockAnalyzerTool[] = [
   GET_CAPTURES,
   GET_TRANSCRIPTS,
   GET_CAPTURES_BY_TIME,
+  CHECK_SUBSCRIBER_HISTORY,
   EMIT_WORK_BLOCK,
   EMIT_MEETING_BLOCK,
   LIST_BLOCKS,

@@ -26,6 +26,7 @@ import {
   SessionMasterStory,
   BlockAnalyzerUserProfile,
   EmittedBlock,
+  SubscriberHistoryEntry,
 } from "./block-analyzer-environment";
 import { getBlockAnalyzerToolByName } from "./block-analyzer-tools";
 import {
@@ -44,6 +45,7 @@ export interface BlockAnalyzerInput {
   masterStory: SessionMasterStory | null;
   knownCustomers?: string[];
   orgName?: string | null;
+  subscriberHistory?: SubscriberHistoryEntry[];
 }
 
 export interface BlockAnalyzerResult {
@@ -133,7 +135,8 @@ class BlockAnalyzerRLMService {
       input.userProfile,
       input.captures,
       input.transcripts,
-      input.masterStory
+      input.masterStory,
+      input.subscriberHistory || []
     );
 
     // Build conversation

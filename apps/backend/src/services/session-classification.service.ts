@@ -175,6 +175,7 @@ Meeting, Development, Communication, Documentation, Design, Research, Project Ma
    - If you find a match, assign that customer. Prefer known customers over inventing new ones.
    - If you see a clear NEW customer not in the list, include them — they'll be added automatically.
    - When in doubt between internal work and client work, assign a customer if there's any evidence.
+   - **NAME FORMAT:** When a known customer matches, use their name EXACTLY as it appears in the list. For NEW customers, use the full official name with abbreviation in parentheses if one exists, e.g., "Education Domain Company (EDC)". Never use abbreviations alone. Every activity for the same customer must use the identical string.
 2. **topic**: A higher-level theme grouping (3-5 words). More specific than category, broader than the activity name. E.g., "Debugging API Issues" (under Development), "Sprint Planning" (under Meeting). Aim for 2-4 unique topics per session.
 3. Total minutes across all activities MUST equal ${totalMinutes}
 4. Each activity should be at least 1 minute

@@ -1103,6 +1103,10 @@ router.get(
 
       const dailyActivityIds = dailyActivities.map((d) => d.id);
 
+      // Normalize the subscriber name for matching — the dashboard aggregation
+      // uses normalizeName() to group variants, so drill-down must match the same way.
+      const normalizedInput = normalizeName(subscriberName);
+
       let blocks: (typeof schema.activityBlocks.$inferSelect)[] = [];
       if (dailyActivityIds.length > 0) {
         blocks = await db
@@ -1111,7 +1115,7 @@ router.get(
           .where(
             and(
               inArray(schema.activityBlocks.dailyActivityId, dailyActivityIds),
-              eq(schema.activityBlocks.subscriberName, subscriberName)
+              sql`TRIM(BOTH '-' FROM LOWER(REGEXP_REPLACE(${schema.activityBlocks.subscriberName}, '[^a-zA-Z0-9]+', '-', 'g'))) = ${normalizedInput}`
             )
           );
       }
