@@ -1,98 +1,813 @@
-* {
+/* ========================================
+   Mitable Browser Bridge — Design System
+   ======================================== */
+
+:root {
+  /* Canvas (backgrounds) */
+  --canvas-base: #0C0C0E;
+  --canvas-raised: #141418;
+  --canvas-overlay: #1C1C22;
+  --canvas-muted: #24242C;
+  --pill-bg: rgba(26, 26, 26, 0.95);
+
+  /* Accent */
+  --indigo: #6366F1;
+  --indigo-light: #818CF8;
+  --indigo-muted: rgba(99, 102, 241, 0.15);
+
+  /* Text */
+  --ink-primary: #F4F4F5;
+  --ink-secondary: #A1A1AA;
+  --ink-tertiary: #52525B;
+
+  /* Status */
+  --status-success: #22C55E;
+  --status-error: #EF4444;
+  --status-warning: #F59E0B;
+
+  /* Borders */
+  --stroke-subtle: rgba(255, 255, 255, 0.06);
+  --stroke-default: rgba(255, 255, 255, 0.12);
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+/* Reset */
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  width: 280px;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-  background: #1a1a2e;
-  color: #e0e0e0;
+  width: 320px;
+  font-family: var(--font-sans);
+  background: var(--canvas-base);
+  color: var(--ink-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
 }
 
-.container {
-  padding: 16px;
+/* ========================================
+   Animations
+   ======================================== */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(99, 102, 241, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(99, 102, 241, 0.5); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes reveal-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================
+   Header
+   ======================================== */
 
 .header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--pill-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--stroke-subtle);
 }
 
-.logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-}
-
-h1 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.status-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.status-row {
+.header-brand {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
 }
 
+.header-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-primary);
+  line-height: 1.2;
+}
+
+.header-subtitle {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.header-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 150ms, background 150ms;
+}
+
+.header-settings:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.header-settings svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========================================
+   Content area
+   ======================================== */
+
+.content {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ========================================
+   Cards
+   ======================================== */
+
+.card {
+  background: var(--canvas-raised);
+  border: 1px solid var(--stroke-subtle);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+}
+
+/* ========================================
+   Section labels
+   ======================================== */
+
+.section-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+/* ========================================
+   Status dots
+   ======================================== */
+
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.status-dot.connected {
-  background: #22c55e;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+.status-dot--connected {
+  background: var(--status-success);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+  animation: pulse 2s infinite;
 }
 
-.status-dot.disconnected {
-  background: #ef4444;
+.status-dot--disconnected {
+  background: var(--status-error);
   box-shadow: 0 0 6px rgba(239, 68, 68, 0.3);
 }
 
-.status-text {
-  font-size: 13px;
+.status-dot--session {
+  width: 6px;
+  height: 6px;
+  background: var(--status-success);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+  animation: pulse 2s infinite;
 }
 
-.btn {
+/* ========================================
+   Spinner (connecting)
+   ======================================== */
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--stroke-default);
+  border-top-color: var(--indigo-light);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ========================================
+   Status card
+   ======================================== */
+
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-primary);
+}
+
+.status-detail {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+}
+
+.status-detail--error {
+  color: var(--status-error);
+  font-family: var(--font-sans);
+}
+
+/* ========================================
+   Tab card
+   ======================================== */
+
+.tab-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tab-favicon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border-radius: 2px;
+}
+
+.tab-favicon svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-tertiary);
+}
+
+.tab-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tab-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-url {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ========================================
+   Activity card
+   ======================================== */
+
+.activity-idle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-tertiary);
+  font-size: 12px;
+}
+
+.activity-idle svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ========================================
+   Session card
+   ======================================== */
+
+.session-card {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.session-info {
+  flex: 1;
+}
+
+.session-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--status-success);
+}
+
+.session-detail {
+  font-size: 11px;
+  color: rgba(34, 197, 94, 0.7);
+}
+
+/* ========================================
+   Help card (disconnected)
+   ======================================== */
+
+.help-card {
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.12);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.help-card svg {
+  width: 14px;
+  height: 14px;
+  color: var(--status-warning);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.help-card p {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+}
+
+/* ========================================
+   Reconnect button
+   ======================================== */
+
+.btn-reconnect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
-  padding: 8px 16px;
-  background: rgba(99, 102, 241, 0.8);
+  height: 36px;
+  background: var(--indigo);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-sans);
   cursor: pointer;
-  transition: background 0.2s;
-  margin-bottom: 12px;
+  transition: background 150ms;
 }
 
-.btn:hover {
-  background: rgba(99, 102, 241, 1);
+.btn-reconnect:hover {
+  background: #4F46E5;
 }
+
+.btn-reconnect:active {
+  background: #4338CA;
+}
+
+.btn-reconnect svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ========================================
+   Troubleshooting (collapsible)
+   ======================================== */
+
+.troubleshoot {
+  cursor: pointer;
+  user-select: none;
+}
+
+.troubleshoot-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-tertiary);
+}
+
+.troubleshoot-header svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 300ms;
+}
+
+.troubleshoot.open .troubleshoot-header svg {
+  transform: rotate(90deg);
+}
+
+.troubleshoot-body {
+  display: none;
+  padding: 8px 0 0 16px;
+}
+
+.troubleshoot.open .troubleshoot-body {
+  display: block;
+}
+
+.troubleshoot-body li {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  line-height: 1.8;
+  list-style: disc;
+  margin-left: 4px;
+}
+
+/* ========================================
+   Progress bar (connecting)
+   ======================================== */
+
+.progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--canvas-muted);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--indigo), var(--indigo-light), var(--indigo));
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  border-radius: 2px;
+}
+
+.progress-text {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--ink-tertiary);
+}
+
+/* ========================================
+   Agent automation banner
+   ======================================== */
+
+.agent-banner {
+  background: var(--indigo-muted);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  animation: glow-pulse 2s infinite;
+}
+
+.agent-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.agent-banner-header svg {
+  width: 14px;
+  height: 14px;
+  color: var(--indigo-light);
+}
+
+.agent-banner-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-primary);
+}
+
+.agent-shimmer {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--indigo-light), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  border-radius: 1px;
+}
+
+/* ========================================
+   Agent — compact status
+   ======================================== */
+
+.compact-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+.compact-status .status-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* ========================================
+   Agent — current action
+   ======================================== */
+
+.current-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.current-action svg {
+  width: 12px;
+  height: 12px;
+  color: var(--indigo-light);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.current-action-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.current-action-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--indigo-light);
+}
+
+.current-action-selector {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--ink-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ========================================
+   Agent — recent actions
+   ======================================== */
+
+.recent-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.recent-item svg {
+  width: 10px;
+  height: 10px;
+  color: var(--status-success);
+  flex-shrink: 0;
+}
+
+.recent-item-text {
+  font-size: 11px;
+  color: var(--ink-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-item-time {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  flex-shrink: 0;
+}
+
+/* ========================================
+   Settings view
+   ======================================== */
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--pill-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--stroke-subtle);
+  gap: 8px;
+}
+
+.settings-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--ink-secondary);
+  transition: color 150ms, background 150ms;
+}
+
+.settings-back:hover {
+  color: var(--ink-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.settings-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-primary);
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.settings-row:not(:last-child) {
+  border-bottom: 1px solid var(--stroke-subtle);
+}
+
+.settings-key {
+  font-size: 12px;
+  color: var(--ink-secondary);
+}
+
+.settings-value {
+  font-size: 12px;
+  color: var(--ink-primary);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Toggle switch */
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--canvas-muted);
+  border: 1px solid var(--stroke-default);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.toggle.active {
+  background: var(--indigo);
+  border-color: var(--indigo);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 150ms;
+}
+
+.toggle.active::after {
+  transform: translateX(16px);
+}
+
+/* Link */
+.settings-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--indigo-light);
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  padding: 0;
+}
+
+.settings-link:hover {
+  text-decoration: underline;
+}
+
+.settings-link svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ========================================
+   Footer
+   ======================================== */
 
 .footer {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  line-height: 1.4;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.5;
+}
+
+/* ========================================
+   View management
+   ======================================== */
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+  animation: reveal-fade 250ms ease-out;
+}
+
+/* Hide sections within a view */
+[data-state] {
+  display: none;
+}
+
+[data-state].active {
+  display: block;
 }

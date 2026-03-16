@@ -11,22 +11,28 @@ const RECONNECT_DELAYS = [1000, 3000, 10000]; // Exponential backoff
 let ws: WebSocket | null = null;
 let reconnectAttempt = 0;
 let isConnected = false;
+let connectedPort: number | null = null;
+let agentIdleTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Discover the bridge by scanning known ports for the HTTP config endpoint */
 async function discoverBridge(): Promise<{ port: number; token: string } | null> {
+  chrome.storage.local.set({ bridgeConnecting: true });
   for (const port of DISCOVERY_PORTS) {
+    chrome.storage.local.set({ bridgeConnectingPort: port });
     try {
       const res = await fetch(`http://127.0.0.1:${port}/mitable-bridge/config`);
       if (!res.ok) continue;
 
       const data = await res.json();
       if (data && data.name === "mitable" && typeof data.token === "string") {
+        chrome.storage.local.set({ bridgeConnecting: false });
         return { port, token: data.token };
       }
     } catch {
       // Port not listening or not our service, try next
     }
   }
+  chrome.storage.local.set({ bridgeConnecting: false });
   return null;
 }
 
@@ -47,9 +53,14 @@ async function connect(): Promise<void> {
     ws.onopen = () => {
       console.log("[MitableBridge] Connected to Electron on port", bridge.port);
       isConnected = true;
+      connectedPort = bridge.port;
       reconnectAttempt = 0;
       updateBadge(true);
       saveState(true);
+      chrome.storage.local.set({
+        bridgePort: bridge.port,
+        bridgeVersion: chrome.runtime.getManifest().version,
+      });
 
       // Send connected event
       ws!.send(
@@ -75,8 +86,13 @@ async function connect(): Promise<void> {
       console.log("[MitableBridge] Disconnected");
       ws = null;
       isConnected = false;
+      connectedPort = null;
       updateBadge(false);
       saveState(false);
+      chrome.storage.local.set({
+        bridgePort: null,
+        bridgeAgentActive: false,
+      });
       scheduleReconnect();
     };
 
@@ -107,6 +123,33 @@ function sendResponse(response: BridgeResponse): void {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(response));
   }
+}
+
+/** Track a completed bridge action for popup display */
+function trackAction(action: string, success: boolean, selector?: string): void {
+  const entry = { action, timestamp: Date.now(), success };
+
+  // Update last action
+  chrome.storage.local.set({
+    bridgeLastAction: { action, selector, timestamp: Date.now() },
+    bridgeAgentActive: true,
+  });
+
+  // Push to recent actions (keep last 5)
+  chrome.storage.local.get("bridgeRecentActions", (result) => {
+    const recent: Array<{ action: string; timestamp: number; success: boolean }> =
+      result.bridgeRecentActions || [];
+    recent.unshift(entry);
+    chrome.storage.local.set({
+      bridgeRecentActions: recent.slice(0, 5),
+    });
+  });
+
+  // Reset agent idle timer — clear active after 3s of no actions
+  if (agentIdleTimer) clearTimeout(agentIdleTimer);
+  agentIdleTimer = setTimeout(() => {
+    chrome.storage.local.set({ bridgeAgentActive: false });
+  }, 3000);
 }
 
 /** Handle incoming requests from Electron */
@@ -234,7 +277,18 @@ async function handleRequest(request: BridgeRequest): Promise<void> {
           error: `Unknown action: ${action}`,
         });
     }
+
+    // Track action for popup display (skip ping)
+    if (action !== "ping") {
+      const selectorValue = payload && typeof payload === "object" && "selector" in payload
+        ? String((payload as { selector?: string }).selector || "")
+        : undefined;
+      trackAction(action, true, selectorValue);
+    }
   } catch (err) {
+    if (action !== "ping") {
+      trackAction(action, false);
+    }
     sendResponse({
       id,
       type: "response",
@@ -1152,11 +1206,30 @@ chrome.runtime.onStartup.addListener(() => {
   connect();
 });
 
-// Handle messages from popup (reconnect button)
-chrome.runtime.onMessage.addListener((message) => {
+// Handle messages from popup
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === "reconnect") {
     reconnectAttempt = 0;
     connect();
+  }
+
+  if (message.action === "getStatus") {
+    chrome.storage.local.get(null, (result) => {
+      sendResponse({
+        bridgeConnected: isConnected,
+        bridgePort: connectedPort,
+        bridgeVersion: chrome.runtime.getManifest().version,
+        bridgeLastAction: result.bridgeLastAction || null,
+        bridgeRecentActions: result.bridgeRecentActions || [],
+        bridgeAgentActive: result.bridgeAgentActive || false,
+        bridgeSessionActive: result.bridgeSessionActive || false,
+        bridgeSessionStart: result.bridgeSessionStart || null,
+        bridgeConnecting: result.bridgeConnecting || false,
+        bridgeConnectingPort: result.bridgeConnectingPort || null,
+        autoReconnect: result.autoReconnect !== false,
+      });
+    });
+    return true; // Keep channel open for async response
   }
 });
 

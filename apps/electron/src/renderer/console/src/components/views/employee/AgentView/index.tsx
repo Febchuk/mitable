@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Square, Bot, Check, X } from "lucide-react";
+import { ArrowUp, Square, Bot, Check, X, ExternalLink } from "lucide-react";
 import AgentMessage, { AgentThinking } from "./AgentMessage";
 
 // Simple UUID fallback for renderer
@@ -238,7 +238,26 @@ export default function AgentView() {
               bridgeConnected ? "bg-green-500" : "bg-amber-500"
             }`}
           />
-          {bridgeConnected ? "Browser bridge connected" : "Browser extension not connected"}
+          <span>
+            {bridgeConnected ? "Browser bridge connected" : "Browser extension not connected"}
+          </span>
+          {!bridgeConnected && (
+            <>
+              <span className="opacity-40">·</span>
+              <button
+                onClick={() =>
+                  window.open(
+                    "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev/mitable-browser-bridge.zip",
+                    "_blank"
+                  )
+                }
+                className="inline-flex items-center gap-1 underline underline-offset-2 hover:opacity-80"
+              >
+                Download
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            </>
+          )}
         </div>
       )}
 

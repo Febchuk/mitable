@@ -180,9 +180,10 @@ class AgentSdkService {
       return;
     }
 
-    // Read skills from local filesystem
+    // Read skills and memory from local filesystem
     const skills = await skillsStore.getRelevant();
-    const systemPrompt = this.buildSystemPrompt(skills, isPlanPhase);
+    const memoryContent = await skillsStore.getMemoryContent();
+    const systemPrompt = this.buildSystemPrompt(skills, isPlanPhase, memoryContent);
 
     // Create custom MCP server with integration tools
     const mitableTools = this.createMitableToolsServer(apiUrl, accessToken);
@@ -985,11 +986,23 @@ class AgentSdkService {
     });
   }
 
-  private buildSystemPrompt(skills: AgentSkill[], isPlanPhase: boolean): string {
+  private buildSystemPrompt(skills: AgentSkill[], isPlanPhase: boolean, memoryContent?: string): string {
     const skillsSection =
       skills.length > 0
         ? skills.map((s) => `### ${s.name}\n${s.contextSummary}`).join("\n\n")
         : "No skills available yet. The user hasn't captured enough work sessions for skill generation.";
+
+    const memorySection = memoryContent
+      ? `## Persistent Memory
+You have a memory directory at ~/.mitable/agent/memory/. Files here persist across conversations.
+- Read MEMORY.md at the start of tasks for context from previous sessions
+- Use Write/Edit tools to save important learnings, user preferences, and patterns
+- Keep entries concise and organized by topic
+- The user can also edit these files directly
+
+### Current Memory
+${memoryContent}`
+      : "";
 
     const basePrompt = `You are Mitable Agent — a personal AI assistant that helps users take action based on their captured work context.
 
@@ -1001,7 +1014,12 @@ class AgentSdkService {
 5. **Integrations**: Send Slack messages (more integrations coming)
 6. **Browser control**: Navigate, screenshot, scroll, click, type, select, hover, keyboard, inspect elements, execute JS, manage tabs, and extract content in Chrome (requires Mitable Chrome Extension)
 
-## User's Work Context (Auto-Generated Skills)
+${memorySection}
+
+## User's Work Skills (auto-generated, user-editable)
+Skills are stored at ~/.mitable/agent/skills/ as markdown files.
+The user may have edited these to correct or refine them.
+
 ${skillsSection}
 
 ## Rules
