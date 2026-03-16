@@ -391,12 +391,7 @@ end tell`;
 
       // Check exclusions
       const policy = getCapturePolicy();
-      const exclusionCheck = shouldExcludeWindow(
-        windowTitle,
-        appName,
-        policy,
-        this.currentUserId
-      );
+      const exclusionCheck = shouldExcludeWindow(windowTitle, appName, policy, this.currentUserId);
       if (exclusionCheck.excluded) {
         logger.info(
           ` AppleScript fallback: skipping excluded app ${appName} (${exclusionCheck.reason})`
