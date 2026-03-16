@@ -73,7 +73,7 @@ ${orgContext}${knownCustomerSection}For each activity, provide:
 - "category": The type of activity (e.g., "Development", "Meeting", "Communication", "Documentation", "Design", "Research", "Project Management", etc.)
 - "minutes": Estimated duration in minutes
 - "topic": A higher-level theme (3-5 words) grouping related activities (e.g., "Debugging API Issues", "Sprint Planning", "Client Onboarding"). Use consistent names across related activities.
-- "subscriber": Client/customer name. FIRST check against the known customers list above. Look for partial matches in window titles, Slack channels (#acme-support → "Acme"), ticket titles (ACME-1234 → "Acme"). Assign a known customer whenever there's a reasonable match. If clearly a NEW customer not in the list, include them. null only if clearly internal work.
+- "subscriber": Client/customer name. FIRST check against the known customers list above. Look for partial matches in window titles, Slack channels (#acme-support → "Acme"), ticket titles (ACME-1234 → "Acme"). Assign a known customer whenever there's a reasonable match. If clearly a NEW customer not in the list, include them. null only if clearly internal work. **NAME FORMAT:** When a known customer matches, use their name EXACTLY as it appears in the list. For NEW customers, use the full official name with abbreviation in parentheses if one exists, e.g., "Education Domain Company (EDC)". Never use abbreviations alone.
 
 Rules:
 - Merge similar/consecutive captures into single activities (don't list every capture separately)

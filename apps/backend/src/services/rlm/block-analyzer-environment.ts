@@ -83,6 +83,15 @@ export interface BlockAnalyzerUserProfile {
   jobTitle: string | null;
 }
 
+export interface SubscriberHistoryEntry {
+  subscriberName: string;
+  totalMinutes: number;
+  blockCount: number;
+  recentTopics: string[];
+  recentApps: string[];
+  lastSeenDate: string;
+}
+
 const CAPTURE_PAGE_SIZE = 30;
 const TRANSCRIPT_PAGE_SIZE = 20;
 
@@ -100,8 +109,23 @@ export class BlockAnalyzerEnvironment {
     public readonly userProfile: BlockAnalyzerUserProfile,
     private readonly captures: SessionCapture[],
     private readonly transcripts: SessionTranscript[],
-    private readonly masterStory: SessionMasterStory | null
+    private readonly masterStory: SessionMasterStory | null,
+    private readonly subscriberHistory: SubscriberHistoryEntry[] = []
   ) {}
+
+  // ──────────────────────────────────────────────
+  // Subscriber History
+  // ──────────────────────────────────────────────
+
+  getSubscriberHistory(): {
+    totalSubscribers: number;
+    subscribers: SubscriberHistoryEntry[];
+  } {
+    return {
+      totalSubscribers: this.subscriberHistory.length,
+      subscribers: this.subscriberHistory,
+    };
+  }
 
   // ──────────────────────────────────────────────
   // Overview

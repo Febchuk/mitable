@@ -11,7 +11,7 @@
 
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, asc, desc, and } from "drizzle-orm";
+import { eq, asc, desc, and, isNotNull, gte } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { blockAnalyzerRLMService } from "./rlm/block-analyzer-rlm.service";
 import { materializeBlockAnalyzerResult } from "./block-analyzer-materializer.service";
@@ -22,6 +22,7 @@ import type {
   SessionTranscript,
   SessionMasterStory,
   BlockAnalyzerUserProfile,
+  SubscriberHistoryEntry,
 } from "./rlm/block-analyzer-environment";
 
 const logger = createLogger({ context: "block-analyzer-orchestrator" });
@@ -195,6 +196,64 @@ export async function runBlockAnalyzer(sessionId: string): Promise<void> {
       getOrgName(session.organizationId),
     ]);
 
+    // 6b. Pre-fetch subscriber history for this user (last 90 days)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const recentBlocks = await db
+      .select({
+        subscriberName: schema.activityBlocks.subscriberName,
+        topicName: schema.activityBlocks.topicName,
+        apps: schema.activityBlocks.apps,
+        durationMinutes: schema.activityBlocks.durationMinutes,
+        startTime: schema.activityBlocks.startTime,
+      })
+      .from(schema.activityBlocks)
+      .where(
+        and(
+          eq(schema.activityBlocks.userId, session.userId),
+          isNotNull(schema.activityBlocks.subscriberName),
+          gte(schema.activityBlocks.startTime, ninetyDaysAgo)
+        )
+      );
+
+    const historyMap = new Map<
+      string,
+      { minutes: number; blocks: number; topics: Set<string>; apps: Set<string>; lastSeen: string }
+    >();
+    for (const b of recentBlocks) {
+      if (!b.subscriberName) continue;
+      const existing = historyMap.get(b.subscriberName) || {
+        minutes: 0,
+        blocks: 0,
+        topics: new Set<string>(),
+        apps: new Set<string>(),
+        lastSeen: "",
+      };
+      existing.minutes += b.durationMinutes;
+      existing.blocks += 1;
+      if (b.topicName) existing.topics.add(b.topicName);
+      if (Array.isArray(b.apps)) {
+        for (const app of b.apps) {
+          if (typeof app === "string") existing.apps.add(app);
+        }
+      }
+      const dateStr = new Date(b.startTime).toISOString().split("T")[0]!;
+      if (dateStr > existing.lastSeen) existing.lastSeen = dateStr;
+      historyMap.set(b.subscriberName, existing);
+    }
+
+    const subscriberHistory: SubscriberHistoryEntry[] = [...historyMap.entries()]
+      .map(([name, data]) => ({
+        subscriberName: name,
+        totalMinutes: data.minutes,
+        blockCount: data.blocks,
+        recentTopics: [...data.topics].slice(0, 10),
+        recentApps: [...data.apps].slice(0, 10),
+        lastSeenDate: data.lastSeen,
+      }))
+      .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
     // 7. Build session meta
     const sessionMeta: SessionMeta = {
       sessionId,
@@ -231,6 +290,7 @@ export async function runBlockAnalyzer(sessionId: string): Promise<void> {
       masterStory,
       knownCustomers,
       orgName,
+      subscriberHistory,
     });
 
     // 9. Materialize results

@@ -103,6 +103,7 @@ TOPIC & SUBSCRIBER TAGGING:
 ${knownCustomers.length > 0 ? knownCustomers.map((c) => `  - ${c}`).join("\n") : "  (none known yet)"}
 - When emitting blocks, ALWAYS check the subscriber field against the known customer list above first. Look for partial matches in window titles, Slack channels, ticket IDs. Assign a known customer whenever there's a reasonable match. Only invent new customer names if the evidence is clear and distinct from all known customers. When in doubt, assign a customer. Never assign the org's own name or "internal/unattributed" as a subscriber.
 - **CRITICAL:** If your topic or block name mentions a known customer (e.g., topic "Flex Voice POC" and "Flex" is a known customer), you MUST set that customer as the subscriber. The topic name is the strongest signal for subscriber attribution — never leave subscriberName null when the topic clearly references a known customer.
+- **SUBSCRIBER NAME FORMAT:** When a known customer matches, use their name EXACTLY as it appears in the list above — do not rephrase, abbreviate, or expand it. When discovering a NEW customer, always use their full official name followed by the abbreviation in parentheses if one exists, e.g., "Education Domain Company (EDC)". Never use just an abbreviation alone like "EDC" or a partial name like "Education Domain". Consistency is critical — every block for the same customer must use the identical string.
 
 GROUNDING:
 - Only reference apps, people, topics, and activities that appear in the actual data
