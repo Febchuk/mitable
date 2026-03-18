@@ -143,6 +143,16 @@ export const config = {
     ).trim(),
   },
 
+  // Granola Integration Configuration (per-user meeting notes via MCP OAuth)
+  // No client_id/secret needed — MCP uses dynamic client registration
+  granola: {
+    redirectUri: (
+      process.env.GRANOLA_REDIRECT_URI ||
+      `http://localhost:${PORT}/api/integrations/granola/callback`
+    ).trim(),
+    mcpBaseUrl: (process.env.GRANOLA_MCP_BASE_URL || "https://mcp.granola.ai").trim(),
+  },
+
   // Google Cloud DLP Configuration (for PII redaction)
   googleCloud: {
     projectId: (process.env.GOOGLE_CLOUD_PROJECT_ID || "").trim(),

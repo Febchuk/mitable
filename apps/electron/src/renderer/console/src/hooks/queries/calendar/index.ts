@@ -16,6 +16,7 @@ import type {
   ActivityType,
   WorkBlockStatus,
 } from "../../../components/views/employee/CalendarView/types";
+import { apiRequest } from "../../../services/api";
 import type { SessionListItem, SessionCapture } from "../../../services/monitoringService";
 
 // Query Keys
@@ -337,8 +338,116 @@ function groupSessionsByDay(
   return days;
 }
 
+// ─── Granola Blocks ──────────────────────────────────────────────────────────
+
+interface GranolaBlockResponse {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  description: string | null;
+  category: string;
+  topicName: string | null;
+  subscriberName: string | null;
+  participants: unknown;
+}
+
+async function fetchGranolaBlocks(): Promise<WorkBlock[]> {
+  try {
+    const data = await apiRequest<{ blocks: GranolaBlockResponse[] }>(
+      "/integrations/granola/blocks"
+    );
+    return (data.blocks || []).map((b) => {
+      const startTime = new Date(b.startTime);
+      const endTime = new Date(b.endTime);
+      const title = b.name?.replace(/^\[Granola\]\s*/, "") || "Meeting";
+      let participants: { name: string; email: string }[] = [];
+      if (Array.isArray(b.participants)) {
+        participants = b.participants as { name: string; email: string }[];
+      } else if (typeof b.participants === "string") {
+        try {
+          participants = JSON.parse(b.participants);
+        } catch {
+          /* ignore */
+        }
+      }
+      return {
+        id: b.id,
+        startTime,
+        endTime,
+        duration: b.durationMinutes,
+        idleGapBefore: null,
+        summary: b.description || "",
+        captures: [],
+        appBreakdown: [{ app: "Granola", minutes: b.durationMinutes, percentage: 100 }],
+        taskBreakdown: [],
+        isActive: false,
+        isFocusedSession: false,
+        goal: title,
+        name: title,
+        status: "ready" as WorkBlockStatus,
+        source: "granola" as const,
+        subscriberName: b.subscriberName || undefined,
+        participants,
+      };
+    });
+  } catch {
+    // Granola not connected or fetch failed — silently skip
+    return [];
+  }
+}
+
+function mergeGranolaBlocksIntoDays(
+  days: ActivityDay[],
+  granolaBlocks: WorkBlock[]
+): ActivityDay[] {
+  if (granolaBlocks.length === 0) return days;
+
+  const dayMap = new Map<string, ActivityDay>();
+  for (const day of days) {
+    const key = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, "0")}-${String(day.date.getDate()).padStart(2, "0")}`;
+    dayMap.set(key, day);
+  }
+
+  for (const block of granolaBlocks) {
+    const d = block.startTime;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    let day = dayMap.get(key);
+    if (!day) {
+      day = {
+        id: `day-${key}`,
+        date: new Date(key + "T00:00:00"),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        totalWorkTime: 0,
+        workBlocks: [],
+        summary: "",
+        topApps: [],
+      };
+      dayMap.set(key, day);
+    }
+
+    day.workBlocks.push(block);
+    // Don't add Granola duration to total — MCP doesn't provide real duration
+  }
+
+  // Sort: Granola blocks first (meetings at top), then normal blocks by start time
+  for (const day of dayMap.values()) {
+    day.workBlocks.sort((a, b) => {
+      const aIsGranola = a.source === "granola" ? 0 : 1;
+      const bIsGranola = b.source === "granola" ? 0 : 1;
+      if (aIsGranola !== bIsGranola) return aIsGranola - bIsGranola;
+      return a.startTime.getTime() - b.startTime.getTime();
+    });
+  }
+
+  // Return sorted by date (most recent first)
+  return [...dayMap.values()].sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
 /**
- * Hook to fetch all calendar days (transformed from sessions)
+ * Hook to fetch all calendar days (transformed from sessions + Granola blocks)
  * Returns ActivityDay[] sorted by date (most recent first)
  */
 export function useCalendarDays() {
@@ -347,11 +456,15 @@ export function useCalendarDays() {
   return useQuery({
     queryKey: calendarKeys.days(),
     queryFn: async () => {
-      const sessions = await monitoringService.fetchAllSessions();
-      if (!sessions.length) return [];
+      const [sessions, granolaBlocks] = await Promise.all([
+        monitoringService.fetchAllSessions(),
+        fetchGranolaBlocks(),
+      ]);
 
       const emptyCaptures = new Map<string, SessionCapture[]>();
-      return groupSessionsByDay(sessions, emptyCaptures);
+      const days = sessions.length ? groupSessionsByDay(sessions, emptyCaptures) : [];
+
+      return mergeGranolaBlocksIntoDays(days, granolaBlocks);
     },
     enabled: !!user,
     staleTime: 5000,

@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/console/src/services/api";
+import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
 import TaskBreakdownSection from "../../../shared/TaskBreakdownSection";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -13,6 +16,7 @@ import {
   Check,
   Clipboard,
   Search,
+  Users,
 } from "lucide-react";
 import {
   BarChart,
@@ -54,7 +58,7 @@ const LABEL_TO_METRIC: Record<string, string> = {
 
 interface RecentWorkItem {
   id: string;
-  type: "session" | "doc";
+  type: "session" | "doc" | "granola";
   title: string;
   preview: string;
   fullContent: string;
@@ -64,6 +68,8 @@ interface RecentWorkItem {
   category?: string;
   docType?: string;
   taskBreakdown?: Array<{ shortTitle: string; description: string; minutes: number }>;
+  participants?: { name: string; email: string }[];
+  subscriberName?: string;
 }
 
 interface PersonViewModel {
@@ -484,7 +490,7 @@ export default function PersonDetail() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedWork, setSelectedWork] = useState<RecentWorkItem | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
-  const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc">("all");
+  const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc" | "granola">("all");
   const [workSearchQuery, setWorkSearchQuery] = useState("");
   const [selectedSubscriber, setSelectedSubscriber] = useState<string | null>(null);
   const [isEditingSummary, setIsEditingSummary] = useState(false);
@@ -512,6 +518,25 @@ export default function PersonDetail() {
   );
   const { data: docData, isLoading: docLoading } = useDocument(selectedDocId || "");
 
+  // Fetch Granola meeting blocks for this user (admin can query any user)
+  const { data: granolaData } = useQuery({
+    queryKey: ["granola-blocks", id],
+    queryFn: () =>
+      apiRequest<{
+        blocks: {
+          id: string;
+          name: string;
+          startTime: string;
+          endTime: string;
+          durationMinutes: number;
+          description: string | null;
+          subscriberName: string | null;
+          participants: unknown;
+        }[];
+      }>(`/integrations/granola/blocks?userId=${id}`),
+    enabled: !!id,
+  });
+
   const handleDrillDown = (label: string) => {
     const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
     // If it's a known metric card, use org-style drill-down; otherwise it's a category
@@ -531,11 +556,51 @@ export default function PersonDetail() {
   };
 
   const person = useMemo(() => {
-    if (apiDetail) {
-      return transformApiToPersonViewModel(apiDetail, timeRange);
+    if (!apiDetail) return null;
+    const vm = transformApiToPersonViewModel(apiDetail, timeRange);
+
+    // Inject Granola meeting blocks into recentWork
+    if (granolaData?.blocks?.length) {
+      for (const b of granolaData.blocks) {
+        const d = new Date(b.startTime);
+        const dateStr = d.toLocaleDateString([], { month: "short", day: "numeric" });
+        const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const title = b.name?.replace(/^\[Granola\]\s*/, "") || "Meeting";
+        const plainPreview = (b.description || "")
+          .replace(/^#{1,6}\s+/gm, "")
+          .replace(/\*\*([^*]+)\*\*/g, "$1")
+          .replace(/[*_~`]/g, "")
+          .replace(/^[-•]\s+/gm, "")
+          .replace(/\n+/g, " ")
+          .trim();
+        const participants = Array.isArray(b.participants)
+          ? (b.participants as { name: string; email: string }[])
+          : [];
+
+        vm.recentWork.push({
+          id: b.id,
+          type: "granola",
+          title,
+          preview: plainPreview.length > 150 ? plainPreview.slice(0, 150) + "…" : plainPreview,
+          fullContent: b.description || "",
+          date: dateStr,
+          time: timeStr,
+          category: "Meeting",
+          participants,
+          subscriberName: b.subscriberName || undefined,
+        });
+      }
+
+      // Re-sort by date descending
+      vm.recentWork.sort((a, b) => {
+        const da = new Date(`${a.date} ${a.time}`).getTime();
+        const db = new Date(`${b.date} ${b.time}`).getTime();
+        return db - da;
+      });
     }
-    return null;
-  }, [apiDetail, timeRange]);
+
+    return vm;
+  }, [apiDetail, timeRange, granolaData]);
 
   if (!person) {
     return (
@@ -805,6 +870,105 @@ export default function PersonDetail() {
                 />
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full-page meeting notes view (Granola meetings)
+  if (selectedWork && selectedWork.type === "granola") {
+    const handleCopyMeeting = async () => {
+      await navigator.clipboard.writeText(selectedWork.fullContent);
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2000);
+    };
+
+    return (
+      <div className="h-screen flex flex-col">
+        {/* Meeting header */}
+        <div className="flex items-start justify-between p-6 border-b border-border-subtle">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                setSelectedWork(null);
+              }}
+              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-3">
+              <GranolaIcon size="md" />
+              <div>
+                <h2 className="text-xl font-bold text-text-primary">{selectedWork.title}</h2>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-text-secondary text-sm">
+                    {selectedWork.date}, {selectedWork.time}
+                  </span>
+                  {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
+                    <span className="text-text-secondary text-sm">
+                      · {truncateDuration(selectedWork.durationMinutes)}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-medium text-[#C8E64A] bg-[#C8E64A]/10 px-1.5 py-0.5 rounded">
+                    Meeting
+                  </span>
+                  {selectedWork.subscriberName && (
+                    <Badge className="bg-canvas-overlay text-text-secondary text-[10px]">
+                      {selectedWork.subscriberName}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Meeting notes content */}
+        <div className="flex-1 overflow-auto bg-background-primary">
+          <div className="max-w-3xl mx-auto px-8 py-6">
+            {/* Participants */}
+            {selectedWork.participants && selectedWork.participants.length > 0 && (
+              <div className="flex items-center gap-2 mb-4 text-sm text-text-secondary">
+                <Users size={14} className="text-text-tertiary shrink-0" />
+                <span className="truncate">
+                  {selectedWork.participants.map((p) => p.name || p.email).join(", ")}
+                </span>
+              </div>
+            )}
+
+            {/* Heading + copy */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-text-primary">Meeting Notes</h3>
+              <button
+                onClick={handleCopyMeeting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
+              >
+                {copiedSummary ? (
+                  <>
+                    <Check size={14} className="text-emerald" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Clipboard size={14} />
+                    Copy
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Rendered markdown content */}
+            <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
+              <DocEditor
+                key={selectedWork.id}
+                initialContent={selectedWork.fullContent}
+                readOnly
+                showToolbar={false}
+                placeholder=""
+                className="h-full"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1150,8 +1314,15 @@ export default function PersonDetail() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 bg-canvas-overlay rounded-lg p-0.5 shrink-0">
-                  {(["all", "session", "doc"] as const).map((f) => {
-                    const label = f === "all" ? "All" : f === "session" ? "Blocks" : "Docs";
+                  {(["all", "session", "granola", "doc"] as const).map((f) => {
+                    const label =
+                      f === "all"
+                        ? "All"
+                        : f === "session"
+                          ? "Blocks"
+                          : f === "granola"
+                            ? "Meetings"
+                            : "Docs";
                     const count =
                       f === "all"
                         ? person.recentWork.length
@@ -1204,15 +1375,19 @@ export default function PersonDetail() {
                         }
                         className="w-full text-left flex items-start gap-3 py-3 px-2 -mx-2 rounded-lg border border-transparent hover:border-stroke-subtle hover:bg-canvas-overlay/50 transition-colors cursor-pointer"
                       >
-                        <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            item.type === "doc"
-                              ? "text-indigo-light bg-indigo/15"
-                              : "text-emerald bg-emerald/15"
-                          }`}
-                        >
-                          {item.type === "doc" ? <FileText size={14} /> : <Zap size={14} />}
-                        </div>
+                        {item.type === "granola" ? (
+                          <GranolaIcon size="sm" />
+                        ) : (
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              item.type === "doc"
+                                ? "text-indigo-light bg-indigo/15"
+                                : "text-emerald bg-emerald/15"
+                            }`}
+                          >
+                            {item.type === "doc" ? <FileText size={14} /> : <Zap size={14} />}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-text-primary truncate">
                             {item.title}
@@ -1224,7 +1399,12 @@ export default function PersonDetail() {
                             <span className="text-[10px] text-text-tertiary">
                               {item.date}, {item.time}
                             </span>
-                            {item.category && (
+                            {item.type === "granola" && (
+                              <span className="text-[9px] font-medium text-[#C8E64A] bg-[#C8E64A]/10 px-1.5 py-0.5 rounded">
+                                Meeting
+                              </span>
+                            )}
+                            {item.type !== "granola" && item.category && (
                               <span className="text-[9px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
                                 {item.category}
                               </span>
@@ -1237,6 +1417,17 @@ export default function PersonDetail() {
                             {item.durationMinutes != null && item.durationMinutes > 0 && (
                               <span className="text-[9px] text-text-tertiary">
                                 {truncateDuration(item.durationMinutes)}
+                              </span>
+                            )}
+                            {item.participants && item.participants.length > 0 && (
+                              <span className="flex items-center gap-1 text-[9px] text-text-tertiary">
+                                <Users size={9} />
+                                {item.participants.map((p) => p.name).join(", ")}
+                              </span>
+                            )}
+                            {item.subscriberName && (
+                              <span className="text-[9px] font-medium text-[#C8E64A] bg-[#C8E64A]/10 px-1.5 py-0.5 rounded">
+                                {item.subscriberName}
                               </span>
                             )}
                           </div>

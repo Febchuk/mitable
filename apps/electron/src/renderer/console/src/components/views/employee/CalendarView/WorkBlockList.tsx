@@ -98,15 +98,39 @@ export default function WorkBlockList({
 
       {/* Work blocks timeline */}
       <div className="space-y-2">
-        {blocks.map((block, index) => (
-          <WorkBlockDetail
-            key={block.id}
-            block={block}
-            blockNumber={index + 1}
-            defaultExpanded={block.isActive || (index === blocks.length - 1 && blocks.length <= 3)}
-            onDelete={onBlockDelete}
-          />
-        ))}
+        {blocks.map((block, index) => {
+          // Insert separator between Granola meetings and regular work blocks
+          const prevBlock = index > 0 ? blocks[index - 1] : null;
+          const showDivider = prevBlock?.source === "granola" && block.source !== "granola";
+
+          return (
+            <div key={block.id}>
+              {showDivider && (
+                <div className="flex items-center gap-3 py-3 my-1">
+                  <div className="flex-1 h-px bg-stroke-subtle" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">
+                    Work Blocks
+                  </span>
+                  <div className="flex-1 h-px bg-stroke-subtle" />
+                </div>
+              )}
+              <WorkBlockDetail
+                block={block}
+                blockNumber={
+                  block.source === "granola"
+                    ? index + 1
+                    : index +
+                      1 -
+                      blocks.filter((b, i) => i < index && b.source === "granola").length
+                }
+                defaultExpanded={
+                  block.isActive || (index === blocks.length - 1 && blocks.length <= 3)
+                }
+                onDelete={onBlockDelete}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import cron from "node-cron";
 import { cleanupStaleSessions } from "../services/stale-session-cleanup.service";
 import { createLogger } from "../lib/logger";
 import { runGraphSyncJob } from "./jobs/graph-sync.job";
+import { runGranolaSyncJob } from "./jobs/granola-sync.job";
 import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });
@@ -57,6 +58,29 @@ export function initCronJobs(): void {
   });
 
   // ──────────────────────────────────────────────
+  // Granola Sync: Every 15 minutes (at :10, :25, :40, :55)
+  // Fetches Granola meetings for integrated users, classifies with
+  // Claude Haiku, and upserts activity_blocks + daily stats.
+  // ──────────────────────────────────────────────
+  let isGranolaSyncRunning = false;
+
+  cron.schedule("10,25,40,55 * * * *", async () => {
+    if (isGranolaSyncRunning) {
+      logger.warn("Granola sync still running — skipping");
+      return;
+    }
+
+    isGranolaSyncRunning = true;
+    try {
+      await runGranolaSyncJob();
+    } catch (error) {
+      logger.error({ error: String(error) }, "Granola sync job failed");
+    } finally {
+      isGranolaSyncRunning = false;
+    }
+  });
+
+  // ──────────────────────────────────────────────
   // Graph Sync: Nightly at 02:15
   // Extracts recent activity and refreshes graph intelligence views.
   // ──────────────────────────────────────────────
@@ -69,5 +93,5 @@ export function initCronJobs(): void {
     logger.info("Graph sync disabled (GRAPH_ENABLED=false)");
   }
 
-  logger.info("Cron scheduler initialized — Stale cleanup every 15min");
+  logger.info("Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min");
 }
