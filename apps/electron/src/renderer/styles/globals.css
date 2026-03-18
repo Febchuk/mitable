@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,78 +6,112 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 240 4% 22%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 250 84% 65%;
+    /* backgrounds */
+    --bg-base: #1A1916;
+    --bg-raised: #211F1B;
+    --bg-overlay: #2A2824;
+    --bg-muted: #33312B;
+
+    /* text */
+    --text-primary: #ECE8E0;
+    --text-secondary: #9B9689;
+    --text-tertiary: #6B665C;
+    --text-faint: #4A4640;
+
+    /* accent — warm indigo */
+    --accent: #9B84E8;
+    --accent-bg: rgba(155, 132, 232, 0.12);
+    --accent-border: rgba(155, 132, 232, 0.22);
+
+    /* status */
+    --status-active: #3A9B6B;
+    --status-active-bg: rgba(58, 155, 107, 0.14);
+    --status-active-border: rgba(58, 155, 107, 0.28);
+
+    /* borders */
+    --border-hairline: 0.5px solid rgba(236, 232, 224, 0.07);
+    --border-subtle: 0.5px solid rgba(236, 232, 224, 0.10);
+
+    /* typography */
+    --font-sans: 'Inter', -apple-system, sans-serif;
+    --font-serif: 'Newsreader', Georgia, serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* radius */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-xl: 12px;
+
+    /* shadcn compatibility vars */
+    --background: 0 0% 10%;
+    --foreground: 40 18% 90%;
+    --card: 36 8% 12%;
+    --card-foreground: 40 18% 90%;
+    --popover: 36 8% 15%;
+    --popover-foreground: 40 18% 90%;
+    --primary: 256 72% 72%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 36 8% 15%;
+    --secondary-foreground: 40 18% 90%;
+    --muted: 36 8% 18%;
+    --muted-foreground: 36 8% 55%;
+    --accent: 36 8% 15%;
+    --accent-foreground: 40 18% 90%;
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 250 84% 65%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    --highlight: oklch(0.852 0.199 91.936);
-    --brand: oklch(0.623 0.214 259.815);
+    --border: 36 8% 18%;
+    --input: 36 8% 18%;
+    --ring: 256 72% 72%;
+    --radius: 0.625rem;
+    --chart-1: 256 72% 72%;
+    --chart-2: 152 45% 47%;
+    --chart-3: 30 50% 55%;
+    --chart-4: 36 8% 55%;
+    --chart-5: 0 62% 50%;
+    --sidebar-background: 36 8% 12%;
+    --sidebar-foreground: 40 18% 90%;
+    --sidebar-primary: 256 72% 72%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 36 8% 15%;
+    --sidebar-accent-foreground: 40 18% 90%;
+    --sidebar-border: 36 8% 15%;
+    --sidebar-ring: 256 72% 72%;
   }
 
   .dark {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 98%;
-    --card: 240 4% 22%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 250 84% 65%;
+    --background: 0 0% 10%;
+    --foreground: 40 18% 90%;
+    --card: 36 8% 12%;
+    --card-foreground: 40 18% 90%;
+    --popover: 36 8% 15%;
+    --popover-foreground: 40 18% 90%;
+    --primary: 256 72% 72%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --secondary: 36 8% 15%;
+    --secondary-foreground: 40 18% 90%;
+    --muted: 36 8% 18%;
+    --muted-foreground: 36 8% 55%;
+    --accent: 36 8% 15%;
+    --accent-foreground: 40 18% 90%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 250 84% 65%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 36 8% 18%;
+    --input: 36 8% 18%;
+    --ring: 256 72% 72%;
+    --chart-1: 256 72% 72%;
+    --chart-2: 152 45% 47%;
+    --chart-3: 30 50% 55%;
+    --chart-4: 36 8% 55%;
+    --chart-5: 0 62% 50%;
+    --sidebar-background: 36 8% 12%;
+    --sidebar-foreground: 40 18% 90%;
+    --sidebar-primary: 256 72% 72%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    --highlight: oklch(0.852 0.199 91.936);
-    --brand: oklch(0.707 0.165 254.624);
+    --sidebar-accent: 36 8% 15%;
+    --sidebar-accent-foreground: 40 18% 90%;
+    --sidebar-border: 36 8% 15%;
+    --sidebar-ring: 256 72% 72%;
   }
 }
 
@@ -91,7 +125,7 @@
     @apply bg-background text-foreground;
     margin: 0;
     padding: 0;
-    font-family: "Manrope", system-ui, sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -101,20 +135,17 @@
     height: 100vh;
   }
 
-  /* Transparent window override for agent/overlay windows */
   html.transparent-window,
   body.transparent-window {
     background: transparent !important;
-    overflow: hidden; /* Prevent scrollbars on transparent windows (agent/overlay) */
+    overflow: hidden;
   }
 
-  /* Prevent scrollbars in transparent window root containers */
   html.transparent-window #root,
   body.transparent-window #root {
     overflow: hidden;
   }
 
-  /* WatchingPill needs overflow visible for dropdown menus */
   html.transparent-window.watching-pill #root,
   body.transparent-window.watching-pill #root {
     overflow: visible;
@@ -123,7 +154,6 @@
 
 /* Typography system */
 @layer components {
-  /* Headings */
   .text-heading-1 {
     @apply text-4xl font-bold;
   }
@@ -140,7 +170,6 @@
     @apply text-xl font-semibold;
   }
 
-  /* Body text */
   .text-body-lg {
     @apply text-lg font-normal;
   }
@@ -153,7 +182,6 @@
     @apply text-sm font-normal;
   }
 
-  /* Navigation */
   .text-nav-item {
     @apply text-xl font-medium;
   }
@@ -162,7 +190,6 @@
     @apply text-base font-medium;
   }
 
-  /* UI elements */
   .text-button {
     @apply text-sm font-semibold;
   }
@@ -185,10 +212,21 @@
   -webkit-app-region: no-drag;
 }
 
-/* Custom Scrollbar - Applied globally and via utility class */
+/* Reveal animations (kept) */
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes revealFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Custom Scrollbar */
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 *::-webkit-scrollbar-track {
@@ -196,17 +234,17 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #4A4A4A;
-  border-radius: 4px;
+  background: rgba(155, 132, 232, 0.18);
+  border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #5A5A5A;
+  background: rgba(155, 132, 232, 0.3);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -214,17 +252,15 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #4A4A4A;
-  border-radius: 4px;
+  background: rgba(155, 132, 232, 0.18);
+  border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #5A5A5A;
+  background: rgba(155, 132, 232, 0.3);
 }
 
-/* Force vertical-only scrolling in ScrollArea — Radix uses display:table on
-   the viewport's inner child to measure content width for horizontal scrolling.
-   Override both the viewport overflow and the child display to prevent horizontal expansion. */
+/* Force vertical-only scrolling in ScrollArea */
 [data-radix-scroll-area-viewport] {
   overflow-x: hidden !important;
 }
@@ -236,7 +272,6 @@
    MDXEditor — Dark theme
    ═══════════════════════════════════════════════════════════════════ */
 
-/* Wrapper layout */
 .mdx-editor-wrapper {
   display: flex;
   flex-direction: column;
@@ -249,81 +284,76 @@
   height: 100%;
   min-height: 0;
   background: transparent;
-  font-family: "Manrope", system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
-/* Editor content wrapper must scroll, not grow */
 .mdx-editor-wrapper .mdxeditor > div:last-child {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
-/* Toolbar */
 .dark-editor [role="toolbar"] {
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 0.5px solid rgba(236, 232, 224, 0.07);
   padding: 4px 12px;
   flex-shrink: 0;
 }
 
 .dark-editor [role="toolbar"] button {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   border-radius: 4px;
   transition: background 0.15s ease;
 }
 
 .dark-editor [role="toolbar"] button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(236, 232, 224, 0.05);
+  color: var(--text-secondary);
 }
 
 .dark-editor [role="toolbar"] button[data-state="on"],
 .dark-editor [role="toolbar"] button[aria-pressed="true"] {
-  background: rgba(124, 101, 246, 0.15);
-  color: #7c65f6;
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 .dark-editor [role="toolbar"] [data-orientation="vertical"] {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(236, 232, 224, 0.07);
   width: 1px;
   margin: 4px 6px;
 }
 
-/* Content area */
 .dark-editor [contenteditable] {
   flex: 1;
   overflow-y: auto;
-  caret-color: #7c65f6;
-  color: rgba(255, 255, 255, 0.88);
+  caret-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .dark-editor [contenteditable]:focus {
   outline: none;
 }
 
-/* Placeholder */
 .dark-editor [data-lexical-editor] p.PlaygroundEditorTheme__paragraph::before,
 .dark-editor .mdxeditor-rich-text-editor [data-placeholder]::before {
-  color: rgba(255, 255, 255, 0.25) !important;
+  color: var(--text-faint) !important;
 }
 
-/* Typography inside editor */
 .dark-editor [contenteditable] h1 {
-  color: white;
+  color: var(--text-primary);
 }
 .dark-editor [contenteditable] h2 {
-  color: white;
+  color: var(--text-primary);
 }
 .dark-editor [contenteditable] h3 {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
 }
 .dark-editor [contenteditable] strong {
   font-weight: 600;
-  color: white;
+  color: var(--text-primary);
 }
 .dark-editor [contenteditable] a {
-  color: #7c65f6;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -336,18 +366,17 @@
   padding-left: 1.5em;
 }
 
-/* Link dialog */
 .dark-editor [role="dialog"] {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-overlay);
+  border: 0.5px solid rgba(236, 232, 224, 0.08);
   border-radius: 8px;
-  color: white;
+  color: var(--text-primary);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .dark-editor [role="dialog"] input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(236, 232, 224, 0.06);
+  border: 0.5px solid rgba(236, 232, 224, 0.1);
   border-radius: 4px;
-  color: white;
+  color: var(--text-primary);
 }

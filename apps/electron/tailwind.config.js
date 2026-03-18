@@ -23,35 +23,6 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          light: "#818CF8",
-          hover: "#4F46E5",
-          pressed: "#4338CA",
-        },
-        /* New accent system */
-        indigo: {
-          DEFAULT: "#6366F1",
-          light: "#818CF8",
-          muted: "rgba(99, 102, 241, 0.15)",
-        },
-        rose: {
-          DEFAULT: "#F472B6",
-          muted: "rgba(244, 114, 182, 0.15)",
-        },
-        emerald: {
-          DEFAULT: "#34D399",
-          muted: "rgba(52, 211, 153, 0.15)",
-        },
-        /* Text colors with new naming */
-        ink: {
-          primary: "#F4F4F5",
-          secondary: "#A1A1AA",
-          tertiary: "#52525B",
-        },
-        /* Border system */
-        stroke: {
-          subtle: "rgba(255, 255, 255, 0.06)",
-          DEFAULT: "rgba(255, 255, 255, 0.12)",
-          strong: "rgba(255, 255, 255, 0.24)",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -65,10 +36,6 @@ export default {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -76,44 +43,6 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
-        },
-        /* New design system - canvas backgrounds */
-        canvas: {
-          base: "#0C0C0E",
-          raised: "#141418",
-          overlay: "#1C1C22",
-          muted: "#24242C",
-        },
-        /* Legacy mappings for compatibility */
-        "background-primary": "#0C0C0E",
-        "background-secondary": "#141418",
-        "background-elevated": "#1C1C22",
-        "border-subtle": "rgba(255, 255, 255, 0.06)",
-        "integration-card": "#3E3D3D",
-        "week-inactive": "#292945",
-        agent: {
-          pill: "#1A1A1A",
-          toggle: {
-            inactive: "#3E3D3D",
-            active: "#FFFFFF",
-          },
-          bubble: "#2A2A2A",
-          card: "#3A3560",
-        },
-        surface: {
-          DEFAULT: "#2A2A2A",
-          elevated: "#3A3A3A",
-        },
-        text: {
-          primary: "#FFFFFF",
-          secondary: "#A1A1A1",
-          tertiary: "#6B6B6B",
-        },
-        status: {
-          success: "#22C55E",
-          warning: "#F59E0B",
-          error: "#EF4444",
-          info: "#3B82F6",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -125,17 +54,96 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+
+        /* New design system */
+        canvas: {
+          base: "#1A1916",
+          raised: "#211F1B",
+          overlay: "#2A2824",
+          muted: "#33312B",
+        },
+        ink: {
+          primary: "#ECE8E0",
+          secondary: "#9B9689",
+          tertiary: "#6B665C",
+          faint: "#4A4640",
+        },
+        accent: {
+          DEFAULT: "#9B84E8",
+          foreground: "hsl(var(--accent-foreground))",
+          bg: "rgba(155,132,232,0.12)",
+          border: "rgba(155,132,232,0.22)",
+        },
+        active: {
+          DEFAULT: "#3A9B6B",
+          bg: "rgba(58,155,107,0.14)",
+          border: "rgba(58,155,107,0.28)",
+        },
+
+        /* Legacy compat — map old names to new tokens */
+        indigo: {
+          DEFAULT: "#9B84E8",
+          light: "#B0A0F0",
+          muted: "rgba(155, 132, 232, 0.15)",
+        },
+        rose: {
+          DEFAULT: "#E87474",
+          muted: "rgba(232, 116, 116, 0.15)",
+        },
+        emerald: {
+          DEFAULT: "#3A9B6B",
+          muted: "rgba(58, 155, 107, 0.15)",
+        },
+        stroke: {
+          subtle: "rgba(236, 232, 224, 0.07)",
+          DEFAULT: "rgba(236, 232, 224, 0.10)",
+          strong: "rgba(236, 232, 224, 0.18)",
+        },
+        text: {
+          primary: "#ECE8E0",
+          secondary: "#9B9689",
+          tertiary: "#6B665C",
+        },
+        status: {
+          success: "#3A9B6B",
+          warning: "#D4A27A",
+          error: "#E87474",
+          info: "#9B84E8",
+        },
+        surface: {
+          DEFAULT: "#2A2824",
+          elevated: "#33312B",
+        },
+        agent: {
+          pill: "#211F1B",
+          toggle: {
+            inactive: "#33312B",
+            active: "#ECE8E0",
+          },
+          bubble: "#2A2824",
+          card: "#33312B",
+        },
+        "background-primary": "#1A1916",
+        "background-secondary": "#211F1B",
+        "background-elevated": "#2A2824",
+        "border-subtle": "rgba(236, 232, 224, 0.07)",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        sm: "4px",
+        md: "6px",
+        lg: "10px",
+        xl: "12px",
+        "2xl": "16px",
         "6px": "6px",
         "10px": "10px",
         "16px": "16px",
       },
+      borderWidth: {
+        hairline: "0.5px",
+      },
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+        sans: ["Inter", "-apple-system", "sans-serif"],
+        serif: ["Newsreader", "Georgia", "serif"],
         display: ["JetBrains Mono", "monospace"],
         mono: ["JetBrains Mono", "monospace"],
       },
@@ -151,15 +159,12 @@ export default {
         "2xl": "48px",
       },
       width: {
-        "sidebar-expanded": "300px",
-        "sidebar-collapsed": "80px",
+        "sidebar-expanded": "220px",
+        "sidebar-collapsed": "0px",
       },
       transitionProperty: {
         width: "width",
         spacing: "margin, padding",
-      },
-      transitionDuration: {
-        300: "300ms",
       },
       keyframes: {
         "accordion-down": {
@@ -170,10 +175,6 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        gradient: {
-          "0%, 100%": { "background-position": "0% 50%" },
-          "50%": { "background-position": "100% 50%" },
-        },
         "reveal-up": {
           from: { opacity: "0", transform: "translateY(20px)" },
           to: { opacity: "1", transform: "translateY(0)" },
@@ -181,21 +182,6 @@ export default {
         "reveal-fade": {
           from: { opacity: "0" },
           to: { opacity: "1" },
-        },
-        "hover-lift": {
-          to: { transform: "translateY(-2px)" },
-        },
-        "glow-pulse": {
-          "0%, 100%": { boxShadow: "0 0 8px rgba(99, 102, 241, 0.4)" },
-          "50%": { boxShadow: "0 0 16px rgba(99, 102, 241, 0.6)" },
-        },
-        breathe: {
-          "0%, 100%": { transform: "scale(1)" },
-          "50%": { transform: "scale(1.02)" },
-        },
-        "icon-tilt": {
-          from: { transform: "rotate(0deg)" },
-          to: { transform: "rotate(3deg)" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
@@ -205,13 +191,8 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        gradient: "gradient 3s ease infinite",
         "reveal-up": "reveal-up 0.5s ease-out both",
         "reveal-fade": "reveal-fade 0.4s ease-out both",
-        "hover-lift": "hover-lift 0.2s ease-out forwards",
-        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
-        breathe: "breathe 3s ease-in-out infinite",
-        "icon-tilt": "icon-tilt 0.2s ease-out forwards",
         shimmer: "shimmer 2s linear infinite",
       },
       transitionDuration: {
