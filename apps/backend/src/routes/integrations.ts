@@ -3157,4 +3157,170 @@ router.get("/granola/blocks", requireAuth, async (req: Request, res: Response): 
   }
 });
 
+// ============================================================================
+// FIREFLIES AI INTEGRATION ROUTES (Per-user API key for meeting transcript sync)
+// ============================================================================
+
+/**
+ * POST /api/integrations/fireflies/connect
+ * Save the user's Fireflies API key (validates it first).
+ */
+router.post(
+  "/fireflies/connect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const { apiKey } = req.body as { apiKey?: string };
+
+      if (!apiKey || typeof apiKey !== "string" || apiKey.trim().length === 0) {
+        sendError(res, 400, "INVALID_API_KEY", "Please provide a valid Fireflies API key.");
+        return;
+      }
+
+      // Validate the key by fetching user profile
+      const { firefliesService } = await import("../services/fireflies.service.js");
+      let ffUser;
+      try {
+        ffUser = await firefliesService.validateApiKey(apiKey.trim());
+      } catch (err) {
+        sendError(
+          res,
+          401,
+          "INVALID_API_KEY",
+          "The API key is invalid or expired. Please check your Fireflies settings.",
+          { detail: String(err) },
+        );
+        return;
+      }
+
+      // Encrypt and store
+      const encrypted = encryptionService.encrypt(apiKey.trim());
+
+      await db
+        .update(schema.users)
+        .set({
+          firefliesApiKeyEncrypted: encrypted,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      console.log(`Fireflies connected for user: ${userId} (${ffUser.email})`);
+
+      res.json({
+        success: true,
+        message: "Fireflies connected successfully",
+        email: ffUser.email,
+        name: ffUser.name,
+      });
+    } catch (error) {
+      console.error("Error connecting Fireflies:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to connect Fireflies",
+      });
+    }
+  },
+);
+
+/**
+ * GET /api/integrations/fireflies/status
+ * Check if the current user has Fireflies connected.
+ */
+router.get(
+  "/fireflies/status",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      const [user] = await db
+        .select({
+          firefliesApiKeyEncrypted: schema.users.firefliesApiKeyEncrypted,
+          firefliesLastSyncedAt: schema.users.firefliesLastSyncedAt,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+
+      const connected = !!user?.firefliesApiKeyEncrypted;
+
+      res.json({
+        connected,
+        lastSyncedAt: user?.firefliesLastSyncedAt || null,
+      });
+    } catch (error) {
+      console.error("Error checking Fireflies status:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to check Fireflies status",
+      });
+    }
+  },
+);
+
+/**
+ * DELETE /api/integrations/fireflies/disconnect
+ * Disconnect Fireflies for the current user.
+ */
+router.delete(
+  "/fireflies/disconnect",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      await db
+        .update(schema.users)
+        .set({
+          firefliesApiKeyEncrypted: null,
+          firefliesLastSyncedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      console.log(`Fireflies disconnected for user: ${userId}`);
+
+      res.json({ success: true, message: "Fireflies disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Fireflies:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to disconnect Fireflies",
+      });
+    }
+  },
+);
+
+/**
+ * POST /api/integrations/fireflies/sync
+ * Trigger a manual sync for the current user.
+ */
+router.post(
+  "/fireflies/sync",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+
+      const { firefliesSyncService } = await import("../services/fireflies-sync.service.js");
+      const result = await firefliesSyncService.syncUserMeetings(userId);
+
+      res.json({
+        success: true,
+        meetingsProcessed: result.meetingsProcessed,
+        meetingsCreated: result.meetingsCreated,
+        meetingsUpdated: result.meetingsUpdated,
+        errors: result.errors,
+      });
+    } catch (error) {
+      console.error("Error syncing Fireflies:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to sync Fireflies meetings",
+      });
+    }
+  },
+);
+
 export default router;

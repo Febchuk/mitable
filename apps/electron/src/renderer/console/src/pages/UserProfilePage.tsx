@@ -21,6 +21,8 @@ import {
   Search,
   Globe,
   FlaskConical,
+  Flame,
+  KeyRound,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { GranolaIcon } from "../../../components/icons/integrations";
@@ -77,6 +79,11 @@ interface GranolaStatus {
   lastSyncedAt: string | null;
 }
 
+interface FirefliesStatus {
+  connected: boolean;
+  lastSyncedAt: string | null;
+}
+
 export default function UserProfilePage() {
   const { user } = useUser();
   const { toast } = useToast();
@@ -110,6 +117,14 @@ export default function UserProfilePage() {
   const [isGranolaLoading, setIsGranolaLoading] = useState(true);
   const [isGranolaConnecting, setIsGranolaConnecting] = useState(false);
   const [isGranolaDisconnecting, setIsGranolaDisconnecting] = useState(false);
+
+  const [firefliesStatus, setFirefliesStatus] = useState<FirefliesStatus | null>(null);
+  const [isFirefliesLoading, setIsFirefliesLoading] = useState(true);
+  const [isFirefliesConnecting, setIsFirefliesConnecting] = useState(false);
+  const [isFirefliesDisconnecting, setIsFirefliesDisconnecting] = useState(false);
+  const [showFirefliesModal, setShowFirefliesModal] = useState(false);
+  const [firefliesApiKey, setFirefliesApiKey] = useState("");
+  const [isFirefliesSyncing, setIsFirefliesSyncing] = useState(false);
 
   // About / Version state
   const [appVersion, setAppVersion] = useState<string>("");
@@ -857,6 +872,7 @@ export default function UserProfilePage() {
     loadGmailStatus();
     loadNotionStatus();
     loadGranolaStatus();
+    loadFirefliesStatus();
     loadAppVersion();
     loadAudioPreferences(); // Load audio devices and preferences
     if (user?.id) {
@@ -1482,6 +1498,135 @@ export default function UserProfilePage() {
       });
     } finally {
       setIsGranolaDisconnecting(false);
+    }
+  };
+
+  const loadFirefliesStatus = async () => {
+    setIsFirefliesLoading(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFirefliesStatus(data);
+      }
+    } catch (error) {
+      logger.error("Error loading Fireflies status:", error);
+    } finally {
+      setIsFirefliesLoading(false);
+    }
+  };
+
+  const handleConnectFireflies = async () => {
+    setIsFirefliesConnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/connect`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ apiKey: firefliesApiKey.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to connect Fireflies");
+      }
+
+      setFirefliesStatus({ connected: true, lastSyncedAt: null });
+      setShowFirefliesModal(false);
+      setFirefliesApiKey("");
+      toast({
+        title: "Fireflies Connected",
+        description: `Connected as ${data.email || data.name || "your account"}. Meetings will sync automatically.`,
+      });
+    } catch (error) {
+      logger.error("Error connecting Fireflies:", error);
+      toast({
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : "Failed to connect Fireflies. Check your API key.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFirefliesConnecting(false);
+    }
+  };
+
+  const handleDisconnectFireflies = async () => {
+    setIsFirefliesDisconnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/disconnect`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        setFirefliesStatus({ connected: false, lastSyncedAt: null });
+        toast({
+          title: "Fireflies Disconnected",
+          description: "Your Fireflies account has been disconnected.",
+        });
+      }
+    } catch (error) {
+      logger.error("Error disconnecting Fireflies:", error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Fireflies. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFirefliesDisconnecting(false);
+    }
+  };
+
+  const handleSyncFireflies = async () => {
+    setIsFirefliesSyncing(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/sync`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Sync Complete",
+          description: `Processed ${data.meetingsProcessed} meeting${data.meetingsProcessed !== 1 ? "s" : ""} (${data.meetingsCreated} new).`,
+        });
+        loadFirefliesStatus();
+      }
+    } catch (error) {
+      logger.error("Error syncing Fireflies:", error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync Fireflies meetings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFirefliesSyncing(false);
     }
   };
 
@@ -2919,6 +3064,148 @@ export default function UserProfilePage() {
                     </div>
                   )}
                 </Card>
+
+                {/* Fireflies AI Integration Card */}
+                <Card className="p-6 bg-background-elevated border-border-subtle">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-[#7C3AED] rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Flame className="w-6 h-6 text-white" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-white">Fireflies.ai</h3>
+                      <p className="text-sm text-text-tertiary">
+                        Connect your Fireflies account to sync meeting transcripts and summaries.
+                      </p>
+                      {firefliesStatus?.connected && firefliesStatus.lastSyncedAt && (
+                        <p className="text-xs text-text-tertiary mt-1">
+                          Last synced: {new Date(firefliesStatus.lastSyncedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    {isFirefliesLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                    ) : firefliesStatus?.connected ? (
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-sm text-green-400">
+                          <Check className="w-4 h-4" />
+                          Connected
+                        </span>
+                        <ShadcnButton
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSyncFireflies}
+                          disabled={isFirefliesSyncing}
+                          className="text-text-tertiary hover:text-white border-border-subtle"
+                        >
+                          {isFirefliesSyncing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </ShadcnButton>
+                        <ShadcnButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleDisconnectFireflies}
+                          disabled={isFirefliesDisconnecting}
+                          className="text-text-tertiary hover:text-red-400"
+                        >
+                          {isFirefliesDisconnecting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Unlink className="w-4 h-4" />
+                          )}
+                        </ShadcnButton>
+                      </div>
+                    ) : (
+                      <ShadcnButton
+                        onClick={() => setShowFirefliesModal(true)}
+                        className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                        Connect
+                      </ShadcnButton>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Fireflies API Key Modal */}
+                {showFirefliesModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-background-elevated border border-border-subtle rounded-xl p-6 w-full max-w-md shadow-xl">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-[#7C3AED]/20 rounded-lg flex items-center justify-center">
+                          <Flame className="w-5 h-5 text-[#7C3AED]" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">Connect Fireflies.ai</h3>
+                          <p className="text-sm text-text-tertiary">Enter your API key to sync meetings</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-text-secondary">API Key</label>
+                          <input
+                            type="password"
+                            value={firefliesApiKey}
+                            onChange={(e) => setFirefliesApiKey(e.target.value)}
+                            placeholder="Enter your Fireflies API key"
+                            className="flex h-10 w-full rounded-md border border-border-subtle bg-background-primary px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/50"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && firefliesApiKey.trim()) {
+                                handleConnectFireflies();
+                              }
+                            }}
+                          />
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-background-primary border border-border-subtle">
+                          <p className="text-xs text-text-tertiary">
+                            <strong className="text-text-secondary">Where to find your key:</strong>{" "}
+                            Go to{" "}
+                            <a
+                              href="https://app.fireflies.ai/integrations/custom/fireflies"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#7C3AED] hover:underline inline-flex items-center gap-0.5"
+                            >
+                              Fireflies Integrations
+                              <ExternalLink className="w-3 h-3" />
+                            </a>{" "}
+                            &rarr; API Key section &rarr; Copy your key.
+                          </p>
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                          <ShadcnButton
+                            variant="ghost"
+                            onClick={() => {
+                              setShowFirefliesModal(false);
+                              setFirefliesApiKey("");
+                            }}
+                          >
+                            Cancel
+                          </ShadcnButton>
+                          <ShadcnButton
+                            onClick={handleConnectFireflies}
+                            disabled={!firefliesApiKey.trim() || isFirefliesConnecting}
+                            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
+                          >
+                            {isFirefliesConnecting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                            Connect
+                          </ShadcnButton>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
