@@ -433,37 +433,80 @@ export default function CalendarView() {
           </div>
         )}
 
-        {!isLoading && !error && selectedDay.workBlocks.length > 0 && (
-          <>
-            {/* Section label */}
-            <div
-              style={{
-                fontSize: 10,
-                color: "#6B665C",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginBottom: 10,
-              }}
-            >
-              Activity
-            </div>
+        {!isLoading &&
+          !error &&
+          selectedDay.workBlocks.length > 0 &&
+          (() => {
+            const granolaBlocks = selectedDay.workBlocks.filter((b) => b.source === "granola");
+            const workBlocks = selectedDay.workBlocks.filter((b) => b.source !== "granola");
 
-            {/* Blocks */}
-            {selectedDay.workBlocks.map((block, index) => (
-              <ActivityBlock
-                key={block.id}
-                block={block}
-                blockNumber={index + 1}
-                defaultExpanded={
-                  !block.isActive &&
-                  index === selectedDay.workBlocks.length - 1 &&
-                  selectedDay.workBlocks.length <= 3
-                }
-                onDelete={handleDeleteBlock}
-              />
-            ))}
-          </>
-        )}
+            return (
+              <>
+                {/* Meetings section (Granola) */}
+                {granolaBlocks.length > 0 && (
+                  <>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "#6B665C",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        marginBottom: 10,
+                      }}
+                    >
+                      Meetings
+                    </div>
+                    {granolaBlocks.map((block) => (
+                      <ActivityBlock
+                        key={block.id}
+                        block={block}
+                        blockNumber={0}
+                        defaultExpanded={granolaBlocks.length <= 2}
+                        onDelete={handleDeleteBlock}
+                      />
+                    ))}
+                  </>
+                )}
+
+                {/* Divider between meetings and activity */}
+                {granolaBlocks.length > 0 && workBlocks.length > 0 && (
+                  <div style={{ margin: "12px 0 8px" }}>
+                    <div style={{ height: "0.5px", background: "rgba(236, 232, 224, 0.06)" }} />
+                  </div>
+                )}
+
+                {/* Activity section (work blocks) */}
+                {workBlocks.length > 0 && (
+                  <>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "#6B665C",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        marginBottom: 10,
+                      }}
+                    >
+                      Activity
+                    </div>
+                    {workBlocks.map((block, index) => (
+                      <ActivityBlock
+                        key={block.id}
+                        block={block}
+                        blockNumber={index + 1}
+                        defaultExpanded={
+                          !block.isActive &&
+                          index === workBlocks.length - 1 &&
+                          workBlocks.length <= 3
+                        }
+                        onDelete={handleDeleteBlock}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
+            );
+          })()}
       </div>
     </div>
   );
