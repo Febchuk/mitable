@@ -10,6 +10,9 @@
  */
 
 import { config } from "../config.js";
+import { createLogger } from "../lib/logger.js";
+
+const logger = createLogger({ context: "fireflies-api" });
 // ============================================================================
 // Types
 // ============================================================================
@@ -33,10 +36,16 @@ export interface FirefliesTranscript {
   summary?: {
     keywords?: string[];
     action_items?: string[];
+    outline?: string[];
+    shorthand_bullet?: string[];
     overview?: string;
+    bullet_gist?: string[];
+    gist?: string;
     short_summary?: string;
+    short_overview?: string;
     meeting_type?: string;
     topics_discussed?: string[];
+    transcript_chapters?: Array<{ gist?: string; headline?: string; start?: number; end?: number }>;
   };
   speakers?: Array<{
     id?: string;
@@ -62,8 +71,8 @@ export interface FirefliesUser {
 // ============================================================================
 
 const TRANSCRIPTS_QUERY = `
-  query Transcripts($fromDate: Float, $toDate: Float, $limit: Int, $skip: Int) {
-    transcripts(date: $fromDate, limit: $limit, skip: $skip) {
+  query Transcripts($fromDate: DateTime, $toDate: DateTime, $limit: Int, $skip: Int) {
+    transcripts(fromDate: $fromDate, toDate: $toDate, limit: $limit, skip: $skip) {
       id
       title
       date
@@ -85,8 +94,13 @@ const TRANSCRIPTS_QUERY = `
       summary {
         keywords
         action_items
+        outline
+        shorthand_bullet
         overview
+        bullet_gist
+        gist
         short_summary
+        short_overview
         meeting_type
         topics_discussed
       }
@@ -155,7 +169,7 @@ class FirefliesService {
   private async graphql<T>(
     apiKey: string,
     query: string,
-    variables: Record<string, unknown> = {},
+    variables: Record<string, unknown> = {}
   ): Promise<T> {
     const response = await fetch(config.fireflies.apiUrl, {
       method: "POST",
@@ -200,16 +214,24 @@ class FirefliesService {
    */
   async listTranscripts(
     apiKey: string,
-    options: { fromDate?: number; limit?: number; skip?: number } = {},
+    options: { fromDate?: number; toDate?: number; limit?: number; skip?: number } = {}
   ): Promise<FirefliesTranscript[]> {
-    const { fromDate, limit = 50, skip = 0 } = options;
+    const { fromDate, toDate, limit = 50, skip = 0 } = options;
     const variables: Record<string, unknown> = { limit, skip };
-    if (fromDate) variables.fromDate = fromDate;
+    if (fromDate) variables.fromDate = new Date(fromDate).toISOString();
+    if (toDate) variables.toDate = new Date(toDate).toISOString();
+
+    logger.info({ variables }, "Fireflies listTranscripts variables");
 
     const data = await this.graphql<{ transcripts: FirefliesTranscript[] }>(
       apiKey,
       TRANSCRIPTS_QUERY,
-      variables,
+      variables
+    );
+
+    logger.info(
+      { count: data.transcripts?.length ?? 0, firstId: data.transcripts?.[0]?.id },
+      "Fireflies listTranscripts response"
     );
 
     return data.transcripts || [];
@@ -222,7 +244,7 @@ class FirefliesService {
     const data = await this.graphql<{ transcript: FirefliesTranscript }>(
       apiKey,
       TRANSCRIPT_DETAIL_QUERY,
-      { transcriptId },
+      { transcriptId }
     );
 
     return data.transcript;

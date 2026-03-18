@@ -8,7 +8,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, AlertCircle, Square, Pause, Play } from "lucide-react";
+import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw } from "lucide-react";
 import WeekStrip from "./WeekStrip";
 import ActivityBlock from "./ActivityBlock";
 import type { ActivityDay } from "./types";
@@ -17,6 +17,8 @@ import { useStartSession } from "../../../../hooks/useStartSession";
 import { deleteSession } from "../../../../services/monitoringService";
 import { monitoringKeys } from "../../../../hooks/queries/monitoring";
 import type { MonitoringSessionState } from "@mitable/shared";
+import { authService } from "../../../../services/authService";
+import { API_BASE_URL } from "../../../../lib/config";
 
 function getStartOfWeek(date: Date): Date {
   const d = new Date(date);
@@ -75,6 +77,60 @@ export default function CalendarView() {
     navigateOnSuccess: false,
     showToasts: true,
   });
+
+  // Integration sync state — only show button if connected
+  const [hasGranola, setHasGranola] = useState(false);
+  const [hasFireflies, setHasFireflies] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const token = authService.getAccessToken();
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    fetch(`${API_BASE_URL}/api/integrations/granola/status`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.connected) setHasGranola(true);
+      })
+      .catch(() => {});
+    fetch(`${API_BASE_URL}/api/integrations/fireflies/status`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.connected) setHasFireflies(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSyncMeetings = useCallback(async () => {
+    const token = authService.getAccessToken();
+    if (!token) return;
+    setIsSyncing(true);
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      const promises: Promise<void>[] = [];
+      if (hasGranola) {
+        promises.push(
+          fetch(`${API_BASE_URL}/api/integrations/granola/sync`, { method: "POST", headers }).then(
+            () => {}
+          )
+        );
+      }
+      if (hasFireflies) {
+        promises.push(
+          fetch(`${API_BASE_URL}/api/integrations/fireflies/sync`, {
+            method: "POST",
+            headers,
+          }).then(() => {})
+        );
+      }
+      await Promise.all(promises);
+      queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
+    } catch (err) {
+      console.error("[CalendarView] sync failed:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [hasGranola, hasFireflies, queryClient]);
 
   // Hydrate session state on mount
   useEffect(() => {
@@ -279,6 +335,48 @@ export default function CalendarView() {
 
         {/* Right: session controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 4 }}>
+          {/* Sync meetings — only visible if Granola or Fireflies is connected */}
+          {(hasGranola || hasFireflies) && (
+            <button
+              onClick={handleSyncMeetings}
+              disabled={isSyncing}
+              title="Sync meetings from connected integrations"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "6px 10px",
+                borderRadius: 8,
+                border: "0.5px solid rgba(155, 132, 232, 0.2)",
+                background: "transparent",
+                color: "#9B84E8",
+                fontSize: 12,
+                fontFamily: "var(--font-sans)",
+                fontWeight: 500,
+                cursor: isSyncing ? "default" : "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+                opacity: isSyncing ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isSyncing) {
+                  e.currentTarget.style.background = "rgba(155, 132, 232, 0.06)";
+                  e.currentTarget.style.borderColor = "rgba(155, 132, 232, 0.3)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "rgba(155, 132, 232, 0.2)";
+              }}
+            >
+              <RefreshCw
+                size={11}
+                strokeWidth={1.8}
+                style={isSyncing ? { animation: "spin 1s linear infinite" } : undefined}
+              />
+              {isSyncing ? "Syncing..." : "Sync Meetings"}
+            </button>
+          )}
           {/* Pause / Play — only visible during a session */}
           {isRecording && (
             <button
@@ -437,13 +535,17 @@ export default function CalendarView() {
           !error &&
           selectedDay.workBlocks.length > 0 &&
           (() => {
-            const granolaBlocks = selectedDay.workBlocks.filter((b) => b.source === "granola");
-            const workBlocks = selectedDay.workBlocks.filter((b) => b.source !== "granola");
+            const meetingBlocks = selectedDay.workBlocks.filter(
+              (b) => b.source === "granola" || b.source === "fireflies"
+            );
+            const workBlocks = selectedDay.workBlocks.filter(
+              (b) => b.source !== "granola" && b.source !== "fireflies"
+            );
 
             return (
               <>
-                {/* Meetings section (Granola) */}
-                {granolaBlocks.length > 0 && (
+                {/* Meetings section (Granola + Fireflies) */}
+                {meetingBlocks.length > 0 && (
                   <>
                     <div
                       style={{
@@ -456,20 +558,19 @@ export default function CalendarView() {
                     >
                       Meetings
                     </div>
-                    {granolaBlocks.map((block) => (
+                    {meetingBlocks.map((block) => (
                       <ActivityBlock
                         key={block.id}
                         block={block}
                         blockNumber={0}
-                        defaultExpanded={granolaBlocks.length <= 2}
-                        onDelete={handleDeleteBlock}
+                        defaultExpanded={false}
                       />
                     ))}
                   </>
                 )}
 
                 {/* Divider between meetings and activity */}
-                {granolaBlocks.length > 0 && workBlocks.length > 0 && (
+                {meetingBlocks.length > 0 && workBlocks.length > 0 && (
                   <div style={{ margin: "12px 0 8px" }}>
                     <div style={{ height: "0.5px", background: "rgba(236, 232, 224, 0.06)" }} />
                   </div>

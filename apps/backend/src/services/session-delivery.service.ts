@@ -473,11 +473,14 @@ class SessionDeliveryService {
       };
     }
 
-    // Check if token is expired and try to refresh
+    // Proactive refresh: refresh when within 1 hour of expiry (not after)
     let accessToken = encryptionService.decrypt(user.gmailAccessTokenEncrypted);
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const isExpiredOrSoon =
+      user.gmailTokenExpiresAt &&
+      new Date(user.gmailTokenExpiresAt).getTime() < Date.now() + ONE_HOUR_MS;
 
-    if (user.gmailTokenExpiresAt && new Date(user.gmailTokenExpiresAt) < new Date()) {
-      // Token expired, try to refresh
+    if (isExpiredOrSoon) {
       if (!user.gmailRefreshTokenEncrypted) {
         return { success: false, error: "Gmail connection expired. Please reconnect." };
       }
@@ -486,7 +489,6 @@ class SessionDeliveryService {
         const refreshToken = encryptionService.decrypt(user.gmailRefreshTokenEncrypted);
         const newTokenData = await gmailService.refreshToken(refreshToken);
 
-        // Update stored tokens
         const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
         await db
           .update(schema.users)

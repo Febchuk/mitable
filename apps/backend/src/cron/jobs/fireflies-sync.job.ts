@@ -78,7 +78,7 @@ export async function runFirefliesSyncJob(): Promise<{
 
   logger.info(
     { usersProcessed, usersSkipped, usersFailed, totalMeetings, totalTimeMs },
-    "Fireflies sync job completed",
+    "Fireflies sync job completed"
   );
 
   return { usersProcessed, usersSkipped, usersFailed, totalMeetings, totalTimeMs };

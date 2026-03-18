@@ -150,20 +150,55 @@ class GranolaSyncService {
       getOrgName(user.organizationId),
     ]);
 
+    // Pre-fetch existing external IDs so we can skip already-ingested meetings
+    const existingExternalIds = new Set<string>();
+    const existingRows = await db
+      .select({ externalId: schema.activityBlocks.externalId })
+      .from(schema.activityBlocks)
+      .where(
+        and(
+          eq(schema.activityBlocks.userId, userId),
+          eq(schema.activityBlocks.blockType, "granola")
+        )
+      );
+    for (const row of existingRows) {
+      if (row.externalId) existingExternalIds.add(row.externalId);
+    }
+
     // Process each meeting
     const touchedDailyIds = new Set<string>();
     const discoveredSubscribers: string[] = [];
 
     for (const meeting of meetings) {
       try {
+        // Skip already-ingested meetings (no re-classification, no transcript refetch)
+        if (meeting.id && existingExternalIds.has(meeting.id)) {
+          logger.debug({ meetingId: meeting.id }, "Skipping already-ingested Granola meeting");
+          result.meetingsProcessed++;
+          continue;
+        }
+
         // Single-shot Claude Haiku classification
         const classification = await this.classifyMeeting(meeting, knownCustomers, orgName);
+
+        // Fetch full transcript for agent context
+        let rawTranscript: string | null = null;
+        try {
+          const transcriptRaw = await granolaService.getMeetingTranscript(accessToken, meeting.id);
+          rawTranscript = this.formatTranscript(transcriptRaw);
+        } catch (err) {
+          logger.warn(
+            { meetingId: meeting.id, error: String(err) },
+            "Failed to fetch Granola transcript"
+          );
+        }
 
         const { created, dailyActivityId } = await this.upsertMeetingAsBlock(
           userId,
           user.organizationId,
           meeting,
-          classification
+          classification,
+          rawTranscript
         );
 
         result.meetingsProcessed++;
@@ -416,13 +451,52 @@ Respond ONLY with JSON:
   // ============================================================================
 
   /**
-   * Create or update an activity block from a Granola meeting.
+   * Format a Granola MCP transcript response into readable speaker-by-speaker text.
    */
+  private formatTranscript(raw: unknown): string | null {
+    if (!raw) return null;
+
+    // MCP tool results come wrapped: { content: [{ type: "text", text: "..." }] }
+    const result = raw as Record<string, unknown>;
+    let segments: Array<{ speaker?: string; text?: string; start_time?: number }> = [];
+
+    if (result.content && Array.isArray(result.content)) {
+      const textBlock = (result.content as Array<{ type: string; text?: string }>).find(
+        (b) => b.type === "text" && b.text
+      );
+      if (textBlock?.text) {
+        try {
+          const parsed = JSON.parse(textBlock.text);
+          if (Array.isArray(parsed)) segments = parsed;
+          else if (parsed.transcript && Array.isArray(parsed.transcript))
+            segments = parsed.transcript;
+          else if (parsed.segments && Array.isArray(parsed.segments)) segments = parsed.segments;
+        } catch {
+          // Not JSON — might be plain text transcript
+          return textBlock.text;
+        }
+      }
+    }
+
+    if (segments.length === 0) return null;
+
+    return segments
+      .map((s) => {
+        const speaker = s.speaker || "Unknown";
+        const mins = Math.floor((s.start_time || 0) / 60);
+        const secs = Math.floor((s.start_time || 0) % 60);
+        const ts = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+        return `${speaker} (${ts}): ${s.text || ""}`;
+      })
+      .join("\n");
+  }
+
   private async upsertMeetingAsBlock(
     userId: string,
     organizationId: string,
     meeting: GranolaMeeting,
-    classification: MeetingClassification
+    classification: MeetingClassification,
+    rawTranscript: string | null
   ): Promise<{ created: boolean; dailyActivityId: string }> {
     const startTime = meeting.start_time
       ? new Date(meeting.start_time)
@@ -453,25 +527,44 @@ Respond ONLY with JSON:
     const dailyActivityId = await this.ensureDailyActivity(userId, organizationId, activityDate);
 
     const blockName = `[Granola] ${meeting.title || "Meeting"}`;
+    const externalId = meeting.id || null;
 
-    // Check if a block for this meeting already exists
-    const existingBlocks = await db
-      .select({ id: schema.activityBlocks.id })
-      .from(schema.activityBlocks)
-      .where(
-        and(eq(schema.activityBlocks.userId, userId), eq(schema.activityBlocks.name, blockName))
-      )
-      .limit(1);
+    // Check if a block for this meeting already exists (by externalId first, then name fallback)
+    let existingBlocks: { id: string }[] = [];
+    if (externalId) {
+      existingBlocks = await db
+        .select({ id: schema.activityBlocks.id })
+        .from(schema.activityBlocks)
+        .where(
+          and(
+            eq(schema.activityBlocks.userId, userId),
+            eq(schema.activityBlocks.blockType, "granola"),
+            eq(schema.activityBlocks.externalId, externalId)
+          )
+        )
+        .limit(1);
+    }
+    if (existingBlocks.length === 0) {
+      existingBlocks = await db
+        .select({ id: schema.activityBlocks.id })
+        .from(schema.activityBlocks)
+        .where(
+          and(eq(schema.activityBlocks.userId, userId), eq(schema.activityBlocks.name, blockName))
+        )
+        .limit(1);
+    }
 
     const blockData = {
       dailyActivityId,
       userId,
       blockType: "granola" as const,
       name: blockName,
+      externalId,
       startTime,
       endTime,
       durationMinutes,
       description,
+      rawTranscript,
       apps: JSON.stringify(["Granola"]),
       category: "meeting",
       participants: JSON.stringify(attendees),
@@ -551,10 +644,13 @@ Respond ONLY with JSON:
 
     let accessToken = encryptionService.decrypt(user.granolaAccessTokenEncrypted);
 
-    const isExpired =
-      user.granolaTokenExpiresAt && new Date(user.granolaTokenExpiresAt) < new Date();
+    // Proactive refresh: refresh when within 1 hour of expiry (not after)
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const isExpiredOrSoon =
+      user.granolaTokenExpiresAt &&
+      new Date(user.granolaTokenExpiresAt).getTime() < Date.now() + ONE_HOUR_MS;
 
-    if (isExpired) {
+    if (isExpiredOrSoon) {
       if (!user.granolaRefreshTokenEncrypted) {
         throw new Error("Granola token expired and no refresh token available");
       }

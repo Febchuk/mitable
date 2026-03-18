@@ -32,6 +32,107 @@ function sendError(
   res.status(statusCode).json(error);
 }
 
+// ============================================================================
+// Proactive Token Refresh Helpers
+// Refresh OAuth tokens when within 1 hour of expiry to prevent "expired" state
+// ============================================================================
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Resolve a valid Linear access token, proactively refreshing if near expiry.
+ * Returns the decrypted access token or null if refresh fails.
+ */
+async function resolveLinearAccessToken(
+  userId: string,
+  user: {
+    linearAccessTokenEncrypted: string | null;
+    linearRefreshTokenEncrypted?: string | null;
+    linearTokenExpiresAt: Date | null;
+  }
+): Promise<string | null> {
+  if (!user.linearAccessTokenEncrypted) return null;
+
+  const isExpiredOrSoon =
+    user.linearTokenExpiresAt &&
+    new Date(user.linearTokenExpiresAt).getTime() < Date.now() + ONE_HOUR_MS;
+
+  if (isExpiredOrSoon && user.linearRefreshTokenEncrypted) {
+    try {
+      const { linearService } = await import("../services/linear.service.js");
+      const refreshToken = encryptionService.decrypt(user.linearRefreshTokenEncrypted);
+      const newTokenData = await linearService.refreshToken(refreshToken);
+      const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
+
+      await db
+        .update(schema.users)
+        .set({
+          linearAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
+          linearRefreshTokenEncrypted: newTokenData.refresh_token
+            ? encryptionService.encrypt(newTokenData.refresh_token)
+            : user.linearRefreshTokenEncrypted,
+          linearTokenExpiresAt: tokenExpiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      return newTokenData.access_token;
+    } catch (err) {
+      console.error(`Linear token refresh failed for user ${userId}:`, err);
+      return null;
+    }
+  }
+
+  return encryptionService.decrypt(user.linearAccessTokenEncrypted);
+}
+
+/**
+ * Resolve a valid Gmail access token, proactively refreshing if near expiry.
+ * Returns the decrypted access token or null if refresh fails.
+ */
+async function resolveGmailAccessToken(
+  userId: string,
+  user: {
+    gmailAccessTokenEncrypted: string | null;
+    gmailRefreshTokenEncrypted?: string | null;
+    gmailTokenExpiresAt: Date | null;
+  }
+): Promise<string | null> {
+  if (!user.gmailAccessTokenEncrypted) return null;
+
+  const isExpiredOrSoon =
+    user.gmailTokenExpiresAt &&
+    new Date(user.gmailTokenExpiresAt).getTime() < Date.now() + ONE_HOUR_MS;
+
+  if (isExpiredOrSoon && user.gmailRefreshTokenEncrypted) {
+    try {
+      const { gmailService } = await import("../services/gmail.service.js");
+      const refreshToken = encryptionService.decrypt(user.gmailRefreshTokenEncrypted);
+      const newTokenData = await gmailService.refreshToken(refreshToken);
+      const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
+
+      await db
+        .update(schema.users)
+        .set({
+          gmailAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
+          gmailRefreshTokenEncrypted: newTokenData.refresh_token
+            ? encryptionService.encrypt(newTokenData.refresh_token)
+            : user.gmailRefreshTokenEncrypted,
+          gmailTokenExpiresAt: tokenExpiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+
+      return newTokenData.access_token;
+    } catch (err) {
+      console.error(`Gmail token refresh failed for user ${userId}:`, err);
+      return null;
+    }
+  }
+
+  return encryptionService.decrypt(user.gmailAccessTokenEncrypted);
+}
+
 // Type definition for Slack OAuth v2 access response
 interface SlackOAuthResponse {
   ok: boolean;
@@ -1790,6 +1891,7 @@ router.get("/linear/status", requireAuth, async (req: Request, res: Response): P
     const [user] = await db
       .select({
         linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        linearRefreshTokenEncrypted: schema.users.linearRefreshTokenEncrypted,
         linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
       })
       .from(schema.users)
@@ -1801,10 +1903,10 @@ router.get("/linear/status", requireAuth, async (req: Request, res: Response): P
       return;
     }
 
+    // Attempt proactive refresh before reporting expired
+    const accessToken = await resolveLinearAccessToken(userId, user);
     const isConnected = !!user.linearAccessTokenEncrypted;
-    const isExpired = user.linearTokenExpiresAt
-      ? new Date(user.linearTokenExpiresAt) < new Date()
-      : false;
+    const isExpired = !accessToken && isConnected;
 
     res.json({
       connected: isConnected && !isExpired,
@@ -1864,6 +1966,7 @@ router.get("/linear/issues", requireAuth, async (req: Request, res: Response): P
     const [user] = await db
       .select({
         linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        linearRefreshTokenEncrypted: schema.users.linearRefreshTokenEncrypted,
         linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
       })
       .from(schema.users)
@@ -1878,17 +1981,15 @@ router.get("/linear/issues", requireAuth, async (req: Request, res: Response): P
       return;
     }
 
-    // Check if token is expired
-    if (user.linearTokenExpiresAt && new Date(user.linearTokenExpiresAt) < new Date()) {
+    // Resolve token (proactively refreshes if near expiry)
+    const accessToken = await resolveLinearAccessToken(userId, user);
+    if (!accessToken) {
       res.status(401).json({
         error: "Token Expired",
         message: "Your Linear connection has expired. Please reconnect.",
       });
       return;
     }
-
-    // Decrypt access token
-    const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
 
     // Fetch issues from Linear
     const { linearService } = await import("../services/linear.service.js");
@@ -1915,6 +2016,7 @@ router.get("/linear/teams", requireAuth, async (req: Request, res: Response): Pr
     const [user] = await db
       .select({
         linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+        linearRefreshTokenEncrypted: schema.users.linearRefreshTokenEncrypted,
         linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
       })
       .from(schema.users)
@@ -1929,8 +2031,15 @@ router.get("/linear/teams", requireAuth, async (req: Request, res: Response): Pr
       return;
     }
 
-    // Decrypt access token
-    const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
+    // Resolve token (proactively refreshes if near expiry)
+    const accessToken = await resolveLinearAccessToken(userId, user);
+    if (!accessToken) {
+      res.status(401).json({
+        error: "Token Expired",
+        message: "Your Linear connection has expired. Please reconnect.",
+      });
+      return;
+    }
 
     // Fetch teams from Linear
     const { linearService } = await import("../services/linear.service.js");
@@ -1970,6 +2079,8 @@ router.post(
       const [user] = await db
         .select({
           linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+          linearRefreshTokenEncrypted: schema.users.linearRefreshTokenEncrypted,
+          linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
         })
         .from(schema.users)
         .where(eq(schema.users.id, userId))
@@ -1983,8 +2094,15 @@ router.post(
         return;
       }
 
-      // Decrypt access token
-      const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
+      // Resolve token (proactively refreshes if near expiry)
+      const accessToken = await resolveLinearAccessToken(userId, user);
+      if (!accessToken) {
+        res.status(401).json({
+          error: "Token Expired",
+          message: "Your Linear connection has expired. Please reconnect.",
+        });
+        return;
+      }
 
       // Create comment on Linear
       const { linearService } = await import("../services/linear.service.js");
@@ -2027,6 +2145,8 @@ router.patch(
       const [user] = await db
         .select({
           linearAccessTokenEncrypted: schema.users.linearAccessTokenEncrypted,
+          linearRefreshTokenEncrypted: schema.users.linearRefreshTokenEncrypted,
+          linearTokenExpiresAt: schema.users.linearTokenExpiresAt,
         })
         .from(schema.users)
         .where(eq(schema.users.id, userId))
@@ -2040,8 +2160,15 @@ router.patch(
         return;
       }
 
-      // Decrypt access token
-      const accessToken = encryptionService.decrypt(user.linearAccessTokenEncrypted);
+      // Resolve token (proactively refreshes if near expiry)
+      const accessToken = await resolveLinearAccessToken(userId, user);
+      if (!accessToken) {
+        res.status(401).json({
+          error: "Token Expired",
+          message: "Your Linear connection has expired. Please reconnect.",
+        });
+        return;
+      }
 
       // Update issue state on Linear
       const { linearService } = await import("../services/linear.service.js");
@@ -2268,6 +2395,7 @@ router.get("/gmail/status", requireAuth, async (req: Request, res: Response): Pr
     const [user] = await db
       .select({
         gmailAccessTokenEncrypted: schema.users.gmailAccessTokenEncrypted,
+        gmailRefreshTokenEncrypted: schema.users.gmailRefreshTokenEncrypted,
         gmailTokenExpiresAt: schema.users.gmailTokenExpiresAt,
         gmailUserEmail: schema.users.gmailUserEmail,
       })
@@ -2280,10 +2408,10 @@ router.get("/gmail/status", requireAuth, async (req: Request, res: Response): Pr
       return;
     }
 
+    // Attempt proactive refresh before reporting expired
+    const accessToken = await resolveGmailAccessToken(userId, user);
     const isConnected = !!user.gmailAccessTokenEncrypted;
-    const isExpired = user.gmailTokenExpiresAt
-      ? new Date(user.gmailTokenExpiresAt) < new Date()
-      : false;
+    const isExpired = !accessToken && isConnected;
 
     res.json({
       connected: isConnected && !isExpired,
@@ -2376,41 +2504,11 @@ router.post("/gmail/send", requireAuth, async (req: Request, res: Response): Pro
     // Import Gmail service
     const { gmailService } = await import("../services/gmail.service.js");
 
-    // Check if token is expired and try to refresh
-    let accessToken = encryptionService.decrypt(user.gmailAccessTokenEncrypted);
-
-    if (user.gmailTokenExpiresAt && new Date(user.gmailTokenExpiresAt) < new Date()) {
-      // Token expired, try to refresh
-      if (!user.gmailRefreshTokenEncrypted) {
-        sendError(
-          res,
-          401,
-          "TOKEN_EXPIRED",
-          "Your Gmail connection has expired. Please reconnect."
-        );
-        return;
-      }
-
-      try {
-        const refreshToken = encryptionService.decrypt(user.gmailRefreshTokenEncrypted);
-        const newTokenData = await gmailService.refreshToken(refreshToken);
-
-        // Update stored tokens
-        const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
-        await db
-          .update(schema.users)
-          .set({
-            gmailAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
-            gmailTokenExpiresAt: tokenExpiresAt,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.users.id, userId));
-
-        accessToken = newTokenData.access_token;
-      } catch {
-        sendError(res, 401, "REFRESH_FAILED", "Failed to refresh Gmail token. Please reconnect.");
-        return;
-      }
+    // Resolve token (proactively refreshes if near expiry)
+    const accessToken = await resolveGmailAccessToken(userId, user);
+    if (!accessToken) {
+      sendError(res, 401, "TOKEN_EXPIRED", "Your Gmail connection has expired. Please reconnect.");
+      return;
     }
 
     // Send email
@@ -3189,7 +3287,7 @@ router.post(
           401,
           "INVALID_API_KEY",
           "The API key is invalid or expired. Please check your Fireflies settings.",
-          { detail: String(err) },
+          { detail: String(err) }
         );
         return;
       }
@@ -3220,44 +3318,40 @@ router.post(
         message: "Failed to connect Fireflies",
       });
     }
-  },
+  }
 );
 
 /**
  * GET /api/integrations/fireflies/status
  * Check if the current user has Fireflies connected.
  */
-router.get(
-  "/fireflies/status",
-  requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = req.userId!;
+router.get("/fireflies/status", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
 
-      const [user] = await db
-        .select({
-          firefliesApiKeyEncrypted: schema.users.firefliesApiKeyEncrypted,
-          firefliesLastSyncedAt: schema.users.firefliesLastSyncedAt,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.id, userId))
-        .limit(1);
+    const [user] = await db
+      .select({
+        firefliesApiKeyEncrypted: schema.users.firefliesApiKeyEncrypted,
+        firefliesLastSyncedAt: schema.users.firefliesLastSyncedAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
 
-      const connected = !!user?.firefliesApiKeyEncrypted;
+    const connected = !!user?.firefliesApiKeyEncrypted;
 
-      res.json({
-        connected,
-        lastSyncedAt: user?.firefliesLastSyncedAt || null,
-      });
-    } catch (error) {
-      console.error("Error checking Fireflies status:", error);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: "Failed to check Fireflies status",
-      });
-    }
-  },
-);
+    res.json({
+      connected,
+      lastSyncedAt: user?.firefliesLastSyncedAt || null,
+    });
+  } catch (error) {
+    console.error("Error checking Fireflies status:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to check Fireflies status",
+    });
+  }
+});
 
 /**
  * DELETE /api/integrations/fireflies/disconnect
@@ -3289,38 +3383,88 @@ router.delete(
         message: "Failed to disconnect Fireflies",
       });
     }
-  },
+  }
 );
 
 /**
  * POST /api/integrations/fireflies/sync
  * Trigger a manual sync for the current user.
  */
-router.post(
-  "/fireflies/sync",
-  requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = req.userId!;
+router.post("/fireflies/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
 
-      const { firefliesSyncService } = await import("../services/fireflies-sync.service.js");
-      const result = await firefliesSyncService.syncUserMeetings(userId);
+    const { firefliesSyncService } = await import("../services/fireflies-sync.service.js");
+    const result = await firefliesSyncService.syncUserMeetings(userId);
 
-      res.json({
-        success: true,
-        meetingsProcessed: result.meetingsProcessed,
-        meetingsCreated: result.meetingsCreated,
-        meetingsUpdated: result.meetingsUpdated,
-        errors: result.errors,
-      });
-    } catch (error) {
-      console.error("Error syncing Fireflies:", error);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: "Failed to sync Fireflies meetings",
-      });
+    res.json({
+      success: true,
+      meetingsProcessed: result.meetingsProcessed,
+      meetingsCreated: result.meetingsCreated,
+      meetingsUpdated: result.meetingsUpdated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    console.error("Error syncing Fireflies:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to sync Fireflies meetings",
+    });
+  }
+});
+
+/**
+ * GET /api/integrations/fireflies/blocks
+ * Return Fireflies activity_blocks for the current user (for calendar view).
+ * Admins can pass ?userId=<id> to fetch blocks for any user.
+ */
+router.get("/fireflies/blocks", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    let userId = req.userId!;
+
+    if (req.query.userId && typeof req.query.userId === "string") {
+      const requestingUser = await db
+        .select({ role: schema.users.role })
+        .from(schema.users)
+        .where(eq(schema.users.id, req.userId!))
+        .limit(1);
+      if (requestingUser[0]?.role !== "admin") {
+        res.status(403).json({ error: "Only admins can query other users' blocks" });
+        return;
+      }
+      userId = req.query.userId;
     }
-  },
-);
+
+    const blocks = await db
+      .select({
+        id: schema.activityBlocks.id,
+        name: schema.activityBlocks.name,
+        startTime: schema.activityBlocks.startTime,
+        endTime: schema.activityBlocks.endTime,
+        durationMinutes: schema.activityBlocks.durationMinutes,
+        description: schema.activityBlocks.description,
+        category: schema.activityBlocks.category,
+        topicName: schema.activityBlocks.topicName,
+        subscriberName: schema.activityBlocks.subscriberName,
+        participants: schema.activityBlocks.participants,
+      })
+      .from(schema.activityBlocks)
+      .where(
+        and(
+          eq(schema.activityBlocks.userId, userId),
+          eq(schema.activityBlocks.blockType, "fireflies")
+        )
+      )
+      .orderBy(schema.activityBlocks.startTime);
+
+    res.json({ blocks });
+  } catch (error) {
+    console.error("Error fetching Fireflies blocks:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to fetch Fireflies blocks",
+    });
+  }
+});
 
 export default router;

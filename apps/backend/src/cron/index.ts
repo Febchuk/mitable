@@ -119,7 +119,7 @@ export function initCronJobs(): void {
             meetings: result.totalMeetings,
             timeMs: result.totalTimeMs,
           },
-          "Fireflies sync completed",
+          "Fireflies sync completed"
         );
       }
     } catch (error) {
@@ -129,5 +129,7 @@ export function initCronJobs(): void {
     }
   });
 
-  logger.info("Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min");
+  logger.info(
+    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min"
+  );
 }
