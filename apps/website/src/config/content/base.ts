@@ -4,7 +4,7 @@
  */
 
 // Single source of truth for version - update this when releasing
-const MITABLE_VERSION = "0.1.35";
+export const MITABLE_VERSION = "0.1.37";
 const R2_BASE = "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev";
 
 export const baseContent = {
