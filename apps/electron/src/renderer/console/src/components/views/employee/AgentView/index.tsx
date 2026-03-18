@@ -317,7 +317,7 @@ export default function AgentView() {
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          minHeight: "calc(100vh - 160px)",
+          minHeight: "calc(100vh - 120px)",
           gap: 28,
           paddingBottom: 40,
         }}
@@ -369,7 +369,7 @@ export default function AgentView() {
       style={{
         display: "flex",
         flexDirection: "column",
-        minHeight: "calc(100vh - 160px)",
+        minHeight: "calc(100vh - 120px)",
       }}
     >
       {/* Browser bridge status */}
@@ -507,10 +507,10 @@ export default function AgentView() {
       <div
         style={{
           position: "sticky",
-          bottom: -40,
+          bottom: -20,
           background: "#1A1916",
           paddingTop: 16,
-          paddingBottom: 40,
+          paddingBottom: 20,
           marginTop: 16,
         }}
       >

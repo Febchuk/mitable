@@ -25,48 +25,20 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-const TASK_COLORS = ["#9B84E8", "#3A9B6B", "#D4A27A", "#9B9689"];
-const APP_COLORS: Record<string, string> = {
-  "Google Chrome": "#F5A623",
-  Chrome: "#F5A623",
-  Claude: "#9B84E8",
-  Slack: "#3A9B6B",
-  "VS Code": "#4A9FD9",
-  "Visual Studio Code": "#4A9FD9",
-  Cursor: "#9B84E8",
-  Figma: "#D4A27A",
-  Terminal: "#9B9689",
-  Safari: "#4A9FD9",
-  Firefox: "#E87474",
-  Notion: "#ECE8E0",
-  Arc: "#9B84E8",
-};
-
-function getAppColor(appName: string): string {
-  if (APP_COLORS[appName]) return APP_COLORS[appName];
-  let hash = 0;
-  for (let i = 0; i < appName.length; i++) {
-    hash = appName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const fallback = ["#F5A623", "#9B84E8", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474"];
-  return fallback[Math.abs(hash) % fallback.length];
-}
+const BAR_COLOR = "#9B84E8";
 
 /** Expandable task row */
 function TaskRow({
   task,
-  index,
   totalMinutes,
   isLast,
 }: {
   task: { shortTitle: string; description: string; minutes: number };
-  index: number;
   totalMinutes: number;
   isLast: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const pct = Math.round((task.minutes / totalMinutes) * 100);
-  const color = TASK_COLORS[index] || TASK_COLORS[TASK_COLORS.length - 1];
   const hasDescription = task.description && task.description.trim().length > 0;
 
   return (
@@ -108,7 +80,7 @@ function TaskRow({
         >
           {task.shortTitle}
         </span>
-        <div style={{ width: 140, flexShrink: 0 }}>
+        <div style={{ width: 120, flexShrink: 0 }}>
           <div
             style={{
               height: 3,
@@ -122,18 +94,30 @@ function TaskRow({
                 height: "100%",
                 borderRadius: 2,
                 width: `${pct}%`,
-                background: color,
+                background: BAR_COLOR,
               }}
             />
           </div>
         </div>
         <span
-          style={{ fontSize: 11, color: "#6B665C", textAlign: "right", minWidth: 28 }}
+          style={{
+            fontSize: 11,
+            color: "#6B665C",
+            textAlign: "right",
+            width: 36,
+            flexShrink: 0,
+          }}
         >
           {formatDuration(task.minutes)}
         </span>
         <span
-          style={{ fontSize: 11, color: "#6B665C", textAlign: "right", minWidth: 28 }}
+          style={{
+            fontSize: 11,
+            color: "#6B665C",
+            textAlign: "right",
+            width: 32,
+            flexShrink: 0,
+          }}
         >
           {pct}%
         </span>
@@ -209,7 +193,7 @@ export default function ActivityBlock({
             fontSize: 11,
             textTransform: "uppercase",
             letterSpacing: "0.07em",
-            color: isActive ? "#3A9B6B" : isExpanded ? "#9B84E8" : "#6B665C",
+            color: isExpanded ? "#9B84E8" : "#6B665C",
             flexShrink: 0,
           }}
         >
@@ -338,7 +322,6 @@ export default function ActivityBlock({
                   <TaskRow
                     key={idx}
                     task={task}
-                    index={idx}
                     totalMinutes={totalMinutes}
                     isLast={idx === block.taskBreakdown.length - 1}
                   />
@@ -369,77 +352,75 @@ export default function ActivityBlock({
                 App breakdown
               </div>
 
-              {block.appBreakdown.map((app, idx) => {
-                const color = getAppColor(app.app);
-
-                return (
-                  <div
-                    key={idx}
+              {block.appBreakdown.map((app, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "7px 0",
+                    borderBottom:
+                      idx < block.appBreakdown.length - 1
+                        ? "0.5px solid rgba(236, 232, 224, 0.04)"
+                        : "none",
+                  }}
+                >
+                  <span
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "7px 0",
-                      borderBottom:
-                        idx < block.appBreakdown.length - 1
-                          ? "0.5px solid rgba(236, 232, 224, 0.04)"
-                          : "none",
+                      fontSize: 13,
+                      color: "#9B9689",
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    <span
+                    {app.app}
+                  </span>
+                  <div style={{ width: 120, flexShrink: 0 }}>
+                    <div
                       style={{
-                        fontSize: 13,
-                        color: "#9B9689",
-                        flex: 1,
+                        height: 3,
+                        background: "rgba(236, 232, 224, 0.06)",
+                        borderRadius: 2,
                         overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
                       }}
                     >
-                      {app.app}
-                    </span>
-                    <div style={{ width: 140, flexShrink: 0 }}>
                       <div
                         style={{
-                          height: 3,
-                          background: "rgba(236, 232, 224, 0.06)",
+                          height: "100%",
                           borderRadius: 2,
-                          overflow: "hidden",
+                          width: `${app.percentage}%`,
+                          background: BAR_COLOR,
                         }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            borderRadius: 2,
-                            width: `${app.percentage}%`,
-                            background: color,
-                          }}
-                        />
-                      </div>
+                      />
                     </div>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: "#6B665C",
-                        textAlign: "right",
-                        minWidth: 28,
-                      }}
-                    >
-                      {formatDuration(app.minutes)}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: "#6B665C",
-                        textAlign: "right",
-                        minWidth: 28,
-                      }}
-                    >
-                      {app.percentage}%
-                    </span>
                   </div>
-                );
-              })}
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#6B665C",
+                      textAlign: "right",
+                      width: 36,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {formatDuration(app.minutes)}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#6B665C",
+                      textAlign: "right",
+                      width: 32,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {app.percentage}%
+                  </span>
+                </div>
+              ))}
             </>
           )}
         </div>

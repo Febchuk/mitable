@@ -234,12 +234,12 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(155, 132, 232, 0.18);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(155, 132, 232, 0.3);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -252,12 +252,12 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(155, 132, 232, 0.18);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(155, 132, 232, 0.3);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* Force vertical-only scrolling in ScrollArea */

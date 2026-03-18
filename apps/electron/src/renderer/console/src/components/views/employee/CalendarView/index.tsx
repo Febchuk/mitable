@@ -221,10 +221,10 @@ export default function CalendarView() {
       <div
         style={{
           position: "sticky",
-          top: -40,
+          top: -20,
           zIndex: 10,
           background: "#1A1916",
-          paddingTop: 40,
+          paddingTop: 20,
           paddingBottom: 20,
         }}
       >

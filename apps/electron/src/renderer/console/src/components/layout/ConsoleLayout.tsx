@@ -38,7 +38,7 @@ export default function ConsoleLayout() {
 
           <div
             className="flex-1 overflow-y-auto flex flex-col items-center"
-            style={{ padding: "40px 0" }}
+            style={{ padding: "20px 0" }}
           >
             <div
               className="w-full flex flex-col"
