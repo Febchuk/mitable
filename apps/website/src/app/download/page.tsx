@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { MITABLE_VERSION } from "@/config/content/base";
 import { siteContent } from "@/config/site-content";
 
 export const metadata: Metadata = {
@@ -113,7 +114,7 @@ export default function DownloadPage() {
 
                         {/* Version note */}
                         <p className="mt-12 text-center font-mono text-xs text-gray-500">
-                            Version 0.1.24 &middot;{" "}
+                            Version {MITABLE_VERSION} &middot;{" "}
                             <a href="/" className="underline underline-offset-2 transition-colors hover:text-gray-300">
                                 Back to homepage
                             </a>
