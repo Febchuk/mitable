@@ -1,13 +1,5 @@
-import {
-  Bot,
-  User,
-  Loader2,
-  Terminal,
-  FileText,
-  Globe,
-  AlertCircle,
-  ClipboardList,
-} from "lucide-react";
+import { Loader2, Terminal, FileText, Globe, AlertCircle, ClipboardList, User } from "lucide-react";
+import MitableIcon from "../../../icons/MitableIcon";
 
 interface AgentMessageProps {
   role: "user" | "assistant" | "tool" | "error";
@@ -19,20 +11,50 @@ interface AgentMessageProps {
 export default function AgentMessage({ role, content, toolName, isPlan }: AgentMessageProps) {
   if (role === "tool") {
     return (
-      <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "4px 0",
+          fontSize: 11,
+          color: "#6B665C",
+        }}
+      >
         <ToolIcon name={toolName} />
-        <span className="truncate">{content}</span>
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {content}
+        </span>
       </div>
     );
   }
 
   if (role === "error") {
     return (
-      <div className="flex items-start gap-3 px-4 py-3">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-          <AlertCircle className="h-4 w-4 text-destructive" />
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0" }}>
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "rgba(232, 116, 116, 0.1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <AlertCircle size={14} style={{ color: "#E87474" }} />
         </div>
-        <div className="text-sm text-destructive">{content}</div>
+        <div style={{ fontSize: 13, color: "#E87474", lineHeight: 1.6, paddingTop: 4 }}>
+          {content}
+        </div>
       </div>
     );
   }
@@ -41,16 +63,51 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
 
   if (isPlan && !isUser) {
     return (
-      <div className="flex items-start gap-3 px-4 py-3 bg-muted/30">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/10">
-          <Bot className="h-4 w-4 text-violet-500" />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+          padding: "12px 0",
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "rgba(155, 132, 232, 0.1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <MitableIcon size={14} style={{ color: "#9B84E8" }} />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-center gap-1.5">
-            <ClipboardList className="h-3.5 w-3.5 text-violet-500" />
-            <span className="text-xs font-medium text-violet-500">Proposed Plan</span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 8,
+            }}
+          >
+            <ClipboardList size={13} style={{ color: "#9B84E8" }} />
+            <span style={{ fontSize: 11, fontWeight: 500, color: "#9B84E8" }}>Proposed Plan</span>
           </div>
-          <div className="border-l-2 border-violet-400 pl-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
+          <div
+            style={{
+              borderLeft: "2px solid rgba(155, 132, 232, 0.3)",
+              paddingLeft: 12,
+              fontSize: 13,
+              lineHeight: 1.7,
+              color: "#ECE8E0",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
             {content}
           </div>
         </div>
@@ -59,19 +116,44 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
   }
 
   return (
-    <div className={`flex items-start gap-3 px-4 py-3 ${isUser ? "" : "bg-muted/30"}`}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        padding: "12px 0",
+      }}
+    >
       <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-          isUser ? "bg-primary/10" : "bg-violet-500/10"
-        }`}
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: isUser ? "rgba(236, 232, 224, 0.06)" : "rgba(155, 132, 232, 0.1)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
       >
         {isUser ? (
-          <User className="h-4 w-4 text-primary" />
+          <User size={14} style={{ color: "#9B9689" }} />
         ) : (
-          <Bot className="h-4 w-4 text-violet-500" />
+          <MitableIcon size={14} style={{ color: "#9B84E8" }} />
         )}
       </div>
-      <div className="min-w-0 flex-1 text-sm leading-relaxed whitespace-pre-wrap break-words">
+      <div
+        style={{
+          minWidth: 0,
+          flex: 1,
+          fontSize: 13,
+          lineHeight: 1.7,
+          color: "#ECE8E0",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          paddingTop: 4,
+        }}
+      >
         {content}
       </div>
     </div>
@@ -105,7 +187,6 @@ export function AgentThinking({
 }) {
   const label = toolName ? formatToolLabel(toolName) : "Thinking...";
   const icon = toolName ? <ToolIcon name={toolName} /> : null;
-  // Show command/file/query snippet for extra context (e.g. "Running command... find ~ -name *.pdf")
   const detail = toolDetail
     ? toolDetail.length > 50
       ? toolDetail.slice(0, 50) + "..."
@@ -113,18 +194,50 @@ export function AgentThinking({
     : null;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-muted/30">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/10">
-        <Bot className="h-4 w-4 text-violet-500" />
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0" }}>
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: "rgba(155, 132, 232, 0.1)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <MitableIcon size={14} style={{ color: "#9B84E8" }} />
       </div>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-          {icon && <span className="text-muted-foreground">{icon}</span>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, paddingTop: 4 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            color: "#6B665C",
+          }}
+        >
+          <Loader2
+            size={13}
+            style={{ color: "#9B84E8", animation: "spin 1s linear infinite", flexShrink: 0 }}
+          />
+          {icon && <span>{icon}</span>}
           <span>{label}</span>
         </div>
         {detail && (
-          <span className="ml-[22px] truncate text-xs text-muted-foreground/60 font-mono">
+          <span
+            style={{
+              marginLeft: 21,
+              fontSize: 11,
+              color: "rgba(107, 102, 92, 0.6)",
+              fontFamily: "var(--font-mono, monospace)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {detail}
           </span>
         )}
@@ -134,7 +247,8 @@ export function AgentThinking({
 }
 
 function ToolIcon({ name }: { name?: string }) {
-  if (!name) return <Terminal className="h-3 w-3" />;
+  const style = { color: "#6B665C" };
+  if (!name) return <Terminal size={12} style={style} />;
   const lower = name.toLowerCase();
   if (
     lower.includes("file") ||
@@ -143,13 +257,13 @@ function ToolIcon({ name }: { name?: string }) {
     lower.includes("edit") ||
     lower === "glob"
   )
-    return <FileText className="h-3 w-3" />;
+    return <FileText size={12} style={style} />;
   if (
     lower.includes("web") ||
     lower.includes("search") ||
     lower.includes("fetch") ||
     lower === "grep"
   )
-    return <Globe className="h-3 w-3" />;
-  return <Terminal className="h-3 w-3" />;
+    return <Globe size={12} style={style} />;
+  return <Terminal size={12} style={style} />;
 }

@@ -42,6 +42,7 @@ import IntegrationsView from "./components/views/admin/IntegrationsView";
 import ReportsView from "./components/views/admin/ReportsView";
 import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
+import UploadsView from "./components/views/employee/UploadsView";
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as monitoringService from "./services/monitoringService";
@@ -390,6 +391,7 @@ function App() {
                         <Route path="monitoring" element={<MonitoringView />} />
                         <Route path="monitoring/:sessionId" element={<SessionDetail />} />
                         <Route path="agent" element={<AgentView />} />
+                        <Route path="uploads" element={<UploadsView />} />
                         <Route path="profile" element={<UserProfilePage />} />
                         {/* Legacy routes (hidden from nav but accessible via URL) */}
                         <Route path="chats" element={<ChatsView />} />

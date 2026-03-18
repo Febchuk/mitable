@@ -1,110 +1,44 @@
 /**
- * CalendarView
+ * CalendarView — Redesigned
  *
- * Main calendar/journal view for passive activity tracking.
- * Shows day-level view with week navigation and work blocks.
- *
- * Data flow:
- * - Uses real session data from backend via useCalendarDays hook
- * - Falls back to mock data in development when no real sessions exist
- * - Sessions are transformed into WorkBlocks with status tracking
+ * Minimal calendar page with centred content column.
+ * WeekStrip is sticky at the top. Content scrolls beneath it.
+ * Record/Stop/Pause controls in the page header.
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-  CalendarDays,
-  Sparkles,
-  Circle,
-  Square,
-  LayoutGrid,
-  List,
-  Loader2,
-  AlertCircle,
-  Pause,
-  Play,
-} from "lucide-react";
-import DayCard from "./DayCard";
-import DaySummary from "./DaySummary";
-import WorkBlockList from "./WorkBlockList";
-import {
-  Calendar as UntitledCalendar,
-  type CalendarEvent,
-} from "@/components/application/calendar/calendar";
+import { Loader2, AlertCircle, Square, Pause, Play } from "lucide-react";
+import WeekStrip from "./WeekStrip";
+import ActivityBlock from "./ActivityBlock";
 import type { ActivityDay } from "./types";
-import { useToast } from "@/hooks/use-toast";
 import { useCalendarDays, calendarKeys } from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
-import {
-  useSessions,
-  monitoringKeys,
-  useGenerateDaySummary,
-  useUpdateSession,
-} from "../../../../hooks/queries/monitoring";
-import {
-  endSession,
-  uploadCaptures,
-  pauseMonitoringSession,
-  resumeMonitoringSession,
-} from "../../../../services/monitoringService";
+import { deleteSession } from "../../../../services/monitoringService";
+import { monitoringKeys } from "../../../../hooks/queries/monitoring";
+import type { MonitoringSessionState } from "@mitable/shared";
 
-// Helper functions
 function getStartOfWeek(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  d.setDate(d.getDate() - day); // Go back to Sunday
+  d.setDate(d.getDate() - d.getDay());
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-function getEndOfWeek(weekStart: Date): Date {
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + 6);
-  return d;
-}
-
-function isSameDay(date1: Date, date2: Date): boolean {
+function isSameDay(a: Date, b: Date): boolean {
   return (
-    date1.getFullYear() === date2.getFullYear() &&
-    date1.getMonth() === date2.getMonth() &&
-    date1.getDate() === date2.getDate()
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
   );
 }
 
-function isSameMonth(date1: Date, date2: Date): boolean {
-  return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth();
-}
-
-function formatDateRange(start: Date, end: Date): string {
-  const startMonth = start.toLocaleDateString("en-US", { month: "short" });
-  const endMonth = end.toLocaleDateString("en-US", { month: "short" });
-  const startDay = start.getDate();
-  const endDay = end.getDate();
-  const year = end.getFullYear();
-
-  if (startMonth === endMonth) {
-    return `${startMonth} ${startDay} - ${endDay}, ${year}`;
-  }
-  return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
-}
-
-function formatMonthYear(date: Date): string {
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
-
-function formatDayHeader(date: Date): string {
+function formatDayHeading(date: Date): string {
   const today = new Date();
-  if (isSameDay(date, today)) {
-    return "Today";
-  }
+  if (isSameDay(date, today)) return "Today";
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  if (isSameDay(date, yesterday)) {
-    return "Yesterday";
-  }
+  if (isSameDay(date, yesterday)) return "Yesterday";
   return date.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -112,105 +46,62 @@ function formatDayHeader(date: Date): string {
   });
 }
 
-// Convert WorkBlocks to CalendarEvents for the untitledui Calendar
-function workBlocksToCalendarEvents(days: ActivityDay[]): CalendarEvent[] {
-  const events: CalendarEvent[] = [];
-
-  days.forEach((day) => {
-    day.workBlocks.forEach((block) => {
-      const endTime = block.endTime || new Date();
-      events.push({
-        id: block.id,
-        title: block.goal || block.appBreakdown[0]?.app || "Work Block",
-        start: new Date(block.startTime),
-        end: new Date(endTime),
-        color: block.isActive ? "green" : "gray",
-        dot: block.isActive,
-      });
-    });
-  });
-
-  return events;
+function formatRecordedTime(minutes: number): string {
+  if (minutes === 0) return "No time recorded";
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins}m recorded`;
+  if (mins === 0) return `${hours}h recorded`;
+  return `${hours}h ${mins}m recorded`;
 }
 
-type ViewMode = "detail" | "week" | "month";
+type SessionStatus = "idle" | "active" | "paused";
+
+function deriveStatus(state: MonitoringSessionState | null): SessionStatus {
+  if (!state) return "idle";
+  if (state.status === "active") return "active";
+  if (state.status === "paused") return "paused";
+  return "idle";
+}
 
 export default function CalendarView() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
-  const [viewMode, setViewMode] = useState<ViewMode>("detail");
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>("idle");
 
-  // Session start/stop — use Electron-local state for immediate UI updates
-  const { startSession, isStarting } = useStartSession({ navigateOnSuccess: false });
-  const { data: monitoringData } = useSessions();
-  const backendActiveSession = monitoringData?.sessions?.find(
-    (s: any) => s.status === "active" || s.status === "paused"
-  );
-  const [isStopping, setIsStopping] = useState(false);
-  const [isPauseLoading, setIsPauseLoading] = useState(false);
-  const [electronSessionActive, setElectronSessionActive] = useState<boolean | null>(null);
-  const [electronSessionId, setElectronSessionId] = useState<string | null>(null);
-  const [electronSessionStatus, setElectronSessionStatus] = useState<string | null>(null);
-  const updateSessionMutation = useUpdateSession();
+  const { startSession, isStarting } = useStartSession({
+    navigateOnSuccess: false,
+    showToasts: true,
+  });
 
-  // Day summary state
-  const [daySummaries, setDaySummaries] = useState<Record<string, string>>({});
-  const daySummaryMutation = useGenerateDaySummary();
-
-  // Listen to Electron-local session state for immediate button response
+  // Hydrate session state on mount
   useEffect(() => {
-    // Check initial state
-    window.consoleAPI?.getMonitoringSessionState?.().then((state) => {
-      setElectronSessionActive(state?.status === "active" || state?.status === "paused");
-      setElectronSessionId(state?.id || null);
-      setElectronSessionStatus(state?.status || null);
+    window.consoleAPI?.getMonitoringSessionState().then((state) => {
+      setSessionStatus(deriveStatus(state));
     });
-    // Listen for updates
-    const unsub = window.consoleAPI?.onMonitoringSessionUpdate?.((state) => {
-      const isActive = state?.status === "active" || state?.status === "paused";
-      setElectronSessionActive(isActive);
-      setElectronSessionId(state?.id || null);
-      setElectronSessionStatus(state?.status || null);
-    });
-    return () => unsub?.();
   }, []);
 
-  // Use Electron state for button, fall back to backend query
-  const activeSession =
-    electronSessionActive !== null
-      ? electronSessionActive
-        ? backendActiveSession || { id: electronSessionId }
-        : undefined
-      : backendActiveSession;
-
-  // Invalidate both calendar and sessions caches so UI updates immediately
-  const refreshData = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
-    queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+  // Listen for session updates — refresh data AND track state
+  useEffect(() => {
+    const unsub = window.consoleAPI?.onMonitoringSessionUpdate?.((state) => {
+      setSessionStatus(deriveStatus(state));
+      queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
+    });
+    return () => unsub?.();
   }, [queryClient]);
 
-  // Fetch real data from backend
-  const { data: realDays, isLoading: isLoadingDays, error: daysError } = useCalendarDays();
-
-  // Use real data only — no mock fallback (mock IDs cause backend 500 errors)
+  const { data: realDays, isLoading, error } = useCalendarDays();
   const allDays = realDays || [];
 
-  // Get week days with activity data
   const weekDays = useMemo(() => {
     const days: ActivityDay[] = [];
     const current = new Date(weekStart);
-
     for (let i = 0; i < 7; i++) {
-      const existingDay = allDays.find((d) => isSameDay(d.date, current));
-
-      if (existingDay) {
-        days.push(existingDay);
-      } else {
-        // Create empty day placeholder
-        days.push({
+      const existing = allDays.find((d) => isSameDay(d.date, current));
+      days.push(
+        existing || {
           id: `day-empty-${current.toISOString()}`,
           date: new Date(current),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -218,21 +109,16 @@ export default function CalendarView() {
           workBlocks: [],
           summary: "",
           topApps: [],
-        });
-      }
+        }
+      );
       current.setDate(current.getDate() + 1);
     }
-
     return days;
   }, [weekStart, allDays]);
 
-  // Convert all days to calendar events for the Calendar component
-  const calendarEvents = useMemo(() => workBlocksToCalendarEvents(allDays), [allDays]);
-
-  // Get selected day data
   const selectedDay = useMemo(() => {
     return (
-      allDays.find((day) => isSameDay(day.date, selectedDate)) || {
+      allDays.find((d) => isSameDay(d.date, selectedDate)) || {
         id: "empty",
         date: selectedDate,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -244,452 +130,338 @@ export default function CalendarView() {
     );
   }, [selectedDate, allDays]);
 
-  // Check navigation constraints
   const isCurrentWeek = isSameDay(weekStart, getStartOfWeek(today));
-  const isCurrentMonth = isSameMonth(selectedDate, today);
-  const canNavigateNext = viewMode === "month" ? !isCurrentMonth : !isCurrentWeek;
 
-  // Check if there's an active work block
-  const hasActiveBlock = !!activeSession;
-
-  // Navigate based on view mode
-  const goToPrevious = () => {
-    if (viewMode === "month") {
-      const newDate = new Date(selectedDate);
-      newDate.setMonth(newDate.getMonth() - 1);
-      setSelectedDate(newDate);
-      setWeekStart(getStartOfWeek(newDate));
-    } else {
-      const newStart = new Date(weekStart);
-      newStart.setDate(newStart.getDate() - 7);
-      setWeekStart(newStart);
-      const dayOffset = Math.floor(
-        (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      const newSelected = new Date(newStart);
-      newSelected.setDate(newSelected.getDate() + dayOffset);
-      setSelectedDate(newSelected);
-    }
+  const goToPrevWeek = () => {
+    const newStart = new Date(weekStart);
+    newStart.setDate(newStart.getDate() - 7);
+    setWeekStart(newStart);
+    const dayOffset = Math.floor(
+      (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const newSelected = new Date(newStart);
+    newSelected.setDate(newSelected.getDate() + dayOffset);
+    setSelectedDate(newSelected);
   };
 
-  const goToNext = () => {
-    if (viewMode === "month") {
-      const newDate = new Date(selectedDate);
-      newDate.setMonth(newDate.getMonth() + 1);
-      setSelectedDate(newDate);
-      setWeekStart(getStartOfWeek(newDate));
-    } else {
-      const newStart = new Date(weekStart);
-      newStart.setDate(newStart.getDate() + 7);
-      setWeekStart(newStart);
-      const dayOffset = Math.floor(
-        (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      const newSelected = new Date(newStart);
-      newSelected.setDate(newSelected.getDate() + dayOffset);
-      setSelectedDate(newSelected);
-    }
+  const goToNextWeek = () => {
+    const newStart = new Date(weekStart);
+    newStart.setDate(newStart.getDate() + 7);
+    setWeekStart(newStart);
+    const dayOffset = Math.floor(
+      (selectedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const newSelected = new Date(newStart);
+    newSelected.setDate(newSelected.getDate() + dayOffset);
+    setSelectedDate(newSelected);
   };
 
-  const goToToday = () => {
-    setWeekStart(getStartOfWeek(today));
-    setSelectedDate(today);
-  };
+  // ── Session controls ──────────────────────────────────────────
+  const handleRecord = useCallback(async () => {
+    await startSession();
+  }, [startSession]);
 
-  // Get the display text for the current period
-  const getPeriodDisplay = () => {
-    if (viewMode === "month") {
-      return formatMonthYear(selectedDate);
-    }
-    return formatDateRange(weekStart, getEndOfWeek(weekStart));
-  };
-
-  // Derive whether the session is paused
-  const isSessionPaused =
-    electronSessionStatus === "paused" ||
-    (backendActiveSession && (backendActiveSession as any).status === "paused");
-
-  // Handle pause/resume
-  const handlePauseSession = async () => {
-    const sessionId = activeSession?.id;
-    if (!sessionId) return;
-    setIsPauseLoading(true);
+  const handleStop = useCallback(async () => {
     try {
-      await pauseMonitoringSession();
-      await updateSessionMutation.mutateAsync({ sessionId, action: "pause" });
-      refreshData();
-    } catch (error) {
-      console.error("Failed to pause session:", error);
-    } finally {
-      setIsPauseLoading(false);
+      setSessionStatus("idle");
+      const result = await window.consoleAPI?.endMonitoringSession();
+      if (result?.error) {
+        console.error("[CalendarView] endMonitoringSession error:", result.error);
+      }
+    } catch (err) {
+      console.error("[CalendarView] endMonitoringSession failed:", err);
     }
-  };
+    queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
+    queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+  }, [queryClient]);
 
-  const handleResumeSession = async () => {
-    const sessionId = activeSession?.id;
-    if (!sessionId) return;
-    setIsPauseLoading(true);
+  const handlePause = useCallback(async () => {
     try {
-      await resumeMonitoringSession();
-      await updateSessionMutation.mutateAsync({ sessionId, action: "resume" });
-      refreshData();
-    } catch (error) {
-      console.error("Failed to resume session:", error);
-    } finally {
-      setIsPauseLoading(false);
+      setSessionStatus("paused");
+      await window.consoleAPI?.pauseMonitoringSession();
+    } catch (err) {
+      console.error("[CalendarView] pauseMonitoringSession failed:", err);
     }
-  };
+  }, []);
 
-  // Handle record toggle
-  const handleRecord = async () => {
-    if (activeSession && activeSession.id) {
-      const sessionId = activeSession.id;
-      setIsStopping(true);
+  const handleResume = useCallback(async () => {
+    try {
+      setSessionStatus("active");
+      await window.consoleAPI?.resumeMonitoringSession();
+    } catch (err) {
+      console.error("[CalendarView] resumeMonitoringSession failed:", err);
+    }
+  }, []);
+
+  const handleDeleteBlock = useCallback(
+    async (blockId: string) => {
       try {
-        // 1. Stop Electron capture loop and get remaining captures
-        const electronResult = await window.consoleAPI.endMonitoringSession();
-
-        // 2. Upload any remaining captures
-        if (electronResult.captures && electronResult.captures.length > 0) {
-          await uploadCaptures(sessionId, electronResult.captures);
+        // If deleting the currently recording block, stop the capture loop first
+        const currentState = await window.consoleAPI?.getMonitoringSessionState();
+        if (currentState && currentState.id === blockId) {
+          setSessionStatus("idle");
+          await window.consoleAPI?.endMonitoringSession();
         }
 
-        // 3. End session on backend (triggers storyteller + classification)
-        await endSession(sessionId);
-        refreshData();
-      } catch (error) {
-        console.error("Failed to end session:", error);
-      } finally {
-        setIsStopping(false);
+        await deleteSession(blockId);
+        queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      } catch (err) {
+        console.error("[CalendarView] deleteSession failed:", err);
       }
-    } else {
-      await startSession();
-      refreshData();
-    }
-  };
+    },
+    [queryClient]
+  );
 
-  // Is this a calendar grid view (week or month)?
-  const isGridView = viewMode === "week" || viewMode === "month";
+  const isRecording = sessionStatus === "active" || sessionStatus === "paused";
 
   return (
-    <div
-      className={`app-no-drag ${isGridView ? "h-full flex flex-col overflow-hidden" : "h-full overflow-auto"}`}
-    >
-      {/* ═══════════════════════════════════════════════════════════════════
-          HEADER - Navigation and View Controls
-          ═══════════════════════════════════════════════════════════════════ */}
-      <div className={`px-8 pt-8 pb-4 ${isGridView ? "flex-shrink-0" : ""}`}>
-        <div className="stagger-1">
-          {/* Title and actions row */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-indigo/10">
-                <Calendar size={20} className="text-indigo" />
-              </div>
-              <div>
-                <h1 className="font-display text-2xl font-semibold text-ink-primary tracking-tight">
-                  Activity Journal
-                </h1>
-                <p className="text-ink-tertiary text-sm">
-                  Passive tracking{" "}
-                  {hasActiveBlock && !isSessionPaused && (
-                    <span className="text-emerald">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald mr-1 animate-pulse" />
-                      recording
-                    </span>
-                  )}
-                  {hasActiveBlock && isSessionPaused && (
-                    <span className="text-amber">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber mr-1" />
-                      paused
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
+    <div className="app-no-drag" style={{ display: "flex", flexDirection: "column" }}>
+      {/* Sticky WeekStrip */}
+      <div
+        style={{
+          position: "sticky",
+          top: -20,
+          zIndex: 10,
+          background: "#1A1916",
+          paddingTop: 20,
+          paddingBottom: 20,
+        }}
+      >
+        <WeekStrip
+          weekStart={weekStart}
+          weekDays={weekDays}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          onPrevWeek={goToPrevWeek}
+          onNextWeek={goToNextWeek}
+          canGoNext={!isCurrentWeek}
+        />
+      </div>
 
-            {/* View toggle and menu */}
-            <div className="flex items-center gap-3">
-              {/* View mode toggle */}
-              <div className="flex items-center rounded-lg border border-stroke-subtle overflow-hidden">
-                <button
-                  onClick={() => setViewMode("detail")}
-                  className={`px-3 py-2 text-xs font-medium transition-colors ${
-                    viewMode === "detail"
-                      ? "bg-indigo/10 text-indigo"
-                      : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
-                  }`}
-                  title="Detail view"
-                >
-                  <List size={14} className="inline mr-1.5" />
-                  Detail
-                </button>
-                <button
-                  onClick={() => setViewMode("week")}
-                  className={`px-3 py-2 text-xs font-medium transition-colors border-l border-stroke-subtle ${
-                    viewMode === "week"
-                      ? "bg-indigo/10 text-indigo"
-                      : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
-                  }`}
-                  title="Week view"
-                >
-                  <LayoutGrid size={14} className="inline mr-1.5" />
-                  Week
-                </button>
-                <button
-                  onClick={() => setViewMode("month")}
-                  className={`px-3 py-2 text-xs font-medium transition-colors border-l border-stroke-subtle ${
-                    viewMode === "month"
-                      ? "bg-indigo/10 text-indigo"
-                      : "text-ink-tertiary hover:text-ink-primary hover:bg-canvas-muted"
-                  }`}
-                  title="Month view"
-                >
-                  <CalendarDays size={14} className="inline mr-1.5" />
-                  Month
-                </button>
-              </div>
+      {/* Page header row — date left, controls right */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
+        {/* Left: date + recorded time */}
+        <div>
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 32,
+              color: "#ECE8E0",
+              fontWeight: 400,
+              letterSpacing: "-0.4px",
+              lineHeight: 1,
+              margin: 0,
+            }}
+          >
+            {formatDayHeading(selectedDate)}
+          </h1>
+          <p
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 15,
+              color: "#6B665C",
+              fontWeight: 400,
+              fontStyle: "italic",
+              margin: "12px 0 0",
+            }}
+          >
+            {formatRecordedTime(selectedDay.totalWorkTime)}
+          </p>
+        </div>
 
-              {/* Session controls */}
-              {activeSession ? (
-                <div className="flex items-center gap-2">
-                  {/* Pause / Resume button */}
-                  {isSessionPaused ? (
-                    <button
-                      onClick={handleResumeSession}
-                      disabled={isPauseLoading}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-emerald/10 text-emerald border border-emerald/20 hover:bg-emerald/20 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {isPauseLoading ? (
-                        <Loader2 size={15} className="animate-spin" />
-                      ) : (
-                        <Play size={14} className="fill-current" />
-                      )}
-                      Resume
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handlePauseSession}
-                      disabled={isPauseLoading}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-amber/10 text-amber border border-amber/20 hover:bg-amber/20 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {isPauseLoading ? (
-                        <Loader2 size={15} className="animate-spin" />
-                      ) : (
-                        <Pause size={14} className="fill-current" />
-                      )}
-                      Pause
-                    </button>
-                  )}
-
-                  {/* Stop button */}
-                  <button
-                    onClick={handleRecord}
-                    disabled={isStopping}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-rose/10 text-rose border border-rose/20 hover:bg-rose/20 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isStopping ? (
-                      <Loader2 size={15} className="animate-spin" />
-                    ) : (
-                      <Square size={14} className="fill-current" />
-                    )}
-                    {isStopping ? "Stopping..." : "Stop"}
-                  </button>
-                </div>
+        {/* Right: session controls */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 4 }}>
+          {/* Pause / Play — only visible during a session */}
+          {isRecording && (
+            <button
+              onClick={sessionStatus === "active" ? handlePause : handleResume}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                border: "none",
+                background: "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#9B9689",
+                transition: "color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "#ECE8E0";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "#9B9689";
+              }}
+            >
+              {sessionStatus === "active" ? (
+                <Pause size={14} strokeWidth={1.5} />
               ) : (
-                <button
-                  onClick={handleRecord}
-                  disabled={isStarting}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-indigo text-white hover:bg-indigo/90 shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isStarting ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : (
-                    <Circle size={14} className="fill-current" />
-                  )}
-                  {isStarting ? "Starting..." : "Record"}
-                </button>
+                <Play size={14} strokeWidth={1.5} />
               )}
-            </div>
-          </div>
-
-          {/* Navigation strip */}
-          <div className="flex items-center gap-4 mb-4">
-            <button
-              onClick={goToPrevious}
-              className="p-2 rounded-lg hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary transition-colors"
-            >
-              <ChevronLeft size={20} />
             </button>
+          )}
 
-            <div className="flex-1 flex items-center justify-center gap-3">
-              <span className="text-sm font-medium text-ink-primary">{getPeriodDisplay()}</span>
-              {((viewMode !== "month" && !isCurrentWeek) ||
-                (viewMode === "month" && !isCurrentMonth)) && (
-                <button
-                  onClick={goToToday}
-                  className="px-2 py-1 text-xs font-medium text-indigo hover:bg-indigo/10 rounded transition-colors"
-                >
-                  Today
-                </button>
-              )}
-            </div>
-
+          {/* Record / Stop button */}
+          {isRecording ? (
             <button
-              onClick={goToNext}
-              disabled={!canNavigateNext}
-              className={`p-2 rounded-lg transition-colors ${
-                !canNavigateNext
-                  ? "text-ink-tertiary/30 cursor-not-allowed"
-                  : "hover:bg-canvas-muted text-ink-tertiary hover:text-ink-primary"
-              }`}
+              onClick={handleStop}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "0.5px solid rgba(232, 116, 116, 0.25)",
+                background: "rgba(232, 116, 116, 0.06)",
+                color: "#E87474",
+                fontSize: 12,
+                fontFamily: "var(--font-sans)",
+                fontWeight: 500,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(232, 116, 116, 0.12)";
+                e.currentTarget.style.borderColor = "rgba(232, 116, 116, 0.35)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(232, 116, 116, 0.06)";
+                e.currentTarget.style.borderColor = "rgba(232, 116, 116, 0.25)";
+              }}
             >
-              <ChevronRight size={20} />
+              <Square size={10} fill="currentColor" strokeWidth={0} />
+              Stop
             </button>
-          </div>
-
-          {/* Week day cards - only shown in detail view */}
-          {viewMode === "detail" && (
-            <div className="flex items-center gap-2 justify-center">
-              {weekDays.map((day) => (
-                <DayCard
-                  key={day.id}
-                  day={day}
-                  isSelected={isSameDay(day.date, selectedDate)}
-                  isToday={isSameDay(day.date, today)}
-                  onClick={() => setSelectedDate(day.date)}
+          ) : (
+            <button
+              onClick={handleRecord}
+              disabled={isStarting}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "0.5px solid rgba(236, 232, 224, 0.12)",
+                background: "transparent",
+                color: "#ECE8E0",
+                fontSize: 12,
+                fontFamily: "var(--font-sans)",
+                fontWeight: 500,
+                cursor: isStarting ? "default" : "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+                opacity: isStarting ? 0.5 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isStarting) {
+                  e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
+                  e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.2)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+              }}
+            >
+              {isStarting ? (
+                <Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} />
+              ) : (
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "#E87474",
+                    flexShrink: 0,
+                  }}
                 />
-              ))}
-            </div>
+              )}
+              {isStarting ? "Starting..." : "Record"}
+            </button>
           )}
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          MAIN CONTENT - Detail view or Calendar grid view
-          ═══════════════════════════════════════════════════════════════════ */}
-      <div className={`px-8 ${isGridView ? "flex-1 flex flex-col min-h-0 pb-4" : "pb-8"}`}>
-        {/* Loading State */}
-        {isLoadingDays && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 size={32} className="text-indigo animate-spin mb-4" />
-            <p className="text-ink-tertiary text-sm">Loading activity data...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {daysError && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="p-3 rounded-full bg-rose/10 mb-4">
-              <AlertCircle size={24} className="text-rose" />
-            </div>
-            <p className="text-ink-primary font-medium mb-1">Failed to load activity data</p>
-            <p className="text-ink-tertiary text-sm">
-              {daysError instanceof Error ? daysError.message : "An error occurred"}
+      {/* Activity section */}
+      <div>
+        {isLoading && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "64px 0",
+            }}
+          >
+            <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
+            <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>
+              Loading activity data...
             </p>
           </div>
         )}
 
-        {/* Main Content */}
-        {!isLoadingDays && !daysError && (
+        {error && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "64px 0",
+            }}
+          >
+            <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
+            <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+              Failed to load activity data
+            </p>
+            <p style={{ color: "#6B665C", fontSize: 12 }}>
+              {error instanceof Error ? error.message : "An error occurred"}
+            </p>
+          </div>
+        )}
+
+        {!isLoading && !error && selectedDay.workBlocks.length > 0 && (
           <>
-            {isGridView ? (
-              /* Calendar Grid View - Using untitledui Calendar */
-              <div className="stagger-2 flex-1 min-h-0 flex flex-col mitable-calendar">
-                <UntitledCalendar
-                  events={calendarEvents}
-                  view={viewMode}
-                  currentDate={selectedDate}
-                  hideHeader={true}
-                  className="flex-1 min-h-0"
-                  onEventClick={(event) => {
-                    // Switch to detail view and set the date to the event's date
-                    setSelectedDate(event.start);
-                    setWeekStart(getStartOfWeek(event.start));
-                    setViewMode("detail");
-                  }}
-                />
-              </div>
-            ) : (
-              /* Detail View */
-              <div className="stagger-2">
-                {/* Day header */}
-                <div className="flex items-center justify-between mb-4 pt-4 border-t border-stroke-subtle">
-                  <h2 className="font-display text-xl font-semibold text-ink-primary">
-                    {formatDayHeader(selectedDate)}
-                  </h2>
+            {/* Section label */}
+            <div
+              style={{
+                fontSize: 10,
+                color: "#6B665C",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 10,
+              }}
+            >
+              Activity
+            </div>
 
-                  {/* AI Summary button */}
-                  {selectedDay.workBlocks.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        const dateKey = selectedDate.toISOString().split("T")[0];
-                        const sessionIds = selectedDay.workBlocks.map((b) => b.id);
-                        try {
-                          const result = await daySummaryMutation.mutateAsync({
-                            date: dateKey,
-                            sessionIds,
-                          });
-                          if (result.summary) {
-                            setDaySummaries((prev) => ({ ...prev, [dateKey]: result.summary! }));
-                            toast({
-                              title: "Summary generated",
-                              description: `Summarized ${result.blockCount} block${result.blockCount !== 1 ? "s" : ""}`,
-                            });
-                          } else {
-                            toast({
-                              title: "No summary available",
-                              description:
-                                result.message ||
-                                "Blocks don't have summaries yet. Try again later.",
-                              variant: "destructive",
-                            });
-                          }
-                        } catch (error) {
-                          toast({
-                            title: "Summary generation failed",
-                            description:
-                              error instanceof Error
-                                ? error.message
-                                : "Something went wrong. Please try again.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      disabled={daySummaryMutation.isPending}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stroke-subtle hover:border-indigo/30 hover:bg-indigo/5 text-ink-secondary hover:text-indigo transition-all disabled:opacity-40"
-                    >
-                      {daySummaryMutation.isPending ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Sparkles size={16} />
-                      )}
-                      <span className="text-sm font-medium">
-                        {daySummaries[selectedDate.toISOString().split("T")[0]] ||
-                        selectedDay.summary
-                          ? "Regenerate Summary"
-                          : "Generate Summary"}
-                      </span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Day Summary with toggle */}
-                <DaySummary
-                  day={{
-                    ...selectedDay,
-                    summary:
-                      daySummaries[selectedDate.toISOString().split("T")[0]] || selectedDay.summary,
-                  }}
-                />
-
-                {/* Work blocks */}
-                <WorkBlockList
-                  blocks={selectedDay.workBlocks}
-                  totalWorkTime={selectedDay.totalWorkTime}
-                />
-              </div>
-            )}
+            {/* Blocks */}
+            {selectedDay.workBlocks.map((block, index) => (
+              <ActivityBlock
+                key={block.id}
+                block={block}
+                blockNumber={index + 1}
+                defaultExpanded={
+                  !block.isActive &&
+                  index === selectedDay.workBlocks.length - 1 &&
+                  selectedDay.workBlocks.length <= 3
+                }
+                onDelete={handleDeleteBlock}
+              />
+            ))}
           </>
         )}
       </div>
