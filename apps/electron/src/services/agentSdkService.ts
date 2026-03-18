@@ -1,9 +1,9 @@
 import { query, tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { app } from "electron";
-import { existsSync, realpathSync } from "fs";
+import { existsSync } from "fs";
 import { join } from "path";
-import { execSync } from "child_process";
+import { createRequire } from "module";
 import { createLogger } from "../lib/logger";
 import { skillsStore, type AgentSkill } from "./skillsStore";
 import { authManager } from "./authManager";
@@ -12,38 +12,30 @@ import { browserBridgeService } from "./browserBridgeService";
 const logger = createLogger("AgentSdkService");
 
 /**
- * Locate the Claude Code CLI binary.
- * Checks common locations and falls back to `which claude`.
+ * Resolve the Claude Code CLI bundled inside @anthropic-ai/claude-agent-sdk.
+ * The SDK ships its own cli.js — no need to find a system-installed binary.
+ * For packaged Electron builds, handles asar-unpacked paths.
  */
 function findClaudeCodeExecutable(): string | undefined {
-  const homeDir = app.getPath("home");
-
-  // Common install locations (in order of preference)
-  const candidates = [
-    join(homeDir, ".local", "bin", "claude"),
-    "/usr/local/bin/claude",
-    "/opt/homebrew/bin/claude",
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      if (existsSync(candidate)) {
-        // Resolve symlinks to get the actual binary
-        return realpathSync(candidate);
-      }
-    } catch {
-      // Skip if can't access
-    }
-  }
-
-  // Fallback: ask the shell
   try {
-    const result = execSync("which claude", { encoding: "utf-8", timeout: 3000 }).trim();
-    if (result && existsSync(result)) {
-      return realpathSync(result);
+    const requireModule = createRequire(import.meta.url);
+    const sdkEntry = requireModule.resolve("@anthropic-ai/claude-agent-sdk");
+    const sdkDir = join(sdkEntry, "..");
+    let cliPath = join(sdkDir, "cli.js");
+
+    // In packaged Electron, files inside asar can't be spawned directly
+    if (cliPath.includes("app.asar")) {
+      const unpackedPath = cliPath.replace("app.asar", "app.asar.unpacked");
+      if (existsSync(unpackedPath)) {
+        cliPath = unpackedPath;
+      }
     }
-  } catch {
-    // Not found via which
+
+    if (existsSync(cliPath)) {
+      return cliPath;
+    }
+  } catch (err) {
+    logger.warn("Failed to resolve SDK bundled CLI", { error: String(err) });
   }
 
   return undefined;
