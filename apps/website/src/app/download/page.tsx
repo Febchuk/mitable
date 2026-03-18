@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
-import { siteContent } from "@/config/site-content";
 import { MITABLE_VERSION } from "@/config/content/base";
+import { siteContent } from "@/config/site-content";
 
 export const metadata: Metadata = {
     title: "Download Mitable",
