@@ -260,6 +260,77 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Granola meeting notes — markdown prose */
+.granola-notes-scroll h1,
+.granola-notes-scroll h2,
+.granola-notes-scroll h3,
+.granola-notes-scroll h4 {
+  color: #ECE8E0;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  line-height: 1.35;
+}
+.granola-notes-scroll h1 { font-size: 16px; }
+.granola-notes-scroll h2 { font-size: 14px; }
+.granola-notes-scroll h3 { font-size: 13px; }
+.granola-notes-scroll h4 { font-size: 12px; }
+
+.granola-notes-scroll p {
+  margin: 4px 0;
+}
+
+.granola-notes-scroll ul,
+.granola-notes-scroll ol {
+  padding-left: 16px;
+  margin: 4px 0;
+  list-style: disc;
+}
+
+.granola-notes-scroll ol {
+  list-style: decimal;
+}
+
+.granola-notes-scroll ul ul,
+.granola-notes-scroll ul ol,
+.granola-notes-scroll ol ul,
+.granola-notes-scroll ol ol {
+  padding-left: 14px;
+  margin: 2px 0;
+}
+
+.granola-notes-scroll li {
+  margin: 2px 0;
+}
+
+.granola-notes-scroll > ul,
+.granola-notes-scroll > ol {
+  padding-left: 6px;
+}
+
+.granola-notes-scroll strong {
+  color: #ECE8E0;
+  font-weight: 600;
+}
+
+.granola-notes-scroll code {
+  background: rgba(236, 232, 224, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.granola-notes-scroll a {
+  color: #9B84E8;
+  text-decoration: none;
+}
+
+.granola-notes-scroll blockquote {
+  border-left: 2px solid rgba(200, 230, 74, 0.3);
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #6B665C;
+}
+
 /* Force vertical-only scrolling in ScrollArea */
 [data-radix-scroll-area-viewport] {
   overflow-x: hidden !important;
