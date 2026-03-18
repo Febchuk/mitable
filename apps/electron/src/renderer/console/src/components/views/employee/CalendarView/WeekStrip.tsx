@@ -122,9 +122,7 @@ export default function WeekStrip({
                   borderRadius: 8,
                   flex: 1,
                   minWidth: 0,
-                  background: highlighted
-                    ? "rgba(155, 132, 232, 0.11)"
-                    : "transparent",
+                  background: highlighted ? "rgba(155, 132, 232, 0.11)" : "transparent",
                   border: highlighted
                     ? "0.5px solid rgba(155, 132, 232, 0.22)"
                     : "0.5px solid transparent",

@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 
 interface NavItemProps {
   to: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: React.ComponentType<Record<string, unknown>>;
   label: string;
 }
 
@@ -46,7 +46,7 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
         }
       }}
     >
-      <Icon size={15} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Icon size={15} strokeWidth={1.5} />
       <span>{label}</span>
     </NavLink>
   );

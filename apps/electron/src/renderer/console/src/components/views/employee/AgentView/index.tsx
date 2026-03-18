@@ -1,5 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Square, Check, X, ExternalLink, Pencil, Zap, CalendarDays, Lightbulb } from "lucide-react";
+import {
+  ArrowUp,
+  Square,
+  Check,
+  X,
+  ExternalLink,
+  Pencil,
+  Zap,
+  CalendarDays,
+  Lightbulb,
+} from "lucide-react";
 import AgentMessage, { AgentThinking } from "./AgentMessage";
 import { useUser } from "../../../../context/UserContext";
 
@@ -95,7 +105,12 @@ export default function AgentView() {
             return [
               ...beforeTurn,
               ...nonStreamed,
-              { id: generateId(), role: "assistant" as const, content: String(event.data), isPlan: true },
+              {
+                id: generateId(),
+                role: "assistant" as const,
+                content: String(event.data),
+                isPlan: true,
+              },
             ];
           });
           setPendingPlan(true);
@@ -191,7 +206,11 @@ export default function AgentView() {
     window.consoleAPI?.agentApprovePlan(conversationId, false);
     setMessages((prev) => [
       ...prev,
-      { id: generateId(), role: "assistant", content: "Plan cancelled. What would you like to do instead?" },
+      {
+        id: generateId(),
+        role: "assistant",
+        content: "Plan cancelled. What would you like to do instead?",
+      },
     ]);
   }, [conversationId]);
 
@@ -334,7 +353,8 @@ export default function AgentView() {
             textAlign: "center",
           }}
         >
-          {getGreeting()}{firstName ? `, ${firstName}` : ""}.
+          {getGreeting()}
+          {firstName ? `, ${firstName}` : ""}.
         </h1>
 
         {/* Centered input */}
@@ -383,9 +403,7 @@ export default function AgentView() {
             fontSize: 11,
             borderRadius: 8,
             marginBottom: 12,
-            background: bridgeConnected
-              ? "rgba(74, 222, 128, 0.06)"
-              : "rgba(251, 191, 36, 0.06)",
+            background: bridgeConnected ? "rgba(74, 222, 128, 0.06)" : "rgba(251, 191, 36, 0.06)",
             color: bridgeConnected ? "#4ade80" : "#fbbf24",
           }}
         >
@@ -398,7 +416,9 @@ export default function AgentView() {
               flexShrink: 0,
             }}
           />
-          <span>{bridgeConnected ? "Browser bridge connected" : "Browser extension not connected"}</span>
+          <span>
+            {bridgeConnected ? "Browser bridge connected" : "Browser extension not connected"}
+          </span>
           {!bridgeConnected && (
             <>
               <span style={{ opacity: 0.3 }}>·</span>
@@ -442,9 +462,7 @@ export default function AgentView() {
             isPlan={msg.isPlan}
           />
         ))}
-        {isLoading && (
-          <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />
-        )}
+        {isLoading && <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />}
         <div ref={messagesEndRef} />
       </div>
 
@@ -526,7 +544,7 @@ function SuggestionChip({
   label,
   onClick,
 }: {
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ComponentType<Record<string, unknown>>;
   label: string;
   onClick: () => void;
 }) {

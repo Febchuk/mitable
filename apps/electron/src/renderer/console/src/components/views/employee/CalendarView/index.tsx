@@ -406,10 +406,7 @@ export default function CalendarView() {
               padding: "64px 0",
             }}
           >
-            <Loader2
-              size={24}
-              style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }}
-            />
+            <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
             <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>
               Loading activity data...
             </p>

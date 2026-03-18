@@ -315,8 +315,7 @@ export default function ActivityBlock({
               </div>
 
               {block.taskBreakdown.map((task, idx) => {
-                const totalMinutes =
-                  block.taskBreakdown.reduce((s, t) => s + t.minutes, 0) || 1;
+                const totalMinutes = block.taskBreakdown.reduce((s, t) => s + t.minutes, 0) || 1;
 
                 return (
                   <TaskRow

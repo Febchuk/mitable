@@ -56,14 +56,7 @@ function getDocInitial(doc: Document): string {
   return (doc.title || "U").charAt(0).toUpperCase();
 }
 
-const DOC_AVATAR_COLORS = [
-  "#9B84E8",
-  "#3A9B6B",
-  "#D4A27A",
-  "#4A9FD9",
-  "#E87474",
-  "#9B9689",
-];
+const DOC_AVATAR_COLORS = ["#9B84E8", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
 
 function getAvatarColor(id: string): string {
   let hash = 0;
@@ -86,10 +79,7 @@ export default function DocsView() {
     );
   }, [documents]);
 
-  const groupedDocuments = useMemo(
-    () => groupDocumentsByDate(sortedDocuments),
-    [sortedDocuments]
-  );
+  const groupedDocuments = useMemo(() => groupDocumentsByDate(sortedDocuments), [sortedDocuments]);
 
   if (isLoading) {
     return (
@@ -102,10 +92,7 @@ export default function DocsView() {
           padding: "80px 0",
         }}
       >
-        <Loader2
-          size={24}
-          style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }}
-        />
+        <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
         <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading docs...</p>
       </div>
     );
@@ -123,9 +110,7 @@ export default function DocsView() {
         }}
       >
         <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
-        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>
-          Failed to load documents
-        </p>
+        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>Failed to load documents</p>
       </div>
     );
   }
@@ -307,7 +292,6 @@ export default function DocsView() {
                           fontSize: 12,
                           color: "#6B665C",
                           flexShrink: 0,
-                          tabularNums: "true",
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
@@ -338,7 +322,15 @@ export default function DocsView() {
             <p style={{ color: "#9B9689", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
               No documents yet
             </p>
-            <p style={{ color: "#6B665C", fontSize: 12, textAlign: "center", maxWidth: 260, lineHeight: 1.5 }}>
+            <p
+              style={{
+                color: "#6B665C",
+                fontSize: 12,
+                textAlign: "center",
+                maxWidth: 260,
+                lineHeight: 1.5,
+              }}
+            >
               Create your first document or generate one from a work session.
             </p>
           </div>

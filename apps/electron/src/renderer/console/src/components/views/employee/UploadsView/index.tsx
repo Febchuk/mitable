@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useMemo } from "react";
-import { Loader2, AlertCircle, Upload, Plus, Paperclip, Trash2, Check, Clock } from "lucide-react";
+import { Loader2, AlertCircle, Plus, Trash2, Check, Clock } from "lucide-react";
 import { useArtifacts } from "../../../../hooks/queries/artifacts";
 import { useUploadArtifact } from "../../../../hooks/queries/artifacts";
 import { useDeleteArtifact } from "../../../../hooks/queries/artifacts";
@@ -89,10 +89,7 @@ export default function UploadsView() {
     );
   }, [artifacts]);
 
-  const groupedArtifacts = useMemo(
-    () => groupArtifactsByDate(sortedArtifacts),
-    [sortedArtifacts]
-  );
+  const groupedArtifacts = useMemo(() => groupArtifactsByDate(sortedArtifacts), [sortedArtifacts]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,10 +123,7 @@ export default function UploadsView() {
           padding: "80px 0",
         }}
       >
-        <Loader2
-          size={24}
-          style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }}
-        />
+        <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
         <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading uploads...</p>
       </div>
     );
@@ -147,9 +141,7 @@ export default function UploadsView() {
         }}
       >
         <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
-        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>
-          Failed to load uploads
-        </p>
+        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>Failed to load uploads</p>
       </div>
     );
   }
@@ -354,9 +346,7 @@ export default function UploadsView() {
                         ) : (
                           <Clock size={11} style={{ color: status.color }} />
                         )}
-                        <span style={{ fontSize: 11, color: status.color }}>
-                          {status.label}
-                        </span>
+                        <span style={{ fontSize: 11, color: status.color }}>{status.label}</span>
                       </div>
 
                       {/* Time */}

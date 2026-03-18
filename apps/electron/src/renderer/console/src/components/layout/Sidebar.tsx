@@ -43,8 +43,7 @@ export default function Sidebar() {
         paddingBottom: open ? 12 : 0,
         flexShrink: 0,
         overflow: "hidden",
-        transition:
-          "width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease, border 0.2s ease",
+        transition: "width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease, border 0.2s ease",
       }}
     >
       {/* Titlebar spacer — clears macOS traffic lights */}

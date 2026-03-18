@@ -7,15 +7,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  X,
-  ChevronDown,
-  Loader2,
-  Check,
-  ArrowUp,
-  Paperclip,
-  Layers,
-} from "lucide-react";
+import { X, ChevronDown, Loader2, Check, ArrowUp, Paperclip, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useGenerateDocumentStream } from "@/console/src/hooks/queries/documents/useGenerateDocumentStream";
@@ -72,8 +64,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
   const { data: sessionsData } = useSessions();
   const sessions = sessionsData?.sessions ?? [];
   const completedSessions = sessions.filter(
-    (s: SessionListItem) =>
-      ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
+    (s: SessionListItem) => ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
   );
 
   const uploadMutation = useUploadArtifact();
@@ -190,8 +181,12 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
             zIndex: 10,
             transition: "color 0.15s ease",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "#ECE8E0"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "#6B665C"; }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "#ECE8E0";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "#6B665C";
+          }}
         >
           <X size={15} />
         </button>
@@ -324,7 +319,9 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                 onMouseEnter={(e) => {
                   if (!uploadMutation.isPending) e.currentTarget.style.color = "#ECE8E0";
                 }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "#6B665C"; }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "#6B665C";
+                }}
               >
                 {uploadMutation.isPending ? (
                   <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
@@ -435,9 +432,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                               padding: "8px 14px",
                               cursor: "pointer",
                               transition: "background 0.1s ease",
-                              background: isSelected
-                                ? "rgba(155, 132, 232, 0.06)"
-                                : "transparent",
+                              background: isSelected ? "rgba(155, 132, 232, 0.06)" : "transparent",
                             }}
                             onMouseEnter={(e) => {
                               if (!isSelected)
@@ -455,9 +450,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                                 width: 16,
                                 height: 16,
                                 borderRadius: 4,
-                                border: isSelected
-                                  ? "none"
-                                  : "1px solid rgba(236, 232, 224, 0.15)",
+                                border: isSelected ? "none" : "1px solid rgba(236, 232, 224, 0.15)",
                                 background: isSelected ? "#9B84E8" : "transparent",
                                 display: "flex",
                                 alignItems: "center",
@@ -511,8 +504,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                   height: 30,
                   borderRadius: 8,
                   border: "none",
-                  background:
-                    input.trim() ? "#9B84E8" : "rgba(236, 232, 224, 0.06)",
+                  background: input.trim() ? "#9B84E8" : "rgba(236, 232, 224, 0.06)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -540,10 +532,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
               gap: 16,
             }}
           >
-            <Loader2
-              size={24}
-              style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }}
-            />
+            <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
             <div style={{ textAlign: "center" }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>
                 {progress ? PHASE_LABELS[progress.phase] || "Working..." : "Starting..."}
@@ -602,9 +591,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
                 border: "0.5px solid rgba(232, 116, 116, 0.15)",
               }}
             >
-              <p style={{ fontSize: 13, fontWeight: 500, color: "#E87474" }}>
-                Generation failed
-              </p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "#E87474" }}>Generation failed</p>
               <p style={{ fontSize: 12, color: "#6B665C", marginTop: 6 }}>{error}</p>
               <button
                 onClick={() => {

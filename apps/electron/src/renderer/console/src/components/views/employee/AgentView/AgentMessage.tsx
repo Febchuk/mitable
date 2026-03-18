@@ -1,12 +1,4 @@
-import {
-  Loader2,
-  Terminal,
-  FileText,
-  Globe,
-  AlertCircle,
-  ClipboardList,
-  User,
-} from "lucide-react";
+import { Loader2, Terminal, FileText, Globe, AlertCircle, ClipboardList, User } from "lucide-react";
 import MitableIcon from "../../../icons/MitableIcon";
 
 interface AgentMessageProps {
