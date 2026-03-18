@@ -21,11 +21,10 @@ import {
   Search,
   Globe,
   FlaskConical,
-  Flame,
   KeyRound,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
-import { GranolaIcon } from "../../../components/icons/integrations";
+import { GranolaIcon, FirefliesIcon } from "../../../components/icons/integrations";
 import Button from "../components/ui/Button";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -3068,9 +3067,7 @@ export default function UserProfilePage() {
                 {/* Fireflies AI Integration Card */}
                 <Card className="p-6 bg-background-elevated border-border-subtle">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#7C3AED] rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Flame className="w-6 h-6 text-white" />
-                    </div>
+                    <FirefliesIcon size="lg" />
 
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold text-white">Fireflies.ai</h3>
@@ -3136,9 +3133,7 @@ export default function UserProfilePage() {
                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                     <div className="bg-background-elevated border border-border-subtle rounded-xl p-6 w-full max-w-md shadow-xl">
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 bg-[#7C3AED]/20 rounded-lg flex items-center justify-center">
-                          <Flame className="w-5 h-5 text-[#7C3AED]" />
-                        </div>
+                        <FirefliesIcon size="md" />
                         <div>
                           <h3 className="text-lg font-semibold text-white">Connect Fireflies.ai</h3>
                           <p className="text-sm text-text-tertiary">Enter your API key to sync meetings</p>
