@@ -49,6 +49,12 @@ jobs:
       - name: Build shared package
         run: npm run build --workspace=packages/shared
 
+      - name: Fix notarize version (override bundled 2.2.1 with 2.5.0)
+        run: |
+          rm -rf node_modules/app-builder-lib/node_modules/@electron/notarize
+          echo "Removed nested @electron/notarize@2.2.1 — will use hoisted @2.5.0"
+          node -e "const p=require('./node_modules/app-builder-lib/node_modules/@electron/notarize/package.json');console.log(p.version)" 2>/dev/null || echo "Nested copy removed, using hoisted version"
+
       - name: Build Electron app for macOS
         run: npm run build:mac --workspace=apps/electron
         env:
