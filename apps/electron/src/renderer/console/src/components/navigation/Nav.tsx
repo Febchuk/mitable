@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, FileText, Download } from "lucide-react";
+import { Calendar, Download, LayoutGrid, User, BarChart2 } from "lucide-react";
 import NavItem from "./NavItem";
 import MitableIcon from "../icons/MitableIcon";
 import { useUser } from "../../context/UserContext";
 
-export default function Nav() {
+interface NavProps {
+  isAdminView?: boolean;
+}
+
+export default function Nav({ isAdminView = false }: NavProps) {
   const { user } = useUser();
   const [agentEnabled, setAgentEnabled] = useState(false);
 
@@ -17,18 +21,28 @@ export default function Nav() {
     refreshAgentEnabled();
   }, [refreshAgentEnabled]);
 
-  // Listen for toggle changes from Settings
   useEffect(() => {
     const handler = () => refreshAgentEnabled();
     window.addEventListener("agent-enabled-changed", handler);
     return () => window.removeEventListener("agent-enabled-changed", handler);
   }, [refreshAgentEnabled]);
 
+  if (isAdminView) {
+    return (
+      <>
+        <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
+        <NavItem to="/people" icon={User} label="People" />
+        {agentEnabled && <NavItem to="/agent" icon={MitableIcon} label="Agent" />}
+        <NavItem to="/reports" icon={BarChart2} label="Reports" />
+      </>
+    );
+  }
+
   return (
     <>
       <NavItem to="/calendar" icon={Calendar} label="Calendar" />
       {agentEnabled && <NavItem to="/agent" icon={MitableIcon} label="Agent" />}
-      <NavItem to="/docs" icon={FileText} label="Docs" />
+      <NavItem to="/reports" icon={BarChart2} label="Reports" />
       <NavItem to="/uploads" icon={Download} label="Uploads" />
     </>
   );

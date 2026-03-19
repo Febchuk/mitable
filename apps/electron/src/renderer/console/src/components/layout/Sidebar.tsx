@@ -9,7 +9,7 @@ const isMac = navigator.platform.toLowerCase().includes("mac");
 
 export default function Sidebar() {
   const { open } = useSidebar();
-  const { user, updateUser, logout } = useUser();
+  const { user, updateUser, logout, organization } = useUser();
   const navigate = useNavigate();
   const [inAdminView, setInAdminView] = useState(user?.role === "admin");
 
@@ -71,7 +71,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
-        <Nav />
+        <Nav isAdminView={inAdminView} />
       </nav>
 
       {/* Bottom section */}
@@ -190,7 +190,7 @@ export default function Sidebar() {
                   lineHeight: 1,
                 }}
               >
-                Free plan
+                {inAdminView && organization?.name ? organization.name : "Free plan"}
               </div>
             </div>
           </div>
