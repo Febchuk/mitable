@@ -1,5 +1,6 @@
 import { Loader2, Terminal, FileText, Globe, AlertCircle, ClipboardList, User } from "lucide-react";
 import MitableIcon from "../../../icons/MitableIcon";
+import { Response } from "../../../../../../components/ui/ai-response";
 
 interface AgentMessageProps {
   role: "user" | "assistant" | "tool" | "error";
@@ -104,11 +105,10 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
               fontSize: 13,
               lineHeight: 1.7,
               color: "#ECE8E0",
-              whiteSpace: "pre-wrap",
               wordBreak: "break-word",
             }}
           >
-            {content}
+            <Response>{content}</Response>
           </div>
         </div>
       </div>
@@ -149,12 +149,11 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
           fontSize: 13,
           lineHeight: 1.7,
           color: "#ECE8E0",
-          whiteSpace: "pre-wrap",
           wordBreak: "break-word",
           paddingTop: 4,
         }}
       >
-        {content}
+        {isUser ? content : <Response>{content}</Response>}
       </div>
     </div>
   );
