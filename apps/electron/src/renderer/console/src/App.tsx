@@ -44,8 +44,6 @@ import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
 import { useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import * as monitoringService from "./services/monitoringService";
 
 // Navigation handler - listens for IPC navigation events from main process
 function NavigationHandler() {
@@ -178,115 +176,6 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Recap notification handler — polls recaps to detect NEW ones and fires OS notification.
-// Does NOT rely on session status (which fires for short sessions with no recap).
-function RecapNotificationHandler() {
-  const { user } = useUser();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  // Track "id:updatedAt" so we detect both NEW recaps and UPDATED ones (rolling daily recap)
-  const knownRecapKeysRef = useRef<Set<string> | null>(null); // null = not yet initialized
-  const latestRecapIdRef = useRef<string | null>(null);
-
-  // Poll recaps directly — fires notification only when a new or updated recap appears
-  const { data: recaps } = useQuery({
-    queryKey: ["recap-notification-poll"],
-    queryFn: async () => {
-      const res = await monitoringService.fetchRecaps();
-      return res.recaps;
-    },
-    enabled: !!user,
-    refetchInterval: 10000, // check every 10s
-    refetchIntervalInBackground: true,
-  });
-
-  useEffect(() => {
-    if (!recaps) return;
-
-    const recapKey = (r: { id: string; updatedAt: string }) => `${r.id}:${r.updatedAt}`;
-    const known = knownRecapKeysRef.current;
-
-    // First load — seed known keys, don't fire notifications
-    if (known === null) {
-      knownRecapKeysRef.current = new Set(recaps.map(recapKey));
-      return;
-    }
-
-    // Check for new OR updated recaps
-    for (const recap of recaps) {
-      const key = recapKey(recap);
-      if (!known.has(key)) {
-        logger.info("New/updated recap detected, firing notification", {
-          recapId: recap.id,
-          title: recap.title,
-        });
-
-        latestRecapIdRef.current = recap.id;
-        // Auto-expire after 60s so stale IDs don't trigger random navigation
-        setTimeout(() => {
-          if (latestRecapIdRef.current === recap.id) latestRecapIdRef.current = null;
-        }, 60000);
-
-        // Invalidate recaps cache so the UI updates immediately
-        queryClient.invalidateQueries({ queryKey: monitoringKeys.recaps() });
-
-        // Fire notification
-        const notifMsg = `Your recap "${recap.title || "Work session"}" is ready to review.`;
-        if (window.consoleAPI?.showRecapNotification) {
-          window.consoleAPI.showRecapNotification({ title: "Recap Ready", message: notifMsg });
-        } else {
-          try {
-            new Notification("Recap Ready", { body: notifMsg });
-          } catch {
-            /* ignore */
-          }
-        }
-
-        // Only notify once per poll cycle (avoid double-notif if multiple recaps changed)
-        break;
-      }
-    }
-
-    // Update known set
-    knownRecapKeysRef.current = new Set(recaps.map(recapKey));
-  }, [recaps, queryClient]);
-
-  // Navigate to recap when notification is clicked.
-  // In Electron: IPC onNavigateToRecaps fires when user clicks the OS notification.
-  // Fallback (non-Electron): use window focus event (assumes focus = notification click).
-  useEffect(() => {
-    let removeFocusListener: (() => void) | undefined;
-    let unsubscribe: (() => void) | undefined;
-
-    if (window.consoleAPI?.onNavigateToRecaps) {
-      // Electron: use IPC — only fires on actual notification click, not random focus events
-      unsubscribe = window.consoleAPI.onNavigateToRecaps(() => {
-        const recapId = latestRecapIdRef.current;
-        latestRecapIdRef.current = null;
-        navigate(recapId ? `/recaps/${recapId}` : "/recaps");
-      });
-    } else {
-      // Non-Electron fallback: navigate on window focus (best-effort)
-      const handleFocus = () => {
-        const recapId = latestRecapIdRef.current;
-        if (recapId) {
-          latestRecapIdRef.current = null;
-          navigate(`/recaps/${recapId}`);
-        }
-      };
-      window.addEventListener("focus", handleFocus);
-      removeFocusListener = () => window.removeEventListener("focus", handleFocus);
-    }
-
-    return () => {
-      removeFocusListener?.();
-      unsubscribe?.();
-    };
-  }, [navigate]);
-
-  return null;
-}
-
 // Default route
 function DefaultRoute() {
   const { user } = useUser();
@@ -348,7 +237,6 @@ function App() {
           <MonitoringSessionHandler />
           <UpdateProvider>
             <UserProvider>
-              <RecapNotificationHandler />
               <VariantWrapper>
                 <DevFlagsProvider>
                   <RecapsProvider>

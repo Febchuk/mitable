@@ -47,7 +47,7 @@ export type DeliveryChannel = "slack" | "email" | "linear";
  */
 export type DeliveryStatus = "pending" | "sent" | "failed";
 
-export type WorkBlockSource = "session" | "granola";
+export type WorkBlockSource = "session" | "granola" | "fireflies";
 
 export interface WorkBlock {
   id: string;
