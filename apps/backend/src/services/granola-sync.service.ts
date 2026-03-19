@@ -44,11 +44,12 @@ interface SyncResult {
   errors: string[];
 }
 
-/** Shape of a meeting returned by Granola MCP list_meetings tool */
+/** Shape of a meeting returned by Granola MCP list_meetings / get_meetings tools */
 interface GranolaMeeting {
   id: string;
   title?: string | null;
   summary?: string | null;
+  notes?: string | null;
   attendees?: { name?: string; email?: string }[];
   start_time?: string | null;
   end_time?: string | null;
@@ -169,6 +170,12 @@ class GranolaSyncService {
       if (row.externalId) existingExternalIds.add(row.externalId);
     }
 
+    // Only enrich new meetings with notes (skip already-ingested)
+    const newMeetings = meetings.filter((m) => !existingExternalIds.has(m.id));
+    if (newMeetings.length > 0) {
+      await this.enrichMeetingsWithNotes(accessToken, newMeetings);
+    }
+
     // Process each meeting
     const touchedDailyIds = new Set<string>();
     const discoveredSubscribers: string[] = [];
@@ -185,16 +192,26 @@ class GranolaSyncService {
         // Single-shot Claude Haiku classification
         const classification = await this.classifyMeeting(meeting, knownCustomers, orgName);
 
-        // Fetch full transcript for agent context
+        // Fetch full transcript for agent context (paid tiers only)
         let rawTranscript: string | null = null;
         try {
           const transcriptRaw = await granolaService.getMeetingTranscript(accessToken, meeting.id);
           rawTranscript = this.formatTranscript(transcriptRaw);
+          // Filter paywall messages — not a real transcript
+          if (rawTranscript && /only available to paid/i.test(rawTranscript)) {
+            logger.debug({ meetingId: meeting.id }, "Transcript paywalled, using notes instead");
+            rawTranscript = null;
+          }
         } catch (err) {
           logger.warn(
             { meetingId: meeting.id, error: String(err) },
             "Failed to fetch Granola transcript"
           );
+        }
+
+        // If transcript is paywalled, store notes as rawTranscript for agentic use
+        if (!rawTranscript && meeting.notes) {
+          rawTranscript = meeting.notes;
         }
 
         const { created, dailyActivityId } = await this.upsertMeetingAsBlock(
@@ -505,13 +522,16 @@ Respond ONLY with JSON:
     const startTime = meeting.start_time
       ? new Date(meeting.start_time)
       : new Date(meeting.created_at || Date.now());
-    const endTime = meeting.end_time
-      ? new Date(meeting.end_time)
-      : new Date(meeting.updated_at || Date.now());
-    const durationMinutes = Math.max(
-      1,
-      Math.round((endTime.getTime() - startTime.getTime()) / 60000)
-    );
+    const DEFAULT_MEETING_MINUTES = 60;
+    let endTime: Date;
+    let durationMinutes: number;
+    if (meeting.end_time) {
+      endTime = new Date(meeting.end_time);
+      durationMinutes = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000));
+    } else {
+      durationMinutes = DEFAULT_MEETING_MINUTES;
+      endTime = new Date(startTime.getTime() + DEFAULT_MEETING_MINUTES * 60000);
+    }
 
     const attendees = (meeting.attendees || []).map((a) => ({
       name: a.name || "",
@@ -519,9 +539,10 @@ Respond ONLY with JSON:
     }));
     const attendeeNames = attendees.map((a) => a.name).filter(Boolean);
 
-    // Build description
+    // Build description — prefer notes/summary over just attendee list
     const descriptionParts: string[] = [];
-    if (meeting.summary) descriptionParts.push(meeting.summary);
+    if (meeting.notes) descriptionParts.push(meeting.notes);
+    else if (meeting.summary) descriptionParts.push(meeting.summary);
     if (attendeeNames.length > 0) {
       descriptionParts.push(`Attendees: ${attendeeNames.join(", ")}`);
     }
@@ -590,6 +611,134 @@ Respond ONLY with JSON:
       sequenceNumber: 0,
     });
     return { created: true, dailyActivityId };
+  }
+
+  // ============================================================================
+  // Meeting Enrichment
+  // ============================================================================
+
+  /**
+   * Batch-fetch meeting details via get_meetings (max 10 per call) to get
+   * enhanced notes and private notes. Mutates meetings in place.
+   */
+  private async enrichMeetingsWithNotes(
+    accessToken: string,
+    meetings: GranolaMeeting[]
+  ): Promise<void> {
+    const BATCH_SIZE = 10;
+
+    for (let i = 0; i < meetings.length; i += BATCH_SIZE) {
+      const batch = meetings.slice(i, i + BATCH_SIZE);
+      const ids = batch.map((m) => m.id).filter(Boolean);
+      if (ids.length === 0) continue;
+
+      try {
+        const raw = await granolaService.getMeetings(accessToken, ids);
+        const details = this.parseMeetingDetails(raw);
+
+        // Merge notes back into the meeting objects
+        for (const meeting of batch) {
+          const detail = details.get(meeting.id);
+          if (detail) {
+            meeting.notes = detail.notes || meeting.notes || null;
+            meeting.summary = detail.summary || meeting.summary || null;
+            if (detail.end_time) meeting.end_time = detail.end_time;
+          }
+        }
+
+        logger.info(
+          { batchSize: ids.length, enriched: details.size },
+          "Enriched Granola meetings with notes via get_meetings"
+        );
+      } catch (err) {
+        logger.warn(
+          { batchStart: i, error: String(err) },
+          "Failed to enrich Granola meetings with notes"
+        );
+      }
+    }
+  }
+
+  /**
+   * Parse get_meetings response into a map of meeting ID → details.
+   * Handles both JSON and XML response shapes from Granola MCP.
+   */
+  private parseMeetingDetails(
+    raw: unknown
+  ): Map<string, { notes?: string; summary?: string; end_time?: string }> {
+    const details = new Map<string, { notes?: string; summary?: string; end_time?: string }>();
+    if (!raw) return details;
+
+    // Extract text from MCP wrapper
+    const result = raw as Record<string, unknown>;
+    let rawText: string | null = null;
+
+    if (result.content && Array.isArray(result.content)) {
+      const textBlock = (result.content as Array<{ type: string; text?: string }>).find(
+        (b) => b.type === "text" && b.text
+      );
+      if (textBlock?.text) rawText = textBlock.text;
+    }
+
+    if (!rawText) {
+      logger.debug("get_meetings returned empty text");
+      return details;
+    }
+
+    logger.debug({ preview: rawText.slice(0, 500) }, "Raw get_meetings response");
+
+    // Try JSON first
+    try {
+      const parsed = JSON.parse(rawText);
+      const arr = Array.isArray(parsed)
+        ? parsed
+        : parsed.meetings || parsed.results || parsed.notes || [];
+      for (const m of arr) {
+        if (m.id) {
+          details.set(m.id, {
+            notes: m.enhanced_notes || m.private_notes || m.notes || undefined,
+            summary: m.summary || undefined,
+            end_time: m.end_time || undefined,
+          });
+        }
+      }
+      return details;
+    } catch {
+      // Not JSON — try XML
+    }
+
+    // XML: <meeting id="...">...<enhanced_notes>...</enhanced_notes>...<private_notes>...</private_notes>...</meeting>
+    const meetingRegex = /<meeting\s+([^>]+)>([\s\S]*?)<\/meeting>/g;
+    let match: RegExpExecArray | null;
+    while ((match = meetingRegex.exec(rawText)) !== null) {
+      const attrStr = match[1];
+      const body = match[2];
+
+      const idMatch = attrStr.match(/id="([^"]*)"/);
+      if (!idMatch) continue;
+      const id = idMatch[1];
+
+      // Extract notes content from various possible XML tags
+      const enhancedMatch = body.match(/<enhanced_notes>([\s\S]*?)<\/enhanced_notes>/);
+      const privateMatch = body.match(/<private_notes>([\s\S]*?)<\/private_notes>/);
+      const notesMatch = body.match(/<notes>([\s\S]*?)<\/notes>/);
+      const summaryMatch = body.match(/<summary>([\s\S]*?)<\/summary>/);
+      const endTimeMatch = attrStr.match(/end_time="([^"]*)"|end="([^"]*)"/);
+
+      const notes =
+        enhancedMatch?.[1]?.trim() ||
+        privateMatch?.[1]?.trim() ||
+        notesMatch?.[1]?.trim() ||
+        undefined;
+
+      details.set(id, {
+        notes,
+        summary: summaryMatch?.[1]?.trim() || undefined,
+        end_time: endTimeMatch?.[1] || endTimeMatch?.[2] || undefined,
+      });
+    }
+
+    return details;
   }
 
   // ============================================================================
