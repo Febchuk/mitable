@@ -79,7 +79,6 @@ export default function Sidebar() {
         style={{
           marginTop: "auto",
           padding: "10px 8px 0",
-          borderTop: "0.5px solid rgba(236, 232, 224, 0.07)",
           display: "flex",
           flexDirection: "column",
           gap: 2,
@@ -87,44 +86,52 @@ export default function Sidebar() {
       >
         {/* Switch view button */}
         {canSwitchRoles && (
-          <button
-            onClick={handleSwitchView}
-            className="flex items-center gap-[11px] rounded-md cursor-pointer whitespace-nowrap hover:bg-[rgba(236,232,224,0.05)]"
-            style={{
-              padding: "8px 12px",
-              borderRadius: 6,
-              fontSize: 13,
-              color: "#9B9689",
-              background: "none",
-              border: "none",
-              textAlign: "left",
-              width: "100%",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-              e.currentTarget.style.color = "#ECE8E0";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "none";
-              e.currentTarget.style.color = "#9B9689";
-            }}
-          >
-            <ArrowLeftRight
-              size={15}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <>
+            <div
+              style={{
+                height: 0.5,
+                background: "rgba(236, 232, 224, 0.06)",
+                margin: "0 -8px 4px",
+              }}
             />
-            <span>{inAdminView ? "Switch to IC View" : "Switch to Admin View"}</span>
-          </button>
+            <button
+              onClick={handleSwitchView}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 11,
+                padding: "8px 12px",
+                borderRadius: 6,
+                fontSize: 13,
+                color: "#9B9689",
+                background: "none",
+                border: "none",
+                textAlign: "left",
+                width: "100%",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
+                e.currentTarget.style.color = "#ECE8E0";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "none";
+                e.currentTarget.style.color = "#9B9689";
+              }}
+            >
+              <ArrowLeftRight size={15} strokeWidth={1.5} />
+              <span>{inAdminView ? "Switch to IC View" : "Switch to Admin View"}</span>
+            </button>
+          </>
         )}
 
-        {/* Divider — breaks out of parent padding to span full sidebar width */}
+        {/* Divider before user row */}
         <div
           style={{
             height: 0.5,
             background: "rgba(236, 232, 224, 0.06)",
-            margin: "4px -8px",
+            margin: canSwitchRoles ? "4px -8px" : "0 -8px",
           }}
         />
 
@@ -143,9 +150,7 @@ export default function Sidebar() {
               e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = showUserMenu
-                ? "rgba(236, 232, 224, 0.05)"
-                : "none";
+              e.currentTarget.style.background = "none";
             }}
             onClick={() => setShowUserMenu(!showUserMenu)}
           >
@@ -235,7 +240,7 @@ export default function Sidebar() {
                 }}
               >
                 <Settings size={14} strokeWidth={1.5} />
-                Settings & Preferences
+                Settings
               </button>
 
               <div

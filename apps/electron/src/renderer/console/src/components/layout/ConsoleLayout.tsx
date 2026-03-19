@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { SidebarProvider } from "../../context/SidebarContext";
 import Sidebar from "./Sidebar";
 import TitleBar from "./TitleBar";
@@ -10,6 +10,8 @@ const logger = createLogger("ConsoleLayout");
 
 export default function ConsoleLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isProfilePage = location.pathname === "/profile";
 
   useEffect(() => {
     const handleDraftsNavigate = (draftId: string) => {
@@ -37,12 +39,16 @@ export default function ConsoleLayout() {
           <UpdateBanner />
 
           <div
-            className="flex-1 overflow-y-auto flex flex-col items-center"
-            style={{ padding: "20px 0" }}
+            className={`flex-1 overflow-y-auto flex flex-col${isProfilePage ? "" : " items-center"}`}
+            style={{ padding: isProfilePage ? 0 : "20px 0" }}
           >
             <div
               className="w-full flex flex-col"
-              style={{ maxWidth: 800, padding: "0 32px", gap: 28 }}
+              style={
+                isProfilePage
+                  ? { flex: 1, minWidth: 0 }
+                  : { maxWidth: 680, padding: "0 40px", gap: 28 }
+              }
             >
               <Outlet />
             </div>

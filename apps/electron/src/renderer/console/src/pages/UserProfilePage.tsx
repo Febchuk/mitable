@@ -1,4 +1,5 @@
 import { useState, FormEvent, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -9,7 +10,6 @@ import {
   Loader2,
   Link2,
   Unlink,
-  Mail,
   RefreshCw,
   ExternalLink,
   Info,
@@ -19,13 +19,10 @@ import {
   Plus,
   Search,
   Globe,
-  KeyRound,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
-import { GranolaIcon, FirefliesIcon } from "../../../components/icons/integrations";
-import Button from "../components/ui/Button";
+import { FirefliesIcon } from "../../../components/icons/integrations";
 import { Button as ShadcnButton } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
 import { useToast } from "@/hooks/use-toast";
@@ -112,7 +109,6 @@ export default function UserProfilePage() {
   const [isGranolaLoading, setIsGranolaLoading] = useState(true);
   const [isGranolaConnecting, setIsGranolaConnecting] = useState(false);
   const [isGranolaDisconnecting, setIsGranolaDisconnecting] = useState(false);
-  const [isGranolaSyncing, setIsGranolaSyncing] = useState(false);
 
   const [firefliesStatus, setFirefliesStatus] = useState<FirefliesStatus | null>(null);
   const [isFirefliesLoading, setIsFirefliesLoading] = useState(true);
@@ -120,7 +116,6 @@ export default function UserProfilePage() {
   const [isFirefliesDisconnecting, setIsFirefliesDisconnecting] = useState(false);
   const [showFirefliesModal, setShowFirefliesModal] = useState(false);
   const [firefliesApiKey, setFirefliesApiKey] = useState("");
-  const [isFirefliesSyncing, setIsFirefliesSyncing] = useState(false);
 
   // About / Version state
   const [appVersion, setAppVersion] = useState<string>("");
@@ -789,7 +784,7 @@ export default function UserProfilePage() {
     loadGranolaStatus();
     loadFirefliesStatus();
     loadAppVersion();
-    loadAudioPreferences(); // Load audio devices and preferences
+    loadAudioPreferences();
     if (user?.id) {
       loadBlockList();
       loadAllBlockableApps();
@@ -1384,37 +1379,6 @@ export default function UserProfilePage() {
     }
   };
 
-  const handleSyncGranola = async () => {
-    setIsGranolaSyncing(true);
-    try {
-      const token = authService.getAccessToken();
-      if (!token) return;
-
-      const response = await fetch(`${API_BASE_URL}/api/integrations/granola/sync`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        toast({
-          title: "Sync Complete",
-          description: `Processed ${data.meetingsProcessed} meeting${data.meetingsProcessed !== 1 ? "s" : ""} (${data.blocksCreated} new).`,
-        });
-        loadGranolaStatus();
-      }
-    } catch (error) {
-      logger.error("Error syncing Granola:", error);
-      toast({
-        title: "Sync Failed",
-        description: "Failed to sync Granola meetings. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGranolaSyncing(false);
-    }
-  };
-
   const handleDisconnectGranola = async () => {
     setIsGranolaDisconnecting(true);
     try {
@@ -1546,37 +1510,6 @@ export default function UserProfilePage() {
     }
   };
 
-  const handleSyncFireflies = async () => {
-    setIsFirefliesSyncing(true);
-    try {
-      const token = authService.getAccessToken();
-      if (!token) return;
-
-      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/sync`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        toast({
-          title: "Sync Complete",
-          description: `Processed ${data.meetingsProcessed} meeting${data.meetingsProcessed !== 1 ? "s" : ""} (${data.meetingsCreated} new).`,
-        });
-        loadFirefliesStatus();
-      }
-    } catch (error) {
-      logger.error("Error syncing Fireflies:", error);
-      toast({
-        title: "Sync Failed",
-        description: "Failed to sync Fireflies meetings. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsFirefliesSyncing(false);
-    }
-  };
-
   const getPasswordStrength = (password: string): "weak" | "medium" | "strong" => {
     let score = 0;
     if (password.length >= 8) score++;
@@ -1660,10 +1593,21 @@ export default function UserProfilePage() {
     }
   };
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<
-    "account" | "security" | "preferences" | "integrations" | "about"
-  >("account");
+  // Tab state — honor ?tab= query param from sidebar menu
+  const [searchParams] = useSearchParams();
+  const validTabs = ["account", "security", "preferences", "integrations", "about"] as const;
+  type TabId = (typeof validTabs)[number];
+  const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
+    ? (searchParams.get("tab") as TabId)
+    : "account";
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab") as TabId;
+    if (tabParam && validTabs.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
@@ -1674,520 +1618,996 @@ export default function UserProfilePage() {
   ];
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto p-8">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-heading-2 text-white">Profile & Settings</h1>
-            <p className="text-body-sm text-text-secondary mt-1">
-              Manage your account, integrations, preferences, and security
-            </p>
-          </div>
+    <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      {/* Settings sidebar navigation */}
+      <div
+        style={{
+          width: 200,
+          minWidth: 200,
+          borderRight: "0.5px solid rgba(236, 232, 224, 0.06)",
+          padding: "28px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          overflowY: "auto",
+        }}
+      >
+        <h2
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 18,
+            color: "#ECE8E0",
+            fontWeight: 400,
+            letterSpacing: "-0.2px",
+            margin: "0 0 16px",
+            padding: "0 10px",
+          }}
+        >
+          Settings
+        </h2>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 9,
+                padding: "8px 10px",
+                borderRadius: 6,
+                fontSize: 13,
+                fontWeight: 400,
+                color: isActive ? "#ECE8E0" : "#6B665C",
+                background: isActive ? "rgba(236, 232, 224, 0.06)" : "none",
+                border: "none",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                textAlign: "left",
+                width: "100%",
+                transition: "color 0.15s ease, background 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.color = "#9B9689";
+                  e.currentTarget.style.background = "rgba(236, 232, 224, 0.03)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.color = "#6B665C";
+                  e.currentTarget.style.background = "none";
+                }
+              }}
+            >
+              <tab.icon size={14} strokeWidth={1.5} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 border-b border-border-subtle mb-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 border-b-2 -mb-px ${
-                  activeTab === tab.id
-                    ? "border-primary-light text-white"
-                    : "border-transparent text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* Settings content area */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ maxWidth: 640, padding: "28px 36px" }}>
+          {/* Section Content */}
+          {/* Account Tab */}
+          {activeTab === "account" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+              {/* Account Information Section */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div
+                  style={{
+                    paddingBottom: 16,
+                    borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                  }}
+                >
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 500,
+                      color: "#ECE8E0",
+                      margin: 0,
+                    }}
+                  >
+                    Account Information
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#6B665C",
+                      margin: "6px 0 0",
+                    }}
+                  >
+                    Your profile details
+                  </p>
+                </div>
 
-          {/* Tab Content */}
-          <div className="space-y-6">
-            {/* Account Tab */}
-            {activeTab === "account" && (
-              <div className="space-y-6">
-                {/* Account Information Section */}
-                <div className="bg-background-secondary rounded-xl border border-border-subtle p-6 space-y-6">
-                  <div className="flex items-center gap-3 pb-4 border-b border-border-subtle">
-                    <div className="w-10 h-10 bg-primary-light/20 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary-light" />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 20,
+                  }}
+                >
+                  {[
+                    { label: "Name", value: user?.name || "Not set" },
+                    { label: "Email", value: user?.email || "Not available" },
+                    {
+                      label: "Role",
+                      value: user?.role || "Employee",
+                      accent: true,
+                    },
+                    {
+                      label: "Organization ID",
+                      value: user?.organizationId || "Not available",
+                      mono: true,
+                    },
+                  ].map((field) => (
+                    <div key={field.label}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: "#6B665C",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
+                        {field.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: field.accent ? "#9B84E8" : field.mono ? "#6B665C" : "#ECE8E0",
+                          fontFamily: field.mono ? "monospace" : "inherit",
+                          padding: "9px 12px",
+                          borderRadius: 6,
+                          border: "0.5px solid rgba(236, 232, 224, 0.06)",
+                          background: "rgba(236, 232, 224, 0.03)",
+                          textTransform: field.accent ? "capitalize" : undefined,
+                          fontWeight: field.accent ? 500 : 400,
+                        }}
+                      >
+                        {field.value}
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-heading-4 text-white">Account Information</h2>
-                      <p className="text-body-sm text-text-tertiary">Your profile details</p>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subscription Section */}
+              <div>
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 500,
+                    color: "#ECE8E0",
+                    margin: "0 0 16px",
+                  }}
+                >
+                  Subscription
+                </h3>
+                <BillingSection />
+              </div>
+            </div>
+          )}
+
+          {/* Security Tab */}
+          {activeTab === "security" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div
+                  style={{
+                    paddingBottom: 16,
+                    borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                  }}
+                >
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 500,
+                      color: "#ECE8E0",
+                      margin: 0,
+                    }}
+                  >
+                    Change Password
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#6B665C",
+                      margin: "6px 0 0",
+                    }}
+                  >
+                    Update your password to keep your account secure
+                  </p>
+                </div>
+
+                <form
+                  onSubmit={handlePasswordChange}
+                  style={{ display: "flex", flexDirection: "column", gap: 20 }}
+                >
+                  {/* Current Password */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <label
+                      htmlFor="currentPassword"
+                      style={{ fontSize: 13, fontWeight: 500, color: "#9B9689" }}
+                    >
+                      Current Password
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        id="currentPassword"
+                        type={showCurrentPassword ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        required
+                        disabled={isChangingPassword}
+                        placeholder="Enter your current password"
+                        style={{
+                          width: "100%",
+                          height: 38,
+                          borderRadius: 6,
+                          border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                          background: "rgba(236, 232, 224, 0.03)",
+                          padding: "0 36px 0 12px",
+                          fontSize: 13,
+                          color: "#ECE8E0",
+                          outline: "none",
+                          opacity: isChangingPassword ? 0.5 : 1,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        disabled={isChangingPassword}
+                        style={{
+                          position: "absolute",
+                          right: 10,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "none",
+                          border: "none",
+                          color: "#6B665C",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-text-secondary">Name</label>
-                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white">
-                        {user?.name || "Not set"}
-                      </div>
+                  {/* New Password */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <label
+                      htmlFor="newPassword"
+                      style={{ fontSize: 13, fontWeight: 500, color: "#9B9689" }}
+                    >
+                      New Password
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        id="newPassword"
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        disabled={isChangingPassword}
+                        placeholder="Enter your new password"
+                        style={{
+                          width: "100%",
+                          height: 38,
+                          borderRadius: 6,
+                          border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                          background: "rgba(236, 232, 224, 0.03)",
+                          padding: "0 36px 0 12px",
+                          fontSize: 13,
+                          color: "#ECE8E0",
+                          outline: "none",
+                          opacity: isChangingPassword ? 0.5 : 1,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        disabled={isChangingPassword}
+                        style={{
+                          position: "absolute",
+                          right: 10,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "none",
+                          border: "none",
+                          color: "#6B665C",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-text-secondary">Email</label>
-                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white">
-                        {user?.email || "Not available"}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-text-secondary">Role</label>
-                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm">
-                        <span className="capitalize text-primary-light font-medium">
-                          {user?.role || "Employee"}
+                    {/* Password strength indicator */}
+                    {newPassword && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                        <div
+                          style={{
+                            flex: 1,
+                            height: 4,
+                            background: "rgba(236, 232, 224, 0.06)",
+                            borderRadius: 2,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            className={`h-full transition-all duration-300 ${strengthColors[passwordStrength]} ${strengthWidth[passwordStrength]}`}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "#6B665C",
+                            textTransform: "capitalize",
+                            minWidth: 50,
+                          }}
+                        >
+                          {passwordStrength}
                         </span>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-text-secondary">
-                        Organization ID
-                      </label>
-                      <div className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-text-tertiary font-mono text-xs">
-                        {user?.organizationId || "Not available"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Subscription Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Subscription</h3>
-                  <BillingSection />
-                </div>
-              </div>
-            )}
-
-            {/* Security Tab */}
-            {activeTab === "security" && (
-              <div className="bg-background-secondary rounded-xl border border-border-subtle p-6">
-                <div className="space-y-6">
-                  <div className="pb-4 border-b border-border-subtle">
-                    <h2 className="text-heading-4 text-white">Security</h2>
-                    <p className="text-body-sm text-text-tertiary mt-1">
-                      Update your password to keep your account secure
-                    </p>
+                    )}
                   </div>
 
-                  <form onSubmit={handlePasswordChange} className="space-y-6">
-                    {/* Current Password */}
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="currentPassword"
-                        className="text-sm font-medium text-text-primary"
+                  {/* Confirm Password */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <label
+                      htmlFor="confirmPassword"
+                      style={{ fontSize: 13, fontWeight: 500, color: "#9B9689" }}
+                    >
+                      Confirm New Password
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        disabled={isChangingPassword}
+                        placeholder="Confirm your new password"
+                        style={{
+                          width: "100%",
+                          height: 38,
+                          borderRadius: 6,
+                          border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                          background: "rgba(236, 232, 224, 0.03)",
+                          padding: "0 36px 0 12px",
+                          fontSize: 13,
+                          color: "#ECE8E0",
+                          outline: "none",
+                          opacity: isChangingPassword ? 0.5 : 1,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        disabled={isChangingPassword}
+                        style={{
+                          position: "absolute",
+                          right: 10,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "none",
+                          border: "none",
+                          color: "#6B665C",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
                       >
-                        Current Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="currentPassword"
-                          type={showCurrentPassword ? "text" : "password"}
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          required
-                          disabled={isChangingPassword}
-                          placeholder="Enter your current password"
-                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          disabled={isChangingPassword}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
-                        >
-                          {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
 
-                    {/* New Password */}
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="newPassword"
-                        className="text-sm font-medium text-text-primary"
+                    {/* Password Match Indicator */}
+                    {confirmPassword && newPassword && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          marginTop: 4,
+                          fontSize: 12,
+                        }}
                       >
-                        New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="newPassword"
-                          type={showNewPassword ? "text" : "password"}
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          required
-                          disabled={isChangingPassword}
-                          placeholder="Enter your new password"
-                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          disabled={isChangingPassword}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
-                        >
-                          {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
+                        {confirmPassword === newPassword ? (
+                          <>
+                            <Check size={14} style={{ color: "#4ADE80", flexShrink: 0 }} />
+                            <span style={{ color: "#4ADE80" }}>Passwords match</span>
+                          </>
+                        ) : (
+                          <>
+                            <X size={14} style={{ color: "#E5534B", flexShrink: 0 }} />
+                            <span style={{ color: "#E5534B" }}>Passwords don't match</span>
+                          </>
+                        )}
                       </div>
+                    )}
+                  </div>
 
-                      {/* Password strength indicator */}
-                      {newPassword && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-background-elevated rounded-full overflow-hidden">
-                              <div
-                                className={`h-full transition-all duration-300 ${strengthColors[passwordStrength]} ${strengthWidth[passwordStrength]}`}
-                              />
+                  {/* Password requirements */}
+                  {newPassword && (
+                    <div
+                      style={{
+                        padding: 14,
+                        borderRadius: 8,
+                        border: "0.5px solid rgba(236, 232, 224, 0.06)",
+                        background: "rgba(236, 232, 224, 0.02)",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: "#6B665C",
+                          margin: "0 0 10px",
+                        }}
+                      >
+                        Password must contain:
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                        {requirements.map((req, idx) => {
+                          const isMet = req.test(newPassword);
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontSize: 12,
+                              }}
+                            >
+                              {isMet ? (
+                                <Check size={14} style={{ color: "#4ADE80", flexShrink: 0 }} />
+                              ) : (
+                                <X size={14} style={{ color: "#4B4740", flexShrink: 0 }} />
+                              )}
+                              <span style={{ color: isMet ? "#4ADE80" : "#4B4740" }}>
+                                {req.label}
+                              </span>
                             </div>
-                            <span className="text-xs text-text-secondary capitalize min-w-[60px]">
-                              {passwordStrength}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ paddingTop: 8 }}>
+                    <button
+                      type="submit"
+                      disabled={isChangingPassword}
+                      style={{
+                        padding: "8px 20px",
+                        borderRadius: 6,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "#fff",
+                        background: "#9B84E8",
+                        border: "none",
+                        cursor: isChangingPassword ? "not-allowed" : "pointer",
+                        opacity: isChangingPassword ? 0.6 : 1,
+                        transition: "opacity 0.15s ease",
+                      }}
+                    >
+                      {isChangingPassword ? "Changing Password..." : "Change Password"}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Block List Section */}
+                <div
+                  style={{
+                    paddingTop: 24,
+                    borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Shield size={16} style={{ color: "#6B665C" }} />
+                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                      Blocked Apps
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "#6B665C", margin: 0 }}>
+                    Apps in this list will never be tracked or captured.
+                  </p>
+
+                  {isBlockListLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Currently Blocked Apps */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-text-primary">
+                          Blocked Apps
+                        </Label>
+                        {blockedApps.length === 0 ? (
+                          <p className="text-xs text-text-tertiary italic">
+                            No apps are currently blocked
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {blockedApps.map((appName) => {
+                              const detectedApp = detectedApps.find(
+                                (a) => a.normalizedName === appName.toLowerCase()
+                              );
+                              const displayName = cleanAppName(
+                                detectedApp?.originalName || appName
+                              );
+                              return (
+                                <div
+                                  key={appName}
+                                  className="flex items-center gap-1.5 bg-destructive/20 border border-destructive/30 rounded-full pl-3 pr-2 py-1"
+                                >
+                                  <span className="text-xs text-white">{displayName}</span>
+                                  <button
+                                    onClick={() => handleRemoveBlockedApp(appName)}
+                                    className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-destructive/30 transition-colors"
+                                    aria-label={`Unblock ${displayName}`}
+                                  >
+                                    <X size={10} className="text-white/70" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Available Apps to Block */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Add App to Block List
+                          </Label>
+                          <ShadcnButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRefreshAppList}
+                            disabled={isRefreshingApps}
+                            className="h-7 px-2 text-xs text-text-tertiary hover:text-text-primary"
+                          >
+                            {isRefreshingApps ? (
+                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                            ) : (
+                              <RefreshCw className="w-3 h-3 mr-1" />
+                            )}
+                            Refresh
+                          </ShadcnButton>
+                        </div>
+                        {isRefreshingApps && detectedApps.length === 0 ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="w-5 h-5 animate-spin text-text-tertiary mr-2" />
+                            <span className="text-xs text-text-tertiary">
+                              Scanning installed apps...
                             </span>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        ) : detectedApps.length === 0 ? (
+                          <p className="text-xs text-text-tertiary italic">
+                            No apps found. Click Refresh to scan for installed apps on your system.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {/* Search input */}
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                              <input
+                                type="text"
+                                placeholder="Search apps..."
+                                value={appSearchQuery}
+                                onChange={(e) => setAppSearchQuery(e.target.value)}
+                                className="w-full pl-8 pr-3 py-2 text-sm bg-background-secondary border border-border-subtle rounded-lg text-white placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
+                              />
+                              {appSearchQuery && (
+                                <button
+                                  onClick={() => setAppSearchQuery("")}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary hover:text-text-primary"
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
+                            </div>
+                            {/* App list */}
+                            <div className="max-h-48 overflow-y-auto border border-border-subtle rounded-lg">
+                              {(() => {
+                                const filteredApps = detectedApps
+                                  .filter((app) => !blockedApps.includes(app.normalizedName))
+                                  .filter((app) => {
+                                    if (!appSearchQuery.trim()) return true;
+                                    const query = appSearchQuery.toLowerCase();
+                                    return (
+                                      app.originalName.toLowerCase().includes(query) ||
+                                      app.normalizedName.includes(query)
+                                    );
+                                  });
 
-                    {/* Confirm Password */}
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="confirmPassword"
-                        className="text-sm font-medium text-text-primary"
-                      >
-                        Confirm New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          required
-                          disabled={isChangingPassword}
-                          placeholder="Confirm your new password"
-                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          disabled={isChangingPassword}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
-                        >
-                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
+                                if (filteredApps.length === 0) {
+                                  return (
+                                    <div className="px-3 py-2 text-xs text-text-tertiary italic">
+                                      {appSearchQuery
+                                        ? "No apps match your search"
+                                        : "All apps are already blocked"}
+                                    </div>
+                                  );
+                                }
+
+                                return filteredApps.map((app) => {
+                                  const displayName = cleanAppName(app.originalName);
+                                  const isInstalledOnly = app.source === "installed";
+                                  return (
+                                    <button
+                                      key={app.normalizedName}
+                                      onClick={() => handleAddBlockedApp(app.normalizedName)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
+                                    >
+                                      <Plus size={14} className="text-text-tertiary" />
+                                      <span className="text-sm text-white flex-1">
+                                        {displayName}
+                                      </span>
+                                      {isInstalledOnly && (
+                                        <span className="text-[10px] text-text-tertiary bg-background-secondary px-1.5 py-0.5 rounded">
+                                          not opened
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                });
+                              })()}
+                            </div>
+                            {/* App count */}
+                            <p className="text-[10px] text-text-tertiary">
+                              {
+                                detectedApps.filter(
+                                  (app) => !blockedApps.includes(app.normalizedName)
+                                ).length
+                              }{" "}
+                              apps available
+                            </p>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Password Match Indicator */}
-                      {confirmPassword && newPassword && (
-                        <div className="flex items-center gap-2 text-xs">
-                          {confirmPassword === newPassword ? (
-                            <>
-                              <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                              <span className="text-green-400">Passwords match</span>
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-4 h-4 text-red-400 flex-shrink-0" />
-                              <span className="text-red-400">Passwords don't match</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Password requirements */}
-                    {newPassword && (
-                      <div className="space-y-2 p-4 bg-background-elevated/50 rounded-lg border border-border-subtle">
-                        <p className="text-xs font-medium text-text-secondary mb-3">
-                          Password must contain:
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {requirements.map((req, idx) => {
-                            const isMet = req.test(newPassword);
-                            return (
-                              <div key={idx} className="flex items-center gap-2 text-xs">
-                                {isMet ? (
-                                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                                ) : (
-                                  <X className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-                                )}
-                                <span className={isMet ? "text-green-400" : "text-text-tertiary"}>
-                                  {req.label}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-4">
-                      <Button
-                        type="submit"
-                        disabled={isChangingPassword}
-                        className="w-full md:w-auto"
-                      >
-                        {isChangingPassword ? "Changing Password..." : "Change Password"}
-                      </Button>
-                    </div>
-                  </form>
+                    </>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Preferences Tab */}
-            {activeTab === "preferences" && (
-              <div className="bg-background-secondary rounded-xl border border-border-subtle p-6">
-                <div className="space-y-6">
-                  <div className="pb-4 border-b border-border-subtle">
-                    <h2 className="text-heading-4 text-white">Session Preferences</h2>
-                    <p className="text-body-sm text-text-tertiary mt-1">
-                      Customize how monitoring sessions behave
+          {/* Preferences Tab */}
+          {activeTab === "preferences" && (
+            <div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div
+                  style={{
+                    paddingBottom: 16,
+                    borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                  }}
+                >
+                  <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                    Session Preferences
+                  </h2>
+                  <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+                    Customize how monitoring sessions behave
+                  </p>
+                </div>
+
+                {/* Show Pill on Session Start Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 flex-1 pr-4">
+                    <Label
+                      htmlFor="show-pill-toggle-profile"
+                      className="text-sm font-medium text-text-primary cursor-pointer"
+                    >
+                      Show Watching Pill on Session Start
+                    </Label>
+                    <p className="text-xs text-text-tertiary">
+                      Automatically show the watching pill when a monitoring session starts
                     </p>
                   </div>
-
-                  {/* Show Pill on Session Start Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5 flex-1 pr-4">
-                      <Label
-                        htmlFor="show-pill-toggle-profile"
-                        className="text-sm font-medium text-text-primary cursor-pointer"
-                      >
-                        Show Watching Pill on Session Start
-                      </Label>
-                      <p className="text-xs text-text-tertiary">
-                        Automatically show the watching pill when a monitoring session starts
-                      </p>
-                    </div>
-                    {isPreferencesLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                    ) : (
-                      <Switch
-                        id="show-pill-toggle-profile"
-                        checked={showPillOnSessionStart}
-                        onCheckedChange={async (checked) => {
-                          const result = await updatePreference("showPillOnSessionStart", checked);
-                          if (result.success) {
-                            toast({
-                              title: "Preference saved",
-                              description: checked
-                                ? "Watching pill will show when sessions start"
-                                : "Watching pill will not auto-show when sessions start",
-                            });
-                          } else {
-                            toast({
-                              title: "Error",
-                              description: "Failed to save preference",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                        className="flex-shrink-0"
-                      />
-                    )}
-                  </div>
-
-                  {/* Hide Pill on Session End Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5 flex-1 pr-4">
-                      <Label
-                        htmlFor="hide-pill-toggle-profile"
-                        className="text-sm font-medium text-text-primary cursor-pointer"
-                      >
-                        Hide Watching Pill on Session End
-                      </Label>
-                      <p className="text-xs text-text-tertiary">
-                        Automatically hide the watching pill when a monitoring session ends
-                      </p>
-                    </div>
-                    {isPreferencesLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                    ) : (
-                      <Switch
-                        id="hide-pill-toggle-profile"
-                        checked={hidePillOnSessionEnd}
-                        onCheckedChange={async (checked) => {
-                          const result = await updatePreference("hidePillOnSessionEnd", checked);
-                          if (result.success) {
-                            toast({
-                              title: "Preference saved",
-                              description: checked
-                                ? "Watching pill will be hidden when sessions end"
-                                : "Watching pill will remain visible when sessions end",
-                            });
-                          } else {
-                            toast({
-                              title: "Error",
-                              description: "Failed to save preference",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                        className="flex-shrink-0"
-                      />
-                    )}
-                  </div>
-
-                  {/* Pill Display Mode Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5 flex-1 pr-4">
-                      <Label
-                        htmlFor="pill-display-mode"
-                        className="text-sm font-medium text-text-primary cursor-pointer"
-                      >
-                        Always Show Expanded Pill
-                      </Label>
-                      <p className="text-xs text-text-tertiary">
-                        Keep the watching pill fully expanded with all controls visible instead of
-                        compact mode
-                      </p>
-                    </div>
-                    {isPillDisplayModeLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                    ) : (
-                      <Switch
-                        id="pill-display-mode"
-                        checked={pillDisplayMode === "expanded"}
-                        onCheckedChange={(checked) =>
-                          handlePillDisplayModeChange(checked ? "expanded" : "compact")
+                  {isPreferencesLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                  ) : (
+                    <Switch
+                      id="show-pill-toggle-profile"
+                      checked={showPillOnSessionStart}
+                      onCheckedChange={async (checked) => {
+                        const result = await updatePreference("showPillOnSessionStart", checked);
+                        if (result.success) {
+                          toast({
+                            title: "Preference saved",
+                            description: checked
+                              ? "Watching pill will show when sessions start"
+                              : "Watching pill will not auto-show when sessions start",
+                          });
+                        } else {
+                          toast({
+                            title: "Error",
+                            description: "Failed to save preference",
+                            variant: "destructive",
+                          });
                         }
-                        className="flex-shrink-0"
-                      />
-                    )}
-                  </div>
+                      }}
+                      className="flex-shrink-0"
+                    />
+                  )}
+                </div>
 
-                  {/* Notification Frequency Setting */}
-                  <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
-                    <div className="space-y-0.5 flex-1 pr-4">
-                      <Label
-                        htmlFor="notification-frequency-input"
-                        className="text-sm font-medium text-text-primary cursor-pointer"
-                      >
-                        Reminder Notification Frequency
-                      </Label>
-                      <p className="text-xs text-text-tertiary">
-                        How often (in minutes) you'd like to receive reminders to record work
-                        sessions
-                      </p>
-                    </div>
-                    {isNotificationFrequencyLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                    ) : (
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <input
-                          id="notification-frequency-input"
-                          type="number"
-                          min="5"
-                          max="240"
-                          step="5"
-                          value={notificationFrequency}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value, 10);
-                            if (!isNaN(value) && value >= 5 && value <= 240) {
-                              handleNotificationFrequencyChange(value);
-                            }
-                          }}
-                          className="w-20 h-10 rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent"
-                        />
-                        <span className="text-sm text-text-secondary">minutes</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Passive Monitoring Toggle */}
-                  <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
-                    <div className="space-y-0.5 flex-1 pr-4">
-                      <Label
-                        htmlFor="passive-monitoring-toggle"
-                        className="text-sm font-medium text-text-primary cursor-pointer"
-                      >
-                        Passive Monitoring
-                      </Label>
-                      <p className="text-xs text-text-tertiary">
-                        Automatically start sessions when sustained activity is detected and end
-                        them after inactivity. No need to manually start or stop blocks.
-                      </p>
-                    </div>
-                    {isPassiveMonitoringLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                    ) : (
-                      <Switch
-                        id="passive-monitoring-toggle"
-                        checked={passiveMonitoring}
-                        onCheckedChange={handlePassiveMonitoringChange}
-                        className="flex-shrink-0"
-                      />
-                    )}
-                  </div>
-
-                  {/* Auto Recap Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5 flex-1 pr-4">
-                      <Label
-                        htmlFor="auto-recap-toggle-profile"
-                        className="text-sm font-medium text-text-primary cursor-pointer"
-                      >
-                        Auto Recap
-                      </Label>
-                      <p className="text-xs text-text-tertiary">
-                        Automatically generate a daily recap when sessions end. When disabled, you
-                        can still create recaps manually from the Recaps page.
-                      </p>
-                    </div>
-                    {isAutoRecapLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                    ) : (
-                      <Switch
-                        id="auto-recap-toggle-profile"
-                        checked={autoRecap}
-                        onCheckedChange={handleAutoRecapChange}
-                        className="flex-shrink-0"
-                      />
-                    )}
-                  </div>
-
-                  {/* Audio Settings Section */}
-                  <div className="pt-6 border-t border-border-subtle space-y-4">
-                    <div className="flex items-center gap-2">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-text-tertiary"
-                      >
-                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                        <line x1="12" x2="12" y1="19" y2="22" />
-                      </svg>
-                      <h3 className="text-heading-4 text-white">Audio Recording</h3>
-                    </div>
-                    <p className="text-body-sm text-text-tertiary">
-                      Configure your microphone and system audio for session recordings
+                {/* Hide Pill on Session End Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 flex-1 pr-4">
+                    <Label
+                      htmlFor="hide-pill-toggle-profile"
+                      className="text-sm font-medium text-text-primary cursor-pointer"
+                    >
+                      Hide Watching Pill on Session End
+                    </Label>
+                    <p className="text-xs text-text-tertiary">
+                      Automatically hide the watching pill when a monitoring session ends
                     </p>
+                  </div>
+                  {isPreferencesLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                  ) : (
+                    <Switch
+                      id="hide-pill-toggle-profile"
+                      checked={hidePillOnSessionEnd}
+                      onCheckedChange={async (checked) => {
+                        const result = await updatePreference("hidePillOnSessionEnd", checked);
+                        if (result.success) {
+                          toast({
+                            title: "Preference saved",
+                            description: checked
+                              ? "Watching pill will be hidden when sessions end"
+                              : "Watching pill will remain visible when sessions end",
+                          });
+                        } else {
+                          toast({
+                            title: "Error",
+                            description: "Failed to save preference",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="flex-shrink-0"
+                    />
+                  )}
+                </div>
 
-                    {isAudioPrefsLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                {/* Pill Display Mode Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 flex-1 pr-4">
+                    <Label
+                      htmlFor="pill-display-mode"
+                      className="text-sm font-medium text-text-primary cursor-pointer"
+                    >
+                      Always Show Expanded Pill
+                    </Label>
+                    <p className="text-xs text-text-tertiary">
+                      Keep the watching pill fully expanded with all controls visible instead of
+                      compact mode
+                    </p>
+                  </div>
+                  {isPillDisplayModeLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                  ) : (
+                    <Switch
+                      id="pill-display-mode"
+                      checked={pillDisplayMode === "expanded"}
+                      onCheckedChange={(checked) =>
+                        handlePillDisplayModeChange(checked ? "expanded" : "compact")
+                      }
+                      className="flex-shrink-0"
+                    />
+                  )}
+                </div>
+
+                {/* Notification Frequency Setting */}
+                <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
+                  <div className="space-y-0.5 flex-1 pr-4">
+                    <Label
+                      htmlFor="notification-frequency-input"
+                      className="text-sm font-medium text-text-primary cursor-pointer"
+                    >
+                      Reminder Notification Frequency
+                    </Label>
+                    <p className="text-xs text-text-tertiary">
+                      How often (in minutes) you'd like to receive reminders to record work sessions
+                    </p>
+                  </div>
+                  {isNotificationFrequencyLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                  ) : (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <input
+                        id="notification-frequency-input"
+                        type="number"
+                        min="5"
+                        max="240"
+                        step="5"
+                        value={notificationFrequency}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value, 10);
+                          if (!isNaN(value) && value >= 5 && value <= 240) {
+                            handleNotificationFrequencyChange(value);
+                          }
+                        }}
+                        className="w-20 h-10 rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent"
+                      />
+                      <span className="text-sm text-text-secondary">minutes</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Passive Monitoring Toggle */}
+                <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
+                  <div className="space-y-0.5 flex-1 pr-4">
+                    <Label
+                      htmlFor="passive-monitoring-toggle"
+                      className="text-sm font-medium text-text-primary cursor-pointer"
+                    >
+                      Passive Monitoring
+                    </Label>
+                    <p className="text-xs text-text-tertiary">
+                      Automatically start sessions when sustained activity is detected and end them
+                      after inactivity. No need to manually start or stop blocks.
+                    </p>
+                  </div>
+                  {isPassiveMonitoringLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                  ) : (
+                    <Switch
+                      id="passive-monitoring-toggle"
+                      checked={passiveMonitoring}
+                      onCheckedChange={handlePassiveMonitoringChange}
+                      className="flex-shrink-0"
+                    />
+                  )}
+                </div>
+
+                {/* Auto Recap Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 flex-1 pr-4">
+                    <Label
+                      htmlFor="auto-recap-toggle-profile"
+                      className="text-sm font-medium text-text-primary cursor-pointer"
+                    >
+                      Auto Recap
+                    </Label>
+                    <p className="text-xs text-text-tertiary">
+                      Automatically generate a daily recap when sessions end. When disabled, you can
+                      still create recaps manually from the Recaps page.
+                    </p>
+                  </div>
+                  {isAutoRecapLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
+                  ) : (
+                    <Switch
+                      id="auto-recap-toggle-profile"
+                      checked={autoRecap}
+                      onCheckedChange={handleAutoRecapChange}
+                      className="flex-shrink-0"
+                    />
+                  )}
+                </div>
+
+                {/* Audio Settings Section */}
+                <div
+                  style={{
+                    paddingTop: 24,
+                    borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ color: "#6B665C" }}
+                    >
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" x2="12" y1="19" y2="22" />
+                    </svg>
+                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                      Audio Recording
+                    </h3>
+                  </div>
+                  <p className="text-body-sm text-text-tertiary">
+                    Configure your microphone and system audio for session recordings
+                  </p>
+
+                  {isAudioPrefsLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Microphone Selection */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-text-primary">Microphone</Label>
+                        <select
+                          value={selectedMicId || "default"}
+                          onChange={(e) => handleMicrophoneChange(e.target.value)}
+                          className="w-full px-3 py-2 bg-[#2a2a2a] border border-border-subtle rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-[#323232] transition-colors [&>option]:bg-[#2a2a2a] [&>option]:text-white [&>option]:py-2"
+                          style={{
+                            colorScheme: "dark",
+                          }}
+                        >
+                          <option value="default" className="bg-[#2a2a2a] text-white">
+                            System Default (Auto-detect)
+                          </option>
+                          {audioDevices.map((device) => (
+                            <option
+                              key={device.deviceId}
+                              value={device.deviceId}
+                              className="bg-[#2a2a2a] text-white"
+                            >
+                              {device.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-text-tertiary">
+                          System Default will automatically use whichever microphone your computer
+                          is currently using. Select a specific device to override this behavior.
+                        </p>
                       </div>
-                    ) : (
-                      <>
-                        {/* Microphone Selection */}
+
+                      {/* System Audio Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5 flex-1 pr-4">
+                          <Label
+                            htmlFor="system-audio-toggle"
+                            className="text-sm font-medium text-text-primary cursor-pointer"
+                          >
+                            Capture System Audio
+                          </Label>
+                          <p className="text-xs text-text-tertiary">
+                            Record audio from apps (Zoom, Slack, browser audio, etc.)
+                          </p>
+                        </div>
+                        <Switch
+                          id="system-audio-toggle"
+                          checked={systemAudioEnabled}
+                          onCheckedChange={handleSystemAudioToggle}
+                          className="flex-shrink-0"
+                        />
+                      </div>
+
+                      {/* System Audio Output Device Selection - only show when enabled */}
+                      {systemAudioEnabled && (
                         <div className="space-y-2">
                           <Label className="text-sm font-medium text-text-primary">
-                            Microphone
+                            System Audio Source
                           </Label>
                           <select
-                            value={selectedMicId || "default"}
-                            onChange={(e) => handleMicrophoneChange(e.target.value)}
+                            value={selectedOutputId || "default"}
+                            onChange={(e) => handleOutputDeviceChange(e.target.value)}
                             className="w-full px-3 py-2 bg-[#2a2a2a] border border-border-subtle rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-[#323232] transition-colors [&>option]:bg-[#2a2a2a] [&>option]:text-white [&>option]:py-2"
                             style={{
                               colorScheme: "dark",
@@ -2196,7 +2616,7 @@ export default function UserProfilePage() {
                             <option value="default" className="bg-[#2a2a2a] text-white">
                               System Default (Auto-detect)
                             </option>
-                            {audioDevices.map((device) => (
+                            {audioOutputDevices.map((device) => (
                               <option
                                 key={device.deviceId}
                                 value={device.deviceId}
@@ -2207,919 +2627,684 @@ export default function UserProfilePage() {
                             ))}
                           </select>
                           <p className="text-xs text-text-tertiary">
-                            System Default will automatically use whichever microphone your computer
-                            is currently using. Select a specific device to override this behavior.
+                            Choose which speakers/output to monitor. If your monitor speakers aren't
+                            working, select your physical speakers instead.
                           </p>
                         </div>
+                      )}
 
-                        {/* System Audio Toggle */}
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5 flex-1 pr-4">
-                            <Label
-                              htmlFor="system-audio-toggle"
-                              className="text-sm font-medium text-text-primary cursor-pointer"
-                            >
-                              Capture System Audio
-                            </Label>
-                            <p className="text-xs text-text-tertiary">
-                              Record audio from apps (Zoom, Slack, browser audio, etc.)
-                            </p>
-                          </div>
-                          <Switch
-                            id="system-audio-toggle"
-                            checked={systemAudioEnabled}
-                            onCheckedChange={handleSystemAudioToggle}
-                            className="flex-shrink-0"
-                          />
-                        </div>
+                      {/* Mic Test Button with Level Visualization */}
+                      <div className="space-y-3 pt-2">
+                        <button
+                          onClick={() => {
+                            if (isMicTesting) {
+                              stopMicTest();
+                            } else {
+                              startMicTest();
+                            }
+                          }}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            isMicTesting
+                              ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40"
+                              : "bg-accent-primary hover:bg-accent-primary/90 text-white"
+                          }`}
+                        >
+                          {isMicTesting ? "Stop Testing" : "Test Microphone"}
+                        </button>
 
-                        {/* System Audio Output Device Selection - only show when enabled */}
-                        {systemAudioEnabled && (
+                        {/* Audio Level Visualization */}
+                        {isMicTesting && (
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium text-text-primary">
-                              System Audio Source
-                            </Label>
-                            <select
-                              value={selectedOutputId || "default"}
-                              onChange={(e) => handleOutputDeviceChange(e.target.value)}
-                              className="w-full px-3 py-2 bg-[#2a2a2a] border border-border-subtle rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-[#323232] transition-colors [&>option]:bg-[#2a2a2a] [&>option]:text-white [&>option]:py-2"
-                              style={{
-                                colorScheme: "dark",
-                              }}
-                            >
-                              <option value="default" className="bg-[#2a2a2a] text-white">
-                                System Default (Auto-detect)
-                              </option>
-                              {audioOutputDevices.map((device) => (
-                                <option
-                                  key={device.deviceId}
-                                  value={device.deviceId}
-                                  className="bg-[#2a2a2a] text-white"
-                                >
-                                  {device.label}
-                                </option>
-                              ))}
-                            </select>
                             <p className="text-xs text-text-tertiary">
-                              Choose which speakers/output to monitor. If your monitor speakers
-                              aren't working, select your physical speakers instead.
+                              Speak into your microphone to see audio levels
                             </p>
-                          </div>
-                        )}
+                            <div className="flex items-center justify-center gap-1 h-16 px-3 py-2 bg-[#1a1a1a] rounded-lg border border-border-subtle">
+                              {/* Waveform Visualization - 20 dots expanding from center */}
+                              {Array.from({ length: 20 }).map((_, i) => {
+                                // Calculate distance from center (0 = center, 10 = edges)
+                                const center = 10;
+                                const distanceFromCenter = Math.abs(i - center);
 
-                        {/* Mic Test Button with Level Visualization */}
-                        <div className="space-y-3 pt-2">
-                          <button
-                            onClick={() => {
-                              if (isMicTesting) {
-                                stopMicTest();
-                              } else {
-                                startMicTest();
-                              }
-                            }}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              isMicTesting
-                                ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40"
-                                : "bg-accent-primary hover:bg-accent-primary/90 text-white"
-                            }`}
-                          >
-                            {isMicTesting ? "Stop Testing" : "Test Microphone"}
-                          </button>
+                                // Convert distance to threshold (center activates first at low levels)
+                                const threshold = (distanceFromCenter / 10) * 100;
+                                const active = micLevel > threshold;
 
-                          {/* Audio Level Visualization */}
-                          {isMicTesting && (
-                            <div className="space-y-2">
-                              <p className="text-xs text-text-tertiary">
-                                Speak into your microphone to see audio levels
-                              </p>
-                              <div className="flex items-center justify-center gap-1 h-16 px-3 py-2 bg-[#1a1a1a] rounded-lg border border-border-subtle">
-                                {/* Waveform Visualization - 20 dots expanding from center */}
-                                {Array.from({ length: 20 }).map((_, i) => {
-                                  // Calculate distance from center (0 = center, 10 = edges)
-                                  const center = 10;
-                                  const distanceFromCenter = Math.abs(i - center);
+                                // Silent state: 4px circle
+                                // Active state: 3px wide, stretch up to 48px tall
+                                const isActive = active && micLevel > 5;
+                                const barHeight = isActive
+                                  ? Math.max(8, Math.min(48, (micLevel / 100) * 48))
+                                  : 4;
+                                const barWidth = isActive ? 3 : 4;
 
-                                  // Convert distance to threshold (center activates first at low levels)
-                                  const threshold = (distanceFromCenter / 10) * 100;
-                                  const active = micLevel > threshold;
-
-                                  // Silent state: 4px circle
-                                  // Active state: 3px wide, stretch up to 48px tall
-                                  const isActive = active && micLevel > 5;
-                                  const barHeight = isActive
-                                    ? Math.max(8, Math.min(48, (micLevel / 100) * 48))
-                                    : 4;
-                                  const barWidth = isActive ? 3 : 4;
-
-                                  return (
-                                    <div
-                                      key={i}
-                                      className="transition-all duration-75"
-                                      style={{
-                                        width: `${barWidth}px`,
-                                        height: `${barHeight}px`,
-                                        backgroundColor: isActive ? "#10b981" : "#4b5563",
-                                        borderRadius: isActive ? "2px" : "50%",
-                                        opacity: isActive ? 1 : 0.5,
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Block List Section */}
-                  <div className="pt-6 border-t border-border-subtle space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Shield size={18} className="text-text-tertiary" />
-                      <h3 className="text-heading-4 text-white">Blocked Apps</h3>
-                    </div>
-                    <p className="text-body-sm text-text-tertiary">
-                      Apps in this list will never be tracked or captured.
-                    </p>
-
-                    {isBlockListLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                      </div>
-                    ) : (
-                      <>
-                        {/* Currently Blocked Apps */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium text-text-primary">
-                            Blocked Apps
-                          </Label>
-                          {blockedApps.length === 0 ? (
-                            <p className="text-xs text-text-tertiary italic">
-                              No apps are currently blocked
-                            </p>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {blockedApps.map((appName) => {
-                                const detectedApp = detectedApps.find(
-                                  (a) => a.normalizedName === appName.toLowerCase()
-                                );
-                                const displayName = cleanAppName(
-                                  detectedApp?.originalName || appName
-                                );
                                 return (
                                   <div
-                                    key={appName}
-                                    className="flex items-center gap-1.5 bg-destructive/20 border border-destructive/30 rounded-full pl-3 pr-2 py-1"
-                                  >
-                                    <span className="text-xs text-white">{displayName}</span>
-                                    <button
-                                      onClick={() => handleRemoveBlockedApp(appName)}
-                                      className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-destructive/30 transition-colors"
-                                      aria-label={`Unblock ${displayName}`}
-                                    >
-                                      <X size={10} className="text-white/70" />
-                                    </button>
-                                  </div>
+                                    key={i}
+                                    className="transition-all duration-75"
+                                    style={{
+                                      width: `${barWidth}px`,
+                                      height: `${barHeight}px`,
+                                      backgroundColor: isActive ? "#10b981" : "#4b5563",
+                                      borderRadius: isActive ? "2px" : "50%",
+                                      opacity: isActive ? 1 : 0.5,
+                                    }}
+                                  />
                                 );
                               })}
                             </div>
-                          )}
-                        </div>
-
-                        {/* Available Apps to Block */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-medium text-text-primary">
-                              Add App to Block List
-                            </Label>
-                            <ShadcnButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleRefreshAppList}
-                              disabled={isRefreshingApps}
-                              className="h-7 px-2 text-xs text-text-tertiary hover:text-text-primary"
-                            >
-                              {isRefreshingApps ? (
-                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                              ) : (
-                                <RefreshCw className="w-3 h-3 mr-1" />
-                              )}
-                              Refresh
-                            </ShadcnButton>
                           </div>
-                          {isRefreshingApps && detectedApps.length === 0 ? (
-                            <div className="flex items-center justify-center py-4">
-                              <Loader2 className="w-5 h-5 animate-spin text-text-tertiary mr-2" />
-                              <span className="text-xs text-text-tertiary">
-                                Scanning installed apps...
-                              </span>
-                            </div>
-                          ) : detectedApps.length === 0 ? (
-                            <p className="text-xs text-text-tertiary italic">
-                              No apps found. Click Refresh to scan for installed apps on your
-                              system.
-                            </p>
-                          ) : (
-                            <div className="space-y-2">
-                              {/* Search input */}
-                              <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-                                <input
-                                  type="text"
-                                  placeholder="Search apps..."
-                                  value={appSearchQuery}
-                                  onChange={(e) => setAppSearchQuery(e.target.value)}
-                                  className="w-full pl-8 pr-3 py-2 text-sm bg-background-secondary border border-border-subtle rounded-lg text-white placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
-                                />
-                                {appSearchQuery && (
-                                  <button
-                                    onClick={() => setAppSearchQuery("")}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary hover:text-text-primary"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                )}
-                              </div>
-                              {/* App list */}
-                              <div className="max-h-48 overflow-y-auto border border-border-subtle rounded-lg">
-                                {(() => {
-                                  const filteredApps = detectedApps
-                                    .filter((app) => !blockedApps.includes(app.normalizedName))
-                                    .filter((app) => {
-                                      if (!appSearchQuery.trim()) return true;
-                                      const query = appSearchQuery.toLowerCase();
-                                      return (
-                                        app.originalName.toLowerCase().includes(query) ||
-                                        app.normalizedName.includes(query)
-                                      );
-                                    });
-
-                                  if (filteredApps.length === 0) {
-                                    return (
-                                      <div className="px-3 py-2 text-xs text-text-tertiary italic">
-                                        {appSearchQuery
-                                          ? "No apps match your search"
-                                          : "All apps are already blocked"}
-                                      </div>
-                                    );
-                                  }
-
-                                  return filteredApps.map((app) => {
-                                    const displayName = cleanAppName(app.originalName);
-                                    const isInstalledOnly = app.source === "installed";
-                                    return (
-                                      <button
-                                        key={app.normalizedName}
-                                        onClick={() => handleAddBlockedApp(app.normalizedName)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
-                                      >
-                                        <Plus size={14} className="text-text-tertiary" />
-                                        <span className="text-sm text-white flex-1">
-                                          {displayName}
-                                        </span>
-                                        {isInstalledOnly && (
-                                          <span className="text-[10px] text-text-tertiary bg-background-secondary px-1.5 py-0.5 rounded">
-                                            not opened
-                                          </span>
-                                        )}
-                                      </button>
-                                    );
-                                  });
-                                })()}
-                              </div>
-                              {/* App count */}
-                              <p className="text-[10px] text-text-tertiary">
-                                {
-                                  detectedApps.filter(
-                                    (app) => !blockedApps.includes(app.normalizedName)
-                                  ).length
-                                }{" "}
-                                apps available
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {/* Organization Settings Section (Admin Only) */}
-                {isAdmin && (
-                  <div className="bg-background-secondary rounded-xl border border-border-subtle p-6 mt-6">
-                    <div className="space-y-6">
-                      <div className="pb-4 border-b border-border-subtle">
-                        <h2 className="text-heading-4 text-white">Organization Settings</h2>
-                        <p className="text-body-sm text-text-tertiary mt-1">
-                          Configure settings that apply to all users in your organization
-                        </p>
-                      </div>
-
-                      {/* Region Variant Selector */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
-                            <Globe size={18} className="text-emerald-400" />
-                          </div>
-                          <div className="space-y-0.5">
-                            <Label className="text-sm font-medium text-text-primary">
-                              Region Variant
-                            </Label>
-                            <p className="text-xs text-text-tertiary">
-                              Customize UI labels based on your region. Changes terminology for
-                              Documents and Artifacts across the application.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0">
-                          {isOrgSettingsLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                          ) : (
-                            <Select
-                              value={currentVariant}
-                              onValueChange={(v) => {
-                                updateOrgSettings(
-                                  { variant: v as OrgVariant },
-                                  {
-                                    onSuccess: () => {
-                                      toast({
-                                        title: "Region updated",
-                                        description: `UI labels changed to ${v === "nigeria" ? "Nigeria" : "Global"} variant`,
-                                      });
-                                    },
-                                    onError: () => {
-                                      toast({
-                                        title: "Error",
-                                        description: "Failed to update region setting",
-                                        variant: "destructive",
-                                      });
-                                    },
-                                  }
-                                );
-                              }}
-                              disabled={isUpdatingOrgSettings}
-                            >
-                              <SelectTrigger className="w-[200px] h-10 text-sm bg-background-elevated border-border-subtle">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {VARIANT_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    <div>
-                                      <span className="font-medium">{option.label}</span>
-                                      <p className="text-xs text-text-tertiary">
-                                        {option.description}
-                                      </p>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Info note */}
-                      <p className="text-xs text-text-tertiary bg-background-elevated rounded-lg p-3 border border-border-subtle">
-                        <span className="font-medium text-text-secondary">Note:</span> Changing the
-                        region variant will update UI labels for all users in your organization.
-                        Underlying data and functionality remain the same.
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
-            )}
 
-            {/* Integrations Tab */}
-            {activeTab === "integrations" && (
-              <div className="space-y-6">
-                {/* Linear Integration Card */}
-                <Card className="p-6 bg-background-elevated border-border-subtle">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#5E6AD2] rounded-lg flex items-center justify-center flex-shrink-0">
-                      <SiLinear className="w-6 h-6 text-white" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-white">Linear</h3>
-                      <p className="text-sm text-text-tertiary">
-                        Connect your Linear account to send session updates to your tickets.
+              {/* Organization Settings Section (Admin Only) */}
+              {isAdmin && (
+                <div style={{ marginTop: 32 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                    <div
+                      style={{
+                        paddingBottom: 16,
+                        borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                      }}
+                    >
+                      <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                        Organization Settings
+                      </h2>
+                      <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+                        Configure settings that apply to all users in your organization
                       </p>
                     </div>
 
-                    {isLinearLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                    ) : linearStatus?.connected ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-sm text-green-400">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </span>
-                        <ShadcnButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleDisconnectLinear}
-                          disabled={isDisconnecting}
-                          className="text-text-tertiary hover:text-red-400"
-                        >
-                          {isDisconnecting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Unlink className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                      </div>
-                    ) : (
-                      <ShadcnButton
-                        onClick={handleConnectLinear}
-                        disabled={isConnecting}
-                        className="bg-[#5E6AD2] hover:bg-[#4F5ABF] text-white gap-2"
-                      >
-                        {isConnecting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Link2 className="w-4 h-4" />
-                        )}
-                        Connect
-                      </ShadcnButton>
-                    )}
-                  </div>
-
-                  {linearStatus?.expired && (
-                    <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-sm text-yellow-400">
-                        Your Linear connection has expired. Please reconnect to continue sending
-                        updates.
-                      </p>
-                    </div>
-                  )}
-                </Card>
-
-                {/* Notion Integration Card */}
-                <Card className="p-6 bg-background-elevated border-border-subtle">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
-                      <SiNotion className="w-6 h-6 text-black" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-white">Notion</h3>
-                      <p className="text-sm text-text-tertiary">
-                        Connect your Notion workspace to export documents.
-                      </p>
-                    </div>
-
-                    {isNotionLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                    ) : notionStatus?.connected ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-sm text-green-400">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </span>
-                        <ShadcnButton
-                          variant="outline"
-                          size="sm"
-                          onClick={handleConnectNotion}
-                          disabled={isNotionConnecting}
-                          className="text-text-tertiary hover:text-white border-border-subtle"
-                        >
-                          {isNotionConnecting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Settings className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                        <ShadcnButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleDisconnectNotion}
-                          disabled={isNotionDisconnecting}
-                          className="text-text-tertiary hover:text-red-400"
-                        >
-                          {isNotionDisconnecting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Unlink className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                      </div>
-                    ) : (
-                      <ShadcnButton
-                        onClick={handleConnectNotion}
-                        disabled={isNotionConnecting}
-                        className="bg-black hover:bg-zinc-800 text-white gap-2"
-                      >
-                        {isNotionConnecting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Link2 className="w-4 h-4" />
-                        )}
-                        Connect
-                      </ShadcnButton>
-                    )}
-                  </div>
-
-                  {notionStatus?.expired && (
-                    <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-sm text-yellow-400">
-                        Your Notion connection has expired. Please reconnect to continue exporting
-                        documents.
-                      </p>
-                    </div>
-                  )}
-                </Card>
-
-                {/* Gmail Integration Card */}
-                <Card className="p-6 bg-background-elevated border-border-subtle">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
-                      <SiGmail className="w-6 h-6 text-[#EA4335]" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-white">Gmail</h3>
-                      <p className="text-sm text-text-tertiary">
-                        Connect your Gmail to send session summaries from your email.
-                      </p>
-                      {gmailStatus?.connected && gmailStatus.email && (
-                        <p className="text-xs text-text-tertiary mt-1">{gmailStatus.email}</p>
-                      )}
-                    </div>
-
-                    {isGmailLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                    ) : gmailStatus?.connected ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-sm text-green-400">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </span>
-                        <ShadcnButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleDisconnectGmail}
-                          disabled={isGmailDisconnecting}
-                          className="text-text-tertiary hover:text-red-400"
-                        >
-                          {isGmailDisconnecting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Unlink className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                      </div>
-                    ) : (
-                      <ShadcnButton
-                        onClick={handleConnectGmail}
-                        disabled={isGmailConnecting}
-                        className="bg-[#EA4335] hover:bg-[#D33426] text-white gap-2"
-                      >
-                        {isGmailConnecting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Mail className="w-4 h-4" />
-                        )}
-                        Connect
-                      </ShadcnButton>
-                    )}
-                  </div>
-
-                  {gmailStatus?.expired && (
-                    <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-sm text-yellow-400">
-                        Your Gmail connection has expired. Please reconnect to continue sending
-                        emails.
-                      </p>
-                    </div>
-                  )}
-                </Card>
-
-                {/* Granola Integration Card */}
-                <Card className="p-6 bg-background-elevated border-border-subtle">
-                  <div className="flex items-center gap-4">
-                    <GranolaIcon />
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-white">Granola</h3>
-                      <p className="text-sm text-text-tertiary">
-                        Connect your Granola account to sync meeting notes.
-                      </p>
-                      {granolaStatus?.connected && granolaStatus.lastSyncedAt && (
-                        <p className="text-xs text-text-tertiary mt-1">
-                          Last synced: {new Date(granolaStatus.lastSyncedAt).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-
-                    {isGranolaLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                    ) : granolaStatus?.connected ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-sm text-green-400">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </span>
-                        <ShadcnButton
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSyncGranola}
-                          disabled={isGranolaSyncing}
-                          className="text-text-tertiary hover:text-white border-border-subtle"
-                        >
-                          {isGranolaSyncing ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                        <ShadcnButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleDisconnectGranola}
-                          disabled={isGranolaDisconnecting}
-                          className="text-text-tertiary hover:text-red-400"
-                        >
-                          {isGranolaDisconnecting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Unlink className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                      </div>
-                    ) : (
-                      <ShadcnButton
-                        onClick={handleConnectGranola}
-                        disabled={isGranolaConnecting}
-                        className="bg-[#1E1E1E] hover:bg-[#333] text-white gap-2"
-                      >
-                        {isGranolaConnecting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Link2 className="w-4 h-4" />
-                        )}
-                        Connect
-                      </ShadcnButton>
-                    )}
-                  </div>
-
-                  {granolaStatus?.expired && (
-                    <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-sm text-yellow-400">
-                        Your Granola connection has expired. Please reconnect to continue syncing
-                        meeting notes.
-                      </p>
-                    </div>
-                  )}
-                </Card>
-
-                {/* Fireflies AI Integration Card */}
-                <Card className="p-6 bg-background-elevated border-border-subtle">
-                  <div className="flex items-center gap-4">
-                    <FirefliesIcon size="lg" />
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-white">Fireflies.ai</h3>
-                      <p className="text-sm text-text-tertiary">
-                        Connect your Fireflies account to sync meeting transcripts and summaries.
-                      </p>
-                      {firefliesStatus?.connected && firefliesStatus.lastSyncedAt && (
-                        <p className="text-xs text-text-tertiary mt-1">
-                          Last synced: {new Date(firefliesStatus.lastSyncedAt).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-
-                    {isFirefliesLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                    ) : firefliesStatus?.connected ? (
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-sm text-green-400">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </span>
-                        <ShadcnButton
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSyncFireflies}
-                          disabled={isFirefliesSyncing}
-                          className="text-text-tertiary hover:text-white border-border-subtle"
-                        >
-                          {isFirefliesSyncing ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                        <ShadcnButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleDisconnectFireflies}
-                          disabled={isFirefliesDisconnecting}
-                          className="text-text-tertiary hover:text-red-400"
-                        >
-                          {isFirefliesDisconnecting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Unlink className="w-4 h-4" />
-                          )}
-                        </ShadcnButton>
-                      </div>
-                    ) : (
-                      <ShadcnButton
-                        onClick={() => setShowFirefliesModal(true)}
-                        className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
-                      >
-                        <KeyRound className="w-4 h-4" />
-                        Connect
-                      </ShadcnButton>
-                    )}
-                  </div>
-                </Card>
-
-                {/* Fireflies API Key Modal */}
-                {showFirefliesModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="bg-background-elevated border border-border-subtle rounded-xl p-6 w-full max-w-md shadow-xl">
-                      <div className="flex items-center gap-3 mb-4">
-                        <FirefliesIcon size="md" />
-                        <div>
-                          <h3 className="text-lg font-semibold text-white">Connect Fireflies.ai</h3>
-                          <p className="text-sm text-text-tertiary">
-                            Enter your API key to sync meetings
-                          </p>
+                    {/* Region Variant Selector */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+                          <Globe size={18} className="text-emerald-400" />
                         </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-text-secondary">API Key</label>
-                          <input
-                            type="password"
-                            value={firefliesApiKey}
-                            onChange={(e) => setFirefliesApiKey(e.target.value)}
-                            placeholder="Enter your Fireflies API key"
-                            className="flex h-10 w-full rounded-md border border-border-subtle bg-background-primary px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/50"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && firefliesApiKey.trim()) {
-                                handleConnectFireflies();
-                              }
-                            }}
-                          />
-                        </div>
-
-                        <div className="p-3 rounded-lg bg-background-primary border border-border-subtle">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Region Variant
+                          </Label>
                           <p className="text-xs text-text-tertiary">
-                            <strong className="text-text-secondary">Where to find your key:</strong>{" "}
-                            Go to{" "}
-                            <a
-                              href="https://app.fireflies.ai/integrations/custom/fireflies"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#7C3AED] hover:underline inline-flex items-center gap-0.5"
-                            >
-                              Fireflies Integrations
-                              <ExternalLink className="w-3 h-3" />
-                            </a>{" "}
-                            &rarr; API Key section &rarr; Copy your key.
+                            Customize UI labels based on your region. Changes terminology for
+                            Documents and Artifacts across the application.
                           </p>
                         </div>
+                      </div>
 
-                        <div className="flex gap-3 justify-end">
-                          <ShadcnButton
-                            variant="ghost"
-                            onClick={() => {
-                              setShowFirefliesModal(false);
-                              setFirefliesApiKey("");
+                      <div className="shrink-0">
+                        {isOrgSettingsLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                        ) : (
+                          <Select
+                            value={currentVariant}
+                            onValueChange={(v) => {
+                              updateOrgSettings(
+                                { variant: v as OrgVariant },
+                                {
+                                  onSuccess: () => {
+                                    toast({
+                                      title: "Region updated",
+                                      description: `UI labels changed to ${v === "nigeria" ? "Nigeria" : "Global"} variant`,
+                                    });
+                                  },
+                                  onError: () => {
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to update region setting",
+                                      variant: "destructive",
+                                    });
+                                  },
+                                }
+                              );
                             }}
+                            disabled={isUpdatingOrgSettings}
                           >
-                            Cancel
-                          </ShadcnButton>
-                          <ShadcnButton
-                            onClick={handleConnectFireflies}
-                            disabled={!firefliesApiKey.trim() || isFirefliesConnecting}
-                            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
-                          >
-                            {isFirefliesConnecting ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Check className="w-4 h-4" />
-                            )}
-                            Connect
-                          </ShadcnButton>
-                        </div>
+                            <SelectTrigger className="w-[200px] h-10 text-sm bg-background-elevated border-border-subtle">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {VARIANT_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  <div>
+                                    <span className="font-medium">{option.label}</span>
+                                    <p className="text-xs text-text-tertiary">
+                                      {option.description}
+                                    </p>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
 
-            {/* About Tab */}
-            {activeTab === "about" && (
-              <Card className="p-6 bg-background-elevated border-border-subtle">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Info className="w-6 h-6 text-primary" />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-white">Mitable</h3>
-                    <p className="text-sm text-text-tertiary">Version {appVersion || "..."}</p>
-                  </div>
-
-                  <ShadcnButton
-                    onClick={
-                      updateStatus === "available"
-                        ? handleDownloadUpdate
-                        : updateStatus === "downloaded"
-                          ? handleInstallUpdate
-                          : handleCheckForUpdates
-                    }
-                    disabled={isCheckingForUpdates || updateStatus === "downloading"}
-                    variant={updateStatus === "downloaded" ? "default" : "outline"}
-                    className={
-                      updateStatus === "downloaded"
-                        ? "gap-2 bg-primary hover:bg-primary/90 text-white"
-                        : "gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
-                    }
-                  >
-                    {isCheckingForUpdates ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Checking...
-                      </>
-                    ) : updateStatus === "up-to-date" ? (
-                      <>
-                        <Check className="w-4 h-4 text-green-400" />
-                        Up to date
-                      </>
-                    ) : updateStatus === "available" ? (
-                      <>
-                        <Download className="w-4 h-4" />
-                        Download v{availableVersion}
-                      </>
-                    ) : updateStatus === "downloading" ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Downloading...
-                      </>
-                    ) : updateStatus === "downloaded" ? (
-                      <>
-                        <RefreshCw className="w-4 h-4" />
-                        Install & Restart
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4" />
-                        Check for Updates
-                      </>
-                    )}
-                  </ShadcnButton>
-                </div>
-
-                {/* Download Progress Bar */}
-                {updateStatus === "downloading" && downloadProgress && (
-                  <div className="mt-4 space-y-2">
-                    <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-300 ease-out"
-                        style={{ width: `${downloadProgress.percent}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-text-tertiary">
-                      {downloadProgress.percent.toFixed(0)}% —{" "}
-                      {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
-                      {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
+                    {/* Info note */}
+                    <p className="text-xs text-text-tertiary bg-background-elevated rounded-lg p-3 border border-border-subtle">
+                      <span className="font-medium text-text-secondary">Note:</span> Changing the
+                      region variant will update UI labels for all users in your organization.
+                      Underlying data and functionality remain the same.
                     </p>
                   </div>
-                )}
-
-                {/* Error State */}
-                {updateStatus === "error" && updateError && (
-                  <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                    <p className="text-sm text-red-400">{updateError}</p>
-                  </div>
-                )}
-
-                {/* Release Notes Link */}
-                <div className="mt-4 pt-4 border-t border-border-subtle">
-                  <a
-                    href="https://github.com/Febchuk/mitable/releases"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    View release notes
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
                 </div>
-              </Card>
-            )}
-          </div>
+              )}
+            </div>
+          )}
+
+          {/* Integrations Tab */}
+          {activeTab === "integrations" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div
+                style={{
+                  paddingBottom: 16,
+                  borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                }}
+              >
+                <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                  Integrations
+                </h2>
+                <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+                  Connect apps and services for richer context
+                </p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {/* Integration rows */}
+                {(
+                  [
+                    {
+                      key: "linear",
+                      name: "Linear",
+                      description: "Session updates to tickets",
+                      icon: (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            background: "#2A2824",
+                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <SiLinear style={{ width: 18, height: 18, color: "#5E6AD2" }} />
+                        </div>
+                      ),
+                      loading: isLinearLoading,
+                      connected: linearStatus?.connected ?? false,
+                      expired: linearStatus?.expired ?? false,
+                      connecting: isConnecting,
+                      disconnecting: isDisconnecting,
+                      onConnect: handleConnectLinear,
+                      onDisconnect: handleDisconnectLinear,
+                    },
+                    {
+                      key: "notion",
+                      name: "Notion",
+                      description: "Export documents",
+                      icon: (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            background: "#2A2824",
+                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <SiNotion style={{ width: 18, height: 18, color: "#ECE8E0" }} />
+                        </div>
+                      ),
+                      loading: isNotionLoading,
+                      connected: notionStatus?.connected ?? false,
+                      expired: notionStatus?.expired ?? false,
+                      connecting: isNotionConnecting,
+                      disconnecting: isNotionDisconnecting,
+                      onConnect: handleConnectNotion,
+                      onDisconnect: handleDisconnectNotion,
+                    },
+                    {
+                      key: "gmail",
+                      name: "Gmail",
+                      description:
+                        gmailStatus?.connected && gmailStatus.email
+                          ? gmailStatus.email
+                          : "Send summaries via email",
+                      icon: (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            background: "#2A2824",
+                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <SiGmail style={{ width: 18, height: 18, color: "#EA4335" }} />
+                        </div>
+                      ),
+                      loading: isGmailLoading,
+                      connected: gmailStatus?.connected ?? false,
+                      expired: gmailStatus?.expired ?? false,
+                      connecting: isGmailConnecting,
+                      disconnecting: isGmailDisconnecting,
+                      onConnect: handleConnectGmail,
+                      onDisconnect: handleDisconnectGmail,
+                    },
+                    {
+                      key: "granola",
+                      name: "Granola",
+                      description:
+                        granolaStatus?.connected && granolaStatus.email
+                          ? granolaStatus.email
+                          : "Sync meeting notes",
+                      icon: (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            background: "#2A2824",
+                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <svg
+                            viewBox="0 0 1308 1350"
+                            style={{ width: 18, height: 18 }}
+                            fill="#C8E64A"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path d="M1033.77,1021.55c-21.6,24.24-40.11,38.92-50.31,45.93c-4.8,3.19-7.8,7.65-11.99,11.48 c-22.2,19.14-46.26,24.83-63.06,38.23c-22.8,17.86-107.98,39.1-132.18,46.54c-40.96,9.31-87.03,12.67-137.43,10.75 c-10.91,0-20.99,0-30.26-0.73c-3.76-0.29-7.54,0.68-11.31,0.72c-0.15,0-0.29,0-0.42,0c-0.4,0-1.07-0.29-2.01-0.86 c-1.06-0.65-2.26-1.06-3.51-1.06c-0.33,0-0.65-0.03-0.97-0.07c-5.08-0.7-7.78,1.09-9.73,2.08c-1.48,0.75-3.09,0.12-4.49-0.77 c-4.43-2.81-14.32-9.14-17.68-10.16c-3.32-1.01-3.64,0.37-5.41,0.68c-1.18,0.21-2.41-0.21-3.3-1.01 c-0.99-0.9-2.06-2.2-4.5-3.5c-4.49-2.39-6.88,3.04-13.55-3.03c-0.97-0.88-1.54-2.61-2.85-2.7c-0.33-0.02-0.56-0.04-0.89-0.1 c-6.72-1.3-18.92-3.8-27.12-6.29c-9.6-2.55-6.61-4.46-10.81-6.37c-56.4-21.05-136.79-62.52-166.19-91.86 c-10.8-10.84-23.4-35.72-31.2-42.1c-6-5.1-18-15.31-21-20.41c-2.4-4.47-0-12.75-4.2-18.49 c-5.4-7.02-16.2-10.85-26.4-26.79c-11.4-17.86-18-41.46-29.4-65.7C202,854.91,175,786.02,175,660.36 c0-84.2,39-200.93,55.8-216.88c10.8-10.21,9.6-32.53,17.39-43.37c89.01-123.75,244.8-214.79,430.2-224.35 c7.53-0.39,15.07-0.63,22.62-0.72c45.74-0.53,91.58,4.47,136.04,15.31c44.41,10.83,86.87,27.73,128.26,46.95 c0,0,4.91,0.39,6.21,1.03c2.16,1.06,3.07,2.99,5.23,4.06c2.16,1.06,5.28,0.16,7.64,0.64c7.77,1.59,9.17,6.21,10.6,8.05 c1.74,2.23,3.83,3.09,7.78,4.22c10.31,2.96,11.67,6.37,13.07,7.94c1.12,1.25,1.61,2.88,2.17,4.34 c0.57,1.48,1.7,2.84,3.28,3.21c3.42,0.8,8.06,4.98,9.02,10.69c0.63,3.72,4.65,5.32,3.55,12.3 c-0.36,2.26,2.05,5.6-10.6,18.07s-39.18,20.33-55.34,14.14c-55.85-21.41-64.13-25.53-86.57-31.65 c-40.96-11.17-75.85-18.76-118.36-17.96c-67.8,1.28-121.21,7.66-185.41,29.98c-28.14,9.97-81.27,37.11-107.93,58.24 c-26.66,21.13-65.26,50.32-81.19,77.33c-5.58,9.46-11.86,18.5-25.06,33.17c-19.2,21.05-41.42,81.93-48.62,111.28 c-1.8,6.38,2.99,13.4,0.59,19.78c-2.4,7.02-13.8,10.21-15,15.95c-4.8,20.41-3.6,46.56-3.6,68.88 c0,12.12,3.6,28.7,7.8,38.27c3,6.38,12.6,10.85,13.8,17.22c0.6,4.46-5.39,9.56-5.4,13.39c0,3.19,5.39,46.57,8.39,52.95 c4.2,7.65,17.4,17.22,21,26.15c2.4,6.38-4.21,12.76,0.59,19.14c3,3.83,12.61,3.82,16.21,8.92 c4.8,6.38,15,24.87,19.8,30.62c3.6,4.47,10.2,6.39,13.2,8.3c9,6.38,1.2,12.11,9.6,21.68 c26.4,29.98,67.2,66.98,106.2,83.57c6.02,2.56,67.75,26.13,71.39,26.15c87,12.83,184.84,11.63,269.44-35.58 c19.8-10.85,131.97-88.81,150.57-181.3c4.2-18.5,9.6-63.16,7.2-81.02c-9.6-66.34-50.48-161.76-125.41-197.09 c-39.91-18.82-70.2-18.5-78-17.22c-22.8,4.46-30.6-8.93-51.6-7.02c-64.2,5.1-127.2,22.97-176.4,74.63 c-45,47.84-54.01,109.08-31.21,147.99c2.4,5.1,1.2,11.48-3.6,14.67c-2.1,1.28-4.05,2.87-4.95,4.55 c-1.79,3.33,3.39,5.11,6.95,6.36c24.96,8.73,33.96,50.84,67,49.06h7.2c0,0,13.8,0,19.2-6.38c4.44-5.24,4.42-11.35,1.27-14.06 c-1.4-1.21-3.18-1.93-3.59-3.74c-0.45-1.99-0.68-4.61-0.68-5.79c0-1.28,1.8-1.92,1.8-3.2c0-3.83-4.2-7.01-3.6-10.84 c0.38-2.04,3.21-4.85,5.21-6.96c1.52-1.6,1.54-3.63,0.55-5.6c-0.04-0.07-0.07-0.14-0.11-0.21c-0.96-1.97-1.14-4.32-0.49-6.41 c0.38-1.2,0.83-2.49,0.83-3.78c0.6-5.74-1.79-8.29-2.39-12.76c0-1.58,8.54-5.32,11.56-7.66c0.89-0.69,0.98-1.84,0.69-2.93 c-0.62-2.32-1.45-3.03-1.45-7.27c0-1.02,0.86-2.44,1.89-3.79c2.08-2.71,4-5.6,4.94-8.88l1.66-5.79 c0.69-2.42,2.53-4.34,4.92-5.15c4.13-1.39,2.22-8.13,6.16-10.01c1.15-0.55,4.02,0.15,8.63-0.83 c9.59-1.91,3-5.1,4.8-10.21c0.84-3.12,3.44-2.81,5.96-2.56c2.02,0.2,3.98-0.46,5.43-1.88c1.43-1.39,2.87-3.02,4.81-3.85 c2.43-1.03,8.81-1.23,13.38-1.27c1.88-0.02,3.74-0.29,5.61-0.51c5.1-0.6,12.33-0.24,15.82-0.77 c4.2-0.64,6.6-4.47,10.19-4.47c3,0,7.21,5.1,10.21,5.1c3,0,6-2.55,9-2.55c1.8,0,2.4,3.19,5.4,3.19h1.2 c0,0,27.6,0.64,56.4,18.49c19.8,12.12,34.2,41.47,34.2,41.47c13.8,23.6-1.51,47.86-1.51,69.55c0,8.93,3,16.58,1.2,24.88 c-1.2,6.38-6,11.49-7.8,16.59c-1.8,4.46-1.79,10.21-7.79,18.49c-4.8,7.02-7.21,7.01-8.41,8.29 c-1.8,1.91-17.34,25.41-27.54,34.34c-27,24.24-51.96,31.34-88.56,31.97c-16.2,0.64-18,3.83-20.4,3.83 c-8.4,0.64-46.79-1.27-58.8-3.19c0,0-53.4-10.21-74.4-20.41c-11.4-5.1-86.41-60.6-103.21-91.86 c-52.2-98.23-40.2-202.84,13.8-273.01c39-51.03,103.2-117.37,255.59-130.13c77.4-6.38,146.41,3.83,200.41,29.35 c76.2,35.72,132,98.87,166.8,173.5C1154.8,743.28,1151.37,887.6,1033.77,1021.55z" />
+                          </svg>
+                        </div>
+                      ),
+                      loading: isGranolaLoading,
+                      connected: granolaStatus?.connected ?? false,
+                      expired: granolaStatus?.expired ?? false,
+                      connecting: isGranolaConnecting,
+                      disconnecting: isGranolaDisconnecting,
+                      onConnect: handleConnectGranola,
+                      onDisconnect: handleDisconnectGranola,
+                    },
+                    {
+                      key: "fireflies",
+                      name: "Fireflies",
+                      description: firefliesStatus?.connected
+                        ? "Meeting transcripts synced"
+                        : "Sync meeting transcripts",
+                      icon: (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            background: "#2A2824",
+                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <svg viewBox="0 0 56 56" style={{ width: 18, height: 18 }} xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                              <linearGradient id="ff-icon-grad" x1="1" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#E82A73" />
+                                <stop offset="30%" stopColor="#C5388F" />
+                                <stop offset="54%" stopColor="#9B4AB0" />
+                                <stop offset="82%" stopColor="#6262DE" />
+                                <stop offset="100%" stopColor="#3B73FF" />
+                              </linearGradient>
+                            </defs>
+                            <path d="M18.4,0H0v18.3h18.4V0z" fill="url(#ff-icon-grad)" />
+                            <path d="M40.2,0H21.8v18.3H56v-2.6c0-4.2-1.7-8.1-4.6-11.1C48.4,1.7,44.4,0,40.2,0z" fill="url(#ff-icon-grad)" />
+                            <path d="M0,22.1v18.3c0,4.2,1.7,8.1,4.6,11.1c3,2.9,7,4.6,11.2,4.6h2.6V22.1H0z" fill="url(#ff-icon-grad)" />
+                            <path d="M40.2,22.1H21.8v18.3h18.4V22.1z" fill="url(#ff-icon-grad)" />
+                          </svg>
+                        </div>
+                      ),
+                      loading: isFirefliesLoading,
+                      connected: firefliesStatus?.connected ?? false,
+                      expired: false,
+                      connecting: isFirefliesConnecting,
+                      disconnecting: isFirefliesDisconnecting,
+                      onConnect: () => setShowFirefliesModal(true),
+                      onDisconnect: handleDisconnectFireflies,
+                    },
+                  ] as const
+                ).map((integration, idx, arr) => (
+                  <div key={integration.key}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: "14px 0",
+                      }}
+                    >
+                      {integration.icon}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: "#ECE8E0",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {integration.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#6B665C",
+                            marginTop: 4,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {integration.expired ? (
+                            <span style={{ color: "#E8B474" }}>Connection expired</span>
+                          ) : (
+                            integration.description
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action area */}
+                      {integration.loading ? (
+                        <Loader2 size={16} style={{ color: "#4B4740" }} className="animate-spin" />
+                      ) : integration.connected ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#4ADE80",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <Check size={13} />
+                            Connected
+                          </span>
+                          <button
+                            onClick={integration.onDisconnect}
+                            disabled={integration.disconnecting}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#4B4740",
+                              cursor: "pointer",
+                              padding: 4,
+                              borderRadius: 4,
+                              display: "flex",
+                              alignItems: "center",
+                              transition: "color 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = "#E5534B";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = "#4B4740";
+                            }}
+                          >
+                            {integration.disconnecting ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Unlink size={14} />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={integration.onConnect}
+                          disabled={integration.connecting}
+                          style={{
+                            padding: "6px 14px",
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: "#ECE8E0",
+                            background: "rgba(236, 232, 224, 0.06)",
+                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            cursor: integration.connecting ? "not-allowed" : "pointer",
+                            opacity: integration.connecting ? 0.6 : 1,
+                            transition: "background 0.15s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "rgba(236, 232, 224, 0.1)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
+                          }}
+                        >
+                          {integration.connecting ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : null}
+                          Connect
+                        </button>
+                      )}
+                    </div>
+                    {idx < arr.length - 1 && (
+                      <div
+                        style={{
+                          height: 0.5,
+                          background: "rgba(236, 232, 224, 0.06)",
+                        }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Fireflies API Key Modal */}
+              {showFirefliesModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="bg-background-elevated border border-border-subtle rounded-xl p-6 w-full max-w-md shadow-xl">
+                    <div className="flex items-center gap-3 mb-4">
+                      <FirefliesIcon size="md" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Connect Fireflies.ai</h3>
+                        <p className="text-sm text-text-tertiary">
+                          Enter your API key to sync meetings
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-secondary">API Key</label>
+                        <input
+                          type="password"
+                          value={firefliesApiKey}
+                          onChange={(e) => setFirefliesApiKey(e.target.value)}
+                          placeholder="Enter your Fireflies API key"
+                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-primary px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/50"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && firefliesApiKey.trim()) {
+                              handleConnectFireflies();
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-background-primary border border-border-subtle">
+                        <p className="text-xs text-text-tertiary">
+                          <strong className="text-text-secondary">Where to find your key:</strong>{" "}
+                          Go to{" "}
+                          <a
+                            href="https://app.fireflies.ai/integrations/custom/fireflies"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#7C3AED] hover:underline inline-flex items-center gap-0.5"
+                          >
+                            Fireflies Integrations
+                            <ExternalLink className="w-3 h-3" />
+                          </a>{" "}
+                          &rarr; API Key section &rarr; Copy your key.
+                        </p>
+                      </div>
+
+                      <div className="flex gap-3 justify-end">
+                        <ShadcnButton
+                          variant="ghost"
+                          onClick={() => {
+                            setShowFirefliesModal(false);
+                            setFirefliesApiKey("");
+                          }}
+                        >
+                          Cancel
+                        </ShadcnButton>
+                        <ShadcnButton
+                          onClick={handleConnectFireflies}
+                          disabled={!firefliesApiKey.trim() || isFirefliesConnecting}
+                          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
+                        >
+                          {isFirefliesConnecting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Check className="w-4 h-4" />
+                          )}
+                          Connect
+                        </ShadcnButton>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* About Tab */}
+          {activeTab === "about" && (
+            <div
+              style={{
+                padding: 20,
+                borderRadius: 8,
+                border: "0.5px solid rgba(236, 232, 224, 0.06)",
+                background: "rgba(236, 232, 224, 0.02)",
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Info className="w-6 h-6 text-primary" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-white">Mitable</h3>
+                  <p className="text-sm text-text-tertiary">Version {appVersion || "..."}</p>
+                </div>
+
+                <ShadcnButton
+                  onClick={
+                    updateStatus === "available"
+                      ? handleDownloadUpdate
+                      : updateStatus === "downloaded"
+                        ? handleInstallUpdate
+                        : handleCheckForUpdates
+                  }
+                  disabled={isCheckingForUpdates || updateStatus === "downloading"}
+                  variant={updateStatus === "downloaded" ? "default" : "outline"}
+                  className={
+                    updateStatus === "downloaded"
+                      ? "gap-2 bg-primary hover:bg-primary/90 text-white"
+                      : "gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
+                  }
+                >
+                  {isCheckingForUpdates ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Checking...
+                    </>
+                  ) : updateStatus === "up-to-date" ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-400" />
+                      Up to date
+                    </>
+                  ) : updateStatus === "available" ? (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Download v{availableVersion}
+                    </>
+                  ) : updateStatus === "downloading" ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Downloading...
+                    </>
+                  ) : updateStatus === "downloaded" ? (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Install & Restart
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Check for Updates
+                    </>
+                  )}
+                </ShadcnButton>
+              </div>
+
+              {/* Download Progress Bar */}
+              {updateStatus === "downloading" && downloadProgress && (
+                <div className="mt-4 space-y-2">
+                  <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300 ease-out"
+                      style={{ width: `${downloadProgress.percent}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-text-tertiary">
+                    {downloadProgress.percent.toFixed(0)}% —{" "}
+                    {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
+                    {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
+                  </p>
+                </div>
+              )}
+
+              {/* Error State */}
+              {updateStatus === "error" && updateError && (
+                <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <p className="text-sm text-red-400">{updateError}</p>
+                </div>
+              )}
+
+              {/* Release Notes Link */}
+              <div className="mt-4 pt-4 border-t border-border-subtle">
+                <a
+                  href="https://github.com/Febchuk/mitable/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  View release notes
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
