@@ -87,6 +87,8 @@ export const IPC_CHANNELS = {
   AUTO_SESSION_START_SET: "auto-session-start-set",
   AUTO_RECAP_GET: "auto-recap-get",
   AUTO_RECAP_SET: "auto-recap-set",
+  AGENT_ENABLED_GET: "agent-enabled-get",
+  AGENT_ENABLED_SET: "agent-enabled-set",
 
   // Summary preferences
   SUMMARY_PREFERENCES_GET: "summary-preferences-get",

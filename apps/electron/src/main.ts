@@ -2111,6 +2111,16 @@ function setupMonitoringSessionHandlers() {
     return { success: true };
   });
 
+  // Agent feature toggle IPC handlers
+  ipcMain.handle(IPC_CHANNELS.AGENT_ENABLED_GET, (_, userId: string) => {
+    return preferencesService.getUserAgentEnabled(userId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AGENT_ENABLED_SET, (_, userId: string, enabled: boolean) => {
+    preferencesService.setUserAgentEnabled(userId, enabled);
+    return { success: true };
+  });
+
   // Summary preferences IPC handlers
   ipcMain.handle(IPC_CHANNELS.SUMMARY_PREFERENCES_GET, () => {
     return preferencesService.getSummaryPreferences();
