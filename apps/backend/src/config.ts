@@ -153,6 +153,11 @@ export const config = {
     mcpBaseUrl: (process.env.GRANOLA_MCP_BASE_URL || "https://mcp.granola.ai").trim(),
   },
 
+  // Fireflies AI Configuration (per-user API key — no server-level key needed)
+  fireflies: {
+    apiUrl: (process.env.FIREFLIES_API_URL || "https://api.fireflies.ai/graphql").trim(),
+  },
+
   // Google Cloud DLP Configuration (for PII redaction)
   googleCloud: {
     projectId: (process.env.GOOGLE_CLOUD_PROJECT_ID || "").trim(),

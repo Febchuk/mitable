@@ -107,6 +107,7 @@ export const activityBlocks = pgTable(
     // Block type and identity
     blockType: varchar("block_type", { length: 20 }).notNull(),
     name: varchar("name", { length: 500 }).notNull(),
+    externalId: varchar("external_id", { length: 255 }),
 
     // Timing
     startTime: timestamp("start_time", { withTimezone: true }).notNull(),
@@ -115,6 +116,7 @@ export const activityBlocks = pgTable(
 
     // Details
     description: text("description"),
+    rawTranscript: text("raw_transcript"), // Full speaker-by-speaker transcript (for agent Q&A)
     apps: jsonb("apps").notNull().default("[]"),
     category: varchar("category", { length: 50 }),
 

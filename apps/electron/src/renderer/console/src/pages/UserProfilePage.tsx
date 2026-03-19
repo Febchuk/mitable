@@ -17,13 +17,12 @@ import {
   Settings,
   Shield,
   Plus,
-  FileText,
   Search,
   Globe,
-  FlaskConical,
+  KeyRound,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
-import { GranolaIcon } from "../../../components/icons/integrations";
+import { GranolaIcon, FirefliesIcon } from "../../../components/icons/integrations";
 import Button from "../components/ui/Button";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,7 +32,6 @@ import { useToast } from "@/hooks/use-toast";
 import { BillingSection } from "@/console/src/components/billing";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import {
   useOrganizationSettings,
@@ -47,7 +45,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { OrgVariant } from "@mitable/shared";
-import { useDevFlags } from "../context/DevFlagsContext";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
 
@@ -74,6 +71,11 @@ interface GranolaStatus {
   connected: boolean;
   expired: boolean;
   email: string | null;
+  lastSyncedAt: string | null;
+}
+
+interface FirefliesStatus {
+  connected: boolean;
   lastSyncedAt: string | null;
 }
 
@@ -110,6 +112,15 @@ export default function UserProfilePage() {
   const [isGranolaLoading, setIsGranolaLoading] = useState(true);
   const [isGranolaConnecting, setIsGranolaConnecting] = useState(false);
   const [isGranolaDisconnecting, setIsGranolaDisconnecting] = useState(false);
+  const [isGranolaSyncing, setIsGranolaSyncing] = useState(false);
+
+  const [firefliesStatus, setFirefliesStatus] = useState<FirefliesStatus | null>(null);
+  const [isFirefliesLoading, setIsFirefliesLoading] = useState(true);
+  const [isFirefliesConnecting, setIsFirefliesConnecting] = useState(false);
+  const [isFirefliesDisconnecting, setIsFirefliesDisconnecting] = useState(false);
+  const [showFirefliesModal, setShowFirefliesModal] = useState(false);
+  const [firefliesApiKey, setFirefliesApiKey] = useState("");
+  const [isFirefliesSyncing, setIsFirefliesSyncing] = useState(false);
 
   // About / Version state
   const [appVersion, setAppVersion] = useState<string>("");
@@ -175,25 +186,12 @@ export default function UserProfilePage() {
   const [isPassiveMonitoringLoading, setIsPassiveMonitoringLoading] = useState(true);
 
   // Auto recap state
-  const [autoRecap, setAutoRecap] = useState<boolean>(true);
+  const [autoRecap, setAutoRecap] = useState<boolean>(false);
   const [isAutoRecapLoading, setIsAutoRecapLoading] = useState(true);
 
   // Pill display mode state
   const [pillDisplayMode, setPillDisplayMode] = useState<"compact" | "expanded">("compact");
   const [isPillDisplayModeLoading, setIsPillDisplayModeLoading] = useState(true);
-
-  // Summary preferences state
-  const [summaryDefaults, setSummaryDefaults] = useState<{
-    detailLevel: "concise" | "verbose";
-    format: "bullets" | "paragraphs";
-    includeScreenshots: boolean;
-  }>({
-    detailLevel: "concise",
-    format: "bullets",
-    includeScreenshots: true,
-  });
-  const [alwaysAskOnSessionEnd, setAlwaysAskOnSessionEnd] = useState<boolean>(true);
-  const [isSummaryPrefsLoading, setIsSummaryPrefsLoading] = useState(true);
 
   // Audio preferences state
   const [audioDevices, setAudioDevices] = useState<
@@ -524,48 +522,6 @@ export default function UserProfilePage() {
     }
   };
 
-  // Summary preferences functions
-  const loadSummaryPreferences = useCallback(async () => {
-    try {
-      setIsSummaryPrefsLoading(true);
-      const prefs = await window.consoleAPI.getSummaryPreferences();
-      if (prefs) {
-        setSummaryDefaults({
-          detailLevel: prefs.detailLevel,
-          format: prefs.format,
-          includeScreenshots: prefs.includeScreenshots,
-        });
-        setAlwaysAskOnSessionEnd(prefs.alwaysAskOnSessionEnd);
-      }
-    } catch (error) {
-      logger.error("Error loading summary preferences:", error);
-    } finally {
-      setIsSummaryPrefsLoading(false);
-    }
-  }, []);
-
-  const handleAlwaysAskOnSessionEndChange = async (enabled: boolean) => {
-    try {
-      const result = await window.consoleAPI.setAlwaysAskOnSessionEnd(enabled);
-      if (result.success) {
-        setAlwaysAskOnSessionEnd(enabled);
-        toast({
-          title: "Preference saved",
-          description: enabled
-            ? "You'll be asked for summary preferences when ending sessions"
-            : "Sessions will end using your default preferences",
-        });
-      }
-    } catch (error) {
-      logger.error("Error setting always ask preference:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save preference",
-        variant: "destructive",
-      });
-    }
-  };
-
   // Audio preferences functions
   const loadAudioPreferences = useCallback(async () => {
     try {
@@ -815,32 +771,6 @@ export default function UserProfilePage() {
     };
   }, [isMicTesting]);
 
-  const handleSummaryDefaultChange = async (
-    key: "detailLevel" | "format" | "includeScreenshots",
-    value: string | boolean
-  ) => {
-    try {
-      const newDefaults = { ...summaryDefaults, [key]: value };
-      const result = await window.consoleAPI.setSummaryDefaults({
-        [key]: value,
-      });
-      if (result.success) {
-        setSummaryDefaults(newDefaults);
-        toast({
-          title: "Preference saved",
-          description: "Summary default updated",
-        });
-      }
-    } catch (error) {
-      logger.error("Error setting summary default:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save preference",
-        variant: "destructive",
-      });
-    }
-  };
-
   // Force scroll to top before any render
   useLayoutEffect(() => {
     const scrollableElement = document.querySelector(".overflow-y-auto");
@@ -857,6 +787,7 @@ export default function UserProfilePage() {
     loadGmailStatus();
     loadNotionStatus();
     loadGranolaStatus();
+    loadFirefliesStatus();
     loadAppVersion();
     loadAudioPreferences(); // Load audio devices and preferences
     if (user?.id) {
@@ -866,7 +797,6 @@ export default function UserProfilePage() {
       loadPassiveMonitoring();
       loadAutoRecap();
       loadPillDisplayMode();
-      loadSummaryPreferences();
     }
   }, [
     user?.id,
@@ -876,7 +806,6 @@ export default function UserProfilePage() {
     loadPassiveMonitoring,
     loadAutoRecap,
     loadPillDisplayMode,
-    loadSummaryPreferences,
     loadAudioPreferences,
   ]);
 
@@ -1455,6 +1384,37 @@ export default function UserProfilePage() {
     }
   };
 
+  const handleSyncGranola = async () => {
+    setIsGranolaSyncing(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/granola/sync`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Sync Complete",
+          description: `Processed ${data.meetingsProcessed} meeting${data.meetingsProcessed !== 1 ? "s" : ""} (${data.blocksCreated} new).`,
+        });
+        loadGranolaStatus();
+      }
+    } catch (error) {
+      logger.error("Error syncing Granola:", error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync Granola meetings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGranolaSyncing(false);
+    }
+  };
+
   const handleDisconnectGranola = async () => {
     setIsGranolaDisconnecting(true);
     try {
@@ -1482,6 +1442,138 @@ export default function UserProfilePage() {
       });
     } finally {
       setIsGranolaDisconnecting(false);
+    }
+  };
+
+  const loadFirefliesStatus = async () => {
+    setIsFirefliesLoading(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFirefliesStatus(data);
+      }
+    } catch (error) {
+      logger.error("Error loading Fireflies status:", error);
+    } finally {
+      setIsFirefliesLoading(false);
+    }
+  };
+
+  const handleConnectFireflies = async () => {
+    setIsFirefliesConnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/connect`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ apiKey: firefliesApiKey.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to connect Fireflies");
+      }
+
+      setFirefliesStatus({ connected: true, lastSyncedAt: null });
+      setShowFirefliesModal(false);
+      setFirefliesApiKey("");
+      toast({
+        title: "Fireflies Connected",
+        description: `Connected as ${data.email || data.name || "your account"}. Meetings will sync automatically.`,
+      });
+    } catch (error) {
+      logger.error("Error connecting Fireflies:", error);
+      toast({
+        title: "Connection Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to connect Fireflies. Check your API key.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFirefliesConnecting(false);
+    }
+  };
+
+  const handleDisconnectFireflies = async () => {
+    setIsFirefliesDisconnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/disconnect`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        setFirefliesStatus({ connected: false, lastSyncedAt: null });
+        toast({
+          title: "Fireflies Disconnected",
+          description: "Your Fireflies account has been disconnected.",
+        });
+      }
+    } catch (error) {
+      logger.error("Error disconnecting Fireflies:", error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Fireflies. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFirefliesDisconnecting(false);
+    }
+  };
+
+  const handleSyncFireflies = async () => {
+    setIsFirefliesSyncing(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/fireflies/sync`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Sync Complete",
+          description: `Processed ${data.meetingsProcessed} meeting${data.meetingsProcessed !== 1 ? "s" : ""} (${data.meetingsCreated} new).`,
+        });
+        loadFirefliesStatus();
+      }
+    } catch (error) {
+      logger.error("Error syncing Fireflies:", error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync Fireflies meetings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFirefliesSyncing(false);
     }
   };
 
@@ -1570,10 +1662,8 @@ export default function UserProfilePage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<
-    "account" | "security" | "preferences" | "integrations" | "about" | "dev"
+    "account" | "security" | "preferences" | "integrations" | "about"
   >("account");
-
-  const { flags, setFlag } = useDevFlags();
 
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
@@ -1581,7 +1671,6 @@ export default function UserProfilePage() {
     { id: "preferences" as const, label: "Preferences", icon: Settings },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
     { id: "about" as const, label: "About", icon: Info },
-    { id: "dev" as const, label: "Dev", icon: FlaskConical },
   ];
 
   return (
@@ -2058,154 +2147,6 @@ export default function UserProfilePage() {
                         className="flex-shrink-0"
                       />
                     )}
-                  </div>
-
-                  {/* Session Summary Defaults Section */}
-                  <div className="pt-6 border-t border-border-subtle space-y-4">
-                    <div className="flex items-center gap-2">
-                      <FileText size={18} className="text-text-tertiary" />
-                      <h3 className="text-heading-4 text-white">Session Summary Defaults</h3>
-                    </div>
-                    <p className="text-body-sm text-text-tertiary">
-                      Configure default preferences for session summaries when ending sessions
-                    </p>
-
-                    {/* Always Ask for Summary Preferences */}
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5 flex-1 pr-4">
-                        <Label
-                          htmlFor="always-ask-summary-toggle"
-                          className="text-sm font-medium text-text-primary cursor-pointer"
-                        >
-                          Always ask for summary preferences
-                        </Label>
-                        <p className="text-xs text-text-tertiary">
-                          Show the summary configuration dialog when ending sessions. When disabled,
-                          sessions will end immediately using your default preferences.
-                        </p>
-                      </div>
-                      {isSummaryPrefsLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                      ) : (
-                        <Switch
-                          id="always-ask-summary-toggle"
-                          checked={alwaysAskOnSessionEnd}
-                          onCheckedChange={handleAlwaysAskOnSessionEndChange}
-                          className="flex-shrink-0"
-                        />
-                      )}
-                    </div>
-
-                    {/* Default Detail Level */}
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5 flex-1 pr-4">
-                        <Label className="text-sm font-medium text-text-primary">
-                          Default Detail Level
-                        </Label>
-                        <p className="text-xs text-text-tertiary">
-                          How detailed your session summaries should be
-                        </p>
-                      </div>
-                      {isSummaryPrefsLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                      ) : (
-                        <RadioGroup
-                          value={summaryDefaults.detailLevel}
-                          onValueChange={(v) =>
-                            handleSummaryDefaultChange("detailLevel", v as "concise" | "verbose")
-                          }
-                          className="flex gap-4"
-                        >
-                          <div className="flex items-center gap-2">
-                            <RadioGroupItem value="concise" id="detail-concise" />
-                            <Label
-                              htmlFor="detail-concise"
-                              className="text-sm text-text-primary cursor-pointer"
-                            >
-                              Concise
-                            </Label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <RadioGroupItem value="verbose" id="detail-verbose" />
-                            <Label
-                              htmlFor="detail-verbose"
-                              className="text-sm text-text-primary cursor-pointer"
-                            >
-                              Verbose
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      )}
-                    </div>
-
-                    {/* Default Format */}
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5 flex-1 pr-4">
-                        <Label className="text-sm font-medium text-text-primary">
-                          Default Format
-                        </Label>
-                        <p className="text-xs text-text-tertiary">
-                          How your session summaries should be formatted
-                        </p>
-                      </div>
-                      {isSummaryPrefsLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                      ) : (
-                        <RadioGroup
-                          value={summaryDefaults.format}
-                          onValueChange={(v) =>
-                            handleSummaryDefaultChange("format", v as "bullets" | "paragraphs")
-                          }
-                          className="flex gap-4"
-                        >
-                          <div className="flex items-center gap-2">
-                            <RadioGroupItem value="bullets" id="format-bullets" />
-                            <Label
-                              htmlFor="format-bullets"
-                              className="text-sm text-text-primary cursor-pointer"
-                            >
-                              Bullets
-                            </Label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <RadioGroupItem value="paragraphs" id="format-paragraphs" />
-                            <Label
-                              htmlFor="format-paragraphs"
-                              className="text-sm text-text-primary cursor-pointer"
-                            >
-                              Paragraphs
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      )}
-                    </div>
-
-                    {/* Include Screenshots by Default */}
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5 flex-1 pr-4">
-                        <Label
-                          htmlFor="include-screenshots-toggle"
-                          className="text-sm font-medium text-text-primary cursor-pointer"
-                        >
-                          Include Screenshots by Default
-                        </Label>
-                        <p className="text-xs text-text-tertiary">
-                          Attach key screenshots to your session summaries
-                        </p>
-                      </div>
-                      {isSummaryPrefsLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-text-tertiary flex-shrink-0" />
-                      ) : (
-                        <Switch
-                          id="include-screenshots-toggle"
-                          checked={summaryDefaults.includeScreenshots}
-                          onCheckedChange={(checked) =>
-                            handleSummaryDefaultChange("includeScreenshots", checked)
-                          }
-                          className="flex-shrink-0"
-                        />
-                      )}
-                    </div>
                   </div>
 
                   {/* Audio Settings Section */}
@@ -2867,8 +2808,10 @@ export default function UserProfilePage() {
                       <p className="text-sm text-text-tertiary">
                         Connect your Granola account to sync meeting notes.
                       </p>
-                      {granolaStatus?.connected && granolaStatus.email && (
-                        <p className="text-xs text-text-tertiary mt-1">{granolaStatus.email}</p>
+                      {granolaStatus?.connected && granolaStatus.lastSyncedAt && (
+                        <p className="text-xs text-text-tertiary mt-1">
+                          Last synced: {new Date(granolaStatus.lastSyncedAt).toLocaleString()}
+                        </p>
                       )}
                     </div>
 
@@ -2880,6 +2823,19 @@ export default function UserProfilePage() {
                           <Check className="w-4 h-4" />
                           Connected
                         </span>
+                        <ShadcnButton
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSyncGranola}
+                          disabled={isGranolaSyncing}
+                          className="text-text-tertiary hover:text-white border-border-subtle"
+                        >
+                          {isGranolaSyncing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </ShadcnButton>
                         <ShadcnButton
                           variant="ghost"
                           size="sm"
@@ -2919,6 +2875,146 @@ export default function UserProfilePage() {
                     </div>
                   )}
                 </Card>
+
+                {/* Fireflies AI Integration Card */}
+                <Card className="p-6 bg-background-elevated border-border-subtle">
+                  <div className="flex items-center gap-4">
+                    <FirefliesIcon size="lg" />
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-white">Fireflies.ai</h3>
+                      <p className="text-sm text-text-tertiary">
+                        Connect your Fireflies account to sync meeting transcripts and summaries.
+                      </p>
+                      {firefliesStatus?.connected && firefliesStatus.lastSyncedAt && (
+                        <p className="text-xs text-text-tertiary mt-1">
+                          Last synced: {new Date(firefliesStatus.lastSyncedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    {isFirefliesLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                    ) : firefliesStatus?.connected ? (
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-sm text-green-400">
+                          <Check className="w-4 h-4" />
+                          Connected
+                        </span>
+                        <ShadcnButton
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSyncFireflies}
+                          disabled={isFirefliesSyncing}
+                          className="text-text-tertiary hover:text-white border-border-subtle"
+                        >
+                          {isFirefliesSyncing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </ShadcnButton>
+                        <ShadcnButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleDisconnectFireflies}
+                          disabled={isFirefliesDisconnecting}
+                          className="text-text-tertiary hover:text-red-400"
+                        >
+                          {isFirefliesDisconnecting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Unlink className="w-4 h-4" />
+                          )}
+                        </ShadcnButton>
+                      </div>
+                    ) : (
+                      <ShadcnButton
+                        onClick={() => setShowFirefliesModal(true)}
+                        className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                        Connect
+                      </ShadcnButton>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Fireflies API Key Modal */}
+                {showFirefliesModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-background-elevated border border-border-subtle rounded-xl p-6 w-full max-w-md shadow-xl">
+                      <div className="flex items-center gap-3 mb-4">
+                        <FirefliesIcon size="md" />
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">Connect Fireflies.ai</h3>
+                          <p className="text-sm text-text-tertiary">
+                            Enter your API key to sync meetings
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-text-secondary">API Key</label>
+                          <input
+                            type="password"
+                            value={firefliesApiKey}
+                            onChange={(e) => setFirefliesApiKey(e.target.value)}
+                            placeholder="Enter your Fireflies API key"
+                            className="flex h-10 w-full rounded-md border border-border-subtle bg-background-primary px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/50"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && firefliesApiKey.trim()) {
+                                handleConnectFireflies();
+                              }
+                            }}
+                          />
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-background-primary border border-border-subtle">
+                          <p className="text-xs text-text-tertiary">
+                            <strong className="text-text-secondary">Where to find your key:</strong>{" "}
+                            Go to{" "}
+                            <a
+                              href="https://app.fireflies.ai/integrations/custom/fireflies"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#7C3AED] hover:underline inline-flex items-center gap-0.5"
+                            >
+                              Fireflies Integrations
+                              <ExternalLink className="w-3 h-3" />
+                            </a>{" "}
+                            &rarr; API Key section &rarr; Copy your key.
+                          </p>
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                          <ShadcnButton
+                            variant="ghost"
+                            onClick={() => {
+                              setShowFirefliesModal(false);
+                              setFirefliesApiKey("");
+                            }}
+                          >
+                            Cancel
+                          </ShadcnButton>
+                          <ShadcnButton
+                            onClick={handleConnectFireflies}
+                            disabled={!firefliesApiKey.trim() || isFirefliesConnecting}
+                            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
+                          >
+                            {isFirefliesConnecting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                            Connect
+                          </ShadcnButton>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3020,36 +3116,6 @@ export default function UserProfilePage() {
                     View release notes
                     <ExternalLink className="w-3 h-3" />
                   </a>
-                </div>
-              </Card>
-            )}
-
-            {activeTab === "dev" && (
-              <Card className="p-6 bg-background-elevated border-border-subtle">
-                <h3 className="text-lg font-semibold text-white mb-1">Beta Features</h3>
-                <p className="text-sm text-text-tertiary mb-6">
-                  Toggle work-in-progress features. These may be incomplete or unstable.
-                </p>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label
-                        htmlFor="flag-experience"
-                        className="text-sm font-medium text-text-primary"
-                      >
-                        Calendar & Recaps
-                      </Label>
-                      <p className="text-xs text-text-tertiary mt-0.5">
-                        Switch between the new Calendar + Recaps experience and classic Sessions
-                      </p>
-                    </div>
-                    <Switch
-                      id="flag-experience"
-                      checked={flags.newExperience}
-                      onCheckedChange={(v) => setFlag("newExperience", v)}
-                    />
-                  </div>
                 </div>
               </Card>
             )}

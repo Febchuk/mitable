@@ -42,7 +42,7 @@ export default function ConsoleLayout() {
           >
             <div
               className="w-full flex flex-col"
-              style={{ maxWidth: 680, padding: "0 40px", gap: 28 }}
+              style={{ maxWidth: 800, padding: "0 32px", gap: 28 }}
             >
               <Outlet />
             </div>

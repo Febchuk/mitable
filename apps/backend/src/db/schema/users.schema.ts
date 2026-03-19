@@ -46,6 +46,10 @@ export const users = pgTable("users", {
   granolaUserEmail: varchar("granola_user_email", { length: 255 }),
   granolaLastSyncedAt: timestamp("granola_last_synced_at"),
 
+  // Fireflies AI integration (per-user API key, encrypted)
+  firefliesApiKeyEncrypted: text("fireflies_api_key_encrypted"),
+  firefliesLastSyncedAt: timestamp("fireflies_last_synced_at"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -15,6 +15,7 @@ import { cleanupStaleSessions } from "../services/stale-session-cleanup.service"
 import { createLogger } from "../lib/logger";
 import { runGraphSyncJob } from "./jobs/graph-sync.job";
 import { runGranolaSyncJob } from "./jobs/granola-sync.job";
+import { runFirefliesSyncJob } from "./jobs/fireflies-sync.job";
 import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });
@@ -93,5 +94,42 @@ export function initCronJobs(): void {
     logger.info("Graph sync disabled (GRAPH_ENABLED=false)");
   }
 
-  logger.info("Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min");
+  // ──────────────────────────────────────────────
+  // Fireflies Sync: Every 15 minutes (at :12, :27, :42, :57)
+  // Fetches recent transcripts for connected users, classifies
+  // with Haiku, and upserts activity_blocks (blockType: "fireflies").
+  // ──────────────────────────────────────────────
+  let isFirefliesSyncRunning = false;
+  cron.schedule("12,27,42,57 * * * *", async () => {
+    if (isFirefliesSyncRunning) {
+      logger.warn("Fireflies sync still running — skipping");
+      return;
+    }
+
+    isFirefliesSyncRunning = true;
+
+    try {
+      const result = await runFirefliesSyncJob();
+      if (result.usersProcessed > 0 || result.usersFailed > 0) {
+        logger.info(
+          {
+            processed: result.usersProcessed,
+            skipped: result.usersSkipped,
+            failed: result.usersFailed,
+            meetings: result.totalMeetings,
+            timeMs: result.totalTimeMs,
+          },
+          "Fireflies sync completed"
+        );
+      }
+    } catch (error) {
+      logger.error({ error: String(error) }, "Fireflies sync job failed");
+    } finally {
+      isFirefliesSyncRunning = false;
+    }
+  });
+
+  logger.info(
+    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min"
+  );
 }

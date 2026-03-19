@@ -338,9 +338,9 @@ function groupSessionsByDay(
   return days;
 }
 
-// ─── Granola Blocks ──────────────────────────────────────────────────────────
+// ─── Integration Blocks (Granola + Fireflies) ──────────────────────────────
 
-interface GranolaBlockResponse {
+interface IntegrationBlockResponse {
   id: string;
   name: string;
   startTime: string;
@@ -353,56 +353,79 @@ interface GranolaBlockResponse {
   participants: unknown;
 }
 
+function parseIntegrationBlocks(
+  blocks: IntegrationBlockResponse[],
+  source: "granola" | "fireflies",
+  prefixToStrip: RegExp,
+  appLabel: string
+): WorkBlock[] {
+  return blocks.map((b) => {
+    const startTime = new Date(b.startTime);
+    const endTime = new Date(b.endTime);
+    const title = b.name?.replace(prefixToStrip, "") || "Meeting";
+    let participants: { name: string; email: string }[] = [];
+    if (Array.isArray(b.participants)) {
+      participants = b.participants as { name: string; email: string }[];
+    } else if (typeof b.participants === "string") {
+      try {
+        participants = JSON.parse(b.participants);
+      } catch {
+        /* ignore */
+      }
+    }
+    return {
+      id: b.id,
+      startTime,
+      endTime,
+      duration: b.durationMinutes,
+      idleGapBefore: null,
+      summary: b.description || "",
+      captures: [],
+      appBreakdown: [{ app: appLabel, minutes: b.durationMinutes, percentage: 100 }],
+      taskBreakdown: [],
+      isActive: false,
+      isFocusedSession: false,
+      goal: title,
+      name: title,
+      status: "ready" as WorkBlockStatus,
+      source,
+      subscriberName: b.subscriberName || undefined,
+      participants,
+    };
+  });
+}
+
 async function fetchGranolaBlocks(): Promise<WorkBlock[]> {
   try {
-    const data = await apiRequest<{ blocks: GranolaBlockResponse[] }>(
+    const data = await apiRequest<{ blocks: IntegrationBlockResponse[] }>(
       "/integrations/granola/blocks"
     );
-    return (data.blocks || []).map((b) => {
-      const startTime = new Date(b.startTime);
-      const endTime = new Date(b.endTime);
-      const title = b.name?.replace(/^\[Granola\]\s*/, "") || "Meeting";
-      let participants: { name: string; email: string }[] = [];
-      if (Array.isArray(b.participants)) {
-        participants = b.participants as { name: string; email: string }[];
-      } else if (typeof b.participants === "string") {
-        try {
-          participants = JSON.parse(b.participants);
-        } catch {
-          /* ignore */
-        }
-      }
-      return {
-        id: b.id,
-        startTime,
-        endTime,
-        duration: b.durationMinutes,
-        idleGapBefore: null,
-        summary: b.description || "",
-        captures: [],
-        appBreakdown: [{ app: "Granola", minutes: b.durationMinutes, percentage: 100 }],
-        taskBreakdown: [],
-        isActive: false,
-        isFocusedSession: false,
-        goal: title,
-        name: title,
-        status: "ready" as WorkBlockStatus,
-        source: "granola" as const,
-        subscriberName: b.subscriberName || undefined,
-        participants,
-      };
-    });
+    return parseIntegrationBlocks(data.blocks || [], "granola", /^\[Granola\]\s*/, "Granola");
   } catch {
-    // Granola not connected or fetch failed — silently skip
     return [];
   }
 }
 
-function mergeGranolaBlocksIntoDays(
+async function fetchFirefliesBlocks(): Promise<WorkBlock[]> {
+  try {
+    const data = await apiRequest<{ blocks: IntegrationBlockResponse[] }>(
+      "/integrations/fireflies/blocks"
+    );
+    return parseIntegrationBlocks(data.blocks || [], "fireflies", /^\[Fireflies\]\s*/, "Fireflies");
+  } catch {
+    return [];
+  }
+}
+
+function isMeetingSource(source?: string): boolean {
+  return source === "granola" || source === "fireflies";
+}
+
+function mergeIntegrationBlocksIntoDays(
   days: ActivityDay[],
-  granolaBlocks: WorkBlock[]
+  integrationBlocks: WorkBlock[]
 ): ActivityDay[] {
-  if (granolaBlocks.length === 0) return days;
+  if (integrationBlocks.length === 0) return days;
 
   const dayMap = new Map<string, ActivityDay>();
   for (const day of days) {
@@ -410,7 +433,7 @@ function mergeGranolaBlocksIntoDays(
     dayMap.set(key, day);
   }
 
-  for (const block of granolaBlocks) {
+  for (const block of integrationBlocks) {
     const d = block.startTime;
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -429,15 +452,14 @@ function mergeGranolaBlocksIntoDays(
     }
 
     day.workBlocks.push(block);
-    // Don't add Granola duration to total — MCP doesn't provide real duration
   }
 
-  // Sort: Granola blocks first (meetings at top), then normal blocks by start time
+  // Sort: meeting blocks first (granola + fireflies), then work blocks by start time
   for (const day of dayMap.values()) {
     day.workBlocks.sort((a, b) => {
-      const aIsGranola = a.source === "granola" ? 0 : 1;
-      const bIsGranola = b.source === "granola" ? 0 : 1;
-      if (aIsGranola !== bIsGranola) return aIsGranola - bIsGranola;
+      const aIsMeeting = isMeetingSource(a.source) ? 0 : 1;
+      const bIsMeeting = isMeetingSource(b.source) ? 0 : 1;
+      if (aIsMeeting !== bIsMeeting) return aIsMeeting - bIsMeeting;
       return a.startTime.getTime() - b.startTime.getTime();
     });
   }
@@ -447,7 +469,7 @@ function mergeGranolaBlocksIntoDays(
 }
 
 /**
- * Hook to fetch all calendar days (transformed from sessions + Granola blocks)
+ * Hook to fetch all calendar days (transformed from sessions + integration blocks)
  * Returns ActivityDay[] sorted by date (most recent first)
  */
 export function useCalendarDays() {
@@ -456,15 +478,17 @@ export function useCalendarDays() {
   return useQuery({
     queryKey: calendarKeys.days(),
     queryFn: async () => {
-      const [sessions, granolaBlocks] = await Promise.all([
+      const [sessions, granolaBlocks, firefliesBlocks] = await Promise.all([
         monitoringService.fetchAllSessions(),
         fetchGranolaBlocks(),
+        fetchFirefliesBlocks(),
       ]);
 
       const emptyCaptures = new Map<string, SessionCapture[]>();
       const days = sessions.length ? groupSessionsByDay(sessions, emptyCaptures) : [];
 
-      return mergeGranolaBlocksIntoDays(days, granolaBlocks);
+      const allIntegrationBlocks = [...granolaBlocks, ...firefliesBlocks];
+      return mergeIntegrationBlocksIntoDays(days, allIntegrationBlocks);
     },
     enabled: !!user,
     staleTime: 5000,

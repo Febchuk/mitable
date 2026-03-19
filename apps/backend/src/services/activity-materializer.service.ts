@@ -330,7 +330,11 @@ export async function recalculateDailyStats(
   const sessionIds = new Set<string>();
 
   for (const block of blocks) {
-    if (block.blockType === "meeting" || block.blockType === "granola") {
+    if (
+      block.blockType === "meeting" ||
+      block.blockType === "granola" ||
+      block.blockType === "fireflies"
+    ) {
       totalMeetingMinutes += block.durationMinutes;
     } else {
       totalWorkMinutes += block.durationMinutes;

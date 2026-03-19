@@ -5,10 +5,20 @@ import { GoogleDriveIcon } from "./GoogleDriveIcon";
 import { LinearIcon } from "./LinearIcon";
 import { GmailIcon } from "./GmailIcon";
 import { GranolaIcon } from "./GranolaIcon";
+import { FirefliesIcon } from "./FirefliesIcon";
 import type { IntegrationProvider } from "../../../console/src/types";
 
 // Export individual icons
-export { SlackIcon, NotionIcon, GitHubIcon, GoogleDriveIcon, LinearIcon, GmailIcon, GranolaIcon };
+export {
+  SlackIcon,
+  NotionIcon,
+  GitHubIcon,
+  GoogleDriveIcon,
+  LinearIcon,
+  GmailIcon,
+  GranolaIcon,
+  FirefliesIcon,
+};
 
 // Icon mapping utility
 export const integrationIcons: Record<IntegrationProvider, React.ComponentType> = {
