@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, Download, LayoutGrid, User, BarChart2 } from "lucide-react";
+import { Calendar, Download, LayoutGrid, User, BarChart2, FileText } from "lucide-react";
 import NavItem from "./NavItem";
 import MitableIcon from "../icons/MitableIcon";
 import { useUser } from "../../context/UserContext";
@@ -31,9 +31,9 @@ export default function Nav({ isAdminView = false }: NavProps) {
     return (
       <>
         <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
-        <NavItem to="/people" icon={User} label="People" />
         {agentEnabled && <NavItem to="/agent" icon={MitableIcon} label="Agent" />}
         <NavItem to="/reports" icon={BarChart2} label="Reports" />
+        <NavItem to="/people" icon={User} label="People" />
       </>
     );
   }
@@ -42,7 +42,7 @@ export default function Nav({ isAdminView = false }: NavProps) {
     <>
       <NavItem to="/calendar" icon={Calendar} label="Calendar" />
       {agentEnabled && <NavItem to="/agent" icon={MitableIcon} label="Agent" />}
-      <NavItem to="/reports" icon={BarChart2} label="Reports" />
+      <NavItem to="/docs" icon={FileText} label="Docs" />
       <NavItem to="/uploads" icon={Download} label="Uploads" />
     </>
   );

@@ -19,23 +19,9 @@ function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
-function formatWeekRange(start: Date): string {
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  const startMonth = start.toLocaleDateString("en-US", { month: "short" });
-  const endMonth = end.toLocaleDateString("en-US", { month: "short" });
-  const year = end.getFullYear();
-
-  if (startMonth === endMonth) {
-    return `${startMonth} ${start.getDate()} – ${end.getDate()}, ${year}`;
-  }
-  return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${year}`;
-}
-
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function WeekStrip({
-  weekStart,
   weekDays,
   selectedDate,
   onSelectDate,
@@ -46,32 +32,17 @@ export default function WeekStrip({
   const today = new Date();
 
   return (
-    <div>
-      {/* Week label */}
-      <div
-        style={{
-          fontSize: 11,
-          color: "#6B665C",
-          letterSpacing: "0.04em",
-          textAlign: "center",
-          marginBottom: 12,
-        }}
-      >
-        {formatWeekRange(weekStart)}
-      </div>
-
-      {/* Week strip card */}
-      <div
-        style={{
-          background: "#211F1B",
-          border: "0.5px solid rgba(236, 232, 224, 0.07)",
-          borderRadius: 12,
-          padding: "16px 10px",
-          display: "flex",
-          alignItems: "center",
-          gap: 2,
-        }}
-      >
+    <div
+      style={{
+        background: "#211F1B",
+        border: "0.5px solid rgba(236, 232, 224, 0.07)",
+        borderRadius: 12,
+        padding: "14px 10px",
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+      }}
+    >
         {/* Prev arrow */}
         <button
           onClick={onPrevWeek}
@@ -208,7 +179,6 @@ export default function WeekStrip({
         >
           <ChevronRight size={14} />
         </button>
-      </div>
     </div>
   );
 }

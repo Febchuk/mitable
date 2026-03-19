@@ -12,7 +12,6 @@ import {
   Unlink,
   RefreshCw,
   ExternalLink,
-  Info,
   Download,
   Settings,
   Shield,
@@ -1608,7 +1607,7 @@ export default function UserProfilePage() {
 
   // Tab state — honor ?tab= query param from sidebar menu
   const [searchParams] = useSearchParams();
-  const validTabs = ["account", "security", "preferences", "beta", "integrations", "about"] as const;
+  const validTabs = ["account", "security", "preferences", "beta", "integrations", "update"] as const;
   type TabId = (typeof validTabs)[number];
   const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
     ? (searchParams.get("tab") as TabId)
@@ -1628,7 +1627,7 @@ export default function UserProfilePage() {
     { id: "preferences" as const, label: "Preferences", icon: Settings },
     { id: "beta" as const, label: "Beta", icon: MitableIcon },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
-    { id: "about" as const, label: "About", icon: Info },
+    { id: "update" as const, label: "Update", icon: RefreshCw },
   ];
 
   return (
@@ -3271,8 +3270,8 @@ export default function UserProfilePage() {
             </div>
           )}
 
-          {/* About Tab */}
-          {activeTab === "about" && (
+          {/* Update Tab */}
+          {activeTab === "update" && (
             <div
               style={{
                 padding: 20,
@@ -3283,7 +3282,7 @@ export default function UserProfilePage() {
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Info className="w-6 h-6 text-primary" />
+                  <RefreshCw className="w-6 h-6 text-primary" />
                 </div>
 
                 <div className="flex-1 min-w-0">

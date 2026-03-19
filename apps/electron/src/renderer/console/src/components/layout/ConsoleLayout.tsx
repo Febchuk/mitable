@@ -12,7 +12,8 @@ export default function ConsoleLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isFullWidthPage =
-    location.pathname === "/profile" || location.pathname === "/dashboard";
+    location.pathname === "/profile" ||
+    location.pathname === "/dashboard";
 
   useEffect(() => {
     const handleDraftsNavigate = (draftId: string) => {
