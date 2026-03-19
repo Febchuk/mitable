@@ -1679,7 +1679,6 @@ export default function UserProfilePage() {
   const [agentEnabled, setAgentEnabled] = useState(false);
   const [isAgentLoading, setIsAgentLoading] = useState(true);
 
-
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
     { id: "security" as const, label: "Security", icon: Lock },
