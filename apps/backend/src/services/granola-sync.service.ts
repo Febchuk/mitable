@@ -133,6 +133,10 @@ class GranolaSyncService {
     let meetings: GranolaMeeting[];
     try {
       const raw = await granolaService.listMeetings(accessToken, "last_30_days");
+      logger.info(
+        { rawType: typeof raw, rawPreview: JSON.stringify(raw).slice(0, 800) },
+        "Raw Granola MCP listMeetings response",
+      );
       meetings = this.parseMeetingsResponse(raw);
     } catch (error) {
       result.errors.push(`Fetch error: ${error instanceof Error ? error.message : String(error)}`);
@@ -623,7 +627,14 @@ Respond ONLY with JSON:
     if (Array.isArray(obj.notes)) return obj.notes as GranolaMeeting[];
     if (Array.isArray(obj.results)) return obj.results as GranolaMeeting[];
 
-    logger.warn({ shape: typeof data }, "Unexpected Granola meetings response shape");
+    logger.warn(
+      {
+        shape: typeof data,
+        keys: Object.keys(obj),
+        preview: JSON.stringify(data).slice(0, 500),
+      },
+      "Unexpected Granola meetings response shape",
+    );
     return [];
   }
 
