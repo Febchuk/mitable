@@ -135,7 +135,7 @@ class GranolaSyncService {
       const raw = await granolaService.listMeetings(accessToken, "last_30_days");
       logger.info(
         { rawType: typeof raw, rawPreview: JSON.stringify(raw).slice(0, 800) },
-        "Raw Granola MCP listMeetings response",
+        "Raw Granola MCP listMeetings response"
       );
       meetings = this.parseMeetingsResponse(raw);
     } catch (error) {
@@ -606,36 +606,99 @@ Respond ONLY with JSON:
     // MCP tool results come wrapped: { content: [{ type: "text", text: "..." }] }
     const result = raw as Record<string, unknown>;
     let data: unknown = result;
+    let rawText: string | null = null;
 
     if (result.content && Array.isArray(result.content)) {
       const textBlock = (result.content as Array<{ type: string; text?: string }>).find(
         (b) => b.type === "text" && b.text
       );
       if (textBlock?.text) {
+        rawText = textBlock.text;
         try {
           data = JSON.parse(textBlock.text);
         } catch {
-          data = result;
+          // Not JSON — might be XML, handled below
+          data = null;
         }
       }
     }
 
-    // Try common response shapes
+    // Try common JSON response shapes
     if (Array.isArray(data)) return data as GranolaMeeting[];
-    const obj = data as Record<string, unknown>;
-    if (Array.isArray(obj.meetings)) return obj.meetings as GranolaMeeting[];
-    if (Array.isArray(obj.notes)) return obj.notes as GranolaMeeting[];
-    if (Array.isArray(obj.results)) return obj.results as GranolaMeeting[];
+    if (data && typeof data === "object") {
+      const obj = data as Record<string, unknown>;
+      if (Array.isArray(obj.meetings)) return obj.meetings as GranolaMeeting[];
+      if (Array.isArray(obj.notes)) return obj.notes as GranolaMeeting[];
+      if (Array.isArray(obj.results)) return obj.results as GranolaMeeting[];
+    }
+
+    // Granola MCP returns XML: <meeting id="..." title="..." date="...">
+    if (rawText && rawText.includes("<meeting ")) {
+      return this.parseMeetingsXml(rawText);
+    }
 
     logger.warn(
       {
         shape: typeof data,
-        keys: Object.keys(obj),
-        preview: JSON.stringify(data).slice(0, 500),
+        preview: JSON.stringify(raw).slice(0, 500),
       },
-      "Unexpected Granola meetings response shape",
+      "Unexpected Granola meetings response shape"
     );
     return [];
+  }
+
+  /**
+   * Parse Granola's XML-formatted meeting list into typed meetings.
+   * Format: <meeting id="..." title="..." date="..."><known_participants>...</known_participants></meeting>
+   */
+  private parseMeetingsXml(xml: string): GranolaMeeting[] {
+    const meetings: GranolaMeeting[] = [];
+    const meetingRegex = /<meeting\s+([^>]+)>([\s\S]*?)<\/meeting>/g;
+
+    let match: RegExpExecArray | null;
+    while ((match = meetingRegex.exec(xml)) !== null) {
+      const attrs: Record<string, string> = {};
+      const attrStr = match[1];
+      const body = match[2];
+
+      const attrRegex = /(\w+)="([^"]*)"/g;
+      let attrMatch: RegExpExecArray | null;
+      while ((attrMatch = attrRegex.exec(attrStr)) !== null) {
+        attrs[attrMatch[1]] = attrMatch[2];
+      }
+
+      if (!attrs.id) continue;
+
+      // Parse participants from <known_participants> block
+      const attendees: { name?: string; email?: string }[] = [];
+      const participantsMatch = body.match(/<known_participants>([\s\S]*?)<\/known_participants>/);
+      if (participantsMatch) {
+        const lines = participantsMatch[1].trim().split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          // Format: "Name (role) <email>" or just "Name <email>"
+          const emailMatch = trimmed.match(/^(.+?)\s*<([^>]+)>/);
+          if (emailMatch) {
+            // Strip "(note creator)" or other role annotations from name
+            const name = emailMatch[1].replace(/\s*\([^)]*\)\s*$/, "").trim();
+            attendees.push({ name, email: emailMatch[2] });
+          } else {
+            attendees.push({ name: trimmed });
+          }
+        }
+      }
+
+      meetings.push({
+        id: attrs.id,
+        title: attrs.title || null,
+        start_time: attrs.date || null,
+        attendees,
+      });
+    }
+
+    logger.info({ count: meetings.length }, "Parsed Granola meetings from XML");
+    return meetings;
   }
 
   /**
