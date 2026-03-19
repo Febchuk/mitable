@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowUp,
   Square,
@@ -57,7 +58,9 @@ function getGreeting(): string {
 
 export default function AgentView() {
   const { user } = useUser();
+  const navigate = useNavigate();
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "";
+  const [agentAllowed, setAgentAllowed] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +70,18 @@ export default function AgentView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const turnStartIndexRef = useRef<number>(0);
+
+  // Route guard: redirect if agent feature is disabled
+  useEffect(() => {
+    if (!user?.id) return;
+    window.consoleAPI?.getAgentEnabled(user.id).then((enabled) => {
+      if (!enabled) {
+        navigate("/calendar", { replace: true });
+      } else {
+        setAgentAllowed(true);
+      }
+    });
+  }, [user?.id, navigate]);
 
   const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
 
@@ -87,10 +102,21 @@ export default function AgentView() {
       switch (event.type) {
         case "result":
           setActiveTool(null);
-          setMessages((prev) => [
-            ...prev,
-            { id: generateId(), role: "assistant", content: String(event.data) },
-          ]);
+          setMessages((prev) => {
+            const startIdx = turnStartIndexRef.current;
+            const beforeTurn = prev.slice(0, startIdx);
+            const duringTurn = prev.slice(startIdx);
+            // Remove intermediate assistant_text messages from this turn —
+            // the result contains the final, complete response.
+            const nonStreamed = duringTurn.filter(
+              (m) => m.role !== "assistant" && m.role !== "tool"
+            );
+            return [
+              ...beforeTurn,
+              ...nonStreamed,
+              { id: generateId(), role: "assistant" as const, content: String(event.data) },
+            ];
+          });
           setIsLoading(false);
           break;
         case "plan_proposed":
@@ -220,6 +246,8 @@ export default function AgentView() {
       sendMessage(input);
     }
   };
+
+  if (agentAllowed === null) return null;
 
   const isEmpty = messages.length === 0;
   const inputDisabled = isLoading || pendingPlan;

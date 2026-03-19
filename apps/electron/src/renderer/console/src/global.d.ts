@@ -284,6 +284,10 @@ interface ConsoleAPI {
   // Navigation - Navigate to update/profile page (from update notification click)
   onNavigateToUpdate: (callback: () => void) => () => void;
 
+  // Agent feature toggle (user-scoped)
+  getAgentEnabled: (userId: string) => Promise<boolean>;
+  setAgentEnabled: (userId: string, enabled: boolean) => Promise<{ success: boolean }>;
+
   // Agent system
   agentSendMessage: (conversationId: string, message: string) => Promise<void>;
   agentCancel: () => Promise<void>;

@@ -21,6 +21,7 @@ import {
   Search,
   Globe,
   FlaskConical,
+  Sparkles,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { GranolaIcon } from "../../../components/icons/integrations";
@@ -880,6 +881,15 @@ export default function UserProfilePage() {
     loadAudioPreferences,
   ]);
 
+  // Load agent feature toggle
+  useEffect(() => {
+    if (!user?.id) return;
+    window.consoleAPI?.getAgentEnabled(user.id).then((enabled) => {
+      setAgentEnabled(enabled);
+      setIsAgentLoading(false);
+    });
+  }, [user?.id]);
+
   // Listen for update events
   useEffect(() => {
     const unsubscribeAvailable = window.consoleAPI?.onUpdateAvailable((info) => {
@@ -1570,8 +1580,12 @@ export default function UserProfilePage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<
-    "account" | "security" | "preferences" | "integrations" | "about" | "dev"
+    "account" | "security" | "preferences" | "features" | "integrations" | "about" | "dev"
   >("account");
+
+  // Agent feature toggle
+  const [agentEnabled, setAgentEnabled] = useState(false);
+  const [isAgentLoading, setIsAgentLoading] = useState(true);
 
   const { flags, setFlag } = useDevFlags();
 
@@ -1579,6 +1593,7 @@ export default function UserProfilePage() {
     { id: "account" as const, label: "Account", icon: User },
     { id: "security" as const, label: "Security", icon: Lock },
     { id: "preferences" as const, label: "Preferences", icon: Settings },
+    { id: "features" as const, label: "Features", icon: Sparkles },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
     { id: "about" as const, label: "About", icon: Info },
     { id: "dev" as const, label: "Dev", icon: FlaskConical },
@@ -2649,6 +2664,41 @@ export default function UserProfilePage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Features Tab */}
+            {activeTab === "features" && (
+              <div className="space-y-6">
+                <Card className="p-6 bg-background-elevated border-border-subtle">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium text-white">Agent</Label>
+                      <p className="text-xs text-text-tertiary">
+                        Enable the AI Agent in the sidebar for chat-based assistance
+                      </p>
+                    </div>
+                    {isAgentLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-text-tertiary" />
+                    ) : (
+                      <Switch
+                        checked={agentEnabled}
+                        onCheckedChange={async (checked) => {
+                          if (!user?.id) return;
+                          setAgentEnabled(checked);
+                          await window.consoleAPI?.setAgentEnabled(user.id, checked);
+                          window.dispatchEvent(new Event("agent-enabled-changed"));
+                          toast({
+                            title: checked ? "Agent enabled" : "Agent disabled",
+                            description: checked
+                              ? "Agent is now available in the sidebar"
+                              : "Agent has been hidden from the sidebar",
+                          });
+                        }}
+                      />
+                    )}
+                  </div>
+                </Card>
               </div>
             )}
 

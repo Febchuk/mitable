@@ -62,6 +62,8 @@ const IPC_CHANNELS = {
   AUTO_SESSION_START_SET: "auto-session-start-set",
   AUTO_RECAP_GET: "auto-recap-get",
   AUTO_RECAP_SET: "auto-recap-set",
+  AGENT_ENABLED_GET: "agent-enabled-get",
+  AGENT_ENABLED_SET: "agent-enabled-set",
   PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
   PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
   // Summary preferences
@@ -623,6 +625,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.NAVIGATE_TO_UPDATE, handler);
   },
+
+  // Agent feature toggle (user-scoped)
+  getAgentEnabled: (userId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_ENABLED_GET, userId),
+
+  setAgentEnabled: (userId: string, enabled: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AGENT_ENABLED_SET, userId, enabled),
 
   // Agent system
   agentSendMessage: (conversationId: string, message: string): Promise<void> =>

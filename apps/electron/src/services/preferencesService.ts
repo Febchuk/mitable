@@ -275,6 +275,21 @@ class PreferencesService {
     logger.info(` Passive monitoring for user ${userId} set to: ${enabled}`);
   }
 
+  // Agent feature toggle (user-scoped, default OFF)
+  getUserAgentEnabled(userId: string): boolean {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    return userPrefs.agentEnabled ?? false;
+  }
+
+  setUserAgentEnabled(userId: string, enabled: boolean): void {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    this.store.set(`users.${userId}`, {
+      ...userPrefs,
+      agentEnabled: enabled,
+    });
+    logger.info(` Agent enabled for user ${userId} set to: ${enabled}`);
+  }
+
   // Summary preferences
   getSummaryPreferences(): SummaryPreferences {
     return (
