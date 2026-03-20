@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
-import { MITABLE_VERSION } from "@/config/content/base";
+import { MITABLE_VERSION, R2_BASE } from "@/config/content/base";
 import { siteContent } from "@/config/site-content";
 
 export const metadata: Metadata = {
@@ -34,7 +34,19 @@ const iconMap = {
     windows: WindowsIcon,
 } as const;
 
-export default function DownloadPage() {
+async function getLatestVersion(): Promise<string> {
+    try {
+        const res = await fetch(`${R2_BASE}/latest.json`, { next: { revalidate: 300 } });
+        if (res.ok) {
+            const data = await res.json();
+            return data.version;
+        }
+    } catch {}
+    return MITABLE_VERSION;
+}
+
+export default async function DownloadPage() {
+    const version = await getLatestVersion();
     const { downloads } = siteContent;
 
     return (
@@ -83,6 +95,7 @@ export default function DownloadPage() {
                         <div className="mx-auto grid max-w-4xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             {downloads.builds.map((build) => {
                                 const Icon = iconMap[build.icon];
+                                const href = `${R2_BASE}/Mitable-${version}-${build.file}`;
                                 return (
                                     <div
                                         key={build.platform}
@@ -101,7 +114,7 @@ export default function DownloadPage() {
 
                                         {/* Download button */}
                                         <a
-                                            href={build.href}
+                                            href={href}
                                             className="inline-flex items-center gap-2 rounded-full bg-brand-solid px-5 py-2.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-brand-solid_hover"
                                         >
                                             <DownloadArrow />
@@ -114,7 +127,7 @@ export default function DownloadPage() {
 
                         {/* Version note */}
                         <p className="mt-12 text-center font-mono text-xs text-gray-500">
-                            Version {MITABLE_VERSION} &middot;{" "}
+                            Version {version} &middot;{" "}
                             <a href="/" className="underline underline-offset-2 transition-colors hover:text-gray-300">
                                 Back to homepage
                             </a>

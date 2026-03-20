@@ -79,11 +79,13 @@ jobs:
 
       - name: Prepare release artifacts for R2
         run: |
+          VERSION=${GITHUB_REF_NAME#v}
           mkdir -p release-artifacts
           cp apps/electron/dist/*.dmg release-artifacts/ || true
           cp apps/electron/dist/*.zip release-artifacts/ || true
           cp apps/electron/dist/*.blockmap release-artifacts/ || true
           cp apps/electron/dist/latest-mac.yml release-artifacts/ || true
+          echo "{\"version\":\"${VERSION}\"}" > release-artifacts/latest.json
           ls -la release-artifacts/
 
       - name: Upload to Cloudflare R2
@@ -179,29 +181,3 @@ jobs:
             apps/electron/dist/latest.yml
           draft: false
           prerelease: false
-
-  update-website-version:
-    name: Update website download version
-    runs-on: ubuntu-latest
-    needs: [build-macos, build-windows]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-
-      - name: Update MITABLE_VERSION in website config
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          echo "Updating website version to $VERSION"
-          sed -i "s/export const MITABLE_VERSION = \".*\"/export const MITABLE_VERSION = \"$VERSION\"/" apps/website/src/config/content/base.ts
-          grep MITABLE_VERSION apps/website/src/config/content/base.ts
-
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apps/website/src/config/content/base.ts
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "chore: update website download version to ${GITHUB_REF_NAME#v}"
-          git push origin HEAD:main

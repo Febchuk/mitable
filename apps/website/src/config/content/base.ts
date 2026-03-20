@@ -3,9 +3,9 @@
  * Download links, footer, social links, navigation structure.
  */
 
-// Single source of truth for version - update this when releasing
+// Fallback version used when latest.json fetch fails
 export const MITABLE_VERSION = "0.1.45";
-const R2_BASE = "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev";
+export const R2_BASE = "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev";
 
 export const baseContent = {
     brand: {
@@ -19,19 +19,19 @@ export const baseContent = {
             {
                 platform: "macOS (Apple Silicon)",
                 description: "For M1, M2, M3, and M4 Macs",
-                href: `${R2_BASE}/Mitable-${MITABLE_VERSION}-arm64.dmg`,
+                file: "arm64.dmg",
                 icon: "apple" as const,
             },
             {
                 platform: "macOS (Intel)",
                 description: "For Intel-based Macs",
-                href: `${R2_BASE}/Mitable-${MITABLE_VERSION}-x64.dmg`,
+                file: "x64.dmg",
                 icon: "apple" as const,
             },
             {
                 platform: "Windows",
                 description: "For Windows 10 and later",
-                href: `${R2_BASE}/Mitable-${MITABLE_VERSION}-x64.exe`,
+                file: "x64.exe",
                 icon: "windows" as const,
             },
         ],
