@@ -222,7 +222,6 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
   ctx.fillStyle = AXIS_COLOR;
   ctx.font = "10px Inter, system-ui, sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText(`0${unit}`, padLeft - 8, padTop + chartH + 3);
   for (let v = step; v <= maxVal; v += step) {
     const y = padTop + chartH * (1 - v / maxVal);
     ctx.fillText(`${Math.round(v / divisor)}${unit}`, padLeft - 8, y + 3);
