@@ -249,7 +249,15 @@ function sessionToWorkBlock(
     isFocusedSession: !!session.name, // Named sessions are focused sessions
     goal: session.name ?? undefined,
     name: session.name ?? undefined,
-    status: mapStatus(session.status),
+    status: (() => {
+      const mapped = mapStatus(session.status);
+      // A block is NOT "ready" until tasks exist — keep it as "summarizing" until then
+      const tasks = session.taskBreakdown as Array<unknown> | null;
+      if (mapped === "ready" && (!tasks || tasks.length === 0)) {
+        return "summarizing" as const;
+      }
+      return mapped;
+    })(),
     deliveryStatus:
       session.deliveryStatus === "pending" ||
       session.deliveryStatus === "sent" ||
@@ -492,10 +500,15 @@ export function useCalendarDays() {
     },
     enabled: !!user,
     staleTime: 5000,
-    // Poll every 5s when there's an active/paused session, 60s otherwise
+    // Poll frequency based on block status:
+    //   active/paused   → 5s  (detect session changes)
+    //   summarizing     → 2s  (catch summary completion + show spinner)
+    //   ready/other     → 60s (idle)
     refetchInterval: (query) => {
       const days = query.state.data;
       if (!days) return 60000;
+      const hasSummarizing = days.some((d) => d.workBlocks.some((b) => b.status === "summarizing"));
+      if (hasSummarizing) return 2000;
       const hasActive = days.some((d) =>
         d.workBlocks.some((b) => b.status === "active" || b.status === "paused")
       );

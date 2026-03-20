@@ -109,6 +109,7 @@ class GranolaSyncService {
         granolaAccessTokenEncrypted: schema.users.granolaAccessTokenEncrypted,
         granolaRefreshTokenEncrypted: schema.users.granolaRefreshTokenEncrypted,
         granolaTokenExpiresAt: schema.users.granolaTokenExpiresAt,
+        granolaOAuthClientId: schema.users.granolaOAuthClientId,
         granolaLastSyncedAt: schema.users.granolaLastSyncedAt,
         organizationId: schema.users.organizationId,
       })
@@ -859,6 +860,7 @@ Respond ONLY with JSON:
       granolaAccessTokenEncrypted: string | null;
       granolaRefreshTokenEncrypted: string | null;
       granolaTokenExpiresAt: Date | null;
+      granolaOAuthClientId: string | null;
     }
   ): Promise<string> {
     if (!user.granolaAccessTokenEncrypted) {
@@ -867,11 +869,12 @@ Respond ONLY with JSON:
 
     let accessToken = encryptionService.decrypt(user.granolaAccessTokenEncrypted);
 
-    // Proactive refresh: refresh when within 1 hour of expiry (not after)
-    const ONE_HOUR_MS = 60 * 60 * 1000;
+    // Proactive refresh: refresh when within 5 minutes of expiry
+    // (was 1 hour — too aggressive, caused unnecessary rotation every cron run)
+    const FIVE_MIN_MS = 5 * 60 * 1000;
     const isExpiredOrSoon =
       user.granolaTokenExpiresAt &&
-      new Date(user.granolaTokenExpiresAt).getTime() < Date.now() + ONE_HOUR_MS;
+      new Date(user.granolaTokenExpiresAt).getTime() < Date.now() + FIVE_MIN_MS;
 
     if (isExpiredOrSoon) {
       if (!user.granolaRefreshTokenEncrypted) {
@@ -879,22 +882,50 @@ Respond ONLY with JSON:
       }
 
       const refreshToken = encryptionService.decrypt(user.granolaRefreshTokenEncrypted);
-      const newTokenData = await granolaService.refreshToken(refreshToken);
-      const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
 
-      await db
-        .update(schema.users)
-        .set({
-          granolaAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
-          granolaRefreshTokenEncrypted: newTokenData.refresh_token
-            ? encryptionService.encrypt(newTokenData.refresh_token)
-            : user.granolaRefreshTokenEncrypted,
-          granolaTokenExpiresAt: tokenExpiresAt,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.users.id, userId));
+      try {
+        const newTokenData = await granolaService.refreshToken(
+          refreshToken,
+          user.granolaOAuthClientId ?? undefined
+        );
+        const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
 
-      accessToken = newTokenData.access_token;
+        await db
+          .update(schema.users)
+          .set({
+            granolaAccessTokenEncrypted: encryptionService.encrypt(newTokenData.access_token),
+            granolaRefreshTokenEncrypted: newTokenData.refresh_token
+              ? encryptionService.encrypt(newTokenData.refresh_token)
+              : user.granolaRefreshTokenEncrypted,
+            granolaTokenExpiresAt: tokenExpiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, userId));
+
+        accessToken = newTokenData.access_token;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+
+        // Permanent failure (invalid refresh token) — clear tokens so user re-auths
+        if (msg.includes("invalid_refresh_token") || msg.includes("invalid_grant")) {
+          logger.warn(
+            { userId },
+            "Granola refresh token permanently invalid — clearing tokens for re-auth"
+          );
+          await db
+            .update(schema.users)
+            .set({
+              granolaAccessTokenEncrypted: null,
+              granolaRefreshTokenEncrypted: null,
+              granolaTokenExpiresAt: null,
+              granolaOAuthClientId: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.users.id, userId));
+        }
+
+        throw error;
+      }
     }
 
     return accessToken;

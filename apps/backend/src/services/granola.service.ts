@@ -310,19 +310,38 @@ class GranolaService {
 
   /**
    * Refresh an expired access token.
+   *
+   * @param refreshToken  The encrypted-then-decrypted refresh token
+   * @param storedClientId  The client_id persisted during the original OAuth flow.
+   *                        When provided, skips dynamic registration (which would
+   *                        create a new client_id and break the refresh token).
    */
-  async refreshToken(refreshToken: string): Promise<GranolaOAuthTokenResponse> {
+  async refreshToken(
+    refreshToken: string,
+    storedClientId?: string
+  ): Promise<GranolaOAuthTokenResponse> {
     const metadata = await this.discoverOAuthMetadata();
-    const client = await this.ensureClientRegistration();
+
+    // Use the stored client_id if available; fall back to dynamic registration
+    let clientId: string;
+    let clientSecret: string | undefined;
+
+    if (storedClientId) {
+      clientId = storedClientId;
+    } else {
+      const client = await this.ensureClientRegistration();
+      clientId = client.client_id;
+      clientSecret = client.client_secret;
+    }
 
     const body: Record<string, string> = {
       grant_type: "refresh_token",
       refresh_token: refreshToken,
-      client_id: client.client_id,
+      client_id: clientId,
     };
 
-    if (client.client_secret) {
-      body.client_secret = client.client_secret;
+    if (clientSecret) {
+      body.client_secret = clientSecret;
     }
 
     const response = await fetch(metadata.token_endpoint, {

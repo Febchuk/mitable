@@ -43,6 +43,7 @@ export const users = pgTable("users", {
   granolaAccessTokenEncrypted: text("granola_access_token_encrypted"),
   granolaRefreshTokenEncrypted: text("granola_refresh_token_encrypted"),
   granolaTokenExpiresAt: timestamp("granola_token_expires_at"),
+  granolaOAuthClientId: varchar("granola_oauth_client_id", { length: 255 }),
   granolaUserEmail: varchar("granola_user_email", { length: 255 }),
   granolaLastSyncedAt: timestamp("granola_last_synced_at"),
 

@@ -164,6 +164,9 @@ export function useEndSession() {
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
       queryClient.invalidateQueries({ queryKey: monitoringKeys.session(params.sessionId) });
+      // Invalidate calendar so the block immediately shows "summarizing" instead of stale "active"
+      // Using raw key to avoid circular dependency (calendar imports from monitoring)
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
     },
   });
 }

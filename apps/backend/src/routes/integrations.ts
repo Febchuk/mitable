@@ -2930,13 +2930,18 @@ router.get("/granola/callback", async (req: Request, res: Response): Promise<voi
       ? encryptionService.encrypt(tokenData.refresh_token)
       : null;
 
-    // Store tokens on user record
+    // Persist the client_id used during this authorization — needed for token refresh
+    // (dynamic registration creates a new client_id on each server restart)
+    const clientReg = await granolaService.ensureClientRegistration();
+
+    // Store tokens + client_id on user record
     await db
       .update(schema.users)
       .set({
         granolaAccessTokenEncrypted: encryptedAccessToken,
         granolaRefreshTokenEncrypted: encryptedRefreshToken,
         granolaTokenExpiresAt: tokenExpiresAt,
+        granolaOAuthClientId: clientReg.client_id,
         updatedAt: new Date(),
       })
       .where(eq(schema.users.id, userId));
@@ -3074,6 +3079,7 @@ router.delete(
           granolaAccessTokenEncrypted: null,
           granolaRefreshTokenEncrypted: null,
           granolaTokenExpiresAt: null,
+          granolaOAuthClientId: null,
           granolaUserEmail: null,
           granolaLastSyncedAt: null,
           updatedAt: new Date(),
@@ -3133,6 +3139,7 @@ router.get("/granola/notes", requireAuth, async (req: Request, res: Response): P
         granolaAccessTokenEncrypted: schema.users.granolaAccessTokenEncrypted,
         granolaRefreshTokenEncrypted: schema.users.granolaRefreshTokenEncrypted,
         granolaTokenExpiresAt: schema.users.granolaTokenExpiresAt,
+        granolaOAuthClientId: schema.users.granolaOAuthClientId,
       })
       .from(schema.users)
       .where(eq(schema.users.id, userId))
@@ -3155,11 +3162,14 @@ router.get("/granola/notes", requireAuth, async (req: Request, res: Response): P
         return;
       }
 
-      // Attempt refresh
+      // Attempt refresh — use the stored client_id (not dynamic re-registration)
       try {
         const { granolaService } = await import("../services/granola.service.js");
         const refreshToken = encryptionService.decrypt(user.granolaRefreshTokenEncrypted);
-        const newTokenData = await granolaService.refreshToken(refreshToken);
+        const newTokenData = await granolaService.refreshToken(
+          refreshToken,
+          user.granolaOAuthClientId ?? undefined
+        );
 
         const tokenExpiresAt = new Date(Date.now() + newTokenData.expires_in * 1000);
         await db
@@ -3179,7 +3189,23 @@ router.get("/granola/notes", requireAuth, async (req: Request, res: Response): P
         const meetings = await svc.listMeetings(newTokenData.access_token, "last_30_days");
         res.json(meetings);
         return;
-      } catch {
+      } catch (refreshError) {
+        const msg = refreshError instanceof Error ? refreshError.message : String(refreshError);
+
+        // Permanent failure — clear tokens so the UI shows "disconnected"
+        if (msg.includes("invalid_refresh_token") || msg.includes("invalid_grant")) {
+          await db
+            .update(schema.users)
+            .set({
+              granolaAccessTokenEncrypted: null,
+              granolaRefreshTokenEncrypted: null,
+              granolaTokenExpiresAt: null,
+              granolaOAuthClientId: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.users.id, userId));
+        }
+
         sendError(res, 401, "REFRESH_FAILED", "Failed to refresh Granola token. Please reconnect.");
         return;
       }

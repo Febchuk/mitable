@@ -212,6 +212,11 @@
   -webkit-app-region: no-drag;
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Reveal animations (kept) */
 @keyframes revealUp {
   from { opacity: 0; transform: translateY(20px); }

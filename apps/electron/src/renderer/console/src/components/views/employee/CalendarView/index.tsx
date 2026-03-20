@@ -72,6 +72,7 @@ export default function CalendarView() {
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("idle");
+  const [summarizingBlockIds, setSummarizingBlockIds] = useState<Set<string>>(new Set());
 
   const { startSession, isStarting } = useStartSession({
     navigateOnSuccess: false,
@@ -140,13 +141,25 @@ export default function CalendarView() {
   }, []);
 
   // Listen for session updates — refresh data AND track state
+  // When session transitions from active→idle (ended), optimistically mark the block as summarizing
   useEffect(() => {
+    let prevStatus: SessionStatus = sessionStatus;
     const unsub = window.consoleAPI?.onMonitoringSessionUpdate?.((state) => {
-      setSessionStatus(deriveStatus(state));
+      const newStatus = deriveStatus(state);
+      // Session just ended (was active/paused, now idle) — mark its block as optimistically summarizing
+      if (
+        (prevStatus === "active" || prevStatus === "paused") &&
+        newStatus === "idle" &&
+        state?.id
+      ) {
+        setSummarizingBlockIds((prev) => new Set(prev).add(state.id));
+      }
+      prevStatus = newStatus;
+      setSessionStatus(newStatus);
       queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
     });
     return () => unsub?.();
-  }, [queryClient]);
+  }, [queryClient, sessionStatus]);
 
   const { data: realDays, isLoading, error } = useCalendarDays();
   const allDays = realDays || [];
@@ -172,7 +185,7 @@ export default function CalendarView() {
     return days;
   }, [weekStart, allDays]);
 
-  const selectedDay = useMemo(() => {
+  const selectedDayRaw = useMemo(() => {
     return (
       allDays.find((d) => isSameDay(d.date, selectedDate)) || {
         id: "empty",
@@ -185,6 +198,47 @@ export default function CalendarView() {
       }
     );
   }, [selectedDate, allDays]);
+
+  // Two rules enforced here:
+  // 1. A work block is NEVER "ready" without tasks — show "summarizing" until tasks arrive
+  // 2. Optimistic flip: if user just ended a session, show "summarizing" instead of stale "active"
+  const selectedDay = useMemo(() => {
+    const clearedIds: string[] = [];
+    const blocks = selectedDayRaw.workBlocks.map((block) => {
+      const isMeeting = block.source === "granola" || block.source === "fireflies";
+      const hasTasks = block.taskBreakdown && block.taskBreakdown.length > 0;
+
+      // Rule 1: "ready" without tasks on a work block → still summarizing
+      // Safety valve: accept "ready" without tasks if session ended >5 min ago (AI didn't generate tasks)
+      const endedRecently = block.endTime && Date.now() - block.endTime.getTime() < 5 * 60 * 1000;
+      if (!isMeeting && block.status === "ready" && !hasTasks && endedRecently) {
+        return { ...block, status: "summarizing" as const };
+      }
+
+      // Rule 2: optimistic flip — block in our set but backend still says "active"
+      if (summarizingBlockIds.has(block.id)) {
+        if (block.status === "active") {
+          return { ...block, status: "summarizing" as const };
+        }
+        // Backend caught up — clear from optimistic set
+        clearedIds.push(block.id);
+      }
+
+      return block;
+    });
+
+    if (clearedIds.length > 0) {
+      setTimeout(() => {
+        setSummarizingBlockIds((prev) => {
+          const next = new Set(prev);
+          clearedIds.forEach((id) => next.delete(id));
+          return next;
+        });
+      }, 0);
+    }
+
+    return { ...selectedDayRaw, workBlocks: blocks };
+  }, [selectedDayRaw, summarizingBlockIds]);
 
   const isCurrentWeek = isSameDay(weekStart, getStartOfWeek(today));
 
@@ -220,6 +274,11 @@ export default function CalendarView() {
   const handleStop = useCallback(async () => {
     try {
       setSessionStatus("idle");
+      // Capture active block ID before ending so we can optimistically mark it as summarizing
+      const currentState = await window.consoleAPI?.getMonitoringSessionState();
+      if (currentState?.id) {
+        setSummarizingBlockIds((prev) => new Set(prev).add(currentState.id));
+      }
       const result = await window.consoleAPI?.endMonitoringSession();
       if (result?.error) {
         console.error("[CalendarView] endMonitoringSession error:", result.error);
