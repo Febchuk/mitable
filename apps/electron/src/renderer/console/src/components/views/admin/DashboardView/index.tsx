@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDashboardMetrics } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
+import { formatTopLevelDuration, topLevelDurationLabel } from "../shared/topLevelDuration";
 
 type TimeFilter = "yesterday" | "week" | "month" | "ytd" | "all";
 
@@ -293,45 +294,6 @@ function drawRoundedTopBar(
   ctx.fill();
 }
 
-/**
- * Adaptive duration formatting:
- * - Yesterday filter always shows hours
- * - <48h  → hours  (e.g. "37h")
- * - <7d   → days   (e.g. "3d")
- * - <52w  → weeks  (e.g. "12w")
- * - ≥52w  → years  (e.g. "2y")
- */
-function formatDuration(totalMinutes: number, filter: TimeFilter): string {
-  const hours = Math.round(totalMinutes / 60);
-
-  if (filter === "yesterday" || hours < 48) {
-    return `${hours.toLocaleString()}h`;
-  }
-
-  const days = Math.round(hours / 24);
-  if (days < 7) {
-    return `${days}d`;
-  }
-
-  const weeks = Math.round(days / 7);
-  if (weeks < 52) {
-    return `${weeks}w`;
-  }
-
-  const years = Math.round(weeks / 52);
-  return `${years}y`;
-}
-
-function statLabel(totalMinutes: number, filter: TimeFilter): string {
-  const hours = Math.round(totalMinutes / 60);
-  if (filter === "yesterday" || hours < 48) return "Hours recorded";
-  const days = Math.round(hours / 24);
-  if (days < 7) return "Days recorded";
-  const weeks = Math.round(days / 7);
-  if (weeks < 52) return "Weeks recorded";
-  return "Years recorded";
-}
-
 export default function DashboardView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get("period") as TimeFilter | null;
@@ -356,8 +318,8 @@ export default function DashboardView() {
     return apiData.metrics.totalTeamWorkMinutes + apiData.metrics.totalTeamMeetingMinutes;
   }, [apiData]);
 
-  const durationDisplay = useMemo(() => formatDuration(totalMinutes, filter), [totalMinutes, filter]);
-  const durationLabel = useMemo(() => statLabel(totalMinutes, filter), [totalMinutes, filter]);
+  const durationDisplay = useMemo(() => formatTopLevelDuration(totalMinutes), [totalMinutes]);
+  const durationLabel = useMemo(() => topLevelDurationLabel(totalMinutes), [totalMinutes]);
 
   const peopleActive = useMemo(() => {
     if (!apiData?.hasData) return "0";

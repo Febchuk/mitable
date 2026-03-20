@@ -12,6 +12,10 @@ import { Loader2, AlertCircle, FileText, Plus, Lock } from "lucide-react";
 import CreateDocumentModal from "./dialogs/CreateDocumentModal";
 import type { Document } from "@mitable/shared";
 
+function isReportDocument(doc: Document): boolean {
+  return doc.tags?.includes("report") ?? false;
+}
+
 function groupDocumentsByDate(documents: Document[]) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -71,7 +75,7 @@ export default function DocsView() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const { data, isLoading, error } = useDocuments();
-  const documents = data?.documents || [];
+  const documents = (data?.documents || []).filter((doc) => !isReportDocument(doc));
 
   const sortedDocuments = useMemo(() => {
     return [...documents].sort(

@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { createLogger } from "../../../../../../lib/logger";
 import { getLocale } from "@/console/src/lib/date";
@@ -25,20 +25,8 @@ import {
   useExportToGoogleDocs,
   useGoogleDriveFolders,
 } from "@/console/src/hooks/queries/documents";
-import {
-  ArrowLeft,
-  Trash2,
-  Loader2,
-  FileText,
-  BookOpen,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  ExternalLink,
-  Sparkles,
-} from "lucide-react";
+import { ArrowLeft, Trash2, Loader2, CheckCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -54,7 +42,6 @@ import { reviseDocument } from "@/console/src/services/documentsService";
 import ExportNotionDialog from "./dialogs/ExportNotionDialog";
 import ExportGoogleDocsDialog from "./dialogs/ExportGoogleDocsDialog";
 import ExportPopover, { type ExportDestination } from "./components/ExportPopover";
-import type { DocType, DocStatus } from "@mitable/shared";
 import { useUser } from "@/console/src/context/UserContext";
 import { apiRequest } from "@/console/src/services/api";
 
@@ -70,21 +57,21 @@ interface NotionStatus {
   workspaceId: string | null;
 }
 
-const DOC_TYPE_LABELS: Record<DocType, string> = {
-  "how-to": "How-To Guide",
-  "knowledge-article": "Knowledge Article",
-  troubleshooting: "Troubleshooting Guide",
-};
-
-const DOC_STATUS_COLORS: Record<DocStatus, string> = {
-  draft: "bg-yellow-500/20 text-yellow-400",
-  published: "bg-green-500/20 text-green-400",
-  archived: "bg-gray-500/20 text-gray-400",
-};
+function stripLeadingTitle(markdown: string): string {
+  if (!markdown) return markdown;
+  const trimmed = markdown.replace(/^\n+/, "");
+  if (trimmed.startsWith("# ")) {
+    const firstNewline = trimmed.indexOf("\n");
+    if (firstNewline === -1) return "";
+    return trimmed.slice(firstNewline).replace(/^\n+/, "");
+  }
+  return markdown;
+}
 
 export default function DocDetail() {
   const { docId } = useParams<{ docId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { user } = useUser();
 
@@ -119,28 +106,39 @@ export default function DocDetail() {
     isLoading: isLoadingFolders,
     refetch: refetchFolders,
   } = useGoogleDriveFolders(googleDocsAvailable);
+  const isReportRoute = location.pathname.startsWith("/reports");
+  const basePath = isReportRoute ? "/reports" : "/docs";
+  const entityLabel = isReportRoute ? "Report" : "Document";
+  const entityLabelLower = entityLabel.toLowerCase();
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isExportNotionDialogOpen, setIsExportNotionDialogOpen] = useState(false);
   const [isExportGoogleDocsDialogOpen, setIsExportGoogleDocsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [title, setTitle] = useState(isNewDocument ? "Untitled Document" : "");
+  const [title, setTitle] = useState(isNewDocument ? `Untitled ${entityLabel}` : "");
   const [createdDocId, setCreatedDocId] = useState<string | null>(null); // Track if we've created the doc
   const [isAIEditMode, setIsAIEditMode] = useState(false);
-  const latestContentRef = useRef<string>(""); // Track latest editor content for AI edit mode
+  const latestContentRef = useRef<string>("");
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   // Debounce timers
   const titleSaveTimeout = useRef<NodeJS.Timeout | null>(null);
   const contentSaveTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize title when document loads
   useEffect(() => {
     if (document) {
       setTitle(document.title);
       setLastSaved(new Date(document.updatedAt));
     }
   }, [document]);
+
+  useEffect(() => {
+    if (titleRef.current) {
+      titleRef.current.style.height = "auto";
+      titleRef.current.style.height = titleRef.current.scrollHeight + "px";
+    }
+  }, [title]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -254,18 +252,19 @@ export default function DocDetail() {
         // If this is a new document, create it first
         if (isNewDocument && !createdDocId) {
           const result = await createMutation.mutateAsync({
-            title: title || "Untitled Document",
+            title: title || `Untitled ${entityLabel}`,
             docType: "knowledge-article",
             content: contentToSave,
+            tags: isReportRoute ? ["report"] : [],
           });
           const newDocId = result.document.id;
           setCreatedDocId(newDocId);
           setLastSaved(new Date());
           // Navigate to the new document URL
-          navigate(`/docs/${newDocId}`, { replace: true });
+          navigate(`${basePath}/${newDocId}`, { replace: true });
           toast({
-            title: "Document created",
-            description: "Your document has been saved.",
+            title: `${entityLabel} created`,
+            description: `Your ${entityLabelLower} has been saved.`,
           });
           return;
         }
@@ -286,14 +285,27 @@ export default function DocDetail() {
         logger.error("Manual save failed:", error);
         toast({
           title: "Save failed",
-          description: "Failed to save document.",
+          description: `Failed to save ${entityLabelLower}.`,
           variant: "destructive",
         });
       } finally {
         setIsSaving(false);
       }
     },
-    [docId, title, isNewDocument, createdDocId, createMutation, updateMutation, navigate, toast]
+    [
+      basePath,
+      createdDocId,
+      createMutation,
+      docId,
+      entityLabel,
+      entityLabelLower,
+      isNewDocument,
+      isReportRoute,
+      navigate,
+      title,
+      toast,
+      updateMutation,
+    ]
   );
 
   const handleDelete = async () => {
@@ -301,15 +313,15 @@ export default function DocDetail() {
 
     try {
       await deleteMutation.mutateAsync(docId);
-      navigate("/docs");
+      navigate(basePath);
       toast({
-        title: "Document deleted",
-        description: "The document has been deleted.",
+        title: `${entityLabel} deleted`,
+        description: `The ${entityLabelLower} has been deleted.`,
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete document.",
+        description: `Failed to delete ${entityLabelLower}.`,
         variant: "destructive",
       });
     }
@@ -444,8 +456,8 @@ export default function DocDetail() {
     const targetId = createdDocId || docId;
     return (
       <AIEditPanel
-        title="Edit Document"
-        subtitle={title || document?.title || "Document"}
+        title={`Edit ${entityLabel}`}
+        subtitle={title || document?.title || entityLabel}
         initialContent={latestContentRef.current || document?.content || ""}
         onSave={handleSaveFromAIEditor}
         onAutoSave={async (content: string) => {
@@ -454,8 +466,8 @@ export default function DocDetail() {
         }}
         onCancel={() => setIsAIEditMode(false)}
         onRevise={handleRevise}
-        placeholder="Edit your document content..."
-        contextLabel="document"
+        placeholder={`Edit your ${entityLabelLower} content...`}
+        contextLabel={entityLabelLower}
         documentId={targetId !== "new" ? targetId : undefined}
       />
     );
@@ -472,216 +484,236 @@ export default function DocDetail() {
   if (!document && !isNewDocument) {
     return (
       <div className="p-8 text-center">
-        <p className="text-text-secondary">Document not found</p>
-        <Button variant="link" onClick={() => navigate("/docs")} className="mt-4">
-          Back to documents
+        <p className="text-text-secondary">{entityLabel} not found</p>
+        <Button variant="link" onClick={() => navigate(basePath)} className="mt-4">
+          Back to {entityLabelLower}s
         </Button>
       </div>
     );
   }
 
-  // For new documents, use defaults
-  const docType = document?.docType || "knowledge-article";
-  const docStatus = document?.status || "draft";
-  const Icon = getDocTypeIcon(docType as DocType);
-  const statusColor = DOC_STATUS_COLORS[docStatus as DocStatus];
-
   return (
-    <div className="h-full flex flex-col app-no-drag">
-      {/* Header */}
-      <div className="flex items-start justify-between p-6 border-b border-border-subtle">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/docs")}
-            className="text-text-secondary hover:text-text-primary"
+    <div className="h-full app-no-drag" style={{ overflow: "auto" }}>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "16px 24px 96px" }}>
+
+        {/* Top bar: back + actions */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 32,
+          }}
+        >
+          <button
+            onClick={() => navigate(basePath)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#6B665C",
+              cursor: "pointer",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+            }}
           >
-            <ArrowLeft size={20} />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Icon size={20} className="text-primary" />
-            </div>
-            <div className="flex-1">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                className="text-xl font-bold text-text-primary bg-transparent border-none outline-none focus:outline-none w-full max-w-2xl"
-                placeholder="Document title..."
+            <ArrowLeft size={18} />
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {hasExportIntegrations && !isNewDocument ? (
+              <ExportPopover
+                destinations={exportDestinations}
+                onExportAll={
+                  notionAvailable &&
+                  googleDocsAvailable &&
+                  document?.notionPageId &&
+                  document?.googleDocsId
+                    ? handleExportToAll
+                    : undefined
+                }
+                isExporting={exportNotionMutation.isPending || exportGoogleDocsMutation.isPending}
               />
-              <div className="flex items-center gap-3 mt-0.5">
-                <span className="text-text-secondary text-sm">
-                  {DOC_TYPE_LABELS[docType as DocType]}
-                </span>
-                <Badge className={statusColor}>{docStatus}</Badge>
-              </div>
-            </div>
+            ) : (
+              <button
+                onClick={() => navigate("/profile?tab=integrations")}
+                disabled={isIntegrationStatusLoading}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  padding: "7px 12px",
+                  borderRadius: 8,
+                  border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                  background: "transparent",
+                  color: "#9B9689",
+                  fontSize: 13,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  cursor: isIntegrationStatusLoading ? "default" : "pointer",
+                  opacity: isIntegrationStatusLoading ? 0.5 : 1,
+                }}
+              >
+                <ExternalLink size={14} />
+                Export
+              </button>
+            )}
+            {!isNewDocument && (
+              <button
+                onClick={() => setIsDeleteDialogOpen(true)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#6B665C",
+                  cursor: "pointer",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Google Docs-style save indicator */}
-          <span className="text-xs text-text-secondary flex items-center gap-1.5 mr-2">
+        <textarea
+          ref={titleRef}
+          value={title}
+          onChange={(e) => handleTitleChange(e.target.value)}
+          placeholder="Untitled"
+          rows={1}
+          style={{
+            width: "100%",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            resize: "none",
+            overflow: "hidden",
+            color: "#ECE8E0",
+            fontFamily: "var(--font-serif)",
+            fontSize: 38,
+            lineHeight: 1.2,
+            letterSpacing: "-0.03em",
+            fontWeight: 400,
+            padding: 0,
+            marginBottom: 14,
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
+        />
+
+        {/* Metadata row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            flexWrap: "wrap",
+            fontSize: 12,
+            color: "#6B665C",
+            fontFamily: "var(--font-sans)",
+            marginBottom: 24,
+          }}
+        >
+          {document ? (
+            <>
+              <span style={{ color: "#9B9689" }}>
+                {new Date(document.updatedAt).toLocaleDateString(getLocale(), {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
+              {document.creator && (
+                <>
+                  <span style={{ color: "#4A473F" }}>·</span>
+                  <span>
+                    {document.creator.firstName} {document.creator.lastName}
+                  </span>
+                </>
+              )}
+              {document.notionPageId && (
+                <>
+                  <span style={{ color: "#4A473F" }}>·</span>
+                  <span style={{ color: "#3A9B6B" }}>Synced</span>
+                </>
+              )}
+            </>
+          ) : (
+            <span>
+              Press <span style={{ color: "#9B9689" }}>⌘+S</span> to save
+            </span>
+          )}
+          <span style={{ color: "#4A473F" }}>·</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             {isSaving ? (
               <>
-                <Loader2 className="animate-spin" size={14} />
-                <span>Saving...</span>
+                <Loader2 size={11} className="animate-spin" />
+                Saving…
               </>
             ) : lastSaved ? (
               <>
-                <CheckCircle size={14} className="text-status-success" />
-                <span>All changes saved</span>
+                <CheckCircle size={11} style={{ color: "#3A9B6B" }} />
+                Saved
               </>
-            ) : null}
+            ) : (
+              <span style={{ color: "#4A473F" }}>Unsaved</span>
+            )}
           </span>
-
-          {!isNewDocument && (
-            <Button
-              variant="outline"
-              className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 gap-2"
-              onClick={() => setIsAIEditMode(true)}
-            >
-              <Sparkles size={16} />
-              Edit with AI
-            </Button>
-          )}
-          {hasExportIntegrations && !isNewDocument ? (
-            <ExportPopover
-              destinations={exportDestinations}
-              onExportAll={
-                notionAvailable &&
-                googleDocsAvailable &&
-                document?.notionPageId &&
-                document?.googleDocsId
-                  ? handleExportToAll
-                  : undefined
-              }
-              isExporting={exportNotionMutation.isPending || exportGoogleDocsMutation.isPending}
-            />
-          ) : (
-            <Button
-              variant="outline"
-              className="bg-background-elevated border-border-subtle text-text-primary hover:bg-background-hover gap-2"
-              onClick={() => navigate("/profile?tab=integrations")}
-              disabled={isIntegrationStatusLoading}
-            >
-              <ExternalLink size={16} />
-              Export
-            </Button>
-          )}
-          {!isNewDocument && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsDeleteDialogOpen(true)}
-              className="text-status-error hover:text-status-error hover:bg-status-error/10"
-            >
-              <Trash2 size={18} />
-            </Button>
-          )}
         </div>
-      </div>
 
-      {/* Metadata bar */}
-      <div className="flex items-center gap-6 text-sm px-6 py-3 border-b border-border-subtle bg-background-secondary/30">
-        {document ? (
-          <>
-            <div className="flex items-center gap-2 text-text-secondary">
-              <Clock size={14} />
-              <span>
-                Updated:{" "}
-                <span className="text-text-primary">
-                  {new Date(document.updatedAt).toLocaleDateString(getLocale(), {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </span>
-            </div>
-            {document.creator && (
-              <div className="text-text-secondary">
-                By:{" "}
-                <span className="text-text-primary">
-                  {document.creator.firstName} {document.creator.lastName}
-                </span>
+        {/* Editor — no wrapper box, just flows into the page */}
+        <DocEditor
+          key={docId}
+          initialContent={stripLeadingTitle(document?.content || "")}
+          onChange={handleContentChange}
+          onSave={handleSave}
+          documentId={docId}
+          variant="fullWidth"
+          placeholder={`Start writing...`}
+          autosaveDelay={3000}
+          className="min-h-[520px]"
+        />
+
+        {document?.sessionContributions && document.sessionContributions.length > 0 && (
+          <div style={{ marginTop: 40, paddingTop: 20, borderTop: "0.5px solid rgba(236, 232, 224, 0.06)" }}>
+            <details>
+              <summary style={{ fontSize: 12, fontWeight: 500, color: "#6B665C", cursor: "pointer" }}>
+                Contributing Sessions ({document.sessionContributions.length})
+              </summary>
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                {document.sessionContributions.map((contribution) => (
+                  <div
+                    key={contribution.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      fontSize: 12,
+                    }}
+                  >
+                    <span style={{ color: "#ECE8E0" }}>
+                      {contribution.session?.name || "Untitled Session"}
+                      <span style={{ color: "#6B665C", marginLeft: 8 }}>
+                        ({contribution.contributionType})
+                      </span>
+                    </span>
+                    {contribution.session?.startedAt && (
+                      <span style={{ color: "#6B665C", flexShrink: 0 }}>
+                        {new Date(contribution.session.startedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
-            {document.notionPageId && (
-              <div className="flex items-center gap-1 text-status-success">
-                <CheckCircle size={14} />
-                <span>Synced</span>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-text-secondary">
-            New document - press{" "}
-            <kbd className="px-1.5 py-0.5 rounded bg-background-tertiary border border-border-subtle">
-              ⌘+S
-            </kbd>{" "}
-            to save
+            </details>
           </div>
         )}
-        <div className="ml-auto text-text-tertiary text-xs">
-          Press{" "}
-          <kbd className="px-1.5 py-0.5 rounded bg-background-tertiary border border-border-subtle">
-            ⌘+J
-          </kbd>{" "}
-          for AI assistance
-        </div>
       </div>
-
-      {/* Editor */}
-      <div className="flex-1 overflow-auto bg-background-primary">
-        <div className="max-w-4xl mx-auto px-8 py-6">
-          <DocEditor
-            key={docId} // Reset editor when document changes
-            initialContent={document?.content || ""}
-            onChange={handleContentChange}
-            onSave={handleSave}
-            documentId={docId}
-            variant="default"
-            placeholder="Start writing your document... Press / for commands or ⌘+J for AI assistance."
-            autosaveDelay={3000}
-            className="h-full"
-          />
-        </div>
-      </div>
-
-      {/* Contributing Sessions (collapsed at bottom if exists) */}
-      {document?.sessionContributions && document.sessionContributions.length > 0 && (
-        <div className="border-t border-border-subtle p-4 bg-background-secondary/30">
-          <details className="group">
-            <summary className="text-sm font-medium text-text-secondary cursor-pointer hover:text-text-primary">
-              Contributing Sessions ({document.sessionContributions.length})
-            </summary>
-            <div className="mt-2 space-y-1">
-              {document.sessionContributions.map((contribution) => (
-                <div
-                  key={contribution.id}
-                  className="flex items-center justify-between text-sm py-1"
-                >
-                  <span className="text-text-primary">
-                    {contribution.session?.name || "Untitled Session"}
-                    <span className="text-text-tertiary ml-2">
-                      ({contribution.contributionType})
-                    </span>
-                  </span>
-                  {contribution.session?.startedAt && (
-                    <span className="text-text-tertiary">
-                      {new Date(contribution.session.startedAt).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </details>
-        </div>
-      )}
 
       {/* Export Dialogs - only shown for existing documents */}
       {document && (
@@ -713,9 +745,9 @@ export default function DocDetail() {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="bg-background-primary border-border-subtle">
           <DialogHeader>
-            <DialogTitle className="text-text-primary">Delete Document</DialogTitle>
+            <DialogTitle className="text-text-primary">Delete {entityLabel}</DialogTitle>
             <DialogDescription className="text-text-secondary">
-              Are you sure you want to delete this document? This action cannot be undone.
+              Are you sure you want to delete this {entityLabelLower}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
 
@@ -744,15 +776,3 @@ export default function DocDetail() {
   );
 }
 
-function getDocTypeIcon(docType: DocType) {
-  switch (docType) {
-    case "how-to":
-      return BookOpen;
-    case "knowledge-article":
-      return FileText;
-    case "troubleshooting":
-      return AlertCircle;
-    default:
-      return FileText;
-  }
-}

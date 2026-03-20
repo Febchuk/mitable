@@ -41,7 +41,7 @@ export default function ExportPopover({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="bg-background-elevated border-border-subtle text-text-primary hover:bg-background-hover gap-2"
+          className="h-10 rounded-xl border-[0.5px] border-white/10 bg-[rgba(236,232,224,0.02)] px-4 text-text-primary hover:bg-[rgba(236,232,224,0.05)] gap-2"
           disabled={isExporting}
         >
           <ExternalLink size={16} />
@@ -49,8 +49,8 @@ export default function ExportPopover({
           <ChevronDown size={14} />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="bg-background-elevated border-border-subtle w-80 p-0" align="end">
-        <div className="p-3 border-b border-border-subtle">
+      <PopoverContent className="w-80 p-0 border-white/10 bg-[#211F1B]" align="end">
+        <div className="p-3 border-b border-white/10">
           <div className="text-sm font-medium text-text-primary">Export to...</div>
         </div>
 
@@ -58,7 +58,7 @@ export default function ExportPopover({
           {destinations.map((dest) => (
             <div
               key={dest.id}
-              className="px-3 py-3 hover:bg-background-hover transition-colors border-b border-border-subtle last:border-0"
+              className="px-3 py-3 hover:bg-white/[0.03] transition-colors border-b border-white/10 last:border-0"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -121,7 +121,7 @@ export default function ExportPopover({
 
         {/* Re-export all button (only show if multiple destinations are exported) */}
         {exportedCount > 1 && onExportAll && (
-          <div className="p-3 border-t border-border-subtle">
+          <div className="p-3 border-t border-white/10">
             <Button
               variant="outline"
               size="sm"

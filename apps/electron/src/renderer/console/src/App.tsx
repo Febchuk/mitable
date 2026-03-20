@@ -37,7 +37,6 @@ import CustomerDetailView from "./components/views/admin/DashboardView/CustomerD
 import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
-import AskView from "./components/views/admin/AskView";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import ReportsView from "./components/views/admin/ReportsView";
 import SetupView from "./components/views/admin/SetupView";
@@ -262,8 +261,9 @@ function App() {
                         <Route path="people" element={<PeopleView />} />
                         <Route path="people/new" element={<AddNewUser />} />
                         <Route path="people/:id" element={<PersonDetail />} />
-                        <Route path="ask" element={<AskView />} />
+                        <Route path="ask" element={<Navigate to="/reports" replace />} />
                         <Route path="reports" element={<ReportsView />} />
+                        <Route path="reports/:docId" element={<DocDetail />} />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
                         {/* Employee Routes */}

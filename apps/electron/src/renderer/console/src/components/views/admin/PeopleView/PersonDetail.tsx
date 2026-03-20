@@ -38,6 +38,7 @@ import {
   type ActivityTimeFilter as TimeRange,
   type ActivityTrendEntry,
 } from "../shared/activityChart";
+import { formatTopLevelDuration } from "../shared/topLevelDuration";
 
 const LABEL_TO_METRIC: Record<string, string> = {
   "Average Focus Time": "focus_time",
@@ -144,8 +145,7 @@ function toPlainText(markdown: string): string {
 }
 
 function formatHours(minutes: number): string {
-  const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${Number.isInteger(hours) ? hours.toFixed(0) : hours.toFixed(1)}h`;
+  return formatTopLevelDuration(minutes);
 }
 
 function formatCompactDuration(minutes: number): string {
@@ -1035,7 +1035,6 @@ export default function PersonDetail() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
                   marginBottom: 18,
                   gap: 12,
                 }}
@@ -1050,9 +1049,6 @@ export default function PersonDetail() {
                   }}
                 >
                   Customer Work
-                </span>
-                <span style={{ fontSize: 11, color: "#6B665C", fontFamily: "var(--font-sans)" }}>
-                  {TIME_RANGE_LABELS[timeRange]}
                 </span>
               </div>
 
@@ -1136,7 +1132,6 @@ export default function PersonDetail() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
                 marginBottom: 18,
                 gap: 12,
               }}
@@ -1152,12 +1147,9 @@ export default function PersonDetail() {
               >
                 Activity Breakdown
               </span>
-              <span style={{ fontSize: 11, color: "#6B665C", fontFamily: "var(--font-sans)" }}>
-                {TIME_RANGE_LABELS[timeRange]}
-              </span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 232, overflowY: "auto", paddingRight: 4 }}>
               {person.activities.map((activity) => {
                 const percentage =
                   totalActivityMinutes > 0 ? Math.round((activity.minutes / totalActivityMinutes) * 100) : 0;
@@ -1170,6 +1162,7 @@ export default function PersonDetail() {
                       alignItems: "center",
                       gap: 12,
                       width: "100%",
+                      minWidth: 0,
                       padding: 0,
                       background: "none",
                       border: "none",
@@ -1177,34 +1170,56 @@ export default function PersonDetail() {
                       textAlign: "left",
                     }}
                   >
-                    <span style={{ width: 120, flexShrink: 0, fontSize: 13, color: "#9B9689" }}>
+                    <span
+                      style={{
+                        flex: "0 1 120px",
+                        minWidth: 0,
+                        fontSize: 13,
+                        color: "#9B9689",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
                       {activity.label}
                     </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          height: 3,
-                          borderRadius: 999,
-                          background: "rgba(236, 232, 224, 0.06)",
-                          overflow: "hidden",
-                        }}
-                      >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
-                            width: `${percentage}%`,
-                            height: "100%",
+                            height: 3,
                             borderRadius: 999,
-                            background: BREAKDOWN_BAR_COLOR,
+                            background: "rgba(236, 232, 224, 0.06)",
+                            overflow: "hidden",
                           }}
-                        />
+                        >
+                          <div
+                            style={{
+                              width: `${percentage}%`,
+                              height: "100%",
+                              borderRadius: 999,
+                              background: BREAKDOWN_BAR_COLOR,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span style={{ fontSize: 11, color: "#6B665C", textAlign: "right" }}>
+                          {formatCompactDuration(activity.minutes)}
+                        </span>
+                        <span style={{ minWidth: 34, fontSize: 11, color: "#6B665C", textAlign: "right" }}>
+                          {percentage}%
+                        </span>
                       </div>
                     </div>
-                    <span style={{ width: 40, flexShrink: 0, fontSize: 11, color: "#6B665C", textAlign: "right" }}>
-                      {formatCompactDuration(activity.minutes)}
-                    </span>
-                    <span style={{ width: 34, flexShrink: 0, fontSize: 11, color: "#6B665C", textAlign: "right" }}>
-                      {percentage}%
-                    </span>
                   </button>
                 );
               })}

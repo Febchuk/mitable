@@ -1,30 +1,21 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, AlertCircle, FileText, Plus } from "lucide-react";
-import {
-  fetchAskThreads,
-  fetchAskThreadMessages,
-  type AskMessageRow,
-  type AskThread,
-} from "@/console/src/services/adminService";
+import { Loader2, AlertCircle, Plus, Lock } from "lucide-react";
+import { useDocuments } from "@/console/src/hooks/queries/documents";
+import CreateDocumentModal from "../../employee/DocsView/dialogs/CreateDocumentModal";
+import type { Document } from "@mitable/shared";
 
-interface ReportItem {
-  id: string;
-  threadId: string;
-  threadTitle: string;
-  title: string;
-  subtitle: string;
-  createdAt: string;
+function isReportDocument(doc: Document): boolean {
+  return doc.tags?.includes("report") ?? false;
 }
 
-function groupReportsByDate(reports: ReportItem[]) {
+function groupReportsByDate(reports: Document[]) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
   const weekAgo = new Date(today.getTime() - 7 * 86400000);
 
-  const groups: { label: string; reports: ReportItem[] }[] = [
+  const groups: { label: string; reports: Document[] }[] = [
     { label: "Today", reports: [] },
     { label: "Yesterday", reports: [] },
     { label: "This week", reports: [] },
@@ -32,8 +23,8 @@ function groupReportsByDate(reports: ReportItem[]) {
   ];
 
   reports.forEach((report) => {
-    const createdAt = new Date(report.createdAt);
-    const reportDay = new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate());
+    const updatedAt = new Date(report.updatedAt);
+    const reportDay = new Date(updatedAt.getFullYear(), updatedAt.getMonth(), updatedAt.getDate());
 
     if (reportDay.getTime() >= today.getTime()) {
       groups[0].reports.push(report);
@@ -72,39 +63,14 @@ function getReportInitial(title: string): string {
   return (title || "R").charAt(0).toUpperCase();
 }
 
-async function fetchReportsIndex(): Promise<ReportItem[]> {
-  const threads = await fetchAskThreads();
-  const settled = await Promise.allSettled(
-    threads.map(async (thread) => {
-      const messages = await fetchAskThreadMessages(thread.id);
-      return messages
-        .filter((row) => row.reportTitle && row.reportHtml)
-        .map((row) => mapReportRow(thread, row));
-    })
-  );
-
-  return settled
-    .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
-
-function mapReportRow(thread: AskThread, row: AskMessageRow): ReportItem {
-  return {
-    id: row.id,
-    threadId: thread.id,
-    threadTitle: thread.title,
-    title: row.reportTitle || "Untitled report",
-    subtitle: row.reportSubtitle || thread.title,
-    createdAt: row.createdAt,
-  };
-}
-
 export default function ReportsView() {
   const navigate = useNavigate();
-  const { data: reports = [], isLoading, error } = useQuery({
-    queryKey: ["admin", "reports", "index"],
-    queryFn: fetchReportsIndex,
-  });
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { data, isLoading, error } = useDocuments();
+  const reports = useMemo(() => {
+    const documents = data?.documents || [];
+    return documents.filter((doc) => isReportDocument(doc));
+  }, [data?.documents]);
 
   const groupedReports = useMemo(() => groupReportsByDate(reports), [reports]);
 
@@ -176,12 +142,12 @@ export default function ReportsView() {
               margin: "12px 0 0",
             }}
           >
-            Generated from admin Ask conversations
+            Generate reports on any work done by your team
           </p>
         </div>
 
         <button
-          onClick={() => navigate("/ask")}
+          onClick={() => setIsCreateModalOpen(true)}
           style={{
             display: "flex",
             alignItems: "center",
@@ -213,7 +179,7 @@ export default function ReportsView() {
         </button>
       </div>
 
-      {groupedReports.length > 0 ? (
+      {groupedReports.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {groupedReports.map((group) => (
             <div key={group.label}>
@@ -232,15 +198,14 @@ export default function ReportsView() {
                 {group.reports.map((report) => {
                   const color = getAvatarColor(report.id);
                   const initial = getReportInitial(report.title);
+                  const creatorName = report.creator
+                    ? `${report.creator.firstName} ${report.creator.lastName}`.trim()
+                    : "Unknown";
 
                   return (
                     <div
                       key={report.id}
-                      onClick={() =>
-                        navigate(
-                          `/ask?threadId=${encodeURIComponent(report.threadId)}&messageId=${encodeURIComponent(report.id)}`
-                        )
-                      }
+                      onClick={() => navigate(`/reports/${report.id}`)}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -298,9 +263,13 @@ export default function ReportsView() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {report.subtitle}
+                          {creatorName}
                         </div>
                       </div>
+
+                      {report.status === "draft" && (
+                        <Lock size={12} style={{ color: "#6B665C", flexShrink: 0 }} />
+                      )}
 
                       <span
                         style={{
@@ -310,7 +279,7 @@ export default function ReportsView() {
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {formatTime(report.createdAt)}
+                        {formatTime(report.updatedAt)}
                       </span>
                     </div>
                   );
@@ -319,37 +288,16 @@ export default function ReportsView() {
             </div>
           ))}
         </div>
-      ) : (
-        <div style={{ paddingTop: 40 }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "48px 0",
-              borderRadius: 12,
-              border: "0.5px dashed rgba(236, 232, 224, 0.1)",
-            }}
-          >
-            <FileText size={20} style={{ color: "#6B665C", marginBottom: 12 }} />
-            <p style={{ color: "#9B9689", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-              No reports yet
-            </p>
-            <p
-              style={{
-                color: "#6B665C",
-                fontSize: 12,
-                textAlign: "center",
-                maxWidth: 260,
-                lineHeight: 1.5,
-              }}
-            >
-              Generate your first report from the Ask view and it will appear here.
-            </p>
-          </div>
-        </div>
       )}
+
+      <CreateDocumentModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        routeBase="/reports"
+        entityLabel="report"
+        promptPlaceholder="What will your report be about?"
+        defaultTags={["report"]}
+      />
     </div>
   );
 }
