@@ -90,6 +90,7 @@ files:
   - "node_modules/msgpackr-extract/**/*"
   - "node_modules/electron-log/**/*"
   - "node_modules/keytar/**/*"
+  - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
   # Exclude everything else
   - "!src"
   - "!**/*.{ts,tsx,map}"
@@ -104,6 +105,7 @@ asarUnpack:
   - "node_modules/active-win/**/*"
   - "node_modules/msgpackr-extract/**/*"
   - "node_modules/keytar/**/*"
+  - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
 
 # Build artifact configuration
 artifactName: "${productName}-${version}-${arch}.${ext}"
