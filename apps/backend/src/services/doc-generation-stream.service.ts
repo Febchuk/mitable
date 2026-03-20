@@ -55,6 +55,8 @@ interface GenerateStreamParams {
   sessionIds?: string[];
   /** Optional artifact IDs to include as reference material */
   artifactIds?: string[];
+  /** Optional tags applied to the generated document. */
+  tags?: string[];
   /** User's real name for document content (replaces generic placeholders) */
   authorName?: string;
   /** User's IANA timezone (e.g. "America/New_York", "Africa/Lagos"). Used to resolve relative dates like "today" correctly. */
@@ -85,6 +87,7 @@ class DocGenerationStreamService {
       userId,
       sessionIds: hintSessionIds,
       artifactIds,
+      tags,
       authorName,
       timezone,
     } = params;
@@ -107,6 +110,7 @@ class DocGenerationStreamService {
           title: `Generating: ${prompt.slice(0, 60)}...`,
           docType,
           content: "",
+          tags: tags ?? [],
           status: "draft", // We'll update this with content when done
           generationModel: DOC_GEN_CONFIG.TEXT_MODEL,
           generationPromptVersion: 1,

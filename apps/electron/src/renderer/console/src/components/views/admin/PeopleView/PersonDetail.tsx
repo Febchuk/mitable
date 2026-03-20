@@ -1,76 +1,101 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Calendar, Clock, FileText, Search, Video, X, Zap } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
 import { apiRequest } from "@/console/src/services/api";
-import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
-import TaskBreakdownSection from "../../../shared/TaskBreakdownSection";
-import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
-  FileText,
-  Zap,
-  Calendar,
-  X,
-  Clock,
-  Briefcase,
-  Edit,
-  Check,
-  Clipboard,
-  Search,
-  Users,
-} from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import {
-  useDashboardPersonDetail,
-  useUserDrillDown,
   useCategoryActivities,
+  useDashboardPersonDetail,
   useSubscriberActivities,
-  useOrganizationSettings,
+  useUserDrillDown,
 } from "@/console/src/hooks/queries/admin";
 import type {
   DashboardPeriod,
   DashboardPersonDetail as PersonDetailData,
 } from "@/console/src/services/adminService";
-import DrillDownPanel from "../DashboardView/DrillDownPanel";
 import { DocEditor } from "@/console/src/components/editor";
 import { useDocument } from "@/console/src/hooks/queries/documents";
-import { updateSessionSummary, reviseSummary } from "@/console/src/services/monitoringService";
-import AIEditPanel from "@/console/src/components/shared/AIEditPanel";
-import { Badge } from "@/components/ui/badge";
 import { getLocale } from "@/console/src/lib/date";
+import DrillDownPanel from "../DashboardView/DrillDownPanel";
+import ActivityBlock from "../../employee/CalendarView/ActivityBlock";
+import type { WorkBlock } from "../../employee/CalendarView/types";
+import {
+  ACTIVITY_FILTERS,
+  buildActivityChartData,
+  drawActivityChart,
+  DEEP_WORK_COLOR,
+  MEETINGS_COLOR,
+  type ActivityTimeFilter as TimeRange,
+  type ActivityTrendEntry,
+} from "../shared/activityChart";
+import { formatTopLevelDuration } from "../shared/topLevelDuration";
 
 const LABEL_TO_METRIC: Record<string, string> = {
-  "Avg Focus Time": "focus_time",
-  "Active Time": "active_time",
-  "Meeting Time": "meeting_load",
-  "Days Tracked": "days_tracked",
+  "Average Focus Time": "focus_time",
+  "Time In Meetings": "meeting_load",
 };
 
-interface RecentWorkItem {
+const FILTER_TO_PERIOD: Record<TimeRange, DashboardPeriod> = {
+  yesterday: "yesterday",
+  week: "week",
+  month: "month",
+  ytd: "ytd",
+  all: "all",
+};
+
+const TIME_RANGE_LABELS: Record<TimeRange, string> = {
+  yesterday: "Yesterday",
+  week: "Week",
+  month: "Month",
+  ytd: "YTD",
+  all: "All",
+};
+
+const CUSTOMER_COLORS = ["#9B84E8", "#7A6ACB", "#5B4AA7", "#3D3068", "#6A5AAE", "#8876D5"];
+
+const BREAKDOWN_BAR_COLOR = "#9B84E8";
+
+type GranolaBlock = {
   id: string;
-  type: "session" | "doc" | "granola";
+  name: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  description: string | null;
+  subscriberName: string | null;
+  participants: unknown;
+};
+
+type RecentWorkFilter = "all" | "block" | "meeting" | "doc";
+
+interface RecentWorkDocItem {
+  kind: "doc";
+  id: string;
   title: string;
   preview: string;
   fullContent: string;
   date: string;
   time: string;
-  durationMinutes?: number;
-  category?: string;
   docType?: string;
-  taskBreakdown?: Array<{ shortTitle: string; description: string; minutes: number }>;
-  participants?: { name: string; email: string }[];
-  subscriberName?: string;
 }
+
+interface RecentWorkBlockItem {
+  kind: "block" | "meeting";
+  id: string;
+  title: string;
+  preview: string;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  category?: string;
+  subscriberName?: string;
+  participants?: { name: string; email: string }[];
+  block: WorkBlock;
+  blockNumber: number;
+}
+
+type RecentWorkItem = RecentWorkDocItem | RecentWorkBlockItem;
 
 interface PersonViewModel {
   name: string;
@@ -80,466 +105,461 @@ interface PersonViewModel {
   lastActive: string;
   mood: string;
   moodColor: string;
-  metrics: { label: string; value: string; sub: string }[];
-  activities: { id: string; label: string; hours: number; color: string }[];
-  weeklyTrend: { day: string; focus: number; meetings: number; other: number }[];
+  metrics: Array<{ label: string; value: string }>;
+  activities: Array<{ id: string; label: string; minutes: number; hours: number }>;
+  chartEntries: ActivityTrendEntry[];
+  customerBreakdown: Array<{ label: string; value: number; hours: number; color: string }>;
   recentWork: RecentWorkItem[];
-  topTopics: { label: string; count: number }[];
-  customerBreakdown: { label: string; value: number; hours: number; color: string }[];
-  projectBreakdown: { label: string; hours: number; color: string }[];
 }
 
-type TimeRange = "yesterday" | "week" | "month" | "ytd" | "all";
-
-function truncateDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.round(minutes / 6) / 10}h`;
-}
-
-const CATEGORY_COLORS: Record<string, string> = {
-  development: "#6366F1",
-  communication: "#F472B6",
-  research: "#F59E0B",
-  design: "#818CF8",
-  review: "#34D399",
-  documentation: "#60A5FA",
-  other: "#A1A1A1",
+type CustomerTooltipPayload = {
+  label: string;
+  value: number;
+  hours: number;
 };
 
-const SUBSCRIBER_COLORS = [
-  "#6366F1",
-  "#F472B6",
-  "#F59E0B",
-  "#818CF8",
-  "#34D399",
-  "#60A5FA",
-  "#A78BFA",
-  "#FB923C",
-  "#A1A1A1",
-];
+function toPlainText(markdown: string): string {
+  return markdown
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/[*_~`]/g, "")
+    .replace(/^[-•]\s+/gm, "")
+    .replace(/\n+/g, " ")
+    .trim();
+}
 
-const TOPIC_COLORS = [
-  "#6366F1",
-  "#F472B6",
-  "#F59E0B",
-  "#818CF8",
-  "#34D399",
-  "#60A5FA",
-  "#A78BFA",
-  "#FB923C",
-  "#2DD4BF",
-  "#E879F9",
-];
+function formatHours(minutes: number): string {
+  return formatTopLevelDuration(minutes);
+}
 
-function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
-  const u = api.user;
-  const s = api.summary;
-  const days = s.daysTracked || 1;
-  const isSingleDay = range === "yesterday";
+function formatCompactDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (remainder === 0) return `${hours}h`;
+  return `${hours}h ${remainder}m`;
+}
 
-  // For multi-day periods, show per-day averages; for single-day, show totals
-  const divisor = isSingleDay ? 1 : days;
+function formatDateLabel(input: string): string {
+  return new Date(input).toLocaleDateString([], { month: "short", day: "numeric" });
+}
 
-  // If dailyActivities time totals are all 0 but sessions exist, compute from session durations
-  let effectiveWorkMin = s.totalWorkMinutes;
-  let effectiveActiveMin = s.totalActiveMinutes;
-  const effectiveMeetingMin = s.totalMeetingMinutes;
+function formatTimeLabel(input: string): string {
+  return new Date(input).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
-  if (effectiveWorkMin === 0 && effectiveActiveMin === 0 && api.sessionActivities?.length > 0) {
-    const totalSessionMin = api.sessionActivities.reduce(
-      (sum, sess) => sum + (sess.durationMinutes || 0),
-      0
-    );
-    effectiveWorkMin = totalSessionMin;
-    effectiveActiveMin = totalSessionMin;
+function formatLastActive(input?: string | null): string {
+  if (!input) return "—";
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function matchesTimeRange(dateString: string, range: TimeRange): boolean {
+  if (range === "all") return true;
+
+  const date = new Date(dateString);
+  const end = new Date();
+  const start = new Date(end);
+
+  if (range === "yesterday") {
+    start.setDate(end.getDate() - 1);
+  } else if (range === "week") {
+    start.setDate(end.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+  } else if (range === "month") {
+    start.setDate(end.getDate() - 29);
+    start.setHours(0, 0, 0, 0);
+  } else if (range === "ytd") {
+    start.setMonth(0, 1);
+    start.setHours(0, 0, 0, 0);
   }
 
-  const workHours = Math.round((effectiveWorkMin / 60 / divisor) * 10) / 10;
-  const meetingHours = Math.round((effectiveMeetingMin / 60 / divisor) * 10) / 10;
-  const activeHours = Math.round((effectiveActiveMin / 60 / divisor) * 10) / 10;
+  return date >= start && date <= end;
+}
 
-  const periodLabel = {
-    yesterday: "yesterday",
-    week: "this week",
-    month: "this month",
-    ytd: "year to date",
-    all: "all time",
-  }[range];
-  const effectiveWorkPct =
-    effectiveActiveMin > 0 ? Math.round((effectiveWorkMin / effectiveActiveMin) * 100) : 0;
-  const effectiveMeetingPct =
-    effectiveActiveMin > 0 ? Math.round((effectiveMeetingMin / effectiveActiveMin) * 100) : 0;
+function buildAppBreakdown(apps: string[] | null | undefined, durationMinutes: number) {
+  const normalized = (apps || []).filter((app): app is string => Boolean(app));
+  if (!normalized.length || durationMinutes <= 0) return [];
 
-  const moodLabel =
-    effectiveMeetingPct > 50
-      ? "Meeting-heavy"
-      : effectiveWorkPct > 70
-        ? "Focused"
-        : "Collaborative";
+  const base = Math.floor(durationMinutes / normalized.length);
+  const remainder = durationMinutes - base * normalized.length;
+
+  return normalized.map((app, index) => {
+    const minutes = base + (index < remainder ? 1 : 0);
+    return {
+      app,
+      minutes,
+      percentage: Math.max(1, Math.round((minutes / durationMinutes) * 100)),
+    };
+  });
+}
+
+function createWorkBlockFromActivityBlock(block: PersonDetailData["blocks"][number]): {
+  block: WorkBlock;
+  blockNumber: number;
+} {
+  return {
+    block: {
+      id: block.id,
+      startTime: new Date(block.startTime),
+      endTime: block.endTime ? new Date(block.endTime) : null,
+      duration: block.durationMinutes,
+      idleGapBefore: null,
+      summary: block.description || "",
+      captures: [],
+      appBreakdown: buildAppBreakdown(block.apps, block.durationMinutes),
+      taskBreakdown: [],
+      name: block.name || `Block ${block.sequenceNumber}`,
+      status: "ready",
+    },
+    blockNumber: block.sequenceNumber || 1,
+  };
+}
+
+function createWorkBlockFromGranolaBlock(block: GranolaBlock): WorkBlock {
+  const participants = Array.isArray(block.participants)
+    ? (block.participants as { name: string; email: string }[])
+    : [];
+
+  return {
+    id: block.id,
+    startTime: new Date(block.startTime),
+    endTime: block.endTime ? new Date(block.endTime) : null,
+    duration: block.durationMinutes,
+    idleGapBefore: null,
+    summary: block.description || "",
+    captures: [],
+    appBreakdown: [],
+    taskBreakdown: [],
+    name: block.name?.replace(/^\[Granola\]\s*/, "") || "Meeting",
+    status: "ready",
+    source: "granola",
+    participants,
+    subscriberName: block.subscriberName || undefined,
+  };
+}
+
+function buildTrendEntries(api: PersonDetailData): ActivityTrendEntry[] {
+  const hasDailyTotals = api.dailyActivities.some(
+    (day) => day.totalWorkMinutes > 0 || day.totalMeetingMinutes > 0
+  );
+
+  if (hasDailyTotals) {
+    return [...api.dailyActivities].reverse().map((day) => ({
+      date: day.date,
+      workMinutes: day.totalWorkMinutes,
+      meetingMinutes: day.totalMeetingMinutes,
+    }));
+  }
+
+  const totalsByDate = new Map<string, { workMinutes: number; meetingMinutes: number }>();
+  for (const block of api.blocks) {
+    const key = new Date(block.startTime).toISOString().split("T")[0]!;
+    const existing = totalsByDate.get(key) || { workMinutes: 0, meetingMinutes: 0 };
+    if (block.type === "meeting") {
+      existing.meetingMinutes += block.durationMinutes;
+    } else {
+      existing.workMinutes += block.durationMinutes;
+    }
+    totalsByDate.set(key, existing);
+  }
+
+  return [...totalsByDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, totals]) => ({
+      date,
+      workMinutes: totals.workMinutes,
+      meetingMinutes: totals.meetingMinutes,
+    }));
+}
+
+function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
+  const daysTracked = api.summary.daysTracked || 1;
+  const divisor = range === "yesterday" ? 1 : daysTracked;
+
+  let effectiveWorkMinutes = api.summary.totalWorkMinutes;
+  let effectiveMeetingMinutes = api.summary.totalMeetingMinutes;
+  let effectiveActiveMinutes = api.summary.totalActiveMinutes;
+
+  if (
+    effectiveWorkMinutes === 0 &&
+    effectiveMeetingMinutes === 0 &&
+    effectiveActiveMinutes === 0 &&
+    api.blocks.length > 0
+  ) {
+    for (const block of api.blocks) {
+      if (block.type === "meeting") {
+        effectiveMeetingMinutes += block.durationMinutes;
+      } else {
+        effectiveWorkMinutes += block.durationMinutes;
+      }
+    }
+    effectiveActiveMinutes = effectiveWorkMinutes + effectiveMeetingMinutes;
+  }
+
+  const workPct =
+    effectiveActiveMinutes > 0
+      ? Math.round((effectiveWorkMinutes / effectiveActiveMinutes) * 100)
+      : 0;
+  const meetingPct =
+    effectiveActiveMinutes > 0
+      ? Math.round((effectiveMeetingMinutes / effectiveActiveMinutes) * 100)
+      : 0;
+
+  const moodLabel = meetingPct > 50 ? "Meeting-heavy" : workPct > 70 ? "Focused" : "Collaborative";
   const moodColor =
-    effectiveMeetingPct > 50
+    meetingPct > 50
       ? "bg-yellow-500/15 text-yellow-400"
-      : effectiveWorkPct > 70
+      : workPct > 70
         ? "bg-emerald/15 text-emerald"
         : "bg-indigo/15 text-indigo-light";
 
-  // Aggregate activity breakdown from period-filtered dailyActivities (respects time filter)
   const categoryMinutes = new Map<string, number>();
   for (const day of api.dailyActivities) {
-    for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
-      categoryMinutes.set(c.category, (categoryMinutes.get(c.category) || 0) + c.minutes);
+    for (const entry of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
+      categoryMinutes.set(
+        entry.category,
+        (categoryMinutes.get(entry.category) || 0) + entry.minutes
+      );
     }
   }
 
-  // Fall back to session-level classifications when dailyActivities have no meaningful category data
-  const totalCategoryMinutes = [...categoryMinutes.values()].reduce((s, v) => s + v, 0);
-  if (totalCategoryMinutes === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
-    categoryMinutes.clear();
-    for (const session of api.sessionActivities) {
-      for (const act of session.activities || []) {
-        const cat = act.category || "Other";
-        categoryMinutes.set(cat, (categoryMinutes.get(cat) || 0) + (act.minutes || 0));
-      }
+  if (categoryMinutes.size === 0) {
+    for (const block of api.blocks) {
+      if (!block.category) continue;
+      categoryMinutes.set(
+        block.category,
+        (categoryMinutes.get(block.category) || 0) + block.durationMinutes
+      );
     }
   }
 
   const activities = [...categoryMinutes.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([cat, mins]) => ({
-      id: cat.toLowerCase(),
-      label: cat.charAt(0).toUpperCase() + cat.slice(1),
-      hours: Math.round((mins / 60) * 10) / 10,
-      color: CATEGORY_COLORS[cat.toLowerCase()] || CATEGORY_COLORS.other,
+    .map(([category, minutes]) => ({
+      id: category.toLowerCase(),
+      label: category.charAt(0).toUpperCase() + category.slice(1),
+      minutes,
+      hours: Math.round((minutes / 60) * 10) / 10,
     }));
 
   if (activities.length === 0) {
     activities.push(
-      { id: "work", label: "Work", hours: workHours, color: "#6366F1" },
-      { id: "meetings", label: "Meetings", hours: meetingHours, color: "#F59E0B" }
+      {
+        id: "focus",
+        label: "Focus",
+        minutes: effectiveWorkMinutes,
+        hours: Math.round((effectiveWorkMinutes / 60) * 10) / 10,
+      },
+      {
+        id: "meetings",
+        label: "Meetings",
+        minutes: effectiveMeetingMinutes,
+        hours: Math.round((effectiveMeetingMinutes / 60) * 10) / 10,
+      }
     );
   }
 
-  // Build trend — fall back to session durations when dailyActivities time fields are 0
-  const dailyTotalsAreZero = api.dailyActivities.every(
-    (d) => d.totalWorkMinutes === 0 && d.totalMeetingMinutes === 0
-  );
-  let trend: PersonViewModel["weeklyTrend"];
-
-  if (dailyTotalsAreZero && api.sessionActivities?.length > 0) {
-    // Group session minutes by date
-    const sessionMinByDate = new Map<string, number>();
-    for (const sess of api.sessionActivities) {
-      const dateKey = new Date(sess.startedAt).toISOString().split("T")[0]!;
-      sessionMinByDate.set(
-        dateKey,
-        (sessionMinByDate.get(dateKey) || 0) + (sess.durationMinutes || 0)
-      );
-    }
-    // Merge with dailyActivities dates (to keep the date range correct)
-    const allDates = new Set([
-      ...api.dailyActivities.map((d) => d.date),
-      ...sessionMinByDate.keys(),
-    ]);
-    trend = [...allDates].sort().map((date) => ({
-      day: date,
-      focus: Math.round(((sessionMinByDate.get(date) || 0) / 60) * 10) / 10,
-      meetings: 0,
-      other: 0,
-    }));
-  } else {
-    trend = api.dailyActivities
-      .map((d) => ({
-        day: d.date,
-        focus: Math.round((d.totalWorkMinutes / 60) * 10) / 10,
-        meetings: Math.round((d.totalMeetingMinutes / 60) * 10) / 10,
-        other: 0,
-      }))
-      .reverse();
-  }
-
-  // Build recent work items from session summaries + user docs
-  const recentWork: RecentWorkItem[] = [];
-
-  // Add session summaries
-  if (api.sessionActivities && api.sessionActivities.length > 0) {
-    for (const session of api.sessionActivities) {
-      const sessionDate = new Date(session.startedAt);
-      const dateStr = sessionDate.toLocaleDateString([], { month: "short", day: "numeric" });
-      const timeStr = sessionDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      const fullContent = session.summary || session.sessionName || "Work session";
-      // Strip markdown for the plain-text preview (first ~150 chars)
-      const plainText = fullContent
-        .replace(/^#{1,6}\s+/gm, "")
-        .replace(/\*\*([^*]+)\*\*/g, "$1")
-        .replace(/[*_~`]/g, "")
-        .replace(/^[-•]\s+/gm, "")
-        .replace(/\n+/g, " ")
-        .trim();
-      const preview = plainText.length > 150 ? plainText.slice(0, 150) + "…" : plainText;
-
-      // Determine primary category from classified activities
-      const catCounts = new Map<string, number>();
-      for (const act of session.activities || []) {
-        if (act.category) catCounts.set(act.category, (catCounts.get(act.category) || 0) + 1);
-      }
-      const topCat = [...catCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-
-      recentWork.push({
-        id: session.sessionId,
-        type: "session",
-        title: session.sessionName || "Work Session",
-        preview,
-        fullContent,
-        date: dateStr,
-        time: timeStr,
-        durationMinutes: session.durationMinutes,
-        category: topCat,
-        taskBreakdown: session.taskBreakdown || [],
-      });
-    }
-  }
-
-  // Add user-created documents
-  if (api.documents && api.documents.length > 0) {
-    for (const doc of api.documents) {
-      const docDate = new Date(doc.createdAt);
-      const dateStr = docDate.toLocaleDateString([], { month: "short", day: "numeric" });
-      const timeStr = docDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      const plainText = (doc.content || "")
-        .replace(/^#{1,6}\s+/gm, "")
-        .replace(/\*\*([^*]+)\*\*/g, "$1")
-        .replace(/[*_~`]/g, "")
-        .replace(/^[-•]\s+/gm, "")
-        .replace(/\n+/g, " ")
-        .trim();
-      const preview = plainText.length > 150 ? plainText.slice(0, 150) + "…" : plainText;
-
-      recentWork.push({
-        id: doc.id,
-        type: "doc",
-        title: doc.title,
-        preview,
-        fullContent: doc.content,
-        date: dateStr,
-        time: timeStr,
-        docType: doc.docType,
-      });
-    }
-  }
-
-  // Sort all by date descending (most recent first)
-  recentWork.sort((a, b) => {
-    const da = new Date(`${a.date} ${a.time}`).getTime();
-    const db = new Date(`${b.date} ${b.time}`).getTime();
-    return db - da;
-  });
-
-  // Aggregate top topics from period-filtered dailyActivities (respects time filter)
-  const topicCounts = new Map<string, number>();
-  for (const day of api.dailyActivities) {
-    for (const c of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
-      const label = c.category.charAt(0).toUpperCase() + c.category.slice(1);
-      topicCounts.set(label, (topicCounts.get(label) || 0) + Math.round(c.minutes / 30));
-    }
-  }
-
-  // Fall back to session-level classifications when dailyActivities have no meaningful topic data
-  const totalTopicCounts = [...topicCounts.values()].reduce((s, v) => s + v, 0);
-  if (totalTopicCounts === 0 && api.sessionActivities && api.sessionActivities.length > 0) {
-    topicCounts.clear();
-    for (const session of api.sessionActivities) {
-      for (const act of session.activities || []) {
-        const label = act.category || "Other";
-        topicCounts.set(label, (topicCounts.get(label) || 0) + 1);
-      }
-    }
-  }
-
-  const topTopics: PersonViewModel["topTopics"] = [...topicCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([label, count]) => ({ label, count }));
-
-  // Aggregate subscriber (customer) breakdown from dailyActivities or API-provided distribution
   const subscriberMinutes = new Map<string, number>();
-  if (api.subscriberDistribution && api.subscriberDistribution.length > 0) {
-    for (const s of api.subscriberDistribution) {
-      subscriberMinutes.set(s.subscriberName, s.totalMinutes);
+  if (api.subscriberDistribution?.length) {
+    for (const entry of api.subscriberDistribution) {
+      subscriberMinutes.set(entry.subscriberName, entry.totalMinutes);
     }
   } else {
     for (const day of api.dailyActivities) {
-      for (const s of (day.subscriberBreakdown || []) as {
+      for (const entry of (day.subscriberBreakdown || []) as {
         subscriberName: string;
         minutes: number;
       }[]) {
-        if (s.subscriberName)
-          subscriberMinutes.set(
-            s.subscriberName,
-            (subscriberMinutes.get(s.subscriberName) || 0) + s.minutes
-          );
+        if (!entry.subscriberName) continue;
+        subscriberMinutes.set(
+          entry.subscriberName,
+          (subscriberMinutes.get(entry.subscriberName) || 0) + entry.minutes
+        );
       }
     }
   }
 
-  const totalSubMin = [...subscriberMinutes.values()].reduce((a, b) => a + b, 0);
-  const customerBreakdown: PersonViewModel["customerBreakdown"] = [...subscriberMinutes.entries()]
+  const totalCustomerMinutes = [...subscriberMinutes.values()].reduce(
+    (sum, value) => sum + value,
+    0
+  );
+  const customerBreakdown = [...subscriberMinutes.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([label, mins], i) => ({
+    .map(([label, minutes], index) => ({
       label,
-      value: totalSubMin > 0 ? Math.round((mins / totalSubMin) * 100) : 0,
-      hours: Math.round((mins / 60) * 10) / 10,
-      color: SUBSCRIBER_COLORS[i % SUBSCRIBER_COLORS.length]!,
+      value: totalCustomerMinutes > 0 ? Math.round((minutes / totalCustomerMinutes) * 100) : 0,
+      hours: Math.round((minutes / 60) * 10) / 10,
+      color: CUSTOMER_COLORS[index % CUSTOMER_COLORS.length] || CUSTOMER_COLORS[0],
     }));
 
-  // Aggregate topic (project) breakdown from dailyActivities or API-provided distribution
-  const topicMinutes = new Map<string, number>();
-  if (api.topicDistribution && api.topicDistribution.length > 0) {
-    for (const t of api.topicDistribution) {
-      topicMinutes.set(t.topicName, t.totalMinutes);
-    }
-  } else {
-    for (const day of api.dailyActivities) {
-      for (const t of (day.topicBreakdown || []) as { topicName: string; minutes: number }[]) {
-        if (t.topicName)
-          topicMinutes.set(t.topicName, (topicMinutes.get(t.topicName) || 0) + t.minutes);
-      }
-    }
+  const recentWork: RecentWorkItem[] = [];
+
+  for (const block of [...api.blocks].sort(
+    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+  )) {
+    if (block.type !== "work") continue;
+
+    const adapted = createWorkBlockFromActivityBlock(block);
+    const previewSource =
+      block.description ||
+      (block.apps?.length ? `Worked across ${block.apps.join(", ")}` : block.name || "");
+
+    recentWork.push({
+      kind: "block",
+      id: block.id,
+      title: block.name || `Block ${block.sequenceNumber}`,
+      preview: toPlainText(previewSource),
+      date: formatDateLabel(block.startTime),
+      time: formatTimeLabel(block.startTime),
+      durationMinutes: block.durationMinutes,
+      category: block.category || undefined,
+      block: adapted.block,
+      blockNumber: adapted.blockNumber,
+    });
   }
 
-  const projectBreakdown: PersonViewModel["projectBreakdown"] = [...topicMinutes.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([label, mins], i) => ({
-      label,
-      hours: Math.round((mins / 60) * 10) / 10,
-      color: TOPIC_COLORS[i % TOPIC_COLORS.length]!,
-    }));
+  for (const doc of api.documents) {
+    recentWork.push({
+      kind: "doc",
+      id: doc.id,
+      title: doc.title,
+      preview: toPlainText(doc.content || doc.description || ""),
+      fullContent: doc.content,
+      date: formatDateLabel(doc.createdAt),
+      time: formatTimeLabel(doc.createdAt),
+      docType: doc.docType,
+    });
+  }
+
+  recentWork.sort((a, b) => {
+    const dateA = new Date(`${a.date} ${a.time}`).getTime();
+    const dateB = new Date(`${b.date} ${b.time}`).getTime();
+    return dateB - dateA;
+  });
+
+  const latestActivityAt =
+    [...api.blocks].sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    )[0]?.startTime ||
+    api.documents[0]?.createdAt ||
+    api.sessionActivities[0]?.startedAt ||
+    null;
 
   return {
-    name: u.name,
-    role: u.role || "Employee",
-    email: u.email,
+    name: api.user.name,
+    role: api.user.jobTitle || api.user.role || "Employee",
+    email: api.user.email,
     startDate: "—",
-    lastActive: s.daysTracked > 0 ? "Today" : "—",
+    lastActive: formatLastActive(latestActivityAt),
     mood: moodLabel,
     moodColor,
     metrics: [
       {
-        label: "Avg Focus Time",
-        value: `${workHours}h`,
-        sub: isSingleDay ? periodLabel : `per day ${periodLabel}`,
+        label: "Average Focus Time",
+        value: formatHours(effectiveWorkMinutes / divisor),
       },
       {
-        label: "Active Time",
-        value: `${activeHours}h`,
-        sub: isSingleDay ? periodLabel : `avg/day ${periodLabel}`,
+        label: "Time In Meetings",
+        value: formatHours(effectiveMeetingMinutes / divisor),
       },
-      {
-        label: "Meeting Time",
-        value: `${meetingHours}h`,
-        sub: isSingleDay ? periodLabel : `avg/day ${periodLabel}`,
-      },
-      { label: "Days Tracked", value: `${s.daysTracked}`, sub: periodLabel },
     ],
     activities,
-    weeklyTrend: trend.length > 0 ? trend : [{ day: "—", focus: 0, meetings: 0, other: 0 }],
-    recentWork,
-    topTopics: topTopics.length > 0 ? topTopics : [{ label: "No data", count: 0 }],
+    chartEntries: buildTrendEntries(api),
     customerBreakdown,
-    projectBreakdown,
+    recentWork,
   };
 }
 
-const timeRangeToPeriod: Record<TimeRange, DashboardPeriod> = {
-  yesterday: "yesterday",
-  week: "week",
-  month: "month",
-  ytd: "ytd",
-  all: "all",
-};
+function RecentWorkIcon({ kind }: { kind: RecentWorkFilter }) {
+  const icon = kind === "doc" ? <FileText size={18} /> : <Video size={18} />;
 
-function ChartTooltipCustom({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
   return (
-    <div className="bg-canvas-overlay border border-stroke-subtle rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
-      <p className="text-text-primary font-medium">{label}</p>
-      {payload.map((entry: any) => (
-        <div key={entry.name} className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-          <span className="text-text-secondary">
-            {entry.name}: {entry.value}h
-          </span>
-        </div>
-      ))}
+    <div
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        border: "0.5px solid rgba(236, 232, 224, 0.08)",
+        background: "rgba(236, 232, 224, 0.04)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#9B9689",
+        flexShrink: 0,
+      }}
+    >
+      {icon}
     </div>
   );
 }
 
-const timeRangeLabels: Record<TimeRange, string> = {
-  yesterday: "Yesterday",
-  week: "This Week",
-  month: "This Month",
-  ytd: "Year to Date",
-  all: "All Time",
-};
+function CustomerWorkTooltip({ active, payload }: TooltipProps<number, string>) {
+  const entry = payload?.[0]?.payload as CustomerTooltipPayload | undefined;
+  if (!active || !entry) return null;
+
+  return (
+    <div className="bg-canvas-overlay border border-stroke-subtle rounded-lg px-3 py-2 text-xs shadow-lg">
+      <span className="text-text-primary font-medium">{entry.label}</span>
+      <span className="text-text-secondary ml-2">
+        {entry.hours}h ({entry.value}%)
+      </span>
+    </div>
+  );
+}
 
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedWork, setSelectedWork] = useState<RecentWorkItem | null>(null);
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
-  const [workFilter, setWorkFilter] = useState<"all" | "session" | "doc" | "granola">("all");
-  const [workSearchQuery, setWorkSearchQuery] = useState("");
   const [selectedSubscriber, setSelectedSubscriber] = useState<string | null>(null);
-  const [isEditingSummary, setIsEditingSummary] = useState(false);
-  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [selectedWork, setSelectedWork] = useState<RecentWorkBlockItem | null>(null);
+  const [workFilter, setWorkFilter] = useState<RecentWorkFilter>("all");
+  const [workSearchQuery, setWorkSearchQuery] = useState("");
 
-  const { data: orgSettings } = useOrganizationSettings();
-  const showCustomer = orgSettings?.settings?.showCustomerBreakdown !== false;
-  const showTopic = orgSettings?.settings?.showTopicBreakdown !== false;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { data: apiDetail } = useDashboardPersonDetail(id || "", timeRangeToPeriod[timeRange]);
+  const { data: apiDetail } = useDashboardPersonDetail(id || "", FILTER_TO_PERIOD[timeRange]);
   const { data: drillDownData } = useUserDrillDown(
     id || "",
     drillDownMetric,
-    timeRangeToPeriod[timeRange]
+    FILTER_TO_PERIOD[timeRange]
   );
   const { data: categoryData } = useCategoryActivities(
     id || "",
     selectedCategory,
-    timeRangeToPeriod[timeRange]
+    FILTER_TO_PERIOD[timeRange]
   );
   const { data: subscriberData } = useSubscriberActivities(
     id || "",
     selectedSubscriber,
-    timeRangeToPeriod[timeRange]
+    FILTER_TO_PERIOD[timeRange]
   );
   const { data: docData, isLoading: docLoading } = useDocument(selectedDocId || "");
 
-  // Fetch Granola meeting blocks for this user (admin can query any user)
   const { data: granolaData } = useQuery({
     queryKey: ["granola-blocks", id],
     queryFn: () =>
-      apiRequest<{
-        blocks: {
-          id: string;
-          name: string;
-          startTime: string;
-          endTime: string;
-          durationMinutes: number;
-          description: string | null;
-          subscriberName: string | null;
-          participants: unknown;
-        }[];
-      }>(`/integrations/granola/blocks?userId=${id}`),
+      apiRequest<{ blocks: GranolaBlock[] }>(`/integrations/granola/blocks?userId=${id}`),
     enabled: !!id,
   });
 
   const handleDrillDown = (label: string) => {
     const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
-    // If it's a known metric card, use org-style drill-down; otherwise it's a category
     if (LABEL_TO_METRIC[label]) {
       setSelectedCategory(null);
       setDrillDownMetric(metricKey);
@@ -559,87 +579,107 @@ export default function PersonDetail() {
     if (!apiDetail) return null;
     const vm = transformApiToPersonViewModel(apiDetail, timeRange);
 
-    // Inject Granola meeting blocks into recentWork
-    if (granolaData?.blocks?.length) {
-      for (const b of granolaData.blocks) {
-        const d = new Date(b.startTime);
-        const dateStr = d.toLocaleDateString([], { month: "short", day: "numeric" });
-        const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-        const title = b.name?.replace(/^\[Granola\]\s*/, "") || "Meeting";
-        const plainPreview = (b.description || "")
-          .replace(/^#{1,6}\s+/gm, "")
-          .replace(/\*\*([^*]+)\*\*/g, "$1")
-          .replace(/[*_~`]/g, "")
-          .replace(/^[-•]\s+/gm, "")
-          .replace(/\n+/g, " ")
-          .trim();
-        const participants = Array.isArray(b.participants)
-          ? (b.participants as { name: string; email: string }[])
-          : [];
+    for (const block of granolaData?.blocks || []) {
+      if (!matchesTimeRange(block.startTime, timeRange)) continue;
+      const workBlock = createWorkBlockFromGranolaBlock(block);
+      const preview = toPlainText(block.description || "");
 
-        vm.recentWork.push({
-          id: b.id,
-          type: "granola",
-          title,
-          preview: plainPreview.length > 150 ? plainPreview.slice(0, 150) + "…" : plainPreview,
-          fullContent: b.description || "",
-          date: dateStr,
-          time: timeStr,
-          category: "Meeting",
-          participants,
-          subscriberName: b.subscriberName || undefined,
-        });
-      }
-
-      // Re-sort by date descending
-      vm.recentWork.sort((a, b) => {
-        const da = new Date(`${a.date} ${a.time}`).getTime();
-        const db = new Date(`${b.date} ${b.time}`).getTime();
-        return db - da;
+      vm.recentWork.push({
+        kind: "meeting",
+        id: block.id,
+        title: workBlock.name || "Meeting",
+        preview,
+        date: formatDateLabel(block.startTime),
+        time: formatTimeLabel(block.startTime),
+        durationMinutes: block.durationMinutes,
+        category: "Meeting",
+        subscriberName: block.subscriberName || undefined,
+        participants: workBlock.participants,
+        block: workBlock,
+        blockNumber: 0,
       });
     }
 
+    vm.recentWork.sort((a, b) => {
+      const dateA = new Date(`${a.date} ${a.time}`).getTime();
+      const dateB = new Date(`${b.date} ${b.time}`).getTime();
+      return dateB - dateA;
+    });
+
     return vm;
-  }, [apiDetail, timeRange, granolaData]);
+  }, [apiDetail, granolaData, timeRange]);
+
+  const chartData = useMemo(() => {
+    if (!person) return [];
+    return buildActivityChartData(person.chartEntries, timeRange);
+  }, [person, timeRange]);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    drawActivityChart(canvasRef.current, chartData);
+  }, [chartData]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (canvasRef.current) {
+        drawActivityChart(canvasRef.current, chartData);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [chartData]);
 
   if (!person) {
     return (
-      <div className="h-screen overflow-y-auto p-8 pb-16 space-y-6">
+      <div style={{ height: "100vh", overflowY: "auto", padding: "32px 36px" }}>
         <button
           onClick={() => navigate("/people")}
-          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            background: "none",
+            border: "none",
+            padding: 0,
+            color: "#9B9689",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
         >
-          <ArrowLeft size={16} />
-          <span className="text-sm">Back to People</span>
+          <ArrowLeft size={15} />
+          Back to People
         </button>
-        <div className="flex items-center justify-center py-24">
-          <div className="text-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-3" />
-            <p className="text-sm text-text-secondary">Loading activity data...</p>
+
+        <div style={{ display: "flex", justifyContent: "center", padding: "120px 0" }}>
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                margin: "0 auto 12px",
+                borderRadius: "50%",
+                border: "2px solid rgba(155, 132, 232, 0.35)",
+                borderTopColor: "#9B84E8",
+                animation: "spin 1s linear infinite",
+              }}
+            />
+            <p style={{ fontSize: 13, color: "#6B665C", margin: 0 }}>Loading activity data...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  const totalActivityHours = person.activities.reduce((s, a) => s + a.hours, 0);
-
-  // Inline read-only doc viewer
   if (selectedDocId) {
-    const DOC_TYPE_LABELS: Record<string, string> = {
+    const docTypeLabels: Record<string, string> = {
       "how-to": "How-To Guide",
       "knowledge-article": "Knowledge Article",
       troubleshooting: "Troubleshooting Guide",
     };
-    const DOC_STATUS_COLORS: Record<string, string> = {
-      draft: "bg-yellow-500/20 text-yellow-400",
-      published: "bg-green-500/20 text-green-400",
-      archived: "bg-gray-500/20 text-gray-400",
-    };
 
     return (
       <div className="h-screen flex flex-col">
-        {/* Doc header */}
         <div className="flex items-start justify-between p-6 border-b border-border-subtle">
           <div className="flex items-center gap-4">
             <button
@@ -649,8 +689,8 @@ export default function PersonDetail() {
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileText size={20} className="text-primary" />
+              <div className="w-10 h-10 rounded-lg bg-canvas-overlay flex items-center justify-center">
+                <FileText size={20} className="text-text-secondary" />
               </div>
               <div>
                 {docLoading ? (
@@ -662,12 +702,12 @@ export default function PersonDetail() {
                     </h2>
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="text-text-secondary text-sm">
-                        {DOC_TYPE_LABELS[docData?.docType || ""] || docData?.docType}
+                        {docTypeLabels[docData?.docType || ""] || docData?.docType}
                       </span>
                       {docData?.status && (
-                        <Badge className={DOC_STATUS_COLORS[docData.status] || ""}>
+                        <span className="text-[10px] text-text-secondary bg-canvas-overlay px-2 py-1 rounded-full uppercase tracking-[0.08em]">
                           {docData.status}
-                        </Badge>
+                        </span>
                       )}
                     </div>
                   </>
@@ -680,7 +720,6 @@ export default function PersonDetail() {
           </span>
         </div>
 
-        {/* Metadata bar */}
         {docData && (
           <div className="flex items-center gap-6 text-sm px-6 py-3 border-b border-border-subtle bg-background-secondary/30">
             <div className="flex items-center gap-2 text-text-secondary">
@@ -697,18 +736,9 @@ export default function PersonDetail() {
                 </span>
               </span>
             </div>
-            {docData.creator && (
-              <div className="text-text-secondary">
-                By:{" "}
-                <span className="text-text-primary">
-                  {docData.creator.firstName} {docData.creator.lastName}
-                </span>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Read-only editor */}
         <div className="flex-1 overflow-auto bg-background-primary">
           {docLoading ? (
             <div className="flex items-center justify-center py-24">
@@ -730,730 +760,840 @@ export default function PersonDetail() {
     );
   }
 
-  // Full-page session summary view — AI Edit mode (reuses AIEditPanel)
-  if (selectedWork && selectedWork.type === "session" && isEditingSummary) {
+  if (selectedWork) {
     return (
-      <AIEditPanel
-        title="Edit Summary"
-        subtitle={selectedWork.title}
-        initialContent={selectedWork.fullContent}
-        onSave={async (content: string) => {
-          const result = await updateSessionSummary(selectedWork.id, content);
-          setSelectedWork({
-            ...selectedWork,
-            fullContent: content,
-            taskBreakdown: result.taskBreakdown || selectedWork.taskBreakdown,
-          });
-          setIsEditingSummary(false);
-        }}
-        onAutoSave={async (content: string) => {
-          const result = await updateSessionSummary(selectedWork.id, content);
-          setSelectedWork((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  fullContent: content,
-                  taskBreakdown: result.taskBreakdown ?? prev.taskBreakdown,
-                }
-              : prev
-          );
-        }}
-        onCancel={() => setIsEditingSummary(false)}
-        onRevise={async (instruction: string, currentContent: string) => {
-          return reviseSummary(selectedWork.id, instruction, currentContent);
-        }}
-        placeholder="Edit the session summary..."
-        contextLabel="session summary"
-        sessionId={selectedWork.id}
-      />
-    );
-  }
+      <div style={{ height: "100vh", overflowY: "auto", padding: "32px 36px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <button
+            onClick={() => setSelectedWork(null)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "#9B9689",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            <ArrowLeft size={15} />
+            Back to Recent Work
+          </button>
 
-  // Full-page session summary view — read mode (like doc viewer)
-  if (selectedWork && selectedWork.type === "session") {
-    const handleCopySummary = async () => {
-      await navigator.clipboard.writeText(selectedWork.fullContent);
-      setCopiedSummary(true);
-      setTimeout(() => setCopiedSummary(false), 2000);
-    };
-
-    return (
-      <div className="h-screen flex flex-col">
-        {/* Session header */}
-        <div className="flex items-start justify-between p-6 border-b border-border-subtle">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => {
-                setSelectedWork(null);
-                setIsEditingSummary(false);
+          <div>
+            <h1
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 26,
+                color: "#ECE8E0",
+                fontWeight: 400,
+                letterSpacing: "-0.3px",
+                margin: 0,
               }}
-              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
             >
-              <ArrowLeft size={20} />
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald/10 flex items-center justify-center">
-                <Zap size={20} className="text-emerald" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-text-primary">{selectedWork.title}</h2>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-text-secondary text-sm">
-                    {selectedWork.date}, {selectedWork.time}
-                  </span>
-                  {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
-                    <span className="text-text-secondary text-sm">
-                      · {truncateDuration(selectedWork.durationMinutes)}
-                    </span>
-                  )}
-                  {selectedWork.category && (
-                    <Badge className="bg-canvas-overlay text-text-secondary text-[10px]">
-                      {selectedWork.category}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
+              {selectedWork.title}
+            </h1>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#6B665C" }}>
+              {selectedWork.date}, {selectedWork.time}
+              {selectedWork.durationMinutes > 0
+                ? ` · ${formatCompactDuration(selectedWork.durationMinutes)}`
+                : ""}
+            </p>
           </div>
-        </div>
 
-        {/* Summary content */}
-        <div className="flex-1 overflow-auto bg-background-primary">
-          <div className="max-w-3xl mx-auto px-8 py-6">
-            {/* Summary heading + actions */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-text-primary">Summary</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCopySummary}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
-                >
-                  {copiedSummary ? (
-                    <>
-                      <Check size={14} className="text-emerald" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Clipboard size={14} />
-                      Copy
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => setIsEditingSummary(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
-                >
-                  <Edit size={14} />
-                  Edit
-                </button>
-              </div>
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#6B665C",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 10,
+              }}
+            >
+              {selectedWork.kind === "meeting" ? "Meetings" : "Activity"}
             </div>
-
-            {/* Task breakdown accordion or fallback to markdown */}
-            {selectedWork.taskBreakdown && selectedWork.taskBreakdown.length > 0 ? (
-              <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50">
-                <TaskBreakdownSection
-                  tasks={selectedWork.taskBreakdown}
-                  totalDuration={selectedWork.durationMinutes || 0}
-                />
-              </div>
-            ) : (
-              <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
-                <DocEditor
-                  key={selectedWork.id}
-                  initialContent={selectedWork.fullContent}
-                  readOnly
-                  showToolbar={false}
-                  placeholder=""
-                  className="h-full"
-                />
-              </div>
-            )}
+            <ActivityBlock
+              block={selectedWork.block}
+              blockNumber={selectedWork.blockNumber}
+              defaultExpanded
+            />
           </div>
         </div>
       </div>
     );
   }
 
-  // Full-page meeting notes view (Granola meetings)
-  if (selectedWork && selectedWork.type === "granola") {
-    const handleCopyMeeting = async () => {
-      await navigator.clipboard.writeText(selectedWork.fullContent);
-      setCopiedSummary(true);
-      setTimeout(() => setCopiedSummary(false), 2000);
-    };
+  const totalActivityMinutes = person.activities.reduce((sum, entry) => sum + entry.minutes, 0);
+  const showCustomerWork = person.customerBreakdown.length > 0;
 
-    return (
-      <div className="h-screen flex flex-col">
-        {/* Meeting header */}
-        <div className="flex items-start justify-between p-6 border-b border-border-subtle">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => {
-                setSelectedWork(null);
-              }}
-              className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-canvas-overlay transition-colors"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div className="flex items-center gap-3">
-              <GranolaIcon size="md" />
-              <div>
-                <h2 className="text-xl font-bold text-text-primary">{selectedWork.title}</h2>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-text-secondary text-sm">
-                    {selectedWork.date}, {selectedWork.time}
-                  </span>
-                  {selectedWork.durationMinutes != null && selectedWork.durationMinutes > 0 && (
-                    <span className="text-text-secondary text-sm">
-                      · {truncateDuration(selectedWork.durationMinutes)}
-                    </span>
-                  )}
-                  <span className="text-[10px] font-medium text-[#C8E64A] bg-[#C8E64A]/10 px-1.5 py-0.5 rounded">
-                    Meeting
-                  </span>
-                  {selectedWork.subscriberName && (
-                    <Badge className="bg-canvas-overlay text-text-secondary text-[10px]">
-                      {selectedWork.subscriberName}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+  const filteredRecentWork = person.recentWork.filter((item) => {
+    const query = workSearchQuery.trim().toLowerCase();
+    const matchesFilter =
+      workFilter === "all" ||
+      (workFilter === "doc" && item.kind === "doc") ||
+      (workFilter === "meeting" && item.kind === "meeting") ||
+      (workFilter === "block" && item.kind === "block");
 
-        {/* Meeting notes content */}
-        <div className="flex-1 overflow-auto bg-background-primary">
-          <div className="max-w-3xl mx-auto px-8 py-6">
-            {/* Participants */}
-            {selectedWork.participants && selectedWork.participants.length > 0 && (
-              <div className="flex items-center gap-2 mb-4 text-sm text-text-secondary">
-                <Users size={14} className="text-text-tertiary shrink-0" />
-                <span className="truncate">
-                  {selectedWork.participants.map((p) => p.name || p.email).join(", ")}
-                </span>
-              </div>
-            )}
+    const matchesQuery =
+      !query ||
+      item.title.toLowerCase().includes(query) ||
+      item.preview.toLowerCase().includes(query) ||
+      ("category" in item && item.category ? item.category.toLowerCase().includes(query) : false) ||
+      ("subscriberName" in item && item.subscriberName
+        ? item.subscriberName.toLowerCase().includes(query)
+        : false);
 
-            {/* Heading + copy */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-text-primary">Meeting Notes</h3>
-              <button
-                onClick={handleCopyMeeting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-canvas-overlay border border-stroke-subtle transition-colors"
-              >
-                {copiedSummary ? (
-                  <>
-                    <Check size={14} className="text-emerald" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Clipboard size={14} />
-                    Copy
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Rendered markdown content */}
-            <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay/50 p-5">
-              <DocEditor
-                key={selectedWork.id}
-                initialContent={selectedWork.fullContent}
-                readOnly
-                showToolbar={false}
-                placeholder=""
-                className="h-full"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    return matchesFilter && matchesQuery;
+  });
 
   return (
     <div className="relative h-screen overflow-hidden">
-      <div className="h-full overflow-y-auto p-8 pb-16 space-y-6">
-        {/* Back button */}
+      <div
+        style={{
+          height: "100%",
+          overflowY: "auto",
+          padding: "32px 36px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 32,
+        }}
+      >
         <button
           onClick={() => navigate("/people")}
-          className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            width: "fit-content",
+            background: "none",
+            border: "none",
+            padding: 0,
+            color: "#9B9689",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
         >
-          <ArrowLeft size={16} />
-          <span className="text-sm">Back to People</span>
+          <ArrowLeft size={15} />
+          Back to People
         </button>
 
-        {/* User header + time filter */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-indigo/20 flex items-center justify-center text-lg font-semibold text-indigo-light">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 20,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div
+              style={{
+                width: 54,
+                height: 54,
+                borderRadius: 999,
+                background: "rgba(155, 132, 232, 0.12)",
+                color: "#9B84E8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 17,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
               {person.name
                 .split(" ")
-                .map((n) => n[0])
-                .join("")}
+                .filter(Boolean)
+                .map((part) => part[0])
+                .join("")
+                .slice(0, 2)}
             </div>
+
             <div>
-              <h1 className="text-3xl font-bold text-text-primary">{person.name}</h1>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-sm text-text-secondary">{person.role}</span>
-                <span className="text-text-tertiary">·</span>
+              <h1
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontSize: 26,
+                  color: "#ECE8E0",
+                  fontWeight: 400,
+                  letterSpacing: "-0.3px",
+                  margin: 0,
+                }}
+              >
+                {person.name}
+              </h1>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginTop: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span style={{ fontSize: 13, color: "#9B9689" }}>{person.role}</span>
                 <span
                   className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${person.moodColor}`}
                 >
                   {person.mood}
                 </span>
-                <span className="text-text-tertiary">·</span>
-                <span className="flex items-center gap-1 text-xs text-text-secondary">
-                  <Zap size={10} className="text-emerald" />
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 12,
+                    color: "#9B9689",
+                  }}
+                >
+                  <Zap size={11} style={{ color: "#54705F" }} />
                   {person.lastActive}
                 </span>
               </div>
-              <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
-                <span className="flex items-center gap-1">
-                  <Calendar size={10} />
-                  Started {person.startDate}
-                </span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: "#6B665C",
+                  flexWrap: "wrap",
+                }}
+              >
                 <span>{person.email}</span>
+                <span style={{ opacity: 0.5 }}>•</span>
+                <span>Started {person.startDate}</span>
               </div>
             </div>
           </div>
 
-          {/* Time filter */}
-          <div className="flex items-center rounded-lg bg-canvas-overlay border border-stroke-subtle p-0.5 self-center">
-            {(Object.keys(timeRangeLabels) as TimeRange[]).map((key) => (
+          <div
+            style={{
+              display: "flex",
+              gap: 1,
+              background: "rgba(236, 232, 224, 0.05)",
+              borderRadius: 7,
+              padding: 3,
+              flexShrink: 0,
+            }}
+          >
+            {ACTIVITY_FILTERS.map((filter) => (
               <button
-                key={key}
-                onClick={() => setTimeRange(key)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-normal ${
-                  timeRange === key
-                    ? "bg-indigo text-white shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
+                key={filter.key}
+                onClick={() => setTimeRange(filter.key)}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 5,
+                  fontSize: 11,
+                  fontFamily: "var(--font-sans)",
+                  color: timeRange === filter.key ? "#ECE8E0" : "#9B9689",
+                  background: timeRange === filter.key ? "#2A2824" : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
-                {key === "ytd"
-                  ? "YTD"
-                  : key === "all"
-                    ? "All"
-                    : timeRangeLabels[key].replace("This ", "")}
+                {filter.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Metric cards */}
-        <div className="grid grid-cols-4 gap-4">
-          {person.metrics.map((m) => (
-            <div
-              key={m.label}
-              onClick={() => handleDrillDown(m.label)}
-              className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-4 cursor-pointer hover:border-indigo/40 transition-colors"
+        <div style={{ display: "flex", gap: 56, alignItems: "flex-end", padding: "0 2px" }}>
+          {person.metrics.map((metric) => (
+            <button
+              key={metric.label}
+              onClick={() => handleDrillDown(metric.label)}
+              style={{
+                textAlign: "left",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+              }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-              <div className="relative">
-                <p className="text-[10px] font-medium text-text-tertiary uppercase tracking-wider">
-                  {m.label}
-                </p>
-                <p className="text-2xl font-bold text-text-primary mt-1">{m.value}</p>
-                <p className="text-xs text-text-secondary mt-0.5">{m.sub}</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "#6B665C",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.09em",
+                    fontFamily: "var(--font-sans)",
+                  }}
+                >
+                  {metric.label}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-serif)",
+                    fontSize: 48,
+                    color: "#ECE8E0",
+                    fontWeight: 300,
+                    letterSpacing: -2,
+                    lineHeight: 1,
+                  }}
+                >
+                  {metric.value}
+                </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* Customer / Client + Project / Topic breakdown */}
-        {(showCustomer || showTopic) &&
-          (person.customerBreakdown.length > 0 || person.projectBreakdown.length > 0) && (
-            <div className="grid grid-cols-2 gap-4">
-              {/* Customer / Client breakdown (donut) */}
-              {showCustomer && person.customerBreakdown.length > 0 && (
-                <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-                  <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-                    Customer / Client
-                    <span className="text-text-secondary font-normal ml-2">
-                      {timeRangeLabels[timeRange]}
-                    </span>
-                  </h3>
-                  <div className="relative flex items-center gap-6">
-                    <div className="w-[140px] h-[140px] shrink-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={person.customerBreakdown}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={40}
-                            outerRadius={65}
-                            dataKey="value"
-                            strokeWidth={0}
-                          >
-                            {person.customerBreakdown.map((entry, i) => (
-                              <Cell key={i} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            content={({ active, payload }: any) => {
-                              if (!active || !payload?.length) return null;
-                              const { label, value, hours } = payload[0].payload;
-                              return (
-                                <div className="bg-canvas-overlay border border-stroke-subtle rounded-lg px-3 py-2 text-xs shadow-lg">
-                                  <span className="text-text-primary font-medium">{label}</span>
-                                  <span className="text-text-secondary ml-2">
-                                    {hours}h ({value}%)
-                                  </span>
-                                </div>
-                              );
-                            }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      {person.customerBreakdown.map((entry) => (
-                        <div
-                          key={entry.label}
-                          onClick={() => {
-                            setDrillDownMetric(null);
-                            setSelectedCategory(null);
-                            setSelectedSubscriber(entry.label);
-                          }}
-                          className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2.5 h-2.5 rounded-full shrink-0"
-                              style={{ backgroundColor: entry.color }}
-                            />
-                            <span className="text-xs text-text-primary">{entry.label}</span>
-                          </div>
-                          <span className="text-xs text-text-secondary">
-                            {entry.hours}h ({entry.value}%)
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: showCustomerWork
+              ? "minmax(0, 1fr) minmax(0, 1fr)"
+              : "minmax(0, 1fr)",
+            gap: 16,
+          }}
+        >
+          {showCustomerWork && (
+            <div
+              style={{
+                background: "#211F1B",
+                border: "0.5px solid rgba(236, 232, 224, 0.07)",
+                borderRadius: 12,
+                padding: "22px 24px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginBottom: 18,
+                  gap: 12,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.09em",
+                    color: "#9B9689",
+                    fontFamily: "var(--font-sans)",
+                  }}
+                >
+                  Customer Work
+                </span>
+              </div>
 
-              {/* Project / Topic breakdown (bar list) */}
-              {showTopic && person.projectBreakdown.length > 0 && (
-                <div className="relative rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-                  <h3 className="text-sm font-semibold text-text-primary mb-4">
-                    Projects / Topics
-                    <span className="text-text-secondary font-normal ml-2">
-                      {timeRangeLabels[timeRange]}
-                    </span>
-                  </h3>
-                  <div className="space-y-3 max-h-[320px] overflow-y-auto overflow-x-hidden pr-1">
-                    {person.projectBreakdown.map((project) => {
-                      const maxHours = person.projectBreakdown[0]?.hours || 1;
-                      return (
-                        <div key={project.label}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-text-primary">{project.label}</span>
-                            <span className="text-xs text-text-secondary">{project.hours}h</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-canvas-overlay overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-normal"
-                              style={{
-                                width: `${maxHours > 0 ? (project.hours / maxHours) * 100 : 0}%`,
-                                backgroundColor: project.color,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 24, minHeight: 180 }}>
+                <div style={{ width: 156, height: 156, flexShrink: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={person.customerBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={44}
+                        outerRadius={70}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
+                        {person.customerBreakdown.map((entry, index) => (
+                          <Cell
+                            key={entry.label}
+                            fill={entry.color || CUSTOMER_COLORS[index % CUSTOMER_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomerWorkTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              )}
+
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {person.customerBreakdown.map((entry) => (
+                    <button
+                      key={entry.label}
+                      onClick={() => {
+                        setDrillDownMetric(null);
+                        setSelectedCategory(null);
+                        setSelectedSubscriber(entry.label);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        width: "100%",
+                        padding: "8px 0",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: 16,
+                            height: 3,
+                            borderRadius: 999,
+                            background: entry.color,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 13,
+                            color: "#ECE8E0",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {entry.label}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 12, color: "#9B9689", flexShrink: 0 }}>
+                        {entry.hours}h ({entry.value}%)
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
-        {/* Activity breakdown + Weekly trend */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Activity breakdown */}
-          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-              Activity Breakdown
-              <span className="text-text-secondary font-normal ml-2">
-                {timeRangeLabels[timeRange]}
+          <div
+            style={{
+              background: "#211F1B",
+              border: "0.5px solid rgba(236, 232, 224, 0.07)",
+              borderRadius: 12,
+              padding: "22px 24px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: 18,
+                gap: 12,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.09em",
+                  color: "#9B9689",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                Activity Breakdown
               </span>
-            </h3>
-            <div className="relative flex h-3 rounded-full overflow-hidden mb-4">
-              {person.activities.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    width: `${totalActivityHours > 0 ? (a.hours / totalActivityHours) * 100 : 0}%`,
-                    backgroundColor: a.color,
-                  }}
-                />
-              ))}
             </div>
-            <div className="relative space-y-2">
-              {person.activities.map((a) => (
-                <div
-                  key={a.id}
-                  onClick={() => handleDrillDown(a.label)}
-                  className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-canvas-overlay transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: a.color }}
-                    />
-                    <span className="text-xs text-text-primary">{a.label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-text-secondary">{a.hours}h</span>
-                    <span className="text-[10px] text-text-tertiary w-7 text-right">
-                      {totalActivityHours > 0
-                        ? Math.round((a.hours / totalActivityHours) * 100)
-                        : 0}
-                      %
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Weekly trend */}
-          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-            <h3 className="relative text-sm font-semibold text-text-primary mb-4">
-              Weekly Trend
-              <span className="text-text-secondary font-normal ml-2">Hours per day</span>
-            </h3>
-            <div className="relative h-[180px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={person.weeklyTrend} barGap={2}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#A1A1A1", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={30}
-                  />
-                  <Tooltip
-                    content={<ChartTooltipCustom />}
-                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                  />
-                  <Bar
-                    dataKey="focus"
-                    name="Focus"
-                    fill="#6366F1"
-                    radius={[3, 3, 0, 0]}
-                    stackId="a"
-                  />
-                  <Bar
-                    dataKey="meetings"
-                    name="Meetings"
-                    fill="#F59E0B"
-                    radius={[0, 0, 0, 0]}
-                    stackId="a"
-                  />
-                  <Bar
-                    dataKey="other"
-                    name="Other"
-                    fill="#818CF8"
-                    radius={[3, 3, 0, 0]}
-                    stackId="a"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                maxHeight: 232,
+                overflowY: "auto",
+                paddingRight: 4,
+              }}
+            >
+              {person.activities.map((activity) => {
+                const percentage =
+                  totalActivityMinutes > 0
+                    ? Math.round((activity.minutes / totalActivityMinutes) * 100)
+                    : 0;
+                return (
+                  <button
+                    key={activity.id}
+                    onClick={() => handleDrillDown(activity.label)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      width: "100%",
+                      minWidth: 0,
+                      padding: 0,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <span
+                      style={{
+                        flex: "0 1 120px",
+                        minWidth: 0,
+                        fontSize: 13,
+                        color: "#9B9689",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {activity.label}
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            height: 3,
+                            borderRadius: 999,
+                            background: "rgba(236, 232, 224, 0.06)",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${percentage}%`,
+                              height: "100%",
+                              borderRadius: 999,
+                              background: BREAKDOWN_BAR_COLOR,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span style={{ fontSize: 11, color: "#6B665C", textAlign: "right" }}>
+                          {formatCompactDuration(activity.minutes)}
+                        </span>
+                        <span
+                          style={{
+                            minWidth: 34,
+                            fontSize: 11,
+                            color: "#6B665C",
+                            textAlign: "right",
+                          }}
+                        >
+                          {percentage}%
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* Recent work */}
-        <div>
-          <div className="relative overflow-hidden rounded-xl border border-stroke-subtle bg-canvas-raised p-5">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none rounded-xl" />
-            <div className="relative space-y-3 mb-4">
-              <h3 className="text-sm font-semibold text-text-primary">
-                Recent Work
-                <span className="text-text-secondary font-normal ml-2">
-                  What they've been doing
-                </span>
-              </h3>
-              <div className="flex items-center justify-between gap-3">
-                <div className="relative flex-1 max-w-xs">
-                  <Search
-                    size={14}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none"
-                  />
-                  <input
-                    type="text"
-                    value={workSearchQuery}
-                    onChange={(e) => setWorkSearchQuery(e.target.value)}
-                    placeholder="Filter by topic or customer..."
-                    className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-canvas-overlay border border-stroke-subtle text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-indigo/50 transition-colors"
-                  />
-                  {workSearchQuery && (
-                    <button
-                      onClick={() => setWorkSearchQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 bg-canvas-overlay rounded-lg p-0.5 shrink-0">
-                  {(["all", "session", "granola", "doc"] as const).map((f) => {
-                    const label =
-                      f === "all"
-                        ? "All"
-                        : f === "session"
-                          ? "Blocks"
-                          : f === "granola"
-                            ? "Meetings"
-                            : "Docs";
-                    const count =
-                      f === "all"
-                        ? person.recentWork.length
-                        : person.recentWork.filter((w) => w.type === f).length;
-                    return (
-                      <button
-                        key={f}
-                        onClick={() => setWorkFilter(f)}
-                        className={`text-[11px] px-2.5 py-1 rounded-md transition-colors ${
-                          workFilter === f
-                            ? "bg-canvas-raised text-text-primary font-medium shadow-sm"
-                            : "text-text-tertiary hover:text-text-secondary"
-                        }`}
-                      >
-                        {label}
-                        {count > 0 ? ` (${count})` : ""}
-                      </button>
-                    );
-                  })}
-                </div>
+        <div
+          style={{
+            background: "#211F1B",
+            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            borderRadius: 12,
+            padding: "22px 24px 16px",
+            minHeight: 320,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 20,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.09em",
+                color: "#9B9689",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              Active Time
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div
+                  style={{
+                    width: 20,
+                    height: 3,
+                    borderRadius: 1.5,
+                    background: DEEP_WORK_COLOR,
+                  }}
+                />
+                <span style={{ fontSize: 11, color: "#9B9689" }}>Deep work</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div
+                  style={{
+                    width: 20,
+                    height: 3,
+                    borderRadius: 1.5,
+                    background: MEETINGS_COLOR,
+                  }}
+                />
+                <span style={{ fontSize: 11, color: "#9B9689" }}>Meetings</span>
               </div>
             </div>
-            {(() => {
-              const query = workSearchQuery.toLowerCase().trim();
-              const filtered = person.recentWork.filter((w) => {
-                const matchesType = workFilter === "all" || w.type === workFilter;
-                const matchesSearch =
-                  !query ||
-                  w.title.toLowerCase().includes(query) ||
-                  w.preview.toLowerCase().includes(query) ||
-                  (w.category && w.category.toLowerCase().includes(query));
-                return matchesType && matchesSearch;
-              });
-              return (
-                <div className="relative space-y-1 max-h-[440px] overflow-y-auto pr-1">
-                  {filtered.length === 0 ? (
-                    <p className="text-sm text-text-tertiary py-4 text-center">
-                      {query
-                        ? `No results for "${workSearchQuery}"`
-                        : workFilter === "all"
-                          ? "No activity yet"
-                          : `No ${workFilter === "doc" ? "documents" : "blocks"} yet`}
+          </div>
+
+          <div style={{ flex: 1, minHeight: 240 }}>
+            <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: "#211F1B",
+            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            borderRadius: 12,
+            padding: "22px 24px",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 18 }}>
+            <h2
+              style={{
+                margin: 0,
+                fontFamily: "var(--font-serif)",
+                fontSize: 24,
+                fontWeight: 400,
+                color: "#ECE8E0",
+                letterSpacing: "-0.2px",
+              }}
+            >
+              Recent Work
+            </h2>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+              }}
+            >
+              <div style={{ position: "relative", flex: 1, maxWidth: 340 }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: "absolute",
+                    left: 12,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "#6B665C",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={workSearchQuery}
+                  onChange={(e) => setWorkSearchQuery(e.target.value)}
+                  placeholder="Filter by title, category, or customer..."
+                  style={{
+                    width: "100%",
+                    height: 36,
+                    padding: "0 34px 0 34px",
+                    borderRadius: 8,
+                    border: "0.5px solid rgba(236, 232, 224, 0.08)",
+                    background: "#1A1916",
+                    color: "#ECE8E0",
+                    fontSize: 12,
+                    outline: "none",
+                  }}
+                />
+                {workSearchQuery ? (
+                  <button
+                    onClick={() => setWorkSearchQuery("")}
+                    style={{
+                      position: "absolute",
+                      right: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      border: "none",
+                      background: "none",
+                      padding: 0,
+                      color: "#6B665C",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                ) : null}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 1,
+                  background: "rgba(236, 232, 224, 0.05)",
+                  borderRadius: 7,
+                  padding: 3,
+                  flexShrink: 0,
+                }}
+              >
+                {(
+                  [
+                    { key: "all", label: "All" },
+                    { key: "block", label: "Blocks" },
+                    { key: "meeting", label: "Meetings" },
+                    { key: "doc", label: "Docs" },
+                  ] as Array<{ key: RecentWorkFilter; label: string }>
+                ).map((filter) => {
+                  const count =
+                    filter.key === "all"
+                      ? person.recentWork.length
+                      : person.recentWork.filter((item) => item.kind === filter.key).length;
+
+                  return (
+                    <button
+                      key={filter.key}
+                      onClick={() => setWorkFilter(filter.key)}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 5,
+                        fontSize: 11,
+                        color: workFilter === filter.key ? "#ECE8E0" : "#9B9689",
+                        background: workFilter === filter.key ? "#2A2824" : "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {filter.label}
+                      {count > 0 ? ` (${count})` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {filteredRecentWork.length === 0 ? (
+              <p
+                style={{
+                  margin: 0,
+                  padding: "16px 0",
+                  fontSize: 13,
+                  color: "#6B665C",
+                  textAlign: "center",
+                }}
+              >
+                {workSearchQuery
+                  ? `No results for "${workSearchQuery}"`
+                  : "No recent work for this view"}
+              </p>
+            ) : (
+              filteredRecentWork.map((item) => (
+                <button
+                  key={`${item.kind}-${item.id}`}
+                  onClick={() =>
+                    item.kind === "doc" ? setSelectedDocId(item.id) : setSelectedWork(item)
+                  }
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 14,
+                    padding: "14px 0",
+                    background: "none",
+                    border: "none",
+                    borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <RecentWorkIcon kind={item.kind === "doc" ? "doc" : "block"} />
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                    >
+                      <span style={{ fontSize: 14, color: "#ECE8E0", fontWeight: 500 }}>
+                        {item.title}
+                      </span>
+                      {item.kind === "meeting" ? (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: "#9B9689",
+                            background: "rgba(236, 232, 224, 0.06)",
+                            borderRadius: 999,
+                            padding: "3px 8px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                          }}
+                        >
+                          Meeting
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <p
+                      style={{ margin: "6px 0 0", fontSize: 12, color: "#9B9689", lineHeight: 1.5 }}
+                    >
+                      {item.preview || "No preview available"}
                     </p>
-                  ) : (
-                    filtered.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() =>
-                          item.type === "doc" ? setSelectedDocId(item.id) : setSelectedWork(item)
-                        }
-                        className="w-full text-left flex items-start gap-3 py-3 px-2 -mx-2 rounded-lg border border-transparent hover:border-stroke-subtle hover:bg-canvas-overlay/50 transition-colors cursor-pointer"
-                      >
-                        {item.type === "granola" ? (
-                          <GranolaIcon size="sm" />
-                        ) : (
-                          <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                              item.type === "doc"
-                                ? "text-indigo-light bg-indigo/15"
-                                : "text-emerald bg-emerald/15"
-                            }`}
-                          >
-                            {item.type === "doc" ? <FileText size={14} /> : <Zap size={14} />}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-text-primary truncate">
-                            {item.title}
-                          </p>
-                          <p className="text-xs text-text-secondary mt-0.5 line-clamp-2 leading-relaxed">
-                            {item.preview}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-text-tertiary">
-                              {item.date}, {item.time}
-                            </span>
-                            {item.type === "granola" && (
-                              <span className="text-[9px] font-medium text-[#C8E64A] bg-[#C8E64A]/10 px-1.5 py-0.5 rounded">
-                                Meeting
-                              </span>
-                            )}
-                            {item.type !== "granola" && item.category && (
-                              <span className="text-[9px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
-                                {item.category}
-                              </span>
-                            )}
-                            {item.docType && (
-                              <span className="text-[9px] font-medium text-indigo-light bg-indigo/10 px-1.5 py-0.5 rounded">
-                                {item.docType}
-                              </span>
-                            )}
-                            {item.durationMinutes != null && item.durationMinutes > 0 && (
-                              <span className="text-[9px] text-text-tertiary">
-                                {truncateDuration(item.durationMinutes)}
-                              </span>
-                            )}
-                            {item.participants && item.participants.length > 0 && (
-                              <span className="flex items-center gap-1 text-[9px] text-text-tertiary">
-                                <Users size={9} />
-                                {item.participants.map((p) => p.name).join(", ")}
-                              </span>
-                            )}
-                            {item.subscriberName && (
-                              <span className="text-[9px] font-medium text-[#C8E64A] bg-[#C8E64A]/10 px-1.5 py-0.5 rounded">
-                                {item.subscriberName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              );
-            })()}
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        marginTop: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 11, color: "#6B665C" }}>
+                        {item.date}, {item.time}
+                      </span>
+                      {"durationMinutes" in item ? (
+                        <span style={{ fontSize: 11, color: "#6B665C" }}>
+                          {formatCompactDuration(item.durationMinutes)}
+                        </span>
+                      ) : null}
+                      {"category" in item && item.category ? (
+                        <span style={{ fontSize: 11, color: "#6B665C" }}>{item.category}</span>
+                      ) : null}
+                      {"subscriberName" in item && item.subscriberName ? (
+                        <span style={{ fontSize: 11, color: "#6B665C" }}>
+                          {item.subscriberName}
+                        </span>
+                      ) : null}
+                      {"docType" in item && item.docType ? (
+                        <span style={{ fontSize: 11, color: "#6B665C" }}>{item.docType}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>
 
-      {/* Metric drill-down overlay (org-style — for metric cards) */}
       {drillDownMetric && drillDownData && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
           <DrillDownPanel data={drillDownData} onClose={closeDrillDown} />
         </div>
       )}
 
-      {/* Subscriber activity list panel (per-user — for customer breakdown) */}
       {selectedSubscriber && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
           <div className="flex flex-col h-full rounded-xl border border-stroke-subtle bg-canvas-raised overflow-hidden">
-            {/* Header */}
             <div className="px-5 py-4 border-b border-stroke-subtle shrink-0">
               <div className="flex items-center justify-between">
                 <button
@@ -1473,12 +1613,11 @@ export default function PersonDetail() {
               <h2 className="text-lg font-semibold text-text-primary mt-2">{selectedSubscriber}</h2>
               <p className="text-xs text-text-secondary mt-0.5">
                 {subscriberData
-                  ? `${subscriberData.totalHours}h across ${subscriberData.activityCount} activities · ${timeRangeLabels[timeRange]}`
+                  ? `${subscriberData.totalHours}h across ${subscriberData.activityCount} activities · ${TIME_RANGE_LABELS[timeRange]}`
                   : "Loading..."}
               </p>
             </div>
 
-            {/* Activity list */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {!subscriberData ? (
                 <div className="flex items-center justify-center py-12">
@@ -1491,19 +1630,7 @@ export default function PersonDetail() {
               ) : (
                 subscriberData.activities.map((act) => {
                   const date = new Date(act.startTime);
-                  const dateStr = date.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
-                  const timeStr = date.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  });
-                  const hours = Math.floor(act.durationMinutes / 60);
-                  const mins = act.durationMinutes % 60;
-                  const duration =
-                    hours > 0 ? `${hours}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
+                  const duration = formatCompactDuration(act.durationMinutes);
 
                   return (
                     <div
@@ -1512,18 +1639,8 @@ export default function PersonDetail() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2.5 min-w-0">
-                          <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                              act.blockType === "meeting"
-                                ? "text-yellow-400 bg-yellow-500/15"
-                                : "text-indigo-light bg-indigo/15"
-                            }`}
-                          >
-                            {act.blockType === "meeting" ? (
-                              <Calendar size={14} />
-                            ) : (
-                              <Briefcase size={14} />
-                            )}
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-text-secondary bg-canvas-overlay">
+                            <Video size={14} />
                           </div>
                           <div className="min-w-0">
                             <p className="text-[13px] font-medium text-text-primary leading-snug">
@@ -1543,7 +1660,16 @@ export default function PersonDetail() {
                       <div className="flex items-center gap-2 mt-2 ml-[38px]">
                         <span className="text-[10px] text-text-tertiary flex items-center gap-1">
                           <Clock size={10} />
-                          {dateStr}, {timeStr}
+                          {date.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          ,{" "}
+                          {date.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
                         </span>
                         {act.category && (
                           <span className="text-[9px] font-medium text-text-tertiary bg-canvas-overlay px-1.5 py-0.5 rounded">
@@ -1560,11 +1686,9 @@ export default function PersonDetail() {
         </div>
       )}
 
-      {/* Category activity list panel (per-user — for activity breakdown) */}
       {selectedCategory && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
           <div className="flex flex-col h-full rounded-xl border border-stroke-subtle bg-canvas-raised overflow-hidden">
-            {/* Header */}
             <div className="px-5 py-4 border-b border-stroke-subtle shrink-0">
               <div className="flex items-center justify-between">
                 <button
@@ -1586,12 +1710,11 @@ export default function PersonDetail() {
               </h2>
               <p className="text-xs text-text-secondary mt-0.5">
                 {categoryData
-                  ? `${categoryData.totalHours}h across ${categoryData.activityCount} activities · ${timeRangeLabels[timeRange]}`
+                  ? `${categoryData.totalHours}h across ${categoryData.activityCount} activities · ${TIME_RANGE_LABELS[timeRange]}`
                   : "Loading..."}
               </p>
             </div>
 
-            {/* Activity list */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {!categoryData ? (
                 <div className="flex items-center justify-center py-12">
@@ -1604,19 +1727,7 @@ export default function PersonDetail() {
               ) : (
                 categoryData.activities.map((act) => {
                   const date = new Date(act.startTime);
-                  const dateStr = date.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
-                  const timeStr = date.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  });
-                  const hours = Math.floor(act.durationMinutes / 60);
-                  const mins = act.durationMinutes % 60;
-                  const duration =
-                    hours > 0 ? `${hours}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
+                  const duration = formatCompactDuration(act.durationMinutes);
 
                   return (
                     <div
@@ -1625,18 +1736,8 @@ export default function PersonDetail() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2.5 min-w-0">
-                          <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                              act.blockType === "meeting"
-                                ? "text-yellow-400 bg-yellow-500/15"
-                                : "text-indigo-light bg-indigo/15"
-                            }`}
-                          >
-                            {act.blockType === "meeting" ? (
-                              <Calendar size={14} />
-                            ) : (
-                              <Briefcase size={14} />
-                            )}
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-text-secondary bg-canvas-overlay">
+                            <Video size={14} />
                           </div>
                           <div className="min-w-0">
                             <p className="text-[13px] font-medium text-text-primary leading-snug">
@@ -1656,7 +1757,16 @@ export default function PersonDetail() {
                       <div className="flex items-center gap-2 mt-2 ml-[38px]">
                         <span className="text-[10px] text-text-tertiary flex items-center gap-1">
                           <Clock size={10} />
-                          {dateStr}, {timeStr}
+                          {date.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          ,{" "}
+                          {date.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
                         </span>
                       </div>
                     </div>

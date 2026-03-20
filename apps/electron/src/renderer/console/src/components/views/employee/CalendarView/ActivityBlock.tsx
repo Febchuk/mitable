@@ -279,23 +279,16 @@ export default function ActivityBlock({
           cursor: "pointer",
         }}
       >
-        {isMeeting ? (
-          isGranola ? (
-            <GranolaLogo size={22} />
-          ) : (
-            <FirefliesLogo size={22} />
-          )
-        ) : (
-          <ChevronRight
-            size={13}
-            style={{
-              color: isExpanded ? accentColor : "#6B665C",
-              transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-              transition: "transform 0.15s ease",
-              flexShrink: 0,
-            }}
-          />
-        )}
+        <ChevronRight
+          size={13}
+          style={{
+            color: isExpanded ? accentColor : "#6B665C",
+            transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+            transition: "transform 0.15s ease",
+            flexShrink: 0,
+          }}
+        />
+        {isMeeting && (isGranola ? <GranolaLogo size={22} /> : <FirefliesLogo size={22} />)}
 
         {isMeeting ? (
           <span

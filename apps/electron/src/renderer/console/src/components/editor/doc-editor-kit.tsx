@@ -17,7 +17,6 @@ import { BlockMenuKit } from "@/components/editor/plugins/block-menu-kit";
 import { CodeBlockKit } from "@/components/editor/plugins/code-block-kit";
 import { CursorOverlayKit } from "@/components/editor/plugins/cursor-overlay-kit";
 import { ExitBreakKit } from "@/components/editor/plugins/exit-break-kit";
-import { FixedToolbarKit } from "@/components/editor/plugins/fixed-toolbar-kit";
 import { FloatingToolbarKit } from "@/components/editor/plugins/floating-toolbar-kit";
 import { LinkKit } from "@/components/editor/plugins/link-kit";
 import { ListKit } from "@/components/editor/plugins/list-kit";
@@ -70,7 +69,6 @@ export const DocEditorKit = [
   ...MarkdownKit,
 
   // UI
-  ...FixedToolbarKit,
   ...FloatingToolbarKit,
 ];
 

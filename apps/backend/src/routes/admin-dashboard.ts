@@ -95,19 +95,19 @@ function resolveDateRange(period: string): {
     case "today":
       return { startDate: todayStr, endDate: todayStr, periodType: "daily" };
     case "week": {
-      const monday = new Date(today);
-      const dayOfWeek = monday.getDay();
-      monday.setDate(monday.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       return {
-        startDate: monday.toISOString().split("T")[0]!,
+        startDate: sevenDaysAgo.toISOString().split("T")[0]!,
         endDate: todayStr,
         periodType: "daily",
       };
     }
     case "month": {
-      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       return {
-        startDate: firstOfMonth.toISOString().split("T")[0]!,
+        startDate: thirtyDaysAgo.toISOString().split("T")[0]!,
         endDate: todayStr,
         periodType: "daily",
       };

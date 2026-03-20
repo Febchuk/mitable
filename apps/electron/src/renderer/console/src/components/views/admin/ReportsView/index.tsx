@@ -1,27 +1,303 @@
-import { FileText } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, AlertCircle, Plus, Lock } from "lucide-react";
+import { useDocuments } from "@/console/src/hooks/queries/documents";
+import CreateDocumentModal from "../../employee/DocsView/dialogs/CreateDocumentModal";
+import type { Document } from "@mitable/shared";
+
+function isReportDocument(doc: Document): boolean {
+  return doc.tags?.includes("report") ?? false;
+}
+
+function groupReportsByDate(reports: Document[]) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+  const groups: { label: string; reports: Document[] }[] = [
+    { label: "Today", reports: [] },
+    { label: "Yesterday", reports: [] },
+    { label: "This week", reports: [] },
+    { label: "Earlier", reports: [] },
+  ];
+
+  reports.forEach((report) => {
+    const updatedAt = new Date(report.updatedAt);
+    const reportDay = new Date(updatedAt.getFullYear(), updatedAt.getMonth(), updatedAt.getDate());
+
+    if (reportDay.getTime() >= today.getTime()) {
+      groups[0].reports.push(report);
+    } else if (reportDay.getTime() >= yesterday.getTime()) {
+      groups[1].reports.push(report);
+    } else if (reportDay.getTime() >= weekAgo.getTime()) {
+      groups[2].reports.push(report);
+    } else {
+      groups[3].reports.push(report);
+    }
+  });
+
+  return groups.filter((group) => group.reports.length > 0);
+}
+
+function formatTime(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+const REPORT_AVATAR_COLORS = ["#9B84E8", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
+
+function getAvatarColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return REPORT_AVATAR_COLORS[Math.abs(hash) % REPORT_AVATAR_COLORS.length];
+}
+
+function getReportInitial(title: string): string {
+  return (title || "R").charAt(0).toUpperCase();
+}
 
 export default function ReportsView() {
+  const navigate = useNavigate();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { data, isLoading, error } = useDocuments();
+  const reports = useMemo(() => {
+    const documents = data?.documents || [];
+    return documents.filter((doc) => isReportDocument(doc));
+  }, [data?.documents]);
+
+  const groupedReports = useMemo(() => groupReportsByDate(reports), [reports]);
+
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "80px 0",
+        }}
+      >
+        <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
+        <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading reports...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "80px 0",
+        }}
+      >
+        <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
+        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>Failed to load reports</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full overflow-y-auto p-6 flex flex-col gap-4">
-      <div>
-        <h1 className="text-4xl font-bold text-text-primary">Reports</h1>
-        <p className="text-sm text-text-secondary mt-1">Generate and view team reports</p>
+    <div className="app-no-drag" style={{ display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 32,
+              color: "#ECE8E0",
+              fontWeight: 400,
+              letterSpacing: "-0.4px",
+              lineHeight: 1,
+              margin: 0,
+            }}
+          >
+            Reports
+          </h1>
+          <p
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 15,
+              color: "#6B665C",
+              fontWeight: 400,
+              fontStyle: "italic",
+              margin: "12px 0 0",
+            }}
+          >
+            Generate reports on any work done by your team
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "0.5px solid rgba(236, 232, 224, 0.12)",
+            background: "transparent",
+            color: "#ECE8E0",
+            fontSize: 12,
+            fontFamily: "var(--font-sans)",
+            fontWeight: 500,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            transition: "all 0.15s ease",
+            marginTop: 4,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
+            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.2)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+          }}
+        >
+          <Plus size={12} strokeWidth={2} />
+          New
+        </button>
       </div>
 
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-indigo/10 flex items-center justify-center mx-auto">
-            <FileText size={32} className="text-indigo-light" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary">Coming Soon</h2>
-            <p className="text-sm text-text-secondary mt-1 max-w-sm">
-              Team reports will be available here. For now, you can generate reports through the Ask
-              tab.
-            </p>
-          </div>
+      {groupedReports.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {groupedReports.map((group) => (
+            <div key={group.label}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#6B665C",
+                  fontWeight: 500,
+                  marginBottom: 8,
+                }}
+              >
+                {group.label}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {group.reports.map((report) => {
+                  const color = getAvatarColor(report.id);
+                  const initial = getReportInitial(report.title);
+                  const creatorName = report.creator
+                    ? `${report.creator.firstName} ${report.creator.lastName}`.trim()
+                    : "Unknown";
+
+                  return (
+                    <div
+                      key={report.id}
+                      onClick={() => navigate(`/reports/${report.id}`)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        transition: "background 0.12s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(236, 232, 224, 0.04)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 7,
+                          background: `${color}20`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color,
+                        }}
+                      >
+                        {initial}
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: "#ECE8E0",
+                            fontWeight: 500,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {report.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#6B665C",
+                            marginTop: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {creatorName}
+                        </div>
+                      </div>
+
+                      {report.status === "draft" && (
+                        <Lock size={12} style={{ color: "#6B665C", flexShrink: 0 }} />
+                      )}
+
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "#6B665C",
+                          flexShrink: 0,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {formatTime(report.updatedAt)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
+
+      <CreateDocumentModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        routeBase="/reports"
+        entityLabel="report"
+        promptPlaceholder="What will your report be about?"
+        defaultTags={["report"]}
+      />
     </div>
   );
 }

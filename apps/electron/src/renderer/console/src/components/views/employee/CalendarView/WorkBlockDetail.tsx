@@ -528,30 +528,30 @@ export default function WorkBlockDetail({
                   {/* App bars */}
                   <div className="space-y-2">
                     {block.appBreakdown.map((app) => (
-                      <div key={app.app} className="flex items-center gap-3">
+                      <div key={app.app} className="flex min-w-0 items-center gap-3">
                         {/* App indicator */}
                         <div
                           className={`w-2 h-2 rounded-full flex-shrink-0 ${getAppColor(app.app)}`}
                         />
                         {/* App name */}
-                        <span className="w-20 flex-shrink-0 text-sm text-ink-secondary truncate">
+                        <span className="min-w-0 flex-[0_1_80px] text-sm text-ink-secondary truncate">
                           {app.app}
                         </span>
-                        {/* Progress bar */}
-                        <div className="flex-1 h-2 bg-canvas-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${getAppColor(app.app)}`}
-                            style={{ width: `${app.percentage}%` }}
-                          />
+                        <div className="flex flex-1 min-w-0 items-center gap-3">
+                          {/* Progress bar */}
+                          <div className="flex-1 min-w-0 h-2 bg-canvas-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${getAppColor(app.app)}`}
+                              style={{ width: `${app.percentage}%` }}
+                            />
+                          </div>
+                          <div className="flex flex-shrink-0 items-center gap-3 whitespace-nowrap text-xs text-ink-tertiary tabular-nums">
+                            {/* Duration */}
+                            <span>{formatDuration(app.minutes)}</span>
+                            {/* Percentage */}
+                            <span className="w-10 text-right">{app.percentage}%</span>
+                          </div>
                         </div>
-                        {/* Duration */}
-                        <span className="w-14 flex-shrink-0 text-xs text-ink-tertiary text-right tabular-nums">
-                          {formatDuration(app.minutes)}
-                        </span>
-                        {/* Percentage */}
-                        <span className="w-10 flex-shrink-0 text-xs text-ink-tertiary text-right tabular-nums">
-                          {app.percentage}%
-                        </span>
                       </div>
                     ))}
                   </div>

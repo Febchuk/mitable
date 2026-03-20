@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Clipboard, X, UserPlus, Shield, Mail } from "lucide-react";
 import { createLogger } from "../../../../../../lib/logger";
-
-const logger = createLogger("AddNewUser");
-import { ArrowLeft, Clipboard, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -18,12 +12,138 @@ import {
 import { useCreateUser } from "@/console/src/hooks/queries/admin";
 import { useToast } from "@/hooks/use-toast";
 
+const logger = createLogger("AddNewUser");
+
+function Field({
+  label,
+  required = false,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  helpText,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: string;
+  helpText?: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <label
+        style={{
+          fontSize: 12,
+          fontWeight: 500,
+          color: "#6B665C",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+        }}
+      >
+        {label}
+        {required ? <span style={{ color: "#E87474" }}> *</span> : null}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          height: 40,
+          padding: "0 12px",
+          borderRadius: 8,
+          border: "0.5px solid rgba(236, 232, 224, 0.08)",
+          background: "#1A1916",
+          color: "#ECE8E0",
+          fontSize: 13,
+          outline: "none",
+        }}
+      />
+      {helpText ? (
+        <p style={{ fontSize: 12, color: "#6B665C", margin: 0, lineHeight: 1.5 }}>{helpText}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ToggleRow({
+  icon,
+  title,
+  description,
+  checked,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 14,
+        padding: "14px 16px",
+        borderRadius: 10,
+        border: checked
+          ? "0.5px solid rgba(155, 132, 232, 0.25)"
+          : "0.5px solid rgba(236, 232, 224, 0.08)",
+        background: checked ? "rgba(155, 132, 232, 0.05)" : "#1A1916",
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: checked ? "rgba(155, 132, 232, 0.14)" : "rgba(236, 232, 224, 0.06)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: checked ? "#9B84E8" : "#6B665C",
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>{title}</div>
+        <div style={{ fontSize: 12, color: "#6B665C", marginTop: 4, lineHeight: 1.5 }}>
+          {description}
+        </div>
+      </div>
+
+      <div
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 999,
+          border: checked ? "5px solid #9B84E8" : "1px solid rgba(236, 232, 224, 0.18)",
+          background: checked ? "#1A1916" : "transparent",
+          marginTop: 4,
+          flexShrink: 0,
+        }}
+      />
+    </button>
+  );
+}
+
 export default function AddNewUser() {
   const navigate = useNavigate();
   const createUserMutation = useCreateUser();
   const { toast } = useToast();
 
-  // Form fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -31,7 +151,6 @@ export default function AddNewUser() {
   const [welcomeEmail, setWelcomeEmail] = useState(true);
   const [makeAdmin, setMakeAdmin] = useState(false);
 
-  // Password modal state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [passwordCopied, setPasswordCopied] = useState(false);
@@ -58,7 +177,6 @@ export default function AddNewUser() {
   };
 
   const handleSubmit = async () => {
-    // Validation
     if (!firstName || !lastName) {
       toast({
         title: "Error",
@@ -96,11 +214,8 @@ export default function AddNewUser() {
         makeAdmin,
       });
 
-      // Show password modal with generated password
       setGeneratedPassword(response.initialPassword);
       setShowPasswordModal(true);
-
-      // React Query auto-invalidates the users list via useCreateUser hook
     } catch (error) {
       logger.error("Error creating user:", error);
       toast({
@@ -113,12 +228,11 @@ export default function AddNewUser() {
 
   return (
     <>
-      {/* Password Modal */}
       <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
-        <DialogContent className="max-w-md bg-background-elevated border-border-subtle">
+        <DialogContent className="max-w-md border-border-subtle bg-background-elevated">
           <button
             onClick={handleClosePasswordModal}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100"
           >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
@@ -126,193 +240,299 @@ export default function AddNewUser() {
 
           <DialogHeader>
             <DialogTitle className="text-2xl text-text-primary">
-              User Created Successfully
+              User created successfully
             </DialogTitle>
             <DialogDescription className="text-text-secondary">
               Save this password and send it to the new user. This password will not be shown again.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Warning Box */}
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-              <p className="text-sm text-text-secondary">
-                <strong className="text-text-primary">Important:</strong> Mitable does not save
-                passwords. Make sure to save this password somewhere secure before closing this
-                window.
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div
+              style={{
+                background: "rgba(212, 162, 122, 0.08)",
+                border: "0.5px solid rgba(212, 162, 122, 0.18)",
+                borderRadius: 10,
+                padding: 14,
+              }}
+            >
+              <p style={{ fontSize: 13, color: "#9B9689", lineHeight: 1.5, margin: 0 }}>
+                <strong style={{ color: "#ECE8E0" }}>Important:</strong> Mitable does not save
+                passwords. Make sure to save this somewhere secure before closing this window.
               </p>
             </div>
 
-            {/* Password Display */}
-            <div className="space-y-2">
-              <Label className="text-text-primary">Generated Password</Label>
-              <div className="flex items-center gap-2">
-                <Input
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "#6B665C" }}>
+                Generated password
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
                   value={generatedPassword}
                   readOnly
-                  className="bg-background-secondary border-border-subtle text-text-primary font-mono"
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    padding: "0 12px",
+                    borderRadius: 8,
+                    border: "0.5px solid rgba(236, 232, 224, 0.08)",
+                    background: "#1A1916",
+                    color: "#ECE8E0",
+                    fontSize: 13,
+                    fontFamily: "monospace",
+                    outline: "none",
+                  }}
                 />
-                <Button
+                <button
                   onClick={handleCopyPassword}
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 bg-background-secondary border-border-subtle hover:bg-background-elevated"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    border: "0.5px solid rgba(236, 232, 224, 0.08)",
+                    background: "#1A1916",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#ECE8E0",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
                 >
                   <Clipboard className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
-              {passwordCopied && (
-                <p className="text-xs text-green-500">Password copied to clipboard!</p>
-              )}
+              {passwordCopied ? (
+                <p style={{ fontSize: 12, color: "#2F7D5A", margin: 0 }}>
+                  Password copied to clipboard
+                </p>
+              ) : null}
             </div>
           </div>
 
-          <div className="flex justify-end mt-4">
-            <Button
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+            <button
               onClick={handleClosePasswordModal}
-              className="bg-primary text-white hover:bg-primary/90"
+              style={{
+                height: 36,
+                padding: "0 14px",
+                borderRadius: 8,
+                border: "0.5px solid rgba(236, 232, 224, 0.08)",
+                background: "#2A2824",
+                color: "#ECE8E0",
+                fontSize: 13,
+                cursor: "pointer",
+              }}
             >
               Done
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <div className="p-8 space-y-6">
-        {/* Header */}
-        <div className="space-y-4">
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <button
             onClick={() => navigate("/people")}
-            className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              width: "fit-content",
+              padding: 0,
+              background: "none",
+              border: "none",
+              color: "#9B9689",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
           >
-            <ArrowLeft size={16} />
-            <span className="text-sm">Back to People</span>
+            <ArrowLeft size={15} />
+            Back to People
           </button>
-          <h1 className="text-4xl font-bold text-text-primary">Add New User</h1>
+
+          <div>
+            <h1
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 26,
+                color: "#ECE8E0",
+                fontWeight: 400,
+                letterSpacing: "-0.3px",
+                margin: 0,
+              }}
+            >
+              Add user
+            </h1>
+            <p style={{ fontSize: 13, color: "#6B665C", margin: "8px 0 0" }}>
+              Invite a new teammate and configure their access before they sign in.
+            </p>
+          </div>
         </div>
 
-        {/* User Info Section */}
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {/* First Name */}
-            <div className="space-y-2">
-              <Label htmlFor="firstName" className="text-text-primary">
-                First Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Enter first name"
-                className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
-              />
-            </div>
+        <div
+          style={{
+            background: "#211F1B",
+            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            borderRadius: 12,
+            padding: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 24,
+          }}
+        >
+          <div
+            style={{
+              paddingBottom: 16,
+              borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+            }}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+              User details
+            </h2>
+            <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+              Basic information for the new teammate.
+            </p>
+          </div>
 
-            {/* Last Name */}
-            <div className="space-y-2">
-              <Label htmlFor="lastName" className="text-text-primary">
-                Last Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Enter last name"
-                className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
-              />
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="email" className="text-text-primary">
-                Email Address <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="email"
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <Field
+              label="First name"
+              required
+              value={firstName}
+              onChange={setFirstName}
+              placeholder="Enter first name"
+            />
+            <Field
+              label="Last name"
+              required
+              value={lastName}
+              onChange={setLastName}
+              placeholder="Enter last name"
+            />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Field
+                label="Email address"
+                required
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={setEmail}
                 placeholder="email@example.com"
-                className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
+                helpText="This is where the user will receive their credentials."
               />
-              <p className="text-xs text-text-secondary">
-                User will receive login credentials at this email
-              </p>
             </div>
-
-            {/* Job Title */}
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="jobTitle" className="text-text-primary">
-                Job Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="jobTitle"
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Field
+                label="Job title"
+                required
                 value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                placeholder="e.g. Software Engineer, Product Designer, Marketing Manager"
-                className="bg-background-secondary border-transparent text-text-primary placeholder:text-text-secondary"
+                onChange={setJobTitle}
+                placeholder="e.g. Software Engineer, Product Designer"
               />
             </div>
           </div>
         </div>
 
-        {/* Settings Section */}
-        <div className="bg-background-elevated rounded-lg border border-border-subtle p-6 space-y-4">
-          <div className="space-y-4">
-            {/* Welcome Email */}
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="welcomeEmail"
-                checked={welcomeEmail}
-                onCheckedChange={(checked) => setWelcomeEmail(checked as boolean)}
-              />
-              <div className="flex-1">
-                <Label
-                  htmlFor="welcomeEmail"
-                  className="text-text-primary font-medium cursor-pointer"
-                >
-                  Send welcome email
-                </Label>
-                <p className="text-sm text-text-secondary mt-1">Email includes login credentials</p>
-              </div>
-            </div>
-
-            {/* Make User an Admin */}
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="makeAdmin"
-                checked={makeAdmin}
-                onCheckedChange={(checked) => setMakeAdmin(checked as boolean)}
-              />
-              <div className="flex-1">
-                <Label htmlFor="makeAdmin" className="text-text-primary font-medium cursor-pointer">
-                  Make user an admin
-                </Label>
-                <p className="text-sm text-text-secondary mt-1">
-                  Admins can manage integrations and view team analytics.
-                </p>
-              </div>
-            </div>
+        <div
+          style={{
+            background: "#211F1B",
+            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            borderRadius: 12,
+            padding: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <div
+            style={{
+              paddingBottom: 16,
+              borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+            }}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+              Access and onboarding
+            </h2>
+            <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+              Choose how this user should be introduced to the workspace.
+            </p>
           </div>
+
+          <ToggleRow
+            icon={<Mail size={14} />}
+            title="Send welcome email"
+            description="Email the user their login credentials and a prompt to get started."
+            checked={welcomeEmail}
+            onChange={setWelcomeEmail}
+          />
+
+          <ToggleRow
+            icon={<Shield size={14} />}
+            title="Make user an admin"
+            description="Admins can manage integrations, view team analytics, and create reports."
+            checked={makeAdmin}
+            onChange={setMakeAdmin}
+          />
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/people")}
-            disabled={createUserMutation.isPending}
-            className="bg-transparent border-border-subtle text-text-primary hover:bg-background-elevated"
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12,
+              color: "#6B665C",
+            }}
           >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={createUserMutation.isPending}
-            className="bg-primary text-white hover:bg-primary/90"
-          >
-            {createUserMutation.isPending ? "Creating..." : "+ Add User"}
-          </Button>
+            <UserPlus size={13} />A password will be generated automatically after creation.
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              onClick={() => navigate("/people")}
+              disabled={createUserMutation.isPending}
+              style={{
+                height: 36,
+                padding: "0 14px",
+                borderRadius: 8,
+                border: "0.5px solid rgba(236, 232, 224, 0.08)",
+                background: "transparent",
+                color: "#ECE8E0",
+                fontSize: 13,
+                cursor: createUserMutation.isPending ? "default" : "pointer",
+                opacity: createUserMutation.isPending ? 0.6 : 1,
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={createUserMutation.isPending}
+              style={{
+                height: 36,
+                padding: "0 14px",
+                borderRadius: 8,
+                border: "0.5px solid rgba(155, 132, 232, 0.22)",
+                background: "rgba(155, 132, 232, 0.12)",
+                color: "#ECE8E0",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: createUserMutation.isPending ? "default" : "pointer",
+                opacity: createUserMutation.isPending ? 0.6 : 1,
+              }}
+            >
+              {createUserMutation.isPending ? "Creating..." : "Create user"}
+            </button>
+          </div>
         </div>
       </div>
     </>

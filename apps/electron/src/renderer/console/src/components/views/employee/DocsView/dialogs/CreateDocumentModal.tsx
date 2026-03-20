@@ -14,10 +14,16 @@ import { useGenerateDocumentStream } from "@/console/src/hooks/queries/documents
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
 import { useUploadArtifact } from "@/console/src/hooks/queries/artifacts";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
+import type { DocType } from "@mitable/shared";
 
 interface CreateDocumentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  routeBase?: string;
+  entityLabel?: string;
+  promptPlaceholder?: string;
+  defaultTags?: string[];
+  docType?: DocType;
 }
 
 function formatDuration(ms: number): string {
@@ -48,7 +54,15 @@ const PHASE_LABELS: Record<string, string> = {
   complete: "Complete!",
 };
 
-export default function CreateDocumentModal({ open, onOpenChange }: CreateDocumentModalProps) {
+export default function CreateDocumentModal({
+  open,
+  onOpenChange,
+  routeBase = "/docs",
+  entityLabel = "document",
+  promptPlaceholder,
+  defaultTags = [],
+  docType = "knowledge-article",
+}: CreateDocumentModalProps) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +82,11 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
   );
 
   const uploadMutation = useUploadArtifact();
+  const entityLabelTitle = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
+  const phaseLabels: Record<string, string> = {
+    ...PHASE_LABELS,
+    drafting: `Drafting ${entityLabel}...`,
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -90,18 +109,18 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
   useEffect(() => {
     if (isComplete) {
       const timer = setTimeout(() => {
-        navigate(`/docs/${documentId}`);
+        navigate(`${routeBase}/${documentId}`);
         onOpenChange(false);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, documentId, navigate, onOpenChange]);
+  }, [documentId, isComplete, navigate, onOpenChange, routeBase]);
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
     const sessionIds = selectedSessionIds.size > 0 ? Array.from(selectedSessionIds) : undefined;
     const artifactIds = uploadedFiles.length > 0 ? uploadedFiles.map((f) => f.id) : undefined;
-    await generate(input, "knowledge-article", { sessionIds, artifactIds });
+    await generate(input, docType, { sessionIds, artifactIds, tags: defaultTags });
   };
 
   const handleClose = () => {
@@ -158,7 +177,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
         showCloseButton={false}
       >
         <VisuallyHidden>
-          <DialogTitle>Create document</DialogTitle>
+          <DialogTitle>Create {entityLabel}</DialogTitle>
         </VisuallyHidden>
 
         {/* Close button */}
@@ -263,7 +282,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="What will your doc be about?"
+              placeholder={promptPlaceholder || `What will your ${entityLabel} be about?`}
               autoFocus
               style={{
                 width: "100%",
@@ -535,7 +554,7 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
             <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
             <div style={{ textAlign: "center" }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>
-                {progress ? PHASE_LABELS[progress.phase] || "Working..." : "Starting..."}
+                {progress ? phaseLabels[progress.phase] || "Working..." : "Starting..."}
               </p>
               <p style={{ fontSize: 12, color: "#6B665C", marginTop: 4 }}>
                 {progress?.message || "Initializing..."}
@@ -570,7 +589,9 @@ export default function CreateDocumentModal({ open, onOpenChange }: CreateDocume
             >
               <Check size={22} style={{ color: "#3A9B6B" }} />
             </div>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>Document created</p>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>
+              {entityLabelTitle} created
+            </p>
             <p style={{ fontSize: 12, color: "#6B665C" }}>Opening...</p>
           </div>
         )}

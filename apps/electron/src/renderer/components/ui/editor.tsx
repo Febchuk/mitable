@@ -78,7 +78,7 @@ const editorVariants = cva(
         comment: cn("rounded-none border-none bg-transparent text-sm"),
         default: "size-full px-16 pt-4 pb-72 text-base sm:px-[max(64px,calc(50%-350px))]",
         demo: "size-full px-16 pt-4 pb-72 text-base sm:px-[max(64px,calc(50%-350px))]",
-        fullWidth: "size-full px-16 pt-4 pb-72 text-base sm:px-24",
+        fullWidth: "size-full px-0 pt-0 pb-72 text-base leading-7",
         none: "",
         select: "px-3 py-2 text-base data-readonly:w-fit",
       },

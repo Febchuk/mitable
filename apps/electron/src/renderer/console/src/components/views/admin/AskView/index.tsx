@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ArrowUp,
   Sparkles,
@@ -579,6 +580,7 @@ function ThreadDropdown({
 }
 
 export default function AskView() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [threads, setThreads] = useState<AskThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -590,6 +592,8 @@ export default function AskView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const requestedThreadId = searchParams.get("threadId");
+  const requestedMessageId = searchParams.get("messageId");
 
   // Load threads from API on mount
   useEffect(() => {
@@ -646,6 +650,29 @@ export default function AskView() {
     }
   };
 
+  const clearDeepLink = () => {
+    if (!requestedThreadId && !requestedMessageId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("threadId");
+    next.delete("messageId");
+    setSearchParams(next, { replace: true });
+  };
+
+  const loadThreadMessages = async (id: string) => {
+    setActiveThreadId(id);
+    setInput("");
+    setIsTyping(false);
+    try {
+      const rows = await fetchAskThreadMessages(id);
+      const nextMessages = rows.map(dbToMessage);
+      setMessages(nextMessages);
+      return nextMessages;
+    } catch {
+      setMessages([]);
+      return [];
+    }
+  };
+
   const refreshThreads = async () => {
     try {
       const updated = await fetchAskThreads();
@@ -654,6 +681,32 @@ export default function AskView() {
       // silently ignore refresh failures
     }
   };
+
+  useEffect(() => {
+    if (!requestedThreadId) return;
+    if (!threads.some((thread) => thread.id === requestedThreadId)) return;
+    if (activeThreadId === requestedThreadId && messages.length > 0) return;
+    loadThreadMessages(requestedThreadId);
+  }, [requestedThreadId, threads, activeThreadId, messages.length]);
+
+  useEffect(() => {
+    if (!requestedMessageId || messages.length === 0) return;
+    const target = messages.find((msg) => msg.id === requestedMessageId);
+    if (!target?.reportHtml || !target.reportCard) return;
+    if (editorOpen && activeReportMsgId === target.id) return;
+
+    setActiveReport({
+      messageId: target.id,
+      title: target.reportCard.title,
+      subtitle: target.reportCard.subtitle,
+      html: target.reportHtml,
+    });
+    setActiveReportMsgId(target.id);
+    setEditorOpen(true);
+    setTimeout(() => {
+      msgRefs.current[target.id]?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 100);
+  }, [requestedMessageId, messages, editorOpen, activeReportMsgId]);
 
   const handleSend = async (text?: string) => {
     const content = text || input.trim();
@@ -706,18 +759,12 @@ export default function AskView() {
   };
 
   const handleSelectThread = async (id: string) => {
-    setActiveThreadId(id);
-    setInput("");
-    setIsTyping(false);
-    try {
-      const rows = await fetchAskThreadMessages(id);
-      setMessages(rows.map(dbToMessage));
-    } catch {
-      setMessages([]);
-    }
+    clearDeepLink();
+    await loadThreadMessages(id);
   };
 
   const handleNewConversation = () => {
+    clearDeepLink();
     setActiveThreadId(null);
     setMessages([]);
     setInput("");
@@ -729,6 +776,7 @@ export default function AskView() {
       await deleteAskThread(id);
       setThreads((prev) => prev.filter((t) => t.id !== id));
       if (activeThreadId === id) {
+        clearDeepLink();
         setActiveThreadId(null);
         setMessages([]);
         setInput("");

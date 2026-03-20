@@ -42,7 +42,7 @@ export function useGenerateDocumentStream() {
     async (
       prompt: string,
       docType: string,
-      options?: { sessionIds?: string[]; artifactIds?: string[] }
+      options?: { sessionIds?: string[]; artifactIds?: string[]; tags?: string[] }
     ) => {
       setState({
         isGenerating: true,

@@ -74,30 +74,30 @@ export default function TaskBreakdownSection({
                   else next.add(idx);
                   setExpandedTasks(next);
                 }}
-                className="w-full flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-canvas-muted/50 transition-colors text-left"
+                className="w-full flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-canvas-muted/50 transition-colors text-left min-w-0"
               >
                 <div className="flex-shrink-0 text-ink-tertiary">
                   {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </div>
                 {/* Short title */}
-                <span className="flex-shrink-0 text-sm font-medium text-ink-primary max-w-[200px] truncate">
+                <span className="min-w-0 flex-[0_1_200px] text-sm font-medium text-ink-primary truncate">
                   {task.shortTitle}
                 </span>
-                {/* Progress bar */}
-                <div className="flex-1 h-2 bg-canvas-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${color} transition-all duration-300`}
-                    style={{ width: `${percentage}%` }}
-                  />
+                <div className="flex flex-1 min-w-0 items-center gap-3">
+                  {/* Progress bar */}
+                  <div className="flex-1 min-w-0 h-2 bg-canvas-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${color} transition-all duration-300`}
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-3 whitespace-nowrap text-xs text-ink-tertiary tabular-nums">
+                    {/* Duration */}
+                    <span>{formatDuration(task.minutes)}</span>
+                    {/* Percentage */}
+                    <span className="w-10 text-right">{percentage}%</span>
+                  </div>
                 </div>
-                {/* Duration */}
-                <span className="flex-shrink-0 text-xs text-ink-tertiary tabular-nums w-10 text-right">
-                  {formatDuration(task.minutes)}
-                </span>
-                {/* Percentage */}
-                <span className="flex-shrink-0 text-xs text-ink-tertiary tabular-nums w-10 text-right">
-                  {percentage}%
-                </span>
               </button>
 
               {/* Expanded description */}
