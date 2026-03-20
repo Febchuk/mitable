@@ -218,6 +218,7 @@ export default function SessionDetail() {
       setOptimisticStatus("summarizing");
       queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId || "") });
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      queryClient.invalidateQueries({ queryKey: ["calendar"] });
       // Clean up URL param (replace to avoid back button issues)
       navigate(`/monitoring/${sessionId}`, { replace: true });
     }
@@ -570,7 +571,8 @@ export default function SessionDetail() {
         // Invalidate React Query caches to refresh UI (pill flow bypasses mutation's onSuccess)
         queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
         queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-        logger.info("Invalidated session queries after external end");
+        queryClient.invalidateQueries({ queryKey: ["calendar"] });
+        logger.info("Invalidated session + calendar queries after external end");
       } else {
         // Triggered from Console - use the original flow
         // 1. Stop Electron capture

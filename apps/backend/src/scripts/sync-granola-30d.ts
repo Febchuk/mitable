@@ -115,6 +115,7 @@ async function main() {
       granolaAccessTokenEncrypted: schema.users.granolaAccessTokenEncrypted,
       granolaRefreshTokenEncrypted: schema.users.granolaRefreshTokenEncrypted,
       granolaTokenExpiresAt: schema.users.granolaTokenExpiresAt,
+      granolaOAuthClientId: schema.users.granolaOAuthClientId,
     })
     .from(schema.users)
     .where(and(...conditions));
@@ -152,7 +153,10 @@ async function main() {
         }
         console.log("  Token expired, refreshing...");
         const refreshToken = encryptionService.decrypt(user.granolaRefreshTokenEncrypted);
-        const newTokenData = await granolaService.refreshToken(refreshToken);
+        const newTokenData = await granolaService.refreshToken(
+          refreshToken,
+          user.granolaOAuthClientId ?? undefined
+        );
         accessToken = newTokenData.access_token;
 
         await db
