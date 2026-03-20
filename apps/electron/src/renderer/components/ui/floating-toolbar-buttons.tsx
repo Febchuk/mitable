@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  BoldIcon,
-  Code2Icon,
-  ItalicIcon,
-  StrikethroughIcon,
-  UnderlineIcon,
-} from "lucide-react";
+import { BoldIcon, Code2Icon, ItalicIcon, StrikethroughIcon, UnderlineIcon } from "lucide-react";
 import { KEYS } from "platejs";
 import { useEditorReadOnly } from "platejs/react";
 

@@ -232,7 +232,9 @@ export default function PeopleView() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 396 }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 396 }}
+        >
           <div style={{ position: "relative", flex: 1 }}>
             <Search
               size={15}

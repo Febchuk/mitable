@@ -1607,7 +1607,14 @@ export default function UserProfilePage() {
 
   // Tab state — honor ?tab= query param from sidebar menu
   const [searchParams] = useSearchParams();
-  const validTabs = ["account", "security", "preferences", "beta", "integrations", "update"] as const;
+  const validTabs = [
+    "account",
+    "security",
+    "preferences",
+    "beta",
+    "integrations",
+    "update",
+  ] as const;
   type TabId = (typeof validTabs)[number];
   const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
     ? (searchParams.get("tab") as TabId)
@@ -3038,7 +3045,11 @@ export default function UserProfilePage() {
                             flexShrink: 0,
                           }}
                         >
-                          <svg viewBox="0 0 56 56" style={{ width: 18, height: 18 }} xmlns="http://www.w3.org/2000/svg">
+                          <svg
+                            viewBox="0 0 56 56"
+                            style={{ width: 18, height: 18 }}
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
                             <defs>
                               <linearGradient id="ff-icon-grad" x1="1" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="#E82A73" />
@@ -3049,8 +3060,14 @@ export default function UserProfilePage() {
                               </linearGradient>
                             </defs>
                             <path d="M18.4,0H0v18.3h18.4V0z" fill="url(#ff-icon-grad)" />
-                            <path d="M40.2,0H21.8v18.3H56v-2.6c0-4.2-1.7-8.1-4.6-11.1C48.4,1.7,44.4,0,40.2,0z" fill="url(#ff-icon-grad)" />
-                            <path d="M0,22.1v18.3c0,4.2,1.7,8.1,4.6,11.1c3,2.9,7,4.6,11.2,4.6h2.6V22.1H0z" fill="url(#ff-icon-grad)" />
+                            <path
+                              d="M40.2,0H21.8v18.3H56v-2.6c0-4.2-1.7-8.1-4.6-11.1C48.4,1.7,44.4,0,40.2,0z"
+                              fill="url(#ff-icon-grad)"
+                            />
+                            <path
+                              d="M0,22.1v18.3c0,4.2,1.7,8.1,4.6,11.1c3,2.9,7,4.6,11.2,4.6h2.6V22.1H0z"
+                              fill="url(#ff-icon-grad)"
+                            />
                             <path d="M40.2,22.1H21.8v18.3h18.4V22.1z" fill="url(#ff-icon-grad)" />
                           </svg>
                         </div>

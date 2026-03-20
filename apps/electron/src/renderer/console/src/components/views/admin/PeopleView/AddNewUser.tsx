@@ -239,7 +239,9 @@ export default function AddNewUser() {
           </button>
 
           <DialogHeader>
-            <DialogTitle className="text-2xl text-text-primary">User created successfully</DialogTitle>
+            <DialogTitle className="text-2xl text-text-primary">
+              User created successfully
+            </DialogTitle>
             <DialogDescription className="text-text-secondary">
               Save this password and send it to the new user. This password will not be shown again.
             </DialogDescription>
@@ -301,7 +303,9 @@ export default function AddNewUser() {
                 </button>
               </div>
               {passwordCopied ? (
-                <p style={{ fontSize: 12, color: "#2F7D5A", margin: 0 }}>Password copied to clipboard</p>
+                <p style={{ fontSize: 12, color: "#2F7D5A", margin: 0 }}>
+                  Password copied to clipboard
+                </p>
               ) : null}
             </div>
           </div>
@@ -489,8 +493,7 @@ export default function AddNewUser() {
               color: "#6B665C",
             }}
           >
-            <UserPlus size={13} />
-            A password will be generated automatically after creation.
+            <UserPlus size={13} />A password will be generated automatically after creation.
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

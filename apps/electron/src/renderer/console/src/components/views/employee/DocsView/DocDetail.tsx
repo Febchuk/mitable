@@ -495,7 +495,6 @@ export default function DocDetail() {
   return (
     <div className="h-full app-no-drag" style={{ overflow: "auto" }}>
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "16px 24px 96px" }}>
-
         {/* Top bar: back + actions */}
         <div
           style={{
@@ -679,9 +678,17 @@ export default function DocDetail() {
         />
 
         {document?.sessionContributions && document.sessionContributions.length > 0 && (
-          <div style={{ marginTop: 40, paddingTop: 20, borderTop: "0.5px solid rgba(236, 232, 224, 0.06)" }}>
+          <div
+            style={{
+              marginTop: 40,
+              paddingTop: 20,
+              borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+            }}
+          >
             <details>
-              <summary style={{ fontSize: 12, fontWeight: 500, color: "#6B665C", cursor: "pointer" }}>
+              <summary
+                style={{ fontSize: 12, fontWeight: 500, color: "#6B665C", cursor: "pointer" }}
+              >
                 Contributing Sessions ({document.sessionContributions.length})
               </summary>
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -775,4 +782,3 @@ export default function DocDetail() {
     </div>
   );
 }
-

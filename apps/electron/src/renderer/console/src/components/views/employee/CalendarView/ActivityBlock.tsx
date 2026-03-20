@@ -288,8 +288,7 @@ export default function ActivityBlock({
             flexShrink: 0,
           }}
         />
-        {isMeeting &&
-          (isGranola ? <GranolaLogo size={22} /> : <FirefliesLogo size={22} />)}
+        {isMeeting && (isGranola ? <GranolaLogo size={22} /> : <FirefliesLogo size={22} />)}
 
         {isMeeting ? (
           <span

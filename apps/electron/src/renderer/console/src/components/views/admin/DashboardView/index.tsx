@@ -47,11 +47,30 @@ function shortDate(date: Date): string {
 
 // Realistic 24h activity distribution — peaks 9am–5pm, quiet overnight
 const HOUR_WEIGHTS = [
-  0.02, 0.01, 0.01, 0.01, 0.01, 0.02, // 12am–5am
-  0.03, 0.05, 0.07,                     // 6am–8am
-  0.10, 0.12, 0.13, 0.12,               // 9am–12pm
-  0.08, 0.11, 0.10, 0.09, 0.07,         // 1pm–5pm
-  0.04, 0.03, 0.02, 0.02, 0.01, 0.01,  // 6pm–11pm
+  0.02,
+  0.01,
+  0.01,
+  0.01,
+  0.01,
+  0.02, // 12am–5am
+  0.03,
+  0.05,
+  0.07, // 6am–8am
+  0.1,
+  0.12,
+  0.13,
+  0.12, // 9am–12pm
+  0.08,
+  0.11,
+  0.1,
+  0.09,
+  0.07, // 1pm–5pm
+  0.04,
+  0.03,
+  0.02,
+  0.02,
+  0.01,
+  0.01, // 6pm–11pm
 ];
 
 function buildChartData(api: DashboardMetrics, filter: TimeFilter): ChartDataPoint[] {
@@ -269,7 +288,6 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
       ctx.fillText(d.label, centerX, padTop + chartH + 16);
     }
   }
-
 }
 
 function drawRoundedTopBar(
@@ -525,10 +543,7 @@ export default function DashboardView() {
 
         {/* Canvas */}
         <div style={{ flex: 1, minHeight: 200 }}>
-          <canvas
-            ref={canvasRef}
-            style={{ width: "100%", height: "100%", display: "block" }}
-          />
+          <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
         </div>
       </div>
     </div>

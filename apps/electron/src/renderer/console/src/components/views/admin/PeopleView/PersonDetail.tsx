@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  FileText,
-  Search,
-  Video,
-  X,
-  Zap,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Clock, FileText, Search, Video, X, Zap } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
 import { apiRequest } from "@/console/src/services/api";
 import {
@@ -61,14 +52,7 @@ const TIME_RANGE_LABELS: Record<TimeRange, string> = {
   all: "All",
 };
 
-const CUSTOMER_COLORS = [
-  "#9B84E8",
-  "#7A6ACB",
-  "#5B4AA7",
-  "#3D3068",
-  "#6A5AAE",
-  "#8876D5",
-];
+const CUSTOMER_COLORS = ["#9B84E8", "#7A6ACB", "#5B4AA7", "#3D3068", "#6A5AAE", "#8876D5"];
 
 const BREAKDOWN_BAR_COLOR = "#9B84E8";
 
@@ -220,9 +204,10 @@ function buildAppBreakdown(apps: string[] | null | undefined, durationMinutes: n
   });
 }
 
-function createWorkBlockFromActivityBlock(
-  block: PersonDetailData["blocks"][number]
-): { block: WorkBlock; blockNumber: number } {
+function createWorkBlockFromActivityBlock(block: PersonDetailData["blocks"][number]): {
+  block: WorkBlock;
+  blockNumber: number;
+} {
   return {
     block: {
       id: block.id,
@@ -270,13 +255,11 @@ function buildTrendEntries(api: PersonDetailData): ActivityTrendEntry[] {
   );
 
   if (hasDailyTotals) {
-    return [...api.dailyActivities]
-      .reverse()
-      .map((day) => ({
-        date: day.date,
-        workMinutes: day.totalWorkMinutes,
-        meetingMinutes: day.totalMeetingMinutes,
-      }));
+    return [...api.dailyActivities].reverse().map((day) => ({
+      date: day.date,
+      workMinutes: day.totalWorkMinutes,
+      meetingMinutes: day.totalMeetingMinutes,
+    }));
   }
 
   const totalsByDate = new Map<string, { workMinutes: number; meetingMinutes: number }>();
@@ -325,14 +308,15 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
   }
 
   const workPct =
-    effectiveActiveMinutes > 0 ? Math.round((effectiveWorkMinutes / effectiveActiveMinutes) * 100) : 0;
+    effectiveActiveMinutes > 0
+      ? Math.round((effectiveWorkMinutes / effectiveActiveMinutes) * 100)
+      : 0;
   const meetingPct =
     effectiveActiveMinutes > 0
       ? Math.round((effectiveMeetingMinutes / effectiveActiveMinutes) * 100)
       : 0;
 
-  const moodLabel =
-    meetingPct > 50 ? "Meeting-heavy" : workPct > 70 ? "Focused" : "Collaborative";
+  const moodLabel = meetingPct > 50 ? "Meeting-heavy" : workPct > 70 ? "Focused" : "Collaborative";
   const moodColor =
     meetingPct > 50
       ? "bg-yellow-500/15 text-yellow-400"
@@ -343,7 +327,10 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
   const categoryMinutes = new Map<string, number>();
   for (const day of api.dailyActivities) {
     for (const entry of (day.categoryBreakdown || []) as { category: string; minutes: number }[]) {
-      categoryMinutes.set(entry.category, (categoryMinutes.get(entry.category) || 0) + entry.minutes);
+      categoryMinutes.set(
+        entry.category,
+        (categoryMinutes.get(entry.category) || 0) + entry.minutes
+      );
     }
   }
 
@@ -403,7 +390,10 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     }
   }
 
-  const totalCustomerMinutes = [...subscriberMinutes.values()].reduce((sum, value) => sum + value, 0);
+  const totalCustomerMinutes = [...subscriberMinutes.values()].reduce(
+    (sum, value) => sum + value,
+    0
+  );
   const customerBreakdown = [...subscriberMinutes.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([label, minutes], index) => ({
@@ -422,7 +412,8 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
 
     const adapted = createWorkBlockFromActivityBlock(block);
     const previewSource =
-      block.description || (block.apps?.length ? `Worked across ${block.apps.join(", ")}` : block.name || "");
+      block.description ||
+      (block.apps?.length ? `Worked across ${block.apps.join(", ")}` : block.name || "");
 
     recentWork.push({
       kind: "block",
@@ -458,8 +449,9 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
   });
 
   const latestActivityAt =
-    [...api.blocks]
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())[0]?.startTime ||
+    [...api.blocks].sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    )[0]?.startTime ||
     api.documents[0]?.createdAt ||
     api.sessionActivities[0]?.startedAt ||
     null;
@@ -805,7 +797,9 @@ export default function PersonDetail() {
             </h1>
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "#6B665C" }}>
               {selectedWork.date}, {selectedWork.time}
-              {selectedWork.durationMinutes > 0 ? ` · ${formatCompactDuration(selectedWork.durationMinutes)}` : ""}
+              {selectedWork.durationMinutes > 0
+                ? ` · ${formatCompactDuration(selectedWork.durationMinutes)}`
+                : ""}
             </p>
           </div>
 
@@ -886,7 +880,14 @@ export default function PersonDetail() {
           Back to People
         </button>
 
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 20,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div
               style={{
@@ -924,17 +925,45 @@ export default function PersonDetail() {
               >
                 {person.name}
               </h1>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginTop: 8,
+                  flexWrap: "wrap",
+                }}
+              >
                 <span style={{ fontSize: 13, color: "#9B9689" }}>{person.role}</span>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${person.moodColor}`}>
+                <span
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${person.moodColor}`}
+                >
                   {person.mood}
                 </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#9B9689" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 12,
+                    color: "#9B9689",
+                  }}
+                >
                   <Zap size={11} style={{ color: "#54705F" }} />
                   {person.lastActive}
                 </span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, fontSize: 12, color: "#6B665C", flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: "#6B665C",
+                  flexWrap: "wrap",
+                }}
+              >
                 <span>{person.email}</span>
                 <span style={{ opacity: 0.5 }}>•</span>
                 <span>Started {person.startDate}</span>
@@ -1018,7 +1047,9 @@ export default function PersonDetail() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: showCustomerWork ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr)",
+            gridTemplateColumns: showCustomerWork
+              ? "minmax(0, 1fr) minmax(0, 1fr)"
+              : "minmax(0, 1fr)",
             gap: 16,
           }}
         >
@@ -1066,7 +1097,10 @@ export default function PersonDetail() {
                         strokeWidth={0}
                       >
                         {person.customerBreakdown.map((entry, index) => (
-                          <Cell key={entry.label} fill={entry.color || CUSTOMER_COLORS[index % CUSTOMER_COLORS.length]} />
+                          <Cell
+                            key={entry.label}
+                            fill={entry.color || CUSTOMER_COLORS[index % CUSTOMER_COLORS.length]}
+                          />
                         ))}
                       </Pie>
                       <Tooltip content={<CustomerWorkTooltip />} />
@@ -1106,7 +1140,15 @@ export default function PersonDetail() {
                             flexShrink: 0,
                           }}
                         />
-                        <span style={{ fontSize: 13, color: "#ECE8E0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            color: "#ECE8E0",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
                           {entry.label}
                         </span>
                       </div>
@@ -1149,10 +1191,21 @@ export default function PersonDetail() {
               </span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 232, overflowY: "auto", paddingRight: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                maxHeight: 232,
+                overflowY: "auto",
+                paddingRight: 4,
+              }}
+            >
               {person.activities.map((activity) => {
                 const percentage =
-                  totalActivityMinutes > 0 ? Math.round((activity.minutes / totalActivityMinutes) * 100) : 0;
+                  totalActivityMinutes > 0
+                    ? Math.round((activity.minutes / totalActivityMinutes) * 100)
+                    : 0;
                 return (
                   <button
                     key={activity.id}
@@ -1183,7 +1236,15 @@ export default function PersonDetail() {
                     >
                       {activity.label}
                     </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
@@ -1215,7 +1276,14 @@ export default function PersonDetail() {
                         <span style={{ fontSize: 11, color: "#6B665C", textAlign: "right" }}>
                           {formatCompactDuration(activity.minutes)}
                         </span>
-                        <span style={{ minWidth: 34, fontSize: 11, color: "#6B665C", textAlign: "right" }}>
+                        <span
+                          style={{
+                            minWidth: 34,
+                            fontSize: 11,
+                            color: "#6B665C",
+                            textAlign: "right",
+                          }}
+                        >
                           {percentage}%
                         </span>
                       </div>
@@ -1310,7 +1378,14 @@ export default function PersonDetail() {
               Recent Work
             </h2>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+              }}
+            >
               <div style={{ position: "relative", flex: 1, maxWidth: 340 }}>
                 <Search
                   size={14}
@@ -1370,12 +1445,14 @@ export default function PersonDetail() {
                   flexShrink: 0,
                 }}
               >
-                {([
-                  { key: "all", label: "All" },
-                  { key: "block", label: "Blocks" },
-                  { key: "meeting", label: "Meetings" },
-                  { key: "doc", label: "Docs" },
-                ] as Array<{ key: RecentWorkFilter; label: string }>).map((filter) => {
+                {(
+                  [
+                    { key: "all", label: "All" },
+                    { key: "block", label: "Blocks" },
+                    { key: "meeting", label: "Meetings" },
+                    { key: "doc", label: "Docs" },
+                  ] as Array<{ key: RecentWorkFilter; label: string }>
+                ).map((filter) => {
                   const count =
                     filter.key === "all"
                       ? person.recentWork.length
@@ -1406,8 +1483,18 @@ export default function PersonDetail() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filteredRecentWork.length === 0 ? (
-              <p style={{ margin: 0, padding: "16px 0", fontSize: 13, color: "#6B665C", textAlign: "center" }}>
-                {workSearchQuery ? `No results for "${workSearchQuery}"` : "No recent work for this view"}
+              <p
+                style={{
+                  margin: 0,
+                  padding: "16px 0",
+                  fontSize: 13,
+                  color: "#6B665C",
+                  textAlign: "center",
+                }}
+              >
+                {workSearchQuery
+                  ? `No results for "${workSearchQuery}"`
+                  : "No recent work for this view"}
               </p>
             ) : (
               filteredRecentWork.map((item) => (
@@ -1432,8 +1519,12 @@ export default function PersonDetail() {
                   <RecentWorkIcon kind={item.kind === "doc" ? "doc" : "block"} />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 14, color: "#ECE8E0", fontWeight: 500 }}>{item.title}</span>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                    >
+                      <span style={{ fontSize: 14, color: "#ECE8E0", fontWeight: 500 }}>
+                        {item.title}
+                      </span>
                       {item.kind === "meeting" ? (
                         <span
                           style={{
@@ -1451,11 +1542,21 @@ export default function PersonDetail() {
                       ) : null}
                     </div>
 
-                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9B9689", lineHeight: 1.5 }}>
+                    <p
+                      style={{ margin: "6px 0 0", fontSize: 12, color: "#9B9689", lineHeight: 1.5 }}
+                    >
                       {item.preview || "No preview available"}
                     </p>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        marginTop: 8,
+                      }}
+                    >
                       <span style={{ fontSize: 11, color: "#6B665C" }}>
                         {item.date}, {item.time}
                       </span>
@@ -1468,7 +1569,9 @@ export default function PersonDetail() {
                         <span style={{ fontSize: 11, color: "#6B665C" }}>{item.category}</span>
                       ) : null}
                       {"subscriberName" in item && item.subscriberName ? (
-                        <span style={{ fontSize: 11, color: "#6B665C" }}>{item.subscriberName}</span>
+                        <span style={{ fontSize: 11, color: "#6B665C" }}>
+                          {item.subscriberName}
+                        </span>
                       ) : null}
                       {"docType" in item && item.docType ? (
                         <span style={{ fontSize: 11, color: "#6B665C" }}>{item.docType}</span>
@@ -1557,7 +1660,11 @@ export default function PersonDetail() {
                       <div className="flex items-center gap-2 mt-2 ml-[38px]">
                         <span className="text-[10px] text-text-tertiary flex items-center gap-1">
                           <Clock size={10} />
-                          {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })},{" "}
+                          {date.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          ,{" "}
                           {date.toLocaleTimeString("en-US", {
                             hour: "numeric",
                             minute: "2-digit",
@@ -1650,7 +1757,11 @@ export default function PersonDetail() {
                       <div className="flex items-center gap-2 mt-2 ml-[38px]">
                         <span className="text-[10px] text-text-tertiary flex items-center gap-1">
                           <Clock size={10} />
-                          {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })},{" "}
+                          {date.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          ,{" "}
                           {date.toLocaleTimeString("en-US", {
                             hour: "numeric",
                             minute: "2-digit",
