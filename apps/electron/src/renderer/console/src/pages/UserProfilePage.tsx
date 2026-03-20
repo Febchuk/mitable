@@ -813,10 +813,16 @@ export default function UserProfilePage() {
   // Load agent feature toggle
   useEffect(() => {
     if (!user?.id) return;
-    window.consoleAPI?.getAgentEnabled(user.id).then((enabled) => {
-      setAgentEnabled(enabled);
-      setIsAgentLoading(false);
-    });
+    window.consoleAPI
+      ?.getAgentEnabled(user.id)
+      .then((enabled) => {
+        setAgentEnabled(enabled);
+        setIsAgentLoading(false);
+      })
+      .catch((err) => {
+        logger.error("Failed to load agent toggle:", err);
+        setIsAgentLoading(false);
+      });
   }, [user?.id]);
 
   // Listen for update events
