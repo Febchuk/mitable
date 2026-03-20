@@ -210,6 +210,9 @@ class AgentSdkService {
         options: {
           ...(resumeId ? { resume: resumeId } : {}),
           pathToClaudeCodeExecutable: claudePath,
+          // In packaged builds, `node` isn't on PATH. Use Electron's own binary as the
+          // Node runtime and set ELECTRON_RUN_AS_NODE so it behaves like plain Node.js.
+          ...(app.isPackaged ? { executable: process.execPath } : {}),
           cwd: app.getPath("home"),
           allowedTools: tools,
           mcpServers: { mitable: mitableTools },
@@ -227,6 +230,7 @@ class AgentSdkService {
             ANTHROPIC_API_KEY: "sk-ant-proxy-key",
             // Prevent "nested session" error when Electron is launched from Claude Code during dev
             CLAUDECODE: "",
+            ...(app.isPackaged ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
           },
         },
       })) {
