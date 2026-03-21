@@ -10,41 +10,11 @@ import { useNavigate } from "react-router-dom";
 import { useDocuments } from "@/console/src/hooks/queries/documents";
 import { Loader2, AlertCircle, FileText, Plus, Lock } from "lucide-react";
 import CreateDocumentModal from "./dialogs/CreateDocumentModal";
+import { groupByDay } from "@/console/src/components/shared/groupByDay";
 import type { Document } from "@mitable/shared";
 
 function isReportDocument(doc: Document): boolean {
   return doc.tags?.includes("report") ?? false;
-}
-
-function groupDocumentsByDate(documents: Document[]) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const weekAgo = new Date(today.getTime() - 7 * 86400000);
-
-  const groups: { label: string; documents: Document[] }[] = [
-    { label: "Today", documents: [] },
-    { label: "Yesterday", documents: [] },
-    { label: "This week", documents: [] },
-    { label: "Earlier", documents: [] },
-  ];
-
-  documents.forEach((doc) => {
-    const docDate = new Date(doc.updatedAt);
-    const docDay = new Date(docDate.getFullYear(), docDate.getMonth(), docDate.getDate());
-
-    if (docDay.getTime() >= today.getTime()) {
-      groups[0].documents.push(doc);
-    } else if (docDay.getTime() >= yesterday.getTime()) {
-      groups[1].documents.push(doc);
-    } else if (docDay.getTime() >= weekAgo.getTime()) {
-      groups[2].documents.push(doc);
-    } else {
-      groups[3].documents.push(doc);
-    }
-  });
-
-  return groups.filter((g) => g.documents.length > 0);
 }
 
 function formatTime(dateString: string): string {
@@ -83,7 +53,10 @@ export default function DocsView() {
     );
   }, [documents]);
 
-  const groupedDocuments = useMemo(() => groupDocumentsByDate(sortedDocuments), [sortedDocuments]);
+  const groupedDocuments = useMemo(
+    () => groupByDay(sortedDocuments, (doc) => doc.updatedAt),
+    [sortedDocuments]
+  );
 
   if (isLoading) {
     return (
@@ -214,7 +187,7 @@ export default function DocsView() {
 
               {/* Document rows */}
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {group.documents.map((doc) => {
+                {group.items.map((doc) => {
                   const color = getAvatarColor(doc.id);
                   const initial = getDocInitial(doc);
                   const creatorName = doc.creator

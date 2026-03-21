@@ -535,7 +535,7 @@ export default function CreateDocumentModal({
                   opacity: input.trim() ? 1 : 0.4,
                 }}
               >
-                <ArrowUp size={15} color="#fff" />
+                <ArrowUp size={15} color="#1A1916" />
               </button>
             </div>
           </div>

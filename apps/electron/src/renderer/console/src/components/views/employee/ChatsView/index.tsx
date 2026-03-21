@@ -1,253 +1,252 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useConversations, useCreateConversation } from "@/console/src/hooks/queries/chats";
-import { Search, Plus, MessageSquare, Zap, BookOpen, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { Plus, Search, MessageSquare } from "lucide-react";
+import { groupByDay } from "@/console/src/components/shared/groupByDay";
 
-function formatTimestamp(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const diffYears = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365));
+interface DemoChat {
+  id: string;
+  title: string;
+  timestamp: Date;
+}
 
-  if (diffMins < 1) {
-    return "Last message just now";
-  } else if (diffMins < 60) {
-    return `Last message ${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
-  } else if (diffHours < 24) {
-    return `Last message ${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-  } else if (diffDays < 365) {
-    return `Last message ${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-  } else {
-    return `Last message ${diffYears} year${diffYears > 1 ? "s" : ""} ago`;
-  }
+const now = new Date();
+function daysAgo(n: number): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - n, 14, 30);
+}
+
+const DEMO_CHATS: DemoChat[] = [
+  { id: "1", title: "What should I work on today?", timestamp: daysAgo(0) },
+  { id: "2", title: "Summarise my week", timestamp: daysAgo(0) },
+  { id: "3", title: "Draft standup update", timestamp: daysAgo(1) },
+  { id: "4", title: "Help me prep for 1:1", timestamp: daysAgo(2) },
+  { id: "5", title: "Review PR feedback", timestamp: daysAgo(3) },
+  { id: "6", title: "Explain the new onboarding flow", timestamp: daysAgo(4) },
+  { id: "7", title: "Write a Slack message to the team", timestamp: daysAgo(5) },
+  { id: "8", title: "Compare Q1 and Q2 roadmap progress", timestamp: daysAgo(8) },
+  { id: "9", title: "Brainstorm feature names", timestamp: daysAgo(12) },
+  { id: "10", title: "Debug the Notion sync issue", timestamp: daysAgo(15) },
+];
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 export default function ChatsView() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const limit = 20;
-  const createConversationMutation = useCreateConversation();
 
-  const { data, isLoading, error } = useConversations(page, limit);
-  const chats = data?.conversations || [];
-  const pagination = data?.pagination;
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return DEMO_CHATS;
+    const q = searchQuery.toLowerCase();
+    return DEMO_CHATS.filter((c) => c.title.toLowerCase().includes(q));
+  }, [searchQuery]);
 
-  // Filter chats based on search query
-  const filteredChats = chats.filter((chat) =>
-    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  if (isLoading) {
-    return (
-      <div className="p-8">
-        <div className="text-center text-text-secondary">Loading conversations...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-8">
-        <div className="text-center text-status-error">Error loading conversations</div>
-      </div>
-    );
-  }
+  const grouped = useMemo(() => groupByDay(filtered, (c) => c.timestamp), [filtered]);
 
   return (
-    <div className="p-8 space-y-6 app-no-drag">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Your chat history</h1>
-        <Button
-          onClick={async () => {
-            try {
-              const result = await createConversationMutation.mutateAsync({
-                title: "New Chat",
-                contextType: "general",
-              });
-              navigate(`/chats/${result.conversation.id}`);
-            } catch (e) {
-              // no-op; optionally toast later
-            }
-          }}
-          className="gap-2 bg-gradient-purple text-white hover:shadow-glow-purple transition-all duration-300"
-        >
-          <Plus size={20} />
-          <span>New Chat</span>
-        </Button>
-      </div>
-
-      {/* Search Bar */}
-      <div className="relative">
-        <Search
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none"
-          size={20}
-        />
-        <Input
-          placeholder="Search your chats..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-12 bg-background-elevated border-transparent text-text-primary placeholder:text-text-secondary"
-        />
-      </div>
-
-      {/* Chat List */}
-      <div className="space-y-2">
-        {filteredChats.map((chat) => {
-          // Determine chat type based on title keywords
-          const isWorkflow =
-            chat.title.toLowerCase().includes("workflow") ||
-            chat.title.toLowerCase().includes("how do");
-          const isKnowledge =
-            chat.title.toLowerCase().includes("what is") ||
-            chat.title.toLowerCase().includes("explain");
-
-          const icon = isWorkflow ? Zap : isKnowledge ? BookOpen : MessageSquare;
-          const iconColor = isWorkflow
-            ? "text-purple-400"
-            : isKnowledge
-              ? "text-blue-400"
-              : "text-gray-400";
-          const borderColor = isWorkflow
-            ? "border-purple-500/20"
-            : isKnowledge
-              ? "border-blue-500/20"
-              : "border-border-subtle";
-
-          return (
-            <div
-              key={chat.id}
-              onClick={() => navigate(`/chats/${chat.id}`)}
-              className={`group bg-background-secondary border ${borderColor} rounded-lg p-4 hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 cursor-pointer`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-8 h-8 bg-background-elevated rounded-lg flex items-center justify-center flex-shrink-0">
-                    {(() => {
-                      const Icon = icon;
-                      return <Icon size={16} className={iconColor} />;
-                    })()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-text-primary text-base font-medium group-hover:text-white transition-colors truncate">
-                      {chat.title}
-                    </h3>
-                    <p className="text-text-tertiary text-xs">{formatTimestamp(chat.timestamp)}</p>
-                  </div>
-                </div>
-                <ChevronRight
-                  size={16}
-                  className="text-text-tertiary group-hover:text-text-secondary group-hover:translate-x-1 transition-all flex-shrink-0"
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Empty State */}
-      {filteredChats.length === 0 && (
-        <div className="bg-background-secondary/50 backdrop-blur rounded-xl border border-border-subtle p-12 text-center shadow-card">
-          <div className="w-16 h-16 bg-gradient-purple-blue rounded-full flex items-center justify-center mx-auto mb-4">
-            <MessageSquare size={32} className="text-white" />
-          </div>
-          <p className="text-text-secondary text-lg">
-            {searchQuery ? `No chats found matching "${searchQuery}"` : "No conversations yet"}
-          </p>
-          <p className="text-text-tertiary text-sm mt-2">
-            {searchQuery ? "Try a different search term" : "Start a new chat to get help"}
+    <div className="app-no-drag" style={{ display: "flex", flexDirection: "column" }}>
+      {/* Page header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 32,
+              color: "#ECE8E0",
+              fontWeight: 400,
+              letterSpacing: "-0.4px",
+              lineHeight: 1,
+              margin: 0,
+            }}
+          >
+            Chats
+          </h1>
+          <p
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 15,
+              color: "#6B665C",
+              fontWeight: 400,
+              fontStyle: "italic",
+              margin: "12px 0 0",
+            }}
+          >
+            Your conversations with Mitable
           </p>
         </div>
-      )}
 
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="space-y-4 pt-4">
-          {/* Pagination Info */}
-          <p className="text-sm text-text-secondary text-center">
-            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, pagination.total)} of{" "}
-            {pagination.total} conversations
-          </p>
+        <button
+          onClick={() => navigate("/agent")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "0.5px solid rgba(236, 232, 224, 0.12)",
+            background: "transparent",
+            color: "#ECE8E0",
+            fontSize: 12,
+            fontFamily: "var(--font-sans)",
+            fontWeight: 500,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            transition: "all 0.15s ease",
+            marginTop: 4,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
+            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.2)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+          }}
+        >
+          <Plus size={12} strokeWidth={2} />
+          New
+        </button>
+      </div>
 
-          {/* Pagination Controls */}
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => pagination.hasPrev && setPage(page - 1)}
-                  className={
-                    pagination.hasPrev
-                      ? "cursor-pointer hover:bg-background-elevated"
-                      : "opacity-50 cursor-not-allowed"
-                  }
-                />
-              </PaginationItem>
+      {/* Search */}
+      <div style={{ position: "relative", marginBottom: 20 }}>
+        <Search
+          size={14}
+          style={{
+            position: "absolute",
+            left: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "#6B665C",
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search chats..."
+          style={{
+            width: "100%",
+            padding: "8px 12px 8px 34px",
+            borderRadius: 8,
+            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+            background: "rgba(236, 232, 224, 0.03)",
+            color: "#ECE8E0",
+            fontSize: 13,
+            fontFamily: "var(--font-sans)",
+            outline: "none",
+          }}
+        />
+      </div>
 
-              {/* Page Numbers */}
-              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => {
-                // Show first page, last page, current page, and pages around current
-                const shouldShow =
-                  pageNum === 1 ||
-                  pageNum === pagination.totalPages ||
-                  Math.abs(pageNum - page) <= 1;
+      {/* Chat list */}
+      {grouped.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {grouped.map((group) => (
+            <div key={group.label}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#6B665C",
+                  fontWeight: 500,
+                  marginBottom: 8,
+                }}
+              >
+                {group.label}
+              </div>
 
-                if (!shouldShow) {
-                  // Show ellipsis for gaps
-                  if (pageNum === 2 && page > 3) {
-                    return (
-                      <PaginationItem key={pageNum}>
-                        <span className="px-4 py-2 text-text-secondary">...</span>
-                      </PaginationItem>
-                    );
-                  }
-                  if (pageNum === pagination.totalPages - 1 && page < pagination.totalPages - 2) {
-                    return (
-                      <PaginationItem key={pageNum}>
-                        <span className="px-4 py-2 text-text-secondary">...</span>
-                      </PaginationItem>
-                    );
-                  }
-                  return null;
-                }
-
-                return (
-                  <PaginationItem key={pageNum}>
-                    <PaginationLink
-                      onClick={() => setPage(pageNum)}
-                      isActive={pageNum === page}
-                      className="cursor-pointer"
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {group.items.map((chat) => (
+                  <div
+                    key={chat.id}
+                    onClick={() => navigate(`/chats/${chat.id}`)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      transition: "background 0.12s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(236, 232, 224, 0.04)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "#ECE8E0",
+                        fontWeight: 500,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                        minWidth: 0,
+                      }}
                     >
-                      {pageNum}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
+                      {chat.title}
+                    </div>
 
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => pagination.hasNext && setPage(page + 1)}
-                  className={
-                    pagination.hasNext
-                      ? "cursor-pointer hover:bg-background-elevated"
-                      : "opacity-50 cursor-not-allowed"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "#6B665C",
+                        flexShrink: 0,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {formatTime(chat.timestamp)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ paddingTop: 40 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "48px 0",
+              borderRadius: 12,
+              border: "0.5px dashed rgba(236, 232, 224, 0.1)",
+            }}
+          >
+            <MessageSquare size={20} style={{ color: "#6B665C", marginBottom: 12 }} />
+            <p style={{ color: "#9B9689", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+              No chats matching &ldquo;{searchQuery}&rdquo;
+            </p>
+            <p
+              style={{
+                color: "#6B665C",
+                fontSize: 12,
+                textAlign: "center",
+                maxWidth: 260,
+                lineHeight: 1.5,
+              }}
+            >
+              Try a different search term
+            </p>
+          </div>
         </div>
       )}
     </div>

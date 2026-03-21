@@ -269,15 +269,6 @@ export default function AgentView() {
           gap: 10,
           width: "100%",
           maxWidth: isCenter ? 560 : undefined,
-          transition: "border-color 0.15s ease",
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.3)";
-        }}
-        onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget)) {
-            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.1)";
-          }
         }}
       >
         <textarea
@@ -314,19 +305,32 @@ export default function AgentView() {
           <button
             onClick={handleCancel}
             style={{
-              width: 30,
               height: 30,
+              padding: "0 12px",
               borderRadius: 8,
-              background: "#E87474",
-              border: "none",
+              background: "rgba(236, 232, 224, 0.06)",
+              border: "0.5px solid rgba(236, 232, 224, 0.1)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              gap: 5,
               cursor: "pointer",
               flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#ECE8E0",
+              fontFamily: "var(--font-sans)",
+              transition: "background 0.12s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(236, 232, 224, 0.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
             }}
           >
-            <Square size={13} color="#fff" />
+            <Square size={10} fill="#ECE8E0" color="#ECE8E0" />
+            Stop
           </button>
         ) : (
           <button
@@ -422,8 +426,8 @@ export default function AgentView() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {/* Browser bridge status */}
-      {bridgeConnected !== null && (
+      {/* Browser bridge error — only shown when disconnected */}
+      {bridgeConnected === false && (
         <div
           style={{
             display: "flex",
@@ -434,8 +438,8 @@ export default function AgentView() {
             fontFamily: "var(--font-sans)",
             borderRadius: 6,
             marginBottom: 8,
-            background: bridgeConnected ? "rgba(58, 155, 107, 0.08)" : "rgba(251, 191, 36, 0.06)",
-            color: bridgeConnected ? "#3A9B6B" : "#fbbf24",
+            background: "rgba(236, 232, 224, 0.04)",
+            color: "#9B9689",
           }}
         >
           <span
@@ -443,42 +447,36 @@ export default function AgentView() {
               width: 5,
               height: 5,
               borderRadius: "50%",
-              background: bridgeConnected ? "#3A9B6B" : "#fbbf24",
+              background: "#6B665C",
               flexShrink: 0,
             }}
           />
-          <span>
-            {bridgeConnected ? "Browser bridge connected" : "Browser extension not connected"}
-          </span>
-          {!bridgeConnected && (
-            <>
-              <span style={{ opacity: 0.3 }}>·</span>
-              <button
-                onClick={() =>
-                  window.open(
-                    "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev/mitable-browser-bridge.zip",
-                    "_blank"
-                  )
-                }
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "inherit",
-                  textDecoration: "underline",
-                  textUnderlineOffset: 2,
-                  cursor: "pointer",
-                  fontSize: 11,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  padding: 0,
-                }}
-              >
-                Download
-                <ExternalLink size={10} />
-              </button>
-            </>
-          )}
+          <span>Browser extension not connected</span>
+          <span style={{ opacity: 0.3 }}>·</span>
+          <button
+            onClick={() =>
+              window.open(
+                "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev/mitable-browser-bridge.zip",
+                "_blank"
+              )
+            }
+            style={{
+              background: "none",
+              border: "none",
+              color: "#9B9689",
+              textDecoration: "underline",
+              textUnderlineOffset: 2,
+              cursor: "pointer",
+              fontSize: 11,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: 0,
+            }}
+          >
+            Download
+            <ExternalLink size={10} />
+          </button>
         </div>
       )}
 
