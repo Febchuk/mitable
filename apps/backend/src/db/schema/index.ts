@@ -22,6 +22,7 @@ export * from "./recaps.schema";
 export * from "./daily-activities.schema";
 export * from "./ask-threads.schema";
 export * from "./graph-sync.schema";
+export * from "./api-keys.schema";
 
 // Agent chat schemas
 export * from "./agent-chats.schema";

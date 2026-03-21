@@ -10,6 +10,7 @@ import { correlationIdMiddleware } from "./middleware/correlationId.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { setupSentryErrorHandler } from "./lib/sentry.js";
+import { mcpRouter } from "./mcp/transport.js";
 
 export const app = express();
 
@@ -100,6 +101,7 @@ app.get("/", (req, res) => {
       apiDocs: "/api-docs",
       apiDocsJson: "/api-docs.json",
       api: "/api/*",
+      mcp: "/mcp",
     },
     links: {
       health: `${baseUrl}/health`,
@@ -119,6 +121,9 @@ app.get("/health", (_req, res) => {
     version: "0.1.0",
   });
 });
+
+// MCP endpoint — no rate limiter (API key auth handles access control)
+app.use("/mcp", mcpRouter);
 
 // API routes with rate limiting
 app.use("/api", generalLimiter, router);
