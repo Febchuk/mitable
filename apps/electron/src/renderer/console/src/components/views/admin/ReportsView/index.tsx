@@ -49,7 +49,7 @@ function formatTime(dateString: string): string {
   });
 }
 
-const REPORT_AVATAR_COLORS = ["#9B84E8", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
+const REPORT_AVATAR_COLORS = ["#C8A960", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
 
 function getAvatarColor(id: string): string {
   let hash = 0;
@@ -85,7 +85,10 @@ export default function ReportsView() {
           padding: "80px 0",
         }}
       >
-        <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
+        <Loader2
+          size={24}
+          style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
+        />
         <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading reports...</p>
       </div>
     );

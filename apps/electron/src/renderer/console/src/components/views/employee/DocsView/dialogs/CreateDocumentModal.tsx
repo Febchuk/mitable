@@ -232,10 +232,10 @@ export default function CreateDocumentModal({
                       gap: 5,
                       padding: "3px 8px",
                       borderRadius: 6,
-                      background: "rgba(155, 132, 232, 0.08)",
-                      border: "0.5px solid rgba(155, 132, 232, 0.2)",
+                      background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.08)",
+                      border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.2)",
                       fontSize: 11,
-                      color: "#9B84E8",
+                      color: "var(--mi-accent)",
                     }}
                   >
                     <Paperclip size={10} />
@@ -246,7 +246,7 @@ export default function CreateDocumentModal({
                         background: "none",
                         border: "none",
                         cursor: "pointer",
-                        color: "#9B84E8",
+                        color: "var(--mi-accent)",
                         padding: 0,
                         display: "flex",
                         marginLeft: 2,
@@ -268,7 +268,7 @@ export default function CreateDocumentModal({
                   gap: 5,
                   marginBottom: 10,
                   fontSize: 11,
-                  color: "#9B84E8",
+                  color: "var(--mi-accent)",
                 }}
               >
                 <Layers size={10} />
@@ -370,7 +370,7 @@ export default function CreateDocumentModal({
                     borderRadius: 6,
                     border: "none",
                     background: blocksOpen ? "rgba(236, 232, 224, 0.05)" : "transparent",
-                    color: selectedSessionIds.size > 0 ? "#9B84E8" : "#6B665C",
+                    color: selectedSessionIds.size > 0 ? "var(--mi-accent)" : "#6B665C",
                     fontSize: 12,
                     fontFamily: "var(--font-sans)",
                     cursor: "pointer",
@@ -388,8 +388,8 @@ export default function CreateDocumentModal({
                   {selectedSessionIds.size > 0 && (
                     <span
                       style={{
-                        background: "rgba(155, 132, 232, 0.15)",
-                        color: "#9B84E8",
+                        background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.15)",
+                        color: "var(--mi-accent)",
                         fontSize: 10,
                         fontWeight: 600,
                         padding: "1px 5px",
@@ -451,7 +451,9 @@ export default function CreateDocumentModal({
                               padding: "8px 14px",
                               cursor: "pointer",
                               transition: "background 0.1s ease",
-                              background: isSelected ? "rgba(155, 132, 232, 0.06)" : "transparent",
+                              background: isSelected
+                                ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.06)"
+                                : "transparent",
                             }}
                             onMouseEnter={(e) => {
                               if (!isSelected)
@@ -459,7 +461,7 @@ export default function CreateDocumentModal({
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background = isSelected
-                                ? "rgba(155, 132, 232, 0.06)"
+                                ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.06)"
                                 : "transparent";
                             }}
                           >
@@ -470,7 +472,7 @@ export default function CreateDocumentModal({
                                 height: 16,
                                 borderRadius: 4,
                                 border: isSelected ? "none" : "1px solid rgba(236, 232, 224, 0.15)",
-                                background: isSelected ? "#9B84E8" : "transparent",
+                                background: isSelected ? "var(--mi-accent)" : "transparent",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -523,7 +525,7 @@ export default function CreateDocumentModal({
                   height: 30,
                   borderRadius: 8,
                   border: "none",
-                  background: input.trim() ? "#9B84E8" : "rgba(236, 232, 224, 0.06)",
+                  background: input.trim() ? "var(--mi-accent)" : "rgba(236, 232, 224, 0.06)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -551,7 +553,10 @@ export default function CreateDocumentModal({
               gap: 16,
             }}
           >
-            <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
+            <Loader2
+              size={24}
+              style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
+            />
             <div style={{ textAlign: "center" }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>
                 {progress ? phaseLabels[progress.phase] || "Working..." : "Starting..."}

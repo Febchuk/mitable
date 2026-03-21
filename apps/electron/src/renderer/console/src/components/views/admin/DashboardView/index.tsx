@@ -24,8 +24,8 @@ const FILTER_TO_PERIOD: Record<TimeFilter, DashboardPeriod> = {
 
 const VALID_FILTERS = new Set<TimeFilter>(["yesterday", "week", "month", "ytd", "all"]);
 
-const DEEP_WORK_COLOR = "#9B84E8";
-const MEETINGS_COLOR = "#3D3068";
+const DEEP_WORK_COLOR = "#C8A960";
+const MEETINGS_COLOR = "#6B5A30";
 const AXIS_COLOR = "#9B9689";
 
 interface ChartDataPoint {

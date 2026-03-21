@@ -27,7 +27,7 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-const BAR_COLOR = "#9B84E8";
+const BAR_COLOR = "#C8A960";
 const GRANOLA_GREEN = "#C8E64A";
 const GRANOLA_BORDER = "rgba(200, 230, 74, 0.18)";
 const FIREFLIES_PINK = "#E84393";
@@ -141,7 +141,7 @@ function TaskRow({
         <ChevronRight
           size={12}
           style={{
-            color: expanded ? "#9B84E8" : "#6B665C",
+            color: expanded ? "var(--mi-accent)" : "#6B665C",
             flexShrink: 0,
             transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
             transition: "transform 0.15s ease",
@@ -242,7 +242,7 @@ export default function ActivityBlock({
   }, [isMeeting, block.summary]);
 
   // Accent colors differ per source
-  const accentColor = isGranola ? GRANOLA_GREEN : isFireflies ? FIREFLIES_PINK : "#9B84E8";
+  const accentColor = isGranola ? GRANOLA_GREEN : isFireflies ? FIREFLIES_PINK : "#C8A960";
   const meetingBorder = isGranola ? GRANOLA_BORDER : FIREFLIES_BORDER;
 
   const cardBorder = isActive
@@ -250,7 +250,7 @@ export default function ActivityBlock({
     : isExpanded
       ? isMeeting
         ? meetingBorder
-        : "rgba(155, 132, 232, 0.18)"
+        : "rgba(200, 169, 96, 0.18)"
       : "rgba(236, 232, 224, 0.08)";
 
   return (

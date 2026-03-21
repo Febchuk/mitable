@@ -93,9 +93,11 @@ export default function WeekStrip({
                 borderRadius: 8,
                 flex: 1,
                 minWidth: 0,
-                background: highlighted ? "rgba(155, 132, 232, 0.11)" : "transparent",
+                background: highlighted
+                  ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.11)"
+                  : "transparent",
                 border: highlighted
-                  ? "0.5px solid rgba(155, 132, 232, 0.22)"
+                  ? "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.22)"
                   : "0.5px solid transparent",
                 transition: "background 0.15s ease",
               }}
@@ -114,7 +116,11 @@ export default function WeekStrip({
               <span
                 style={{
                   fontSize: 10,
-                  color: highlighted ? "#9B84E8" : isToday ? "#9B84E8" : "#6B665C",
+                  color: highlighted
+                    ? "var(--mi-accent)"
+                    : isToday
+                      ? "var(--mi-accent)"
+                      : "#6B665C",
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                 }}
@@ -142,7 +148,7 @@ export default function WeekStrip({
                   borderRadius: "50%",
                   background: hasActivity
                     ? highlighted || isToday
-                      ? "#9B84E8"
+                      ? "var(--mi-accent)"
                       : "#6B665C"
                     : "transparent",
                 }}

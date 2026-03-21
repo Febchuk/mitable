@@ -200,7 +200,7 @@ export default function WorkflowOptions({
               flex items-center gap-3 px-5 py-2.5 rounded-[18px] text-left transition-all duration-200
               ${
                 selectedIndex === index
-                  ? "bg-[#8B5CF6] text-white ring-2 ring-[#8B5CF6] ring-offset-2 ring-offset-[#2A2A35] hover:scale-105 hover:shadow-lg"
+                  ? "bg-accent text-canvas-base ring-2 ring-accent ring-offset-2 ring-offset-[#2A2A35] hover:scale-105 hover:shadow-lg"
                   : "bg-[#3A3A45] text-white hover:bg-[#4A4A55] hover:scale-105 hover:shadow-lg"
               }
               ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}

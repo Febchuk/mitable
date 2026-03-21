@@ -272,7 +272,7 @@ export default function AgentView() {
           transition: "border-color 0.15s ease",
         }}
         onFocus={(e) => {
-          e.currentTarget.style.borderColor = "rgba(155, 132, 232, 0.3)";
+          e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.3)";
         }}
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget)) {
@@ -336,7 +336,8 @@ export default function AgentView() {
               width: 30,
               height: 30,
               borderRadius: 8,
-              background: input.trim() && !inputDisabled ? "#9B84E8" : "rgba(236, 232, 224, 0.06)",
+              background:
+                input.trim() && !inputDisabled ? "var(--mi-accent)" : "rgba(236, 232, 224, 0.06)",
               border: "none",
               display: "flex",
               alignItems: "center",
@@ -347,7 +348,7 @@ export default function AgentView() {
               opacity: input.trim() && !inputDisabled ? 1 : 0.4,
             }}
           >
-            <ArrowUp size={15} color="#fff" />
+            <ArrowUp size={15} color="#1A1916" />
           </button>
         )}
       </div>
@@ -418,6 +419,7 @@ export default function AgentView() {
         display: "flex",
         flexDirection: "column",
         minHeight: "calc(100vh - 120px)",
+        fontFamily: "var(--font-sans)",
       }}
     >
       {/* Browser bridge status */}
@@ -427,12 +429,13 @@ export default function AgentView() {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            padding: "6px 12px",
+            padding: "5px 10px",
             fontSize: 11,
-            borderRadius: 8,
-            marginBottom: 12,
-            background: bridgeConnected ? "rgba(74, 222, 128, 0.06)" : "rgba(251, 191, 36, 0.06)",
-            color: bridgeConnected ? "#4ade80" : "#fbbf24",
+            fontFamily: "var(--font-sans)",
+            borderRadius: 6,
+            marginBottom: 8,
+            background: bridgeConnected ? "rgba(58, 155, 107, 0.08)" : "rgba(251, 191, 36, 0.06)",
+            color: bridgeConnected ? "#3A9B6B" : "#fbbf24",
           }}
         >
           <span
@@ -440,7 +443,7 @@ export default function AgentView() {
               width: 5,
               height: 5,
               borderRadius: "50%",
-              background: bridgeConnected ? "#4ade80" : "#fbbf24",
+              background: bridgeConnected ? "#3A9B6B" : "#fbbf24",
               flexShrink: 0,
             }}
           />
@@ -503,8 +506,8 @@ export default function AgentView() {
             gap: 8,
             padding: "10px 14px",
             borderRadius: 10,
-            border: "0.5px solid rgba(155, 132, 232, 0.15)",
-            background: "rgba(155, 132, 232, 0.04)",
+            border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.15)",
+            background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.04)",
             marginTop: 12,
           }}
         >
@@ -536,8 +539,8 @@ export default function AgentView() {
               padding: "6px 12px",
               borderRadius: 7,
               border: "none",
-              background: "#9B84E8",
-              color: "#fff",
+              background: "var(--mi-accent)",
+              color: "#1A1916",
               fontSize: 12,
               fontWeight: 500,
               cursor: "pointer",
