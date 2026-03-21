@@ -894,8 +894,8 @@ export default function PersonDetail() {
                 width: 54,
                 height: 54,
                 borderRadius: 999,
-                background: "var(--mi-accent-bg)",
-                color: "var(--mi-accent)",
+                background: "rgba(236, 232, 224, 0.1)",
+                color: "#ECE8E0",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -904,12 +904,7 @@ export default function PersonDetail() {
                 flexShrink: 0,
               }}
             >
-              {person.name
-                .split(" ")
-                .filter(Boolean)
-                .map((part) => part[0])
-                .join("")
-                .slice(0, 2)}
+              {(person.name?.charAt(0) || "U").toUpperCase()}
             </div>
 
             <div>

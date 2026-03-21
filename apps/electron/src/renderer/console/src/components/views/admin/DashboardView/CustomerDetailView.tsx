@@ -34,14 +34,8 @@ const PROJECT_COLORS = [
   "#FB923C",
 ];
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+function getInitial(name: string): string {
+  return (name?.charAt(0) || "?").toUpperCase();
 }
 
 export default function CustomerDetailView() {
@@ -290,7 +284,7 @@ export default function CustomerDetailView() {
                 className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-canvas-overlay/50 transition-colors"
               >
                 {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-indigo/20 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-full bg-[rgba(236,232,224,0.1)] flex items-center justify-center shrink-0">
                   {member.avatarUrl ? (
                     <img
                       src={member.avatarUrl}
@@ -298,8 +292,8 @@ export default function CustomerDetailView() {
                       className="w-9 h-9 rounded-full object-cover"
                     />
                   ) : (
-                    <span className="text-xs font-semibold text-indigo">
-                      {getInitials(member.name || member.email || "?")}
+                    <span className="text-xs font-semibold text-[#ECE8E0]">
+                      {getInitial(member.name || member.email || "?")}
                     </span>
                   )}
                 </div>

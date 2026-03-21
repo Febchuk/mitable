@@ -45,13 +45,8 @@ const emptyActivity: UserActivityMeta = {
   indicatorColor: null,
 };
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function getInitial(name: string): string {
+  return (name?.charAt(0) || "U").toUpperCase();
 }
 
 function PersonRow({
@@ -99,7 +94,7 @@ function PersonRow({
           flexShrink: 0,
         }}
       >
-        {getInitials(user.name)}
+        {getInitial(user.name)}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
