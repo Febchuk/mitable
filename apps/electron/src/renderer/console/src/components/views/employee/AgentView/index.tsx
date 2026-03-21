@@ -477,6 +477,15 @@ export default function AgentView() {
           gap: 10,
           width: "100%",
           maxWidth: isCenter ? 560 : undefined,
+          transition: "border-color 0.15s ease",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.3)";
+        }}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.1)";
+          }
         }}
       >
         <textarea
