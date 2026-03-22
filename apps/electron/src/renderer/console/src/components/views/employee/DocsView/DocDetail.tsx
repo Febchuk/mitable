@@ -543,7 +543,7 @@ export default function DocDetail() {
                   gap: 7,
                   padding: "7px 12px",
                   borderRadius: 8,
-                  border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                  border: "var(--border-subtle)",
                   background: "transparent",
                   color: "var(--text-secondary)",
                   fontSize: 13,
@@ -682,7 +682,7 @@ export default function DocDetail() {
             style={{
               marginTop: 40,
               paddingTop: 20,
-              borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+              borderTop: "var(--border-hairline)",
             }}
           >
             <details>

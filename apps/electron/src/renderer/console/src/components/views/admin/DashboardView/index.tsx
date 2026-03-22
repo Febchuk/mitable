@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDashboardMetrics } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
-import { formatTopLevelDuration, topLevelDurationLabel } from "../shared/topLevelDuration";
+import { formatDashboardDuration, dashboardDurationLabel } from "../shared/topLevelDuration";
 
 type TimeFilter = "yesterday" | "week" | "month" | "ytd" | "all";
 
@@ -345,8 +345,16 @@ export default function DashboardView() {
     return apiData.metrics.totalTeamWorkMinutes + apiData.metrics.totalTeamMeetingMinutes;
   }, [apiData]);
 
-  const durationDisplay = useMemo(() => formatTopLevelDuration(totalMinutes), [totalMinutes]);
-  const durationLabel = useMemo(() => topLevelDurationLabel(totalMinutes), [totalMinutes]);
+  const userCount = apiData?.hasData ? apiData.metrics.totalUsersTracked : 1;
+
+  const durationDisplay = useMemo(
+    () => formatDashboardDuration(totalMinutes, filter, userCount),
+    [totalMinutes, filter, userCount]
+  );
+  const durationLabel = useMemo(
+    () => dashboardDurationLabel(totalMinutes, filter, userCount),
+    [totalMinutes, filter, userCount]
+  );
 
   const peopleActive = useMemo(() => {
     if (!apiData?.hasData) return "0";
@@ -489,7 +497,7 @@ export default function DashboardView() {
       <div
         style={{
           background: "var(--bg-raised)",
-          border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+          border: "var(--border-hairline)",
           borderRadius: 12,
           padding: "22px 24px 16px",
           flex: 1,

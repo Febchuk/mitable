@@ -497,7 +497,7 @@ function RecentWorkIcon({ kind }: { kind: RecentWorkFilter }) {
         width: 36,
         height: 36,
         borderRadius: 10,
-        border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+        border: "var(--border-subtle)",
         background: "rgba(var(--ui-rgb), 0.04)",
         display: "flex",
         alignItems: "center",
@@ -1059,7 +1059,7 @@ export default function PersonDetail() {
             <div
               style={{
                 background: "var(--bg-raised)",
-                border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+                border: "var(--border-hairline)",
                 borderRadius: 12,
                 padding: "22px 24px",
               }}
@@ -1167,7 +1167,7 @@ export default function PersonDetail() {
           <div
             style={{
               background: "var(--bg-raised)",
-              border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+              border: "var(--border-hairline)",
               borderRadius: 12,
               padding: "22px 24px",
             }}
@@ -1300,7 +1300,7 @@ export default function PersonDetail() {
         <div
           style={{
             background: "var(--bg-raised)",
-            border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+            border: "var(--border-hairline)",
             borderRadius: 12,
             padding: "22px 24px 16px",
             minHeight: 320,
@@ -1361,7 +1361,7 @@ export default function PersonDetail() {
         <div
           style={{
             background: "var(--bg-raised)",
-            border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+            border: "var(--border-hairline)",
             borderRadius: 12,
             padding: "22px 24px",
           }}
@@ -1410,7 +1410,7 @@ export default function PersonDetail() {
                     height: 36,
                     padding: "0 34px 0 34px",
                     borderRadius: 8,
-                    border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                    border: "var(--border-subtle)",
                     background: "var(--bg-base)",
                     color: "var(--text-primary)",
                     fontSize: 12,
@@ -1513,7 +1513,7 @@ export default function PersonDetail() {
                     padding: "14px 0",
                     background: "none",
                     border: "none",
-                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                    borderTop: "var(--border-hairline)",
                     cursor: "pointer",
                     textAlign: "left",
                   }}

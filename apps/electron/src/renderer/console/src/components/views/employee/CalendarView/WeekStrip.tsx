@@ -35,7 +35,7 @@ export default function WeekStrip({
     <div
       style={{
         background: "var(--bg-raised)",
-        border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+        border: "var(--border-hairline)",
         borderRadius: 12,
         padding: "14px 10px",
         display: "flex",

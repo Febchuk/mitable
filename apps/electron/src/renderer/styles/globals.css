@@ -45,6 +45,7 @@
     /* borders */
     --border-hairline: 0.5px solid rgba(var(--ui-rgb), 0.07);
     --border-subtle: 0.5px solid rgba(var(--ui-rgb), 0.10);
+    --divider: rgba(var(--ui-rgb), 0.06);
 
     /* typography */
     --font-sans: 'Inter', -apple-system, sans-serif;
@@ -126,6 +127,78 @@
     --sidebar-accent-foreground: 40 18% 90%;
     --sidebar-border: 36 8% 15%;
     --sidebar-ring: 190 42% 66%;
+  }
+
+  .light {
+    /* backgrounds — cream/off-white, white cards */
+    --bg-base: #F5F1ED;
+    --bg-raised: #FFFFFF;
+    --bg-overlay: #FFFFFF;
+    --bg-muted: #E8E2DC;
+
+    /* text — dark navy, never pure black */
+    --text-primary: #1C2B33;
+    --text-secondary: #5C6B73;
+    --text-tertiary: #8A9199;
+    --text-faint: #B0B7BC;
+
+    /* UI chrome RGB — flips to dark for borders/overlays on light bg */
+    --ui-rgb: 28, 43, 51;
+
+    /* accent — darker teal for contrast on light surfaces */
+    --mi-accent: #2A7F8E;
+    --mi-accent-rgb: 42, 127, 142;
+    --mi-accent-dark: #16697A;
+    --mi-accent-light: #82C0CC;
+    --mi-accent-bg: rgba(42, 127, 142, 0.08);
+    --mi-accent-border: rgba(42, 127, 142, 0.15);
+
+    /* status — slightly deeper for readability on cream */
+    --status-success: #2D8659;
+    --status-success-rgb: 45, 134, 89;
+    --status-warning: #B8854A;
+    --status-error: #D45555;
+    --status-error-rgb: 212, 85, 85;
+    --status-info: #3A85B5;
+
+    /* borders — higher opacity on light bg for equivalent visual weight */
+    --border-hairline: 0.5px solid rgba(28, 43, 51, 0.12);
+    --border-subtle: 0.5px solid rgba(28, 43, 51, 0.18);
+    --divider: rgba(28, 43, 51, 0.12);
+
+    /* shadcn compatibility */
+    --background: 24 26% 95%;
+    --foreground: 200 29% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 29% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 29% 16%;
+    --primary: 190 54% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 20% 89%;
+    --secondary-foreground: 200 29% 16%;
+    --muted: 24 20% 89%;
+    --muted-foreground: 196 10% 41%;
+    --accent: 24 20% 89%;
+    --accent-foreground: 200 29% 16%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 24 10% 80%;
+    --input: 24 10% 80%;
+    --ring: 190 54% 36%;
+    --chart-1: 190 54% 36%;
+    --chart-2: 152 50% 35%;
+    --chart-3: 30 50% 45%;
+    --chart-4: 196 10% 41%;
+    --chart-5: 0 60% 45%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 200 29% 16%;
+    --sidebar-primary: 190 54% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 24 20% 89%;
+    --sidebar-accent-foreground: 200 29% 16%;
+    --sidebar-border: 24 10% 80%;
+    --sidebar-ring: 190 54% 36%;
   }
 }
 

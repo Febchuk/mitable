@@ -171,7 +171,7 @@ export default function CreateDocumentModal({
         className="sm:max-w-[520px] p-0 overflow-visible"
         style={{
           background: "var(--bg-base)",
-          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+          border: "var(--border-subtle)",
           borderRadius: 14,
         }}
         showCloseButton={false}
@@ -312,7 +312,7 @@ export default function CreateDocumentModal({
                 alignItems: "center",
                 gap: 4,
                 marginTop: 12,
-                borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                borderTop: "var(--border-hairline)",
                 paddingTop: 12,
               }}
             >
@@ -419,7 +419,7 @@ export default function CreateDocumentModal({
                       maxHeight: 260,
                       overflowY: "auto",
                       background: "var(--bg-raised)",
-                      border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                      border: "var(--border-subtle)",
                       borderRadius: 10,
                       padding: "6px 0",
                       zIndex: 50,
@@ -628,7 +628,7 @@ export default function CreateDocumentModal({
                   marginTop: 14,
                   padding: "6px 14px",
                   borderRadius: 7,
-                  border: "0.5px solid rgba(var(--ui-rgb), 0.12)",
+                  border: "var(--border-subtle)",
                   background: "transparent",
                   color: "var(--text-primary)",
                   fontSize: 12,

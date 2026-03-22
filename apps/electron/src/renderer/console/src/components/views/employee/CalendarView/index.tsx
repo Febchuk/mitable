@@ -510,7 +510,7 @@ export default function CalendarView() {
                 gap: 6,
                 padding: "6px 12px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(var(--ui-rgb), 0.12)",
+                border: "var(--border-subtle)",
                 background: "transparent",
                 color: "var(--text-primary)",
                 fontSize: 12,
@@ -634,7 +634,7 @@ export default function CalendarView() {
                 {/* Divider between meetings and activity */}
                 {meetingBlocks.length > 0 && workBlocks.length > 0 && (
                   <div style={{ margin: "12px 0 8px" }}>
-                    <div style={{ height: "0.5px", background: "rgba(var(--ui-rgb), 0.06)" }} />
+                    <div style={{ height: "0.5px", background: "var(--divider)" }} />
                   </div>
                 )}
 

@@ -334,6 +334,16 @@ class PreferencesService {
     return this.setSummaryPreferences({ alwaysAskOnSessionEnd: value });
   }
 
+  // Theme / appearance preference
+  getTheme(): "dark" | "light" | "system" {
+    return (this.store.get("appearance.theme") as "dark" | "light" | "system") ?? "dark";
+  }
+
+  setTheme(theme: "dark" | "light" | "system"): void {
+    this.store.set("appearance.theme", theme);
+    logger.info(` Theme set to: ${theme}`);
+  }
+
   // Pill display mode preference (user-scoped)
   getUserPillDisplayMode(userId: string): "compact" | "expanded" {
     const userPrefs = this.store.get(`users.${userId}`, {});

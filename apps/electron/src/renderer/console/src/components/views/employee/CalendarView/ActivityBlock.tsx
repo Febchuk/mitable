@@ -124,7 +124,7 @@ function TaskRow({
   return (
     <div
       style={{
-        borderBottom: !isLast ? "0.5px solid rgba(var(--ui-rgb), 0.04)" : "none",
+        borderBottom: !isLast ? "var(--border-hairline)" : "none",
       }}
     >
       {/* Main row */}
@@ -504,7 +504,7 @@ export default function ActivityBlock({
                           background: "rgba(var(--ui-rgb), 0.05)",
                           padding: "3px 8px",
                           borderRadius: 4,
-                          border: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                          border: "var(--border-hairline)",
                         }}
                       >
                         {p.name || p.email}
@@ -614,7 +614,7 @@ export default function ActivityBlock({
                         padding: "7px 0",
                         borderBottom:
                           idx < block.appBreakdown.length - 1
-                            ? "0.5px solid rgba(var(--ui-rgb), 0.04)"
+                            ? "var(--border-hairline)"
                             : "none",
                       }}
                     >

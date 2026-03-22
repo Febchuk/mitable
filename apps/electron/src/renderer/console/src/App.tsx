@@ -40,6 +40,13 @@ import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
 import { useEffect, useRef } from "react";
+import { useTheme } from "./hooks/useTheme";
+
+// Applies stored theme class to <html> on mount and syncs across windows
+function ThemeInitializer() {
+  useTheme();
+  return null;
+}
 
 // Navigation handler - listens for IPC navigation events from main process
 function NavigationHandler() {
@@ -229,6 +236,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <HashRouter>
         <TooltipProvider>
+          <ThemeInitializer />
           <NavigationHandler />
           <MonitoringSessionHandler />
           <UpdateProvider>

@@ -68,7 +68,7 @@ function PersonRow({
         alignItems: "center",
         gap: 14,
         padding: "14px 0",
-        borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+        borderBottom: "var(--border-hairline)",
         cursor: "pointer",
         transition: "background 0.15s ease",
       }}
@@ -251,7 +251,7 @@ export default function PeopleView() {
                 height: 34,
                 padding: "0 12px 0 36px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                border: "var(--border-subtle)",
                 background: "var(--bg-raised)",
                 color: "var(--text-primary)",
                 fontSize: 13,
@@ -269,7 +269,7 @@ export default function PeopleView() {
               gap: 8,
               padding: "0 12px",
               borderRadius: 8,
-              border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+              border: "var(--border-subtle)",
               background: "var(--bg-overlay)",
               color: "var(--text-primary)",
               fontSize: 13,
@@ -283,7 +283,7 @@ export default function PeopleView() {
         </div>
       </div>
 
-      <div style={{ borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)" }}>
+      <div style={{ borderTop: "var(--border-hairline)" }}>
         {loading ? (
           <div style={{ padding: "64px 0", textAlign: "center" }}>
             <div

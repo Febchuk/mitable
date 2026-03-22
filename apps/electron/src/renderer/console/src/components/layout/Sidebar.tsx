@@ -51,7 +51,7 @@ export default function Sidebar() {
         minWidth: open ? 220 : 0,
         opacity: open ? 1 : 0,
         background: "var(--bg-raised)",
-        borderRight: open ? "0.5px solid rgba(var(--ui-rgb), 0.07)" : "none",
+        borderRight: open ? "var(--border-hairline)" : "none",
         display: "flex",
         flexDirection: "column",
         paddingBottom: open ? 12 : 0,
@@ -90,7 +90,7 @@ export default function Sidebar() {
             <div
               style={{
                 height: 0.5,
-                background: "rgba(var(--ui-rgb), 0.06)",
+                background: "var(--divider)",
                 margin: "0 -8px 4px",
               }}
             />
@@ -130,7 +130,7 @@ export default function Sidebar() {
         <div
           style={{
             height: 0.5,
-            background: "rgba(var(--ui-rgb), 0.06)",
+            background: "var(--divider)",
             margin: canSwitchRoles ? "4px -8px" : "0 -8px",
           }}
         />
@@ -204,7 +204,7 @@ export default function Sidebar() {
                 left: 0,
                 right: 0,
                 background: "var(--bg-overlay)",
-                border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                border: "var(--border-subtle)",
                 borderRadius: 8,
                 padding: 4,
                 zIndex: 50,
@@ -246,7 +246,7 @@ export default function Sidebar() {
               <div
                 style={{
                   height: 0.5,
-                  background: "rgba(var(--ui-rgb), 0.06)",
+                  background: "var(--divider)",
                   margin: "2px 8px",
                 }}
               />

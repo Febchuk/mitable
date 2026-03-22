@@ -55,7 +55,7 @@ function Field({
           height: 40,
           padding: "0 12px",
           borderRadius: 8,
-          border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+          border: "var(--border-subtle)",
           background: "var(--bg-base)",
           color: "var(--text-primary)",
           fontSize: 13,
@@ -95,7 +95,7 @@ function ToggleRow({
         borderRadius: 10,
         border: checked
           ? "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.25)"
-          : "0.5px solid rgba(var(--ui-rgb), 0.08)",
+          : "var(--border-subtle)",
         background: checked ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.05)" : "var(--bg-base)",
         cursor: "pointer",
         textAlign: "left",
@@ -277,7 +277,7 @@ export default function AddNewUser() {
                     height: 40,
                     padding: "0 12px",
                     borderRadius: 8,
-                    border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                    border: "var(--border-subtle)",
                     background: "var(--bg-base)",
                     color: "var(--text-primary)",
                     fontSize: 13,
@@ -291,7 +291,7 @@ export default function AddNewUser() {
                     width: 40,
                     height: 40,
                     borderRadius: 8,
-                    border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                    border: "var(--border-subtle)",
                     background: "var(--bg-base)",
                     display: "flex",
                     alignItems: "center",
@@ -319,7 +319,7 @@ export default function AddNewUser() {
                 height: 36,
                 padding: "0 14px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                border: "var(--border-subtle)",
                 background: "var(--bg-overlay)",
                 color: "var(--text-primary)",
                 fontSize: 13,
@@ -375,7 +375,7 @@ export default function AddNewUser() {
         <div
           style={{
             background: "var(--bg-raised)",
-            border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+            border: "var(--border-hairline)",
             borderRadius: 12,
             padding: 24,
             display: "flex",
@@ -386,7 +386,7 @@ export default function AddNewUser() {
           <div
             style={{
               paddingBottom: 16,
-              borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+              borderBottom: "var(--border-hairline)",
             }}
           >
             <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
@@ -438,7 +438,7 @@ export default function AddNewUser() {
         <div
           style={{
             background: "var(--bg-raised)",
-            border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+            border: "var(--border-hairline)",
             borderRadius: 12,
             padding: 24,
             display: "flex",
@@ -449,7 +449,7 @@ export default function AddNewUser() {
           <div
             style={{
               paddingBottom: 16,
-              borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+              borderBottom: "var(--border-hairline)",
             }}
           >
             <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
@@ -506,7 +506,7 @@ export default function AddNewUser() {
                 height: 36,
                 padding: "0 14px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                border: "var(--border-subtle)",
                 background: "transparent",
                 color: "var(--text-primary)",
                 fontSize: 13,

@@ -127,7 +127,7 @@ export default function ReportsView() {
             gap: 6,
             padding: "6px 12px",
             borderRadius: 8,
-            border: "0.5px solid rgba(var(--ui-rgb), 0.12)",
+            border: "var(--border-subtle)",
             background: "transparent",
             color: "var(--text-primary)",
             fontSize: 12,

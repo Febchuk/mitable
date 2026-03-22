@@ -1650,7 +1650,7 @@ export default function UserProfilePage() {
         style={{
           width: 200,
           minWidth: 200,
-          borderRight: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+          borderRight: "var(--border-hairline)",
           padding: "28px 12px",
           display: "flex",
           flexDirection: "column",
@@ -1726,7 +1726,7 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingBottom: 16,
-                    borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                    borderBottom: "var(--border-hairline)",
                   }}
                 >
                   <h2
@@ -1795,7 +1795,7 @@ export default function UserProfilePage() {
                           fontFamily: field.mono ? "monospace" : "inherit",
                           padding: "9px 12px",
                           borderRadius: 6,
-                          border: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                          border: "var(--border-hairline)",
                           background: "rgba(var(--ui-rgb), 0.03)",
                           textTransform: field.accent ? "capitalize" : undefined,
                           fontWeight: field.accent ? 500 : 400,
@@ -1832,7 +1832,7 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingBottom: 16,
-                    borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                    borderBottom: "var(--border-hairline)",
                   }}
                 >
                   <h2
@@ -1881,7 +1881,7 @@ export default function UserProfilePage() {
                           width: "100%",
                           height: 38,
                           borderRadius: 6,
-                          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                          border: "var(--border-subtle)",
                           background: "rgba(var(--ui-rgb), 0.03)",
                           padding: "0 36px 0 12px",
                           fontSize: 13,
@@ -1932,7 +1932,7 @@ export default function UserProfilePage() {
                           width: "100%",
                           height: 38,
                           borderRadius: 6,
-                          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                          border: "var(--border-subtle)",
                           background: "rgba(var(--ui-rgb), 0.03)",
                           padding: "0 36px 0 12px",
                           fontSize: 13,
@@ -2012,7 +2012,7 @@ export default function UserProfilePage() {
                           width: "100%",
                           height: 38,
                           borderRadius: 6,
-                          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                          border: "var(--border-subtle)",
                           background: "rgba(var(--ui-rgb), 0.03)",
                           padding: "0 36px 0 12px",
                           fontSize: 13,
@@ -2073,7 +2073,7 @@ export default function UserProfilePage() {
                       style={{
                         padding: 14,
                         borderRadius: 8,
-                        border: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                        border: "var(--border-hairline)",
                         background: "rgba(var(--ui-rgb), 0.02)",
                       }}
                     >
@@ -2141,7 +2141,7 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingTop: 24,
-                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                    borderTop: "var(--border-hairline)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 12,
@@ -2327,7 +2327,7 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingBottom: 16,
-                    borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                    borderBottom: "var(--border-hairline)",
                   }}
                 >
                   <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
@@ -2541,7 +2541,7 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingTop: 24,
-                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                    borderTop: "var(--border-hairline)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 12,
@@ -2737,7 +2737,7 @@ export default function UserProfilePage() {
                     <div
                       style={{
                         paddingBottom: 16,
-                        borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                        borderBottom: "var(--border-hairline)",
                       }}
                     >
                       <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
@@ -2831,7 +2831,7 @@ export default function UserProfilePage() {
               <div
                 style={{
                   paddingBottom: 16,
-                  borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                  borderBottom: "var(--border-hairline)",
                 }}
               >
                 <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
@@ -2891,7 +2891,7 @@ export default function UserProfilePage() {
               <div
                 style={{
                   paddingBottom: 16,
-                  borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                  borderBottom: "var(--border-hairline)",
                 }}
               >
                 <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
@@ -2917,7 +2917,7 @@ export default function UserProfilePage() {
                             height: 36,
                             borderRadius: 8,
                             background: "var(--bg-overlay)",
-                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                            border: "var(--border-subtle)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -2946,7 +2946,7 @@ export default function UserProfilePage() {
                             height: 36,
                             borderRadius: 8,
                             background: "var(--bg-overlay)",
-                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                            border: "var(--border-subtle)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -2978,7 +2978,7 @@ export default function UserProfilePage() {
                             height: 36,
                             borderRadius: 8,
                             background: "var(--bg-overlay)",
-                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                            border: "var(--border-subtle)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3010,7 +3010,7 @@ export default function UserProfilePage() {
                             height: 36,
                             borderRadius: 8,
                             background: "var(--bg-overlay)",
-                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                            border: "var(--border-subtle)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3048,7 +3048,7 @@ export default function UserProfilePage() {
                             height: 36,
                             borderRadius: 8,
                             background: "var(--bg-overlay)",
-                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                            border: "var(--border-subtle)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3185,7 +3185,7 @@ export default function UserProfilePage() {
                             fontWeight: 500,
                             color: "var(--text-primary)",
                             background: "rgba(var(--ui-rgb), 0.06)",
-                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                            border: "var(--border-subtle)",
                             cursor: integration.connecting ? "not-allowed" : "pointer",
                             opacity: integration.connecting ? 0.6 : 1,
                             transition: "background 0.15s ease",
@@ -3211,7 +3211,7 @@ export default function UserProfilePage() {
                       <div
                         style={{
                           height: 0.5,
-                          background: "rgba(var(--ui-rgb), 0.06)",
+                          background: "var(--divider)",
                         }}
                       />
                     )}
@@ -3303,7 +3303,7 @@ export default function UserProfilePage() {
               style={{
                 padding: 20,
                 borderRadius: 8,
-                border: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                border: "var(--border-hairline)",
                 background: "rgba(var(--ui-rgb), 0.02)",
               }}
             >
