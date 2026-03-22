@@ -48,8 +48,8 @@ const READ_ONLY_TOOLS = [
   "Grep",
   "WebSearch",
   "WebFetch",
-  "mcp__mitable__get_my_sessions",
-  "mcp__mitable__get_daily_summary",
+  "mcp__mitable__get_my_activity",
+  "mcp__mitable__get_activity_detail",
   "mcp__mitable__slack_list_channels",
   "mcp__mitable__browser_status",
   "mcp__mitable__browser_extract",
@@ -59,6 +59,11 @@ const READ_ONLY_TOOLS = [
   "mcp__mitable__browser_scroll",
   "mcp__mitable__browser_hover",
   "mcp__mitable__browser_read_element",
+  // Admin analytics tools (only registered when user is admin, but always in allowlist)
+  "mcp__mitable__list_team_members",
+  "mcp__mitable__query_org_metrics",
+  "mcp__mitable__query_user_metrics",
+  "mcp__mitable__query_session_summaries",
 ];
 
 // Phase 2: all tools including write/mutate
@@ -402,20 +407,28 @@ class AgentSdkService {
       Authorization: `Bearer ${accessToken}`,
     };
 
-    const getMySessionsTool = tool(
-      "get_my_sessions",
-      "Get the user's recent work sessions with summaries. Returns session data including what apps were used, key activities, and time spent.",
-      { days: z.number().optional().describe("Number of days to look back (default 7)") },
-      async ({ days }) => {
+    const getMyActivityTool = tool(
+      "get_my_activity",
+      "Get the user's activity across ALL content types for a date range: work sessions, meeting notes (Granola, Fireflies), activity blocks, daily summaries, and documents created. Returns a compact overview — use get_activity_detail to drill into any specific item. Max 31 days per query.",
+      {
+        start_date: z
+          .string()
+          .optional()
+          .describe("Start date YYYY-MM-DD (default: 7 days ago)"),
+        end_date: z.string().optional().describe("End date YYYY-MM-DD (default: today)"),
+      },
+      async ({ start_date, end_date }) => {
         try {
           const freshToken = authManager.getAccessToken();
           const headers = {
             ...authHeaders,
             ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
           };
-          const res = await fetch(`${apiUrl}/api/agent/tools/sessions?days=${days ?? 7}`, {
-            headers,
-          });
+          const params = new URLSearchParams();
+          if (start_date) params.set("start_date", start_date);
+          if (end_date) params.set("end_date", end_date);
+          const qs = params.toString() ? `?${params.toString()}` : "";
+          const res = await fetch(`${apiUrl}/api/agent/tools/activity${qs}`, { headers });
           const text = await res.text();
           return { content: [{ type: "text" as const, text }] };
         } catch (err) {
@@ -424,18 +437,26 @@ class AgentSdkService {
       }
     );
 
-    const getDailySummaryTool = tool(
-      "get_daily_summary",
-      "Get today's work activity summary including all sessions, apps used, and time breakdown.",
-      {},
-      async () => {
+    const getActivityDetailTool = tool(
+      "get_activity_detail",
+      "Drill into a specific activity item by ID. Use after get_my_activity to get full details: meeting transcripts, session task breakdowns, or document content.",
+      {
+        id: z.string().describe("The ID of the item (from get_my_activity results)"),
+        type: z
+          .enum(["block", "session", "document"])
+          .describe("Type of item: 'block' for activity/meeting blocks, 'session' for work sessions, 'document' for created docs"),
+      },
+      async ({ id, type }) => {
         try {
           const freshToken = authManager.getAccessToken();
           const headers = {
             ...authHeaders,
             ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
           };
-          const res = await fetch(`${apiUrl}/api/agent/tools/daily-summary`, { headers });
+          const res = await fetch(
+            `${apiUrl}/api/agent/tools/activity-detail?id=${encodeURIComponent(id)}&type=${type}`,
+            { headers }
+          );
           const text = await res.text();
           return { content: [{ type: "text" as const, text }] };
         } catch (err) {
@@ -952,11 +973,125 @@ class AgentSdkService {
       }
     );
 
+    // ── Admin Analytics Tools (only registered for admin users) ──
+    const adminTools = [];
+
+    if (authManager.isAdmin()) {
+      logger.info("Admin role detected — registering analytics tools");
+
+      const listTeamMembersTool = tool(
+        "list_team_members",
+        "List all tracked team members in the organization with names and roles. Call this first to know who you can query.",
+        {},
+        async () => {
+          try {
+            const freshToken = authManager.getAccessToken();
+            const headers = {
+              ...authHeaders,
+              ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+            };
+            const res = await fetch(`${apiUrl}/api/agent/tools/admin/team-members`, { headers });
+            const text = await res.text();
+            return { content: [{ type: "text" as const, text }] };
+          } catch (err) {
+            return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+          }
+        }
+      );
+
+      const queryOrgMetricsTool = tool(
+        "query_org_metrics",
+        "Get org-level productivity metrics for a date range (max 31 days). Returns averages, category breakdown, and daily trend.",
+        {
+          start_date: z.string().describe("Start date YYYY-MM-DD"),
+          end_date: z.string().describe("End date YYYY-MM-DD"),
+        },
+        async ({ start_date, end_date }) => {
+          try {
+            const freshToken = authManager.getAccessToken();
+            const headers = {
+              ...authHeaders,
+              ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+            };
+            const res = await fetch(
+              `${apiUrl}/api/agent/tools/admin/org-metrics?start_date=${start_date}&end_date=${end_date}`,
+              { headers }
+            );
+            const text = await res.text();
+            return { content: [{ type: "text" as const, text }] };
+          } catch (err) {
+            return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+          }
+        }
+      );
+
+      const queryUserMetricsTool = tool(
+        "query_user_metrics",
+        "Get detailed productivity metrics for a specific team member (max 31 days). Returns daily breakdown, categories, and day summaries. Use the person's name (e.g. 'Emily' or 'Emily Chen').",
+        {
+          user_name: z.string().describe("Name of the team member (e.g. 'Emily' or 'Emily Chen')"),
+          start_date: z.string().describe("Start date YYYY-MM-DD"),
+          end_date: z.string().describe("End date YYYY-MM-DD"),
+        },
+        async ({ user_name, start_date, end_date }) => {
+          try {
+            const freshToken = authManager.getAccessToken();
+            const headers = {
+              ...authHeaders,
+              ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+            };
+            const res = await fetch(
+              `${apiUrl}/api/agent/tools/admin/user-metrics?user_name=${encodeURIComponent(user_name)}&start_date=${start_date}&end_date=${end_date}`,
+              { headers }
+            );
+            const text = await res.text();
+            return { content: [{ type: "text" as const, text }] };
+          } catch (err) {
+            return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+          }
+        }
+      );
+
+      const querySessionSummariesTool = tool(
+        "query_session_summaries",
+        "Get individual session summaries for a team member (max 31 days, 20 sessions). Returns session titles, durations, and narrative summaries.",
+        {
+          user_name: z.string().describe("Name of the team member"),
+          start_date: z.string().describe("Start date YYYY-MM-DD"),
+          end_date: z.string().describe("End date YYYY-MM-DD"),
+        },
+        async ({ user_name, start_date, end_date }) => {
+          try {
+            const freshToken = authManager.getAccessToken();
+            const headers = {
+              ...authHeaders,
+              ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+            };
+            const res = await fetch(
+              `${apiUrl}/api/agent/tools/admin/session-summaries?user_name=${encodeURIComponent(user_name)}&start_date=${start_date}&end_date=${end_date}`,
+              { headers }
+            );
+            const text = await res.text();
+            return { content: [{ type: "text" as const, text }] };
+          } catch (err) {
+            return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+          }
+        }
+      );
+
+      adminTools.push(
+        listTeamMembersTool,
+        queryOrgMetricsTool,
+        queryUserMetricsTool,
+        querySessionSummariesTool
+      );
+    }
+
     return createSdkMcpServer({
       name: "mitable",
       tools: [
-        getMySessionsTool,
-        getDailySummaryTool,
+        getMyActivityTool,
+        getActivityDetailTool,
         slackChannelsTool,
         slackSendTool,
         browserStatusTool,
@@ -975,6 +1110,7 @@ class AgentSdkService {
         browserTabOpenTool,
         browserTabCloseTool,
         browserKeyboardTool,
+        ...adminTools,
       ],
     });
   }
@@ -1001,6 +1137,26 @@ You have a memory directory at ~/.mitable/agent/memory/. Files here persist acro
 ${memoryContent}`
       : "";
 
+    const adminSection = authManager.isAdmin()
+      ? `
+7. **Team Analytics** (admin-only): Query any team member's productivity data
+   - \`list_team_members\` — see who's in the org
+   - \`query_user_metrics\` — get a specific person's daily metrics, categories, accomplishments
+   - \`query_org_metrics\` — get org-wide aggregated trends
+   - \`query_session_summaries\` — get a person's session summaries with task breakdowns
+   - All queries are capped at 31 days per call. For longer periods, make multiple queries.
+   - Use \`list_team_members\` first to resolve names before querying metrics.`
+      : "";
+
+    const adminRules = authManager.isAdmin()
+      ? `
+- You have admin access: you can query ANY team member's data using the analytics tools
+- When asked about a specific person, call list_team_members first, then query their metrics
+- For comparisons between people, make separate query_user_metrics calls for each person
+- Always reference actual numbers from the tool results — never fabricate data
+- Date ranges are capped at 31 days per query. For "last 3 months", make 3 separate monthly queries`
+      : "";
+
     const basePrompt = `You are Mitable Agent — a personal AI assistant that helps users take action based on their captured work context.
 
 ## Your Capabilities
@@ -1009,7 +1165,7 @@ ${memoryContent}`
 3. **Web**: Search the web and fetch pages
 4. **Work context**: Access the user's captured work sessions, activity data, and daily summaries via Mitable tools
 5. **Integrations**: Send Slack messages (more integrations coming)
-6. **Browser control**: Navigate, screenshot, scroll, click, type, select, hover, keyboard, inspect elements, execute JS, manage tabs, and extract content in Chrome (requires Mitable Chrome Extension)
+6. **Browser control**: Navigate, screenshot, scroll, click, type, select, hover, keyboard, inspect elements, execute JS, manage tabs, and extract content in Chrome (requires Mitable Chrome Extension)${adminSection}
 
 ${memorySection}
 
@@ -1020,11 +1176,12 @@ The user may have edited these to correct or refine them.
 ${skillsSection}
 
 ## Rules
-- Use Mitable tools (get_my_sessions, get_daily_summary) to gather context before acting when the user asks about their work
+- When the user asks about their work, ALWAYS call get_my_activity first — it returns ALL content types (sessions, meeting notes, activity blocks, documents) for a date range
+- Use get_activity_detail to drill into specific items when more detail is needed (e.g. meeting transcripts, task breakdowns, document content)
 - For integration actions (Slack, Linear, Gmail), ALWAYS confirm the message content and target with the user before sending
 - Match the user's communication style from their skills when drafting messages
 - Be concise — users want quick actions, not essays
-- When asked about work patterns or time spent, use the session data tools to give data-driven answers`;
+- When asked about work patterns or time spent, use get_my_activity to give data-driven answers across ALL activity types, not just sessions${adminRules}`;
 
     return isPlanPhase ? basePrompt + PLAN_MODE_INSTRUCTIONS : basePrompt;
   }

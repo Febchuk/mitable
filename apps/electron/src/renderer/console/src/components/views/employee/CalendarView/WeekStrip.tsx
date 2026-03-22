@@ -40,7 +40,7 @@ export default function WeekStrip({
         padding: "14px 10px",
         display: "flex",
         alignItems: "center",
-        gap: 2,
+        gap: 6,
       }}
     >
       {/* Prev arrow */}
@@ -70,7 +70,7 @@ export default function WeekStrip({
       </button>
 
       {/* Days */}
-      <div style={{ flex: 1, display: "flex", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", gap: 6, minWidth: 0 }}>
         {weekDays.map((day, i) => {
           const isToday = isSameDay(day.date, today);
           const isSelected = isSameDay(day.date, selectedDate);

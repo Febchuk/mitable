@@ -6,7 +6,8 @@ import { slackService } from "../services/slack.service.js";
 import { createLogger } from "../lib/logger.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and, desc, gte } from "drizzle-orm";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { AskEnvironment } from "../services/rlm/ask-environment.js";
 
 const logger = createLogger({ module: "AgentRoutes" });
 const agentRouter = Router();
@@ -132,13 +133,81 @@ agentRouter.post("/generate-skills", async (req: Request, res: Response) => {
 // ── Integration Tool Endpoints ───────────────────────────────────────
 // These endpoints are called by the Electron-side Agent SDK as custom MCP tools.
 
-// Session data: recent sessions (default: last 7 days, max 20)
-agentRouter.get("/tools/sessions", async (req: Request, res: Response) => {
+// Unified activity scan: queries activity_blocks, daily_activities, sessions, and documents
+// for a date range (max 31 days). Returns a compact overview across ALL content types.
+agentRouter.get("/tools/activity", async (req: Request, res: Response) => {
   try {
-    const days = parseInt(req.query.days as string) || 7;
-    const since = new Date();
-    since.setDate(since.getDate() - days);
+    const startDate = req.query.start_date as string | undefined;
+    const endDate = req.query.end_date as string | undefined;
 
+    // Default: last 7 days
+    const end = endDate ? new Date(endDate + "T23:59:59Z") : new Date();
+    const start = startDate
+      ? new Date(startDate + "T00:00:00Z")
+      : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Cap at 31 days
+    const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays > 31) {
+      res.status(400).json({ error: "Date range cannot exceed 31 days" });
+      return;
+    }
+
+    // 1. Activity blocks (meetings + work blocks from Day Analyzer — includes Granola/Fireflies)
+    const blocks = await db
+      .select({
+        id: schema.activityBlocks.id,
+        blockType: schema.activityBlocks.blockType,
+        name: schema.activityBlocks.name,
+        description: schema.activityBlocks.description,
+        startTime: schema.activityBlocks.startTime,
+        endTime: schema.activityBlocks.endTime,
+        durationMinutes: schema.activityBlocks.durationMinutes,
+        category: schema.activityBlocks.category,
+        participants: schema.activityBlocks.participants,
+        apps: schema.activityBlocks.apps,
+        topicName: schema.activityBlocks.topicName,
+        subscriberName: schema.activityBlocks.subscriberName,
+      })
+      .from(schema.activityBlocks)
+      .where(
+        and(
+          eq(schema.activityBlocks.userId, req.userId!),
+          gte(schema.activityBlocks.startTime, start),
+          lte(schema.activityBlocks.startTime, end)
+        )
+      )
+      .orderBy(desc(schema.activityBlocks.startTime))
+      .limit(50);
+
+    // 2. Daily activity rollups (pre-aggregated summaries, accomplishments, metrics)
+    const startDateStr = start.toISOString().split("T")[0];
+    const endDateStr = end.toISOString().split("T")[0];
+
+    const dailyActivities = await db
+      .select({
+        id: schema.userDailyActivities.id,
+        activityDate: schema.userDailyActivities.activityDate,
+        totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
+        totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
+        totalSessions: schema.userDailyActivities.totalSessions,
+        daySummary: schema.userDailyActivities.daySummary,
+        keyAccomplishments: schema.userDailyActivities.keyAccomplishments,
+        categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
+      })
+      .from(schema.userDailyActivities)
+      .where(
+        and(
+          eq(schema.userDailyActivities.userId, req.userId!),
+          gte(schema.userDailyActivities.activityDate, startDateStr),
+          lte(schema.userDailyActivities.activityDate, endDateStr),
+          eq(schema.userDailyActivities.periodType, "daily")
+        )
+      )
+      .orderBy(desc(schema.userDailyActivities.activityDate))
+      .limit(31);
+
+    // 3. Sessions with summaries (task breakdowns, accomplishments, blockers)
     const sessions = await db
       .select({
         id: schema.monitoringSessions.id,
@@ -148,55 +217,152 @@ agentRouter.get("/tools/sessions", async (req: Request, res: Response) => {
         startedAt: schema.monitoringSessions.startedAt,
         endedAt: schema.monitoringSessions.endedAt,
         finalSummary: schema.monitoringSessions.finalSummary,
-        keyActivities: schema.monitoringSessions.keyActivities,
+        taskBreakdown: schema.monitoringSessions.taskBreakdown,
+        accomplishments: schema.monitoringSessions.accomplishments,
+        blockers: schema.monitoringSessions.blockers,
       })
       .from(schema.monitoringSessions)
       .where(
         and(
           eq(schema.monitoringSessions.userId, req.userId!),
-          gte(schema.monitoringSessions.startedAt, since)
+          gte(schema.monitoringSessions.startedAt, start),
+          lte(schema.monitoringSessions.startedAt, end)
         )
       )
       .orderBy(desc(schema.monitoringSessions.startedAt))
       .limit(20);
 
-    res.json({ sessions });
+    // 4. Documents created in range
+    const documents = await db
+      .select({
+        id: schema.documents.id,
+        title: schema.documents.title,
+        docType: schema.documents.docType,
+        status: schema.documents.status,
+        description: schema.documents.description,
+        createdAt: schema.documents.createdAt,
+      })
+      .from(schema.documents)
+      .where(
+        and(
+          eq(schema.documents.createdBy, req.userId!),
+          gte(schema.documents.createdAt, start),
+          lte(schema.documents.createdAt, end)
+        )
+      )
+      .orderBy(desc(schema.documents.createdAt))
+      .limit(20);
+
+    res.json({
+      dateRange: { start: startDateStr, end: endDateStr },
+      activityBlocks: blocks,
+      dailySummaries: dailyActivities,
+      sessions,
+      documents,
+    });
   } catch (error) {
-    logger.error({ error }, "Failed to fetch sessions");
-    res.status(500).json({ error: "Failed to fetch sessions" });
+    logger.error({ error }, "Failed to fetch activity");
+    res.status(500).json({ error: "Failed to fetch activity" });
   }
 });
 
-// Session data: all sessions that started today (midnight-relative, UTC)
-agentRouter.get("/tools/daily-summary", async (req: Request, res: Response) => {
+// Drill into a specific activity item by ID and type
+agentRouter.get("/tools/activity-detail", async (req: Request, res: Response) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { id, type } = req.query as { id?: string; type?: string };
+    if (!id || !type) {
+      res.status(400).json({ error: "id and type required (type: block | session | document)" });
+      return;
+    }
 
-    const sessions = await db
-      .select({
-        id: schema.monitoringSessions.id,
-        name: schema.monitoringSessions.name,
-        sessionType: schema.monitoringSessions.sessionType,
-        startedAt: schema.monitoringSessions.startedAt,
-        endedAt: schema.monitoringSessions.endedAt,
-        finalSummary: schema.monitoringSessions.finalSummary,
-        keyActivities: schema.monitoringSessions.keyActivities,
-        timeBreakdown: schema.monitoringSessions.timeBreakdown,
-      })
-      .from(schema.monitoringSessions)
-      .where(
-        and(
-          eq(schema.monitoringSessions.userId, req.userId!),
-          gte(schema.monitoringSessions.startedAt, today)
+    if (type === "block") {
+      const [block] = await db
+        .select({
+          id: schema.activityBlocks.id,
+          blockType: schema.activityBlocks.blockType,
+          name: schema.activityBlocks.name,
+          description: schema.activityBlocks.description,
+          rawTranscript: schema.activityBlocks.rawTranscript,
+          startTime: schema.activityBlocks.startTime,
+          endTime: schema.activityBlocks.endTime,
+          durationMinutes: schema.activityBlocks.durationMinutes,
+          category: schema.activityBlocks.category,
+          participants: schema.activityBlocks.participants,
+          apps: schema.activityBlocks.apps,
+          topicName: schema.activityBlocks.topicName,
+          subscriberName: schema.activityBlocks.subscriberName,
+        })
+        .from(schema.activityBlocks)
+        .where(
+          and(eq(schema.activityBlocks.id, id), eq(schema.activityBlocks.userId, req.userId!))
         )
-      )
-      .orderBy(desc(schema.monitoringSessions.startedAt));
+        .limit(1);
 
-    res.json({ date: today.toISOString().split("T")[0], sessions });
+      if (!block) {
+        res.status(404).json({ error: "Activity block not found" });
+        return;
+      }
+      res.json({ type: "block", data: block });
+    } else if (type === "session") {
+      const [session] = await db
+        .select({
+          id: schema.monitoringSessions.id,
+          name: schema.monitoringSessions.name,
+          sessionType: schema.monitoringSessions.sessionType,
+          status: schema.monitoringSessions.status,
+          startedAt: schema.monitoringSessions.startedAt,
+          endedAt: schema.monitoringSessions.endedAt,
+          finalSummary: schema.monitoringSessions.finalSummary,
+          keyActivities: schema.monitoringSessions.keyActivities,
+          taskBreakdown: schema.monitoringSessions.taskBreakdown,
+          timeBreakdown: schema.monitoringSessions.timeBreakdown,
+          accomplishments: schema.monitoringSessions.accomplishments,
+          blockers: schema.monitoringSessions.blockers,
+        })
+        .from(schema.monitoringSessions)
+        .where(
+          and(
+            eq(schema.monitoringSessions.id, id),
+            eq(schema.monitoringSessions.userId, req.userId!)
+          )
+        )
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      res.json({ type: "session", data: session });
+    } else if (type === "document") {
+      const [doc] = await db
+        .select({
+          id: schema.documents.id,
+          title: schema.documents.title,
+          docType: schema.documents.docType,
+          status: schema.documents.status,
+          description: schema.documents.description,
+          content: schema.documents.content,
+          tags: schema.documents.tags,
+          createdAt: schema.documents.createdAt,
+          updatedAt: schema.documents.updatedAt,
+        })
+        .from(schema.documents)
+        .where(
+          and(eq(schema.documents.id, id), eq(schema.documents.createdBy, req.userId!))
+        )
+        .limit(1);
+
+      if (!doc) {
+        res.status(404).json({ error: "Document not found" });
+        return;
+      }
+      res.json({ type: "document", data: doc });
+    } else {
+      res.status(400).json({ error: "Invalid type. Must be: block, session, or document" });
+    }
   } catch (error) {
-    logger.error({ error }, "Failed to fetch daily summary");
-    res.status(500).json({ error: "Failed to fetch daily summary" });
+    logger.error({ error }, "Failed to fetch activity detail");
+    res.status(500).json({ error: "Failed to fetch activity detail" });
   }
 });
 
@@ -226,6 +392,283 @@ agentRouter.post("/tools/slack/send", async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, "Failed to send Slack message");
     res.status(500).json({ error: "Failed to send Slack message" });
+  }
+});
+
+// ── Admin Analytics Tool Endpoints ───────────────────────────────────
+// These endpoints are admin-only and reuse the AskEnvironment for bounded data.
+// The Electron-side agent conditionally registers these tools based on user role.
+
+async function requireAdminRole(req: Request, res: Response): Promise<boolean> {
+  const [user] = await db
+    .select({ role: schema.users.role })
+    .from(schema.users)
+    .where(eq(schema.users.id, req.userId!))
+    .limit(1);
+
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ error: "Admin access required" });
+    return false;
+  }
+  return true;
+}
+
+// List all team members in the org
+agentRouter.get("/tools/admin/team-members", async (req: Request, res: Response) => {
+  try {
+    if (!(await requireAdminRole(req, res))) return;
+    const env = new AskEnvironment(req.organizationId!);
+    const result = await env.listTeamMembers();
+    res.json(result);
+  } catch (error) {
+    logger.error({ error }, "Failed to list team members");
+    res.status(500).json({ error: "Failed to list team members" });
+  }
+});
+
+// Get org-level productivity metrics for a date range (max 31 days)
+agentRouter.get("/tools/admin/org-metrics", async (req: Request, res: Response) => {
+  try {
+    if (!(await requireAdminRole(req, res))) return;
+    const { start_date, end_date } = req.query as { start_date?: string; end_date?: string };
+    if (!start_date || !end_date) {
+      res.status(400).json({ error: "start_date and end_date required (YYYY-MM-DD)" });
+      return;
+    }
+    const env = new AskEnvironment(req.organizationId!);
+    const result = await env.queryOrgMetrics(start_date, end_date);
+    res.json(result);
+  } catch (error) {
+    logger.error({ error }, "Failed to query org metrics");
+    res.status(500).json({ error: "Failed to query org metrics" });
+  }
+});
+
+// Get detailed metrics for a specific team member (max 31 days)
+agentRouter.get("/tools/admin/user-metrics", async (req: Request, res: Response) => {
+  try {
+    if (!(await requireAdminRole(req, res))) return;
+    const { user_name, start_date, end_date } = req.query as {
+      user_name?: string;
+      start_date?: string;
+      end_date?: string;
+    };
+    if (!user_name || !start_date || !end_date) {
+      res.status(400).json({ error: "user_name, start_date, and end_date required" });
+      return;
+    }
+    const env = new AskEnvironment(req.organizationId!);
+    const result = await env.queryUserMetrics(user_name, start_date, end_date);
+    res.json(result);
+  } catch (error) {
+    logger.error({ error }, "Failed to query user metrics");
+    res.status(500).json({ error: "Failed to query user metrics" });
+  }
+});
+
+// Get session summaries for a specific team member (max 31 days, 20 sessions)
+agentRouter.get("/tools/admin/session-summaries", async (req: Request, res: Response) => {
+  try {
+    if (!(await requireAdminRole(req, res))) return;
+    const { user_name, start_date, end_date } = req.query as {
+      user_name?: string;
+      start_date?: string;
+      end_date?: string;
+    };
+    if (!user_name || !start_date || !end_date) {
+      res.status(400).json({ error: "user_name, start_date, and end_date required" });
+      return;
+    }
+    const env = new AskEnvironment(req.organizationId!);
+    const result = await env.querySessionSummaries(user_name, start_date, end_date);
+    res.json(result);
+  } catch (error) {
+    logger.error({ error }, "Failed to query session summaries");
+    res.status(500).json({ error: "Failed to query session summaries" });
+  }
+});
+
+// ── Agent Chat Persistence ───────────────────────────────────────────
+
+// List conversations for current user (newest first)
+agentRouter.get("/chats", async (req: Request, res: Response) => {
+  try {
+    const conversations = await db
+      .select({
+        id: schema.agentConversations.id,
+        title: schema.agentConversations.title,
+        sessionId: schema.agentConversations.sessionId,
+        createdAt: schema.agentConversations.createdAt,
+        updatedAt: schema.agentConversations.updatedAt,
+      })
+      .from(schema.agentConversations)
+      .where(eq(schema.agentConversations.userId, req.userId!))
+      .orderBy(desc(schema.agentConversations.updatedAt));
+
+    res.json({ conversations });
+  } catch (error) {
+    logger.error({ error }, "Failed to list agent chats");
+    res.status(500).json({ error: "Failed to list agent chats" });
+  }
+});
+
+// Create a new conversation
+agentRouter.post("/chats", async (req: Request, res: Response) => {
+  try {
+    const { id, title } = req.body as { id?: string; title?: string };
+
+    const [conversation] = await db
+      .insert(schema.agentConversations)
+      .values({
+        ...(id ? { id } : {}),
+        userId: req.userId!,
+        organizationId: req.organizationId!,
+        title: title || "New chat",
+      })
+      .returning();
+
+    res.json({ conversation });
+  } catch (error) {
+    logger.error({ error }, "Failed to create agent chat");
+    res.status(500).json({ error: "Failed to create agent chat" });
+  }
+});
+
+// Get a conversation with its messages
+agentRouter.get("/chats/:id", async (req: Request, res: Response) => {
+  try {
+    const [conversation] = await db
+      .select()
+      .from(schema.agentConversations)
+      .where(
+        and(
+          eq(schema.agentConversations.id, req.params.id),
+          eq(schema.agentConversations.userId, req.userId!)
+        )
+      );
+
+    if (!conversation) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    const messages = await db
+      .select()
+      .from(schema.agentMessages)
+      .where(eq(schema.agentMessages.conversationId, req.params.id))
+      .orderBy(schema.agentMessages.createdAt);
+
+    res.json({ conversation, messages });
+  } catch (error) {
+    logger.error({ error }, "Failed to get agent chat");
+    res.status(500).json({ error: "Failed to get agent chat" });
+  }
+});
+
+// Rename a conversation
+agentRouter.patch("/chats/:id", async (req: Request, res: Response) => {
+  try {
+    const { title, sessionId } = req.body as { title?: string; sessionId?: string };
+
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (title !== undefined) updates.title = title;
+    if (sessionId !== undefined) updates.sessionId = sessionId;
+
+    const [updated] = await db
+      .update(schema.agentConversations)
+      .set(updates)
+      .where(
+        and(
+          eq(schema.agentConversations.id, req.params.id),
+          eq(schema.agentConversations.userId, req.userId!)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    res.json({ conversation: updated });
+  } catch (error) {
+    logger.error({ error }, "Failed to update agent chat");
+    res.status(500).json({ error: "Failed to update agent chat" });
+  }
+});
+
+// Delete a conversation (cascades to messages)
+agentRouter.delete("/chats/:id", async (req: Request, res: Response) => {
+  try {
+    const [deleted] = await db
+      .delete(schema.agentConversations)
+      .where(
+        and(
+          eq(schema.agentConversations.id, req.params.id),
+          eq(schema.agentConversations.userId, req.userId!)
+        )
+      )
+      .returning({ id: schema.agentConversations.id });
+
+    if (!deleted) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Failed to delete agent chat");
+    res.status(500).json({ error: "Failed to delete agent chat" });
+  }
+});
+
+// Add a message to a conversation
+agentRouter.post("/chats/:id/messages", async (req: Request, res: Response) => {
+  try {
+    const { role, content, toolCalls } = req.body as {
+      role: string;
+      content: string;
+      toolCalls?: Array<{ name: string; input?: unknown; detail?: string }>;
+    };
+
+    if (!role || !content) {
+      res.status(400).json({ error: "role and content required" });
+      return;
+    }
+
+    const [message] = await db
+      .insert(schema.agentMessages)
+      .values({
+        conversationId: req.params.id,
+        role,
+        content,
+        toolCalls: toolCalls || [],
+      })
+      .returning();
+
+    // Update conversation timestamp + auto-title from first user message
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+    if (role === "user") {
+      const [convo] = await db
+        .select({ title: schema.agentConversations.title })
+        .from(schema.agentConversations)
+        .where(eq(schema.agentConversations.id, req.params.id));
+
+      if (convo?.title === "New chat") {
+        updates.title = content.length > 60 ? content.slice(0, 57) + "..." : content;
+      }
+    }
+
+    await db
+      .update(schema.agentConversations)
+      .set(updates)
+      .where(eq(schema.agentConversations.id, req.params.id));
+
+    res.json({ message });
+  } catch (error) {
+    logger.error({ error }, "Failed to add agent message");
+    res.status(500).json({ error: "Failed to add agent message" });
   }
 });
 

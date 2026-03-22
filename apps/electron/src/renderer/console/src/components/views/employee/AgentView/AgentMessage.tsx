@@ -78,9 +78,10 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
           style={{
             borderLeft: "2px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.25)",
             paddingLeft: 14,
-            fontSize: 14,
-            lineHeight: 1.7,
+            fontSize: 15,
+            lineHeight: 1.75,
             color: "#ECE8E0",
+            letterSpacing: "-0.01em",
             wordBreak: "break-word",
           }}
         >
@@ -116,9 +117,10 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
     <div
       style={{
         padding: "14px 0",
-        fontSize: 14,
+        fontSize: 15,
         lineHeight: 1.75,
         color: "#ECE8E0",
+        letterSpacing: "-0.01em",
         wordBreak: "break-word",
       }}
     >

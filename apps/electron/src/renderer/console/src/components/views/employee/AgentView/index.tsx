@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowUp,
   Square,
@@ -12,14 +12,17 @@ import {
   Lightbulb,
 } from "lucide-react";
 import AgentMessage, { AgentThinking } from "./AgentMessage";
+import ChatHistorySidebar from "./ChatHistorySidebar";
 import { useUser } from "../../../../context/UserContext";
-
-function generateId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
-}
+import {
+  useAgentChats,
+  useAgentChat,
+  useCreateAgentChat,
+  useDeleteAgentChat,
+  useRenameAgentChat,
+  useAddAgentMessage,
+  useUpdateAgentChatSession,
+} from "../../../../hooks/queries/agent-chats";
 
 interface ChatMessage {
   id: string;
@@ -27,6 +30,13 @@ interface ChatMessage {
   content: string;
   toolName?: string;
   isPlan?: boolean;
+}
+
+function generateId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
 const SUGGESTION_CHIPS = [
@@ -59,6 +69,7 @@ function getGreeting(): string {
 export default function AgentView() {
   const { user } = useUser();
   const navigate = useNavigate();
+  const { chatId } = useParams<{ chatId: string }>();
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "";
   const [agentAllowed, setAgentAllowed] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -66,10 +77,46 @@ export default function AgentView() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTool, setActiveTool] = useState<{ name: string; detail?: string } | null>(null);
   const [pendingPlan, setPendingPlan] = useState(false);
-  const [conversationId] = useState(() => generateId());
+  // API hooks
+  const { data: conversations = [] } = useAgentChats();
+  const createChat = useCreateAgentChat();
+  const deleteChat = useDeleteAgentChat();
+  const renameChat = useRenameAgentChat();
+  const addMessage = useAddAgentMessage();
+  const updateSession = useUpdateAgentChatSession();
+
+  // The active conversation ID — from URL or null (new chat)
+  const activeIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const turnStartIndexRef = useRef<number>(0);
+  const turnToolCallsRef = useRef<Array<{ name: string; detail?: string }>>([]);
+
+  // Load conversation from DB when URL changes
+  const { data: chatData } = useAgentChat(chatId);
+
+  useEffect(() => {
+    if (chatId && chatId === activeIdRef.current) return;
+
+    if (chatId) {
+      if (chatData) {
+        setMessages(
+          chatData.messages.map((m) => ({
+            id: m.id,
+            role: m.role as ChatMessage["role"],
+            content: m.content,
+          }))
+        );
+        activeIdRef.current = chatId;
+      }
+    } else {
+      setMessages([]);
+      activeIdRef.current = null;
+    }
+    setIsLoading(false);
+    setPendingPlan(false);
+    setActiveTool(null);
+  }, [chatId, chatData]);
 
   // Route guard: redirect if agent feature is disabled
   useEffect(() => {
@@ -99,28 +146,39 @@ export default function AgentView() {
     if (!window.consoleAPI?.onAgentMessageEvent) return;
 
     const unsubscribe = window.consoleAPI.onAgentMessageEvent((event) => {
+      const convId = activeIdRef.current;
+
       switch (event.type) {
-        case "result":
+        case "result": {
           setActiveTool(null);
+          const resultText = String(event.data);
+          const toolCalls = [...turnToolCallsRef.current];
+          turnToolCallsRef.current = [];
           setMessages((prev) => {
             const startIdx = turnStartIndexRef.current;
             const beforeTurn = prev.slice(0, startIdx);
             const duringTurn = prev.slice(startIdx);
-            // Remove intermediate assistant_text messages from this turn —
-            // the result contains the final, complete response.
             const nonStreamed = duringTurn.filter(
               (m) => m.role !== "assistant" && m.role !== "tool"
             );
             return [
               ...beforeTurn,
               ...nonStreamed,
-              { id: generateId(), role: "assistant" as const, content: String(event.data) },
+              { id: generateId(), role: "assistant" as const, content: resultText },
             ];
           });
           setIsLoading(false);
+          // Save assistant message to DB
+          if (convId) {
+            addMessage.mutate({ conversationId: convId, role: "assistant", content: resultText, toolCalls });
+          }
           break;
-        case "plan_proposed":
+        }
+        case "plan_proposed": {
           setActiveTool(null);
+          const planText = String(event.data);
+          const toolCalls = [...turnToolCallsRef.current];
+          turnToolCallsRef.current = [];
           setMessages((prev) => {
             const startIdx = turnStartIndexRef.current;
             const beforeTurn = prev.slice(0, startIdx);
@@ -131,17 +189,17 @@ export default function AgentView() {
             return [
               ...beforeTurn,
               ...nonStreamed,
-              {
-                id: generateId(),
-                role: "assistant" as const,
-                content: String(event.data),
-                isPlan: true,
-              },
+              { id: generateId(), role: "assistant" as const, content: planText, isPlan: true },
             ];
           });
           setPendingPlan(true);
           setIsLoading(false);
+          // Save plan message to DB
+          if (convId) {
+            addMessage.mutate({ conversationId: convId, role: "plan", content: planText, toolCalls });
+          }
           break;
+        }
         case "assistant_text":
           setActiveTool(null);
           setMessages((prev) => [
@@ -151,7 +209,17 @@ export default function AgentView() {
           break;
         case "tool_use": {
           const toolData = event.data as { name?: string; detail?: string };
+          if (toolData?.name) {
+            turnToolCallsRef.current.push({ name: toolData.name, detail: toolData.detail });
+          }
           setActiveTool(toolData?.name ? { name: toolData.name, detail: toolData.detail } : null);
+          break;
+        }
+        case "init": {
+          const initData = event.data as { sessionId?: string };
+          if (convId && initData?.sessionId) {
+            updateSession.mutate({ id: convId, sessionId: initData.sessionId });
+          }
           break;
         }
         case "error":
@@ -162,6 +230,11 @@ export default function AgentView() {
           ]);
           setIsLoading(false);
           setPendingPlan(false);
+          turnToolCallsRef.current = [];
+          // Save error to DB
+          if (convId) {
+            addMessage.mutate({ conversationId: convId, role: "error", content: String(event.data) });
+          }
           break;
       }
     });
@@ -173,12 +246,23 @@ export default function AgentView() {
     async (text: string) => {
       if (!text.trim() || isLoading || pendingPlan) return;
 
+      // Create conversation on first message if this is a new chat
+      let convId = activeIdRef.current ?? "";
+      const isNew = !convId;
+      if (isNew) {
+        convId = generateId();
+        activeIdRef.current = convId;
+        navigate(`/agent/${convId}`, { replace: true });
+      }
+
+      const trimmed = text.trim();
       const userMessage: ChatMessage = {
         id: generateId(),
         role: "user",
-        content: text.trim(),
+        content: trimmed,
       };
 
+      turnToolCallsRef.current = [];
       setMessages((prev) => {
         const next = [...prev, userMessage];
         turnStartIndexRef.current = next.length;
@@ -191,8 +275,14 @@ export default function AgentView() {
         inputRef.current.style.height = "auto";
       }
 
+      // Ensure conversation exists in DB before saving the message
+      if (isNew) {
+        await createChat.mutateAsync({ id: convId, title: "New chat" });
+      }
+      addMessage.mutate({ conversationId: convId, role: "user", content: trimmed });
+
       try {
-        await window.consoleAPI?.agentSendMessage(conversationId, text.trim());
+        await window.consoleAPI?.agentSendMessage(convId, trimmed);
       } catch {
         setMessages((prev) => [
           ...prev,
@@ -201,7 +291,7 @@ export default function AgentView() {
         setIsLoading(false);
       }
     },
-    [conversationId, isLoading, pendingPlan]
+    [isLoading, pendingPlan, navigate, createChat, addMessage]
   );
 
   const handleCancel = useCallback(() => {
@@ -210,6 +300,8 @@ export default function AgentView() {
   }, []);
 
   const handleApprove = useCallback(async () => {
+    const convId = activeIdRef.current;
+    if (!convId) return;
     setPendingPlan(false);
     setIsLoading(true);
     setMessages((prev) => {
@@ -217,7 +309,7 @@ export default function AgentView() {
       return prev;
     });
     try {
-      await window.consoleAPI?.agentApprovePlan(conversationId, true);
+      await window.consoleAPI?.agentApprovePlan(convId, true);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -225,11 +317,13 @@ export default function AgentView() {
       ]);
       setIsLoading(false);
     }
-  }, [conversationId]);
+  }, []);
 
   const handleDeny = useCallback(() => {
+    const convId = activeIdRef.current;
+    if (!convId) return;
     setPendingPlan(false);
-    window.consoleAPI?.agentApprovePlan(conversationId, false);
+    window.consoleAPI?.agentApprovePlan(convId, false);
     setMessages((prev) => [
       ...prev,
       {
@@ -238,7 +332,24 @@ export default function AgentView() {
         content: "Plan cancelled. What would you like to do instead?",
       },
     ]);
-  }, [conversationId]);
+  }, []);
+
+  const handleDeleteChat = useCallback(
+    (id: string) => {
+      deleteChat.mutate(id);
+      if (id === activeIdRef.current) {
+        navigate("/agent", { replace: true });
+      }
+    },
+    [navigate, deleteChat]
+  );
+
+  const handleRenameChat = useCallback(
+    (id: string, title: string) => {
+      renameChat.mutate({ id, title });
+    },
+    [renameChat]
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -249,7 +360,7 @@ export default function AgentView() {
 
   if (agentAllowed === null) return null;
 
-  const isEmpty = messages.length === 0;
+  const isEmpty = messages.length === 0 && !chatId;
   const inputDisabled = isLoading || pendingPlan;
 
   // ── Shared input area ──────────────────────────────────────────────
@@ -359,210 +470,222 @@ export default function AgentView() {
     );
   };
 
-  // ── Empty state ────────────────────────────────────────────────────
-  if (isEmpty) {
+  // ── Chat content area ──────────────────────────────────────────────
+  const renderChat = () => {
+    if (isEmpty) {
+      return (
+        <div
+          className="app-no-drag"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            flex: 1,
+            gap: 28,
+            paddingBottom: 40,
+          }}
+        >
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 28,
+              color: "#ECE8E0",
+              fontWeight: 400,
+              letterSpacing: "-0.3px",
+              margin: 0,
+              textAlign: "center",
+            }}
+          >
+            {getGreeting()}
+            {firstName ? `, ${firstName}` : ""}.
+          </h1>
+
+          {renderInput("center")}
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}
+          >
+            {SUGGESTION_CHIPS.map((chip) => (
+              <SuggestionChip
+                key={chip.label}
+                icon={chip.icon}
+                label={chip.label}
+                onClick={() => sendMessage(chip.prompt)}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         className="app-no-drag"
         style={{
           display: "flex",
           flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "calc(100vh - 120px)",
-          gap: 28,
-          paddingBottom: 40,
+          flex: 1,
+          fontFamily: "var(--font-sans)",
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
-        {/* Greeting */}
-        <h1
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: 28,
-            color: "#ECE8E0",
-            fontWeight: 400,
-            letterSpacing: "-0.3px",
-            margin: 0,
-            textAlign: "center",
-          }}
-        >
-          {getGreeting()}
-          {firstName ? `, ${firstName}` : ""}.
-        </h1>
+        {bridgeConnected === false && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "5px 10px",
+              fontSize: 11,
+              fontFamily: "var(--font-sans)",
+              borderRadius: 6,
+              marginBottom: 8,
+              background: "rgba(236, 232, 224, 0.04)",
+              color: "#9B9689",
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: "#6B665C",
+                flexShrink: 0,
+              }}
+            />
+            <span>Browser extension not connected</span>
+            <span style={{ opacity: 0.3 }}>·</span>
+            <button
+              onClick={() =>
+                window.open(
+                  "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev/mitable-browser-bridge.zip",
+                  "_blank"
+                )
+              }
+              style={{
+                background: "none",
+                border: "none",
+                color: "#9B9689",
+                textDecoration: "underline",
+                textUnderlineOffset: 2,
+                cursor: "pointer",
+                fontSize: 11,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: 0,
+              }}
+            >
+              Download
+              <ExternalLink size={10} />
+            </button>
+          </div>
+        )}
 
-        {/* Centered input */}
-        {renderInput("center")}
+        {/* Scrollable messages */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 40px" }} className="scrollbar-hide">
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>
+            {messages.map((msg) => (
+              <AgentMessage
+                key={msg.id}
+                role={msg.role}
+                content={msg.content}
+                toolName={msg.toolName}
+                isPlan={msg.isPlan}
+              />
+            ))}
+            {isLoading && (
+              <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
 
-        {/* Suggestion chips */}
+        {/* Plan approval */}
+        {pendingPlan && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.15)",
+              background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.04)",
+              margin: "12px 40px 0",
+              maxWidth: 680,
+            }}
+          >
+            <span style={{ flex: 1, fontSize: 12, color: "#9B9689" }}>Execute this plan?</span>
+            <button
+              onClick={handleDeny}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "6px 12px",
+                borderRadius: 7,
+                border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                background: "transparent",
+                color: "#9B9689",
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              <X size={13} />
+              Deny
+            </button>
+            <button
+              onClick={handleApprove}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "6px 12px",
+                borderRadius: 7,
+                border: "none",
+                background: "var(--mi-accent)",
+                color: "#1A1916",
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              <Check size={13} />
+              Accept
+            </button>
+          </div>
+        )}
+
+        {/* Bottom input */}
         <div
           style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-            justifyContent: "center",
+            background: "#1A1916",
+            padding: "16px 40px 20px",
+            flexShrink: 0,
           }}
         >
-          {SUGGESTION_CHIPS.map((chip) => (
-            <SuggestionChip
-              key={chip.label}
-              icon={chip.icon}
-              label={chip.label}
-              onClick={() => sendMessage(chip.prompt)}
-            />
-          ))}
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>
+            {renderInput("bottom")}
+          </div>
         </div>
       </div>
     );
-  }
+  };
 
-  // ── Chat state ─────────────────────────────────────────────────────
+  // ── Layout: sidebar + chat ─────────────────────────────────────────
   return (
-    <div
-      className="app-no-drag"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "calc(100vh - 120px)",
-        fontFamily: "var(--font-sans)",
-      }}
-    >
-      {/* Browser bridge error — only shown when disconnected */}
-      {bridgeConnected === false && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "5px 10px",
-            fontSize: 11,
-            fontFamily: "var(--font-sans)",
-            borderRadius: 6,
-            marginBottom: 8,
-            background: "rgba(236, 232, 224, 0.04)",
-            color: "#9B9689",
-          }}
-        >
-          <span
-            style={{
-              width: 5,
-              height: 5,
-              borderRadius: "50%",
-              background: "#6B665C",
-              flexShrink: 0,
-            }}
-          />
-          <span>Browser extension not connected</span>
-          <span style={{ opacity: 0.3 }}>·</span>
-          <button
-            onClick={() =>
-              window.open(
-                "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev/mitable-browser-bridge.zip",
-                "_blank"
-              )
-            }
-            style={{
-              background: "none",
-              border: "none",
-              color: "#9B9689",
-              textDecoration: "underline",
-              textUnderlineOffset: 2,
-              cursor: "pointer",
-              fontSize: 11,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              padding: 0,
-            }}
-          >
-            Download
-            <ExternalLink size={10} />
-          </button>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div style={{ flex: 1 }}>
-        {messages.map((msg) => (
-          <AgentMessage
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            toolName={msg.toolName}
-            isPlan={msg.isPlan}
-          />
-        ))}
-        {isLoading && <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Plan approval */}
-      {pendingPlan && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.15)",
-            background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.04)",
-            marginTop: 12,
-          }}
-        >
-          <span style={{ flex: 1, fontSize: 12, color: "#9B9689" }}>Execute this plan?</span>
-          <button
-            onClick={handleDeny}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "6px 12px",
-              borderRadius: 7,
-              border: "0.5px solid rgba(236, 232, 224, 0.1)",
-              background: "transparent",
-              color: "#9B9689",
-              fontSize: 12,
-              cursor: "pointer",
-            }}
-          >
-            <X size={13} />
-            Deny
-          </button>
-          <button
-            onClick={handleApprove}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "6px 12px",
-              borderRadius: 7,
-              border: "none",
-              background: "var(--mi-accent)",
-              color: "#1A1916",
-              fontSize: 12,
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
-          >
-            <Check size={13} />
-            Accept
-          </button>
-        </div>
-      )}
-
-      {/* Bottom input */}
-      <div
-        style={{
-          position: "sticky",
-          bottom: -20,
-          background: "#1A1916",
-          paddingTop: 16,
-          paddingBottom: 20,
-          marginTop: 16,
-        }}
-      >
-        {renderInput("bottom")}
-      </div>
+    <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
+      <ChatHistorySidebar conversations={conversations} onDelete={handleDeleteChat} onRename={handleRenameChat} />
+      {renderChat()}
     </div>
   );
 }

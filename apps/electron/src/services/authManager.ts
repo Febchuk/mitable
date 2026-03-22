@@ -32,6 +32,7 @@ export interface RestoredSession {
 class AuthManager {
   private accessToken: string | null = null;
   private _refreshToken: string | null = null;
+  private _userRole: string | null = null;
   private apiBaseUrl: string;
 
   constructor() {
@@ -94,6 +95,27 @@ class AuthManager {
    */
   getApiBaseUrl(): string {
     return this.apiBaseUrl;
+  }
+
+  /**
+   * Set user role (called from main process when user context is set)
+   */
+  setUserRole(role: string): void {
+    this._userRole = role;
+  }
+
+  /**
+   * Get user role — returns 'admin' | 'employee' | null
+   */
+  getUserRole(): string | null {
+    return this._userRole;
+  }
+
+  /**
+   * Check if the current user is an admin
+   */
+  isAdmin(): boolean {
+    return this._userRole === "admin";
   }
 
   /**

@@ -81,7 +81,7 @@ let closedWindowCheckInterval: NodeJS.Timeout | null = null;
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
 // User context storage (shared across all windows for session start)
-let currentUserContext: { userId: string; organizationId: string } | null = null;
+let currentUserContext: { userId: string; organizationId: string; role?: string } | null = null;
 
 // Auth token storage (shared across all windows)
 const authTokens: {
@@ -1239,9 +1239,14 @@ function setupIPC() {
 
   ipcMain.on(
     IPC_CHANNELS.USER_CONTEXT_SET,
-    (_event, user: { userId: string; organizationId: string }) => {
+    (_event, user: { userId: string; organizationId: string; role?: string }) => {
       consoleLogger.info(" Set:", user);
       currentUserContext = user;
+
+      // Store user role in auth manager so services (e.g. agent) can check it
+      if (user.role) {
+        authManager.setUserRole(user.role);
+      }
 
       // If tokens are already in memory but weren't persisted to keychain
       // (because user context wasn't available yet), persist now.

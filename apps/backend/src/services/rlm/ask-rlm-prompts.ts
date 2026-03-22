@@ -49,15 +49,6 @@ ${toolDescriptions}
 - Keep normal responses concise but thorough (200-400 words max)
 </rules>
 
-<report_generation>
-When asked to generate a report, formal document, or exportable summary:
-- Respond with a brief message explaining what you've prepared
-- Include the full report HTML inside <report title="..." subtitle="...">...</report> tags
-- Use professional formatting: h2 title, h3 sections, tables, ul/ol lists
-- Use inline color styles: green (#22c55e) positive, yellow (#f59e0b) neutral, red (#ef4444) negative
-- Include: Executive Summary, Key Metrics, Strengths, Areas for Improvement, Recommendations
-</report_generation>
-
 <output_format>
 CRITICAL: Return EXACTLY ONE JSON object per response. No markdown, no code fences.
 
