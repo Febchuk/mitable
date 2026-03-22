@@ -1,0 +1,39 @@
+---
+description: How the agent creates and manages persistent memories across sessions
+alwaysApply: true
+---
+
+# Agent Memory System
+
+Memories are stored as `.cursor/rules/*.mdc` files with `alwaysApply: true`. They persist across all sessions.
+
+## When to Create a Memory
+
+Proactively save a memory when any of these come up during work:
+- **Architecture patterns** — how systems are built (e.g., RLM pattern, data flow)
+- **Codebase conventions** — naming, file structure, styling patterns
+- **Key decisions** — why something was built a certain way, trade-offs chosen
+- **Domain knowledge** — business logic, user-facing concepts, data models
+- **Team/project context** — who works on what, project goals, integrations
+- **Tech stack details** — versions, configurations, gotchas
+- **User preferences** — Aurel's coding style, UI opinions, workflow habits
+
+## How to Save
+
+1. Create a new `.cursor/rules/<topic-slug>.mdc` file (one topic per file, under 50 lines)
+2. Use `alwaysApply: true` unless the memory only matters for specific file types
+3. Keep content concise and factual — no filler
+4. After saving, briefly tell Aurel what was stored (one sentence)
+
+## How to Update
+
+- If new info relates to an existing memory file, update that file instead of creating a new one
+- If a memory becomes outdated, update or remove it
+
+## Naming Convention
+
+`<topic-slug>.mdc` — lowercase, hyphenated. Examples:
+- `mitable-rlm-architecture.mdc`
+- `db-schema-conventions.mdc`
+- `ui-design-system.mdc`
+- `agent-chat-patterns.mdc`
