@@ -232,7 +232,14 @@ export default function ChatsView() {
             }}
           >
             <MessageSquare size={20} style={{ color: "var(--text-tertiary)", marginBottom: 12 }} />
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 4,
+              }}
+            >
               No chats matching &ldquo;{searchQuery}&rdquo;
             </p>
             <p

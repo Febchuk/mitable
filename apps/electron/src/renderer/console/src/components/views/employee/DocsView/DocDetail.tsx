@@ -687,7 +687,12 @@ export default function DocDetail() {
           >
             <details>
               <summary
-                style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", cursor: "pointer" }}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "var(--text-tertiary)",
+                  cursor: "pointer",
+                }}
               >
                 Contributing Sessions ({document.sessionContributions.length})
               </summary>

@@ -127,7 +127,9 @@ export default function UploadsView() {
           size={24}
           style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
         />
-        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>Loading uploads...</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
+          Loading uploads...
+        </p>
       </div>
     );
   }
@@ -144,7 +146,9 @@ export default function UploadsView() {
         }}
       >
         <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
-        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>Failed to load uploads</p>
+        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>
+          Failed to load uploads
+        </p>
       </div>
     );
   }

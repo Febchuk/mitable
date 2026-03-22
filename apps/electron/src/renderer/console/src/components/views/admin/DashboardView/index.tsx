@@ -537,7 +537,13 @@ export default function DashboardView() {
                   background: DEEP_WORK_COLOR,
                 }}
               />
-              <span style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
                 Deep work
               </span>
             </div>
@@ -550,7 +556,13 @@ export default function DashboardView() {
                   background: MEETINGS_COLOR,
                 }}
               />
-              <span style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
                 Meetings
               </span>
             </div>

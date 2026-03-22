@@ -300,7 +300,14 @@ export default function PeopleView() {
             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading people...</div>
           </div>
         ) : error ? (
-          <div style={{ padding: "64px 0", textAlign: "center", fontSize: 13, color: "var(--status-error)" }}>
+          <div
+            style={{
+              padding: "64px 0",
+              textAlign: "center",
+              fontSize: 13,
+              color: "var(--status-error)",
+            }}
+          >
             Error: {error.message}
           </div>
         ) : filteredUsers.length === 0 ? (

@@ -336,7 +336,8 @@ export default function CreateDocumentModal({
                   opacity: uploadMutation.isPending ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (!uploadMutation.isPending) e.currentTarget.style.color = "var(--text-primary)";
+                  if (!uploadMutation.isPending)
+                    e.currentTarget.style.color = "var(--text-primary)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = "var(--text-tertiary)";
@@ -370,17 +371,20 @@ export default function CreateDocumentModal({
                     borderRadius: 6,
                     border: "none",
                     background: blocksOpen ? "rgba(var(--ui-rgb), 0.05)" : "transparent",
-                    color: selectedSessionIds.size > 0 ? "var(--mi-accent)" : "var(--text-tertiary)",
+                    color:
+                      selectedSessionIds.size > 0 ? "var(--mi-accent)" : "var(--text-tertiary)",
                     fontSize: 12,
                     fontFamily: "var(--font-sans)",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedSessionIds.size === 0) e.currentTarget.style.color = "var(--text-primary)";
+                    if (selectedSessionIds.size === 0)
+                      e.currentTarget.style.color = "var(--text-primary)";
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedSessionIds.size === 0) e.currentTarget.style.color = "var(--text-tertiary)";
+                    if (selectedSessionIds.size === 0)
+                      e.currentTarget.style.color = "var(--text-tertiary)";
                   }}
                 >
                   <Layers size={13} />
@@ -488,7 +492,9 @@ export default function CreateDocumentModal({
                               <div
                                 style={{
                                   fontSize: 12,
-                                  color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
+                                  color: isSelected
+                                    ? "var(--text-primary)"
+                                    : "var(--text-secondary)",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
                                   whiteSpace: "nowrap",
@@ -499,10 +505,14 @@ export default function CreateDocumentModal({
                             </div>
 
                             {/* Meta */}
-                            <span style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}>
+                            <span
+                              style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}
+                            >
                               {formatDuration(session.duration.totalMs)}
                             </span>
-                            <span style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}>
+                            <span
+                              style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}
+                            >
                               {formatRelativeDate(session.startedAt)}
                             </span>
                           </div>
@@ -617,7 +627,9 @@ export default function CreateDocumentModal({
                 border: "0.5px solid rgba(var(--status-error-rgb), 0.15)",
               }}
             >
-              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--status-error)" }}>Generation failed</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--status-error)" }}>
+                Generation failed
+              </p>
               <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>{error}</p>
               <button
                 onClick={() => {

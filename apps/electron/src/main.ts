@@ -2231,19 +2231,16 @@ function setupMonitoringSessionHandlers() {
     return preferencesService.getTheme();
   });
 
-  ipcMain.handle(
-    IPC_CHANNELS.THEME_SET,
-    (_, theme: "dark" | "light" | "system") => {
-      preferencesService.setTheme(theme);
-      const allWindows = BrowserWindow.getAllWindows();
-      for (const win of allWindows) {
-        if (!win.isDestroyed()) {
-          win.webContents.send(IPC_CHANNELS.THEME_CHANGED, theme);
-        }
+  ipcMain.handle(IPC_CHANNELS.THEME_SET, (_, theme: "dark" | "light" | "system") => {
+    preferencesService.setTheme(theme);
+    const allWindows = BrowserWindow.getAllWindows();
+    for (const win of allWindows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.THEME_CHANGED, theme);
       }
-      return { success: true };
     }
-  );
+    return { success: true };
+  });
 
   // Pill display mode preference
   ipcMain.handle(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, (_, userId: string) => {

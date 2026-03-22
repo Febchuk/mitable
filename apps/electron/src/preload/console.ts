@@ -497,8 +497,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.invoke(IPC_CHANNELS.PILL_DISPLAY_MODE_SET, userId, mode),
 
   // Theme / appearance API
-  getTheme: (): Promise<"dark" | "light" | "system"> =>
-    ipcRenderer.invoke(IPC_CHANNELS.THEME_GET),
+  getTheme: (): Promise<"dark" | "light" | "system"> => ipcRenderer.invoke(IPC_CHANNELS.THEME_GET),
 
   setTheme: (theme: "dark" | "light" | "system"): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.THEME_SET, theme),

@@ -419,8 +419,10 @@ export default function CalendarView() {
               }}
               onMouseEnter={(e) => {
                 if (!isSyncing) {
-                  e.currentTarget.style.background = "rgba(var(--mi-accent-rgb, 130,192,204), 0.06)";
-                  e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 130,192,204), 0.3)";
+                  e.currentTarget.style.background =
+                    "rgba(var(--mi-accent-rgb, 130,192,204), 0.06)";
+                  e.currentTarget.style.borderColor =
+                    "rgba(var(--mi-accent-rgb, 130,192,204), 0.3)";
                 }
               }}
               onMouseLeave={(e) => {
@@ -584,7 +586,14 @@ export default function CalendarView() {
             }}
           >
             <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
-            <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+            <p
+              style={{
+                color: "var(--text-primary)",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 4,
+              }}
+            >
               Failed to load activity data
             </p>
             <p style={{ color: "var(--text-tertiary)", fontSize: 12 }}>

@@ -133,7 +133,11 @@ export default function WeekStrip({
                 style={{
                   fontFamily: "var(--font-serif)",
                   fontSize: 20,
-                  color: highlighted ? "var(--text-primary)" : isToday ? "var(--text-primary)" : "var(--text-secondary)",
+                  color: highlighted
+                    ? "var(--text-primary)"
+                    : isToday
+                      ? "var(--text-primary)"
+                      : "var(--text-secondary)",
                   fontWeight: 400,
                 }}
               >

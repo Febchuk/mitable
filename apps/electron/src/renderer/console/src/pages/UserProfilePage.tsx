@@ -2149,7 +2149,14 @@ export default function UserProfilePage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Shield size={16} style={{ color: "var(--text-tertiary)" }} />
-                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                    <h3
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        margin: 0,
+                      }}
+                    >
                       Blocked Apps
                     </h3>
                   </div>
@@ -2330,7 +2337,14 @@ export default function UserProfilePage() {
                     borderBottom: "var(--border-hairline)",
                   }}
                 >
-                  <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      margin: 0,
+                    }}
+                  >
                     Session Preferences
                   </h2>
                   <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
@@ -2564,7 +2578,14 @@ export default function UserProfilePage() {
                       <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                       <line x1="12" x2="12" y1="19" y2="22" />
                     </svg>
-                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                    <h3
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        margin: 0,
+                      }}
+                    >
                       Audio Recording
                     </h3>
                   </div>
@@ -2740,7 +2761,14 @@ export default function UserProfilePage() {
                         borderBottom: "var(--border-hairline)",
                       }}
                     >
-                      <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                      <h2
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: "var(--text-primary)",
+                          margin: 0,
+                        }}
+                      >
                         Organization Settings
                       </h2>
                       <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
@@ -2834,7 +2862,9 @@ export default function UserProfilePage() {
                   borderBottom: "var(--border-hairline)",
                 }}
               >
-                <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                <h2
+                  style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}
+                >
                   Beta Features
                 </h2>
                 <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
@@ -2853,7 +2883,12 @@ export default function UserProfilePage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <Label
                     htmlFor="agent-toggle"
-                    style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", cursor: "pointer" }}
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      cursor: "pointer",
+                    }}
                   >
                     Agent
                   </Label>
@@ -2894,7 +2929,9 @@ export default function UserProfilePage() {
                   borderBottom: "var(--border-hairline)",
                 }}
               >
-                <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                <h2
+                  style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}
+                >
                   Integrations
                 </h2>
                 <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
@@ -2953,7 +2990,9 @@ export default function UserProfilePage() {
                             flexShrink: 0,
                           }}
                         >
-                          <SiNotion style={{ width: 18, height: 18, color: "var(--text-primary)" }} />
+                          <SiNotion
+                            style={{ width: 18, height: 18, color: "var(--text-primary)" }}
+                          />
                         </div>
                       ),
                       loading: isNotionLoading,

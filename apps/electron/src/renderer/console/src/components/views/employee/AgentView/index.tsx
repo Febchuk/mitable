@@ -729,7 +729,9 @@ export default function AgentView() {
               maxWidth: 680,
             }}
           >
-            <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>Execute this plan?</span>
+            <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>
+              Execute this plan?
+            </span>
             <button
               onClick={handleDeny}
               style={{

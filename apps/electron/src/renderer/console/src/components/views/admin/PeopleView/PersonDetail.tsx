@@ -671,7 +671,9 @@ export default function PersonDetail() {
                 animation: "spin 1s linear infinite",
               }}
             />
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>Loading activity data...</p>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
+              Loading activity data...
+            </p>
           </div>
         </div>
       </div>
@@ -1275,7 +1277,13 @@ export default function PersonDetail() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-tertiary)",
+                            textAlign: "right",
+                          }}
+                        >
                           {formatCompactDuration(activity.minutes)}
                         </span>
                         <span
@@ -1468,7 +1476,10 @@ export default function PersonDetail() {
                         padding: "4px 10px",
                         borderRadius: 5,
                         fontSize: 11,
-                        color: workFilter === filter.key ? "var(--text-primary)" : "var(--text-secondary)",
+                        color:
+                          workFilter === filter.key
+                            ? "var(--text-primary)"
+                            : "var(--text-secondary)",
                         background: workFilter === filter.key ? "var(--bg-overlay)" : "transparent",
                         border: "none",
                         cursor: "pointer",
@@ -1545,7 +1556,12 @@ export default function PersonDetail() {
                     </div>
 
                     <p
-                      style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}
+                      style={{
+                        margin: "6px 0 0",
+                        fontSize: 12,
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.5,
+                      }}
                     >
                       {item.preview || "No preview available"}
                     </p>
@@ -1568,7 +1584,9 @@ export default function PersonDetail() {
                         </span>
                       ) : null}
                       {"category" in item && item.category ? (
-                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{item.category}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                          {item.category}
+                        </span>
                       ) : null}
                       {"subscriberName" in item && item.subscriberName ? (
                         <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
@@ -1576,7 +1594,9 @@ export default function PersonDetail() {
                         </span>
                       ) : null}
                       {"docType" in item && item.docType ? (
-                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{item.docType}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                          {item.docType}
+                        </span>
                       ) : null}
                     </div>
                   </div>

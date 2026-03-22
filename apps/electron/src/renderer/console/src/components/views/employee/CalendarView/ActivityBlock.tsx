@@ -317,7 +317,9 @@ export default function ActivityBlock({
             >
               Block {blockNumber}
             </span>
-            <span style={{ fontSize: 13, color: "var(--text-secondary)", flexShrink: 0 }}>{timeRange}</span>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)", flexShrink: 0 }}>
+              {timeRange}
+            </span>
             <div style={{ flex: 1, minWidth: 0 }} />
           </>
         )}
@@ -613,9 +615,7 @@ export default function ActivityBlock({
                         gap: 10,
                         padding: "7px 0",
                         borderBottom:
-                          idx < block.appBreakdown.length - 1
-                            ? "var(--border-hairline)"
-                            : "none",
+                          idx < block.appBreakdown.length - 1 ? "var(--border-hairline)" : "none",
                       }}
                     >
                       <span

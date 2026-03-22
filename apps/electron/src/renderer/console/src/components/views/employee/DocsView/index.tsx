@@ -30,7 +30,14 @@ function getDocInitial(doc: Document): string {
   return (doc.title || "U").charAt(0).toUpperCase();
 }
 
-const DOC_AVATAR_COLORS = ["var(--mi-accent)", "var(--status-success)", "var(--status-warning)", "var(--status-info)", "var(--status-error)", "var(--text-secondary)"];
+const DOC_AVATAR_COLORS = [
+  "var(--mi-accent)",
+  "var(--status-success)",
+  "var(--status-warning)",
+  "var(--status-info)",
+  "var(--status-error)",
+  "var(--text-secondary)",
+];
 
 function getAvatarColor(id: string): string {
   let hash = 0;
@@ -73,7 +80,9 @@ export default function DocsView() {
           size={24}
           style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
         />
-        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>Loading docs...</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
+          Loading docs...
+        </p>
       </div>
     );
   }
@@ -90,7 +99,9 @@ export default function DocsView() {
         }}
       >
         <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
-        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>Failed to load documents</p>
+        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>
+          Failed to load documents
+        </p>
       </div>
     );
   }
@@ -299,7 +310,14 @@ export default function DocsView() {
             }}
           >
             <FileText size={20} style={{ color: "var(--text-tertiary)", marginBottom: 12 }} />
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 4,
+              }}
+            >
               No documents yet
             </p>
             <p

@@ -63,7 +63,9 @@ function Field({
         }}
       />
       {helpText ? (
-        <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5 }}>{helpText}</p>
+        <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5 }}>
+          {helpText}
+        </p>
       ) : null}
     </div>
   );
@@ -258,9 +260,12 @@ export default function AddNewUser() {
                 padding: 14,
               }}
             >
-              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
-                <strong style={{ color: "var(--text-primary)" }}>Important:</strong> Mitable does not save
-                passwords. Make sure to save this somewhere secure before closing this window.
+              <p
+                style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}
+              >
+                <strong style={{ color: "var(--text-primary)" }}>Important:</strong> Mitable does
+                not save passwords. Make sure to save this somewhere secure before closing this
+                window.
               </p>
             </div>
 

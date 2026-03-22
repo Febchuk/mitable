@@ -19,7 +19,14 @@ function formatTime(dateString: string): string {
   });
 }
 
-const REPORT_AVATAR_COLORS = ["var(--mi-accent)", "var(--status-success)", "var(--status-warning)", "var(--status-info)", "var(--status-error)", "var(--text-secondary)"];
+const REPORT_AVATAR_COLORS = [
+  "var(--mi-accent)",
+  "var(--status-success)",
+  "var(--status-warning)",
+  "var(--status-info)",
+  "var(--status-error)",
+  "var(--text-secondary)",
+];
 
 function getAvatarColor(id: string): string {
   let hash = 0;
@@ -59,7 +66,9 @@ export default function ReportsView() {
           size={24}
           style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
         />
-        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>Loading reports...</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
+          Loading reports...
+        </p>
       </div>
     );
   }
@@ -76,7 +85,9 @@ export default function ReportsView() {
         }}
       >
         <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
-        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>Failed to load reports</p>
+        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>
+          Failed to load reports
+        </p>
       </div>
     );
   }
