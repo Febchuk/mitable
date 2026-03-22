@@ -161,13 +161,33 @@ export const Response = memo(
           components={{
             // Headings
             h1: ({ ...props }) => (
-              <h1 style={{ fontFamily: 'var(--font-serif)', fontWeight: 400, letterSpacing: '-0.3px' }} className="text-xl text-text-primary mb-4 mt-6" {...props} />
+              <h1
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontWeight: 400,
+                  letterSpacing: "-0.3px",
+                }}
+                className="text-xl text-text-primary mb-4 mt-6"
+                {...props}
+              />
             ),
             h2: ({ ...props }) => (
-              <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 400, letterSpacing: '-0.2px' }} className="text-lg text-text-primary mb-3 mt-5" {...props} />
+              <h2
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontWeight: 400,
+                  letterSpacing: "-0.2px",
+                }}
+                className="text-lg text-text-primary mb-3 mt-5"
+                {...props}
+              />
             ),
             h3: ({ ...props }) => (
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontWeight: 400 }} className="text-base text-text-primary mb-2 mt-4" {...props} />
+              <h3
+                style={{ fontFamily: "var(--font-serif)", fontWeight: 400 }}
+                className="text-base text-text-primary mb-2 mt-4"
+                {...props}
+              />
             ),
             h4: ({ ...props }) => (
               <h4 className="text-sm font-semibold text-text-primary mb-2 mt-3" {...props} />
@@ -181,13 +201,23 @@ export const Response = memo(
 
             // Paragraphs
             p: ({ ...props }) => (
-              <p style={{ letterSpacing: '-0.01em' }} className="text-text-primary leading-relaxed mb-4" {...props} />
+              <p
+                style={{ letterSpacing: "-0.01em" }}
+                className="text-text-primary leading-relaxed mb-4"
+                {...props}
+              />
             ),
 
             // Lists
             ul: ({ ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1.5" {...props} />,
             ol: ({ ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1.5" {...props} />,
-            li: ({ ...props }) => <li style={{ letterSpacing: '-0.01em' }} className="text-text-primary leading-relaxed" {...props} />,
+            li: ({ ...props }) => (
+              <li
+                style={{ letterSpacing: "-0.01em" }}
+                className="text-text-primary leading-relaxed"
+                {...props}
+              />
+            ),
 
             // Tables
             table: ({ ...props }) => (
@@ -219,7 +249,11 @@ export const Response = memo(
               return isInline ? (
                 <code
                   className="px-1.5 py-0.5 rounded text-xs"
-                  style={{ fontFamily: 'var(--font-mono)', background: 'rgba(236, 232, 224, 0.06)', color: '#C8A960' }}
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    background: "rgba(236, 232, 224, 0.06)",
+                    color: "#C8A960",
+                  }}
                   {...props}
                 />
               ) : (
@@ -271,7 +305,7 @@ export const Response = memo(
 
             // Strong/Bold
             strong: ({ ...props }) => (
-              <strong style={{ color: '#ECE8E0' }} className="font-medium" {...props} />
+              <strong style={{ color: "#ECE8E0" }} className="font-medium" {...props} />
             ),
 
             // Emphasis/Italic

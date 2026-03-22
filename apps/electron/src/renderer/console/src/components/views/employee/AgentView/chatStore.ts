@@ -74,9 +74,8 @@ export function addMessage(conversationId: string, message: ChatMessage): void {
 
   // Auto-title from first user message
   if (convo.title === "New chat" && message.role === "user") {
-    convo.title = message.content.length > 60
-      ? message.content.slice(0, 57) + "..."
-      : message.content;
+    convo.title =
+      message.content.length > 60 ? message.content.slice(0, 57) + "..." : message.content;
   }
 
   writeAll(all);
@@ -95,9 +94,8 @@ export function setMessages(conversationId: string, messages: ChatMessage[]): vo
   if (convo.title === "New chat") {
     const firstUser = messages.find((m) => m.role === "user");
     if (firstUser) {
-      convo.title = firstUser.content.length > 60
-        ? firstUser.content.slice(0, 57) + "..."
-        : firstUser.content;
+      convo.title =
+        firstUser.content.length > 60 ? firstUser.content.slice(0, 57) + "..." : firstUser.content;
     }
   }
 

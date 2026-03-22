@@ -1,12 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  Calendar,
-  Download,
-  LayoutGrid,
-  User,
-  BarChart2,
-  FileText,
-} from "lucide-react";
+import { Calendar, Download, LayoutGrid, User, BarChart2, FileText } from "lucide-react";
 import NavItem from "./NavItem";
 import MitableIcon from "../icons/MitableIcon";
 import { useUser } from "../../context/UserContext";

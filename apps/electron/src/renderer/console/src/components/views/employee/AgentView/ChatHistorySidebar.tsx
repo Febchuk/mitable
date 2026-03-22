@@ -10,7 +10,11 @@ interface ChatHistorySidebarProps {
   onRename: (id: string, title: string) => void;
 }
 
-export default function ChatHistorySidebar({ conversations, onDelete, onRename }: ChatHistorySidebarProps) {
+export default function ChatHistorySidebar({
+  conversations,
+  onDelete,
+  onRename,
+}: ChatHistorySidebarProps) {
   const navigate = useNavigate();
   const { chatId } = useParams<{ chatId: string }>();
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,10 +40,7 @@ export default function ChatHistorySidebar({ conversations, onDelete, onRename }
     return conversations.filter((c) => (c.title || "").toLowerCase().includes(q));
   }, [conversations, searchQuery]);
 
-  const grouped = useMemo(
-    () => groupByDay(filtered, (c) => c.updatedAt),
-    [filtered]
-  );
+  const grouped = useMemo(() => groupByDay(filtered, (c) => c.updatedAt), [filtered]);
 
   return (
     <div

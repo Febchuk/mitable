@@ -8,6 +8,12 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { AskEnvironment } from "../services/rlm/ask-environment.js";
+import { AgentQueryEnvironment } from "../services/rlm/agent-query-environment.js";
+import { getAgentQueryToolByName } from "../services/rlm/agent-query-tools.js";
+import { getAgentQuerySystemPrompt } from "../services/rlm/agent-query-prompts.js";
+import { parseJsonResponse } from "../lib/parse-json.js";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 const logger = createLogger({ module: "AgentRoutes" });
 const agentRouter = Router();
@@ -140,11 +146,11 @@ agentRouter.get("/tools/activity", async (req: Request, res: Response) => {
     const startDate = req.query.start_date as string | undefined;
     const endDate = req.query.end_date as string | undefined;
 
-    // Default: last 7 days
+    // Default: last 30 days
     const end = endDate ? new Date(endDate + "T23:59:59Z") : new Date();
     const start = startDate
       ? new Date(startDate + "T00:00:00Z")
-      : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+      : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Cap at 31 days
     const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
@@ -293,9 +299,7 @@ agentRouter.get("/tools/activity-detail", async (req: Request, res: Response) =>
           subscriberName: schema.activityBlocks.subscriberName,
         })
         .from(schema.activityBlocks)
-        .where(
-          and(eq(schema.activityBlocks.id, id), eq(schema.activityBlocks.userId, req.userId!))
-        )
+        .where(and(eq(schema.activityBlocks.id, id), eq(schema.activityBlocks.userId, req.userId!)))
         .limit(1);
 
       if (!block) {
@@ -347,9 +351,7 @@ agentRouter.get("/tools/activity-detail", async (req: Request, res: Response) =>
           updatedAt: schema.documents.updatedAt,
         })
         .from(schema.documents)
-        .where(
-          and(eq(schema.documents.id, id), eq(schema.documents.createdBy, req.userId!))
-        )
+        .where(and(eq(schema.documents.id, id), eq(schema.documents.createdBy, req.userId!)))
         .limit(1);
 
       if (!doc) {
@@ -669,6 +671,198 @@ agentRouter.post("/chats/:id/messages", async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, "Failed to add agent message");
     res.status(500).json({ error: "Failed to add agent message" });
+  }
+});
+
+// ── Agent Query Layer (Layer 1) ─────────────────────────────────────
+// Lightweight RLM loop for conversational queries about the user's work.
+// No CLI subprocess — direct LLM + DB queries, fast and cheap.
+
+const AGENT_QUERY_MAX_ITERATIONS = 25;
+
+// ── LLM clients (lazy init) — Claude → GPT-5 → DeepSeek V3.2 ──────
+
+let agentAnthropicClient: Anthropic | null = null;
+let agentOpenaiClient: OpenAI | null = null;
+let agentDeepseekClient: OpenAI | null = null;
+
+function getAgentAnthropicClient(): Anthropic | null {
+  if (!agentAnthropicClient && config.anthropic.apiKey) {
+    agentAnthropicClient = new Anthropic({ apiKey: config.anthropic.apiKey });
+  }
+  return agentAnthropicClient;
+}
+
+function getAgentOpenaiClient(): OpenAI | null {
+  if (!agentOpenaiClient && config.openai.apiKey) {
+    agentOpenaiClient = new OpenAI({ apiKey: config.openai.apiKey });
+  }
+  return agentOpenaiClient;
+}
+
+function getAgentDeepseekClient(): OpenAI | null {
+  if (!agentDeepseekClient && config.deepseek.apiKey) {
+    agentDeepseekClient = new OpenAI({
+      apiKey: config.deepseek.apiKey,
+      baseURL: "https://api.deepseek.com",
+    });
+  }
+  return agentDeepseekClient;
+}
+
+async function callAgentQueryLLM(
+  systemPrompt: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>
+): Promise<string> {
+  // 1. Claude Sonnet 4.5 (primary)
+  const claude = getAgentAnthropicClient();
+  if (claude) {
+    try {
+      const response = await claude.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages,
+      });
+      for (const block of response.content) {
+        if (block.type === "text") return block.text.trim();
+      }
+    } catch (error) {
+      const errStr = String(error);
+      const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
+      if (isFatal) {
+        logger.error({ error: errStr }, "Agent query: Claude auth/billing error");
+        agentAnthropicClient = null;
+      } else {
+        logger.warn({ error: errStr }, "Agent query: Claude failed (transient) — trying GPT-5");
+      }
+    }
+  }
+
+  // 2. GPT-5 (fallback)
+  const oai = getAgentOpenaiClient();
+  if (oai) {
+    try {
+      const completion = await oai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        temperature: 0.7,
+        max_completion_tokens: 4000,
+      });
+      const content = completion.choices[0]?.message?.content?.trim();
+      if (content) return content;
+    } catch (error) {
+      logger.warn({ error: String(error) }, "Agent query: GPT-5 failed — trying DeepSeek");
+    }
+  }
+
+  // 3. DeepSeek V3.2 (last resort)
+  const deepseek = getAgentDeepseekClient();
+  if (deepseek) {
+    const completion = await deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+    return completion.choices[0]?.message?.content?.trim() || "";
+  }
+
+  throw new Error("No LLM available — need ANTHROPIC_API_KEY, OPENAI_API_KEY, or DEEPSEEK_API_KEY");
+}
+
+agentRouter.post("/ask", async (req: Request, res: Response) => {
+  try {
+    const { message, conversationHistory = [] } = req.body as {
+      message: string;
+      conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+    };
+
+    if (!message) {
+      res.status(400).json({ error: "message required" });
+      return;
+    }
+
+    // Resolve user name for the prompt
+    const [user] = await db
+      .select({ firstName: schema.users.firstName })
+      .from(schema.users)
+      .where(eq(schema.users.id, req.userId!))
+      .limit(1);
+
+    const userName = user?.firstName || "there";
+    const environment = new AgentQueryEnvironment(req.userId!, req.organizationId!);
+    const systemPrompt = getAgentQuerySystemPrompt(userName);
+
+    const rlmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+      ...conversationHistory,
+      { role: "user", content: message },
+    ];
+
+    let iterations = 0;
+    let toolCalls = 0;
+    let finalResponse = "";
+
+    while (iterations < AGENT_QUERY_MAX_ITERATIONS) {
+      iterations++;
+
+      const llmRaw = await callAgentQueryLLM(systemPrompt, rlmMessages);
+
+      let decision: {
+        tool?: string;
+        parameters?: Record<string, string>;
+        reasoning?: string;
+        done?: boolean;
+        response?: string;
+      };
+
+      try {
+        decision = parseJsonResponse(llmRaw);
+      } catch {
+        finalResponse = llmRaw;
+        break;
+      }
+
+      rlmMessages.push({ role: "assistant", content: JSON.stringify(decision) });
+
+      if (decision.done && decision.response) {
+        finalResponse = decision.response;
+        break;
+      }
+
+      if (decision.tool && decision.parameters !== undefined) {
+        const tool = getAgentQueryToolByName(decision.tool);
+        if (!tool) {
+          rlmMessages.push({
+            role: "user",
+            content: `Error: Unknown tool "${decision.tool}". Available: get_my_activity, get_activity_detail.`,
+          });
+          continue;
+        }
+
+        const toolResult = await tool.execute(decision.parameters, environment);
+        toolCalls++;
+
+        rlmMessages.push({
+          role: "user",
+          content: `Tool "${decision.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step.`,
+        });
+      } else {
+        if (decision.response) finalResponse = decision.response;
+        break;
+      }
+    }
+
+    if (!finalResponse) {
+      finalResponse = "I wasn't able to generate a response. Please try rephrasing your question.";
+    }
+
+    logger.info({ iterations, toolCalls }, "Agent query RLM completed");
+
+    res.json({ response: finalResponse });
+  } catch (error) {
+    logger.error({ error }, "Agent query failed");
+    res.status(500).json({ error: "Failed to process query" });
   }
 });
 

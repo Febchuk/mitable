@@ -409,12 +409,9 @@ class AgentSdkService {
 
     const getMyActivityTool = tool(
       "get_my_activity",
-      "Get the user's activity across ALL content types for a date range: work sessions, meeting notes (Granola, Fireflies), activity blocks, daily summaries, and documents created. Returns a compact overview — use get_activity_detail to drill into any specific item. Max 31 days per query.",
+      'Get the user\'s activity across ALL content types for a date range: work sessions, meeting notes (Granola, Fireflies), activity blocks, daily summaries, and documents created. Returns a compact overview — use get_activity_detail to drill into any specific item. Max 31 days per query; omitting dates returns the last 30 days. For broad questions ("what do I do?", "overview of me"), make multiple calls to cover 2-3 months, then synthesize. If a query returns sparse results, expand the date range further before concluding the user has little data.',
       {
-        start_date: z
-          .string()
-          .optional()
-          .describe("Start date YYYY-MM-DD (default: 7 days ago)"),
+        start_date: z.string().optional().describe("Start date YYYY-MM-DD (default: 30 days ago)"),
         end_date: z.string().optional().describe("End date YYYY-MM-DD (default: today)"),
       },
       async ({ start_date, end_date }) => {
@@ -444,7 +441,9 @@ class AgentSdkService {
         id: z.string().describe("The ID of the item (from get_my_activity results)"),
         type: z
           .enum(["block", "session", "document"])
-          .describe("Type of item: 'block' for activity/meeting blocks, 'session' for work sessions, 'document' for created docs"),
+          .describe(
+            "Type of item: 'block' for activity/meeting blocks, 'session' for work sessions, 'document' for created docs"
+          ),
       },
       async ({ id, type }) => {
         try {
@@ -1175,13 +1174,33 @@ The user may have edited these to correct or refine them.
 
 ${skillsSection}
 
+## Critical: Use Mitable Tools for Work Data
+- NEVER use Read, Bash, Glob, or Grep to access work data. Do NOT read files from .claude/projects/ or tool-result caches — these are stale artifacts from previous conversations, not live data.
+- ALWAYS use get_my_activity and get_activity_detail for ANY question about the user's work, schedule, meetings, activity, or profile. These are live API calls that return fresh, complete data.
+- If get_my_activity returns an error, retry or inform the user. Do NOT fall back to reading cached files.
+
 ## Rules
-- When the user asks about their work, ALWAYS call get_my_activity first — it returns ALL content types (sessions, meeting notes, activity blocks, documents) for a date range
+
+### Data Retrieval
+- When the user asks about their work, ALWAYS call get_my_activity as your FIRST action — it returns ALL content types (sessions, meeting notes, activity blocks, documents) for a date range
 - Use get_activity_detail to drill into specific items when more detail is needed (e.g. meeting transcripts, task breakdowns, document content)
-- For integration actions (Slack, Linear, Gmail), ALWAYS confirm the message content and target with the user before sending
+- When asked about work patterns or time spent, use get_my_activity to give data-driven answers across ALL activity types, not just sessions
+- Pay attention to dailySummaries — they contain pre-computed metrics, category breakdowns, and accomplishments that give you a broad picture without needing raw detail
+
+### Broad Questions (overview, profile, "what do I do?", work patterns)
+- Call get_my_activity immediately with a broad range. Start with the default 30 days.
+- If the results are sparse or the question demands more history, make additional calls for earlier months (e.g. 60-90 days back). The 31-day cap is per-query, not per-conversation — paginate across months.
+- NEVER conclude the user has little data after a single query. Always expand the search window before saying data is thin.
+- Synthesize across ALL sources: daily summaries (metrics, category breakdowns), meeting notes (Granola, Fireflies), work sessions, and documents. Build a rich, complete picture.
+- For these questions, give a thorough and detailed response — the user is asking for depth, not brevity.
+
+### Response Style
+- For action-oriented requests (send a message, draft something, run a command): be concise and direct
+- For analytical or reflective questions (overview, patterns, "tell me about my work"): be thorough and synthesize across data sources — the user wants insight, not a one-liner
 - Match the user's communication style from their skills when drafting messages
-- Be concise — users want quick actions, not essays
-- When asked about work patterns or time spent, use get_my_activity to give data-driven answers across ALL activity types, not just sessions${adminRules}`;
+
+### Safety
+- For integration actions (Slack, Linear, Gmail), ALWAYS confirm the message content and target with the user before sending${adminRules}`;
 
     return isPlanPhase ? basePrompt + PLAN_MODE_INSTRUCTIONS : basePrompt;
   }

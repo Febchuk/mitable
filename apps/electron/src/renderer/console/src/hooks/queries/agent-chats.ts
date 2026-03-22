@@ -36,8 +36,7 @@ export function useAgentChat(id: string | undefined) {
 export function useCreateAgentChat() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, title }: { id?: string; title?: string }) =>
-      createAgentChat(id, title),
+    mutationFn: ({ id, title }: { id?: string; title?: string }) => createAgentChat(id, title),
     onSuccess: () => qc.invalidateQueries({ queryKey: agentChatKeys.list() }),
   });
 }
@@ -45,8 +44,7 @@ export function useCreateAgentChat() {
 export function useRenameAgentChat() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, title }: { id: string; title: string }) =>
-      renameAgentChat(id, title),
+    mutationFn: ({ id, title }: { id: string; title: string }) => renameAgentChat(id, title),
     onSuccess: () => qc.invalidateQueries({ queryKey: agentChatKeys.list() }),
   });
 }

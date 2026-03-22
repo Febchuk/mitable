@@ -34,8 +34,12 @@ async function runMigration() {
     await pool.query(migrationSQL);
 
     console.log("\nMigration 0048 complete!");
-    console.log("  - Created agent_conversations table (id, user_id, organization_id, title, session_id)");
-    console.log("  - Created agent_messages table (id, conversation_id, role, content, tool_calls)");
+    console.log(
+      "  - Created agent_conversations table (id, user_id, organization_id, title, session_id)"
+    );
+    console.log(
+      "  - Created agent_messages table (id, conversation_id, role, content, tool_calls)"
+    );
     console.log("  - Added indexes for user, org, conversation, and timestamp queries");
   } catch (error) {
     console.error("Migration failed:", error);

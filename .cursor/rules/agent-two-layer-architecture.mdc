@@ -1,0 +1,28 @@
+---
+description: Agent chat uses a 2-layer architecture - lightweight RLM for queries, Claude Code SDK for complex actions
+alwaysApply: true
+---
+
+# Agent Two-Layer Architecture
+
+## Layer 1: Conversational Query (agent-query-*)
+- **Engine**: RLM loop (server-side, no CLI subprocess)
+- **Files**: `services/rlm/agent-query-environment.ts`, `agent-query-tools.ts`, `agent-query-prompts.ts`
+- **Route**: `POST /api/agent/ask`
+- **Tools**: `get_my_activity`, `get_activity_detail` — direct DB queries via `AgentQueryEnvironment`
+- **LLM**: Claude Sonnet 4.5, max 10 iterations, JSON tool-call protocol
+- **Use for**: "tell me about my work", "summarize my week", data questions, overviews, patterns
+
+## Layer 2: Agentic SDK (agentSdkService)
+- **Engine**: Claude Code SDK via CLI subprocess
+- **Tools**: File ops, Bash, browser control, Slack, web search + all MCP tools
+- **Use for**: Browser automation, file operations, terminal commands, Slack messages, multi-step actions
+
+## Routing
+- `needsSdkAgent()` in `agentChatService.ts` — keyword-based intent check
+- SDK keywords: slack, browser, file, terminal, bash, navigate, screenshot, etc.
+- Default: Layer 1 (most queries don't need the SDK)
+
+## Naming
+- `agent-query-*` prefix for Layer 1 files (no overlap with `ask-*` files which are deprecated admin code)
+- `AgentQueryEnvironment` takes `userId` (user-scoped), unlike `AskEnvironment` which takes `organizationId`

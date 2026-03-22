@@ -23,6 +23,7 @@ import {
   useAddAgentMessage,
   useUpdateAgentChatSession,
 } from "../../../../hooks/queries/agent-chats";
+import { askAgentQuery, needsSdkAgent } from "../../../../services/agentChatService";
 
 interface ChatMessage {
   id: string;
@@ -87,9 +88,12 @@ export default function AgentView() {
 
   // The active conversation ID — from URL or null (new chat)
   const activeIdRef = useRef<string | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const turnStartIndexRef = useRef<number>(0);
+  const layer1AbortRef = useRef<AbortController | null>(null);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const turnToolCallsRef = useRef<Array<{ name: string; detail?: string }>>([]);
 
   // Load conversation from DB when URL changes
@@ -139,6 +143,7 @@ export default function AgentView() {
   }, []);
 
   useEffect(() => {
+    messagesRef.current = messages;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -170,7 +175,12 @@ export default function AgentView() {
           setIsLoading(false);
           // Save assistant message to DB
           if (convId) {
-            addMessage.mutate({ conversationId: convId, role: "assistant", content: resultText, toolCalls });
+            addMessage.mutate({
+              conversationId: convId,
+              role: "assistant",
+              content: resultText,
+              toolCalls,
+            });
           }
           break;
         }
@@ -196,7 +206,12 @@ export default function AgentView() {
           setIsLoading(false);
           // Save plan message to DB
           if (convId) {
-            addMessage.mutate({ conversationId: convId, role: "plan", content: planText, toolCalls });
+            addMessage.mutate({
+              conversationId: convId,
+              role: "plan",
+              content: planText,
+              toolCalls,
+            });
           }
           break;
         }
@@ -233,7 +248,11 @@ export default function AgentView() {
           turnToolCallsRef.current = [];
           // Save error to DB
           if (convId) {
-            addMessage.mutate({ conversationId: convId, role: "error", content: String(event.data) });
+            addMessage.mutate({
+              conversationId: convId,
+              role: "error",
+              content: String(event.data),
+            });
           }
           break;
       }
@@ -281,9 +300,69 @@ export default function AgentView() {
       }
       addMessage.mutate({ conversationId: convId, role: "user", content: trimmed });
 
+      const usesSdk = needsSdkAgent(trimmed);
+
       try {
-        await window.consoleAPI?.agentSendMessage(convId, trimmed);
-      } catch {
+        if (usesSdk) {
+          // Layer 2: Claude Code SDK for complex actions (browser, file ops, terminal, Slack)
+          await window.consoleAPI?.agentSendMessage(convId, trimmed);
+        } else {
+          // Layer 1: Lightweight RLM for conversational queries
+          const history = messagesRef.current
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .slice(0, -1)
+            .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+          // Abort controller so we can cancel if chat is deleted
+          const abort = new AbortController();
+          layer1AbortRef.current = abort;
+
+          // Cycling progress messages while the RLM works
+          const progressSteps = [
+            "Searching your activity...",
+            "Fetching sessions & meetings...",
+            "Analyzing daily summaries...",
+            "Reviewing meeting notes...",
+            "Compiling insights...",
+            "Synthesizing patterns...",
+          ];
+          let stepIdx = 0;
+          setActiveTool({ name: "layer1_progress", detail: progressSteps[0] });
+          progressTimerRef.current = setInterval(() => {
+            stepIdx = Math.min(stepIdx + 1, progressSteps.length - 1);
+            setActiveTool({ name: "layer1_progress", detail: progressSteps[stepIdx] });
+          }, 4000);
+
+          const result = await askAgentQuery(trimmed, history, abort.signal);
+
+          // Clean up progress timer
+          if (progressTimerRef.current) {
+            clearInterval(progressTimerRef.current);
+            progressTimerRef.current = null;
+          }
+          setActiveTool(null);
+          layer1AbortRef.current = null;
+
+          // Guard: only apply if this conversation is still active
+          if (activeIdRef.current !== convId) return;
+
+          const assistantMsg: ChatMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: result.response,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setIsLoading(false);
+
+          addMessage.mutate({
+            conversationId: convId,
+            role: "assistant",
+            content: result.response,
+          });
+        }
+      } catch (err) {
+        // Don't show error if we intentionally aborted
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setMessages((prev) => [
           ...prev,
           { id: generateId(), role: "error", content: "Failed to send message. Please try again." },
@@ -296,7 +375,14 @@ export default function AgentView() {
 
   const handleCancel = useCallback(() => {
     window.consoleAPI?.agentCancel();
+    layer1AbortRef.current?.abort();
+    layer1AbortRef.current = null;
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
     setIsLoading(false);
+    setActiveTool(null);
   }, []);
 
   const handleApprove = useCallback(async () => {
@@ -336,10 +422,21 @@ export default function AgentView() {
 
   const handleDeleteChat = useCallback(
     (id: string) => {
-      deleteChat.mutate(id);
       if (id === activeIdRef.current) {
+        window.consoleAPI?.agentCancel();
+        layer1AbortRef.current?.abort();
+        layer1AbortRef.current = null;
+        if (progressTimerRef.current) {
+          clearInterval(progressTimerRef.current);
+          progressTimerRef.current = null;
+        }
+        setIsLoading(false);
+        setActiveTool(null);
+        setPendingPlan(false);
+        setMessages([]);
         navigate("/agent", { replace: true });
       }
+      deleteChat.mutate(id);
     },
     [navigate, deleteChat]
   );
@@ -591,7 +688,7 @@ export default function AgentView() {
         )}
 
         {/* Scrollable messages */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 40px" }} className="scrollbar-hide">
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 40px" }}>
           <div style={{ maxWidth: 680, margin: "0 auto" }}>
             {messages.map((msg) => (
               <AgentMessage
@@ -673,9 +770,7 @@ export default function AgentView() {
             flexShrink: 0,
           }}
         >
-          <div style={{ maxWidth: 680, margin: "0 auto" }}>
-            {renderInput("bottom")}
-          </div>
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>{renderInput("bottom")}</div>
         </div>
       </div>
     );
@@ -684,7 +779,11 @@ export default function AgentView() {
   // ── Layout: sidebar + chat ─────────────────────────────────────────
   return (
     <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
-      <ChatHistorySidebar conversations={conversations} onDelete={handleDeleteChat} onRename={handleRenameChat} />
+      <ChatHistorySidebar
+        conversations={conversations}
+        onDelete={handleDeleteChat}
+        onRename={handleRenameChat}
+      />
       {renderChat()}
     </div>
   );

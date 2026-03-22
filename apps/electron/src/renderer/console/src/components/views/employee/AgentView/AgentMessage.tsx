@@ -154,13 +154,16 @@ export function AgentThinking({
   toolName?: string | null;
   toolDetail?: string | null;
 }) {
-  const label = toolName ? formatToolLabel(toolName) : "Thinking...";
-  const icon = toolName ? <ToolIcon name={toolName} /> : null;
-  const detail = toolDetail
-    ? toolDetail.length > 50
-      ? toolDetail.slice(0, 50) + "..."
-      : toolDetail
-    : null;
+  const isLayer1 = toolName === "layer1_progress";
+  const label =
+    isLayer1 && toolDetail ? toolDetail : toolName ? formatToolLabel(toolName) : "Thinking...";
+  const icon = toolName && !isLayer1 ? <ToolIcon name={toolName} /> : null;
+  const detail =
+    !isLayer1 && toolDetail
+      ? toolDetail.length > 50
+        ? toolDetail.slice(0, 50) + "..."
+        : toolDetail
+      : null;
 
   return (
     <div style={{ padding: "10px 0" }}>
