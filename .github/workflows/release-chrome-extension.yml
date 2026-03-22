@@ -1,0 +1,65 @@
+name: Release Chrome Extension
+
+on:
+  push:
+    tags:
+      - "chrome-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    name: Build & Upload Chrome Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: apps/chrome-extension
+        run: npm install
+
+      - name: Sync version from tag
+        working-directory: apps/chrome-extension
+        run: |
+          VERSION=${GITHUB_REF_NAME#chrome-v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          jq --arg v "$VERSION" '.version = $v' manifest.json > tmp.json && mv tmp.json manifest.json
+          echo "Set manifest version to $VERSION"
+
+      - name: Build extension
+        working-directory: apps/chrome-extension
+        run: npm run build
+
+      - name: Package extension
+        working-directory: apps/chrome-extension
+        run: |
+          zip -r mitable-browser-bridge.zip \
+            manifest.json dist/ popup/ icons/ \
+            -x "*.ts" "*.map" "node_modules/*" "tsconfig.json" "build.mjs" "package.json" "package-lock.json"
+          mkdir -p ../../release-artifacts
+          cp mitable-browser-bridge.zip ../../release-artifacts/
+
+      - name: Upload to Cloudflare R2
+        uses: ryand56/r2-upload-action@latest
+        with:
+          r2-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          r2-bucket: mitable-releases
+          source-dir: release-artifacts
+          destination-dir: ./
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/chrome-extension/mitable-browser-bridge.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
