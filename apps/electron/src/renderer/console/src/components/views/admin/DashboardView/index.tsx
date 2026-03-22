@@ -26,7 +26,6 @@ const VALID_FILTERS = new Set<TimeFilter>(["yesterday", "week", "month", "ytd", 
 
 const DEEP_WORK_COLOR = "var(--mi-accent)";
 const MEETINGS_COLOR = "var(--mi-accent-dark)";
-const AXIS_COLOR = "var(--text-secondary)";
 
 function getCssVar(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
