@@ -406,7 +406,7 @@ export default function CalendarView() {
                 gap: 5,
                 padding: "6px 10px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.2)",
+                border: "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.2)",
                 background: "transparent",
                 color: "var(--mi-accent)",
                 fontSize: 12,
@@ -419,13 +419,13 @@ export default function CalendarView() {
               }}
               onMouseEnter={(e) => {
                 if (!isSyncing) {
-                  e.currentTarget.style.background = "rgba(var(--mi-accent-rgb, 200,169,96), 0.06)";
-                  e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.3)";
+                  e.currentTarget.style.background = "rgba(var(--mi-accent-rgb, 130,192,204), 0.06)";
+                  e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 130,192,204), 0.3)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.2)";
+                e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 130,192,204), 0.2)";
               }}
             >
               <RefreshCw

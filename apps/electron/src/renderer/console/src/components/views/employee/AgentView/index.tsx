@@ -723,8 +723,8 @@ export default function AgentView() {
               gap: 8,
               padding: "10px 14px",
               borderRadius: 10,
-              border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.15)",
-              background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.04)",
+              border: "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.15)",
+              background: "rgba(var(--mi-accent-rgb, 130,192,204), 0.04)",
               margin: "12px 40px 0",
               maxWidth: 680,
             }}

@@ -69,12 +69,12 @@ export default {
           faint: "#4A4640",
         },
         accent: {
-          DEFAULT: "var(--mi-accent, #C8A960)",
+          DEFAULT: "var(--mi-accent, #82C0CC)",
           foreground: "hsl(var(--accent-foreground))",
-          bg: "var(--mi-accent-bg, rgba(200,169,96,0.12))",
-          border: "var(--mi-accent-border, rgba(200,169,96,0.22))",
-          dark: "var(--mi-accent-dark, #6B5A30)",
-          light: "var(--mi-accent-light, #D9C08A)",
+          bg: "var(--mi-accent-bg, rgba(130,192,204,0.12))",
+          border: "var(--mi-accent-border, rgba(130,192,204,0.22))",
+          dark: "var(--mi-accent-dark, #3A7A87)",
+          light: "var(--mi-accent-light, #B8DDE4)",
         },
         active: {
           DEFAULT: "#3A9B6B",
@@ -84,9 +84,9 @@ export default {
 
         /* Legacy compat — map old names to new tokens */
         indigo: {
-          DEFAULT: "var(--mi-accent, #C8A960)",
-          light: "var(--mi-accent-light, #D9C08A)",
-          muted: "rgba(var(--mi-accent-rgb, 200,169,96), 0.15)",
+          DEFAULT: "var(--mi-accent, #82C0CC)",
+          light: "var(--mi-accent-light, #B8DDE4)",
+          muted: "rgba(var(--mi-accent-rgb, 130,192,204), 0.15)",
         },
         rose: {
           DEFAULT: "#E87474",
@@ -110,7 +110,7 @@ export default {
           success: "#3A9B6B",
           warning: "#D4A27A",
           error: "#E87474",
-          info: "var(--mi-accent, #C8A960)",
+          info: "var(--mi-accent, #82C0CC)",
         },
         surface: {
           DEFAULT: "#2A2824",

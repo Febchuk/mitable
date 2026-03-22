@@ -232,8 +232,8 @@ export default function CreateDocumentModal({
                       gap: 5,
                       padding: "3px 8px",
                       borderRadius: 6,
-                      background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.08)",
-                      border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.2)",
+                      background: "rgba(var(--mi-accent-rgb, 130,192,204), 0.08)",
+                      border: "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.2)",
                       fontSize: 11,
                       color: "var(--mi-accent)",
                     }}
@@ -388,7 +388,7 @@ export default function CreateDocumentModal({
                   {selectedSessionIds.size > 0 && (
                     <span
                       style={{
-                        background: "rgba(var(--mi-accent-rgb, 200,169,96), 0.15)",
+                        background: "rgba(var(--mi-accent-rgb, 130,192,204), 0.15)",
                         color: "var(--mi-accent)",
                         fontSize: 10,
                         fontWeight: 600,
@@ -452,7 +452,7 @@ export default function CreateDocumentModal({
                               cursor: "pointer",
                               transition: "background 0.1s ease",
                               background: isSelected
-                                ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.06)"
+                                ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.06)"
                                 : "transparent",
                             }}
                             onMouseEnter={(e) => {
@@ -461,7 +461,7 @@ export default function CreateDocumentModal({
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background = isSelected
-                                ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.06)"
+                                ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.06)"
                                 : "transparent";
                             }}
                           >

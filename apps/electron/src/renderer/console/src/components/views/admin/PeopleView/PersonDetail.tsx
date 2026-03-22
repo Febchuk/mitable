@@ -52,9 +52,16 @@ const TIME_RANGE_LABELS: Record<TimeRange, string> = {
   all: "All",
 };
 
-const CUSTOMER_COLORS = ["#C8A960", "#A88E45", "#8B7535", "#6B5A30", "#B59A50", "#D4B870"];
+const CUSTOMER_COLORS = [
+  "var(--mi-accent)",
+  "var(--mi-accent-dark)",
+  "var(--mi-accent-light)",
+  "rgba(var(--mi-accent-rgb), 0.7)",
+  "rgba(var(--mi-accent-rgb), 0.5)",
+  "rgba(var(--mi-accent-rgb), 0.35)",
+];
 
-const BREAKDOWN_BAR_COLOR = "#C8A960";
+const BREAKDOWN_BAR_COLOR = "var(--mi-accent)";
 
 type GranolaBlock = {
   id: string;
@@ -659,7 +666,7 @@ export default function PersonDetail() {
                 height: 24,
                 margin: "0 auto 12px",
                 borderRadius: "50%",
-                border: "2px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.35)",
+                border: "2px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.35)",
                 borderTopColor: "var(--mi-accent)",
                 animation: "spin 1s linear infinite",
               }}

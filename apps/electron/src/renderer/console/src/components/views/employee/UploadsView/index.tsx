@@ -66,7 +66,7 @@ const EXT_COLORS: Record<string, string> = {
 
 function getExtColor(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
-  return EXT_COLORS[ext] || "#C8A960";
+  return EXT_COLORS[ext] || "var(--mi-accent)";
 }
 
 function getExtLabel(filename: string): string {

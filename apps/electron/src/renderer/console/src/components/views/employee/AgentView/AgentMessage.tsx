@@ -76,7 +76,7 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
         </div>
         <div
           style={{
-            borderLeft: "2px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.25)",
+            borderLeft: "2px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.25)",
             paddingLeft: 14,
             fontSize: 15,
             lineHeight: 1.75,

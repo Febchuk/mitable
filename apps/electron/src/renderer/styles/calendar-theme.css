@@ -21,8 +21,8 @@
   --cal-ink-primary: #F4F4F5;
   --cal-ink-secondary: #A1A1AA;
   --cal-ink-tertiary: #52525B;
-  --cal-indigo: #C8A960;
-  --cal-indigo-light: #D9C08A;
+  --cal-indigo: var(--mi-accent);
+  --cal-indigo-light: var(--mi-accent-light);
   --cal-emerald: #34D399;
 }
 

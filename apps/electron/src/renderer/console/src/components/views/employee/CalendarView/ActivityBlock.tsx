@@ -27,7 +27,7 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-const BAR_COLOR = "#C8A960";
+const BAR_COLOR = "var(--mi-accent)";
 const GRANOLA_GREEN = "#C8E64A";
 const GRANOLA_BORDER = "rgba(200, 230, 74, 0.18)";
 const FIREFLIES_PINK = "#E84393";
@@ -242,7 +242,7 @@ export default function ActivityBlock({
   }, [isMeeting, block.summary]);
 
   // Accent colors differ per source
-  const accentColor = isGranola ? GRANOLA_GREEN : isFireflies ? FIREFLIES_PINK : "#C8A960";
+  const accentColor = isGranola ? GRANOLA_GREEN : isFireflies ? FIREFLIES_PINK : "var(--mi-accent)";
   const meetingBorder = isGranola ? GRANOLA_BORDER : FIREFLIES_BORDER;
 
   const cardBorder = isActive
@@ -250,7 +250,7 @@ export default function ActivityBlock({
     : isExpanded
       ? isMeeting
         ? meetingBorder
-        : "rgba(200, 169, 96, 0.18)"
+        : "rgba(var(--mi-accent-rgb), 0.18)"
       : "rgba(236, 232, 224, 0.08)";
 
   return (

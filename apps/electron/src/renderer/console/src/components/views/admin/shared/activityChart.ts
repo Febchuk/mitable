@@ -28,8 +28,13 @@ export const VALID_ACTIVITY_FILTERS = new Set<ActivityTimeFilter>([
   "all",
 ]);
 
-export const DEEP_WORK_COLOR = "#C8A960";
-export const MEETINGS_COLOR = "#6B5A30";
+function getCssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+export const DEEP_WORK_COLOR = "var(--mi-accent)";
+export const MEETINGS_COLOR = "var(--mi-accent-dark)";
 export const AXIS_COLOR = "#9B9689";
 
 function formatHour(h: number): string {
@@ -182,6 +187,9 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
+  const deepWorkHex = getCssVar("--mi-accent", "#82C0CC");
+  const meetingsHex = getCssVar("--mi-accent-dark", "#3A7A87");
+
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * dpr;
@@ -248,19 +256,19 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
     if (!dwIsZero && !mtIsZero) {
       const dwH = (d.deepWork / maxVal) * chartH;
       const dwX = centerX - barW - gap / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, DEEP_WORK_COLOR);
+      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
 
       const mtH = (d.meetings / maxVal) * chartH;
       const mtX = centerX + gap / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, MEETINGS_COLOR);
+      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
     } else if (!dwIsZero) {
       const dwH = (d.deepWork / maxVal) * chartH;
       const dwX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, DEEP_WORK_COLOR);
+      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
     } else if (!mtIsZero) {
       const mtH = (d.meetings / maxVal) * chartH;
       const mtX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, MEETINGS_COLOR);
+      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
     }
 
     if (labelSet.has(i)) {

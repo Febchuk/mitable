@@ -27,7 +27,7 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
         margin: "1px 8px",
         fontSize: 13,
         color: isInSection ? "var(--mi-accent)" : "#9B9689",
-        background: isInSection ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.13)" : "transparent",
+        background: isInSection ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.13)" : "transparent",
         cursor: "pointer",
         whiteSpace: "nowrap",
         textDecoration: "none",

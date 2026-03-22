@@ -94,9 +94,9 @@ function ToggleRow({
         padding: "14px 16px",
         borderRadius: 10,
         border: checked
-          ? "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.25)"
+          ? "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.25)"
           : "0.5px solid rgba(236, 232, 224, 0.08)",
-        background: checked ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.05)" : "#1A1916",
+        background: checked ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.05)" : "#1A1916",
         cursor: "pointer",
         textAlign: "left",
       }}
@@ -107,7 +107,7 @@ function ToggleRow({
           height: 28,
           borderRadius: 8,
           background: checked
-            ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.14)"
+            ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.14)"
             : "rgba(236, 232, 224, 0.06)",
           display: "flex",
           alignItems: "center",

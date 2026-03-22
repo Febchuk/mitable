@@ -189,7 +189,7 @@ export default function ChatHistorySidebar({
                           cursor: "pointer",
                           transition: "background 0.1s ease",
                           background: isActive
-                            ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.1)"
+                            ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.1)"
                             : isHovered
                               ? "rgba(236, 232, 224, 0.04)"
                               : "transparent",

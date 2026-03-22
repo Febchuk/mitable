@@ -94,10 +94,10 @@ export default function WeekStrip({
                 flex: 1,
                 minWidth: 0,
                 background: highlighted
-                  ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.11)"
+                  ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.11)"
                   : "transparent",
                 border: highlighted
-                  ? "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.22)"
+                  ? "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.22)"
                   : "0.5px solid transparent",
                 transition: "background 0.15s ease",
               }}

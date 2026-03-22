@@ -30,7 +30,7 @@ function getDocInitial(doc: Document): string {
   return (doc.title || "U").charAt(0).toUpperCase();
 }
 
-const DOC_AVATAR_COLORS = ["#C8A960", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
+const DOC_AVATAR_COLORS = ["var(--mi-accent)", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
 
 function getAvatarColor(id: string): string {
   let hash = 0;

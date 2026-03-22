@@ -252,7 +252,7 @@ export const Response = memo(
                   style={{
                     fontFamily: "var(--font-mono)",
                     background: "rgba(236, 232, 224, 0.06)",
-                    color: "#C8A960",
+                    color: "var(--mi-accent)",
                   }}
                   {...props}
                 />

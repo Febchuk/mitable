@@ -18,13 +18,13 @@
     --text-tertiary: #6B665C;
     --text-faint: #4A4640;
 
-    /* accent — warm amber / gold */
-    --mi-accent: #C8A960;
-    --mi-accent-rgb: 200, 169, 96;
-    --mi-accent-dark: #6B5A30;
-    --mi-accent-light: #D9C08A;
-    --mi-accent-bg: rgba(200, 169, 96, 0.12);
-    --mi-accent-border: rgba(200, 169, 96, 0.22);
+    /* accent — teal blue */
+    --mi-accent: #82C0CC;
+    --mi-accent-rgb: 130, 192, 204;
+    --mi-accent-dark: #3A7A87;
+    --mi-accent-light: #B8DDE4;
+    --mi-accent-bg: rgba(130, 192, 204, 0.12);
+    --mi-accent-border: rgba(130, 192, 204, 0.22);
 
     /* status */
     --status-active: #3A9B6B;
@@ -53,7 +53,7 @@
     --card-foreground: 40 18% 90%;
     --popover: 36 8% 15%;
     --popover-foreground: 40 18% 90%;
-    --primary: 42 48% 58%;
+    --primary: 190 42% 66%;
     --primary-foreground: 0 0% 100%;
     --secondary: 36 8% 15%;
     --secondary-foreground: 40 18% 90%;
@@ -65,21 +65,21 @@
     --destructive-foreground: 0 0% 98%;
     --border: 36 8% 18%;
     --input: 36 8% 18%;
-    --ring: 42 48% 58%;
+    --ring: 190 42% 66%;
     --radius: 0.625rem;
-    --chart-1: 42 48% 58%;
+    --chart-1: 190 42% 66%;
     --chart-2: 152 45% 47%;
     --chart-3: 30 50% 55%;
     --chart-4: 36 8% 55%;
     --chart-5: 0 62% 50%;
     --sidebar-background: 36 8% 12%;
     --sidebar-foreground: 40 18% 90%;
-    --sidebar-primary: 42 48% 58%;
+    --sidebar-primary: 190 42% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 36 8% 15%;
     --sidebar-accent-foreground: 40 18% 90%;
     --sidebar-border: 36 8% 15%;
-    --sidebar-ring: 42 48% 58%;
+    --sidebar-ring: 190 42% 66%;
   }
 
   .dark {
@@ -89,7 +89,7 @@
     --card-foreground: 40 18% 90%;
     --popover: 36 8% 15%;
     --popover-foreground: 40 18% 90%;
-    --primary: 42 48% 58%;
+    --primary: 190 42% 66%;
     --primary-foreground: 0 0% 100%;
     --secondary: 36 8% 15%;
     --secondary-foreground: 40 18% 90%;
@@ -101,20 +101,20 @@
     --destructive-foreground: 0 0% 98%;
     --border: 36 8% 18%;
     --input: 36 8% 18%;
-    --ring: 42 48% 58%;
-    --chart-1: 42 48% 58%;
+    --ring: 190 42% 66%;
+    --chart-1: 190 42% 66%;
     --chart-2: 152 45% 47%;
     --chart-3: 30 50% 55%;
     --chart-4: 36 8% 55%;
     --chart-5: 0 62% 50%;
     --sidebar-background: 36 8% 12%;
     --sidebar-foreground: 40 18% 90%;
-    --sidebar-primary: 42 48% 58%;
+    --sidebar-primary: 190 42% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 36 8% 15%;
     --sidebar-accent-foreground: 40 18% 90%;
     --sidebar-border: 36 8% 15%;
-    --sidebar-ring: 42 48% 58%;
+    --sidebar-ring: 190 42% 66%;
   }
 }
 
