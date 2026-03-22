@@ -77,49 +77,19 @@ export async function addAgentMessage(
 // ── Agent Query Layer (Layer 1) ─────────────────────────────────────
 // Lightweight RLM for conversational queries — no SDK subprocess needed.
 
-export async function askAgentQuery(
-  message: string,
-  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>,
-  signal?: AbortSignal
-): Promise<{ response: string }> {
-  return apiRequest("/agent/ask", {
-    method: "POST",
-    body: JSON.stringify({ message, conversationHistory }),
-    signal,
-  });
+export interface AgentQueryResult {
+  response?: string;
+  escalate?: boolean;
 }
 
-const SDK_KEYWORDS = [
-  "send slack",
-  "slack message",
-  "post to slack",
-  "open browser",
-  "navigate to",
-  "go to http",
-  "go to www",
-  "screenshot",
-  "click",
-  "type in",
-  "scroll to",
-  "create file",
-  "write file",
-  "edit file",
-  "read file",
-  "delete file",
-  "run command",
-  "terminal",
-  "bash",
-  "shell",
-  "create document",
-  "draft a",
-  "write a doc",
-  "linear",
-  "gmail",
-  "send email",
-  "send a message",
-];
-
-export function needsSdkAgent(message: string): boolean {
-  const lower = message.toLowerCase();
-  return SDK_KEYWORDS.some((kw) => lower.includes(kw));
+export async function askAgentQuery(
+  message: string,
+  conversationId?: string,
+  signal?: AbortSignal
+): Promise<AgentQueryResult> {
+  return apiRequest("/agent/ask", {
+    method: "POST",
+    body: JSON.stringify({ message, conversationId }),
+    signal,
+  });
 }

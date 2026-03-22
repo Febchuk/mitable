@@ -23,7 +23,7 @@ import {
   useAddAgentMessage,
   useUpdateAgentChatSession,
 } from "../../../../hooks/queries/agent-chats";
-import { askAgentQuery, needsSdkAgent } from "../../../../services/agentChatService";
+import { askAgentQuery } from "../../../../services/agentChatService";
 
 interface ChatMessage {
   id: string;
@@ -89,7 +89,7 @@ export default function AgentView() {
   // The active conversation ID — from URL or null (new chat)
   const activeIdRef = useRef<string | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const turnStartIndexRef = useRef<number>(0);
   const layer1AbortRef = useRef<AbortController | null>(null);
@@ -144,7 +144,14 @@ export default function AgentView() {
 
   useEffect(() => {
     messagesRef.current = messages;
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll the messages container to bottom — use scrollTop instead of
+    // scrollIntoView to avoid bubbling up and shifting ancestor containers.
+    const el = scrollContainerRef.current;
+    if (el) {
+      requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      });
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -300,52 +307,45 @@ export default function AgentView() {
       }
       addMessage.mutate({ conversationId: convId, role: "user", content: trimmed });
 
-      const usesSdk = needsSdkAgent(trimmed);
-
       try {
-        if (usesSdk) {
-          // Layer 2: Claude Code SDK for complex actions (browser, file ops, terminal, Slack)
+        // Always try Layer 1 (lightweight RLM) first
+        const abort = new AbortController();
+        layer1AbortRef.current = abort;
+
+        // Cycling progress messages while the RLM works
+        const progressSteps = [
+          "Searching your activity...",
+          "Fetching sessions & meetings...",
+          "Analyzing daily summaries...",
+          "Reviewing meeting notes...",
+          "Compiling insights...",
+          "Synthesizing patterns...",
+        ];
+        let stepIdx = 0;
+        setActiveTool({ name: "layer1_progress", detail: progressSteps[0] });
+        progressTimerRef.current = setInterval(() => {
+          stepIdx = Math.min(stepIdx + 1, progressSteps.length - 1);
+          setActiveTool({ name: "layer1_progress", detail: progressSteps[stepIdx] });
+        }, 4000);
+
+        const result = await askAgentQuery(trimmed, convId, abort.signal);
+
+        // Clean up progress timer
+        if (progressTimerRef.current) {
+          clearInterval(progressTimerRef.current);
+          progressTimerRef.current = null;
+        }
+        setActiveTool(null);
+        layer1AbortRef.current = null;
+
+        // Guard: only apply if this conversation is still active
+        if (activeIdRef.current !== convId) return;
+
+        if (result.escalate) {
+          // Layer 1 can't handle it — fall back to Layer 2 (Claude Code SDK)
           await window.consoleAPI?.agentSendMessage(convId, trimmed);
-        } else {
-          // Layer 1: Lightweight RLM for conversational queries
-          const history = messagesRef.current
-            .filter((m) => m.role === "user" || m.role === "assistant")
-            .slice(0, -1)
-            .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
-
-          // Abort controller so we can cancel if chat is deleted
-          const abort = new AbortController();
-          layer1AbortRef.current = abort;
-
-          // Cycling progress messages while the RLM works
-          const progressSteps = [
-            "Searching your activity...",
-            "Fetching sessions & meetings...",
-            "Analyzing daily summaries...",
-            "Reviewing meeting notes...",
-            "Compiling insights...",
-            "Synthesizing patterns...",
-          ];
-          let stepIdx = 0;
-          setActiveTool({ name: "layer1_progress", detail: progressSteps[0] });
-          progressTimerRef.current = setInterval(() => {
-            stepIdx = Math.min(stepIdx + 1, progressSteps.length - 1);
-            setActiveTool({ name: "layer1_progress", detail: progressSteps[stepIdx] });
-          }, 4000);
-
-          const result = await askAgentQuery(trimmed, history, abort.signal);
-
-          // Clean up progress timer
-          if (progressTimerRef.current) {
-            clearInterval(progressTimerRef.current);
-            progressTimerRef.current = null;
-          }
-          setActiveTool(null);
-          layer1AbortRef.current = null;
-
-          // Guard: only apply if this conversation is still active
-          if (activeIdRef.current !== convId) return;
-
+        } else if (result.response) {
+          // Layer 1 handled it
           const assistantMsg: ChatMessage = {
             id: generateId(),
             role: "assistant",
@@ -688,7 +688,7 @@ export default function AgentView() {
         )}
 
         {/* Scrollable messages */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 40px" }}>
+        <div ref={scrollContainerRef} style={{ flex: 1, overflowY: "auto", padding: "0 40px" }}>
           <div style={{ maxWidth: 680, margin: "0 auto" }}>
             {messages.map((msg) => (
               <AgentMessage
@@ -702,7 +702,6 @@ export default function AgentView() {
             {isLoading && (
               <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />
             )}
-            <div ref={messagesEndRef} />
           </div>
         </div>
 

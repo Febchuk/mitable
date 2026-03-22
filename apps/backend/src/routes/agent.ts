@@ -6,11 +6,12 @@ import { slackService } from "../services/slack.service.js";
 import { createLogger } from "../lib/logger.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { AskEnvironment } from "../services/rlm/ask-environment.js";
 import { AgentQueryEnvironment } from "../services/rlm/agent-query-environment.js";
 import { getAgentQueryToolByName } from "../services/rlm/agent-query-tools.js";
 import { getAgentQuerySystemPrompt } from "../services/rlm/agent-query-prompts.js";
+import { UserActivityQueryService } from "../services/user-activity-queries.js";
 import { parseJsonResponse } from "../lib/parse-json.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
@@ -145,127 +146,9 @@ agentRouter.get("/tools/activity", async (req: Request, res: Response) => {
   try {
     const startDate = req.query.start_date as string | undefined;
     const endDate = req.query.end_date as string | undefined;
-
-    // Default: last 30 days
-    const end = endDate ? new Date(endDate + "T23:59:59Z") : new Date();
-    const start = startDate
-      ? new Date(startDate + "T00:00:00Z")
-      : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    // Cap at 31 days
-    const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-    if (diffDays > 31) {
-      res.status(400).json({ error: "Date range cannot exceed 31 days" });
-      return;
-    }
-
-    // 1. Activity blocks (meetings + work blocks from Day Analyzer — includes Granola/Fireflies)
-    const blocks = await db
-      .select({
-        id: schema.activityBlocks.id,
-        blockType: schema.activityBlocks.blockType,
-        name: schema.activityBlocks.name,
-        description: schema.activityBlocks.description,
-        startTime: schema.activityBlocks.startTime,
-        endTime: schema.activityBlocks.endTime,
-        durationMinutes: schema.activityBlocks.durationMinutes,
-        category: schema.activityBlocks.category,
-        participants: schema.activityBlocks.participants,
-        apps: schema.activityBlocks.apps,
-        topicName: schema.activityBlocks.topicName,
-        subscriberName: schema.activityBlocks.subscriberName,
-      })
-      .from(schema.activityBlocks)
-      .where(
-        and(
-          eq(schema.activityBlocks.userId, req.userId!),
-          gte(schema.activityBlocks.startTime, start),
-          lte(schema.activityBlocks.startTime, end)
-        )
-      )
-      .orderBy(desc(schema.activityBlocks.startTime))
-      .limit(50);
-
-    // 2. Daily activity rollups (pre-aggregated summaries, accomplishments, metrics)
-    const startDateStr = start.toISOString().split("T")[0];
-    const endDateStr = end.toISOString().split("T")[0];
-
-    const dailyActivities = await db
-      .select({
-        id: schema.userDailyActivities.id,
-        activityDate: schema.userDailyActivities.activityDate,
-        totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
-        totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
-        totalSessions: schema.userDailyActivities.totalSessions,
-        daySummary: schema.userDailyActivities.daySummary,
-        keyAccomplishments: schema.userDailyActivities.keyAccomplishments,
-        categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
-      })
-      .from(schema.userDailyActivities)
-      .where(
-        and(
-          eq(schema.userDailyActivities.userId, req.userId!),
-          gte(schema.userDailyActivities.activityDate, startDateStr),
-          lte(schema.userDailyActivities.activityDate, endDateStr),
-          eq(schema.userDailyActivities.periodType, "daily")
-        )
-      )
-      .orderBy(desc(schema.userDailyActivities.activityDate))
-      .limit(31);
-
-    // 3. Sessions with summaries (task breakdowns, accomplishments, blockers)
-    const sessions = await db
-      .select({
-        id: schema.monitoringSessions.id,
-        name: schema.monitoringSessions.name,
-        sessionType: schema.monitoringSessions.sessionType,
-        status: schema.monitoringSessions.status,
-        startedAt: schema.monitoringSessions.startedAt,
-        endedAt: schema.monitoringSessions.endedAt,
-        finalSummary: schema.monitoringSessions.finalSummary,
-        taskBreakdown: schema.monitoringSessions.taskBreakdown,
-        accomplishments: schema.monitoringSessions.accomplishments,
-        blockers: schema.monitoringSessions.blockers,
-      })
-      .from(schema.monitoringSessions)
-      .where(
-        and(
-          eq(schema.monitoringSessions.userId, req.userId!),
-          gte(schema.monitoringSessions.startedAt, start),
-          lte(schema.monitoringSessions.startedAt, end)
-        )
-      )
-      .orderBy(desc(schema.monitoringSessions.startedAt))
-      .limit(20);
-
-    // 4. Documents created in range
-    const documents = await db
-      .select({
-        id: schema.documents.id,
-        title: schema.documents.title,
-        docType: schema.documents.docType,
-        status: schema.documents.status,
-        description: schema.documents.description,
-        createdAt: schema.documents.createdAt,
-      })
-      .from(schema.documents)
-      .where(
-        and(
-          eq(schema.documents.createdBy, req.userId!),
-          gte(schema.documents.createdAt, start),
-          lte(schema.documents.createdAt, end)
-        )
-      )
-      .orderBy(desc(schema.documents.createdAt))
-      .limit(20);
-
-    res.json({
-      dateRange: { start: startDateStr, end: endDateStr },
-      activityBlocks: blocks,
-      dailySummaries: dailyActivities,
-      sessions,
-      documents,
-    });
+    const service = new UserActivityQueryService(req.userId!);
+    const result = await service.getActivity(startDate, endDate);
+    res.json(result);
   } catch (error) {
     logger.error({ error }, "Failed to fetch activity");
     res.status(500).json({ error: "Failed to fetch activity" });
@@ -280,88 +163,19 @@ agentRouter.get("/tools/activity-detail", async (req: Request, res: Response) =>
       res.status(400).json({ error: "id and type required (type: block | session | document)" });
       return;
     }
-
-    if (type === "block") {
-      const [block] = await db
-        .select({
-          id: schema.activityBlocks.id,
-          blockType: schema.activityBlocks.blockType,
-          name: schema.activityBlocks.name,
-          description: schema.activityBlocks.description,
-          rawTranscript: schema.activityBlocks.rawTranscript,
-          startTime: schema.activityBlocks.startTime,
-          endTime: schema.activityBlocks.endTime,
-          durationMinutes: schema.activityBlocks.durationMinutes,
-          category: schema.activityBlocks.category,
-          participants: schema.activityBlocks.participants,
-          apps: schema.activityBlocks.apps,
-          topicName: schema.activityBlocks.topicName,
-          subscriberName: schema.activityBlocks.subscriberName,
-        })
-        .from(schema.activityBlocks)
-        .where(and(eq(schema.activityBlocks.id, id), eq(schema.activityBlocks.userId, req.userId!)))
-        .limit(1);
-
-      if (!block) {
-        res.status(404).json({ error: "Activity block not found" });
-        return;
-      }
-      res.json({ type: "block", data: block });
-    } else if (type === "session") {
-      const [session] = await db
-        .select({
-          id: schema.monitoringSessions.id,
-          name: schema.monitoringSessions.name,
-          sessionType: schema.monitoringSessions.sessionType,
-          status: schema.monitoringSessions.status,
-          startedAt: schema.monitoringSessions.startedAt,
-          endedAt: schema.monitoringSessions.endedAt,
-          finalSummary: schema.monitoringSessions.finalSummary,
-          keyActivities: schema.monitoringSessions.keyActivities,
-          taskBreakdown: schema.monitoringSessions.taskBreakdown,
-          timeBreakdown: schema.monitoringSessions.timeBreakdown,
-          accomplishments: schema.monitoringSessions.accomplishments,
-          blockers: schema.monitoringSessions.blockers,
-        })
-        .from(schema.monitoringSessions)
-        .where(
-          and(
-            eq(schema.monitoringSessions.id, id),
-            eq(schema.monitoringSessions.userId, req.userId!)
-          )
-        )
-        .limit(1);
-
-      if (!session) {
-        res.status(404).json({ error: "Session not found" });
-        return;
-      }
-      res.json({ type: "session", data: session });
-    } else if (type === "document") {
-      const [doc] = await db
-        .select({
-          id: schema.documents.id,
-          title: schema.documents.title,
-          docType: schema.documents.docType,
-          status: schema.documents.status,
-          description: schema.documents.description,
-          content: schema.documents.content,
-          tags: schema.documents.tags,
-          createdAt: schema.documents.createdAt,
-          updatedAt: schema.documents.updatedAt,
-        })
-        .from(schema.documents)
-        .where(and(eq(schema.documents.id, id), eq(schema.documents.createdBy, req.userId!)))
-        .limit(1);
-
-      if (!doc) {
-        res.status(404).json({ error: "Document not found" });
-        return;
-      }
-      res.json({ type: "document", data: doc });
-    } else {
+    if (type !== "block" && type !== "session" && type !== "document") {
       res.status(400).json({ error: "Invalid type. Must be: block, session, or document" });
+      return;
     }
+
+    const service = new UserActivityQueryService(req.userId!);
+    const result = await service.getActivityDetail(id, type);
+    if (!result) {
+      const labels = { block: "Activity block", session: "Session", document: "Document" };
+      res.status(404).json({ error: `${labels[type]} not found` });
+      return;
+    }
+    res.json(result);
   } catch (error) {
     logger.error({ error }, "Failed to fetch activity detail");
     res.status(500).json({ error: "Failed to fetch activity detail" });
@@ -638,6 +452,23 @@ agentRouter.post("/chats/:id/messages", async (req: Request, res: Response) => {
       return;
     }
 
+    // Ownership check: verify the conversation belongs to this user
+    const [conversation] = await db
+      .select({ id: schema.agentConversations.id })
+      .from(schema.agentConversations)
+      .where(
+        and(
+          eq(schema.agentConversations.id, req.params.id),
+          eq(schema.agentConversations.userId, req.userId!)
+        )
+      )
+      .limit(1);
+
+    if (!conversation) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
     const [message] = await db
       .insert(schema.agentMessages)
       .values({
@@ -655,7 +486,12 @@ agentRouter.post("/chats/:id/messages", async (req: Request, res: Response) => {
       const [convo] = await db
         .select({ title: schema.agentConversations.title })
         .from(schema.agentConversations)
-        .where(eq(schema.agentConversations.id, req.params.id));
+        .where(
+          and(
+            eq(schema.agentConversations.id, req.params.id),
+            eq(schema.agentConversations.userId, req.userId!)
+          )
+        );
 
       if (convo?.title === "New chat") {
         updates.title = content.length > 60 ? content.slice(0, 57) + "..." : content;
@@ -665,7 +501,12 @@ agentRouter.post("/chats/:id/messages", async (req: Request, res: Response) => {
     await db
       .update(schema.agentConversations)
       .set(updates)
-      .where(eq(schema.agentConversations.id, req.params.id));
+      .where(
+        and(
+          eq(schema.agentConversations.id, req.params.id),
+          eq(schema.agentConversations.userId, req.userId!)
+        )
+      );
 
     res.json({ message });
   } catch (error) {
@@ -678,7 +519,7 @@ agentRouter.post("/chats/:id/messages", async (req: Request, res: Response) => {
 // Lightweight RLM loop for conversational queries about the user's work.
 // No CLI subprocess — direct LLM + DB queries, fast and cheap.
 
-const AGENT_QUERY_MAX_ITERATIONS = 25;
+const AGENT_QUERY_MAX_ITERATIONS = 10;
 
 // ── LLM clients (lazy init) — Claude → GPT-5 → DeepSeek V3.2 ──────
 
@@ -773,14 +614,42 @@ async function callAgentQueryLLM(
 
 agentRouter.post("/ask", async (req: Request, res: Response) => {
   try {
-    const { message, conversationHistory = [] } = req.body as {
+    const { message, conversationId } = req.body as {
       message: string;
-      conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+      conversationId?: string;
     };
 
     if (!message) {
       res.status(400).json({ error: "message required" });
       return;
+    }
+
+    // Load conversation history server-side if a conversationId is provided
+    let conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+    if (conversationId) {
+      // Verify ownership
+      const [convo] = await db
+        .select({ id: schema.agentConversations.id })
+        .from(schema.agentConversations)
+        .where(
+          and(
+            eq(schema.agentConversations.id, conversationId),
+            eq(schema.agentConversations.userId, req.userId!)
+          )
+        )
+        .limit(1);
+
+      if (convo) {
+        const dbMessages = await db
+          .select({ role: schema.agentMessages.role, content: schema.agentMessages.content })
+          .from(schema.agentMessages)
+          .where(eq(schema.agentMessages.conversationId, conversationId))
+          .orderBy(schema.agentMessages.createdAt);
+
+        conversationHistory = dbMessages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+      }
     }
 
     // Resolve user name for the prompt
@@ -802,6 +671,7 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
     let iterations = 0;
     let toolCalls = 0;
     let finalResponse = "";
+    let escalate = false;
 
     while (iterations < AGENT_QUERY_MAX_ITERATIONS) {
       iterations++;
@@ -814,6 +684,8 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
         reasoning?: string;
         done?: boolean;
         response?: string;
+        escalate?: boolean;
+        reason?: string;
       };
 
       try {
@@ -824,6 +696,12 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
       }
 
       rlmMessages.push({ role: "assistant", content: JSON.stringify(decision) });
+
+      // Check for escalation signal
+      if (decision.escalate) {
+        escalate = true;
+        break;
+      }
 
       if (decision.done && decision.response) {
         finalResponse = decision.response;
@@ -851,6 +729,12 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
         if (decision.response) finalResponse = decision.response;
         break;
       }
+    }
+
+    if (escalate) {
+      logger.info({ iterations, toolCalls }, "Agent query RLM escalating to SDK");
+      res.json({ escalate: true });
+      return;
     }
 
     if (!finalResponse) {
