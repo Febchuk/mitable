@@ -19,7 +19,7 @@ function formatTime(dateString: string): string {
   });
 }
 
-const REPORT_AVATAR_COLORS = ["var(--mi-accent)", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
+const REPORT_AVATAR_COLORS = ["var(--mi-accent)", "var(--status-success)", "var(--status-warning)", "var(--status-info)", "var(--status-error)", "var(--text-secondary)"];
 
 function getAvatarColor(id: string): string {
   let hash = 0;
@@ -59,7 +59,7 @@ export default function ReportsView() {
           size={24}
           style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
         />
-        <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading reports...</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>Loading reports...</p>
       </div>
     );
   }
@@ -75,8 +75,8 @@ export default function ReportsView() {
           padding: "80px 0",
         }}
       >
-        <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
-        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>Failed to load reports</p>
+        <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
+        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>Failed to load reports</p>
       </div>
     );
   }
@@ -96,7 +96,7 @@ export default function ReportsView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 32,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 400,
               letterSpacing: "-0.4px",
               lineHeight: 1,
@@ -109,7 +109,7 @@ export default function ReportsView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 15,
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               fontWeight: 400,
               fontStyle: "italic",
               margin: "12px 0 0",
@@ -127,9 +127,9 @@ export default function ReportsView() {
             gap: 6,
             padding: "6px 12px",
             borderRadius: 8,
-            border: "0.5px solid rgba(236, 232, 224, 0.12)",
+            border: "0.5px solid rgba(var(--ui-rgb), 0.12)",
             background: "transparent",
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             fontSize: 12,
             fontFamily: "var(--font-sans)",
             fontWeight: 500,
@@ -139,12 +139,12 @@ export default function ReportsView() {
             marginTop: 4,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.2)";
+            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+            e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+            e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
           }}
         >
           <Plus size={12} strokeWidth={2} />
@@ -159,7 +159,7 @@ export default function ReportsView() {
               <div
                 style={{
                   fontSize: 12,
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   fontWeight: 500,
                   marginBottom: 8,
                 }}
@@ -189,7 +189,7 @@ export default function ReportsView() {
                         transition: "background 0.12s ease",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(236, 232, 224, 0.04)";
+                        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "transparent";
@@ -217,7 +217,7 @@ export default function ReportsView() {
                         <div
                           style={{
                             fontSize: 13,
-                            color: "#ECE8E0",
+                            color: "var(--text-primary)",
                             fontWeight: 500,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -229,7 +229,7 @@ export default function ReportsView() {
                         <div
                           style={{
                             fontSize: 12,
-                            color: "#6B665C",
+                            color: "var(--text-tertiary)",
                             marginTop: 1,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -241,13 +241,13 @@ export default function ReportsView() {
                       </div>
 
                       {report.status === "draft" && (
-                        <Lock size={12} style={{ color: "#6B665C", flexShrink: 0 }} />
+                        <Lock size={12} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
                       )}
 
                       <span
                         style={{
                           fontSize: 12,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           flexShrink: 0,
                           fontVariantNumeric: "tabular-nums",
                         }}

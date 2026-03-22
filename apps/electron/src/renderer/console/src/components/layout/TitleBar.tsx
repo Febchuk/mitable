@@ -33,18 +33,18 @@ export default function TitleBar() {
           justifyContent: "center",
           borderRadius: 6,
           cursor: "pointer",
-          color: "#6B665C",
+          color: "var(--text-tertiary)",
           background: "none",
           border: "none",
           padding: 0,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
-          e.currentTarget.style.color = "#9B9689";
+          e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+          e.currentTarget.style.color = "var(--text-secondary)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "none";
-          e.currentTarget.style.color = "#6B665C";
+          e.currentTarget.style.color = "var(--text-tertiary)";
         }}
       >
         <PanelLeft size={16} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />

@@ -497,12 +497,12 @@ function RecentWorkIcon({ kind }: { kind: RecentWorkFilter }) {
         width: 36,
         height: 36,
         borderRadius: 10,
-        border: "0.5px solid rgba(236, 232, 224, 0.08)",
-        background: "rgba(236, 232, 224, 0.04)",
+        border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+        background: "rgba(var(--ui-rgb), 0.04)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#9B9689",
+        color: "var(--text-secondary)",
         flexShrink: 0,
       }}
     >
@@ -649,7 +649,7 @@ export default function PersonDetail() {
             background: "none",
             border: "none",
             padding: 0,
-            color: "#9B9689",
+            color: "var(--text-secondary)",
             cursor: "pointer",
             fontSize: 13,
           }}
@@ -671,7 +671,7 @@ export default function PersonDetail() {
                 animation: "spin 1s linear infinite",
               }}
             />
-            <p style={{ fontSize: 13, color: "#6B665C", margin: 0 }}>Loading activity data...</p>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>Loading activity data...</p>
           </div>
         </div>
       </div>
@@ -780,7 +780,7 @@ export default function PersonDetail() {
               background: "none",
               border: "none",
               padding: 0,
-              color: "#9B9689",
+              color: "var(--text-secondary)",
               cursor: "pointer",
               fontSize: 13,
             }}
@@ -794,7 +794,7 @@ export default function PersonDetail() {
               style={{
                 fontFamily: "var(--font-serif)",
                 fontSize: 26,
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 fontWeight: 400,
                 letterSpacing: "-0.3px",
                 margin: 0,
@@ -802,7 +802,7 @@ export default function PersonDetail() {
             >
               {selectedWork.title}
             </h1>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#6B665C" }}>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-tertiary)" }}>
               {selectedWork.date}, {selectedWork.time}
               {selectedWork.durationMinutes > 0
                 ? ` · ${formatCompactDuration(selectedWork.durationMinutes)}`
@@ -814,7 +814,7 @@ export default function PersonDetail() {
             <div
               style={{
                 fontSize: 10,
-                color: "#6B665C",
+                color: "var(--text-tertiary)",
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
                 marginBottom: 10,
@@ -878,7 +878,7 @@ export default function PersonDetail() {
             background: "none",
             border: "none",
             padding: 0,
-            color: "#9B9689",
+            color: "var(--text-secondary)",
             cursor: "pointer",
             fontSize: 13,
           }}
@@ -901,8 +901,8 @@ export default function PersonDetail() {
                 width: 54,
                 height: 54,
                 borderRadius: 999,
-                background: "rgba(236, 232, 224, 0.1)",
-                color: "#ECE8E0",
+                background: "rgba(var(--ui-rgb), 0.1)",
+                color: "var(--text-primary)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -919,7 +919,7 @@ export default function PersonDetail() {
                 style={{
                   fontFamily: "var(--font-serif)",
                   fontSize: 26,
-                  color: "#ECE8E0",
+                  color: "var(--text-primary)",
                   fontWeight: 400,
                   letterSpacing: "-0.3px",
                   margin: 0,
@@ -936,7 +936,7 @@ export default function PersonDetail() {
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: 13, color: "#9B9689" }}>{person.role}</span>
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{person.role}</span>
                 <span
                   className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${person.moodColor}`}
                 >
@@ -948,7 +948,7 @@ export default function PersonDetail() {
                     alignItems: "center",
                     gap: 5,
                     fontSize: 12,
-                    color: "#9B9689",
+                    color: "var(--text-secondary)",
                   }}
                 >
                   <Zap size={11} style={{ color: "#54705F" }} />
@@ -962,7 +962,7 @@ export default function PersonDetail() {
                   gap: 12,
                   marginTop: 8,
                   fontSize: 12,
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   flexWrap: "wrap",
                 }}
               >
@@ -977,7 +977,7 @@ export default function PersonDetail() {
             style={{
               display: "flex",
               gap: 1,
-              background: "rgba(236, 232, 224, 0.05)",
+              background: "rgba(var(--ui-rgb), 0.05)",
               borderRadius: 7,
               padding: 3,
               flexShrink: 0,
@@ -992,8 +992,8 @@ export default function PersonDetail() {
                   borderRadius: 5,
                   fontSize: 11,
                   fontFamily: "var(--font-sans)",
-                  color: timeRange === filter.key ? "#ECE8E0" : "#9B9689",
-                  background: timeRange === filter.key ? "#2A2824" : "transparent",
+                  color: timeRange === filter.key ? "var(--text-primary)" : "var(--text-secondary)",
+                  background: timeRange === filter.key ? "var(--bg-overlay)" : "transparent",
                   border: "none",
                   cursor: "pointer",
                 }}
@@ -1021,7 +1021,7 @@ export default function PersonDetail() {
                 <span
                   style={{
                     fontSize: 10,
-                    color: "#6B665C",
+                    color: "var(--text-tertiary)",
                     textTransform: "uppercase",
                     letterSpacing: "0.09em",
                     fontFamily: "var(--font-sans)",
@@ -1033,7 +1033,7 @@ export default function PersonDetail() {
                   style={{
                     fontFamily: "var(--font-serif)",
                     fontSize: 48,
-                    color: "#ECE8E0",
+                    color: "var(--text-primary)",
                     fontWeight: 300,
                     letterSpacing: -2,
                     lineHeight: 1,
@@ -1058,8 +1058,8 @@ export default function PersonDetail() {
           {showCustomerWork && (
             <div
               style={{
-                background: "#211F1B",
-                border: "0.5px solid rgba(236, 232, 224, 0.07)",
+                background: "var(--bg-raised)",
+                border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
                 borderRadius: 12,
                 padding: "22px 24px",
               }}
@@ -1077,7 +1077,7 @@ export default function PersonDetail() {
                     fontSize: 10,
                     textTransform: "uppercase",
                     letterSpacing: "0.09em",
-                    color: "#9B9689",
+                    color: "var(--text-secondary)",
                     fontFamily: "var(--font-sans)",
                   }}
                 >
@@ -1145,7 +1145,7 @@ export default function PersonDetail() {
                         <span
                           style={{
                             fontSize: 13,
-                            color: "#ECE8E0",
+                            color: "var(--text-primary)",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -1154,7 +1154,7 @@ export default function PersonDetail() {
                           {entry.label}
                         </span>
                       </div>
-                      <span style={{ fontSize: 12, color: "#9B9689", flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0 }}>
                         {entry.hours}h ({entry.value}%)
                       </span>
                     </button>
@@ -1166,8 +1166,8 @@ export default function PersonDetail() {
 
           <div
             style={{
-              background: "#211F1B",
-              border: "0.5px solid rgba(236, 232, 224, 0.07)",
+              background: "var(--bg-raised)",
+              border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
               borderRadius: 12,
               padding: "22px 24px",
             }}
@@ -1185,7 +1185,7 @@ export default function PersonDetail() {
                   fontSize: 10,
                   textTransform: "uppercase",
                   letterSpacing: "0.09em",
-                  color: "#9B9689",
+                  color: "var(--text-secondary)",
                   fontFamily: "var(--font-sans)",
                 }}
               >
@@ -1230,7 +1230,7 @@ export default function PersonDetail() {
                         flex: "0 1 120px",
                         minWidth: 0,
                         fontSize: 13,
-                        color: "#9B9689",
+                        color: "var(--text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -1252,7 +1252,7 @@ export default function PersonDetail() {
                           style={{
                             height: 3,
                             borderRadius: 999,
-                            background: "rgba(236, 232, 224, 0.06)",
+                            background: "rgba(var(--ui-rgb), 0.06)",
                             overflow: "hidden",
                           }}
                         >
@@ -1275,14 +1275,14 @@ export default function PersonDetail() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        <span style={{ fontSize: 11, color: "#6B665C", textAlign: "right" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>
                           {formatCompactDuration(activity.minutes)}
                         </span>
                         <span
                           style={{
                             minWidth: 34,
                             fontSize: 11,
-                            color: "#6B665C",
+                            color: "var(--text-tertiary)",
                             textAlign: "right",
                           }}
                         >
@@ -1299,8 +1299,8 @@ export default function PersonDetail() {
 
         <div
           style={{
-            background: "#211F1B",
-            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            background: "var(--bg-raised)",
+            border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
             borderRadius: 12,
             padding: "22px 24px 16px",
             minHeight: 320,
@@ -1321,7 +1321,7 @@ export default function PersonDetail() {
                 fontSize: 10,
                 textTransform: "uppercase",
                 letterSpacing: "0.09em",
-                color: "#9B9689",
+                color: "var(--text-secondary)",
                 fontFamily: "var(--font-sans)",
               }}
             >
@@ -1337,7 +1337,7 @@ export default function PersonDetail() {
                     background: DEEP_WORK_COLOR,
                   }}
                 />
-                <span style={{ fontSize: 11, color: "#9B9689" }}>Deep work</span>
+                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Deep work</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <div
@@ -1348,7 +1348,7 @@ export default function PersonDetail() {
                     background: MEETINGS_COLOR,
                   }}
                 />
-                <span style={{ fontSize: 11, color: "#9B9689" }}>Meetings</span>
+                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Meetings</span>
               </div>
             </div>
           </div>
@@ -1360,8 +1360,8 @@ export default function PersonDetail() {
 
         <div
           style={{
-            background: "#211F1B",
-            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            background: "var(--bg-raised)",
+            border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
             borderRadius: 12,
             padding: "22px 24px",
           }}
@@ -1373,7 +1373,7 @@ export default function PersonDetail() {
                 fontFamily: "var(--font-serif)",
                 fontSize: 24,
                 fontWeight: 400,
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 letterSpacing: "-0.2px",
               }}
             >
@@ -1396,7 +1396,7 @@ export default function PersonDetail() {
                     left: 12,
                     top: "50%",
                     transform: "translateY(-50%)",
-                    color: "#6B665C",
+                    color: "var(--text-tertiary)",
                     pointerEvents: "none",
                   }}
                 />
@@ -1410,9 +1410,9 @@ export default function PersonDetail() {
                     height: 36,
                     padding: "0 34px 0 34px",
                     borderRadius: 8,
-                    border: "0.5px solid rgba(236, 232, 224, 0.08)",
-                    background: "#1A1916",
-                    color: "#ECE8E0",
+                    border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                    background: "var(--bg-base)",
+                    color: "var(--text-primary)",
                     fontSize: 12,
                     outline: "none",
                   }}
@@ -1428,7 +1428,7 @@ export default function PersonDetail() {
                       border: "none",
                       background: "none",
                       padding: 0,
-                      color: "#6B665C",
+                      color: "var(--text-tertiary)",
                       cursor: "pointer",
                     }}
                   >
@@ -1441,7 +1441,7 @@ export default function PersonDetail() {
                 style={{
                   display: "flex",
                   gap: 1,
-                  background: "rgba(236, 232, 224, 0.05)",
+                  background: "rgba(var(--ui-rgb), 0.05)",
                   borderRadius: 7,
                   padding: 3,
                   flexShrink: 0,
@@ -1468,8 +1468,8 @@ export default function PersonDetail() {
                         padding: "4px 10px",
                         borderRadius: 5,
                         fontSize: 11,
-                        color: workFilter === filter.key ? "#ECE8E0" : "#9B9689",
-                        background: workFilter === filter.key ? "#2A2824" : "transparent",
+                        color: workFilter === filter.key ? "var(--text-primary)" : "var(--text-secondary)",
+                        background: workFilter === filter.key ? "var(--bg-overlay)" : "transparent",
                         border: "none",
                         cursor: "pointer",
                       }}
@@ -1490,7 +1490,7 @@ export default function PersonDetail() {
                   margin: 0,
                   padding: "16px 0",
                   fontSize: 13,
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   textAlign: "center",
                 }}
               >
@@ -1513,7 +1513,7 @@ export default function PersonDetail() {
                     padding: "14px 0",
                     background: "none",
                     border: "none",
-                    borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                     cursor: "pointer",
                     textAlign: "left",
                   }}
@@ -1524,15 +1524,15 @@ export default function PersonDetail() {
                     <div
                       style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
                     >
-                      <span style={{ fontSize: 14, color: "#ECE8E0", fontWeight: 500 }}>
+                      <span style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>
                         {item.title}
                       </span>
                       {item.kind === "meeting" ? (
                         <span
                           style={{
                             fontSize: 10,
-                            color: "#9B9689",
-                            background: "rgba(236, 232, 224, 0.06)",
+                            color: "var(--text-secondary)",
+                            background: "rgba(var(--ui-rgb), 0.06)",
                             borderRadius: 999,
                             padding: "3px 8px",
                             textTransform: "uppercase",
@@ -1545,7 +1545,7 @@ export default function PersonDetail() {
                     </div>
 
                     <p
-                      style={{ margin: "6px 0 0", fontSize: 12, color: "#9B9689", lineHeight: 1.5 }}
+                      style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}
                     >
                       {item.preview || "No preview available"}
                     </p>
@@ -1559,24 +1559,24 @@ export default function PersonDetail() {
                         marginTop: 8,
                       }}
                     >
-                      <span style={{ fontSize: 11, color: "#6B665C" }}>
+                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                         {item.date}, {item.time}
                       </span>
                       {"durationMinutes" in item ? (
-                        <span style={{ fontSize: 11, color: "#6B665C" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                           {formatCompactDuration(item.durationMinutes)}
                         </span>
                       ) : null}
                       {"category" in item && item.category ? (
-                        <span style={{ fontSize: 11, color: "#6B665C" }}>{item.category}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{item.category}</span>
                       ) : null}
                       {"subscriberName" in item && item.subscriberName ? (
-                        <span style={{ fontSize: 11, color: "#6B665C" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                           {item.subscriberName}
                         </span>
                       ) : null}
                       {"docType" in item && item.docType ? (
-                        <span style={{ fontSize: 11, color: "#6B665C" }}>{item.docType}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{item.docType}</span>
                       ) : null}
                     </div>
                   </div>

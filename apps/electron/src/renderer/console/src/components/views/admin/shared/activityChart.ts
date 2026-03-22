@@ -35,7 +35,7 @@ function getCssVar(name: string, fallback: string): string {
 
 export const DEEP_WORK_COLOR = "var(--mi-accent)";
 export const MEETINGS_COLOR = "var(--mi-accent-dark)";
-export const AXIS_COLOR = "#9B9689";
+export const AXIS_COLOR = "var(--text-secondary)";
 
 function formatHour(h: number): string {
   if (h === 0) return "12am";
@@ -189,6 +189,8 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
 
   const deepWorkHex = getCssVar("--mi-accent", "#82C0CC");
   const meetingsHex = getCssVar("--mi-accent-dark", "#3A7A87");
+  const uiRgb = getCssVar("--ui-rgb", "236, 232, 224");
+  const axisHex = getCssVar("--text-secondary", "#9B9689");
 
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -202,7 +204,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   ctx.clearRect(0, 0, W, H);
 
   if (!data.length) {
-    ctx.fillStyle = AXIS_COLOR;
+    ctx.fillStyle = axisHex;
     ctx.font = "12px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("No data for this period", W / 2, H / 2);
@@ -221,7 +223,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   const { step, unit, divisor } = niceAxis(rawMax);
   const maxVal = Math.ceil(rawMax / step) * step;
 
-  ctx.strokeStyle = "rgba(236, 232, 224, 0.04)";
+  ctx.strokeStyle = `rgba(${uiRgb}, 0.04)`;
   ctx.lineWidth = 1;
   for (let v = step; v <= maxVal; v += step) {
     const y = padTop + chartH * (1 - v / maxVal);
@@ -231,7 +233,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
     ctx.stroke();
   }
 
-  ctx.fillStyle = AXIS_COLOR;
+  ctx.fillStyle = axisHex;
   ctx.font = "10px Inter, system-ui, sans-serif";
   ctx.textAlign = "right";
   for (let v = step; v <= maxVal; v += step) {
@@ -272,7 +274,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
     }
 
     if (labelSet.has(i)) {
-      ctx.fillStyle = AXIS_COLOR;
+      ctx.fillStyle = axisHex;
       ctx.font = "10px Inter, system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(d.label, centerX, padTop + chartH + 16);

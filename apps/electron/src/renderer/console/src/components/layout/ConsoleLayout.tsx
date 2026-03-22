@@ -34,7 +34,7 @@ export default function ConsoleLayout() {
     <SidebarProvider>
       <div
         className="flex h-screen overflow-hidden"
-        style={{ background: "#1A1916", fontFamily: "var(--font-sans)" }}
+        style={{ background: "var(--bg-base)", fontFamily: "var(--font-sans)" }}
       >
         <Sidebar />
 

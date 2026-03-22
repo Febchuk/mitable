@@ -468,9 +468,9 @@ export default function AgentView() {
       <div
         style={{
           position: "relative",
-          border: "0.5px solid rgba(236, 232, 224, 0.1)",
+          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
           borderRadius: 14,
-          background: "rgba(236, 232, 224, 0.03)",
+          background: "rgba(var(--ui-rgb), 0.03)",
           padding: "12px 14px",
           display: "flex",
           alignItems: "flex-end",
@@ -504,7 +504,7 @@ export default function AgentView() {
             background: "transparent",
             border: "none",
             outline: "none",
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             fontSize: 14,
             fontFamily: "var(--font-sans)",
             lineHeight: "1.5",
@@ -525,8 +525,8 @@ export default function AgentView() {
               height: 30,
               padding: "0 12px",
               borderRadius: 8,
-              background: "rgba(236, 232, 224, 0.06)",
-              border: "0.5px solid rgba(236, 232, 224, 0.1)",
+              background: "rgba(var(--ui-rgb), 0.06)",
+              border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -535,18 +535,18 @@ export default function AgentView() {
               flexShrink: 0,
               fontSize: 12,
               fontWeight: 500,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontFamily: "var(--font-sans)",
               transition: "background 0.12s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(236, 232, 224, 0.1)";
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.1)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
             }}
           >
-            <Square size={10} fill="#ECE8E0" color="#ECE8E0" />
+            <Square size={10} fill="var(--text-primary)" color="var(--text-primary)" />
             Stop
           </button>
         ) : (
@@ -558,7 +558,7 @@ export default function AgentView() {
               height: 30,
               borderRadius: 8,
               background:
-                input.trim() && !inputDisabled ? "var(--mi-accent)" : "rgba(236, 232, 224, 0.06)",
+                input.trim() && !inputDisabled ? "var(--mi-accent)" : "rgba(var(--ui-rgb), 0.06)",
               border: "none",
               display: "flex",
               alignItems: "center",
@@ -569,7 +569,7 @@ export default function AgentView() {
               opacity: input.trim() && !inputDisabled ? 1 : 0.4,
             }}
           >
-            <ArrowUp size={15} color="#1A1916" />
+            <ArrowUp size={15} color="var(--bg-base)" />
           </button>
         )}
       </div>
@@ -596,7 +596,7 @@ export default function AgentView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 28,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 400,
               letterSpacing: "-0.3px",
               margin: 0,
@@ -653,8 +653,8 @@ export default function AgentView() {
               fontFamily: "var(--font-sans)",
               borderRadius: 6,
               marginBottom: 8,
-              background: "rgba(236, 232, 224, 0.04)",
-              color: "#9B9689",
+              background: "rgba(var(--ui-rgb), 0.04)",
+              color: "var(--text-secondary)",
               flexShrink: 0,
             }}
           >
@@ -663,7 +663,7 @@ export default function AgentView() {
                 width: 5,
                 height: 5,
                 borderRadius: "50%",
-                background: "#6B665C",
+                background: "var(--text-tertiary)",
                 flexShrink: 0,
               }}
             />
@@ -679,7 +679,7 @@ export default function AgentView() {
               style={{
                 background: "none",
                 border: "none",
-                color: "#9B9689",
+                color: "var(--text-secondary)",
                 textDecoration: "underline",
                 textUnderlineOffset: 2,
                 cursor: "pointer",
@@ -729,7 +729,7 @@ export default function AgentView() {
               maxWidth: 680,
             }}
           >
-            <span style={{ flex: 1, fontSize: 12, color: "#9B9689" }}>Execute this plan?</span>
+            <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>Execute this plan?</span>
             <button
               onClick={handleDeny}
               style={{
@@ -738,9 +738,9 @@ export default function AgentView() {
                 gap: 5,
                 padding: "6px 12px",
                 borderRadius: 7,
-                border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                 background: "transparent",
-                color: "#9B9689",
+                color: "var(--text-secondary)",
                 fontSize: 12,
                 cursor: "pointer",
               }}
@@ -758,7 +758,7 @@ export default function AgentView() {
                 borderRadius: 7,
                 border: "none",
                 background: "var(--mi-accent)",
-                color: "#1A1916",
+                color: "var(--bg-base)",
                 fontSize: 12,
                 fontWeight: 500,
                 cursor: "pointer",
@@ -773,7 +773,7 @@ export default function AgentView() {
         {/* Bottom input */}
         <div
           style={{
-            background: "#1A1916",
+            background: "var(--bg-base)",
             padding: "16px 40px 20px",
             flexShrink: 0,
           }}
@@ -816,9 +816,9 @@ function SuggestionChip({
         gap: 7,
         padding: "8px 14px",
         borderRadius: 8,
-        border: "0.5px solid rgba(236, 232, 224, 0.1)",
+        border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
         background: "transparent",
-        color: "#9B9689",
+        color: "var(--text-secondary)",
         fontSize: 13,
         fontFamily: "var(--font-sans)",
         cursor: "pointer",
@@ -826,14 +826,14 @@ function SuggestionChip({
         transition: "all 0.15s ease",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-        e.currentTarget.style.color = "#ECE8E0";
-        e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.15)";
+        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+        e.currentTarget.style.color = "var(--text-primary)";
+        e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.15)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "#9B9689";
-        e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.1)";
+        e.currentTarget.style.color = "var(--text-secondary)";
+        e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.1)";
       }}
     >
       <Icon size={14} />

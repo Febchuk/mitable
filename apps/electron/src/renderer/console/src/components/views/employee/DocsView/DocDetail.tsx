@@ -509,7 +509,7 @@ export default function DocDetail() {
             style={{
               background: "transparent",
               border: "none",
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               cursor: "pointer",
               padding: 0,
               display: "flex",
@@ -543,9 +543,9 @@ export default function DocDetail() {
                   gap: 7,
                   padding: "7px 12px",
                   borderRadius: 8,
-                  border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                  border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                   background: "transparent",
-                  color: "#9B9689",
+                  color: "var(--text-secondary)",
                   fontSize: 13,
                   fontFamily: "var(--font-sans)",
                   fontWeight: 500,
@@ -563,7 +563,7 @@ export default function DocDetail() {
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   cursor: "pointer",
                   padding: 4,
                   display: "flex",
@@ -589,7 +589,7 @@ export default function DocDetail() {
             outline: "none",
             resize: "none",
             overflow: "hidden",
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             fontFamily: "var(--font-serif)",
             fontSize: 38,
             lineHeight: 1.2,
@@ -611,14 +611,14 @@ export default function DocDetail() {
             gap: 6,
             flexWrap: "wrap",
             fontSize: 12,
-            color: "#6B665C",
+            color: "var(--text-tertiary)",
             fontFamily: "var(--font-sans)",
             marginBottom: 24,
           }}
         >
           {document ? (
             <>
-              <span style={{ color: "#9B9689" }}>
+              <span style={{ color: "var(--text-secondary)" }}>
                 {new Date(document.updatedAt).toLocaleDateString(getLocale(), {
                   month: "short",
                   day: "numeric",
@@ -637,13 +637,13 @@ export default function DocDetail() {
               {document.notionPageId && (
                 <>
                   <span style={{ color: "#4A473F" }}>·</span>
-                  <span style={{ color: "#3A9B6B" }}>Synced</span>
+                  <span style={{ color: "var(--status-success)" }}>Synced</span>
                 </>
               )}
             </>
           ) : (
             <span>
-              Press <span style={{ color: "#9B9689" }}>⌘+S</span> to save
+              Press <span style={{ color: "var(--text-secondary)" }}>⌘+S</span> to save
             </span>
           )}
           <span style={{ color: "#4A473F" }}>·</span>
@@ -655,7 +655,7 @@ export default function DocDetail() {
               </>
             ) : lastSaved ? (
               <>
-                <CheckCircle size={11} style={{ color: "#3A9B6B" }} />
+                <CheckCircle size={11} style={{ color: "var(--status-success)" }} />
                 Saved
               </>
             ) : (
@@ -682,12 +682,12 @@ export default function DocDetail() {
             style={{
               marginTop: 40,
               paddingTop: 20,
-              borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+              borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
             }}
           >
             <details>
               <summary
-                style={{ fontSize: 12, fontWeight: 500, color: "#6B665C", cursor: "pointer" }}
+                style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", cursor: "pointer" }}
               >
                 Contributing Sessions ({document.sessionContributions.length})
               </summary>
@@ -703,14 +703,14 @@ export default function DocDetail() {
                       fontSize: 12,
                     }}
                   >
-                    <span style={{ color: "#ECE8E0" }}>
+                    <span style={{ color: "var(--text-primary)" }}>
                       {contribution.session?.name || "Untitled Session"}
-                      <span style={{ color: "#6B665C", marginLeft: 8 }}>
+                      <span style={{ color: "var(--text-tertiary)", marginLeft: 8 }}>
                         ({contribution.contributionType})
                       </span>
                     </span>
                     {contribution.session?.startedAt && (
-                      <span style={{ color: "#6B665C", flexShrink: 0 }}>
+                      <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>
                         {new Date(contribution.session.startedAt).toLocaleDateString()}
                       </span>
                     )}

@@ -1,5 +1,5 @@
 ---
-description: "Color token system — never hardcode accent hex values"
+description: "Color token system — never hardcode theme hex values"
 alwaysApply: true
 ---
 
@@ -7,26 +7,32 @@ alwaysApply: true
 
 ## Single Source of Truth
 
-All accent/CTA colors are defined as CSS custom properties in `apps/electron/src/renderer/styles/globals.css`:
+All theme colors are CSS custom properties in `apps/electron/src/renderer/styles/globals.css`.
+Tailwind maps them in `tailwind.config.js`. Components NEVER use raw hex for theme colors.
 
-| Variable | Purpose |
-|---|---|
-| `--mi-accent` | Primary accent (buttons, links, highlights) |
-| `--mi-accent-rgb` | RGB triplet for use in `rgba()` |
-| `--mi-accent-dark` | Darker shade (secondary charts, borders) |
-| `--mi-accent-light` | Lighter shade (hover states, subtle text) |
-| `--mi-accent-bg` | Low-opacity background tint |
-| `--mi-accent-border` | Low-opacity border tint |
+## Variable Reference
 
-Tailwind maps these via `tailwind.config.js` → `accent.*`, `indigo.*`, `status.info`.
+| Variable | Dark mode | Tailwind token |
+|---|---|---|
+| `--bg-base` | `#1A1916` | `canvas-base` |
+| `--bg-raised` | `#211F1B` | `canvas-raised` |
+| `--bg-overlay` | `#2A2824` | `canvas-overlay` |
+| `--bg-muted` | `#33312B` | `canvas-muted` |
+| `--text-primary` | `#ECE8E0` | `ink-primary` |
+| `--text-secondary` | `#9B9689` | `ink-secondary` |
+| `--text-tertiary` | `#6B665C` | `ink-tertiary` |
+| `--text-faint` | `#4A4640` | `ink-faint` |
+| `--ui-rgb` | `236, 232, 224` | `stroke-*` |
+| `--mi-accent` | `#82C0CC` | `accent` |
+| `--mi-accent-rgb` | `130, 192, 204` | — |
+| `--status-success` | `#3A9B6B` | `status-success` |
+| `--status-error` | `#E87474` | `status-error` |
+| `--status-warning` | `#D4A27A` | `status-warning` |
 
 ## Rules
 
-1. **Never hardcode accent hex values** (`#82C0CC`, `#3A7A87`, etc.) in components.
-   Use `var(--mi-accent)`, `var(--mi-accent-dark)`, etc. in inline styles,
-   or Tailwind classes like `text-accent`, `bg-accent`, `border-accent`.
-2. **For rgba with opacity**, use `rgba(var(--mi-accent-rgb), <opacity>)`.
-3. **Fallback values** in `rgba(var(--mi-accent-rgb, 130,192,204), 0.2)` must match the current accent RGB. If the accent changes, update `globals.css` and these fallbacks will be stale — so prefer omitting fallbacks when possible.
-4. **CSS files** that need the accent (e.g. `calendar-theme.css`) should reference `var(--mi-accent)`, not repeat the hex.
-5. **Canvas 2D / SVG chart contexts** cannot resolve `var(--mi-accent)`. Use `getComputedStyle(document.documentElement).getPropertyValue('--mi-accent')` to resolve the hex at draw-time. See `getCssVar()` helper in `activityChart.ts` and `DashboardView/index.tsx`.
-6. **Non-accent colors** (status green, rose, neutral grays) are fine as direct hex — they don't change with the brand accent.
+1. **Never hardcode theme hex values** in components. Use `var(--*)` in inline styles or Tailwind semantic tokens.
+2. **For rgba with opacity**, use `rgba(var(--ui-rgb), <opacity>)` for borders/overlays, `rgba(var(--mi-accent-rgb), <opacity>)` for accent tints.
+3. **Canvas 2D** cannot resolve `var()`. Use `getCssVar()` helper to resolve at draw-time. See `activityChart.ts`.
+4. **Third-party brand colors** (Granola `#C8E64A`, Fireflies `#E84393`) are NOT themed — keep as hardcoded hex.
+5. **Shadows** (`rgba(0, 0, 0, ...)`) are NOT themed — keep as-is.

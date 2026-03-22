@@ -50,8 +50,8 @@ export default function ChatHistorySidebar({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        borderRight: "0.5px solid rgba(236, 232, 224, 0.07)",
-        background: "#1A1916",
+        borderRight: "0.5px solid rgba(var(--ui-rgb), 0.07)",
+        background: "var(--bg-base)",
       }}
     >
       {/* Header */}
@@ -68,7 +68,7 @@ export default function ChatHistorySidebar({
             style={{
               fontSize: 13,
               fontWeight: 500,
-              color: "#9B9689",
+              color: "var(--text-secondary)",
               letterSpacing: "0.02em",
             }}
           >
@@ -83,19 +83,19 @@ export default function ChatHistorySidebar({
               width: 26,
               height: 26,
               borderRadius: 6,
-              border: "0.5px solid rgba(236, 232, 224, 0.1)",
+              border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
               background: "transparent",
-              color: "#9B9689",
+              color: "var(--text-secondary)",
               cursor: "pointer",
               transition: "all 0.12s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
-              e.currentTarget.style.color = "#ECE8E0";
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+              e.currentTarget.style.color = "var(--text-primary)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "#9B9689";
+              e.currentTarget.style.color = "var(--text-secondary)";
             }}
             title="New chat"
           >
@@ -112,7 +112,7 @@ export default function ChatHistorySidebar({
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               pointerEvents: "none",
             }}
           />
@@ -124,9 +124,9 @@ export default function ChatHistorySidebar({
               width: "100%",
               padding: "6px 10px 6px 30px",
               borderRadius: 6,
-              border: "0.5px solid rgba(236, 232, 224, 0.08)",
-              background: "rgba(236, 232, 224, 0.03)",
-              color: "#ECE8E0",
+              border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+              background: "rgba(var(--ui-rgb), 0.03)",
+              color: "var(--text-primary)",
               fontSize: 12,
               fontFamily: "var(--font-sans)",
               outline: "none",
@@ -151,7 +151,7 @@ export default function ChatHistorySidebar({
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#6B665C",
+                    color: "var(--text-tertiary)",
                     fontWeight: 500,
                     padding: "0 8px",
                     marginBottom: 4,
@@ -191,7 +191,7 @@ export default function ChatHistorySidebar({
                           background: isActive
                             ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.1)"
                             : isHovered
-                              ? "rgba(236, 232, 224, 0.04)"
+                              ? "rgba(var(--ui-rgb), 0.04)"
                               : "transparent",
                         }}
                       >
@@ -209,9 +209,9 @@ export default function ChatHistorySidebar({
                             style={{
                               flex: 1,
                               fontSize: 12,
-                              color: "#ECE8E0",
-                              background: "rgba(236, 232, 224, 0.06)",
-                              border: "0.5px solid rgba(236, 232, 224, 0.15)",
+                              color: "var(--text-primary)",
+                              background: "rgba(var(--ui-rgb), 0.06)",
+                              border: "0.5px solid rgba(var(--ui-rgb), 0.15)",
                               borderRadius: 4,
                               padding: "2px 6px",
                               outline: "none",
@@ -224,7 +224,7 @@ export default function ChatHistorySidebar({
                             style={{
                               flex: 1,
                               fontSize: 12,
-                              color: isActive ? "var(--mi-accent)" : "#ECE8E0",
+                              color: isActive ? "var(--mi-accent)" : "var(--text-primary)",
                               fontWeight: isActive ? 500 : 400,
                               overflow: "hidden",
                               textOverflow: "ellipsis",
@@ -251,15 +251,15 @@ export default function ChatHistorySidebar({
                               borderRadius: 4,
                               border: "none",
                               background: "transparent",
-                              color: "#6B665C",
+                              color: "var(--text-tertiary)",
                               cursor: "pointer",
                               flexShrink: 0,
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.color = "#E87474";
+                              e.currentTarget.style.color = "var(--status-error)";
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.color = "#6B665C";
+                              e.currentTarget.style.color = "var(--text-tertiary)";
                             }}
                             title="Delete chat"
                           >
@@ -284,8 +284,8 @@ export default function ChatHistorySidebar({
               textAlign: "center",
             }}
           >
-            <MessageSquare size={18} style={{ color: "#4A4640", marginBottom: 8 }} />
-            <span style={{ fontSize: 12, color: "#6B665C" }}>
+            <MessageSquare size={18} style={{ color: "var(--text-faint)", marginBottom: 8 }} />
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
               {searchQuery ? "No matching chats" : "No chats yet"}
             </span>
           </div>

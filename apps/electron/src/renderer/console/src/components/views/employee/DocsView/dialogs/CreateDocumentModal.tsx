@@ -170,8 +170,8 @@ export default function CreateDocumentModal({
       <DialogContent
         className="sm:max-w-[520px] p-0 overflow-visible"
         style={{
-          background: "#1A1916",
-          border: "0.5px solid rgba(236, 232, 224, 0.1)",
+          background: "var(--bg-base)",
+          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
           borderRadius: 14,
         }}
         showCloseButton={false}
@@ -196,15 +196,15 @@ export default function CreateDocumentModal({
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
-            color: "#6B665C",
+            color: "var(--text-tertiary)",
             zIndex: 10,
             transition: "color 0.15s ease",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "#ECE8E0";
+            e.currentTarget.style.color = "var(--text-primary)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = "#6B665C";
+            e.currentTarget.style.color = "var(--text-tertiary)";
           }}
         >
           <X size={15} />
@@ -292,7 +292,7 @@ export default function CreateDocumentModal({
                 background: "transparent",
                 border: "none",
                 outline: "none",
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 fontSize: 14,
                 fontFamily: "var(--font-sans)",
                 lineHeight: 1.6,
@@ -312,7 +312,7 @@ export default function CreateDocumentModal({
                 alignItems: "center",
                 gap: 4,
                 marginTop: 12,
-                borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+                borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                 paddingTop: 12,
               }}
             >
@@ -328,7 +328,7 @@ export default function CreateDocumentModal({
                   borderRadius: 6,
                   border: "none",
                   background: "transparent",
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   fontSize: 12,
                   fontFamily: "var(--font-sans)",
                   cursor: uploadMutation.isPending ? "default" : "pointer",
@@ -336,10 +336,10 @@ export default function CreateDocumentModal({
                   opacity: uploadMutation.isPending ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (!uploadMutation.isPending) e.currentTarget.style.color = "#ECE8E0";
+                  if (!uploadMutation.isPending) e.currentTarget.style.color = "var(--text-primary)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "#6B665C";
+                  e.currentTarget.style.color = "var(--text-tertiary)";
                 }}
               >
                 {uploadMutation.isPending ? (
@@ -369,18 +369,18 @@ export default function CreateDocumentModal({
                     padding: "5px 10px",
                     borderRadius: 6,
                     border: "none",
-                    background: blocksOpen ? "rgba(236, 232, 224, 0.05)" : "transparent",
-                    color: selectedSessionIds.size > 0 ? "var(--mi-accent)" : "#6B665C",
+                    background: blocksOpen ? "rgba(var(--ui-rgb), 0.05)" : "transparent",
+                    color: selectedSessionIds.size > 0 ? "var(--mi-accent)" : "var(--text-tertiary)",
                     fontSize: 12,
                     fontFamily: "var(--font-sans)",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedSessionIds.size === 0) e.currentTarget.style.color = "#ECE8E0";
+                    if (selectedSessionIds.size === 0) e.currentTarget.style.color = "var(--text-primary)";
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedSessionIds.size === 0) e.currentTarget.style.color = "#6B665C";
+                    if (selectedSessionIds.size === 0) e.currentTarget.style.color = "var(--text-tertiary)";
                   }}
                 >
                   <Layers size={13} />
@@ -418,8 +418,8 @@ export default function CreateDocumentModal({
                       width: 340,
                       maxHeight: 260,
                       overflowY: "auto",
-                      background: "#211F1B",
-                      border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                      background: "var(--bg-raised)",
+                      border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                       borderRadius: 10,
                       padding: "6px 0",
                       zIndex: 50,
@@ -432,7 +432,7 @@ export default function CreateDocumentModal({
                           padding: "20px 14px",
                           textAlign: "center",
                           fontSize: 12,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                         }}
                       >
                         No completed blocks yet
@@ -457,7 +457,7 @@ export default function CreateDocumentModal({
                             }}
                             onMouseEnter={(e) => {
                               if (!isSelected)
-                                e.currentTarget.style.background = "rgba(236, 232, 224, 0.03)";
+                                e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.03)";
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background = isSelected
@@ -471,7 +471,7 @@ export default function CreateDocumentModal({
                                 width: 16,
                                 height: 16,
                                 borderRadius: 4,
-                                border: isSelected ? "none" : "1px solid rgba(236, 232, 224, 0.15)",
+                                border: isSelected ? "none" : "1px solid rgba(var(--ui-rgb), 0.15)",
                                 background: isSelected ? "var(--mi-accent)" : "transparent",
                                 display: "flex",
                                 alignItems: "center",
@@ -488,7 +488,7 @@ export default function CreateDocumentModal({
                               <div
                                 style={{
                                   fontSize: 12,
-                                  color: isSelected ? "#ECE8E0" : "#9B9689",
+                                  color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
                                   whiteSpace: "nowrap",
@@ -499,10 +499,10 @@ export default function CreateDocumentModal({
                             </div>
 
                             {/* Meta */}
-                            <span style={{ fontSize: 11, color: "#6B665C", flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}>
                               {formatDuration(session.duration.totalMs)}
                             </span>
-                            <span style={{ fontSize: 11, color: "#6B665C", flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}>
                               {formatRelativeDate(session.startedAt)}
                             </span>
                           </div>
@@ -525,7 +525,7 @@ export default function CreateDocumentModal({
                   height: 30,
                   borderRadius: 8,
                   border: "none",
-                  background: input.trim() ? "var(--mi-accent)" : "rgba(236, 232, 224, 0.06)",
+                  background: input.trim() ? "var(--mi-accent)" : "rgba(var(--ui-rgb), 0.06)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -535,7 +535,7 @@ export default function CreateDocumentModal({
                   opacity: input.trim() ? 1 : 0.4,
                 }}
               >
-                <ArrowUp size={15} color="#1A1916" />
+                <ArrowUp size={15} color="var(--bg-base)" />
               </button>
             </div>
           </div>
@@ -558,10 +558,10 @@ export default function CreateDocumentModal({
               style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
             />
             <div style={{ textAlign: "center" }}>
-              <p style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
                 {progress ? phaseLabels[progress.phase] || "Working..." : "Starting..."}
               </p>
-              <p style={{ fontSize: 12, color: "#6B665C", marginTop: 4 }}>
+              <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
                 {progress?.message || "Initializing..."}
               </p>
             </div>
@@ -585,19 +585,19 @@ export default function CreateDocumentModal({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: "rgba(58, 155, 107, 0.1)",
-                border: "0.5px solid rgba(58, 155, 107, 0.2)",
+                background: "rgba(var(--status-success-rgb), 0.1)",
+                border: "0.5px solid rgba(var(--status-success-rgb), 0.2)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Check size={22} style={{ color: "#3A9B6B" }} />
+              <Check size={22} style={{ color: "var(--status-success)" }} />
             </div>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
               {entityLabelTitle} created
             </p>
-            <p style={{ fontSize: 12, color: "#6B665C" }}>Opening...</p>
+            <p style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Opening...</p>
           </div>
         )}
 
@@ -613,12 +613,12 @@ export default function CreateDocumentModal({
               style={{
                 padding: "20px",
                 borderRadius: 10,
-                background: "rgba(232, 116, 116, 0.06)",
-                border: "0.5px solid rgba(232, 116, 116, 0.15)",
+                background: "rgba(var(--status-error-rgb), 0.06)",
+                border: "0.5px solid rgba(var(--status-error-rgb), 0.15)",
               }}
             >
-              <p style={{ fontSize: 13, fontWeight: 500, color: "#E87474" }}>Generation failed</p>
-              <p style={{ fontSize: 12, color: "#6B665C", marginTop: 6 }}>{error}</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--status-error)" }}>Generation failed</p>
+              <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>{error}</p>
               <button
                 onClick={() => {
                   reset?.();
@@ -628,9 +628,9 @@ export default function CreateDocumentModal({
                   marginTop: 14,
                   padding: "6px 14px",
                   borderRadius: 7,
-                  border: "0.5px solid rgba(236, 232, 224, 0.12)",
+                  border: "0.5px solid rgba(var(--ui-rgb), 0.12)",
                   background: "transparent",
-                  color: "#ECE8E0",
+                  color: "var(--text-primary)",
                   fontSize: 12,
                   fontFamily: "var(--font-sans)",
                   cursor: "pointer",

@@ -50,8 +50,8 @@ export default function Sidebar() {
         width: open ? 220 : 0,
         minWidth: open ? 220 : 0,
         opacity: open ? 1 : 0,
-        background: "#211F1B",
-        borderRight: open ? "0.5px solid rgba(236, 232, 224, 0.07)" : "none",
+        background: "var(--bg-raised)",
+        borderRight: open ? "0.5px solid rgba(var(--ui-rgb), 0.07)" : "none",
         display: "flex",
         flexDirection: "column",
         paddingBottom: open ? 12 : 0,
@@ -90,7 +90,7 @@ export default function Sidebar() {
             <div
               style={{
                 height: 0.5,
-                background: "rgba(236, 232, 224, 0.06)",
+                background: "rgba(var(--ui-rgb), 0.06)",
                 margin: "0 -8px 4px",
               }}
             />
@@ -103,7 +103,7 @@ export default function Sidebar() {
                 padding: "8px 12px",
                 borderRadius: 6,
                 fontSize: 13,
-                color: "#9B9689",
+                color: "var(--text-secondary)",
                 background: "none",
                 border: "none",
                 textAlign: "left",
@@ -112,12 +112,12 @@ export default function Sidebar() {
                 whiteSpace: "nowrap",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-                e.currentTarget.style.color = "#ECE8E0";
+                e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+                e.currentTarget.style.color = "var(--text-primary)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "none";
-                e.currentTarget.style.color = "#9B9689";
+                e.currentTarget.style.color = "var(--text-secondary)";
               }}
             >
               <ArrowLeftRight size={15} strokeWidth={1.5} />
@@ -130,7 +130,7 @@ export default function Sidebar() {
         <div
           style={{
             height: 0.5,
-            background: "rgba(236, 232, 224, 0.06)",
+            background: "rgba(var(--ui-rgb), 0.06)",
             margin: canSwitchRoles ? "4px -8px" : "0 -8px",
           }}
         />
@@ -147,7 +147,7 @@ export default function Sidebar() {
               borderRadius: 6,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "none";
@@ -159,13 +159,13 @@ export default function Sidebar() {
               style={{
                 width: 32,
                 height: 32,
-                background: "rgba(236, 232, 224, 0.1)",
+                background: "rgba(var(--ui-rgb), 0.1)",
                 borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 13,
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 flexShrink: 0,
               }}
             >
@@ -175,7 +175,7 @@ export default function Sidebar() {
               <div
                 style={{
                   fontSize: 13,
-                  color: "#ECE8E0",
+                  color: "var(--text-primary)",
                   fontWeight: 500,
                   lineHeight: 1,
                 }}
@@ -185,7 +185,7 @@ export default function Sidebar() {
               <div
                 style={{
                   fontSize: 11,
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   marginTop: 6,
                   lineHeight: 1,
                 }}
@@ -203,8 +203,8 @@ export default function Sidebar() {
                 bottom: "calc(100% + 6px)",
                 left: 0,
                 right: 0,
-                background: "#2A2824",
-                border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                background: "var(--bg-overlay)",
+                border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                 borderRadius: 8,
                 padding: 4,
                 zIndex: 50,
@@ -225,18 +225,18 @@ export default function Sidebar() {
                   borderRadius: 6,
                   border: "none",
                   background: "none",
-                  color: "#9B9689",
+                  color: "var(--text-secondary)",
                   fontSize: 13,
                   cursor: "pointer",
                   textAlign: "left",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
-                  e.currentTarget.style.color = "#ECE8E0";
+                  e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+                  e.currentTarget.style.color = "var(--text-primary)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "none";
-                  e.currentTarget.style.color = "#9B9689";
+                  e.currentTarget.style.color = "var(--text-secondary)";
                 }}
               >
                 <Settings size={14} strokeWidth={1.5} />
@@ -246,7 +246,7 @@ export default function Sidebar() {
               <div
                 style={{
                   height: 0.5,
-                  background: "rgba(236, 232, 224, 0.06)",
+                  background: "rgba(var(--ui-rgb), 0.06)",
                   margin: "2px 8px",
                 }}
               />
@@ -265,18 +265,18 @@ export default function Sidebar() {
                   borderRadius: 6,
                   border: "none",
                   background: "none",
-                  color: "#9B9689",
+                  color: "var(--text-secondary)",
                   fontSize: 13,
                   cursor: "pointer",
                   textAlign: "left",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(232, 116, 116, 0.08)";
-                  e.currentTarget.style.color = "#E87474";
+                  e.currentTarget.style.background = "rgba(var(--status-error-rgb), 0.08)";
+                  e.currentTarget.style.color = "var(--status-error)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "none";
-                  e.currentTarget.style.color = "#9B9689";
+                  e.currentTarget.style.color = "var(--text-secondary)";
                 }}
               >
                 <LogOut size={14} strokeWidth={1.5} />

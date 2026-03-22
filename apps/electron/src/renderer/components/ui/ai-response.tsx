@@ -251,7 +251,7 @@ export const Response = memo(
                   className="px-1.5 py-0.5 rounded text-xs"
                   style={{
                     fontFamily: "var(--font-mono)",
-                    background: "rgba(236, 232, 224, 0.06)",
+                    background: "rgba(var(--ui-rgb), 0.06)",
                     color: "var(--mi-accent)",
                   }}
                   {...props}
@@ -305,7 +305,7 @@ export const Response = memo(
 
             // Strong/Bold
             strong: ({ ...props }) => (
-              <strong style={{ color: "#ECE8E0" }} className="font-medium" {...props} />
+              <strong style={{ color: "var(--text-primary)" }} className="font-medium" {...props} />
             ),
 
             // Emphasis/Italic

@@ -18,6 +18,9 @@
     --text-tertiary: #6B665C;
     --text-faint: #4A4640;
 
+    /* UI chrome RGB — borders, hover overlays, code backgrounds (use with rgba()) */
+    --ui-rgb: 236, 232, 224;
+
     /* accent — teal blue */
     --mi-accent: #82C0CC;
     --mi-accent-rgb: 130, 192, 204;
@@ -27,13 +30,21 @@
     --mi-accent-border: rgba(130, 192, 204, 0.22);
 
     /* status */
-    --status-active: #3A9B6B;
-    --status-active-bg: rgba(58, 155, 107, 0.14);
-    --status-active-border: rgba(58, 155, 107, 0.28);
+    --status-success: #3A9B6B;
+    --status-success-rgb: 58, 155, 107;
+    --status-warning: #D4A27A;
+    --status-error: #E87474;
+    --status-error-rgb: 232, 116, 116;
+    --status-info: #4A9FD9;
+
+    /* legacy alias */
+    --status-active: var(--status-success);
+    --status-active-bg: rgba(var(--status-success-rgb), 0.14);
+    --status-active-border: rgba(var(--status-success-rgb), 0.28);
 
     /* borders */
-    --border-hairline: 0.5px solid rgba(236, 232, 224, 0.07);
-    --border-subtle: 0.5px solid rgba(236, 232, 224, 0.10);
+    --border-hairline: 0.5px solid rgba(var(--ui-rgb), 0.07);
+    --border-subtle: 0.5px solid rgba(var(--ui-rgb), 0.10);
 
     /* typography */
     --font-sans: 'Inter', -apple-system, sans-serif;
@@ -242,12 +253,12 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(var(--ui-rgb), 0.15);
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(var(--ui-rgb), 0.25);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -260,12 +271,12 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(var(--ui-rgb), 0.15);
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(var(--ui-rgb), 0.25);
 }
 
 /* Granola meeting notes — markdown prose */
@@ -273,7 +284,7 @@
 .granola-notes-scroll h2,
 .granola-notes-scroll h3,
 .granola-notes-scroll h4 {
-  color: #ECE8E0;
+  color: var(--text-primary);
   font-weight: 600;
   margin: 12px 0 6px;
   line-height: 1.35;
@@ -316,12 +327,12 @@
 }
 
 .granola-notes-scroll strong {
-  color: #ECE8E0;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .granola-notes-scroll code {
-  background: rgba(236, 232, 224, 0.06);
+  background: rgba(var(--ui-rgb), 0.06);
   padding: 1px 5px;
   border-radius: 3px;
   font-size: 11px;
@@ -336,7 +347,7 @@
   border-left: 2px solid rgba(200, 230, 74, 0.3);
   padding-left: 12px;
   margin: 8px 0;
-  color: #6B665C;
+  color: var(--text-tertiary);
 }
 
 /* Force vertical-only scrolling in ScrollArea */
@@ -374,7 +385,7 @@
 
 .dark-editor [role="toolbar"] {
   background: transparent;
-  border-bottom: 0.5px solid rgba(236, 232, 224, 0.07);
+  border-bottom: 0.5px solid rgba(var(--ui-rgb), 0.07);
   padding: 4px 12px;
   flex-shrink: 0;
 }
@@ -386,7 +397,7 @@
 }
 
 .dark-editor [role="toolbar"] button:hover {
-  background: rgba(236, 232, 224, 0.05);
+  background: rgba(var(--ui-rgb), 0.05);
   color: var(--text-secondary);
 }
 
@@ -397,7 +408,7 @@
 }
 
 .dark-editor [role="toolbar"] [data-orientation="vertical"] {
-  background: rgba(236, 232, 224, 0.07);
+  background: rgba(var(--ui-rgb), 0.07);
   width: 1px;
   margin: 4px 6px;
 }
@@ -447,15 +458,15 @@
 
 .dark-editor [role="dialog"] {
   background: var(--bg-overlay);
-  border: 0.5px solid rgba(236, 232, 224, 0.08);
+  border: 0.5px solid rgba(var(--ui-rgb), 0.08);
   border-radius: 8px;
   color: var(--text-primary);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .dark-editor [role="dialog"] input {
-  background: rgba(236, 232, 224, 0.06);
-  border: 0.5px solid rgba(236, 232, 224, 0.1);
+  background: rgba(var(--ui-rgb), 0.06);
+  border: 0.5px solid rgba(var(--ui-rgb), 0.1);
   border-radius: 4px;
   color: var(--text-primary);
 }

@@ -1650,7 +1650,7 @@ export default function UserProfilePage() {
         style={{
           width: 200,
           minWidth: 200,
-          borderRight: "0.5px solid rgba(236, 232, 224, 0.06)",
+          borderRight: "0.5px solid rgba(var(--ui-rgb), 0.06)",
           padding: "28px 12px",
           display: "flex",
           flexDirection: "column",
@@ -1662,7 +1662,7 @@ export default function UserProfilePage() {
           style={{
             fontFamily: "var(--font-serif)",
             fontSize: 18,
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             fontWeight: 400,
             letterSpacing: "-0.2px",
             margin: "0 0 16px",
@@ -1685,8 +1685,8 @@ export default function UserProfilePage() {
                 borderRadius: 6,
                 fontSize: 13,
                 fontWeight: 400,
-                color: isActive ? "#ECE8E0" : "#6B665C",
-                background: isActive ? "rgba(236, 232, 224, 0.06)" : "none",
+                color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
+                background: isActive ? "rgba(var(--ui-rgb), 0.06)" : "none",
                 border: "none",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
@@ -1696,13 +1696,13 @@ export default function UserProfilePage() {
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.color = "#9B9689";
-                  e.currentTarget.style.background = "rgba(236, 232, 224, 0.03)";
+                  e.currentTarget.style.color = "var(--text-secondary)";
+                  e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.03)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.color = "#6B665C";
+                  e.currentTarget.style.color = "var(--text-tertiary)";
                   e.currentTarget.style.background = "none";
                 }
               }}
@@ -1726,14 +1726,14 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingBottom: 16,
-                    borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                   }}
                 >
                   <h2
                     style={{
                       fontSize: 16,
                       fontWeight: 500,
-                      color: "#ECE8E0",
+                      color: "var(--text-primary)",
                       margin: 0,
                     }}
                   >
@@ -1742,7 +1742,7 @@ export default function UserProfilePage() {
                   <p
                     style={{
                       fontSize: 13,
-                      color: "#6B665C",
+                      color: "var(--text-tertiary)",
                       margin: "6px 0 0",
                     }}
                   >
@@ -1776,7 +1776,7 @@ export default function UserProfilePage() {
                         style={{
                           fontSize: 12,
                           fontWeight: 500,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           marginBottom: 6,
                           textTransform: "uppercase",
                           letterSpacing: "0.5px",
@@ -1790,13 +1790,13 @@ export default function UserProfilePage() {
                           color: field.accent
                             ? "var(--mi-accent)"
                             : field.mono
-                              ? "#6B665C"
-                              : "#ECE8E0",
+                              ? "var(--text-tertiary)"
+                              : "var(--text-primary)",
                           fontFamily: field.mono ? "monospace" : "inherit",
                           padding: "9px 12px",
                           borderRadius: 6,
-                          border: "0.5px solid rgba(236, 232, 224, 0.06)",
-                          background: "rgba(236, 232, 224, 0.03)",
+                          border: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                          background: "rgba(var(--ui-rgb), 0.03)",
                           textTransform: field.accent ? "capitalize" : undefined,
                           fontWeight: field.accent ? 500 : 400,
                         }}
@@ -1814,7 +1814,7 @@ export default function UserProfilePage() {
                   style={{
                     fontSize: 16,
                     fontWeight: 500,
-                    color: "#ECE8E0",
+                    color: "var(--text-primary)",
                     margin: "0 0 16px",
                   }}
                 >
@@ -1832,14 +1832,14 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingBottom: 16,
-                    borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                   }}
                 >
                   <h2
                     style={{
                       fontSize: 16,
                       fontWeight: 500,
-                      color: "#ECE8E0",
+                      color: "var(--text-primary)",
                       margin: 0,
                     }}
                   >
@@ -1848,7 +1848,7 @@ export default function UserProfilePage() {
                   <p
                     style={{
                       fontSize: 13,
-                      color: "#6B665C",
+                      color: "var(--text-tertiary)",
                       margin: "6px 0 0",
                     }}
                   >
@@ -1864,7 +1864,7 @@ export default function UserProfilePage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label
                       htmlFor="currentPassword"
-                      style={{ fontSize: 13, fontWeight: 500, color: "#9B9689" }}
+                      style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}
                     >
                       Current Password
                     </label>
@@ -1881,11 +1881,11 @@ export default function UserProfilePage() {
                           width: "100%",
                           height: 38,
                           borderRadius: 6,
-                          border: "0.5px solid rgba(236, 232, 224, 0.1)",
-                          background: "rgba(236, 232, 224, 0.03)",
+                          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                          background: "rgba(var(--ui-rgb), 0.03)",
                           padding: "0 36px 0 12px",
                           fontSize: 13,
-                          color: "#ECE8E0",
+                          color: "var(--text-primary)",
                           outline: "none",
                           opacity: isChangingPassword ? 0.5 : 1,
                         }}
@@ -1901,7 +1901,7 @@ export default function UserProfilePage() {
                           transform: "translateY(-50%)",
                           background: "none",
                           border: "none",
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           cursor: "pointer",
                           padding: 0,
                         }}
@@ -1915,7 +1915,7 @@ export default function UserProfilePage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label
                       htmlFor="newPassword"
-                      style={{ fontSize: 13, fontWeight: 500, color: "#9B9689" }}
+                      style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}
                     >
                       New Password
                     </label>
@@ -1932,11 +1932,11 @@ export default function UserProfilePage() {
                           width: "100%",
                           height: 38,
                           borderRadius: 6,
-                          border: "0.5px solid rgba(236, 232, 224, 0.1)",
-                          background: "rgba(236, 232, 224, 0.03)",
+                          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                          background: "rgba(var(--ui-rgb), 0.03)",
                           padding: "0 36px 0 12px",
                           fontSize: 13,
-                          color: "#ECE8E0",
+                          color: "var(--text-primary)",
                           outline: "none",
                           opacity: isChangingPassword ? 0.5 : 1,
                         }}
@@ -1952,7 +1952,7 @@ export default function UserProfilePage() {
                           transform: "translateY(-50%)",
                           background: "none",
                           border: "none",
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           cursor: "pointer",
                           padding: 0,
                         }}
@@ -1968,7 +1968,7 @@ export default function UserProfilePage() {
                           style={{
                             flex: 1,
                             height: 4,
-                            background: "rgba(236, 232, 224, 0.06)",
+                            background: "rgba(var(--ui-rgb), 0.06)",
                             borderRadius: 2,
                             overflow: "hidden",
                           }}
@@ -1980,7 +1980,7 @@ export default function UserProfilePage() {
                         <span
                           style={{
                             fontSize: 11,
-                            color: "#6B665C",
+                            color: "var(--text-tertiary)",
                             textTransform: "capitalize",
                             minWidth: 50,
                           }}
@@ -1995,7 +1995,7 @@ export default function UserProfilePage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label
                       htmlFor="confirmPassword"
-                      style={{ fontSize: 13, fontWeight: 500, color: "#9B9689" }}
+                      style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}
                     >
                       Confirm New Password
                     </label>
@@ -2012,11 +2012,11 @@ export default function UserProfilePage() {
                           width: "100%",
                           height: 38,
                           borderRadius: 6,
-                          border: "0.5px solid rgba(236, 232, 224, 0.1)",
-                          background: "rgba(236, 232, 224, 0.03)",
+                          border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                          background: "rgba(var(--ui-rgb), 0.03)",
                           padding: "0 36px 0 12px",
                           fontSize: 13,
-                          color: "#ECE8E0",
+                          color: "var(--text-primary)",
                           outline: "none",
                           opacity: isChangingPassword ? 0.5 : 1,
                         }}
@@ -2032,7 +2032,7 @@ export default function UserProfilePage() {
                           transform: "translateY(-50%)",
                           background: "none",
                           border: "none",
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           cursor: "pointer",
                           padding: 0,
                         }}
@@ -2073,15 +2073,15 @@ export default function UserProfilePage() {
                       style={{
                         padding: 14,
                         borderRadius: 8,
-                        border: "0.5px solid rgba(236, 232, 224, 0.06)",
-                        background: "rgba(236, 232, 224, 0.02)",
+                        border: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                        background: "rgba(var(--ui-rgb), 0.02)",
                       }}
                     >
                       <p
                         style={{
                           fontSize: 12,
                           fontWeight: 500,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           margin: "0 0 10px",
                         }}
                       >
@@ -2124,7 +2124,7 @@ export default function UserProfilePage() {
                         borderRadius: 6,
                         fontSize: 13,
                         fontWeight: 500,
-                        color: "#1A1916",
+                        color: "var(--bg-base)",
                         background: "var(--mi-accent)",
                         border: "none",
                         cursor: isChangingPassword ? "not-allowed" : "pointer",
@@ -2141,19 +2141,19 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingTop: 24,
-                    borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 12,
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Shield size={16} style={{ color: "#6B665C" }} />
-                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                    <Shield size={16} style={{ color: "var(--text-tertiary)" }} />
+                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
                       Blocked Apps
                     </h3>
                   </div>
-                  <p style={{ fontSize: 13, color: "#6B665C", margin: 0 }}>
+                  <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
                     Apps in this list will never be tracked or captured.
                   </p>
 
@@ -2327,13 +2327,13 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingBottom: 16,
-                    borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                   }}
                 >
-                  <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
                     Session Preferences
                   </h2>
-                  <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+                  <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
                     Customize how monitoring sessions behave
                   </p>
                 </div>
@@ -2541,7 +2541,7 @@ export default function UserProfilePage() {
                 <div
                   style={{
                     paddingTop: 24,
-                    borderTop: "0.5px solid rgba(236, 232, 224, 0.06)",
+                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 12,
@@ -2558,13 +2558,13 @@ export default function UserProfilePage() {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      style={{ color: "#6B665C" }}
+                      style={{ color: "var(--text-tertiary)" }}
                     >
                       <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
                       <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                       <line x1="12" x2="12" y1="19" y2="22" />
                     </svg>
-                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
                       Audio Recording
                     </h3>
                   </div>
@@ -2737,13 +2737,13 @@ export default function UserProfilePage() {
                     <div
                       style={{
                         paddingBottom: 16,
-                        borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                        borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                       }}
                     >
-                      <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                      <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
                         Organization Settings
                       </h2>
-                      <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+                      <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
                         Configure settings that apply to all users in your organization
                       </p>
                     </div>
@@ -2831,13 +2831,13 @@ export default function UserProfilePage() {
               <div
                 style={{
                   paddingBottom: 16,
-                  borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                  borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                 }}
               >
-                <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
                   Beta Features
                 </h2>
-                <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
                   Toggle features that are still in development
                 </p>
               </div>
@@ -2853,11 +2853,11 @@ export default function UserProfilePage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <Label
                     htmlFor="agent-toggle"
-                    style={{ fontSize: 14, fontWeight: 500, color: "#ECE8E0", cursor: "pointer" }}
+                    style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", cursor: "pointer" }}
                   >
                     Agent
                   </Label>
-                  <p style={{ fontSize: 12, color: "#6B665C", margin: 0 }}>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
                     Enable the AI Agent in the sidebar for chat-based assistance
                   </p>
                 </div>
@@ -2891,13 +2891,13 @@ export default function UserProfilePage() {
               <div
                 style={{
                   paddingBottom: 16,
-                  borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+                  borderBottom: "0.5px solid rgba(var(--ui-rgb), 0.06)",
                 }}
               >
-                <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
                   Integrations
                 </h2>
-                <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
                   Connect apps and services for richer context
                 </p>
               </div>
@@ -2916,8 +2916,8 @@ export default function UserProfilePage() {
                             width: 36,
                             height: 36,
                             borderRadius: 8,
-                            background: "#2A2824",
-                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            background: "var(--bg-overlay)",
+                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -2945,15 +2945,15 @@ export default function UserProfilePage() {
                             width: 36,
                             height: 36,
                             borderRadius: 8,
-                            background: "#2A2824",
-                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            background: "var(--bg-overlay)",
+                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
                           }}
                         >
-                          <SiNotion style={{ width: 18, height: 18, color: "#ECE8E0" }} />
+                          <SiNotion style={{ width: 18, height: 18, color: "var(--text-primary)" }} />
                         </div>
                       ),
                       loading: isNotionLoading,
@@ -2977,8 +2977,8 @@ export default function UserProfilePage() {
                             width: 36,
                             height: 36,
                             borderRadius: 8,
-                            background: "#2A2824",
-                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            background: "var(--bg-overlay)",
+                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3009,8 +3009,8 @@ export default function UserProfilePage() {
                             width: 36,
                             height: 36,
                             borderRadius: 8,
-                            background: "#2A2824",
-                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            background: "var(--bg-overlay)",
+                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3047,8 +3047,8 @@ export default function UserProfilePage() {
                             width: 36,
                             height: 36,
                             borderRadius: 8,
-                            background: "#2A2824",
-                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            background: "var(--bg-overlay)",
+                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -3107,7 +3107,7 @@ export default function UserProfilePage() {
                           style={{
                             fontSize: 14,
                             fontWeight: 500,
-                            color: "#ECE8E0",
+                            color: "var(--text-primary)",
                             lineHeight: 1,
                           }}
                         >
@@ -3116,7 +3116,7 @@ export default function UserProfilePage() {
                         <div
                           style={{
                             fontSize: 12,
-                            color: "#6B665C",
+                            color: "var(--text-tertiary)",
                             marginTop: 4,
                             lineHeight: 1,
                           }}
@@ -3183,9 +3183,9 @@ export default function UserProfilePage() {
                             borderRadius: 6,
                             fontSize: 12,
                             fontWeight: 500,
-                            color: "#ECE8E0",
-                            background: "rgba(236, 232, 224, 0.06)",
-                            border: "0.5px solid rgba(236, 232, 224, 0.1)",
+                            color: "var(--text-primary)",
+                            background: "rgba(var(--ui-rgb), 0.06)",
+                            border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
                             cursor: integration.connecting ? "not-allowed" : "pointer",
                             opacity: integration.connecting ? 0.6 : 1,
                             transition: "background 0.15s ease",
@@ -3194,10 +3194,10 @@ export default function UserProfilePage() {
                             gap: 5,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "rgba(236, 232, 224, 0.1)";
+                            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.1)";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
+                            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
                           }}
                         >
                           {integration.connecting ? (
@@ -3211,7 +3211,7 @@ export default function UserProfilePage() {
                       <div
                         style={{
                           height: 0.5,
-                          background: "rgba(236, 232, 224, 0.06)",
+                          background: "rgba(var(--ui-rgb), 0.06)",
                         }}
                       />
                     )}
@@ -3303,8 +3303,8 @@ export default function UserProfilePage() {
               style={{
                 padding: 20,
                 borderRadius: 8,
-                border: "0.5px solid rgba(236, 232, 224, 0.06)",
-                background: "rgba(236, 232, 224, 0.02)",
+                border: "0.5px solid rgba(var(--ui-rgb), 0.06)",
+                background: "rgba(var(--ui-rgb), 0.02)",
               }}
             >
               <div className="flex items-center gap-4">

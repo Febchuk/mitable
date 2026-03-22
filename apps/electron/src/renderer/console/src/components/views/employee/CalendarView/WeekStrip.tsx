@@ -34,8 +34,8 @@ export default function WeekStrip({
   return (
     <div
       style={{
-        background: "#211F1B",
-        border: "0.5px solid rgba(236, 232, 224, 0.07)",
+        background: "var(--bg-raised)",
+        border: "0.5px solid rgba(var(--ui-rgb), 0.07)",
         borderRadius: 12,
         padding: "14px 10px",
         display: "flex",
@@ -53,14 +53,14 @@ export default function WeekStrip({
           alignItems: "center",
           justifyContent: "center",
           borderRadius: 6,
-          color: "#6B665C",
+          color: "var(--text-tertiary)",
           background: "none",
           border: "none",
           cursor: "pointer",
           flexShrink: 0,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
+          e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "none";
@@ -103,7 +103,7 @@ export default function WeekStrip({
               }}
               onMouseEnter={(e) => {
                 if (!highlighted) {
-                  e.currentTarget.style.background = "rgba(236, 232, 224, 0.04)";
+                  e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
                 }
               }}
               onMouseLeave={(e) => {
@@ -120,7 +120,7 @@ export default function WeekStrip({
                     ? "var(--mi-accent)"
                     : isToday
                       ? "var(--mi-accent)"
-                      : "#6B665C",
+                      : "var(--text-tertiary)",
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                 }}
@@ -133,7 +133,7 @@ export default function WeekStrip({
                 style={{
                   fontFamily: "var(--font-serif)",
                   fontSize: 20,
-                  color: highlighted ? "#ECE8E0" : isToday ? "#ECE8E0" : "#9B9689",
+                  color: highlighted ? "var(--text-primary)" : isToday ? "var(--text-primary)" : "var(--text-secondary)",
                   fontWeight: 400,
                 }}
               >
@@ -149,7 +149,7 @@ export default function WeekStrip({
                   background: hasActivity
                     ? highlighted || isToday
                       ? "var(--mi-accent)"
-                      : "#6B665C"
+                      : "var(--text-tertiary)"
                     : "transparent",
                 }}
               />
@@ -169,7 +169,7 @@ export default function WeekStrip({
           alignItems: "center",
           justifyContent: "center",
           borderRadius: 6,
-          color: canGoNext ? "#6B665C" : "#4A4640",
+          color: canGoNext ? "var(--text-tertiary)" : "var(--text-faint)",
           background: "none",
           border: "none",
           cursor: canGoNext ? "pointer" : "not-allowed",
@@ -177,7 +177,7 @@ export default function WeekStrip({
           opacity: canGoNext ? 1 : 0.4,
         }}
         onMouseEnter={(e) => {
-          if (canGoNext) e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
+          if (canGoNext) e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "none";
