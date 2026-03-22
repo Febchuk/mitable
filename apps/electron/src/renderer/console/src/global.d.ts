@@ -58,7 +58,7 @@ interface ConsoleAPI {
   ) => (() => void) | undefined;
 
   // User context - share userId/orgId with main process for cross-window access
-  setCurrentUser: (user: { userId: string; organizationId: string }) => void;
+  setCurrentUser: (user: { userId: string; organizationId: string; role?: string }) => void;
 
   // Monitoring session management
   startMonitoringSession: (config: {

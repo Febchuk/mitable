@@ -52,9 +52,9 @@ const TIME_RANGE_LABELS: Record<TimeRange, string> = {
   all: "All",
 };
 
-const CUSTOMER_COLORS = ["#9B84E8", "#7A6ACB", "#5B4AA7", "#3D3068", "#6A5AAE", "#8876D5"];
+const CUSTOMER_COLORS = ["#C8A960", "#A88E45", "#8B7535", "#6B5A30", "#B59A50", "#D4B870"];
 
-const BREAKDOWN_BAR_COLOR = "#9B84E8";
+const BREAKDOWN_BAR_COLOR = "#C8A960";
 
 type GranolaBlock = {
   id: string;
@@ -659,8 +659,8 @@ export default function PersonDetail() {
                 height: 24,
                 margin: "0 auto 12px",
                 borderRadius: "50%",
-                border: "2px solid rgba(155, 132, 232, 0.35)",
-                borderTopColor: "#9B84E8",
+                border: "2px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.35)",
+                borderTopColor: "var(--mi-accent)",
                 animation: "spin 1s linear infinite",
               }}
             />
@@ -894,8 +894,8 @@ export default function PersonDetail() {
                 width: 54,
                 height: 54,
                 borderRadius: 999,
-                background: "rgba(155, 132, 232, 0.12)",
-                color: "#9B84E8",
+                background: "rgba(236, 232, 224, 0.1)",
+                color: "#ECE8E0",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -904,12 +904,7 @@ export default function PersonDetail() {
                 flexShrink: 0,
               }}
             >
-              {person.name
-                .split(" ")
-                .filter(Boolean)
-                .map((part) => part[0])
-                .join("")
-                .slice(0, 2)}
+              {(person.name?.charAt(0) || "U").toUpperCase()}
             </div>
 
             <div>

@@ -94,9 +94,9 @@ function ToggleRow({
         padding: "14px 16px",
         borderRadius: 10,
         border: checked
-          ? "0.5px solid rgba(155, 132, 232, 0.25)"
+          ? "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.25)"
           : "0.5px solid rgba(236, 232, 224, 0.08)",
-        background: checked ? "rgba(155, 132, 232, 0.05)" : "#1A1916",
+        background: checked ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.05)" : "#1A1916",
         cursor: "pointer",
         textAlign: "left",
       }}
@@ -106,11 +106,13 @@ function ToggleRow({
           width: 28,
           height: 28,
           borderRadius: 8,
-          background: checked ? "rgba(155, 132, 232, 0.14)" : "rgba(236, 232, 224, 0.06)",
+          background: checked
+            ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.14)"
+            : "rgba(236, 232, 224, 0.06)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: checked ? "#9B84E8" : "#6B665C",
+          color: checked ? "var(--mi-accent)" : "#6B665C",
           flexShrink: 0,
         }}
       >
@@ -129,7 +131,7 @@ function ToggleRow({
           width: 18,
           height: 18,
           borderRadius: 999,
-          border: checked ? "5px solid #9B84E8" : "1px solid rgba(236, 232, 224, 0.18)",
+          border: checked ? "5px solid var(--mi-accent)" : "1px solid rgba(236, 232, 224, 0.18)",
           background: checked ? "#1A1916" : "transparent",
           marginTop: 4,
           flexShrink: 0,
@@ -521,8 +523,8 @@ export default function AddNewUser() {
                 height: 36,
                 padding: "0 14px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(155, 132, 232, 0.22)",
-                background: "rgba(155, 132, 232, 0.12)",
+                border: "0.5px solid var(--mi-accent-border)",
+                background: "var(--mi-accent-bg)",
                 color: "#ECE8E0",
                 fontSize: 13,
                 fontWeight: 500,

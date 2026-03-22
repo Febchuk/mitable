@@ -31,7 +31,7 @@ function UserCard({ user }: { user: UserActivity }) {
       {/* Header: avatar + name + status */}
       <div className="relative flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-indigo/20 flex items-center justify-center text-xs font-semibold text-indigo-light shrink-0">
+          <div className="w-9 h-9 rounded-full bg-[rgba(236,232,224,0.1)] flex items-center justify-center text-xs font-semibold text-[#ECE8E0] shrink-0">
             {user.avatar}
           </div>
           <div>

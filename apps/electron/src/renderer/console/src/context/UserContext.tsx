@@ -72,6 +72,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       window.consoleAPI.setCurrentUser({
         userId: response.profile.id,
         organizationId: response.profile.organizationId || "",
+        role: dbRole,
       });
     }
   };
@@ -207,6 +208,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       window.consoleAPI.setCurrentUser({
         userId: newUser.id,
         organizationId: newUser.organizationId || "",
+        role: newUser.originalRole || newUser.role || "employee",
       });
     }
   };

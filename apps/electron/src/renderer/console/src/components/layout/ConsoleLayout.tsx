@@ -14,7 +14,8 @@ export default function ConsoleLayout() {
   const isFullWidthPage =
     location.pathname === "/profile" ||
     location.pathname === "/dashboard" ||
-    location.pathname.startsWith("/people/");
+    location.pathname.startsWith("/people/") ||
+    location.pathname.startsWith("/agent");
 
   useEffect(() => {
     const handleDraftsNavigate = (draftId: string) => {
@@ -42,14 +43,14 @@ export default function ConsoleLayout() {
           <UpdateBanner />
 
           <div
-            className={`flex-1 overflow-y-auto flex flex-col${isFullWidthPage ? "" : " items-center"}`}
+            className={`flex-1 flex flex-col${isFullWidthPage ? " overflow-hidden" : " overflow-y-auto items-center"}`}
             style={{ padding: isFullWidthPage ? 0 : "20px 0" }}
           >
             <div
               className="w-full flex flex-col"
               style={
                 isFullWidthPage
-                  ? { flex: 1, minWidth: 0 }
+                  ? { flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden" }
                   : { maxWidth: 680, padding: "0 40px", gap: 28 }
               }
             >

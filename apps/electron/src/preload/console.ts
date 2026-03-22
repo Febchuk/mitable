@@ -197,7 +197,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   },
 
   // User context - Share userId/orgId with main process for cross-window access
-  setCurrentUser: (user: { userId: string; organizationId: string }) =>
+  setCurrentUser: (user: { userId: string; organizationId: string; role?: string }) =>
     ipcRenderer.send(IPC_CHANNELS.USER_CONTEXT_SET, user),
 
   // Monitoring session management

@@ -406,9 +406,9 @@ export default function CalendarView() {
                 gap: 5,
                 padding: "6px 10px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(155, 132, 232, 0.2)",
+                border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.2)",
                 background: "transparent",
-                color: "#9B84E8",
+                color: "var(--mi-accent)",
                 fontSize: 12,
                 fontFamily: "var(--font-sans)",
                 fontWeight: 500,
@@ -419,13 +419,13 @@ export default function CalendarView() {
               }}
               onMouseEnter={(e) => {
                 if (!isSyncing) {
-                  e.currentTarget.style.background = "rgba(155, 132, 232, 0.06)";
-                  e.currentTarget.style.borderColor = "rgba(155, 132, 232, 0.3)";
+                  e.currentTarget.style.background = "rgba(var(--mi-accent-rgb, 200,169,96), 0.06)";
+                  e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.3)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "rgba(155, 132, 232, 0.2)";
+                e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.2)";
               }}
             >
               <RefreshCw
@@ -563,7 +563,10 @@ export default function CalendarView() {
               padding: "64px 0",
             }}
           >
-            <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
+            <Loader2
+              size={24}
+              style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
+            />
             <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>
               Loading activity data...
             </p>

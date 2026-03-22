@@ -18,10 +18,13 @@
     --text-tertiary: #6B665C;
     --text-faint: #4A4640;
 
-    /* accent — warm indigo */
-    --accent: #9B84E8;
-    --accent-bg: rgba(155, 132, 232, 0.12);
-    --accent-border: rgba(155, 132, 232, 0.22);
+    /* accent — warm amber / gold */
+    --mi-accent: #C8A960;
+    --mi-accent-rgb: 200, 169, 96;
+    --mi-accent-dark: #6B5A30;
+    --mi-accent-light: #D9C08A;
+    --mi-accent-bg: rgba(200, 169, 96, 0.12);
+    --mi-accent-border: rgba(200, 169, 96, 0.22);
 
     /* status */
     --status-active: #3A9B6B;
@@ -50,7 +53,7 @@
     --card-foreground: 40 18% 90%;
     --popover: 36 8% 15%;
     --popover-foreground: 40 18% 90%;
-    --primary: 256 72% 72%;
+    --primary: 42 48% 58%;
     --primary-foreground: 0 0% 100%;
     --secondary: 36 8% 15%;
     --secondary-foreground: 40 18% 90%;
@@ -62,21 +65,21 @@
     --destructive-foreground: 0 0% 98%;
     --border: 36 8% 18%;
     --input: 36 8% 18%;
-    --ring: 256 72% 72%;
+    --ring: 42 48% 58%;
     --radius: 0.625rem;
-    --chart-1: 256 72% 72%;
+    --chart-1: 42 48% 58%;
     --chart-2: 152 45% 47%;
     --chart-3: 30 50% 55%;
     --chart-4: 36 8% 55%;
     --chart-5: 0 62% 50%;
     --sidebar-background: 36 8% 12%;
     --sidebar-foreground: 40 18% 90%;
-    --sidebar-primary: 256 72% 72%;
+    --sidebar-primary: 42 48% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 36 8% 15%;
     --sidebar-accent-foreground: 40 18% 90%;
     --sidebar-border: 36 8% 15%;
-    --sidebar-ring: 256 72% 72%;
+    --sidebar-ring: 42 48% 58%;
   }
 
   .dark {
@@ -86,7 +89,7 @@
     --card-foreground: 40 18% 90%;
     --popover: 36 8% 15%;
     --popover-foreground: 40 18% 90%;
-    --primary: 256 72% 72%;
+    --primary: 42 48% 58%;
     --primary-foreground: 0 0% 100%;
     --secondary: 36 8% 15%;
     --secondary-foreground: 40 18% 90%;
@@ -98,20 +101,20 @@
     --destructive-foreground: 0 0% 98%;
     --border: 36 8% 18%;
     --input: 36 8% 18%;
-    --ring: 256 72% 72%;
-    --chart-1: 256 72% 72%;
+    --ring: 42 48% 58%;
+    --chart-1: 42 48% 58%;
     --chart-2: 152 45% 47%;
     --chart-3: 30 50% 55%;
     --chart-4: 36 8% 55%;
     --chart-5: 0 62% 50%;
     --sidebar-background: 36 8% 12%;
     --sidebar-foreground: 40 18% 90%;
-    --sidebar-primary: 256 72% 72%;
+    --sidebar-primary: 42 48% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 36 8% 15%;
     --sidebar-accent-foreground: 40 18% 90%;
     --sidebar-border: 36 8% 15%;
-    --sidebar-ring: 256 72% 72%;
+    --sidebar-ring: 42 48% 58%;
   }
 }
 
@@ -325,7 +328,7 @@
 }
 
 .granola-notes-scroll a {
-  color: #9B84E8;
+  color: var(--mi-accent);
   text-decoration: none;
 }
 
@@ -389,8 +392,8 @@
 
 .dark-editor [role="toolbar"] button[data-state="on"],
 .dark-editor [role="toolbar"] button[aria-pressed="true"] {
-  background: var(--accent-bg);
-  color: var(--accent);
+  background: var(--mi-accent-bg);
+  color: var(--mi-accent);
 }
 
 .dark-editor [role="toolbar"] [data-orientation="vertical"] {
@@ -402,7 +405,7 @@
 .dark-editor [contenteditable] {
   flex: 1;
   overflow-y: auto;
-  caret-color: var(--accent);
+  caret-color: var(--mi-accent);
   color: var(--text-primary);
 }
 
@@ -429,7 +432,7 @@
   color: var(--text-primary);
 }
 .dark-editor [contenteditable] a {
-  color: var(--accent);
+  color: var(--mi-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

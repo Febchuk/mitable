@@ -1787,7 +1787,11 @@ export default function UserProfilePage() {
                       <div
                         style={{
                           fontSize: 13,
-                          color: field.accent ? "#9B84E8" : field.mono ? "#6B665C" : "#ECE8E0",
+                          color: field.accent
+                            ? "var(--mi-accent)"
+                            : field.mono
+                              ? "#6B665C"
+                              : "#ECE8E0",
                           fontFamily: field.mono ? "monospace" : "inherit",
                           padding: "9px 12px",
                           borderRadius: 6,
@@ -2120,8 +2124,8 @@ export default function UserProfilePage() {
                         borderRadius: 6,
                         fontSize: 13,
                         fontWeight: 500,
-                        color: "#fff",
-                        background: "#9B84E8",
+                        color: "#1A1916",
+                        background: "var(--mi-accent)",
                         border: "none",
                         cursor: isChangingPassword ? "not-allowed" : "pointer",
                         opacity: isChangingPassword ? 0.6 : 1,

@@ -28,8 +28,8 @@ export const VALID_ACTIVITY_FILTERS = new Set<ActivityTimeFilter>([
   "all",
 ]);
 
-export const DEEP_WORK_COLOR = "#9B84E8";
-export const MEETINGS_COLOR = "#3D3068";
+export const DEEP_WORK_COLOR = "#C8A960";
+export const MEETINGS_COLOR = "#6B5A30";
 export const AXIS_COLOR = "#9B9689";
 
 function formatHour(h: number): string {

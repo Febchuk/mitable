@@ -3,41 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Loader2, AlertCircle, Plus, Lock } from "lucide-react";
 import { useDocuments } from "@/console/src/hooks/queries/documents";
 import CreateDocumentModal from "../../employee/DocsView/dialogs/CreateDocumentModal";
+import { groupByDay } from "@/console/src/components/shared/groupByDay";
 import type { Document } from "@mitable/shared";
 
 function isReportDocument(doc: Document): boolean {
   return doc.tags?.includes("report") ?? false;
-}
-
-function groupReportsByDate(reports: Document[]) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const weekAgo = new Date(today.getTime() - 7 * 86400000);
-
-  const groups: { label: string; reports: Document[] }[] = [
-    { label: "Today", reports: [] },
-    { label: "Yesterday", reports: [] },
-    { label: "This week", reports: [] },
-    { label: "Earlier", reports: [] },
-  ];
-
-  reports.forEach((report) => {
-    const updatedAt = new Date(report.updatedAt);
-    const reportDay = new Date(updatedAt.getFullYear(), updatedAt.getMonth(), updatedAt.getDate());
-
-    if (reportDay.getTime() >= today.getTime()) {
-      groups[0].reports.push(report);
-    } else if (reportDay.getTime() >= yesterday.getTime()) {
-      groups[1].reports.push(report);
-    } else if (reportDay.getTime() >= weekAgo.getTime()) {
-      groups[2].reports.push(report);
-    } else {
-      groups[3].reports.push(report);
-    }
-  });
-
-  return groups.filter((group) => group.reports.length > 0);
 }
 
 function formatTime(dateString: string): string {
@@ -49,7 +19,7 @@ function formatTime(dateString: string): string {
   });
 }
 
-const REPORT_AVATAR_COLORS = ["#9B84E8", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
+const REPORT_AVATAR_COLORS = ["#C8A960", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
 
 function getAvatarColor(id: string): string {
   let hash = 0;
@@ -72,7 +42,7 @@ export default function ReportsView() {
     return documents.filter((doc) => isReportDocument(doc));
   }, [data?.documents]);
 
-  const groupedReports = useMemo(() => groupReportsByDate(reports), [reports]);
+  const groupedReports = useMemo(() => groupByDay(reports, (r) => r.updatedAt), [reports]);
 
   if (isLoading) {
     return (
@@ -85,7 +55,10 @@ export default function ReportsView() {
           padding: "80px 0",
         }}
       >
-        <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
+        <Loader2
+          size={24}
+          style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
+        />
         <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading reports...</p>
       </div>
     );
@@ -195,7 +168,7 @@ export default function ReportsView() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {group.reports.map((report) => {
+                {group.items.map((report) => {
                   const color = getAvatarColor(report.id);
                   const initial = getReportInitial(report.title);
                   const creatorName = report.creator

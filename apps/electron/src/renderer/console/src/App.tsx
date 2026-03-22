@@ -18,9 +18,6 @@ import LoginPage from "./pages/LoginPage";
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import ChatsView from "./components/views/employee/ChatsView";
-import ChatDetail from "./components/views/employee/ChatsView/ChatDetail";
-import NewChat from "./components/views/employee/ChatsView/NewChat";
 import MonitoringView from "./components/views/employee/MonitoringView";
 import SessionDetail from "./components/views/employee/MonitoringView/SessionDetail";
 import CalendarView from "./components/views/employee/CalendarView";
@@ -62,7 +59,7 @@ function NavigationHandler() {
     // Listen for navigation requests from main process (e.g., from Agent window)
     const unsubscribeChat = window.consoleAPI.onNavigateToChat?.((conversationId: string) => {
       logger.info(" Navigating to chat:", conversationId);
-      navigate(`/chats/${conversationId}`);
+      navigate(`/agent/${conversationId}`);
     });
 
     // Listen for active session navigation (from native notification click)
@@ -279,12 +276,12 @@ function App() {
                         <Route path="monitoring" element={<MonitoringView />} />
                         <Route path="monitoring/:sessionId" element={<SessionDetail />} />
                         <Route path="agent" element={<AgentView />} />
+                        <Route path="agent/:chatId" element={<AgentView />} />
                         <Route path="uploads" element={<UploadsView />} />
                         <Route path="profile" element={<UserProfilePage />} />
-                        {/* Legacy routes (hidden from nav but accessible via URL) */}
-                        <Route path="chats" element={<ChatsView />} />
-                        <Route path="chats/new" element={<NewChat />} />
-                        <Route path="chats/:chatId" element={<ChatDetail />} />
+                        {/* Legacy redirect: /chats → /agent */}
+                        <Route path="chats" element={<Navigate to="/agent" replace />} />
+                        <Route path="chats/:chatId" element={<Navigate to="/agent" replace />} />
                       </Route>
                     </Routes>
                   </RecapsProvider>

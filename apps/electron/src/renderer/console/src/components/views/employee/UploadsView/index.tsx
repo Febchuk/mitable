@@ -66,7 +66,7 @@ const EXT_COLORS: Record<string, string> = {
 
 function getExtColor(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
-  return EXT_COLORS[ext] || "#9B84E8";
+  return EXT_COLORS[ext] || "#C8A960";
 }
 
 function getExtLabel(filename: string): string {
@@ -123,7 +123,10 @@ export default function UploadsView() {
           padding: "80px 0",
         }}
       >
-        <Loader2 size={24} style={{ color: "#9B84E8", animation: "spin 1s linear infinite" }} />
+        <Loader2
+          size={24}
+          style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
+        />
         <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading uploads...</p>
       </div>
     );

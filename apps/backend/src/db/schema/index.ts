@@ -23,6 +23,9 @@ export * from "./daily-activities.schema";
 export * from "./ask-threads.schema";
 export * from "./graph-sync.schema";
 
+// Agent chat schemas
+export * from "./agent-chats.schema";
+
 // GitHub schemas
 export * from "./github/github-repos.schema";
 export * from "./github/github-commits.schema";
