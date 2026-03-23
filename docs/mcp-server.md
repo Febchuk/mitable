@@ -39,6 +39,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 {
   "mcpServers": {
     "mitable": {
+      "type": "http",
       "url": "https://mitablebackend-production.up.railway.app/mcp",
       "headers": {
         "Authorization": "Bearer mk_live_YOUR_API_KEY"
