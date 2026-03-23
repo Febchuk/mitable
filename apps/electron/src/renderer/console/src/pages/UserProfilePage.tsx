@@ -14,11 +14,14 @@ import {
   ExternalLink,
   Download,
   Settings,
-  Shield,
   Plus,
   Search,
   Globe,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
+import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { FirefliesIcon } from "../../../components/icons/integrations";
 import MitableIcon from "../components/icons/MitableIcon";
@@ -79,6 +82,7 @@ interface FirefliesStatus {
 export default function UserProfilePage() {
   const { user } = useUser();
   const { toast } = useToast();
+  const { theme: currentTheme, setTheme } = useTheme();
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -1839,12 +1843,9 @@ export default function UserProfilePage() {
                     gap: 12,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Shield size={16} style={{ color: "var(--text-tertiary)" }} />
-                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
-                      Blocked Apps
-                    </h3>
-                  </div>
+                  <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                    Blocked Apps
+                  </h3>
                   <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
                     Apps in this list will never be tracked or captured.
                   </p>
@@ -2319,12 +2320,89 @@ export default function UserProfilePage() {
           {activeTab === "preferences" && (
             <div>
               <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                <div
-                  style={{
-                    paddingBottom: 16,
-                    borderBottom: "var(--border-hairline)",
-                  }}
-                >
+                {/* Appearance */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div>
+                    <h2
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        margin: 0,
+                      }}
+                    >
+                      Appearance
+                    </h2>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text-tertiary)",
+                        margin: "6px 0 0",
+                      }}
+                    >
+                      Choose how Mitable looks. Select a theme or sync with your system.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {(
+                      [
+                        { value: "light" as const, label: "Light", icon: Sun },
+                        { value: "dark" as const, label: "Dark", icon: Moon },
+                        { value: "system" as const, label: "System", icon: Monitor },
+                      ]
+                    ).map(({ value, label, icon: Icon }) => {
+                      const active = currentTheme === value;
+                      return (
+                        <button
+                          key={value}
+                          onClick={() => setTheme(value)}
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "14px 12px",
+                            borderRadius: 10,
+                            border: active
+                              ? "1.5px solid var(--mi-accent)"
+                              : "var(--border-subtle)",
+                            background: active
+                              ? "rgba(var(--ui-rgb), 0.04)"
+                              : "transparent",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!active)
+                              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!active) e.currentTarget.style.background = "transparent";
+                          }}
+                        >
+                          <Icon
+                            size={20}
+                            style={{
+                              color: active ? "var(--mi-accent)" : "var(--text-tertiary)",
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: active ? 500 : 400,
+                              color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                            }}
+                          >
+                            {label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
                   <h2
                     style={{
                       fontSize: 16,
@@ -2480,7 +2558,7 @@ export default function UserProfilePage() {
                             handleNotificationFrequencyChange(value);
                           }
                         }}
-                        className="w-20 h-10 rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent"
+                        className="w-20 h-10 rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-text-primary text-center focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent"
                       />
                       <span className="text-sm text-text-secondary">minutes</span>
                     </div>
@@ -2593,19 +2671,16 @@ export default function UserProfilePage() {
                         <select
                           value={selectedMicId || "default"}
                           onChange={(e) => handleMicrophoneChange(e.target.value)}
-                          className="w-full px-3 py-2 bg-[#2a2a2a] border border-border-subtle rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-[#323232] transition-colors [&>option]:bg-[#2a2a2a] [&>option]:text-white [&>option]:py-2"
-                          style={{
-                            colorScheme: "dark",
-                          }}
+                          className="w-full px-3 py-2 bg-background-elevated border border-border-subtle rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-background-secondary transition-colors [&>option]:bg-background-elevated [&>option]:text-text-primary [&>option]:py-2"
                         >
-                          <option value="default" className="bg-[#2a2a2a] text-white">
+                          <option value="default" className="bg-background-elevated text-text-primary">
                             System Default (Auto-detect)
                           </option>
                           {audioDevices.map((device) => (
                             <option
                               key={device.deviceId}
                               value={device.deviceId}
-                              className="bg-[#2a2a2a] text-white"
+                              className="bg-background-elevated text-text-primary"
                             >
                               {device.label}
                             </option>
@@ -2647,19 +2722,16 @@ export default function UserProfilePage() {
                           <select
                             value={selectedOutputId || "default"}
                             onChange={(e) => handleOutputDeviceChange(e.target.value)}
-                            className="w-full px-3 py-2 bg-[#2a2a2a] border border-border-subtle rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-[#323232] transition-colors [&>option]:bg-[#2a2a2a] [&>option]:text-white [&>option]:py-2"
-                            style={{
-                              colorScheme: "dark",
-                            }}
+                            className="w-full px-3 py-2 bg-background-elevated border border-border-subtle rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-background-secondary transition-colors [&>option]:bg-background-elevated [&>option]:text-text-primary [&>option]:py-2"
                           >
-                            <option value="default" className="bg-[#2a2a2a] text-white">
+                            <option value="default" className="bg-background-elevated text-text-primary">
                               System Default (Auto-detect)
                             </option>
                             {audioOutputDevices.map((device) => (
                               <option
                                 key={device.deviceId}
                                 value={device.deviceId}
-                                className="bg-[#2a2a2a] text-white"
+                                className="bg-background-elevated text-text-primary"
                               >
                                 {device.label}
                               </option>
@@ -2684,8 +2756,8 @@ export default function UserProfilePage() {
                           }}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                             isMicTesting
-                              ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40"
-                              : "bg-accent-primary hover:bg-accent-primary/90 text-white"
+                              ? "bg-status-error/10 hover:bg-status-error/20 text-status-error border border-status-error/30"
+                              : "bg-accent-primary/10 hover:bg-accent-primary/20 text-accent-primary border border-accent-primary/30"
                           }`}
                         >
                           {isMicTesting ? "Stop Testing" : "Test Microphone"}
@@ -3253,7 +3325,7 @@ export default function UserProfilePage() {
                     <div className="flex items-center gap-3 mb-4">
                       <FirefliesIcon size="md" />
                       <div>
-                        <h3 className="text-lg font-semibold text-white">Connect Fireflies.ai</h3>
+                        <h3 className="text-lg font-semibold text-text-primary">Connect Fireflies.ai</h3>
                         <p className="text-sm text-text-tertiary">
                           Enter your API key to sync meetings
                         </p>
@@ -3268,7 +3340,7 @@ export default function UserProfilePage() {
                           value={firefliesApiKey}
                           onChange={(e) => setFirefliesApiKey(e.target.value)}
                           placeholder="Enter your Fireflies API key"
-                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-primary px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/50"
+                          className="flex h-10 w-full rounded-md border border-border-subtle bg-background-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/50"
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && firefliesApiKey.trim()) {
                               handleConnectFireflies();
@@ -3340,7 +3412,7 @@ export default function UserProfilePage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-white">Mitable</h3>
+                  <h3 className="text-lg font-semibold text-text-primary">Mitable</h3>
                   <p className="text-sm text-text-tertiary">Version {appVersion || "..."}</p>
                 </div>
 

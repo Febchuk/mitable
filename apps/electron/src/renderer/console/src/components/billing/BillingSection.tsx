@@ -37,7 +37,7 @@ export default function BillingSection() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-white">Subscription</h3>
+          <h3 className="text-lg font-semibold text-text-primary">Subscription</h3>
           <p className="text-sm text-muted-foreground mt-1">Your current plan and usage</p>
         </div>
         <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export default function BillingSection() {
               <Infinity className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <p className="text-white font-medium">Unlimited Usage</p>
+              <p className="text-text-primary font-medium">Unlimited Usage</p>
               <p className="text-sm text-muted-foreground">
                 {isInternal
                   ? "Internal account - all limits bypassed"

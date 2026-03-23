@@ -4,7 +4,8 @@
  * User settings page with Linear integration connection.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useTheme } from "@/console/src/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import { createLogger } from "../../../../../../lib/logger";
 
@@ -29,6 +30,9 @@ import {
   FileText,
   List,
   Sparkles,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { BillingSection } from "@/console/src/components/billing";
@@ -51,8 +55,11 @@ interface NotionStatus {
   workspaceId: string | null;
 }
 
+type ThemeOption = "light" | "dark" | "system";
+
 export default function SettingsView() {
   const { toast } = useToast();
+  const { theme: currentTheme, setTheme } = useTheme();
   const [linearStatus, setLinearStatus] = useState<LinearStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -604,26 +611,100 @@ export default function SettingsView() {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-4xl font-bold text-white">Settings</h1>
+        <h1 className="text-4xl font-bold text-text-primary">Settings</h1>
         <p className="text-text-secondary mt-2">Manage your account and integrations</p>
       </div>
 
       {/* Subscription Section */}
       <div className="space-y-4 max-w-2xl">
-        <h2 className="text-2xl font-semibold text-white">Subscription</h2>
+        <h2 className="text-2xl font-semibold text-text-primary">Subscription</h2>
         <BillingSection />
+      </div>
+
+      {/* Appearance Section */}
+      <div className="space-y-4 max-w-2xl">
+        <h2 className="text-2xl font-semibold text-text-primary">Appearance</h2>
+        <Card className="p-6 bg-background-elevated border-border-subtle">
+          <div className="space-y-3">
+            <p className="text-sm text-text-secondary">
+              Choose how Mitable looks to you. Select a theme or sync with your system setting.
+            </p>
+            <div className="flex gap-3">
+              {(
+                [
+                  { value: "light", label: "Light", icon: Sun },
+                  { value: "dark", label: "Dark", icon: Moon },
+                  { value: "system", label: "System", icon: Monitor },
+                ] as const
+              ).map(({ value, label, icon: Icon }) => {
+                const active = currentTheme === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setTheme(value)}
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "14px 12px",
+                      borderRadius: 10,
+                      border: active
+                        ? "1.5px solid var(--mi-accent)"
+                        : "var(--border-subtle)",
+                      background: active
+                        ? "rgba(var(--ui-rgb), 0.04)"
+                        : "transparent",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active)
+                        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active)
+                        e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <Icon
+                      size={20}
+                      style={{
+                        color: active
+                          ? "var(--mi-accent)"
+                          : "var(--text-tertiary)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: active ? 500 : 400,
+                        color: active
+                          ? "var(--text-primary)"
+                          : "var(--text-secondary)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Preferences Section */}
       <div className="space-y-4 max-w-2xl">
-        <h2 className="text-2xl font-semibold text-white">Preferences</h2>
+        <h2 className="text-2xl font-semibold text-text-primary">Preferences</h2>
         <Card className="p-6 bg-background-elevated border-border-subtle">
           <div className="space-y-6">
             {/* Session Preferences */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Settings size={18} className="text-text-secondary" />
-                <h3 className="text-lg font-semibold text-white">Session</h3>
+                <h3 className="text-lg font-semibold text-text-primary">Session</h3>
               </div>
 
               {/* Show Pill on Session Start Toggle */}
@@ -631,7 +712,7 @@ export default function SettingsView() {
                 <div className="space-y-0.5">
                   <Label
                     htmlFor="show-pill-toggle"
-                    className="text-sm font-medium text-white cursor-pointer"
+                    className="text-sm font-medium text-text-primary cursor-pointer"
                   >
                     Show Watching Pill on Session Start
                   </Label>
@@ -672,7 +753,7 @@ export default function SettingsView() {
                 <div className="space-y-0.5">
                   <Label
                     htmlFor="hide-pill-toggle"
-                    className="text-sm font-medium text-white cursor-pointer"
+                    className="text-sm font-medium text-text-primary cursor-pointer"
                   >
                     Hide Watching Pill on Session End
                   </Label>
@@ -716,7 +797,7 @@ export default function SettingsView() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <FileText size={18} className="text-text-secondary" />
-                <h3 className="text-lg font-semibold text-white">Session Summary</h3>
+                <h3 className="text-lg font-semibold text-text-primary">Session Summary</h3>
               </div>
 
               {/* Always Ask at End of Session */}
@@ -724,7 +805,7 @@ export default function SettingsView() {
                 <div className="space-y-0.5">
                   <Label
                     htmlFor="always-ask-toggle"
-                    className="text-sm font-medium text-white cursor-pointer"
+                    className="text-sm font-medium text-text-primary cursor-pointer"
                   >
                     Always ask for summary preferences
                   </Label>
@@ -770,7 +851,7 @@ export default function SettingsView() {
                   {/* Default Detail Level */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-medium text-white">Detail Level</Label>
+                      <Label className="text-sm font-medium text-text-primary">Detail Level</Label>
                       <p className="text-xs text-muted-foreground">
                         {detailLevel === "concise" ? "Key highlights only" : "Full narrative"}
                       </p>
@@ -815,7 +896,7 @@ export default function SettingsView() {
                   {/* Default Format */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-medium text-white">Format</Label>
+                      <Label className="text-sm font-medium text-text-primary">Format</Label>
                       <p className="text-xs text-muted-foreground">
                         {format === "bullets" ? "Bullet points" : "Paragraphs"}
                       </p>
@@ -862,7 +943,7 @@ export default function SettingsView() {
                     <div className="space-y-0.5">
                       <Label
                         htmlFor="include-screenshots-toggle"
-                        className="text-sm font-medium text-white cursor-pointer"
+                        className="text-sm font-medium text-text-primary cursor-pointer"
                       >
                         Include Screenshots
                       </Label>
@@ -900,7 +981,7 @@ export default function SettingsView() {
 
       {/* Integrations Section */}
       <div className="space-y-4 max-w-2xl">
-        <h2 className="text-2xl font-semibold text-white">Integrations</h2>
+        <h2 className="text-2xl font-semibold text-text-primary">Integrations</h2>
 
         {/* Linear Integration Card */}
         <Card className="p-6 bg-background-elevated border-border-subtle">
@@ -912,7 +993,7 @@ export default function SettingsView() {
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-white">Linear</h3>
+              <h3 className="text-lg font-semibold text-text-primary">Linear</h3>
               <p className="text-sm text-muted-foreground">
                 Connect your Linear account to send session updates to your tickets.
               </p>
@@ -976,7 +1057,7 @@ export default function SettingsView() {
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-white">Notion</h3>
+              <h3 className="text-lg font-semibold text-text-primary">Notion</h3>
               <p className="text-sm text-muted-foreground">
                 Connect your Notion workspace to export documents.
               </p>
@@ -1054,7 +1135,7 @@ export default function SettingsView() {
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-white">Gmail</h3>
+              <h3 className="text-lg font-semibold text-text-primary">Gmail</h3>
               <p className="text-sm text-muted-foreground">
                 Connect your Gmail to send session summaries from your email.
               </p>
@@ -1114,7 +1195,7 @@ export default function SettingsView() {
 
       {/* About Section */}
       <div className="space-y-4 max-w-2xl">
-        <h2 className="text-2xl font-semibold text-white">About</h2>
+        <h2 className="text-2xl font-semibold text-text-primary">About</h2>
         <Card className="p-6 bg-background-elevated border-border-subtle">
           <div className="flex items-center gap-4">
             {/* App Icon */}
@@ -1124,7 +1205,7 @@ export default function SettingsView() {
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-white">Mitable</h3>
+              <h3 className="text-lg font-semibold text-text-primary">Mitable</h3>
               <p className="text-sm text-muted-foreground">Version {appVersion || "..."}</p>
             </div>
 
