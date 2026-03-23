@@ -91,8 +91,7 @@ export default function SignupOrganizationPage() {
     }
   };
 
-  const getInputStyle = (field: string) =>
-    focusedField === field ? inputFocusStyle : inputStyle;
+  const getInputStyle = (field: string) => (focusedField === field ? inputFocusStyle : inputStyle);
 
   return (
     <div
@@ -360,12 +359,8 @@ export default function SignupOrganizationPage() {
                 href="#/login"
                 className="font-medium transition-colors"
                 style={{ color: "var(--mi-accent)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.color = "var(--mi-accent-light)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color = "var(--mi-accent)")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--mi-accent-light)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--mi-accent)")}
               >
                 Sign in
               </a>

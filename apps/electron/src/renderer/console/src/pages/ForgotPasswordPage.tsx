@@ -43,8 +43,7 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const getInputStyle = (field: string) =>
-    focusedField === field ? inputFocusStyle : inputStyle;
+  const getInputStyle = (field: string) => (focusedField === field ? inputFocusStyle : inputStyle);
 
   if (isSuccess) {
     return (
@@ -97,10 +96,7 @@ export default function ForgotPasswordPage() {
                 </span>
                 , you'll receive a password reset link shortly.
               </p>
-              <p
-                className="text-body-sm pt-4"
-                style={{ color: "var(--text-tertiary)" }}
-              >
+              <p className="text-body-sm pt-4" style={{ color: "var(--text-tertiary)" }}>
                 The link will expire in 1 hour for security reasons.
               </p>
             </div>

@@ -24,7 +24,11 @@ async function getUserContext(
     res.status(403).json({ error: "User not found" });
     return null;
   }
-  return { organizationId: user.organizationId, userId: req.userId!, isAdmin: user.role === "admin" };
+  return {
+    organizationId: user.organizationId,
+    userId: req.userId!,
+    isAdmin: user.role === "admin",
+  };
 }
 
 /** POST /api/api-keys — Create a new API key (returns full key once) */

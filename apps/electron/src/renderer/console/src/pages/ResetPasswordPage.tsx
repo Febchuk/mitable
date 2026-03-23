@@ -118,8 +118,7 @@ export default function ResetPasswordPage() {
     }
   };
 
-  const getInputStyle = (field: string) =>
-    focusedField === field ? inputFocusStyle : inputStyle;
+  const getInputStyle = (field: string) => (focusedField === field ? inputFocusStyle : inputStyle);
 
   const pageWrapper = (children: React.ReactNode) => (
     <div
@@ -143,10 +142,7 @@ export default function ResetPasswordPage() {
       <>
         <AuthLogo />
         <div>
-          <h1
-            className="text-heading-3 mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
+          <h1 className="text-heading-3 mb-2" style={{ color: "var(--text-primary)" }}>
             Invalid Reset Link
           </h1>
           <p className="text-body-sm" style={{ color: "var(--text-secondary)" }}>
@@ -170,10 +166,7 @@ export default function ResetPasswordPage() {
           <Check className="w-8 h-8" style={{ color: "var(--status-success)" }} />
         </div>
         <div>
-          <h1
-            className="text-heading-3 mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
+          <h1 className="text-heading-3 mb-2" style={{ color: "var(--text-primary)" }}>
             Password Reset Successful!
           </h1>
           <p className="text-body-sm" style={{ color: "var(--text-secondary)" }}>
@@ -329,10 +322,7 @@ export default function ResetPasswordPage() {
                   border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
                 }}
               >
-                <p
-                  className="text-xs font-medium"
-                  style={{ color: "var(--text-secondary)" }}
-                >
+                <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                   Password must contain:
                 </p>
                 <div className="space-y-1">
@@ -341,21 +331,13 @@ export default function ResetPasswordPage() {
                     return (
                       <div key={idx} className="flex items-center gap-2 text-xs">
                         {isMet ? (
-                          <Check
-                            className="w-3 h-3"
-                            style={{ color: "var(--status-success)" }}
-                          />
+                          <Check className="w-3 h-3" style={{ color: "var(--status-success)" }} />
                         ) : (
-                          <X
-                            className="w-3 h-3"
-                            style={{ color: "var(--text-tertiary)" }}
-                          />
+                          <X className="w-3 h-3" style={{ color: "var(--text-tertiary)" }} />
                         )}
                         <span
                           style={{
-                            color: isMet
-                              ? "var(--status-success)"
-                              : "var(--text-tertiary)",
+                            color: isMet ? "var(--status-success)" : "var(--text-tertiary)",
                           }}
                         >
                           {req.label}

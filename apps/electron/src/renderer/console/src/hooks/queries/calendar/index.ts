@@ -236,7 +236,8 @@ function sessionToWorkBlock(
     endTime,
     duration: Math.round(durationMinutes),
     idleGapBefore,
-    summary: session.finalSummary || session.rawActivitySummary || "Work session — summary unavailable.",
+    summary:
+      session.finalSummary || session.rawActivitySummary || "Work session — summary unavailable.",
     captures: transformedCaptures,
     appBreakdown,
     taskBreakdown:

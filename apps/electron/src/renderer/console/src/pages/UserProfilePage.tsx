@@ -1582,17 +1582,17 @@ export default function UserProfilePage() {
     if (!newKeyName.trim()) return;
     setIsCreatingKey(true);
     try {
-      const result = await apiRequest<{ id: string; key: string; keyPrefix: string }>(
-        "/api-keys",
-        {
-          method: "POST",
-          body: JSON.stringify({ name: newKeyName.trim() }),
-        }
-      );
+      const result = await apiRequest<{ id: string; key: string; keyPrefix: string }>("/api-keys", {
+        method: "POST",
+        body: JSON.stringify({ name: newKeyName.trim() }),
+      });
       setNewlyCreatedKey(result.key);
       setNewKeyName("");
       await loadApiKeys();
-      toast({ title: "API Key Created", description: "Copy your key now — it won't be shown again." });
+      toast({
+        title: "API Key Created",
+        description: "Copy your key now — it won't be shown again.",
+      });
     } catch (error) {
       logger.error("Error creating API key:", error);
       toast({ title: "Error", description: "Failed to create API key.", variant: "destructive" });
@@ -3423,13 +3423,18 @@ export default function UserProfilePage() {
                   }}
                 >
                   <h2
-                    style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      margin: 0,
+                    }}
                   >
                     API Keys
                   </h2>
                   <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
-                    Create API keys to connect AI agents like Claude Desktop to your Mitable data via
-                    MCP
+                    Create API keys to connect AI agents like Claude Desktop to your Mitable data
+                    via MCP
                   </p>
                 </div>
 
@@ -3469,7 +3474,10 @@ export default function UserProfilePage() {
                       fontSize: 12,
                       fontWeight: 500,
                       color: "#fff",
-                      background: isCreatingKey || !newKeyName.trim() ? "#555" : "var(--mi-accent-dark, #3A7A87)",
+                      background:
+                        isCreatingKey || !newKeyName.trim()
+                          ? "#555"
+                          : "var(--mi-accent-dark, #3A7A87)",
                       border: "none",
                       cursor: isCreatingKey || !newKeyName.trim() ? "not-allowed" : "pointer",
                       display: "flex",

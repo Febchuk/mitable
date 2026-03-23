@@ -66,8 +66,7 @@ export default function LoginPage() {
     }
   };
 
-  const getInputStyle = (field: string) =>
-    focusedField === field ? inputFocusStyle : inputStyle;
+  const getInputStyle = (field: string) => (focusedField === field ? inputFocusStyle : inputStyle);
 
   return (
     <div
@@ -172,12 +171,8 @@ export default function LoginPage() {
                     onClick={() => navigate("/forgot-password")}
                     className="text-xs transition-colors"
                     style={{ color: "var(--mi-accent)" }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.color = "var(--mi-accent-light)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.color = "var(--mi-accent)")
-                    }
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--mi-accent-light)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--mi-accent)")}
                   >
                     Forgot password?
                   </button>
@@ -190,10 +185,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p
-            className="text-center text-sm"
-            style={{ color: "var(--text-tertiary)" }}
-          >
+          <p className="text-center text-sm" style={{ color: "var(--text-tertiary)" }}>
             Questions? Your AI assistant is here to help
           </p>
 
@@ -207,12 +199,8 @@ export default function LoginPage() {
                 href="#/signup-organization"
                 className="font-medium transition-colors"
                 style={{ color: "var(--mi-accent)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.color = "var(--mi-accent-light)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color = "var(--mi-accent)")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--mi-accent-light)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--mi-accent)")}
               >
                 Sign up now &rarr;
               </a>

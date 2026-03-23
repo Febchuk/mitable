@@ -23,11 +23,11 @@ Authorization: Bearer mk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 All endpoints require admin authentication (JWT via `requireAuth` middleware).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/api-keys` | Create a new key. Body: `{ "name": "My Agent" }`. Returns `{ id, key, keyPrefix }`. |
-| `GET` | `/api/api-keys` | List all keys (prefix only, never full key). |
-| `DELETE` | `/api/api-keys/:id` | Revoke a key (soft delete). |
+| Method   | Path                | Description                                                                         |
+| -------- | ------------------- | ----------------------------------------------------------------------------------- |
+| `POST`   | `/api/api-keys`     | Create a new key. Body: `{ "name": "My Agent" }`. Returns `{ id, key, keyPrefix }`. |
+| `GET`    | `/api/api-keys`     | List all keys (prefix only, never full key).                                        |
+| `DELETE` | `/api/api-keys/:id` | Revoke a key (soft delete).                                                         |
 
 ## Configuration
 
@@ -69,131 +69,145 @@ Replace the URL with `http://localhost:3000/mcp`.
 ### Sessions
 
 #### `get_sessions`
+
 List monitoring sessions with optional filters.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `userId` | `string (uuid)` | — | Filter by user ID |
-| `status` | `string` | — | `active`, `paused`, `ended`, `summarizing`, `ready`, `delivered` |
-| `dateFrom` | `string` | — | ISO date — sessions started on or after |
-| `dateTo` | `string` | — | ISO date — sessions started on or before |
-| `page` | `integer` | `1` | Page number |
-| `limit` | `integer` | `20` | Results per page (max 100) |
+| Parameter  | Type            | Default | Description                                                      |
+| ---------- | --------------- | ------- | ---------------------------------------------------------------- |
+| `userId`   | `string (uuid)` | —       | Filter by user ID                                                |
+| `status`   | `string`        | —       | `active`, `paused`, `ended`, `summarizing`, `ready`, `delivered` |
+| `dateFrom` | `string`        | —       | ISO date — sessions started on or after                          |
+| `dateTo`   | `string`        | —       | ISO date — sessions started on or before                         |
+| `page`     | `integer`       | `1`     | Page number                                                      |
+| `limit`    | `integer`       | `20`    | Results per page (max 100)                                       |
 
 #### `get_session_detail`
+
 Get full details of a single session including summary, workstreams, and key frames.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter   | Type            | Description                  |
+| ----------- | --------------- | ---------------------------- |
 | `sessionId` | `string (uuid)` | **Required.** The session ID |
 
 #### `search_sessions`
+
 Semantic search across session data using natural language queries.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `query` | `string` | — | **Required.** Natural language search query |
-| `userId` | `string (uuid)` | — | Filter to a specific user's sessions |
-| `topK` | `integer` | `10` | Number of results (max 50) |
+| Parameter | Type            | Default | Description                                 |
+| --------- | --------------- | ------- | ------------------------------------------- |
+| `query`   | `string`        | —       | **Required.** Natural language search query |
+| `userId`  | `string (uuid)` | —       | Filter to a specific user's sessions        |
+| `topK`    | `integer`       | `10`    | Number of results (max 50)                  |
 
 #### `get_day_summary`
+
 Get a summary of a user's work day assembled from session summaries.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `userId` | `string (uuid)` | — | **Required.** The user to summarize |
-| `date` | `string` | today | Date in `YYYY-MM-DD` format |
+| Parameter | Type            | Default | Description                         |
+| --------- | --------------- | ------- | ----------------------------------- |
+| `userId`  | `string (uuid)` | —       | **Required.** The user to summarize |
+| `date`    | `string`        | today   | Date in `YYYY-MM-DD` format         |
 
 ### Metrics
 
 #### `get_team_metrics`
+
 Organization-wide metrics: focus time, meeting load, app usage, category breakdown.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `period` | `enum` | `today` | `today`, `yesterday`, `week`, `month`, `all` |
+| Parameter | Type   | Default | Description                                  |
+| --------- | ------ | ------- | -------------------------------------------- |
+| `period`  | `enum` | `today` | `today`, `yesterday`, `week`, `month`, `all` |
 
 #### `get_team_activity`
+
 Per-user activity breakdown (work time, meeting time) for the last 30 days. No parameters.
 
 #### `get_user_activity`
+
 Detailed activity for a specific user over a time period.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `userId` | `string (uuid)` | — | **Required.** The user to query |
-| `period` | `enum` | `week` | `today`, `yesterday`, `week`, `month`, `all` |
+| Parameter | Type            | Default | Description                                  |
+| --------- | --------------- | ------- | -------------------------------------------- |
+| `userId`  | `string (uuid)` | —       | **Required.** The user to query              |
+| `period`  | `enum`          | `week`  | `today`, `yesterday`, `week`, `month`, `all` |
 
 ### Documents
 
 #### `search_documents`
+
 Search knowledge base documents by keyword, type, or status.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `search` | `string` | — | Search term for title and description |
-| `docType` | `string` | — | Filter by document type |
-| `status` | `string` | — | `draft`, `published`, `archived` |
-| `page` | `integer` | `1` | Page number |
-| `limit` | `integer` | `20` | Results per page (max 50) |
+| Parameter | Type      | Default | Description                           |
+| --------- | --------- | ------- | ------------------------------------- |
+| `search`  | `string`  | —       | Search term for title and description |
+| `docType` | `string`  | —       | Filter by document type               |
+| `status`  | `string`  | —       | `draft`, `published`, `archived`      |
+| `page`    | `integer` | `1`     | Page number                           |
+| `limit`   | `integer` | `20`    | Results per page (max 50)             |
 
 #### `get_document`
+
 Get full document content by ID.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter    | Type            | Description                   |
+| ------------ | --------------- | ----------------------------- |
 | `documentId` | `string (uuid)` | **Required.** The document ID |
 
 #### `create_document`
+
 Create a new knowledge base document.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `title` | `string` | **Required.** Document title |
-| `content` | `string` | **Required.** Document content (markdown) |
-| `docType` | `string` | Document type (e.g., `update`, `note`, `report`) |
-| `description` | `string` | Short description |
+| Parameter     | Type     | Description                                      |
+| ------------- | -------- | ------------------------------------------------ |
+| `title`       | `string` | **Required.** Document title                     |
+| `content`     | `string` | **Required.** Document content (markdown)        |
+| `docType`     | `string` | Document type (e.g., `update`, `note`, `report`) |
+| `description` | `string` | Short description                                |
 
 ### Integrations
 
 #### `list_slack_channels`
+
 List Slack channels the bot is a member of. No parameters.
 
 #### `send_slack_message`
+
 Send a message to a Slack channel.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter   | Type     | Description                    |
+| ----------- | -------- | ------------------------------ |
 | `channelId` | `string` | **Required.** Slack channel ID |
-| `text` | `string` | **Required.** Message text |
+| `text`      | `string` | **Required.** Message text     |
 
 ### Recaps
 
 #### `generate_recap`
+
 Generate an AI recap from one or more session IDs.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `sessionIds` | `string[] (uuid)` | — | **Required.** Session IDs to include |
-| `tone` | `enum` | `professional` | `professional`, `casual`, `concise`, `detailed` |
-| `length` | `enum` | `standard` | `brief`, `standard`, `comprehensive` |
+| Parameter    | Type              | Default        | Description                                     |
+| ------------ | ----------------- | -------------- | ----------------------------------------------- |
+| `sessionIds` | `string[] (uuid)` | —              | **Required.** Session IDs to include            |
+| `tone`       | `enum`            | `professional` | `professional`, `casual`, `concise`, `detailed` |
+| `length`     | `enum`            | `standard`     | `brief`, `standard`, `comprehensive`            |
 
 #### `list_recaps`
+
 List previously generated recaps.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `userId` | `string (uuid)` | — | Filter to a specific user |
-| `limit` | `integer` | `20` | Results (max 50) |
+| Parameter | Type            | Default | Description               |
+| --------- | --------------- | ------- | ------------------------- |
+| `userId`  | `string (uuid)` | —       | Filter to a specific user |
+| `limit`   | `integer`       | `20`    | Results (max 50)          |
 
 ## Resources Reference
 
-| URI | Description |
-|-----|-------------|
-| `mitable://organization` | Organization name, domain, and settings |
-| `mitable://organization/subscription` | Subscription tier, status, usage, and limits |
+| URI                                   | Description                                        |
+| ------------------------------------- | -------------------------------------------------- |
+| `mitable://organization`              | Organization name, domain, and settings            |
+| `mitable://organization/subscription` | Subscription tier, status, usage, and limits       |
 | `mitable://organization/integrations` | Connected providers, statuses, and last sync times |
-| `mitable://organization/team` | Team roster: IDs, names, emails, roles, statuses |
+| `mitable://organization/team`         | Team roster: IDs, names, emails, roles, statuses   |
 
 ## Example Prompts
 
