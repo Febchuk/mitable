@@ -90,6 +90,26 @@ export const apiKeyService = {
   },
 
   /**
+   * List keys created by a specific user within an org.
+   */
+  async listKeysForUser(organizationId: string, userId: string) {
+    return db
+      .select({
+        id: apiKeys.id,
+        name: apiKeys.name,
+        keyPrefix: apiKeys.keyPrefix,
+        scopes: apiKeys.scopes,
+        lastUsedAt: apiKeys.lastUsedAt,
+        expiresAt: apiKeys.expiresAt,
+        revokedAt: apiKeys.revokedAt,
+        createdAt: apiKeys.createdAt,
+      })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.organizationId, organizationId), eq(apiKeys.createdBy, userId)))
+      .orderBy(apiKeys.createdAt);
+  },
+
+  /**
    * Soft-revoke a key.
    */
   async revokeKey(id: string, organizationId: string): Promise<boolean> {
@@ -97,6 +117,24 @@ export const apiKeyService = {
       .update(apiKeys)
       .set({ revokedAt: new Date() })
       .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, organizationId)));
+
+    return (result.rowCount ?? 0) > 0;
+  },
+
+  /**
+   * Soft-revoke a key only if it was created by the given user.
+   */
+  async revokeOwnKey(id: string, organizationId: string, userId: string): Promise<boolean> {
+    const result = await db
+      .update(apiKeys)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(apiKeys.id, id),
+          eq(apiKeys.organizationId, organizationId),
+          eq(apiKeys.createdBy, userId)
+        )
+      );
 
     return (result.rowCount ?? 0) > 0;
   },

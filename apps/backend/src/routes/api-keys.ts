@@ -7,28 +7,31 @@ import { apiKeyService } from "../services/api-key.service.js";
 
 const router = Router();
 
-// All routes require admin auth
+// All routes require authentication (but not admin)
 router.use(requireAuth);
 
-async function verifyAdmin(req: any, res: any): Promise<{ organizationId: string } | null> {
+async function getUserContext(
+  req: any,
+  res: any
+): Promise<{ organizationId: string; userId: string; isAdmin: boolean } | null> {
   const [user] = await db
     .select({ organizationId: users.organizationId, role: users.role })
     .from(users)
     .where(eq(users.id, req.userId!))
     .limit(1);
 
-  if (!user || user.role !== "admin") {
-    res.status(403).json({ error: "Admin access required" });
+  if (!user) {
+    res.status(403).json({ error: "User not found" });
     return null;
   }
-  return { organizationId: user.organizationId };
+  return { organizationId: user.organizationId, userId: req.userId!, isAdmin: user.role === "admin" };
 }
 
 /** POST /api/api-keys — Create a new API key (returns full key once) */
 router.post("/", async (req, res) => {
   try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+    const ctx = await getUserContext(req, res);
+    if (!ctx) return;
 
     const { name } = req.body;
     if (!name || typeof name !== "string") {
@@ -36,7 +39,7 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const result = await apiKeyService.createKey(admin.organizationId, req.userId!, name);
+    const result = await apiKeyService.createKey(ctx.organizationId, ctx.userId, name);
     res.status(201).json(result);
   } catch (error) {
     console.error("Error creating API key:", error);
@@ -44,13 +47,15 @@ router.post("/", async (req, res) => {
   }
 });
 
-/** GET /api/api-keys — List all keys (prefix only) */
+/** GET /api/api-keys — List keys. Admins see all org keys; non-admins see only their own. */
 router.get("/", async (req, res) => {
   try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+    const ctx = await getUserContext(req, res);
+    if (!ctx) return;
 
-    const keys = await apiKeyService.listKeys(admin.organizationId);
+    const keys = ctx.isAdmin
+      ? await apiKeyService.listKeys(ctx.organizationId)
+      : await apiKeyService.listKeysForUser(ctx.organizationId, ctx.userId);
     res.json({ keys });
   } catch (error) {
     console.error("Error listing API keys:", error);
@@ -58,13 +63,16 @@ router.get("/", async (req, res) => {
   }
 });
 
-/** DELETE /api/api-keys/:id — Revoke a key */
+/** DELETE /api/api-keys/:id — Revoke a key. Admins can revoke any org key; non-admins only their own. */
 router.delete("/:id", async (req, res) => {
   try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+    const ctx = await getUserContext(req, res);
+    if (!ctx) return;
 
-    const revoked = await apiKeyService.revokeKey(req.params.id, admin.organizationId);
+    const revoked = ctx.isAdmin
+      ? await apiKeyService.revokeKey(req.params.id, ctx.organizationId)
+      : await apiKeyService.revokeOwnKey(req.params.id, ctx.organizationId, ctx.userId);
+
     if (!revoked) {
       res.status(404).json({ error: "API key not found" });
       return;
