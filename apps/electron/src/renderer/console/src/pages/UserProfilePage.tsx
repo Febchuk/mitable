@@ -1935,7 +1935,7 @@ export default function UserProfilePage() {
                                 placeholder="Search apps..."
                                 value={appSearchQuery}
                                 onChange={(e) => setAppSearchQuery(e.target.value)}
-                                className="w-full pl-8 pr-3 py-2 text-sm bg-background-secondary border border-border-subtle rounded-lg text-white placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
+                                className="w-full pl-8 pr-3 py-2 text-sm bg-background-secondary border border-border-subtle rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
                               />
                               {appSearchQuery && (
                                 <button
@@ -1980,7 +1980,7 @@ export default function UserProfilePage() {
                                       className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
                                     >
                                       <Plus size={14} className="text-text-tertiary" />
-                                      <span className="text-sm text-white flex-1">
+                                      <span className="text-sm text-text-primary flex-1">
                                         {displayName}
                                       </span>
                                       {isInstalledOnly && (
