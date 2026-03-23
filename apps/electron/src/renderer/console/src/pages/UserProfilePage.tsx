@@ -1829,12 +1829,187 @@ export default function UserProfilePage() {
           {activeTab === "security" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                {/* Block List Section */}
                 <div
                   style={{
-                    paddingBottom: 16,
+                    paddingBottom: 24,
                     borderBottom: "var(--border-hairline)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
                   }}
                 >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Shield size={16} style={{ color: "var(--text-tertiary)" }} />
+                    <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                      Blocked Apps
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
+                    Apps in this list will never be tracked or captured.
+                  </p>
+
+                  {isBlockListLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Currently Blocked Apps */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-text-primary">
+                          Blocked Apps
+                        </Label>
+                        {blockedApps.length === 0 ? (
+                          <p className="text-xs text-text-tertiary italic">
+                            No apps are currently blocked
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {blockedApps.map((appName) => {
+                              const detectedApp = detectedApps.find(
+                                (a) => a.normalizedName === appName.toLowerCase()
+                              );
+                              const displayName = cleanAppName(
+                                detectedApp?.originalName || appName
+                              );
+                              return (
+                                <div
+                                  key={appName}
+                                  className="flex items-center gap-1.5 bg-muted border border-border rounded-full pl-3 pr-2 py-1"
+                                >
+                                  <span className="text-xs text-foreground">{displayName}</span>
+                                  <button
+                                    onClick={() => handleRemoveBlockedApp(appName)}
+                                    className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-accent transition-colors"
+                                    aria-label={`Unblock ${displayName}`}
+                                  >
+                                    <X size={10} className="text-muted-foreground" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Available Apps to Block */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium text-text-primary">
+                            Add App to Block List
+                          </Label>
+                          <ShadcnButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRefreshAppList}
+                            disabled={isRefreshingApps}
+                            className="h-7 px-2 text-xs text-text-tertiary hover:text-text-primary"
+                          >
+                            {isRefreshingApps ? (
+                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                            ) : (
+                              <RefreshCw className="w-3 h-3 mr-1" />
+                            )}
+                            Refresh
+                          </ShadcnButton>
+                        </div>
+                        {isRefreshingApps && detectedApps.length === 0 ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="w-5 h-5 animate-spin text-text-tertiary mr-2" />
+                            <span className="text-xs text-text-tertiary">
+                              Scanning installed apps...
+                            </span>
+                          </div>
+                        ) : detectedApps.length === 0 ? (
+                          <p className="text-xs text-text-tertiary italic">
+                            No apps found. Click Refresh to scan for installed apps on your system.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {/* Search input */}
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                              <input
+                                type="text"
+                                placeholder="Search apps..."
+                                value={appSearchQuery}
+                                onChange={(e) => setAppSearchQuery(e.target.value)}
+                                className="w-full pl-8 pr-3 py-2 text-sm bg-background-secondary border border-border-subtle rounded-lg text-white placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
+                              />
+                              {appSearchQuery && (
+                                <button
+                                  onClick={() => setAppSearchQuery("")}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary hover:text-text-primary"
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
+                            </div>
+                            {/* App list */}
+                            <div className="max-h-48 overflow-y-auto border border-border-subtle rounded-lg">
+                              {(() => {
+                                const filteredApps = detectedApps
+                                  .filter((app) => !blockedApps.includes(app.normalizedName))
+                                  .filter((app) => {
+                                    if (!appSearchQuery.trim()) return true;
+                                    const query = appSearchQuery.toLowerCase();
+                                    return (
+                                      app.originalName.toLowerCase().includes(query) ||
+                                      app.normalizedName.includes(query)
+                                    );
+                                  });
+
+                                if (filteredApps.length === 0) {
+                                  return (
+                                    <div className="px-3 py-2 text-xs text-text-tertiary italic">
+                                      {appSearchQuery
+                                        ? "No apps match your search"
+                                        : "All apps are already blocked"}
+                                    </div>
+                                  );
+                                }
+
+                                return filteredApps.map((app) => {
+                                  const displayName = cleanAppName(app.originalName);
+                                  const isInstalledOnly = app.source === "installed";
+                                  return (
+                                    <button
+                                      key={app.normalizedName}
+                                      onClick={() => handleAddBlockedApp(app.normalizedName)}
+                                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
+                                    >
+                                      <Plus size={14} className="text-text-tertiary" />
+                                      <span className="text-sm text-white flex-1">
+                                        {displayName}
+                                      </span>
+                                      {isInstalledOnly && (
+                                        <span className="text-[10px] text-text-tertiary bg-background-secondary px-1.5 py-0.5 rounded">
+                                          not opened
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                });
+                              })()}
+                            </div>
+                            {/* App count */}
+                            <p className="text-[10px] text-text-tertiary">
+                              {
+                                detectedApps.filter(
+                                  (app) => !blockedApps.includes(app.normalizedName)
+                                ).length
+                              }{" "}
+                              apps available
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div>
                   <h2
                     style={{
                       fontSize: 16,
@@ -2136,193 +2311,6 @@ export default function UserProfilePage() {
                     </button>
                   </div>
                 </form>
-
-                {/* Block List Section */}
-                <div
-                  style={{
-                    paddingTop: 24,
-                    borderTop: "var(--border-hairline)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Shield size={16} style={{ color: "var(--text-tertiary)" }} />
-                    <h3
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 500,
-                        color: "var(--text-primary)",
-                        margin: 0,
-                      }}
-                    >
-                      Blocked Apps
-                    </h3>
-                  </div>
-                  <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
-                    Apps in this list will never be tracked or captured.
-                  </p>
-
-                  {isBlockListLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                    </div>
-                  ) : (
-                    <>
-                      {/* Currently Blocked Apps */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium text-text-primary">
-                          Blocked Apps
-                        </Label>
-                        {blockedApps.length === 0 ? (
-                          <p className="text-xs text-text-tertiary italic">
-                            No apps are currently blocked
-                          </p>
-                        ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {blockedApps.map((appName) => {
-                              const detectedApp = detectedApps.find(
-                                (a) => a.normalizedName === appName.toLowerCase()
-                              );
-                              const displayName = cleanAppName(
-                                detectedApp?.originalName || appName
-                              );
-                              return (
-                                <div
-                                  key={appName}
-                                  className="flex items-center gap-1.5 bg-destructive/20 border border-destructive/30 rounded-full pl-3 pr-2 py-1"
-                                >
-                                  <span className="text-xs text-white">{displayName}</span>
-                                  <button
-                                    onClick={() => handleRemoveBlockedApp(appName)}
-                                    className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-destructive/30 transition-colors"
-                                    aria-label={`Unblock ${displayName}`}
-                                  >
-                                    <X size={10} className="text-white/70" />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Available Apps to Block */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-medium text-text-primary">
-                            Add App to Block List
-                          </Label>
-                          <ShadcnButton
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleRefreshAppList}
-                            disabled={isRefreshingApps}
-                            className="h-7 px-2 text-xs text-text-tertiary hover:text-text-primary"
-                          >
-                            {isRefreshingApps ? (
-                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                            ) : (
-                              <RefreshCw className="w-3 h-3 mr-1" />
-                            )}
-                            Refresh
-                          </ShadcnButton>
-                        </div>
-                        {isRefreshingApps && detectedApps.length === 0 ? (
-                          <div className="flex items-center justify-center py-4">
-                            <Loader2 className="w-5 h-5 animate-spin text-text-tertiary mr-2" />
-                            <span className="text-xs text-text-tertiary">
-                              Scanning installed apps...
-                            </span>
-                          </div>
-                        ) : detectedApps.length === 0 ? (
-                          <p className="text-xs text-text-tertiary italic">
-                            No apps found. Click Refresh to scan for installed apps on your system.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {/* Search input */}
-                            <div className="relative">
-                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-                              <input
-                                type="text"
-                                placeholder="Search apps..."
-                                value={appSearchQuery}
-                                onChange={(e) => setAppSearchQuery(e.target.value)}
-                                className="w-full pl-8 pr-3 py-2 text-sm bg-background-secondary border border-border-subtle rounded-lg text-white placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
-                              />
-                              {appSearchQuery && (
-                                <button
-                                  onClick={() => setAppSearchQuery("")}
-                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary hover:text-text-primary"
-                                >
-                                  <X size={14} />
-                                </button>
-                              )}
-                            </div>
-                            {/* App list */}
-                            <div className="max-h-48 overflow-y-auto border border-border-subtle rounded-lg">
-                              {(() => {
-                                const filteredApps = detectedApps
-                                  .filter((app) => !blockedApps.includes(app.normalizedName))
-                                  .filter((app) => {
-                                    if (!appSearchQuery.trim()) return true;
-                                    const query = appSearchQuery.toLowerCase();
-                                    return (
-                                      app.originalName.toLowerCase().includes(query) ||
-                                      app.normalizedName.includes(query)
-                                    );
-                                  });
-
-                                if (filteredApps.length === 0) {
-                                  return (
-                                    <div className="px-3 py-2 text-xs text-text-tertiary italic">
-                                      {appSearchQuery
-                                        ? "No apps match your search"
-                                        : "All apps are already blocked"}
-                                    </div>
-                                  );
-                                }
-
-                                return filteredApps.map((app) => {
-                                  const displayName = cleanAppName(app.originalName);
-                                  const isInstalledOnly = app.source === "installed";
-                                  return (
-                                    <button
-                                      key={app.normalizedName}
-                                      onClick={() => handleAddBlockedApp(app.normalizedName)}
-                                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
-                                    >
-                                      <Plus size={14} className="text-text-tertiary" />
-                                      <span className="text-sm text-white flex-1">
-                                        {displayName}
-                                      </span>
-                                      {isInstalledOnly && (
-                                        <span className="text-[10px] text-text-tertiary bg-background-secondary px-1.5 py-0.5 rounded">
-                                          not opened
-                                        </span>
-                                      )}
-                                    </button>
-                                  );
-                                });
-                              })()}
-                            </div>
-                            {/* App count */}
-                            <p className="text-[10px] text-text-tertiary">
-                              {
-                                detectedApps.filter(
-                                  (app) => !blockedApps.includes(app.normalizedName)
-                                ).length
-                              }{" "}
-                              apps available
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
               </div>
             </div>
           )}

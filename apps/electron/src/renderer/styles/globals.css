@@ -130,11 +130,11 @@
   }
 
   .light {
-    /* backgrounds — bright content, warm sidebar/hover */
-    --bg-base: #F8F5F0;
-    --bg-raised: #FDFCFA;
-    --bg-overlay: #FDFCFA;
-    --bg-muted: #F3EEE6;
+    /* backgrounds — warm cream hierarchy, no pure whites */
+    --bg-base: #F5F1ED;
+    --bg-raised: #FAF8F6;
+    --bg-overlay: #FDFCFB;
+    --bg-muted: #E8E2DC;
 
     /* text — dark navy, never pure black */
     --text-primary: #1C2B33;
@@ -169,9 +169,9 @@
     /* shadcn compatibility */
     --background: 36 30% 96%;
     --foreground: 200 29% 16%;
-    --card: 40 33% 99%;
+    --card: 30 25% 97%;
     --card-foreground: 200 29% 16%;
-    --popover: 40 33% 99%;
+    --popover: 30 17% 99%;
     --popover-foreground: 200 29% 16%;
     --primary: 190 54% 36%;
     --primary-foreground: 0 0% 100%;

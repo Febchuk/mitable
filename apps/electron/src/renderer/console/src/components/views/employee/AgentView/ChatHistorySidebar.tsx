@@ -273,7 +273,7 @@ export default function ChatHistorySidebar({
               </div>
             ))}
           </div>
-        ) : (
+        ) : searchQuery ? (
           <div
             style={{
               display: "flex",
@@ -284,12 +284,11 @@ export default function ChatHistorySidebar({
               textAlign: "center",
             }}
           >
-            <MessageSquare size={18} style={{ color: "var(--text-faint)", marginBottom: 8 }} />
             <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-              {searchQuery ? "No matching chats" : "No chats yet"}
+              No matching chats
             </span>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
