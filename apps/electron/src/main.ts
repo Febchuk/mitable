@@ -34,8 +34,8 @@ import { agentSdkService } from "./services/agentSdkService";
 import { skillsStore } from "./services/skillsStore";
 import { browserBridgeService } from "./services/browserBridgeService";
 
-// Force dark theme for consistent vibrancy effect regardless of system settings
-nativeTheme.themeSource = "dark";
+// Set theme from stored preference (defaults to "system" which follows OS)
+nativeTheme.themeSource = preferencesService.getTheme();
 
 // Register mitable:// protocol for Windows native notification action buttons
 if (process.platform === "win32") {
@@ -2232,6 +2232,7 @@ function setupMonitoringSessionHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.THEME_SET, (_, theme: "dark" | "light" | "system") => {
+    nativeTheme.themeSource = theme;
     preferencesService.setTheme(theme);
     const allWindows = BrowserWindow.getAllWindows();
     for (const win of allWindows) {
