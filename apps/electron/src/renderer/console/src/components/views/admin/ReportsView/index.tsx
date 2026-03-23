@@ -19,23 +19,6 @@ function formatTime(dateString: string): string {
   });
 }
 
-const REPORT_AVATAR_COLORS = [
-  "var(--mi-accent)",
-  "var(--status-success)",
-  "var(--status-warning)",
-  "var(--status-info)",
-  "var(--status-error)",
-  "var(--text-secondary)",
-];
-
-function getAvatarColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return REPORT_AVATAR_COLORS[Math.abs(hash) % REPORT_AVATAR_COLORS.length];
-}
-
 function getReportInitial(title: string): string {
   return (title || "R").charAt(0).toUpperCase();
 }
@@ -180,7 +163,6 @@ export default function ReportsView() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {group.items.map((report) => {
-                  const color = getAvatarColor(report.id);
                   const initial = getReportInitial(report.title);
                   const creatorName = report.creator
                     ? `${report.creator.firstName} ${report.creator.lastName}`.trim()
@@ -211,14 +193,14 @@ export default function ReportsView() {
                           width: 32,
                           height: 32,
                           borderRadius: 7,
-                          background: `${color}20`,
+                          background: "rgba(var(--ui-rgb), 0.06)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
                           fontSize: 13,
                           fontWeight: 600,
-                          color,
+                          color: "var(--text-tertiary)",
                         }}
                       >
                         {initial}

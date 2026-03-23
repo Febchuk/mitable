@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Search, MessageSquare, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { groupByDay } from "@/console/src/components/shared/groupByDay";
 import type { AgentConversationSummary } from "../../../../services/agentChatService";
 
@@ -273,7 +273,7 @@ export default function ChatHistorySidebar({
               </div>
             ))}
           </div>
-        ) : (
+        ) : searchQuery ? (
           <div
             style={{
               display: "flex",
@@ -284,12 +284,9 @@ export default function ChatHistorySidebar({
               textAlign: "center",
             }}
           >
-            <MessageSquare size={18} style={{ color: "var(--text-faint)", marginBottom: 8 }} />
-            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-              {searchQuery ? "No matching chats" : "No chats yet"}
-            </span>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>No matching chats</span>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

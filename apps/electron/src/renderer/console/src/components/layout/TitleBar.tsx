@@ -1,16 +1,12 @@
-import { PanelLeft, Sun, Moon } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { useSidebar } from "../../context/SidebarContext";
-import { useTheme } from "../../hooks/useTheme";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 
 export default function TitleBar() {
   const { open, toggle } = useSidebar();
-  const { resolved, setTheme } = useTheme();
 
   const paddingLeft = isMac && !open ? 80 : 16;
-
-  const toggleTheme = () => setTheme(resolved === "dark" ? "light" : "dark");
 
   const iconButtonStyle: React.CSSProperties = {
     width: 30,
@@ -52,21 +48,6 @@ export default function TitleBar() {
         onMouseLeave={(e) => handleHover(e, false)}
       >
         <PanelLeft size={16} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-      </button>
-
-      <button
-        onClick={toggleTheme}
-        className="app-no-drag"
-        style={iconButtonStyle}
-        onMouseEnter={(e) => handleHover(e, true)}
-        onMouseLeave={(e) => handleHover(e, false)}
-        title={resolved === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      >
-        {resolved === "dark" ? (
-          <Sun size={16} strokeWidth={1.5} />
-        ) : (
-          <Moon size={16} strokeWidth={1.5} />
-        )}
       </button>
     </div>
   );

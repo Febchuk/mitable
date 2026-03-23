@@ -10,33 +10,7 @@ import { Loader2, AlertCircle, Plus, Trash2, Check, Clock } from "lucide-react";
 import { useArtifacts } from "../../../../hooks/queries/artifacts";
 import { useUploadArtifact } from "../../../../hooks/queries/artifacts";
 import { useDeleteArtifact } from "../../../../hooks/queries/artifacts";
-import type { Artifact } from "../../../../services/artifactsService";
-
-function groupArtifactsByDate(artifacts: Artifact[]) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const weekAgo = new Date(today.getTime() - 7 * 86400000);
-
-  const groups: { label: string; artifacts: Artifact[] }[] = [
-    { label: "Today", artifacts: [] },
-    { label: "Yesterday", artifacts: [] },
-    { label: "This week", artifacts: [] },
-    { label: "Earlier", artifacts: [] },
-  ];
-
-  artifacts.forEach((a) => {
-    const d = new Date(a.createdAt);
-    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
-    if (day.getTime() >= today.getTime()) groups[0].artifacts.push(a);
-    else if (day.getTime() >= yesterday.getTime()) groups[1].artifacts.push(a);
-    else if (day.getTime() >= weekAgo.getTime()) groups[2].artifacts.push(a);
-    else groups[3].artifacts.push(a);
-  });
-
-  return groups.filter((g) => g.artifacts.length > 0);
-}
+import { groupByDay } from "@/console/src/components/shared/groupByDay";
 
 function formatTime(dateString: string): string {
   return new Date(dateString).toLocaleTimeString("en-US", {
@@ -47,26 +21,26 @@ function formatTime(dateString: string): string {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  completed: { label: "Ready", color: "var(--status-success)" },
-  processing: { label: "Processing", color: "var(--status-warning)" },
+  completed: { label: "Ready", color: "var(--text-tertiary)" },
+  processing: { label: "Processing", color: "var(--text-tertiary)" },
   pending: { label: "Pending", color: "var(--text-tertiary)" },
-  failed: { label: "Failed", color: "var(--status-error)" },
+  failed: { label: "Failed", color: "var(--text-tertiary)" },
   skipped: { label: "Skipped", color: "var(--text-tertiary)" },
 };
 
 const EXT_COLORS: Record<string, string> = {
-  pdf: "var(--status-error)",
-  doc: "var(--status-info)",
-  docx: "var(--status-info)",
-  txt: "var(--text-secondary)",
-  md: "var(--text-secondary)",
-  csv: "var(--status-success)",
-  json: "var(--status-warning)",
+  pdf: "var(--text-tertiary)",
+  doc: "var(--text-tertiary)",
+  docx: "var(--text-tertiary)",
+  txt: "var(--text-tertiary)",
+  md: "var(--text-tertiary)",
+  csv: "var(--text-tertiary)",
+  json: "var(--text-tertiary)",
 };
 
 function getExtColor(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
-  return EXT_COLORS[ext] || "var(--mi-accent)";
+  return EXT_COLORS[ext] || "var(--text-tertiary)";
 }
 
 function getExtLabel(filename: string): string {
@@ -89,7 +63,10 @@ export default function UploadsView() {
     );
   }, [artifacts]);
 
-  const groupedArtifacts = useMemo(() => groupArtifactsByDate(sortedArtifacts), [sortedArtifacts]);
+  const groupedArtifacts = useMemo(
+    () => groupByDay(sortedArtifacts, (a) => a.createdAt),
+    [sortedArtifacts]
+  );
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -261,7 +238,7 @@ export default function UploadsView() {
 
               {/* Artifact rows */}
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {group.artifacts.map((artifact) => {
+                {group.items.map((artifact) => {
                   const color = getExtColor(artifact.filename);
                   const ext = getExtLabel(artifact.filename);
                   const status = STATUS_LABELS[artifact.extractionStatus] || STATUS_LABELS.pending;
@@ -390,7 +367,7 @@ export default function UploadsView() {
                         onMouseEnter={(e) => {
                           if (!isDeleting) {
                             e.currentTarget.style.opacity = "1";
-                            e.currentTarget.style.color = "var(--status-error)";
+                            e.currentTarget.style.color = "var(--text-secondary)";
                           }
                         }}
                         onMouseLeave={(e) => {

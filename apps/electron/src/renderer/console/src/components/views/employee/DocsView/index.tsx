@@ -30,23 +30,6 @@ function getDocInitial(doc: Document): string {
   return (doc.title || "U").charAt(0).toUpperCase();
 }
 
-const DOC_AVATAR_COLORS = [
-  "var(--mi-accent)",
-  "var(--status-success)",
-  "var(--status-warning)",
-  "var(--status-info)",
-  "var(--status-error)",
-  "var(--text-secondary)",
-];
-
-function getAvatarColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return DOC_AVATAR_COLORS[Math.abs(hash) % DOC_AVATAR_COLORS.length];
-}
-
 export default function DocsView() {
   const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -199,7 +182,6 @@ export default function DocsView() {
               {/* Document rows */}
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {group.items.map((doc) => {
-                  const color = getAvatarColor(doc.id);
                   const initial = getDocInitial(doc);
                   const creatorName = doc.creator
                     ? `${doc.creator.firstName} ${doc.creator.lastName}`.trim()
@@ -231,14 +213,14 @@ export default function DocsView() {
                           width: 32,
                           height: 32,
                           borderRadius: 7,
-                          background: `${color}20`,
+                          background: "rgba(var(--ui-rgb), 0.06)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
                           fontSize: 13,
                           fontWeight: 600,
-                          color: color,
+                          color: "var(--text-tertiary)",
                         }}
                       >
                         {initial}
