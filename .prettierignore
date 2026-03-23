@@ -7,4 +7,3 @@ out
 package-lock.json
 coverage
 .turbo
-apps/website
