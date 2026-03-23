@@ -66,6 +66,9 @@ const IPC_CHANNELS = {
   AGENT_ENABLED_SET: "agent-enabled-set",
   PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
   PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
+  THEME_GET: "theme-get",
+  THEME_SET: "theme-set",
+  THEME_CHANGED: "theme-changed",
   // Summary preferences
   SUMMARY_PREFERENCES_GET: "summary-preferences-get",
   SUMMARY_PREFERENCES_SET: "summary-preferences-set",
@@ -492,6 +495,19 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     mode: "compact" | "expanded"
   ): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.PILL_DISPLAY_MODE_SET, userId, mode),
+
+  // Theme / appearance API
+  getTheme: (): Promise<"dark" | "light" | "system"> => ipcRenderer.invoke(IPC_CHANNELS.THEME_GET),
+
+  setTheme: (theme: "dark" | "light" | "system"): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.THEME_SET, theme),
+
+  onThemeChanged: (callback: (theme: "dark" | "light" | "system") => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, theme: "dark" | "light" | "system") =>
+      callback(theme);
+    ipcRenderer.on(IPC_CHANNELS.THEME_CHANGED, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.THEME_CHANGED, handler);
+  },
 
   // Summary preferences API
   getSummaryPreferences: (): Promise<{

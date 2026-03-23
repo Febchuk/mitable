@@ -12,7 +12,7 @@ interface UserActivityMeta {
 const RECENT_BRIGHT = "#2F7D5A";
 const RECENT_MEDIUM = "#54705F";
 const RECENT_DARK = "#435147";
-const RECENT_DIM = "#6B665C";
+const RECENT_DIM = "var(--text-tertiary)";
 
 function deriveActivityFromDashboard(person: DashboardPerson): UserActivityMeta {
   if (!person.lastActiveAt) {
@@ -68,12 +68,12 @@ function PersonRow({
         alignItems: "center",
         gap: 14,
         padding: "14px 0",
-        borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+        borderBottom: "var(--border-hairline)",
         cursor: "pointer",
         transition: "background 0.15s ease",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(236, 232, 224, 0.02)";
+        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
@@ -84,13 +84,13 @@ function PersonRow({
           width: 32,
           height: 32,
           borderRadius: "50%",
-          background: "rgba(236, 232, 224, 0.1)",
+          background: "rgba(var(--ui-rgb), 0.1)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: 12,
           fontWeight: 500,
-          color: "#ECE8E0",
+          color: "var(--text-primary)",
           flexShrink: 0,
         }}
       >
@@ -102,7 +102,7 @@ function PersonRow({
           style={{
             fontSize: 13,
             fontWeight: 500,
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             lineHeight: 1.2,
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -114,7 +114,7 @@ function PersonRow({
         <div
           style={{
             fontSize: 11,
-            color: "#6B665C",
+            color: "var(--text-tertiary)",
             marginTop: 5,
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -133,7 +133,7 @@ function PersonRow({
             justifyContent: "flex-end",
             gap: 5,
             fontSize: 12,
-            color: "#9B9689",
+            color: "var(--text-secondary)",
             lineHeight: 1.2,
           }}
         >
@@ -144,7 +144,7 @@ function PersonRow({
         </div>
       </div>
 
-      <ChevronRight size={15} style={{ color: "#6B665C", flexShrink: 0 }} />
+      <ChevronRight size={15} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
     </div>
   );
 }
@@ -208,7 +208,7 @@ export default function PeopleView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 26,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 400,
               letterSpacing: "-0.3px",
               margin: 0,
@@ -219,7 +219,7 @@ export default function PeopleView() {
           <div
             style={{
               fontSize: 12,
-              color: "#9B9689",
+              color: "var(--text-secondary)",
               marginTop: 8,
             }}
           >
@@ -238,7 +238,7 @@ export default function PeopleView() {
                 left: 12,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: "#6B665C",
+                color: "var(--text-tertiary)",
                 pointerEvents: "none",
               }}
             />
@@ -251,9 +251,9 @@ export default function PeopleView() {
                 height: 34,
                 padding: "0 12px 0 36px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(236, 232, 224, 0.08)",
-                background: "#211F1B",
-                color: "#ECE8E0",
+                border: "var(--border-subtle)",
+                background: "var(--bg-raised)",
+                color: "var(--text-primary)",
                 fontSize: 13,
                 outline: "none",
               }}
@@ -269,9 +269,9 @@ export default function PeopleView() {
               gap: 8,
               padding: "0 12px",
               borderRadius: 8,
-              border: "0.5px solid rgba(236, 232, 224, 0.08)",
-              background: "#2A2824",
-              color: "#ECE8E0",
+              border: "var(--border-subtle)",
+              background: "var(--bg-overlay)",
+              color: "var(--text-primary)",
               fontSize: 13,
               cursor: "pointer",
               flexShrink: 0,
@@ -283,7 +283,7 @@ export default function PeopleView() {
         </div>
       </div>
 
-      <div style={{ borderTop: "0.5px solid rgba(236, 232, 224, 0.06)" }}>
+      <div style={{ borderTop: "var(--border-hairline)" }}>
         {loading ? (
           <div style={{ padding: "64px 0", textAlign: "center" }}>
             <div
@@ -293,19 +293,26 @@ export default function PeopleView() {
                 height: 24,
                 margin: "0 auto 12px",
                 borderRadius: "50%",
-                border: "2px solid rgba(58, 155, 107, 0.2)",
+                border: "2px solid rgba(var(--status-success-rgb), 0.2)",
                 borderTopColor: RECENT_BRIGHT,
               }}
             />
-            <div style={{ fontSize: 13, color: "#9B9689" }}>Loading people...</div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading people...</div>
           </div>
         ) : error ? (
-          <div style={{ padding: "64px 0", textAlign: "center", fontSize: 13, color: "#E87474" }}>
+          <div
+            style={{
+              padding: "64px 0",
+              textAlign: "center",
+              fontSize: 13,
+              color: "var(--status-error)",
+            }}
+          >
             Error: {error.message}
           </div>
         ) : filteredUsers.length === 0 ? (
           <div style={{ padding: "64px 0", textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "#9B9689" }}>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
               {searchQuery ? `No people found matching "${searchQuery}"` : "No users found"}
             </div>
           </div>

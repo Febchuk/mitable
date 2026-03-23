@@ -284,7 +284,7 @@ export default function CustomerDetailView() {
                 className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-canvas-overlay/50 transition-colors"
               >
                 {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-[rgba(236,232,224,0.1)] flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-full bg-[rgba(var(--ui-rgb),0.1)] flex items-center justify-center shrink-0">
                   {member.avatarUrl ? (
                     <img
                       src={member.avatarUrl}
@@ -292,7 +292,7 @@ export default function CustomerDetailView() {
                       className="w-9 h-9 rounded-full object-cover"
                     />
                   ) : (
-                    <span className="text-xs font-semibold text-[#ECE8E0]">
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
                       {getInitial(member.name || member.email || "?")}
                     </span>
                   )}

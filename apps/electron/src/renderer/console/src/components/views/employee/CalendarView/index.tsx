@@ -338,7 +338,7 @@ export default function CalendarView() {
           position: "sticky",
           top: -20,
           zIndex: 10,
-          background: "#1A1916",
+          background: "var(--bg-base)",
           paddingTop: 20,
           paddingBottom: 20,
         }}
@@ -369,7 +369,7 @@ export default function CalendarView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 32,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 400,
               letterSpacing: "-0.4px",
               lineHeight: 1,
@@ -382,7 +382,7 @@ export default function CalendarView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 15,
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               fontWeight: 400,
               fontStyle: "italic",
               margin: "12px 0 0",
@@ -406,7 +406,7 @@ export default function CalendarView() {
                 gap: 5,
                 padding: "6px 10px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.2)",
+                border: "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.2)",
                 background: "transparent",
                 color: "var(--mi-accent)",
                 fontSize: 12,
@@ -419,13 +419,15 @@ export default function CalendarView() {
               }}
               onMouseEnter={(e) => {
                 if (!isSyncing) {
-                  e.currentTarget.style.background = "rgba(var(--mi-accent-rgb, 200,169,96), 0.06)";
-                  e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.3)";
+                  e.currentTarget.style.background =
+                    "rgba(var(--mi-accent-rgb, 130,192,204), 0.06)";
+                  e.currentTarget.style.borderColor =
+                    "rgba(var(--mi-accent-rgb, 130,192,204), 0.3)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 200,169,96), 0.2)";
+                e.currentTarget.style.borderColor = "rgba(var(--mi-accent-rgb, 130,192,204), 0.2)";
               }}
             >
               <RefreshCw
@@ -450,14 +452,14 @@ export default function CalendarView() {
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                color: "#9B9689",
+                color: "var(--text-secondary)",
                 transition: "color 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = "#ECE8E0";
+                e.currentTarget.style.color = "var(--text-primary)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = "#9B9689";
+                e.currentTarget.style.color = "var(--text-secondary)";
               }}
             >
               {sessionStatus === "active" ? (
@@ -478,9 +480,9 @@ export default function CalendarView() {
                 gap: 6,
                 padding: "6px 12px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(232, 116, 116, 0.25)",
-                background: "rgba(232, 116, 116, 0.06)",
-                color: "#E87474",
+                border: "0.5px solid rgba(var(--status-error-rgb), 0.25)",
+                background: "rgba(var(--status-error-rgb), 0.06)",
+                color: "var(--status-error)",
                 fontSize: 12,
                 fontFamily: "var(--font-sans)",
                 fontWeight: 500,
@@ -489,12 +491,12 @@ export default function CalendarView() {
                 transition: "all 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(232, 116, 116, 0.12)";
-                e.currentTarget.style.borderColor = "rgba(232, 116, 116, 0.35)";
+                e.currentTarget.style.background = "rgba(var(--status-error-rgb), 0.12)";
+                e.currentTarget.style.borderColor = "rgba(var(--status-error-rgb), 0.35)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(232, 116, 116, 0.06)";
-                e.currentTarget.style.borderColor = "rgba(232, 116, 116, 0.25)";
+                e.currentTarget.style.background = "rgba(var(--status-error-rgb), 0.06)";
+                e.currentTarget.style.borderColor = "rgba(var(--status-error-rgb), 0.25)";
               }}
             >
               <Square size={10} fill="currentColor" strokeWidth={0} />
@@ -510,9 +512,9 @@ export default function CalendarView() {
                 gap: 6,
                 padding: "6px 12px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(236, 232, 224, 0.12)",
+                border: "var(--border-subtle)",
                 background: "transparent",
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 fontSize: 12,
                 fontFamily: "var(--font-sans)",
                 fontWeight: 500,
@@ -523,13 +525,13 @@ export default function CalendarView() {
               }}
               onMouseEnter={(e) => {
                 if (!isStarting) {
-                  e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-                  e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.2)";
+                  e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+                  e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+                e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
               }}
             >
               {isStarting ? (
@@ -540,7 +542,7 @@ export default function CalendarView() {
                     width: 7,
                     height: 7,
                     borderRadius: "50%",
-                    background: "#E87474",
+                    background: "var(--status-error)",
                     flexShrink: 0,
                   }}
                 />
@@ -567,7 +569,7 @@ export default function CalendarView() {
               size={24}
               style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
             />
-            <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>
+            <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
               Loading activity data...
             </p>
           </div>
@@ -583,11 +585,18 @@ export default function CalendarView() {
               padding: "64px 0",
             }}
           >
-            <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
-            <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+            <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
+            <p
+              style={{
+                color: "var(--text-primary)",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 4,
+              }}
+            >
               Failed to load activity data
             </p>
-            <p style={{ color: "#6B665C", fontSize: 12 }}>
+            <p style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
               {error instanceof Error ? error.message : "An error occurred"}
             </p>
           </div>
@@ -612,7 +621,7 @@ export default function CalendarView() {
                     <div
                       style={{
                         fontSize: 10,
-                        color: "#6B665C",
+                        color: "var(--text-tertiary)",
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
                         marginBottom: 10,
@@ -634,7 +643,7 @@ export default function CalendarView() {
                 {/* Divider between meetings and activity */}
                 {meetingBlocks.length > 0 && workBlocks.length > 0 && (
                   <div style={{ margin: "12px 0 8px" }}>
-                    <div style={{ height: "0.5px", background: "rgba(236, 232, 224, 0.06)" }} />
+                    <div style={{ height: "0.5px", background: "var(--divider)" }} />
                   </div>
                 )}
 
@@ -644,7 +653,7 @@ export default function CalendarView() {
                     <div
                       style={{
                         fontSize: 10,
-                        color: "#6B665C",
+                        color: "var(--text-tertiary)",
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
                         marginBottom: 10,

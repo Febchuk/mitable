@@ -37,13 +37,13 @@ function Field({
         style={{
           fontSize: 12,
           fontWeight: 500,
-          color: "#6B665C",
+          color: "var(--text-tertiary)",
           textTransform: "uppercase",
           letterSpacing: "0.06em",
         }}
       >
         {label}
-        {required ? <span style={{ color: "#E87474" }}> *</span> : null}
+        {required ? <span style={{ color: "var(--status-error)" }}> *</span> : null}
       </label>
       <input
         type={type}
@@ -55,15 +55,17 @@ function Field({
           height: 40,
           padding: "0 12px",
           borderRadius: 8,
-          border: "0.5px solid rgba(236, 232, 224, 0.08)",
-          background: "#1A1916",
-          color: "#ECE8E0",
+          border: "var(--border-subtle)",
+          background: "var(--bg-base)",
+          color: "var(--text-primary)",
           fontSize: 13,
           outline: "none",
         }}
       />
       {helpText ? (
-        <p style={{ fontSize: 12, color: "#6B665C", margin: 0, lineHeight: 1.5 }}>{helpText}</p>
+        <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5 }}>
+          {helpText}
+        </p>
       ) : null}
     </div>
   );
@@ -94,9 +96,9 @@ function ToggleRow({
         padding: "14px 16px",
         borderRadius: 10,
         border: checked
-          ? "0.5px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.25)"
-          : "0.5px solid rgba(236, 232, 224, 0.08)",
-        background: checked ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.05)" : "#1A1916",
+          ? "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.25)"
+          : "var(--border-subtle)",
+        background: checked ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.05)" : "var(--bg-base)",
         cursor: "pointer",
         textAlign: "left",
       }}
@@ -107,12 +109,12 @@ function ToggleRow({
           height: 28,
           borderRadius: 8,
           background: checked
-            ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.14)"
-            : "rgba(236, 232, 224, 0.06)",
+            ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.14)"
+            : "rgba(var(--ui-rgb), 0.06)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: checked ? "var(--mi-accent)" : "#6B665C",
+          color: checked ? "var(--mi-accent)" : "var(--text-tertiary)",
           flexShrink: 0,
         }}
       >
@@ -120,8 +122,8 @@ function ToggleRow({
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: "#ECE8E0" }}>{title}</div>
-        <div style={{ fontSize: 12, color: "#6B665C", marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{title}</div>
+        <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4, lineHeight: 1.5 }}>
           {description}
         </div>
       </div>
@@ -131,8 +133,8 @@ function ToggleRow({
           width: 18,
           height: 18,
           borderRadius: 999,
-          border: checked ? "5px solid var(--mi-accent)" : "1px solid rgba(236, 232, 224, 0.18)",
-          background: checked ? "#1A1916" : "transparent",
+          border: checked ? "5px solid var(--mi-accent)" : "1px solid rgba(var(--ui-rgb), 0.18)",
+          background: checked ? "var(--bg-base)" : "transparent",
           marginTop: 4,
           flexShrink: 0,
         }}
@@ -258,14 +260,17 @@ export default function AddNewUser() {
                 padding: 14,
               }}
             >
-              <p style={{ fontSize: 13, color: "#9B9689", lineHeight: 1.5, margin: 0 }}>
-                <strong style={{ color: "#ECE8E0" }}>Important:</strong> Mitable does not save
-                passwords. Make sure to save this somewhere secure before closing this window.
+              <p
+                style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}
+              >
+                <strong style={{ color: "var(--text-primary)" }}>Important:</strong> Mitable does
+                not save passwords. Make sure to save this somewhere secure before closing this
+                window.
               </p>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "#6B665C" }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
                 Generated password
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -277,9 +282,9 @@ export default function AddNewUser() {
                     height: 40,
                     padding: "0 12px",
                     borderRadius: 8,
-                    border: "0.5px solid rgba(236, 232, 224, 0.08)",
-                    background: "#1A1916",
-                    color: "#ECE8E0",
+                    border: "var(--border-subtle)",
+                    background: "var(--bg-base)",
+                    color: "var(--text-primary)",
                     fontSize: 13,
                     fontFamily: "monospace",
                     outline: "none",
@@ -291,12 +296,12 @@ export default function AddNewUser() {
                     width: 40,
                     height: 40,
                     borderRadius: 8,
-                    border: "0.5px solid rgba(236, 232, 224, 0.08)",
-                    background: "#1A1916",
+                    border: "var(--border-subtle)",
+                    background: "var(--bg-base)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "#ECE8E0",
+                    color: "var(--text-primary)",
                     cursor: "pointer",
                     flexShrink: 0,
                   }}
@@ -319,9 +324,9 @@ export default function AddNewUser() {
                 height: 36,
                 padding: "0 14px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(236, 232, 224, 0.08)",
-                background: "#2A2824",
-                color: "#ECE8E0",
+                border: "var(--border-subtle)",
+                background: "var(--bg-overlay)",
+                color: "var(--text-primary)",
                 fontSize: 13,
                 cursor: "pointer",
               }}
@@ -344,7 +349,7 @@ export default function AddNewUser() {
               padding: 0,
               background: "none",
               border: "none",
-              color: "#9B9689",
+              color: "var(--text-secondary)",
               fontSize: 13,
               cursor: "pointer",
             }}
@@ -358,7 +363,7 @@ export default function AddNewUser() {
               style={{
                 fontFamily: "var(--font-serif)",
                 fontSize: 26,
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 fontWeight: 400,
                 letterSpacing: "-0.3px",
                 margin: 0,
@@ -366,7 +371,7 @@ export default function AddNewUser() {
             >
               Add user
             </h1>
-            <p style={{ fontSize: 13, color: "#6B665C", margin: "8px 0 0" }}>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0" }}>
               Invite a new teammate and configure their access before they sign in.
             </p>
           </div>
@@ -374,8 +379,8 @@ export default function AddNewUser() {
 
         <div
           style={{
-            background: "#211F1B",
-            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            background: "var(--bg-raised)",
+            border: "var(--border-hairline)",
             borderRadius: 12,
             padding: 24,
             display: "flex",
@@ -386,13 +391,13 @@ export default function AddNewUser() {
           <div
             style={{
               paddingBottom: 16,
-              borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+              borderBottom: "var(--border-hairline)",
             }}
           >
-            <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
               User details
             </h2>
-            <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
               Basic information for the new teammate.
             </p>
           </div>
@@ -437,8 +442,8 @@ export default function AddNewUser() {
 
         <div
           style={{
-            background: "#211F1B",
-            border: "0.5px solid rgba(236, 232, 224, 0.07)",
+            background: "var(--bg-raised)",
+            border: "var(--border-hairline)",
             borderRadius: 12,
             padding: 24,
             display: "flex",
@@ -449,13 +454,13 @@ export default function AddNewUser() {
           <div
             style={{
               paddingBottom: 16,
-              borderBottom: "0.5px solid rgba(236, 232, 224, 0.06)",
+              borderBottom: "var(--border-hairline)",
             }}
           >
-            <h2 style={{ fontSize: 16, fontWeight: 500, color: "#ECE8E0", margin: 0 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
               Access and onboarding
             </h2>
-            <p style={{ fontSize: 13, color: "#6B665C", margin: "6px 0 0" }}>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
               Choose how this user should be introduced to the workspace.
             </p>
           </div>
@@ -492,7 +497,7 @@ export default function AddNewUser() {
               alignItems: "center",
               gap: 8,
               fontSize: 12,
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
             }}
           >
             <UserPlus size={13} />A password will be generated automatically after creation.
@@ -506,9 +511,9 @@ export default function AddNewUser() {
                 height: 36,
                 padding: "0 14px",
                 borderRadius: 8,
-                border: "0.5px solid rgba(236, 232, 224, 0.08)",
+                border: "var(--border-subtle)",
                 background: "transparent",
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 fontSize: 13,
                 cursor: createUserMutation.isPending ? "default" : "pointer",
                 opacity: createUserMutation.isPending ? 0.6 : 1,
@@ -525,7 +530,7 @@ export default function AddNewUser() {
                 borderRadius: 8,
                 border: "0.5px solid var(--mi-accent-border)",
                 background: "var(--mi-accent-bg)",
-                color: "#ECE8E0",
+                color: "var(--text-primary)",
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: createUserMutation.isPending ? "default" : "pointer",

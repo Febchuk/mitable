@@ -47,26 +47,26 @@ function formatTime(dateString: string): string {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  completed: { label: "Ready", color: "#3A9B6B" },
-  processing: { label: "Processing", color: "#D4A27A" },
-  pending: { label: "Pending", color: "#6B665C" },
-  failed: { label: "Failed", color: "#E87474" },
-  skipped: { label: "Skipped", color: "#6B665C" },
+  completed: { label: "Ready", color: "var(--status-success)" },
+  processing: { label: "Processing", color: "var(--status-warning)" },
+  pending: { label: "Pending", color: "var(--text-tertiary)" },
+  failed: { label: "Failed", color: "var(--status-error)" },
+  skipped: { label: "Skipped", color: "var(--text-tertiary)" },
 };
 
 const EXT_COLORS: Record<string, string> = {
-  pdf: "#E87474",
-  doc: "#4A9FD9",
-  docx: "#4A9FD9",
-  txt: "#9B9689",
-  md: "#9B9689",
-  csv: "#3A9B6B",
-  json: "#D4A27A",
+  pdf: "var(--status-error)",
+  doc: "var(--status-info)",
+  docx: "var(--status-info)",
+  txt: "var(--text-secondary)",
+  md: "var(--text-secondary)",
+  csv: "var(--status-success)",
+  json: "var(--status-warning)",
 };
 
 function getExtColor(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
-  return EXT_COLORS[ext] || "#C8A960";
+  return EXT_COLORS[ext] || "var(--mi-accent)";
 }
 
 function getExtLabel(filename: string): string {
@@ -127,7 +127,9 @@ export default function UploadsView() {
           size={24}
           style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
         />
-        <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading uploads...</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
+          Loading uploads...
+        </p>
       </div>
     );
   }
@@ -143,8 +145,10 @@ export default function UploadsView() {
           padding: "80px 0",
         }}
       >
-        <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
-        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>Failed to load uploads</p>
+        <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
+        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>
+          Failed to load uploads
+        </p>
       </div>
     );
   }
@@ -165,7 +169,7 @@ export default function UploadsView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 32,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 400,
               letterSpacing: "-0.4px",
               lineHeight: 1,
@@ -178,7 +182,7 @@ export default function UploadsView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 15,
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               fontWeight: 400,
               fontStyle: "italic",
               margin: "12px 0 0",
@@ -198,9 +202,9 @@ export default function UploadsView() {
             gap: 6,
             padding: "6px 12px",
             borderRadius: 8,
-            border: "0.5px solid rgba(236, 232, 224, 0.12)",
+            border: "var(--border-subtle)",
             background: "transparent",
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             fontSize: 12,
             fontFamily: "var(--font-sans)",
             fontWeight: 500,
@@ -212,13 +216,13 @@ export default function UploadsView() {
           }}
           onMouseEnter={(e) => {
             if (!uploadMutation.isPending) {
-              e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-              e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.2)";
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+              e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
             }
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+            e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
           }}
         >
           {uploadMutation.isPending ? (
@@ -247,7 +251,7 @@ export default function UploadsView() {
               <div
                 style={{
                   fontSize: 12,
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   fontWeight: 500,
                   marginBottom: 8,
                 }}
@@ -276,7 +280,7 @@ export default function UploadsView() {
                         opacity: isDeleting ? 0.4 : 1,
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(236, 232, 224, 0.04)";
+                        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "transparent";
@@ -308,7 +312,7 @@ export default function UploadsView() {
                         <div
                           style={{
                             fontSize: 13,
-                            color: "#ECE8E0",
+                            color: "var(--text-primary)",
                             fontWeight: 500,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -320,7 +324,7 @@ export default function UploadsView() {
                         <div
                           style={{
                             fontSize: 12,
-                            color: "#6B665C",
+                            color: "var(--text-tertiary)",
                             marginTop: 1,
                           }}
                         >
@@ -356,7 +360,7 @@ export default function UploadsView() {
                       <span
                         style={{
                           fontSize: 12,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           flexShrink: 0,
                           fontVariantNumeric: "tabular-nums",
                         }}
@@ -378,7 +382,7 @@ export default function UploadsView() {
                           alignItems: "center",
                           justifyContent: "center",
                           cursor: isDeleting ? "default" : "pointer",
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           opacity: 0.5,
                           transition: "opacity 0.15s ease, color 0.15s ease",
                           flexShrink: 0,
@@ -386,12 +390,12 @@ export default function UploadsView() {
                         onMouseEnter={(e) => {
                           if (!isDeleting) {
                             e.currentTarget.style.opacity = "1";
-                            e.currentTarget.style.color = "#E87474";
+                            e.currentTarget.style.color = "var(--status-error)";
                           }
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.opacity = "0.5";
-                          e.currentTarget.style.color = "#6B665C";
+                          e.currentTarget.style.color = "var(--text-tertiary)";
                         }}
                       >
                         <Trash2 size={12} strokeWidth={1.5} />

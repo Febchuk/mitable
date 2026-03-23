@@ -27,7 +27,7 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-const BAR_COLOR = "#C8A960";
+const BAR_COLOR = "var(--mi-accent)";
 const GRANOLA_GREEN = "#C8E64A";
 const GRANOLA_BORDER = "rgba(200, 230, 74, 0.18)";
 const FIREFLIES_PINK = "#E84393";
@@ -124,7 +124,7 @@ function TaskRow({
   return (
     <div
       style={{
-        borderBottom: !isLast ? "0.5px solid rgba(236, 232, 224, 0.04)" : "none",
+        borderBottom: !isLast ? "var(--border-hairline)" : "none",
       }}
     >
       {/* Main row */}
@@ -141,7 +141,7 @@ function TaskRow({
         <ChevronRight
           size={12}
           style={{
-            color: expanded ? "var(--mi-accent)" : "#6B665C",
+            color: expanded ? "var(--mi-accent)" : "var(--text-tertiary)",
             flexShrink: 0,
             transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
             transition: "transform 0.15s ease",
@@ -151,7 +151,7 @@ function TaskRow({
         <span
           style={{
             fontSize: 13,
-            color: expanded ? "#ECE8E0" : "#9B9689",
+            color: expanded ? "var(--text-primary)" : "var(--text-secondary)",
             flex: 1,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -164,7 +164,7 @@ function TaskRow({
           <div
             style={{
               height: 3,
-              background: "rgba(236, 232, 224, 0.06)",
+              background: "rgba(var(--ui-rgb), 0.06)",
               borderRadius: 2,
               overflow: "hidden",
             }}
@@ -182,7 +182,7 @@ function TaskRow({
         <span
           style={{
             fontSize: 11,
-            color: "#6B665C",
+            color: "var(--text-tertiary)",
             textAlign: "right",
             width: 36,
             flexShrink: 0,
@@ -193,7 +193,7 @@ function TaskRow({
         <span
           style={{
             fontSize: 11,
-            color: "#6B665C",
+            color: "var(--text-tertiary)",
             textAlign: "right",
             width: 32,
             flexShrink: 0,
@@ -209,7 +209,7 @@ function TaskRow({
           style={{
             padding: "4px 0 10px 22px",
             fontSize: 12,
-            color: "#9B9689",
+            color: "var(--text-secondary)",
             lineHeight: 1.5,
           }}
         >
@@ -242,16 +242,16 @@ export default function ActivityBlock({
   }, [isMeeting, block.summary]);
 
   // Accent colors differ per source
-  const accentColor = isGranola ? GRANOLA_GREEN : isFireflies ? FIREFLIES_PINK : "#C8A960";
+  const accentColor = isGranola ? GRANOLA_GREEN : isFireflies ? FIREFLIES_PINK : "var(--mi-accent)";
   const meetingBorder = isGranola ? GRANOLA_BORDER : FIREFLIES_BORDER;
 
   const cardBorder = isActive
-    ? "rgba(58, 155, 107, 0.2)"
+    ? "rgba(var(--status-success-rgb), 0.2)"
     : isExpanded
       ? isMeeting
         ? meetingBorder
-        : "rgba(200, 169, 96, 0.18)"
-      : "rgba(236, 232, 224, 0.08)";
+        : "rgba(var(--mi-accent-rgb), 0.18)"
+      : "rgba(var(--ui-rgb), 0.08)";
 
   return (
     <div
@@ -261,7 +261,7 @@ export default function ActivityBlock({
             ? isGranola
               ? "rgba(200, 230, 74, 0.02)"
               : "rgba(232, 67, 147, 0.02)"
-            : "#211F1B",
+            : "var(--bg-raised)",
         border: `0.5px solid ${cardBorder}`,
         borderRadius: 10,
         overflow: "hidden",
@@ -282,7 +282,7 @@ export default function ActivityBlock({
         <ChevronRight
           size={13}
           style={{
-            color: isExpanded ? accentColor : "#6B665C",
+            color: isExpanded ? accentColor : "var(--text-tertiary)",
             transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
             transition: "transform 0.15s ease",
             flexShrink: 0,
@@ -294,7 +294,7 @@ export default function ActivityBlock({
           <span
             style={{
               fontSize: 13,
-              color: isExpanded ? "#ECE8E0" : "#9B9689",
+              color: isExpanded ? "var(--text-primary)" : "var(--text-secondary)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -311,13 +311,15 @@ export default function ActivityBlock({
                 fontSize: 11,
                 textTransform: "uppercase",
                 letterSpacing: "0.07em",
-                color: isExpanded ? accentColor : "#6B665C",
+                color: isExpanded ? accentColor : "var(--text-tertiary)",
                 flexShrink: 0,
               }}
             >
               Block {blockNumber}
             </span>
-            <span style={{ fontSize: 13, color: "#9B9689", flexShrink: 0 }}>{timeRange}</span>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)", flexShrink: 0 }}>
+              {timeRange}
+            </span>
             <div style={{ flex: 1, minWidth: 0 }} />
           </>
         )}
@@ -329,11 +331,11 @@ export default function ActivityBlock({
               alignItems: "center",
               gap: 4,
               fontSize: 12,
-              color: "#9B9689",
+              color: "var(--text-secondary)",
               flexShrink: 0,
             }}
           >
-            <Clock size={12} style={{ color: "#6B665C" }} />
+            <Clock size={12} style={{ color: "var(--text-tertiary)" }} />
             {formatDuration(block.duration)}
           </span>
         )}
@@ -348,9 +350,9 @@ export default function ActivityBlock({
                 fontWeight: 500,
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
-                background: "rgba(58, 155, 107, 0.14)",
-                color: "#3A9B6B",
-                border: "0.5px solid rgba(58, 155, 107, 0.28)",
+                background: "rgba(var(--status-success-rgb), 0.14)",
+                color: "var(--status-success)",
+                border: "0.5px solid rgba(var(--status-success-rgb), 0.28)",
               }}
             >
               Active
@@ -400,8 +402,8 @@ export default function ActivityBlock({
                 fontWeight: 500,
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
-                background: "rgba(236, 232, 224, 0.07)",
-                color: "#9B9689",
+                background: "rgba(var(--ui-rgb), 0.07)",
+                color: "var(--text-secondary)",
               }}
             >
               Ready
@@ -425,18 +427,18 @@ export default function ActivityBlock({
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               opacity: 0.5,
               transition: "opacity 0.15s ease, color 0.15s ease",
               flexShrink: 0,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = "1";
-              e.currentTarget.style.color = "#E87474";
+              e.currentTarget.style.color = "var(--status-error)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.opacity = "0.5";
-              e.currentTarget.style.color = "#6B665C";
+              e.currentTarget.style.color = "var(--text-tertiary)";
             }}
           >
             <Trash2 size={12} strokeWidth={1.5} />
@@ -453,7 +455,7 @@ export default function ActivityBlock({
                 ? isGranola
                   ? "rgba(200, 230, 74, 0.08)"
                   : "rgba(232, 67, 147, 0.08)"
-                : "rgba(236, 232, 224, 0.06)"
+                : "rgba(var(--ui-rgb), 0.06)"
             }`,
             padding: "0 16px 16px",
           }}
@@ -482,7 +484,7 @@ export default function ActivityBlock({
                   <div
                     style={{
                       fontSize: 10,
-                      color: "#6B665C",
+                      color: "var(--text-tertiary)",
                       textTransform: "uppercase",
                       letterSpacing: "0.07em",
                       padding: block.subscriberName ? "14px 0 6px" : "14px 0 6px",
@@ -491,7 +493,7 @@ export default function ActivityBlock({
                       gap: 6,
                     }}
                   >
-                    <Users size={11} style={{ color: "#6B665C" }} />
+                    <Users size={11} style={{ color: "var(--text-tertiary)" }} />
                     Participants
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -500,11 +502,11 @@ export default function ActivityBlock({
                         key={idx}
                         style={{
                           fontSize: 11,
-                          color: "#9B9689",
-                          background: "rgba(236, 232, 224, 0.05)",
+                          color: "var(--text-secondary)",
+                          background: "rgba(var(--ui-rgb), 0.05)",
                           padding: "3px 8px",
                           borderRadius: 4,
-                          border: "0.5px solid rgba(236, 232, 224, 0.06)",
+                          border: "var(--border-hairline)",
                         }}
                       >
                         {p.name || p.email}
@@ -520,7 +522,7 @@ export default function ActivityBlock({
                   <div
                     style={{
                       fontSize: 10,
-                      color: "#6B665C",
+                      color: "var(--text-tertiary)",
                       textTransform: "uppercase",
                       letterSpacing: "0.07em",
                       padding: "14px 0 6px",
@@ -533,7 +535,7 @@ export default function ActivityBlock({
                       maxHeight: 280,
                       overflowY: "auto",
                       fontSize: 12,
-                      color: "#9B9689",
+                      color: "var(--text-secondary)",
                       lineHeight: 1.6,
                     }}
                     className="granola-notes-scroll"
@@ -553,7 +555,7 @@ export default function ActivityBlock({
                   <div
                     style={{
                       fontSize: 10,
-                      color: "#6B665C",
+                      color: "var(--text-tertiary)",
                       textTransform: "uppercase",
                       letterSpacing: "0.07em",
                       padding: "14px 0 8px",
@@ -562,7 +564,7 @@ export default function ActivityBlock({
                       gap: 6,
                     }}
                   >
-                    <TrendingUp size={11} style={{ color: "#6B665C" }} />
+                    <TrendingUp size={11} style={{ color: "var(--text-tertiary)" }} />
                     Tasks
                   </div>
 
@@ -588,7 +590,7 @@ export default function ActivityBlock({
                   <div
                     style={{
                       fontSize: 10,
-                      color: "#6B665C",
+                      color: "var(--text-tertiary)",
                       textTransform: "uppercase",
                       letterSpacing: "0.07em",
                       padding:
@@ -600,7 +602,7 @@ export default function ActivityBlock({
                       gap: 6,
                     }}
                   >
-                    <LayoutList size={11} style={{ color: "#6B665C" }} />
+                    <LayoutList size={11} style={{ color: "var(--text-tertiary)" }} />
                     App breakdown
                   </div>
 
@@ -613,15 +615,13 @@ export default function ActivityBlock({
                         gap: 10,
                         padding: "7px 0",
                         borderBottom:
-                          idx < block.appBreakdown.length - 1
-                            ? "0.5px solid rgba(236, 232, 224, 0.04)"
-                            : "none",
+                          idx < block.appBreakdown.length - 1 ? "var(--border-hairline)" : "none",
                       }}
                     >
                       <span
                         style={{
                           fontSize: 13,
-                          color: "#9B9689",
+                          color: "var(--text-secondary)",
                           flex: 1,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -634,7 +634,7 @@ export default function ActivityBlock({
                         <div
                           style={{
                             height: 3,
-                            background: "rgba(236, 232, 224, 0.06)",
+                            background: "rgba(var(--ui-rgb), 0.06)",
                             borderRadius: 2,
                             overflow: "hidden",
                           }}
@@ -652,7 +652,7 @@ export default function ActivityBlock({
                       <span
                         style={{
                           fontSize: 11,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           textAlign: "right",
                           width: 36,
                           flexShrink: 0,
@@ -663,7 +663,7 @@ export default function ActivityBlock({
                       <span
                         style={{
                           fontSize: 11,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           textAlign: "right",
                           width: 32,
                           flexShrink: 0,

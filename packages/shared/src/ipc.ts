@@ -110,6 +110,11 @@ export const IPC_CHANNELS = {
   PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
   PILL_DISPLAY_MODE_CHANGED: "pill-display-mode-changed",
 
+  // Theme / appearance preference
+  THEME_GET: "theme-get",
+  THEME_SET: "theme-set",
+  THEME_CHANGED: "theme-changed",
+
   // End session dialog coordination (pill → console)
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog
   END_SESSION_WITH_PREFERENCES: "end-session-with-preferences", // Console → Main: end with prefs

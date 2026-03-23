@@ -1,0 +1,38 @@
+---
+description: "Color token system — never hardcode theme hex values"
+alwaysApply: true
+---
+
+# Color Token System
+
+## Single Source of Truth
+
+All theme colors are CSS custom properties in `apps/electron/src/renderer/styles/globals.css`.
+Tailwind maps them in `tailwind.config.js`. Components NEVER use raw hex for theme colors.
+
+## Variable Reference
+
+| Variable | Dark mode | Tailwind token |
+|---|---|---|
+| `--bg-base` | `#1A1916` | `canvas-base` |
+| `--bg-raised` | `#211F1B` | `canvas-raised` |
+| `--bg-overlay` | `#2A2824` | `canvas-overlay` |
+| `--bg-muted` | `#33312B` | `canvas-muted` |
+| `--text-primary` | `#ECE8E0` | `ink-primary` |
+| `--text-secondary` | `#9B9689` | `ink-secondary` |
+| `--text-tertiary` | `#6B665C` | `ink-tertiary` |
+| `--text-faint` | `#4A4640` | `ink-faint` |
+| `--ui-rgb` | `236, 232, 224` | `stroke-*` |
+| `--mi-accent` | `#82C0CC` | `accent` |
+| `--mi-accent-rgb` | `130, 192, 204` | — |
+| `--status-success` | `#3A9B6B` | `status-success` |
+| `--status-error` | `#E87474` | `status-error` |
+| `--status-warning` | `#D4A27A` | `status-warning` |
+
+## Rules
+
+1. **Never hardcode theme hex values** in components. Use `var(--*)` in inline styles or Tailwind semantic tokens.
+2. **For rgba with opacity**, use `rgba(var(--ui-rgb), <opacity>)` for borders/overlays, `rgba(var(--mi-accent-rgb), <opacity>)` for accent tints.
+3. **Canvas 2D** cannot resolve `var()`. Use `getCssVar()` helper to resolve at draw-time. See `activityChart.ts`.
+4. **Third-party brand colors** (Granola `#C8E64A`, Fireflies `#E84393`) are NOT themed — keep as hardcoded hex.
+5. **Shadows** (`rgba(0, 0, 0, ...)`) are NOT themed — keep as-is.

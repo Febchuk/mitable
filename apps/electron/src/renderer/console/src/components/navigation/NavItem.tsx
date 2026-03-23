@@ -26,8 +26,8 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
         borderRadius: 6,
         margin: "1px 8px",
         fontSize: 13,
-        color: isInSection ? "var(--mi-accent)" : "#9B9689",
-        background: isInSection ? "rgba(var(--mi-accent-rgb, 200,169,96), 0.13)" : "transparent",
+        color: isInSection ? "var(--mi-accent)" : "var(--text-secondary)",
+        background: isInSection ? "rgba(var(--mi-accent-rgb, 130,192,204), 0.13)" : "transparent",
         cursor: "pointer",
         whiteSpace: "nowrap",
         textDecoration: "none",
@@ -35,14 +35,14 @@ export default function NavItem({ to, icon: Icon, label }: NavItemProps) {
       }}
       onMouseEnter={(e) => {
         if (!isInSection) {
-          e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-          e.currentTarget.style.color = "#ECE8E0";
+          e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+          e.currentTarget.style.color = "var(--text-primary)";
         }
       }}
       onMouseLeave={(e) => {
         if (!isInSection) {
           e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.color = "#9B9689";
+          e.currentTarget.style.color = "var(--text-secondary)";
         }
       }}
     >

@@ -193,6 +193,11 @@ interface ConsoleAPI {
     mode: "compact" | "expanded"
   ) => Promise<{ success: boolean }>;
 
+  // Theme / appearance API
+  getTheme: () => Promise<"dark" | "light" | "system">;
+  setTheme: (theme: "dark" | "light" | "system") => Promise<{ success: boolean }>;
+  onThemeChanged: (callback: (theme: "dark" | "light" | "system") => void) => () => void;
+
   // Summary preferences API
   getSummaryPreferences: () => Promise<{
     detailLevel: "concise" | "verbose";

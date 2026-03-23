@@ -18,7 +18,7 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
           gap: 8,
           padding: "3px 0",
           fontSize: 11,
-          color: "#6B665C",
+          color: "var(--text-tertiary)",
         }}
       >
         <ToolIcon name={toolName} />
@@ -45,10 +45,10 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
           padding: "10px 14px",
           margin: "6px 0",
           borderRadius: 10,
-          background: "rgba(232, 116, 116, 0.06)",
+          background: "rgba(var(--status-error-rgb), 0.06)",
           fontSize: 13,
           lineHeight: 1.6,
-          color: "#E87474",
+          color: "var(--status-error)",
         }}
       >
         <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 3 }} />
@@ -76,11 +76,11 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
         </div>
         <div
           style={{
-            borderLeft: "2px solid rgba(var(--mi-accent-rgb, 200,169,96), 0.25)",
+            borderLeft: "2px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.25)",
             paddingLeft: 14,
             fontSize: 15,
             lineHeight: 1.75,
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             letterSpacing: "-0.01em",
             wordBreak: "break-word",
           }}
@@ -100,10 +100,10 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
             padding: "10px 16px",
             borderRadius: 18,
             borderBottomRightRadius: 4,
-            background: "rgba(236, 232, 224, 0.08)",
+            background: "rgba(var(--ui-rgb), 0.08)",
             fontSize: 14,
             lineHeight: 1.6,
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             wordBreak: "break-word",
           }}
         >
@@ -119,7 +119,7 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
         padding: "14px 0",
         fontSize: 15,
         lineHeight: 1.75,
-        color: "#ECE8E0",
+        color: "var(--text-primary)",
         letterSpacing: "-0.01em",
         wordBreak: "break-word",
       }}
@@ -173,7 +173,7 @@ export function AgentThinking({
           alignItems: "center",
           gap: 8,
           fontSize: 13,
-          color: "#6B665C",
+          color: "var(--text-tertiary)",
         }}
       >
         <Loader2
@@ -205,7 +205,7 @@ export function AgentThinking({
 }
 
 function ToolIcon({ name }: { name?: string }) {
-  const style = { color: "#6B665C" };
+  const style = { color: "var(--text-tertiary)" };
   if (!name) return <Terminal size={12} style={style} />;
   const lower = name.toLowerCase();
   if (

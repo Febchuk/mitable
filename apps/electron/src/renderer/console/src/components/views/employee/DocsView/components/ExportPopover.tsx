@@ -41,7 +41,7 @@ export default function ExportPopover({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="h-10 rounded-xl border-[0.5px] border-white/10 bg-[rgba(236,232,224,0.02)] px-4 text-text-primary hover:bg-[rgba(236,232,224,0.05)] gap-2"
+          className="h-10 rounded-xl border-[0.5px] border-white/10 bg-[rgba(var(--ui-rgb),0.02)] px-4 text-text-primary hover:bg-[rgba(var(--ui-rgb),0.05)] gap-2"
           disabled={isExporting}
         >
           <ExternalLink size={16} />
@@ -49,7 +49,7 @@ export default function ExportPopover({
           <ChevronDown size={14} />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0 border-white/10 bg-[#211F1B]" align="end">
+      <PopoverContent className="w-80 p-0 border-white/10 bg-[var(--bg-raised)]" align="end">
         <div className="p-3 border-b border-white/10">
           <div className="text-sm font-medium text-text-primary">Export to...</div>
         </div>

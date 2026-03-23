@@ -28,9 +28,14 @@ export const VALID_ACTIVITY_FILTERS = new Set<ActivityTimeFilter>([
   "all",
 ]);
 
-export const DEEP_WORK_COLOR = "#C8A960";
-export const MEETINGS_COLOR = "#6B5A30";
-export const AXIS_COLOR = "#9B9689";
+function getCssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+export const DEEP_WORK_COLOR = "var(--mi-accent)";
+export const MEETINGS_COLOR = "var(--mi-accent-dark)";
+export const AXIS_COLOR = "var(--text-secondary)";
 
 function formatHour(h: number): string {
   if (h === 0) return "12am";
@@ -182,6 +187,11 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
+  const deepWorkHex = getCssVar("--mi-accent", "#82C0CC");
+  const meetingsHex = getCssVar("--mi-accent-dark", "#3A7A87");
+  const uiRgb = getCssVar("--ui-rgb", "236, 232, 224");
+  const axisHex = getCssVar("--text-secondary", "#9B9689");
+
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * dpr;
@@ -194,7 +204,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   ctx.clearRect(0, 0, W, H);
 
   if (!data.length) {
-    ctx.fillStyle = AXIS_COLOR;
+    ctx.fillStyle = axisHex;
     ctx.font = "12px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("No data for this period", W / 2, H / 2);
@@ -213,7 +223,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   const { step, unit, divisor } = niceAxis(rawMax);
   const maxVal = Math.ceil(rawMax / step) * step;
 
-  ctx.strokeStyle = "rgba(236, 232, 224, 0.04)";
+  ctx.strokeStyle = `rgba(${uiRgb}, 0.04)`;
   ctx.lineWidth = 1;
   for (let v = step; v <= maxVal; v += step) {
     const y = padTop + chartH * (1 - v / maxVal);
@@ -223,7 +233,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
     ctx.stroke();
   }
 
-  ctx.fillStyle = AXIS_COLOR;
+  ctx.fillStyle = axisHex;
   ctx.font = "10px Inter, system-ui, sans-serif";
   ctx.textAlign = "right";
   for (let v = step; v <= maxVal; v += step) {
@@ -248,23 +258,23 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
     if (!dwIsZero && !mtIsZero) {
       const dwH = (d.deepWork / maxVal) * chartH;
       const dwX = centerX - barW - gap / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, DEEP_WORK_COLOR);
+      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
 
       const mtH = (d.meetings / maxVal) * chartH;
       const mtX = centerX + gap / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, MEETINGS_COLOR);
+      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
     } else if (!dwIsZero) {
       const dwH = (d.deepWork / maxVal) * chartH;
       const dwX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, DEEP_WORK_COLOR);
+      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
     } else if (!mtIsZero) {
       const mtH = (d.meetings / maxVal) * chartH;
       const mtX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, MEETINGS_COLOR);
+      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
     }
 
     if (labelSet.has(i)) {
-      ctx.fillStyle = AXIS_COLOR;
+      ctx.fillStyle = axisHex;
       ctx.font = "10px Inter, system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(d.label, centerX, padTop + chartH + 16);

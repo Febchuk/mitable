@@ -30,7 +30,14 @@ function getDocInitial(doc: Document): string {
   return (doc.title || "U").charAt(0).toUpperCase();
 }
 
-const DOC_AVATAR_COLORS = ["#C8A960", "#3A9B6B", "#D4A27A", "#4A9FD9", "#E87474", "#9B9689"];
+const DOC_AVATAR_COLORS = [
+  "var(--mi-accent)",
+  "var(--status-success)",
+  "var(--status-warning)",
+  "var(--status-info)",
+  "var(--status-error)",
+  "var(--text-secondary)",
+];
 
 function getAvatarColor(id: string): string {
   let hash = 0;
@@ -73,7 +80,9 @@ export default function DocsView() {
           size={24}
           style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
         />
-        <p style={{ color: "#6B665C", fontSize: 13, marginTop: 12 }}>Loading docs...</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
+          Loading docs...
+        </p>
       </div>
     );
   }
@@ -89,8 +98,10 @@ export default function DocsView() {
           padding: "80px 0",
         }}
       >
-        <AlertCircle size={24} style={{ color: "#E87474", marginBottom: 12 }} />
-        <p style={{ color: "#ECE8E0", fontSize: 13, fontWeight: 500 }}>Failed to load documents</p>
+        <AlertCircle size={24} style={{ color: "var(--status-error)", marginBottom: 12 }} />
+        <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}>
+          Failed to load documents
+        </p>
       </div>
     );
   }
@@ -111,7 +122,7 @@ export default function DocsView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 32,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 400,
               letterSpacing: "-0.4px",
               lineHeight: 1,
@@ -124,7 +135,7 @@ export default function DocsView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 15,
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               fontWeight: 400,
               fontStyle: "italic",
               margin: "12px 0 0",
@@ -143,9 +154,9 @@ export default function DocsView() {
             gap: 6,
             padding: "6px 12px",
             borderRadius: 8,
-            border: "0.5px solid rgba(236, 232, 224, 0.12)",
+            border: "var(--border-subtle)",
             background: "transparent",
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             fontSize: 12,
             fontFamily: "var(--font-sans)",
             fontWeight: 500,
@@ -155,12 +166,12 @@ export default function DocsView() {
             marginTop: 4,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(236, 232, 224, 0.05)";
-            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.2)";
+            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+            e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+            e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
           }}
         >
           <Plus size={12} strokeWidth={2} />
@@ -177,7 +188,7 @@ export default function DocsView() {
               <div
                 style={{
                   fontSize: 12,
-                  color: "#6B665C",
+                  color: "var(--text-tertiary)",
                   fontWeight: 500,
                   marginBottom: 8,
                 }}
@@ -208,7 +219,7 @@ export default function DocsView() {
                         transition: "background 0.12s ease",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(236, 232, 224, 0.04)";
+                        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "transparent";
@@ -238,7 +249,7 @@ export default function DocsView() {
                         <div
                           style={{
                             fontSize: 13,
-                            color: "#ECE8E0",
+                            color: "var(--text-primary)",
                             fontWeight: 500,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -250,7 +261,7 @@ export default function DocsView() {
                         <div
                           style={{
                             fontSize: 12,
-                            color: "#6B665C",
+                            color: "var(--text-tertiary)",
                             marginTop: 1,
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -263,14 +274,14 @@ export default function DocsView() {
 
                       {/* Status */}
                       {doc.status === "draft" && (
-                        <Lock size={12} style={{ color: "#6B665C", flexShrink: 0 }} />
+                        <Lock size={12} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
                       )}
 
                       {/* Time */}
                       <span
                         style={{
                           fontSize: 12,
-                          color: "#6B665C",
+                          color: "var(--text-tertiary)",
                           flexShrink: 0,
                           fontVariantNumeric: "tabular-nums",
                         }}
@@ -295,16 +306,23 @@ export default function DocsView() {
               justifyContent: "center",
               padding: "48px 0",
               borderRadius: 12,
-              border: "0.5px dashed rgba(236, 232, 224, 0.1)",
+              border: "0.5px dashed rgba(var(--ui-rgb), 0.1)",
             }}
           >
-            <FileText size={20} style={{ color: "#6B665C", marginBottom: 12 }} />
-            <p style={{ color: "#9B9689", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+            <FileText size={20} style={{ color: "var(--text-tertiary)", marginBottom: 12 }} />
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 4,
+              }}
+            >
               No documents yet
             </p>
             <p
               style={{
-                color: "#6B665C",
+                color: "var(--text-tertiary)",
                 fontSize: 12,
                 textAlign: "center",
                 maxWidth: 260,

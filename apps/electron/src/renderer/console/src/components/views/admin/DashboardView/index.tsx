@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDashboardMetrics } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
-import { formatTopLevelDuration, topLevelDurationLabel } from "../shared/topLevelDuration";
+import { formatDashboardDuration, dashboardDurationLabel } from "../shared/topLevelDuration";
 
 type TimeFilter = "yesterday" | "week" | "month" | "ytd" | "all";
 
@@ -24,9 +24,12 @@ const FILTER_TO_PERIOD: Record<TimeFilter, DashboardPeriod> = {
 
 const VALID_FILTERS = new Set<TimeFilter>(["yesterday", "week", "month", "ytd", "all"]);
 
-const DEEP_WORK_COLOR = "#C8A960";
-const MEETINGS_COLOR = "#6B5A30";
-const AXIS_COLOR = "#9B9689";
+const DEEP_WORK_COLOR = "var(--mi-accent)";
+const MEETINGS_COLOR = "var(--mi-accent-dark)";
+
+function getCssVar(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
 
 interface ChartDataPoint {
   label: string;
@@ -193,6 +196,11 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
+  const deepWorkHex = getCssVar("--mi-accent", "#82C0CC");
+  const meetingsHex = getCssVar("--mi-accent-dark", "#3A7A87");
+  const uiRgb = getCssVar("--ui-rgb", "236, 232, 224");
+  const axisHex = getCssVar("--text-secondary", "#9B9689");
+
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * dpr;
@@ -205,7 +213,7 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
   ctx.clearRect(0, 0, W, H);
 
   if (!data.length) {
-    ctx.fillStyle = AXIS_COLOR;
+    ctx.fillStyle = axisHex;
     ctx.font = "12px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("No data for this period", W / 2, H / 2);
@@ -228,7 +236,7 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
   const maxVal = Math.ceil(rawMax / step) * step;
 
   // Grid lines at each step interval
-  ctx.strokeStyle = "rgba(236, 232, 224, 0.04)";
+  ctx.strokeStyle = `rgba(${uiRgb}, 0.04)`;
   ctx.lineWidth = 1;
   for (let v = step; v <= maxVal; v += step) {
     const y = padTop + chartH * (1 - v / maxVal);
@@ -239,7 +247,7 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
   }
 
   // Y-axis labels at each step
-  ctx.fillStyle = AXIS_COLOR;
+  ctx.fillStyle = axisHex;
   ctx.font = "10px Inter, system-ui, sans-serif";
   ctx.textAlign = "right";
   for (let v = step; v <= maxVal; v += step) {
@@ -266,23 +274,23 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
     if (!dwIsZero && !mtIsZero) {
       const dwH = (d.deepWork / maxVal) * chartH;
       const dwX = centerX - barW - gap / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, DEEP_WORK_COLOR);
+      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
 
       const mtH = (d.meetings / maxVal) * chartH;
       const mtX = centerX + gap / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, MEETINGS_COLOR);
+      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
     } else if (!dwIsZero) {
       const dwH = (d.deepWork / maxVal) * chartH;
       const dwX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, DEEP_WORK_COLOR);
+      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
     } else if (!mtIsZero) {
       const mtH = (d.meetings / maxVal) * chartH;
       const mtX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, MEETINGS_COLOR);
+      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
     }
 
     if (labelSet.has(i)) {
-      ctx.fillStyle = AXIS_COLOR;
+      ctx.fillStyle = axisHex;
       ctx.font = "10px Inter, system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(d.label, centerX, padTop + chartH + 16);
@@ -336,8 +344,16 @@ export default function DashboardView() {
     return apiData.metrics.totalTeamWorkMinutes + apiData.metrics.totalTeamMeetingMinutes;
   }, [apiData]);
 
-  const durationDisplay = useMemo(() => formatTopLevelDuration(totalMinutes), [totalMinutes]);
-  const durationLabel = useMemo(() => topLevelDurationLabel(totalMinutes), [totalMinutes]);
+  const userCount = apiData?.hasData ? apiData.metrics.totalUsersTracked : 1;
+
+  const durationDisplay = useMemo(
+    () => formatDashboardDuration(totalMinutes, filter, userCount),
+    [totalMinutes, filter, userCount]
+  );
+  const durationLabel = useMemo(
+    () => dashboardDurationLabel(totalMinutes, filter, userCount),
+    [totalMinutes, filter, userCount]
+  );
 
   const peopleActive = useMemo(() => {
     if (!apiData?.hasData) return "0";
@@ -381,7 +397,7 @@ export default function DashboardView() {
           style={{
             fontFamily: "var(--font-serif)",
             fontSize: 26,
-            color: "#ECE8E0",
+            color: "var(--text-primary)",
             fontWeight: 400,
             letterSpacing: "-0.3px",
             margin: 0,
@@ -395,7 +411,7 @@ export default function DashboardView() {
           style={{
             display: "flex",
             gap: 1,
-            background: "rgba(236, 232, 224, 0.05)",
+            background: "rgba(var(--ui-rgb), 0.05)",
             borderRadius: 7,
             padding: 3,
           }}
@@ -409,8 +425,8 @@ export default function DashboardView() {
                 borderRadius: 5,
                 fontSize: 11,
                 fontFamily: "var(--font-sans)",
-                color: filter === f.key ? "#ECE8E0" : "#9B9689",
-                background: filter === f.key ? "#2A2824" : "transparent",
+                color: filter === f.key ? "var(--text-primary)" : "var(--text-secondary)",
+                background: filter === f.key ? "var(--bg-overlay)" : "transparent",
                 border: "none",
                 cursor: "pointer",
                 transition: "background 0.1s, color 0.1s",
@@ -428,7 +444,7 @@ export default function DashboardView() {
           <span
             style={{
               fontSize: 10,
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               textTransform: "uppercase",
               letterSpacing: "0.09em",
               fontFamily: "var(--font-sans)",
@@ -440,7 +456,7 @@ export default function DashboardView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 48,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 300,
               letterSpacing: -2,
               lineHeight: 1,
@@ -453,7 +469,7 @@ export default function DashboardView() {
           <span
             style={{
               fontSize: 10,
-              color: "#6B665C",
+              color: "var(--text-tertiary)",
               textTransform: "uppercase",
               letterSpacing: "0.09em",
               fontFamily: "var(--font-sans)",
@@ -465,7 +481,7 @@ export default function DashboardView() {
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 48,
-              color: "#ECE8E0",
+              color: "var(--text-primary)",
               fontWeight: 300,
               letterSpacing: -2,
               lineHeight: 1,
@@ -479,8 +495,8 @@ export default function DashboardView() {
       {/* Team active time chart card */}
       <div
         style={{
-          background: "#211F1B",
-          border: "0.5px solid rgba(236, 232, 224, 0.07)",
+          background: "var(--bg-raised)",
+          border: "var(--border-hairline)",
           borderRadius: 12,
           padding: "22px 24px 16px",
           flex: 1,
@@ -503,7 +519,7 @@ export default function DashboardView() {
               fontSize: 10,
               textTransform: "uppercase",
               letterSpacing: "0.09em",
-              color: "#9B9689",
+              color: "var(--text-secondary)",
               fontFamily: "var(--font-sans)",
             }}
           >
@@ -521,7 +537,13 @@ export default function DashboardView() {
                   background: DEEP_WORK_COLOR,
                 }}
               />
-              <span style={{ fontSize: 11, color: "#9B9689", fontFamily: "var(--font-sans)" }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
                 Deep work
               </span>
             </div>
@@ -534,7 +556,13 @@ export default function DashboardView() {
                   background: MEETINGS_COLOR,
                 }}
               />
-              <span style={{ fontSize: 11, color: "#9B9689", fontFamily: "var(--font-sans)" }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
                 Meetings
               </span>
             </div>
