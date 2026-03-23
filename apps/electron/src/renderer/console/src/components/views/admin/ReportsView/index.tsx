@@ -19,7 +19,6 @@ function formatTime(dateString: string): string {
   });
 }
 
-
 function getReportInitial(title: string): string {
   return (title || "R").charAt(0).toUpperCase();
 }

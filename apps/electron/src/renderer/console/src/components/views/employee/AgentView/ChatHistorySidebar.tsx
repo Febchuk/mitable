@@ -284,9 +284,7 @@ export default function ChatHistorySidebar({
               textAlign: "center",
             }}
           >
-            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-              No matching chats
-            </span>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>No matching chats</span>
           </div>
         ) : null}
       </div>

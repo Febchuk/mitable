@@ -30,7 +30,6 @@ function getDocInitial(doc: Document): string {
   return (doc.title || "U").charAt(0).toUpperCase();
 }
 
-
 export default function DocsView() {
   const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

@@ -1843,7 +1843,14 @@ export default function UserProfilePage() {
                     gap: 12,
                   }}
                 >
-                  <h3 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                  <h3
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      margin: 0,
+                    }}
+                  >
                     Blocked Apps
                   </h3>
                   <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
@@ -2344,13 +2351,11 @@ export default function UserProfilePage() {
                     </p>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
-                    {(
-                      [
-                        { value: "light" as const, label: "Light", icon: Sun },
-                        { value: "dark" as const, label: "Dark", icon: Moon },
-                        { value: "system" as const, label: "System", icon: Monitor },
-                      ]
-                    ).map(({ value, label, icon: Icon }) => {
+                    {[
+                      { value: "light" as const, label: "Light", icon: Sun },
+                      { value: "dark" as const, label: "Dark", icon: Moon },
+                      { value: "system" as const, label: "System", icon: Monitor },
+                    ].map(({ value, label, icon: Icon }) => {
                       const active = currentTheme === value;
                       return (
                         <button
@@ -2367,9 +2372,7 @@ export default function UserProfilePage() {
                             border: active
                               ? "1.5px solid var(--mi-accent)"
                               : "var(--border-subtle)",
-                            background: active
-                              ? "rgba(var(--ui-rgb), 0.04)"
-                              : "transparent",
+                            background: active ? "rgba(var(--ui-rgb), 0.04)" : "transparent",
                             cursor: "pointer",
                             transition: "all 0.15s ease",
                           }}
@@ -2673,7 +2676,10 @@ export default function UserProfilePage() {
                           onChange={(e) => handleMicrophoneChange(e.target.value)}
                           className="w-full px-3 py-2 bg-background-elevated border border-border-subtle rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-background-secondary transition-colors [&>option]:bg-background-elevated [&>option]:text-text-primary [&>option]:py-2"
                         >
-                          <option value="default" className="bg-background-elevated text-text-primary">
+                          <option
+                            value="default"
+                            className="bg-background-elevated text-text-primary"
+                          >
                             System Default (Auto-detect)
                           </option>
                           {audioDevices.map((device) => (
@@ -2724,7 +2730,10 @@ export default function UserProfilePage() {
                             onChange={(e) => handleOutputDeviceChange(e.target.value)}
                             className="w-full px-3 py-2 bg-background-elevated border border-border-subtle rounded-lg text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary cursor-pointer hover:bg-background-secondary transition-colors [&>option]:bg-background-elevated [&>option]:text-text-primary [&>option]:py-2"
                           >
-                            <option value="default" className="bg-background-elevated text-text-primary">
+                            <option
+                              value="default"
+                              className="bg-background-elevated text-text-primary"
+                            >
                               System Default (Auto-detect)
                             </option>
                             {audioOutputDevices.map((device) => (
@@ -3325,7 +3334,9 @@ export default function UserProfilePage() {
                     <div className="flex items-center gap-3 mb-4">
                       <FirefliesIcon size="md" />
                       <div>
-                        <h3 className="text-lg font-semibold text-text-primary">Connect Fireflies.ai</h3>
+                        <h3 className="text-lg font-semibold text-text-primary">
+                          Connect Fireflies.ai
+                        </h3>
                         <p className="text-sm text-text-tertiary">
                           Enter your API key to sync meetings
                         </p>

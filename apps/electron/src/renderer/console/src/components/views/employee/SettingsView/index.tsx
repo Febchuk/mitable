@@ -648,39 +648,29 @@ export default function SettingsView() {
                       gap: 8,
                       padding: "14px 12px",
                       borderRadius: 10,
-                      border: active
-                        ? "1.5px solid var(--mi-accent)"
-                        : "var(--border-subtle)",
-                      background: active
-                        ? "rgba(var(--ui-rgb), 0.04)"
-                        : "transparent",
+                      border: active ? "1.5px solid var(--mi-accent)" : "var(--border-subtle)",
+                      background: active ? "rgba(var(--ui-rgb), 0.04)" : "transparent",
                       cursor: "pointer",
                       transition: "all 0.15s ease",
                     }}
                     onMouseEnter={(e) => {
-                      if (!active)
-                        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
+                      if (!active) e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
                     }}
                     onMouseLeave={(e) => {
-                      if (!active)
-                        e.currentTarget.style.background = "transparent";
+                      if (!active) e.currentTarget.style.background = "transparent";
                     }}
                   >
                     <Icon
                       size={20}
                       style={{
-                        color: active
-                          ? "var(--mi-accent)"
-                          : "var(--text-tertiary)",
+                        color: active ? "var(--mi-accent)" : "var(--text-tertiary)",
                       }}
                     />
                     <span
                       style={{
                         fontSize: 13,
                         fontWeight: active ? 500 : 400,
-                        color: active
-                          ? "var(--text-primary)"
-                          : "var(--text-secondary)",
+                        color: active ? "var(--text-primary)" : "var(--text-secondary)",
                       }}
                     >
                       {label}
