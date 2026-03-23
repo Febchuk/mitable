@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Search, MessageSquare, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { groupByDay } from "@/console/src/components/shared/groupByDay";
 import type { AgentConversationSummary } from "../../../../services/agentChatService";
 

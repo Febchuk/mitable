@@ -11,7 +11,6 @@ import { useArtifacts } from "../../../../hooks/queries/artifacts";
 import { useUploadArtifact } from "../../../../hooks/queries/artifacts";
 import { useDeleteArtifact } from "../../../../hooks/queries/artifacts";
 import { groupByDay } from "@/console/src/components/shared/groupByDay";
-import type { Artifact } from "../../../../services/artifactsService";
 
 function formatTime(dateString: string): string {
   return new Date(dateString).toLocaleTimeString("en-US", {

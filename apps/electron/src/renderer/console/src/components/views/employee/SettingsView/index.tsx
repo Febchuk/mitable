@@ -4,7 +4,7 @@
  * User settings page with Linear integration connection.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "@/console/src/hooks/useTheme";
 import { Button } from "@/components/ui/button";
 import { createLogger } from "../../../../../../lib/logger";
@@ -54,8 +54,6 @@ interface NotionStatus {
   expired: boolean;
   workspaceId: string | null;
 }
-
-type ThemeOption = "light" | "dark" | "system";
 
 export default function SettingsView() {
   const { toast } = useToast();
