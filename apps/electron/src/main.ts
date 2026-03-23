@@ -96,6 +96,8 @@ const authTokens: {
 let lastAudioChunkWarnAt = 0;
 // Flag to silently drop audio chunks after cleanup (renderer may lag behind)
 let audioCleanupDone = false;
+// Tracks whether audio was recording when session was paused (for auto-resume)
+let audioActiveBeforePause = false;
 
 /**
  * Stop audio recording infrastructure: disconnect WS, notify backend, tell renderer to kill AudioWorklet.
@@ -1691,26 +1693,65 @@ function setupMonitoringSessionHandlers() {
     }
   );
 
-  // Pause the active session
+  // Pause the active session — also stops audio recording
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_PAUSE, async () => {
     monitoringLogger.info(" Pausing session");
+
+    audioActiveBeforePause = audioWebSocketService.isConnected();
+    const sessionState = monitoringSessionService.getSessionState();
+
+    // Stop audio if it was running (non-blocking)
+    if (audioActiveBeforePause) {
+      monitoringLogger.info("🔇 Pausing audio recording");
+      audioWebSocketService.disconnect();
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP);
+      }
+      // Notify backend to stop tracking audio duration
+      if (sessionState?.id) {
+        const token = authTokens.accessToken;
+        const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
+        const backendUrl = app.isPackaged
+          ? PROD_API_URL
+          : process.env.VITE_API_URL || "http://localhost:3000";
+        if (token) {
+          fetch(`${backendUrl}/api/monitoring/sessions/${sessionState.id}/audio/stop`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          }).catch((err) => monitoringLogger.error("Failed to stop audio on pause:", err));
+        }
+      }
+    }
+
     return monitoringSessionService.pauseSession();
   });
 
-  // Resume the paused session
+  // Resume the paused session — restarts audio if it was active before pause
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESUME, async () => {
     monitoringLogger.info(" Resuming session");
-    return monitoringSessionService.resumeSession();
+    const result = await monitoringSessionService.resumeSession();
+
+    if (result.success && audioActiveBeforePause) {
+      monitoringLogger.info("🎤 Audio was active before pause — signalling pill to restart");
+      audioActiveBeforePause = false;
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_AUDIO_FORCE_START);
+      }
+    }
+
+    return result;
   });
 
-  // End the active session
+  // End the active session — returns immediately after stopping captures.
+  // Audio cleanup runs in the background so the UI updates fast.
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
     monitoringLogger.info(" Ending session");
+    audioActiveBeforePause = false;
 
-    // Stop audio recording before ending session (prevents runaway AudioWorklet)
+    // Grab state before ending so we can clean up audio in background
     const preEndState = monitoringSessionService.getSessionState();
-    await cleanupAudioRecording(preEndState?.id);
 
+    // Stop captures / trackers — fast now that Top-K is removed
     const result = await monitoringSessionService.endSession();
 
     // Always hide watching pill when session ends
@@ -1718,17 +1759,23 @@ function setupMonitoringSessionHandlers() {
       watchingPillWindow.hide();
     }
 
-    // Only resume passive monitoring if user has it enabled
-    if (currentUserContext?.userId) {
-      const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
-        currentUserContext.userId
-      );
-      if (passiveEnabled) {
-        passiveMonitorService.onManualSessionEnd();
-      } else {
-        monitoringLogger.info(" Passive monitoring disabled, not resuming after manual end");
+    // Fire-and-forget: audio cleanup + passive monitoring resume
+    // These run after we've already returned the result to the renderer
+    (async () => {
+      try {
+        await cleanupAudioRecording(preEndState?.id);
+      } catch (err) {
+        monitoringLogger.error(" Background audio cleanup failed:", err);
       }
-    }
+      if (currentUserContext?.userId) {
+        const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
+          currentUserContext.userId
+        );
+        if (passiveEnabled) {
+          passiveMonitorService.onManualSessionEnd();
+        }
+      }
+    })();
 
     return result;
   });
@@ -2263,72 +2310,58 @@ function setupMonitoringSessionHandlers() {
     }
   );
 
-  // End session with preferences (called from Console after dialog confirmation)
-  ipcMain.handle(
-    IPC_CHANNELS.END_SESSION_WITH_PREFERENCES,
-    async (
-      _,
-      preferences: {
-        detailLevel: "concise" | "verbose";
-        format: "bullets" | "paragraphs";
-        includeScreenshots: boolean;
-      }
-    ) => {
-      monitoringLogger.info(" End session with preferences requested:", preferences);
+  // End session fully: stop Electron captures + upload + POST /end to backend
+  ipcMain.handle(IPC_CHANNELS.END_SESSION_WITH_PREFERENCES, async () => {
+    monitoringLogger.info(" End session requested");
+    audioActiveBeforePause = false;
 
-      // Stop audio recording before ending session (prevents runaway AudioWorklet)
-      const preEndState = monitoringSessionService.getSessionState();
-      await cleanupAudioRecording(preEndState?.id);
+    // Grab state before ending so we can clean up audio in background
+    const preEndState = monitoringSessionService.getSessionState();
 
-      // End Electron-side capture loop and get captures
-      const result = await monitoringSessionService.endSession();
+    // End Electron-side capture loop — fast (no Top-K / base64)
+    const result = await monitoringSessionService.endSession();
 
-      if (!result.success || !result.sessionId) {
-        return result;
-      }
+    // Fire-and-forget: audio cleanup (non-blocking)
+    cleanupAudioRecording(preEndState?.id).catch((err) =>
+      monitoringLogger.error(" Background audio cleanup failed:", err)
+    );
 
-      // Upload captures and end backend session with preferences
-      try {
-        // Upload captures if any exist
-        if (result.captures && result.captures.length > 0) {
-          monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
-          await authManager.authenticatedFetch(
-            `/api/monitoring/sessions/${result.sessionId}/captures`,
-            {
-              method: "POST",
-              body: JSON.stringify({ captures: result.captures }),
-            }
-          );
-        }
-
-        // End backend session with preferences
-        monitoringLogger.info(` Triggering backend summarization with preferences`);
-        const autoRecapWithPrefs = currentUserContext?.userId
-          ? preferencesService.getUserAutoRecap(currentUserContext.userId)
-          : true;
-        await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
-          method: "POST",
-          body: JSON.stringify({
-            preferences: {
-              detailLevel: preferences.detailLevel,
-              format: preferences.format,
-              includeScreenshots: preferences.includeScreenshots,
-            },
-            autoRecap: autoRecapWithPrefs,
-          }),
-        });
-      } catch (error) {
-        monitoringLogger.error(" Error ending session with preferences:", error);
-      }
-
-      // Hide watching pill after successful end
-      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-        watchingPillWindow.hide();
-      }
-
+    if (!result.success || !result.sessionId) {
       return result;
     }
-  );
+
+    // Upload captures and trigger backend summarization
+    try {
+      if (result.captures && result.captures.length > 0) {
+        monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
+        await authManager.authenticatedFetch(
+          `/api/monitoring/sessions/${result.sessionId}/captures`,
+          {
+            method: "POST",
+            body: JSON.stringify({ captures: result.captures }),
+          }
+        );
+      }
+
+      monitoringLogger.info(` Triggering backend summarization`);
+      const autoRecap = currentUserContext?.userId
+        ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+        : true;
+      await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
+        method: "POST",
+        body: JSON.stringify({ autoRecap }),
+      });
+    } catch (error) {
+      monitoringLogger.error(" Error ending session:", error);
+    }
+
+    // Hide watching pill after successful end
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.hide();
+    }
+
+    return result;
+  });
 
   ipcLogger.info(" Monitoring session handlers registered successfully");
 }

@@ -6,7 +6,7 @@
  * Responsibility:
  * - Generate a final narrative summary from the categorized Activity Timeline.
  * - Applies the "Materiality Filter" (summarizing 10 small actions into 1 meaningful update).
- * - Respects user formatting preferences (Verbose/Concise, Bullets/Paragraphs).
+ * - Outputs concise bullet-point task summaries.
  *
  * Key changes from v2 (RLM Architecture):
  * - Uses Storyteller mini-RLM for recursive summarization
@@ -28,11 +28,6 @@ import { storytellerRLMService } from "./rlm/storyteller-rlm.service";
 export interface GenerateStoryOptions {
   sessionId: string;
   userId: string;
-  formatPreference: {
-    style: "verbose" | "concise";
-    format: "bullets" | "paragraphs";
-    includeScreenshots: boolean;
-  };
 }
 
 class MasterStoryService {
@@ -139,17 +134,8 @@ class MasterStoryService {
         activityCount: timeline.length,
         transcriptCount: transcripts.length,
         durationMinutes,
-        style: options.formatPreference.style,
-        format: options.formatPreference.format,
       });
 
-      // 4a. Update progress: applying_preferences
-      await db
-        .update(monitoringSessions)
-        .set({ summarizationProgress: "applying_preferences" })
-        .where(eq(monitoringSessions.id, options.sessionId));
-
-      // 4b. Update progress: writing_summary (RLM is now generating)
       await db
         .update(monitoringSessions)
         .set({ summarizationProgress: "writing_summary" })
@@ -158,9 +144,8 @@ class MasterStoryService {
       const rlmResult = await storytellerRLMService.generateSummary({
         sessionId: options.sessionId,
         timeline,
-        fullTranscriptText, // Full audio context for rich narrative
+        fullTranscriptText,
         metadata,
-        preferences: options.formatPreference,
       });
 
       log.info("Storyteller RLM completed", {

@@ -11,12 +11,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { config } from "../../config";
-import {
-  StorytellerEnvironment,
-  Activity,
-  SessionMetadata,
-  UserPreferences,
-} from "./storyteller-environment";
+import { StorytellerEnvironment, Activity, SessionMetadata } from "./storyteller-environment";
 import { getToolByName } from "./storyteller-tools";
 import { getStorytellerSystemPrompt, getStorytellerUserPrompt } from "./storyteller-rlm-prompts";
 import { createTimer } from "../../lib/sessionLogger";
@@ -27,9 +22,8 @@ const logger = createLogger({ context: "storyteller-rlm" });
 export interface StorytellerRLMInput {
   sessionId: string;
   timeline: Activity[];
-  fullTranscriptText?: string; // Complete session audio transcripts for narrative enrichment
+  fullTranscriptText?: string;
   metadata: SessionMetadata;
-  preferences: UserPreferences;
 }
 
 export interface StorytellerRLMResult {
@@ -88,12 +82,10 @@ class StorytellerRLMService {
   async generateSummary(input: StorytellerRLMInput): Promise<StorytellerRLMResult> {
     const timer = createTimer("StorytellerRLM.generateSummary");
 
-    // Initialize environment
     const environment = new StorytellerEnvironment(
       input.timeline,
-      input.fullTranscriptText, // Full audio context for narrative richness
-      input.metadata,
-      input.preferences
+      input.fullTranscriptText,
+      input.metadata
     );
 
     // Scale max iterations based on timeline size:

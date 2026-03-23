@@ -702,12 +702,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
-    const { preferences, autoRecap } = req.body as {
-      preferences?: {
-        detailLevel: "concise" | "verbose";
-        format: "bullets" | "paragraphs";
-        includeScreenshots: boolean;
-      };
+    const { autoRecap } = req.body as {
       autoRecap?: boolean;
     };
 
@@ -928,20 +923,6 @@ router.post(
         return;
       }
 
-      // Trigger async story generation using the new 3-step pipeline (don't await - let it run in background)
-      // Transform frontend preferences (detailLevel) to service format (style)
-      const formatPreference = preferences
-        ? {
-            style: preferences.detailLevel,
-            format: preferences.format,
-            includeScreenshots: preferences.includeScreenshots,
-          }
-        : {
-            style: "concise" as const,
-            format: "bullets" as const,
-            includeScreenshots: false,
-          };
-
       // Wait briefly for in-flight analyze-frame requests to complete before querying activities.
       // The Electron client fires analyzeFrameAsync calls that may still be writing
       // activityDescription to the DB when the end request arrives.
@@ -985,7 +966,6 @@ router.post(
               return masterStoryService.generateStory({
                 sessionId: id,
                 userId,
-                formatPreference,
               });
             })(),
           ])
@@ -1342,94 +1322,6 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to end session",
-      });
-    }
-  }
-);
-/**
- * POST /api/monitoring/sessions/:id/regenerate-summary
- * DEV ONLY: Regenerate the session summary without re-running the session
- */
-router.post(
-  "/sessions/:id/regenerate-summary",
-  requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
-    const userId = req.userId!;
-    const { id } = req.params;
-
-    try {
-      // Verify ownership
-      const [session] = await db
-        .select()
-        .from(schema.monitoringSessions)
-        .where(eq(schema.monitoringSessions.id, id))
-        .limit(1);
-
-      if (!session) {
-        res.status(404).json({ error: "Not Found", message: "Session not found" });
-        return;
-      }
-
-      if (session.userId !== userId) {
-        res.status(403).json({ error: "Forbidden", message: "Not your session" });
-        return;
-      }
-
-      // Set status to summarizing
-      await db
-        .update(schema.monitoringSessions)
-        .set({ status: "summarizing" })
-        .where(eq(schema.monitoringSessions.id, id));
-
-      // Trigger regeneration in background using RLM
-      masterStoryService
-        .generateStory({
-          sessionId: id,
-          userId,
-          formatPreference: {
-            style: "concise",
-            format: "bullets",
-            includeScreenshots: false,
-          },
-        })
-        .then(async () => {
-          // Update status to ready after successful regeneration
-          await db
-            .update(schema.monitoringSessions)
-            .set({ status: "ready" })
-            .where(eq(schema.monitoringSessions.id, id));
-          console.log("[DEV] ✅ RLM Regeneration completed for session:", id);
-
-          // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id).catch((error) => {
-            console.error("[SessionIngestion] Failed after regeneration:", {
-              sessionId: id,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          });
-        })
-        .catch(async (err) => {
-          console.error("[DEV] ❌ RLM Regenerate summary failed:", err);
-          // Still mark as ready even if failed
-          await db
-            .update(schema.monitoringSessions)
-            .set({ status: "ready" })
-            .where(eq(schema.monitoringSessions.id, id));
-
-          // Trigger session ingestion (chunk + embed session data)
-          SessionIngestionService.ingestSession(id).catch((ingestError) => {
-            console.error("[SessionIngestion] Failed after failed regeneration:", {
-              sessionId: id,
-              error: ingestError instanceof Error ? ingestError.message : String(ingestError),
-            });
-          });
-        });
-
-      res.json({ success: true, message: "RLM summary regeneration started" });
-    } catch (error) {
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: error instanceof Error ? error.message : "Failed to regenerate",
       });
     }
   }

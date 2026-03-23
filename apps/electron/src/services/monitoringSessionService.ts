@@ -357,59 +357,25 @@ class MonitoringSessionService {
     const sessionId = this.activeSession.id;
 
     try {
-      // Get manifest to access all frames
-      const manifest = await localFrameStorage.loadManifest(sessionId);
-      if (!manifest) {
-        throw new Error("Session manifest not found");
-      }
-
-      // Select Top-K frames based on importance scores
-      const topKFrameIds = this.selectTopKFrames(manifest.frames, 10);
-
-      // End session in local storage with Top-K selection
-      await localFrameStorage.endSession(sessionId, topKFrameIds);
-
-      // Get Top-K frames for upload
-      const topKFrames = await localFrameStorage.getTopKFrames(sessionId);
-
-      // Convert to upload format with base64 data
-      const captures = await Promise.all(
-        topKFrames.map(async ({ metadata, imageBuffer }) => ({
-          sequenceNumber: metadata.sequenceNumber,
-          captureTrigger: metadata.trigger,
-          capturedAt: new Date(metadata.timestamp).getTime(),
-          windowId: metadata.windowSourceId,
-          appName: metadata.appName,
-          windowTitle: metadata.windowTitle,
-          screenshotHash: metadata.hash,
-          imageData: imageBuffer.toString("base64"),
-          // Include analysis metadata
-          deltaChanged: metadata.deltaChanged,
-          deltaChangeType: metadata.deltaChangeType,
-          deltaChangeDescription: metadata.deltaChangeDescription,
-          deltaUserAction: metadata.deltaUserAction,
-          onTask: metadata.onTask,
-          taskRelevance: metadata.taskRelevance,
-          importanceScore: metadata.importanceScore,
-          importanceReason: metadata.importanceReason,
-        }))
-      );
-
-      const captureCount = manifest.totalFrameCount;
-
       // End checkpoint tracking (removes checkpoint file)
       await checkpointService.endSession();
+
+      // End session in local storage (no Top-K selection needed — captures
+      // are already analyzed and stored on the backend during the session)
+      const manifest = await localFrameStorage.loadManifest(sessionId);
+      const captureCount = manifest?.totalFrameCount ?? 0;
+      await localFrameStorage.endSession(sessionId, []);
 
       // Update internal state
       this.activeSession.status = "ended";
 
-      // Broadcast update
+      // Broadcast update immediately so renderer sees "ended"
       this.broadcastSessionUpdate();
 
+      const duration = Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs;
       logger.info(` Session ended: ${sessionId}`, {
         totalCaptureCount: captureCount,
-        uploadCount: captures.length,
-        duration: Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs,
+        duration,
       });
 
       // Cleanup session state
@@ -423,7 +389,7 @@ class MonitoringSessionService {
         10 * 60 * 1000
       );
 
-      return { success: true, sessionId, captureCount, captures };
+      return { success: true, sessionId, captureCount, captures: [] };
     } catch (error) {
       logger.error(" Failed to end session:", error);
       return {

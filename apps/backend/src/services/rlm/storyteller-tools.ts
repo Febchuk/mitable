@@ -414,14 +414,9 @@ export const MERGE_SUMMARIES: RLMTool = {
     const summariesText = summaries.map((s, i) => `Chunk ${i + 1}: ${s}`).join("\n\n");
 
     const styleGuidance =
-      env.preferences.style === "concise"
-        ? "Write a concise summary (3-7 main points). Focus on key highlights and outcomes."
-        : "Write a detailed narrative (8-15 main points). Include context, process, and outcomes.";
+      "Write a concise summary (3-7 main points). Focus on key highlights and outcomes.";
 
-    const formatGuidance =
-      env.preferences.format === "bullets"
-        ? "Use bullet points (• or -) for each main activity."
-        : "Write in flowing, connected paragraphs with transitions.";
+    const formatGuidance = "Use bullet points (• or -) for each main activity.";
 
     const prompt = `Merge these chunk summaries into a cohesive final session update.
 
@@ -445,7 +440,7 @@ Final Summary:`;
 
         const userPrompt = `${prompt}\n\nIMPORTANT: Only reference apps, websites, and actions mentioned in the chunk summaries above. Do NOT add information not present. Write the user's own actions in first person. Preserve attribution for other people's actions (e.g. "Mark resolved X").`;
 
-        const maxTokens = env.preferences.style === "verbose" ? 2000 : 1000;
+        const maxTokens = 1000;
         const finalSummary = await callSummarizationLLM(mergeSystemPrompt, userPrompt, maxTokens);
 
         log.debug("Merged summaries", {

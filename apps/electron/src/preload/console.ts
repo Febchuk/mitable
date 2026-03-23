@@ -562,17 +562,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   }): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.AUDIO_PREFERENCES_SET, prefs),
 
-  // End session with preferences (called from Console after dialog confirmation)
-  endSessionWithPreferences: (preferences: {
-    detailLevel: "concise" | "verbose";
-    format: "bullets" | "paragraphs";
-    includeScreenshots: boolean;
-  }): Promise<{
+  // End session fully: stop captures + upload + trigger backend summarization
+  endSessionWithPreferences: (): Promise<{
     success: boolean;
     sessionId?: string;
     captureCount?: number;
     error?: string;
-  }> => ipcRenderer.invoke(IPC_CHANNELS.END_SESSION_WITH_PREFERENCES, preferences),
+  }> => ipcRenderer.invoke(IPC_CHANNELS.END_SESSION_WITH_PREFERENCES),
 
   // Listen for show end session dialog event (triggered from pill)
   onShowEndSessionDialog: (callback: () => void): (() => void) => {

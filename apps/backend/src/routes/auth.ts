@@ -337,9 +337,33 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       return;
     }
 
-    // Database trigger created user with 'employee' role, update to 'admin'
+    // Database trigger should have created user with 'employee' role.
+    // Fallback: if trigger did not fire (e.g. not applied in production),
+    // manually insert the user row so registration never silently fails.
     if (data.user) {
-      await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, data.user.id));
+      const [existingUser] = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.id, data.user.id))
+        .limit(1);
+
+      if (!existingUser) {
+        console.warn("Auth trigger did not create user row — inserting manually:", data.user.id);
+        await db.insert(schema.users).values({
+          id: data.user.id,
+          organizationId: organization.id,
+          email,
+          firstName,
+          lastName,
+          role: "admin",
+          status: "active",
+        });
+      } else {
+        await db
+          .update(schema.users)
+          .set({ role: "admin" })
+          .where(eq(schema.users.id, data.user.id));
+      }
     }
 
     // Auto-login: Generate session by signing in with the new credentials

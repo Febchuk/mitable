@@ -231,14 +231,7 @@ export async function updateSession(
 /**
  * End a session and trigger summary generation
  */
-export async function endSession(
-  sessionId: string,
-  preferences?: {
-    style: "verbose" | "concise";
-    format: "bullets" | "paragraphs";
-    includeScreenshots: boolean;
-  }
-): Promise<{
+export async function endSession(sessionId: string): Promise<{
   success: boolean;
   session: {
     id: string;
@@ -254,25 +247,9 @@ export async function endSession(
     captureCount: number;
   };
 }> {
-  const body: {
-    preferences?: {
-      detailLevel: "verbose" | "concise";
-      format: "bullets" | "paragraphs";
-      includeScreenshots: boolean;
-    };
-  } = {};
-
-  if (preferences) {
-    body.preferences = {
-      detailLevel: preferences.style, // Backend expects detailLevel, frontend uses style
-      format: preferences.format,
-      includeScreenshots: preferences.includeScreenshots,
-    };
-  }
-
   return apiRequest(`/monitoring/sessions/${sessionId}/end`, {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({}),
   });
 }
 
@@ -602,18 +579,6 @@ export async function disconnectGmail(): Promise<{ success: boolean }> {
   return apiRequest<{ success: boolean }>("/integrations/gmail/disconnect", {
     method: "DELETE",
   });
-}
-
-/**
- * DEV ONLY: Regenerate session summary
- */
-export async function regenerateSummary(
-  sessionId: string
-): Promise<{ success: boolean; message: string }> {
-  return apiRequest<{ success: boolean; message: string }>(
-    `/monitoring/sessions/${sessionId}/regenerate-summary`,
-    { method: "POST" }
-  );
 }
 
 // ===========================

@@ -272,20 +272,26 @@ export default function CalendarView() {
   }, [startSession]);
 
   const handleStop = useCallback(async () => {
+    // 1. Optimistic UI: immediately show summarizing state
+    const currentState = await window.consoleAPI?.getMonitoringSessionState();
+    setSessionStatus("idle");
+    if (currentState?.id) {
+      setSummarizingBlockIds((prev) => new Set(prev).add(currentState.id));
+    }
+    queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
+    queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+
+    // 2. Full end flow: stop captures + upload + POST /end (same as pill/SessionDetail)
     try {
-      setSessionStatus("idle");
-      // Capture active block ID before ending so we can optimistically mark it as summarizing
-      const currentState = await window.consoleAPI?.getMonitoringSessionState();
-      if (currentState?.id) {
-        setSummarizingBlockIds((prev) => new Set(prev).add(currentState.id));
-      }
-      const result = await window.consoleAPI?.endMonitoringSession();
+      const result = await window.consoleAPI?.endSessionWithPreferences();
       if (result?.error) {
-        console.error("[CalendarView] endMonitoringSession error:", result.error);
+        console.error("[CalendarView] endSessionWithPreferences error:", result.error);
       }
     } catch (err) {
-      console.error("[CalendarView] endMonitoringSession failed:", err);
+      console.error("[CalendarView] endSessionWithPreferences failed:", err);
     }
+
+    // 3. Refresh data now that backend has started summarization
     queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
     queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
   }, [queryClient]);
