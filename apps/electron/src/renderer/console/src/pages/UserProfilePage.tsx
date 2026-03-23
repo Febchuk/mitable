@@ -20,6 +20,8 @@ import {
   Sun,
   Moon,
   Monitor,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
@@ -47,6 +49,7 @@ import {
 import type { OrgVariant } from "@mitable/shared";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
+import { apiRequest } from "../services/api";
 
 const logger = createLogger("UserProfilePage");
 
@@ -120,6 +123,23 @@ export default function UserProfilePage() {
   const [isFirefliesDisconnecting, setIsFirefliesDisconnecting] = useState(false);
   const [showFirefliesModal, setShowFirefliesModal] = useState(false);
   const [firefliesApiKey, setFirefliesApiKey] = useState("");
+
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<
+    Array<{
+      id: string;
+      name: string;
+      keyPrefix: string;
+      lastUsedAt: string | null;
+      createdAt: string;
+      revokedAt: string | null;
+    }>
+  >([]);
+  const [isApiKeysLoading, setIsApiKeysLoading] = useState(true);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [isCreatingKey, setIsCreatingKey] = useState(false);
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
+  const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
 
   // Agent feature toggle
   const [agentEnabled, setAgentEnabled] = useState(false);
@@ -1529,6 +1549,69 @@ export default function UserProfilePage() {
       });
     } finally {
       setIsFirefliesDisconnecting(false);
+    }
+  };
+
+  // ── API Keys handlers ──
+  const loadApiKeys = useCallback(async () => {
+    setIsApiKeysLoading(true);
+    try {
+      const data = await apiRequest<{
+        keys: Array<{
+          id: string;
+          name: string;
+          keyPrefix: string;
+          lastUsedAt: string | null;
+          createdAt: string;
+          revokedAt: string | null;
+        }>;
+      }>("/api-keys");
+      setApiKeys(data.keys.filter((k) => !k.revokedAt));
+    } catch (error) {
+      logger.error("Error loading API keys:", error);
+    } finally {
+      setIsApiKeysLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadApiKeys();
+  }, [loadApiKeys]);
+
+  const handleCreateApiKey = async () => {
+    if (!newKeyName.trim()) return;
+    setIsCreatingKey(true);
+    try {
+      const result = await apiRequest<{ id: string; key: string; keyPrefix: string }>(
+        "/api-keys",
+        {
+          method: "POST",
+          body: JSON.stringify({ name: newKeyName.trim() }),
+        }
+      );
+      setNewlyCreatedKey(result.key);
+      setNewKeyName("");
+      await loadApiKeys();
+      toast({ title: "API Key Created", description: "Copy your key now — it won't be shown again." });
+    } catch (error) {
+      logger.error("Error creating API key:", error);
+      toast({ title: "Error", description: "Failed to create API key.", variant: "destructive" });
+    } finally {
+      setIsCreatingKey(false);
+    }
+  };
+
+  const handleRevokeApiKey = async (id: string) => {
+    setRevokingKeyId(id);
+    try {
+      await apiRequest(`/api-keys/${id}`, { method: "DELETE" });
+      setApiKeys((prev) => prev.filter((k) => k.id !== id));
+      toast({ title: "API Key Revoked" });
+    } catch (error) {
+      logger.error("Error revoking API key:", error);
+      toast({ title: "Error", description: "Failed to revoke API key.", variant: "destructive" });
+    } finally {
+      setRevokingKeyId(null);
     }
   };
 
@@ -3325,6 +3408,270 @@ export default function UserProfilePage() {
                     )}
                   </div>
                 ))}
+              </div>
+
+              {/* ── API Keys Section ── */}
+              <div
+                style={{
+                  paddingTop: 8,
+                  borderTop: "var(--border-hairline)",
+                }}
+              >
+                <div
+                  style={{
+                    paddingBottom: 16,
+                  }}
+                >
+                  <h2
+                    style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}
+                  >
+                    API Keys
+                  </h2>
+                  <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
+                    Create API keys to connect AI agents like Claude Desktop to your Mitable data via
+                    MCP
+                  </p>
+                </div>
+
+                {/* Create key form */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newKeyName.trim()) handleCreateApiKey();
+                    }}
+                    placeholder="Key name (e.g. Claude Desktop)"
+                    style={{
+                      flex: 1,
+                      padding: "7px 12px",
+                      borderRadius: 6,
+                      fontSize: 13,
+                      color: "var(--text-primary)",
+                      background: "var(--bg-primary)",
+                      border: "var(--border-subtle)",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={handleCreateApiKey}
+                    disabled={!newKeyName.trim() || isCreatingKey}
+                    style={{
+                      padding: "7px 16px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "#fff",
+                      background: isCreatingKey || !newKeyName.trim() ? "#555" : "var(--mi-accent-dark, #3A7A87)",
+                      border: "none",
+                      cursor: isCreatingKey || !newKeyName.trim() ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      transition: "background 0.15s ease",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {isCreatingKey ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Plus size={13} />
+                    )}
+                    Create Key
+                  </button>
+                </div>
+
+                {/* Newly created key banner */}
+                {newlyCreatedKey && (
+                  <div
+                    style={{
+                      marginBottom: 16,
+                      padding: "12px 14px",
+                      borderRadius: 8,
+                      background: "rgba(130, 192, 204, 0.08)",
+                      border: "1px solid rgba(130, 192, 204, 0.25)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#E8B474",
+                          marginBottom: 4,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Copy your key — it won't be shown again
+                      </div>
+                      <code
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-primary)",
+                          wordBreak: "break-all",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {newlyCreatedKey}
+                      </code>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(newlyCreatedKey);
+                        toast({ title: "Copied to clipboard" });
+                      }}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        background: "rgba(var(--ui-rgb), 0.08)",
+                        border: "var(--border-subtle)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Copy size={12} />
+                      Copy
+                    </button>
+                    <button
+                      onClick={() => setNewlyCreatedKey(null)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-tertiary)",
+                        cursor: "pointer",
+                        padding: 4,
+                        display: "flex",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Keys list */}
+                {isApiKeysLoading ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 24,
+                    }}
+                  >
+                    <Loader2 size={16} className="animate-spin" style={{ color: "#4B4740" }} />
+                  </div>
+                ) : apiKeys.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "20px 0",
+                      textAlign: "center",
+                      fontSize: 13,
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    No API keys yet
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      borderRadius: 8,
+                      border: "var(--border-subtle)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {apiKeys.map((key, idx) => (
+                      <div
+                        key={key.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "10px 14px",
+                          borderBottom: idx < apiKeys.length - 1 ? "var(--border-subtle)" : "none",
+                          background: "rgba(var(--ui-rgb), 0.02)",
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: "var(--text-primary)",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {key.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-tertiary)",
+                              marginTop: 3,
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {key.keyPrefix}...
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-tertiary)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {new Date(key.createdAt).toLocaleDateString()}
+                        </div>
+                        <button
+                          onClick={() => handleRevokeApiKey(key.id)}
+                          disabled={revokingKeyId === key.id}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "#4B4740",
+                            cursor: "pointer",
+                            padding: 4,
+                            borderRadius: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            transition: "color 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#E5534B";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#4B4740";
+                          }}
+                          title="Revoke key"
+                        >
+                          {revokingKeyId === key.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Fireflies API Key Modal */}
