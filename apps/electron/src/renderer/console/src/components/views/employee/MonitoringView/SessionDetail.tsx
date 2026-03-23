@@ -1023,11 +1023,7 @@ export default function SessionDetail() {
           </div>
         </div>
 
-        {isRegenerating ? (
-          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
-            <SummarizationProgress progress={session.summarizationProgress ?? null} />
-          </div>
-        ) : summary ? (
+        {summary ? (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6 max-h-[400px] overflow-y-auto">
             <div className="prose prose-invert prose-sm max-w-none break-words [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-white [&_h1]:mb-3 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-white [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-white/90 [&_h3]:mb-2 [&_p]:text-ink-primary [&_p]:text-sm [&_p]:leading-relaxed [&_p]:mb-3 [&_ul]:pl-5 [&_ul]:mb-3 [&_ul]:list-disc [&_ol]:pl-5 [&_ol]:mb-3 [&_ol]:list-decimal [&_li]:text-ink-primary [&_li]:text-sm [&_li]:leading-relaxed [&_li]:mb-1 [&_li]:marker:text-ink-tertiary [&_strong]:text-white [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-primary/80 [&_hr]:border-stroke-subtle [&_hr]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_blockquote]:italic [&_code]:bg-white/5 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-primary">
               <div dangerouslySetInnerHTML={{ __html: summaryHtml }} />

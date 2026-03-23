@@ -332,6 +332,7 @@ declare global {
       stopAudioRecording: () => Promise<{ success: boolean }>;
       sendAudioChunk: (audioBuffer: ArrayBuffer) => void;
       onForceStopAudio: (callback: () => void) => () => void;
+      onForceStartAudio: (callback: () => void) => () => void;
 
       // Pill display mode
       getPillDisplayMode: (userId: string) => Promise<"compact" | "expanded">;

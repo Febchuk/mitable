@@ -206,7 +206,10 @@ function createConsoleWindow() {
     titleBarStyle: "hidden",
     // Show native window controls on Windows/Linux via titleBarOverlay
     ...(isMac
-      ? {}
+      ? {
+          // Position macOS traffic lights within our 44px custom title bar
+          trafficLightPosition: { x: 16, y: 14 },
+        }
       : {
           titleBarOverlay: {
             color: "#1a1a1a",
@@ -305,6 +308,16 @@ function createConsoleWindow() {
   consoleWindow.on("closed", () => {
     app.quit(); // Quit app when main console window is closed
   });
+
+  // macOS: ensure traffic light buttons stay visible after fullscreen transitions
+  if (isMac) {
+    consoleWindow.on("enter-full-screen", () => {
+      consoleWindow?.setWindowButtonVisibility(true);
+    });
+    consoleWindow.on("leave-full-screen", () => {
+      consoleWindow?.setWindowButtonVisibility(true);
+    });
+  }
 }
 
 function createWatchingPillWindow() {
