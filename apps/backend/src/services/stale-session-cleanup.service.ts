@@ -23,6 +23,7 @@ import { eq, and, inArray, isNotNull, sql } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { materializeSession } from "./activity-materializer.service";
 import { masterStoryService } from "./master-story.service";
+import { sessionSummarizationService } from "./session-summarization.service";
 
 const logger = createLogger({ context: "stale-session-cleanup" });
 
@@ -303,14 +304,45 @@ async function triggerSummarization(sessionId: string, userId: string): Promise<
       })(),
     ]);
 
-    // Success — set to ready with the story (include ingestionStatus to match /end route)
+    // Refine master story into task-oriented summary (same as /end route)
+    let finalSummary = storyResult;
+    let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> = [];
+    let accomplishments: string[] = [];
+    let blockers: string[] = [];
+
+    if (storyResult) {
+      try {
+        const refined = await sessionSummarizationService.refineMasterStoryForDelivery(
+          storyResult,
+          sessionId
+        );
+        finalSummary = refined.summary;
+        taskBreakdown = refined.taskBreakdown;
+        accomplishments = refined.accomplishments;
+        blockers = refined.blockers;
+
+        logger.info({ sessionId, taskCount: taskBreakdown.length }, "Stale session story refined");
+      } catch (refineError) {
+        logger.warn(
+          {
+            sessionId,
+            error: refineError instanceof Error ? refineError.message : String(refineError),
+          },
+          "Stale session story refinement failed, using raw story"
+        );
+      }
+    }
+
     await db
       .update(schema.monitoringSessions)
       .set({
         status: "ready",
         summarizationProgress: null,
         ingestionStatus: "ingesting",
-        ...(storyResult ? { finalSummary: storyResult } : {}),
+        ...(finalSummary ? { finalSummary } : {}),
+        ...(taskBreakdown.length > 0 ? { taskBreakdown } : {}),
+        ...(accomplishments.length > 0 ? { accomplishments } : {}),
+        ...(blockers.length > 0 ? { blockers } : {}),
       })
       .where(eq(schema.monitoringSessions.id, sessionId));
 

@@ -249,15 +249,7 @@ function sessionToWorkBlock(
     isFocusedSession: !!session.name, // Named sessions are focused sessions
     goal: session.name ?? undefined,
     name: session.name ?? undefined,
-    status: (() => {
-      const mapped = mapStatus(session.status);
-      // A block is NOT "ready" until tasks exist — keep it as "summarizing" until then
-      const tasks = session.taskBreakdown as Array<unknown> | null;
-      if (mapped === "ready" && (!tasks || tasks.length === 0)) {
-        return "summarizing" as const;
-      }
-      return mapped;
-    })(),
+    status: mapStatus(session.status),
     deliveryStatus:
       session.deliveryStatus === "pending" ||
       session.deliveryStatus === "sent" ||
@@ -276,11 +268,20 @@ function groupSessionsByDay(
 ): ActivityDay[] {
   const MIN_SESSION_DURATION_MS = 3 * 60 * 1000; // 3 minutes — same gate as summarization pipeline
 
-  // Filter out noise/short sessions (same gate as backend summarization)
   const meaningful = sessions.filter((s) => {
     if (s.name === "Short session") return false;
-    if (s.status === "active" || s.status === "paused") return true; // keep active sessions
-    return s.duration.activeMs >= MIN_SESSION_DURATION_MS;
+    if (s.status === "active" || s.status === "paused") return true;
+    if (s.duration.activeMs < MIN_SESSION_DURATION_MS) return false;
+    // Hide unclassified sessions: title is "Work session" with no real summary or tasks
+    if (
+      s.name === "Work session" &&
+      !s.finalSummary &&
+      !s.rawActivitySummary &&
+      !(s.taskBreakdown as unknown[] | null)?.length
+    ) {
+      return false;
+    }
+    return true;
   });
 
   const dayMap = new Map<string, SessionListItem[]>();

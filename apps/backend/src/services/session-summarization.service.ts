@@ -418,7 +418,7 @@ class SessionSummarizationService {
     return `\n<graph_context>\nUse these inferred workflow insights to shape emphasis and wording, but do not invent facts that are not in the session data:\n${sections.join("\n")}\n</graph_context>\n`;
   }
 
-  private async refineMasterStoryForDelivery(
+  async refineMasterStoryForDelivery(
     masterStory: string,
     sessionId: string
   ): Promise<{

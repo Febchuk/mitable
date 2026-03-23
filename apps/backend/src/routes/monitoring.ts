@@ -993,36 +993,55 @@ router.post(
         .then(async ([_, storyResult]) => {
           log.info("Session end processing completed", { sessionId: id });
 
-          // Extract structured task breakdown from the generated story
+          // Refine master story into task-oriented summary with structured breakdown.
+          // refineMasterStoryForDelivery uses capture-level time data, user prefs,
+          // and graph context for accurate task attribution.
+          // Falls back to raw master story if refinement fails.
+          let finalSummary = storyResult;
           let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> =
             [];
+          let accomplishments: string[] = [];
+          let blockers: string[] = [];
+
           if (storyResult) {
             try {
-              const totalMinutes = Math.round(Math.max(0, activeDurationMs) / 60000);
-              taskBreakdown = await sessionSummarizationService.parseTaskBreakdownFromSummary(
+              await db
+                .update(schema.monitoringSessions)
+                .set({ summarizationProgress: "writing_summary" })
+                .where(eq(schema.monitoringSessions.id, id));
+
+              const refined = await sessionSummarizationService.refineMasterStoryForDelivery(
                 storyResult,
-                totalMinutes
+                id
               );
-              log.info("Task breakdown extracted", {
+              finalSummary = refined.summary;
+              taskBreakdown = refined.taskBreakdown;
+              accomplishments = refined.accomplishments;
+              blockers = refined.blockers;
+
+              log.info("Master story refined with task breakdown", {
                 sessionId: id,
                 taskCount: taskBreakdown.length,
+                summaryLength: finalSummary.length,
               });
-            } catch (tbError) {
-              log.warn("Task breakdown extraction failed (non-fatal)", {
-                error: tbError instanceof Error ? tbError.message : String(tbError),
+            } catch (refineError) {
+              log.warn("Master story refinement failed, using raw story as fallback", {
+                error: refineError instanceof Error ? refineError.message : String(refineError),
               });
             }
           }
 
-          // Update status to ready and persist the story summary on the session record
+          // Update status to ready and persist refined summary on the session record
           await db
             .update(schema.monitoringSessions)
             .set({
               status: "ready",
               summarizationProgress: null,
               ingestionStatus: "ingesting",
-              ...(storyResult ? { finalSummary: storyResult } : {}),
+              ...(finalSummary ? { finalSummary } : {}),
               ...(taskBreakdown.length > 0 ? { taskBreakdown } : {}),
+              ...(accomplishments.length > 0 ? { accomplishments } : {}),
+              ...(blockers.length > 0 ? { blockers } : {}),
             })
             .where(eq(schema.monitoringSessions.id, id));
 

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, Clock, FileText, Search, Video, X, Zap } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, FileText, Search, Video, X, Zap, Monitor } from "lucide-react";
+import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
 import { apiRequest } from "@/console/src/services/api";
 import {
@@ -100,6 +101,7 @@ interface RecentWorkBlockItem {
   participants?: { name: string; email: string }[];
   block: WorkBlock;
   blockNumber: number;
+  source?: "granola" | "fireflies" | "session";
 }
 
 type RecentWorkItem = RecentWorkDocItem | RecentWorkBlockItem;
@@ -416,6 +418,7 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
   )) {
     if (block.type !== "work") continue;
+    if (block.description === "Unclassified session." && block.category === "other") continue;
 
     const adapted = createWorkBlockFromActivityBlock(block);
     const previewSource =
@@ -488,8 +491,25 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
   };
 }
 
-function RecentWorkIcon({ kind }: { kind: RecentWorkFilter }) {
-  const icon = kind === "doc" ? <FileText size={18} /> : <Video size={18} />;
+function RecentWorkIcon({
+  kind,
+  source,
+}: {
+  kind: RecentWorkFilter;
+  source?: "granola" | "fireflies" | "session";
+}) {
+  if (kind === "meeting" && source === "granola") {
+    return <GranolaIcon size="md" />;
+  }
+
+  const icon =
+    kind === "doc" ? (
+      <FileText size={18} />
+    ) : kind === "meeting" ? (
+      <Video size={18} />
+    ) : (
+      <Monitor size={18} />
+    );
 
   return (
     <div
@@ -604,6 +624,7 @@ export default function PersonDetail() {
         participants: workBlock.participants,
         block: workBlock,
         blockNumber: 0,
+        source: "granola",
       });
     }
 
@@ -1112,7 +1133,16 @@ export default function PersonDetail() {
                   </ResponsiveContainer>
                 </div>
 
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    maxHeight: 220,
+                    overflowY: "auto",
+                  }}
+                >
                   {person.customerBreakdown.map((entry) => (
                     <button
                       key={entry.label}
@@ -1529,7 +1559,12 @@ export default function PersonDetail() {
                     textAlign: "left",
                   }}
                 >
-                  <RecentWorkIcon kind={item.kind === "doc" ? "doc" : "block"} />
+                  <RecentWorkIcon
+                    kind={
+                      item.kind === "doc" ? "doc" : item.kind === "meeting" ? "meeting" : "block"
+                    }
+                    source={"source" in item ? item.source : undefined}
+                  />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -1542,8 +1577,14 @@ export default function PersonDetail() {
                         <span
                           style={{
                             fontSize: 10,
-                            color: "var(--text-secondary)",
-                            background: "rgba(var(--ui-rgb), 0.06)",
+                            color:
+                              "source" in item && item.source === "granola"
+                                ? "#C8E64A"
+                                : "var(--text-secondary)",
+                            background:
+                              "source" in item && item.source === "granola"
+                                ? "rgba(200, 230, 74, 0.1)"
+                                : "rgba(var(--ui-rgb), 0.06)",
                             borderRadius: 999,
                             padding: "3px 8px",
                             textTransform: "uppercase",
@@ -1555,16 +1596,22 @@ export default function PersonDetail() {
                       ) : null}
                     </div>
 
-                    <p
-                      style={{
-                        margin: "6px 0 0",
-                        fontSize: 12,
-                        color: "var(--text-secondary)",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {item.preview || "No preview available"}
-                    </p>
+                    {item.kind !== "doc" && item.preview && (
+                      <p
+                        style={{
+                          margin: "6px 0 0",
+                          fontSize: 12,
+                          color: "var(--text-secondary)",
+                          lineHeight: 1.5,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {item.preview}
+                      </p>
+                    )}
 
                     <div
                       style={{
