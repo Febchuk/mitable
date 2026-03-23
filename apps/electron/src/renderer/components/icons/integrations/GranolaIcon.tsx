@@ -3,7 +3,7 @@ interface GranolaIconProps {
 }
 
 const sizeMap = {
-  sm: { container: "w-6 h-6 rounded", icon: "w-3.5 h-3.5" },
+  sm: { container: "w-6 h-6 rounded", icon: "w-4 h-4" },
   md: { container: "w-8 h-8 rounded-md", icon: "w-5 h-5" },
   lg: { container: "w-12 h-12 rounded-lg", icon: "w-7 h-7" },
 };

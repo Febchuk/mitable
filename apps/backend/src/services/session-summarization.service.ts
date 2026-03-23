@@ -1858,6 +1858,66 @@ Revised recap:`;
       );
     }
   }
+
+  /**
+   * Refine a master story and persist the refined summary, task breakdown,
+   * accomplishments, and blockers to the session record.
+   * Shared by the /end route and stale-session-cleanup.
+   * Falls back to the raw story if refinement fails.
+   */
+  async refineAndPersistSession(
+    sessionId: string,
+    storyResult: string | null,
+    options?: { updateProgress?: boolean }
+  ): Promise<{
+    finalSummary: string | null;
+    taskBreakdown: TaskBreakdownItem[];
+    accomplishments: string[];
+    blockers: string[];
+  }> {
+    let finalSummary = storyResult;
+    let taskBreakdown: TaskBreakdownItem[] = [];
+    let accomplishments: string[] = [];
+    let blockers: string[] = [];
+
+    if (storyResult) {
+      try {
+        if (options?.updateProgress) {
+          await db
+            .update(schema.monitoringSessions)
+            .set({ summarizationProgress: "writing_summary" })
+            .where(eq(schema.monitoringSessions.id, sessionId));
+        }
+
+        const refined = await this.refineMasterStoryForDelivery(storyResult, sessionId);
+        finalSummary = refined.summary;
+        taskBreakdown = refined.taskBreakdown;
+        accomplishments = refined.accomplishments;
+        blockers = refined.blockers;
+      } catch (refineError) {
+        const log = createSessionLogger({ sessionId });
+        log.warn("Master story refinement failed, using raw story as fallback", {
+          error: refineError instanceof Error ? refineError.message : String(refineError),
+        });
+      }
+    }
+
+    await db
+      .update(schema.monitoringSessions)
+      .set({
+        status: "ready",
+        summarizationProgress: null,
+        ingestionStatus: "ingesting",
+        ...(finalSummary ? { finalSummary } : {}),
+        ...(taskBreakdown.length > 0 ? { taskBreakdown } : {}),
+        ...(accomplishments.length > 0 ? { accomplishments } : {}),
+        ...(blockers.length > 0 ? { blockers } : {}),
+      })
+      .where(eq(schema.monitoringSessions.id, sessionId));
+
+    return { finalSummary, taskBreakdown, accomplishments, blockers };
+  }
+
   /**
    * Re-parse a markdown summary into structured task breakdown.
    * Used when admin edits a summary — keeps task_breakdown in sync.

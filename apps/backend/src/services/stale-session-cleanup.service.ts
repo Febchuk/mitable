@@ -23,6 +23,7 @@ import { eq, and, inArray, isNotNull, sql } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { materializeSession } from "./activity-materializer.service";
 import { masterStoryService } from "./master-story.service";
+import { sessionSummarizationService } from "./session-summarization.service";
 
 const logger = createLogger({ context: "stale-session-cleanup" });
 
@@ -303,18 +304,15 @@ async function triggerSummarization(sessionId: string, userId: string): Promise<
       })(),
     ]);
 
-    // Success — set to ready with the story (include ingestionStatus to match /end route)
-    await db
-      .update(schema.monitoringSessions)
-      .set({
-        status: "ready",
-        summarizationProgress: null,
-        ingestionStatus: "ingesting",
-        ...(storyResult ? { finalSummary: storyResult } : {}),
-      })
-      .where(eq(schema.monitoringSessions.id, sessionId));
-
-    logger.info({ sessionId }, "Stale session summarization completed");
+    // Refine master story and persist (shared with /end route)
+    const { taskBreakdown } = await sessionSummarizationService.refineAndPersistSession(
+      sessionId,
+      storyResult
+    );
+    logger.info(
+      { sessionId, taskCount: taskBreakdown.length },
+      "Stale session summarization completed"
+    );
   } catch (error) {
     logger.error(
       { sessionId, error: String(error) },
