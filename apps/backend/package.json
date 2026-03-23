@@ -51,6 +51,7 @@
     "@deepgram/sdk": "^4.11.3",
     "@google/generative-ai": "^0.24.1",
     "@mitable/shared": "*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@notionhq/client": "^5.2.1",
     "@octokit/app": "^15.1.6",
     "@octokit/core": "^6.1.6",

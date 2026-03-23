@@ -4,8 +4,23 @@ import { Eye, EyeOff } from "lucide-react";
 import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
-import logoSvg from "../../../assets/logo.svg";
+import AuthLogo from "../components/ui/AuthLogo";
 import type { AccountType } from "@mitable/shared";
+
+const inputClassName =
+  "flex h-10 w-full rounded-md px-3 py-2 text-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 outline-none";
+
+const inputStyle = {
+  background: "var(--bg-overlay)",
+  color: "var(--text-primary)",
+  border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+};
+
+const inputFocusStyle = {
+  ...inputStyle,
+  boxShadow: "0 0 0 2px rgba(var(--mi-accent-rgb), 0.35)",
+  borderColor: "var(--mi-accent)",
+};
 
 export default function SignupOrganizationPage() {
   const [formData, setFormData] = useState({
@@ -20,6 +35,7 @@ export default function SignupOrganizationPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const navigate = useNavigate();
   const { updateUser } = useUser();
 
@@ -31,7 +47,6 @@ export default function SignupOrganizationPage() {
     setFormData((prev) => ({
       ...prev,
       accountType: type,
-      // Clear org fields when switching to personal
       organizationName: type === "personal" ? "" : prev.organizationName,
       organizationDomain: type === "personal" ? "" : prev.organizationDomain,
     }));
@@ -49,7 +64,6 @@ export default function SignupOrganizationPage() {
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        // Only send org fields for team accounts
         organizationName: formData.accountType === "team" ? formData.organizationName : undefined,
         organizationDomain:
           formData.accountType === "team" && formData.organizationDomain
@@ -57,10 +71,8 @@ export default function SignupOrganizationPage() {
             : undefined,
       });
 
-      // Save tokens
       authService.saveTokens(response.session.access_token, response.session.refresh_token);
 
-      // Update user context
       updateUser({
         id: response.profile.id,
         name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
@@ -71,7 +83,6 @@ export default function SignupOrganizationPage() {
         organizationId: response.profile.organizationId || "",
       });
 
-      // Redirect to admin dashboard
       navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
@@ -80,23 +91,34 @@ export default function SignupOrganizationPage() {
     }
   };
 
+  const getInputStyle = (field: string) => (focusedField === field ? inputFocusStyle : inputStyle);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#1A1A1A] p-4">
-      <div className="w-full max-w-md bg-background-secondary rounded-lg border border-border-subtle p-8 space-y-6">
+    <div
+      className="flex min-h-screen items-center justify-center p-4"
+      style={{ background: "var(--bg-base)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-xl p-8 space-y-6"
+        style={{
+          background: "var(--bg-raised)",
+          border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+        }}
+      >
         {/* Logo */}
         <div className="flex justify-center">
-          <img src={logoSvg} alt="Mitable" className="h-14 w-auto" />
+          <AuthLogo />
         </div>
 
         {/* Signup form */}
         <div className="space-y-6">
           <div className="space-y-2 text-center">
-            <h1 className="text-heading-3 text-white">
+            <h1 className="text-heading-3" style={{ color: "var(--text-primary)" }}>
               {formData.accountType === "personal"
                 ? "Create Your Account"
                 : "Create Your Organization"}
             </h1>
-            <p className="text-body-sm text-text-secondary">
+            <p className="text-body-sm" style={{ color: "var(--text-secondary)" }}>
               {formData.accountType === "personal"
                 ? "Set up your personal Mitable account"
                 : "Set up your organization and admin account"}
@@ -105,26 +127,34 @@ export default function SignupOrganizationPage() {
 
           {/* Account Type Toggle */}
           <div className="flex justify-center">
-            <div className="inline-flex rounded-lg border border-border-subtle bg-background-elevated p-1">
+            <div
+              className="inline-flex rounded-lg p-1"
+              style={{
+                background: "var(--bg-overlay)",
+                border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => handleAccountTypeChange("personal")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                className="px-4 py-2 text-sm font-medium rounded-md transition-all"
+                style={
                   formData.accountType === "personal"
-                    ? "bg-primary text-white"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
+                    ? { background: "var(--mi-accent-bg)", color: "var(--mi-accent)" }
+                    : { color: "var(--text-secondary)" }
+                }
               >
                 Personal
               </button>
               <button
                 type="button"
                 onClick={() => handleAccountTypeChange("team")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                className="px-4 py-2 text-sm font-medium rounded-md transition-all"
+                style={
                   formData.accountType === "team"
-                    ? "bg-primary text-white"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
+                    ? { background: "var(--mi-accent-bg)", color: "var(--mi-accent)" }
+                    : { color: "var(--text-secondary)" }
+                }
               >
                 Team
               </button>
@@ -132,7 +162,14 @@ export default function SignupOrganizationPage() {
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+            <div
+              className="rounded-md p-3 text-sm"
+              style={{
+                background: "rgba(var(--status-error-rgb), 0.10)",
+                border: "0.5px solid rgba(var(--status-error-rgb), 0.20)",
+                color: "var(--status-error)",
+              }}
+            >
               {error}
             </div>
           )}
@@ -141,7 +178,11 @@ export default function SignupOrganizationPage() {
             {/* Name fields in a row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label htmlFor="firstName" className="text-sm font-medium text-text-primary">
+                <label
+                  htmlFor="firstName"
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   First Name
                 </label>
                 <input
@@ -152,11 +193,18 @@ export default function SignupOrganizationPage() {
                   onChange={(e) => handleChange("firstName", e.target.value)}
                   required
                   disabled={isLoading}
-                  className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  onFocus={() => setFocusedField("firstName")}
+                  onBlur={() => setFocusedField(null)}
+                  className={inputClassName}
+                  style={getInputStyle("firstName")}
                 />
               </div>
               <div className="space-y-2">
-                <label htmlFor="lastName" className="text-sm font-medium text-text-primary">
+                <label
+                  htmlFor="lastName"
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   Last Name
                 </label>
                 <input
@@ -167,14 +215,21 @@ export default function SignupOrganizationPage() {
                   onChange={(e) => handleChange("lastName", e.target.value)}
                   required
                   disabled={isLoading}
-                  className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  onFocus={() => setFocusedField("lastName")}
+                  onBlur={() => setFocusedField(null)}
+                  className={inputClassName}
+                  style={getInputStyle("lastName")}
                 />
               </div>
             </div>
 
             {/* Email */}
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-text-primary">
+              <label
+                htmlFor="email"
+                className="text-sm font-medium"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Email
               </label>
               <input
@@ -185,13 +240,20 @@ export default function SignupOrganizationPage() {
                 onChange={(e) => handleChange("email", e.target.value)}
                 required
                 disabled={isLoading}
-                className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField(null)}
+                className={inputClassName}
+                style={getInputStyle("email")}
               />
             </div>
 
             {/* Password */}
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-text-primary">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Password
               </label>
               <div className="relative">
@@ -202,13 +264,17 @@ export default function SignupOrganizationPage() {
                   onChange={(e) => handleChange("password", e.target.value)}
                   required
                   disabled={isLoading}
-                  className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  onFocus={() => setFocusedField("password")}
+                  onBlur={() => setFocusedField(null)}
+                  className={`${inputClassName} pr-10`}
+                  style={getInputStyle("password")}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isLoading}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors disabled:opacity-50"
+                  style={{ color: "var(--text-tertiary)" }}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -219,11 +285,11 @@ export default function SignupOrganizationPage() {
             {/* Organization Fields - Only shown for Team accounts */}
             {formData.accountType === "team" && (
               <>
-                {/* Organization Name */}
                 <div className="space-y-2">
                   <label
                     htmlFor="organizationName"
-                    className="text-sm font-medium text-text-primary"
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-primary)" }}
                   >
                     Organization Name
                   </label>
@@ -235,18 +301,23 @@ export default function SignupOrganizationPage() {
                     onChange={(e) => handleChange("organizationName", e.target.value)}
                     required
                     disabled={isLoading}
-                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                    onFocus={() => setFocusedField("organizationName")}
+                    onBlur={() => setFocusedField(null)}
+                    className={inputClassName}
+                    style={getInputStyle("organizationName")}
                   />
                 </div>
 
-                {/* Organization Domain (optional) */}
                 <div className="space-y-2">
                   <label
                     htmlFor="organizationDomain"
-                    className="text-sm font-medium text-text-primary"
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-primary)" }}
                   >
                     Organization Domain{" "}
-                    <span className="text-text-tertiary font-normal">(optional)</span>
+                    <span style={{ color: "var(--text-tertiary)" }} className="font-normal">
+                      (optional)
+                    </span>
                   </label>
                   <input
                     id="organizationDomain"
@@ -255,9 +326,12 @@ export default function SignupOrganizationPage() {
                     value={formData.organizationDomain}
                     onChange={(e) => handleChange("organizationDomain", e.target.value)}
                     disabled={isLoading}
-                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                    onFocus={() => setFocusedField("organizationDomain")}
+                    onBlur={() => setFocusedField(null)}
+                    className={inputClassName}
+                    style={getInputStyle("organizationDomain")}
                   />
-                  <p className="text-xs text-text-tertiary">
+                  <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
                     Auto-join employees with matching email domain
                   </p>
                 </div>
@@ -275,12 +349,18 @@ export default function SignupOrganizationPage() {
             </Button>
           </form>
 
-          <div className="text-center pt-2 border-t border-border-subtle">
-            <p className="text-sm text-text-tertiary">
+          <div
+            className="text-center pt-2"
+            style={{ borderTop: "0.5px solid rgba(var(--ui-rgb), 0.10)" }}
+          >
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>
               Already have an account?{" "}
               <a
                 href="#/login"
-                className="text-primary-light hover:text-primary-hover transition-colors font-medium"
+                className="font-medium transition-colors"
+                style={{ color: "var(--mi-accent)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--mi-accent-light)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--mi-accent)")}
               >
                 Sign in
               </a>
