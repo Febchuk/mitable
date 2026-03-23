@@ -1,6 +1,6 @@
 {
   "name": "@mitable/electron",
-  "version": "0.1.46",
+  "version": "0.1.47",
   "description": "Mitable AI Onboarding Buddy - Desktop Application",
   "author": "Mitable",
   "type": "module",
