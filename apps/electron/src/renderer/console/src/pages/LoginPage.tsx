@@ -4,7 +4,22 @@ import { Eye, EyeOff } from "lucide-react";
 import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
-import logoSvg from "../../../assets/logo.svg";
+import AuthLogo from "../components/ui/AuthLogo";
+
+const inputClassName =
+  "flex h-10 w-full rounded-md px-3 py-2 text-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 outline-none";
+
+const inputStyle = {
+  background: "var(--bg-overlay)",
+  color: "var(--text-primary)",
+  border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+};
+
+const inputFocusStyle = {
+  ...inputStyle,
+  boxShadow: "0 0 0 2px rgba(var(--mi-accent-rgb), 0.35)",
+  borderColor: "var(--mi-accent)",
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,6 +27,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const navigate = useNavigate();
   const { updateUser } = useUser();
 
@@ -50,27 +66,46 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background-primary via-[#1e1b4b] to-background-primary p-4 relative overflow-hidden">
-      {/* Animated gradient orbs */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+  const getInputStyle = (field: string) =>
+    focusedField === field ? inputFocusStyle : inputStyle;
 
-      <div className="w-full max-w-md bg-background-secondary/80 backdrop-blur-xl rounded-2xl border border-border-subtle shadow-card-hover p-8 space-y-8 relative z-10">
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center p-4"
+      style={{ background: "var(--bg-base)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-xl p-8 space-y-8"
+        style={{
+          background: "var(--bg-raised)",
+          border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+        }}
+      >
         {/* Logo */}
         <div className="flex justify-center">
-          <img src={logoSvg} alt="Mitable" className="h-14 w-auto" />
+          <AuthLogo />
         </div>
 
         {/* Login form */}
         <div className="space-y-6">
           <div className="space-y-2 text-center">
-            <h1 className="text-heading-3 text-white">Welcome</h1>
-            <p className="text-body-sm text-text-secondary">Sign in to your workspace</p>
+            <h1 className="text-heading-3" style={{ color: "var(--text-primary)" }}>
+              Welcome
+            </h1>
+            <p className="text-body-sm" style={{ color: "var(--text-secondary)" }}>
+              Sign in to your workspace
+            </p>
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
+            <div
+              className="rounded-md p-3 text-sm"
+              style={{
+                background: "rgba(var(--status-error-rgb), 0.10)",
+                border: "0.5px solid rgba(var(--status-error-rgb), 0.20)",
+                color: "var(--status-error)",
+              }}
+            >
               {error}
             </div>
           )}
@@ -78,7 +113,11 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-text-primary">
+                <label
+                  htmlFor="email"
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   Email
                 </label>
                 <input
@@ -89,11 +128,18 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent focus:shadow-glow-purple disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  onFocus={() => setFocusedField("email")}
+                  onBlur={() => setFocusedField(null)}
+                  className={inputClassName}
+                  style={getInputStyle("email")}
                 />
               </div>
               <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-text-primary">
+                <label
+                  htmlFor="password"
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   Password
                 </label>
                 <div className="relative">
@@ -104,13 +150,17 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={isLoading}
-                    className="flex h-10 w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 pr-10 text-sm text-white placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                    onFocus={() => setFocusedField("password")}
+                    onBlur={() => setFocusedField(null)}
+                    className={`${inputClassName} pr-10`}
+                    style={getInputStyle("password")}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors disabled:opacity-50"
+                    style={{ color: "var(--text-tertiary)" }}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -120,7 +170,14 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => navigate("/forgot-password")}
-                    className="text-xs text-primary-light hover:text-primary-hover transition-colors"
+                    className="text-xs transition-colors"
+                    style={{ color: "var(--mi-accent)" }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "var(--mi-accent-light)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = "var(--mi-accent)")
+                    }
                   >
                     Forgot password?
                   </button>
@@ -133,18 +190,31 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-text-tertiary">
+          <p
+            className="text-center text-sm"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             Questions? Your AI assistant is here to help
           </p>
 
-          <div className="text-center pt-2 border-t border-border-subtle">
-            <p className="text-sm text-text-tertiary">
+          <div
+            className="text-center pt-2"
+            style={{ borderTop: "0.5px solid rgba(var(--ui-rgb), 0.10)" }}
+          >
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>
               New to Mitable?{" "}
               <a
                 href="#/signup-organization"
-                className="text-primary-light hover:text-primary-hover transition-colors font-medium"
+                className="font-medium transition-colors"
+                style={{ color: "var(--mi-accent)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "var(--mi-accent-light)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "var(--mi-accent)")
+                }
               >
-                Sign up now →
+                Sign up now &rarr;
               </a>
             </p>
           </div>
