@@ -236,7 +236,7 @@ function sessionToWorkBlock(
     endTime,
     duration: Math.round(durationMinutes),
     idleGapBefore,
-    summary: session.finalSummary || session.rawActivitySummary || "",
+    summary: session.finalSummary || session.rawActivitySummary || "Work session — summary unavailable.",
     captures: transformedCaptures,
     appBreakdown,
     taskBreakdown:
@@ -272,15 +272,6 @@ function groupSessionsByDay(
     if (s.name === "Short session") return false;
     if (s.status === "active" || s.status === "paused") return true;
     if (s.duration.activeMs < MIN_SESSION_DURATION_MS) return false;
-    // Hide unclassified sessions: title is "Work session" with no real summary or tasks
-    if (
-      s.name === "Work session" &&
-      !s.finalSummary &&
-      !s.rawActivitySummary &&
-      !(s.taskBreakdown as unknown[] | null)?.length
-    ) {
-      return false;
-    }
     return true;
   });
 

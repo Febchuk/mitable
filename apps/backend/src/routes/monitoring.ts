@@ -993,57 +993,16 @@ router.post(
         .then(async ([_, storyResult]) => {
           log.info("Session end processing completed", { sessionId: id });
 
-          // Refine master story into task-oriented summary with structured breakdown.
-          // refineMasterStoryForDelivery uses capture-level time data, user prefs,
-          // and graph context for accurate task attribution.
-          // Falls back to raw master story if refinement fails.
-          let finalSummary = storyResult;
-          let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> =
-            [];
-          let accomplishments: string[] = [];
-          let blockers: string[] = [];
-
-          if (storyResult) {
-            try {
-              await db
-                .update(schema.monitoringSessions)
-                .set({ summarizationProgress: "writing_summary" })
-                .where(eq(schema.monitoringSessions.id, id));
-
-              const refined = await sessionSummarizationService.refineMasterStoryForDelivery(
-                storyResult,
-                id
-              );
-              finalSummary = refined.summary;
-              taskBreakdown = refined.taskBreakdown;
-              accomplishments = refined.accomplishments;
-              blockers = refined.blockers;
-
-              log.info("Master story refined with task breakdown", {
-                sessionId: id,
-                taskCount: taskBreakdown.length,
-                summaryLength: finalSummary.length,
-              });
-            } catch (refineError) {
-              log.warn("Master story refinement failed, using raw story as fallback", {
-                error: refineError instanceof Error ? refineError.message : String(refineError),
-              });
-            }
-          }
-
-          // Update status to ready and persist refined summary on the session record
-          await db
-            .update(schema.monitoringSessions)
-            .set({
-              status: "ready",
-              summarizationProgress: null,
-              ingestionStatus: "ingesting",
-              ...(finalSummary ? { finalSummary } : {}),
-              ...(taskBreakdown.length > 0 ? { taskBreakdown } : {}),
-              ...(accomplishments.length > 0 ? { accomplishments } : {}),
-              ...(blockers.length > 0 ? { blockers } : {}),
-            })
-            .where(eq(schema.monitoringSessions.id, id));
+          // Refine master story and persist summary + task breakdown to DB
+          const { taskBreakdown } = await sessionSummarizationService.refineAndPersistSession(
+            id,
+            storyResult,
+            { updateProgress: true }
+          );
+          log.info("Session refined and persisted", {
+            sessionId: id,
+            taskCount: taskBreakdown.length,
+          });
 
           // Rolling daily recap: append to today's recap or create a new one
           // Skip if client explicitly disabled auto-recap (default: enabled)

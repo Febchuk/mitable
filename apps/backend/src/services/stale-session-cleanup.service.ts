@@ -304,49 +304,15 @@ async function triggerSummarization(sessionId: string, userId: string): Promise<
       })(),
     ]);
 
-    // Refine master story into task-oriented summary (same as /end route)
-    let finalSummary = storyResult;
-    let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> = [];
-    let accomplishments: string[] = [];
-    let blockers: string[] = [];
-
-    if (storyResult) {
-      try {
-        const refined = await sessionSummarizationService.refineMasterStoryForDelivery(
-          storyResult,
-          sessionId
-        );
-        finalSummary = refined.summary;
-        taskBreakdown = refined.taskBreakdown;
-        accomplishments = refined.accomplishments;
-        blockers = refined.blockers;
-
-        logger.info({ sessionId, taskCount: taskBreakdown.length }, "Stale session story refined");
-      } catch (refineError) {
-        logger.warn(
-          {
-            sessionId,
-            error: refineError instanceof Error ? refineError.message : String(refineError),
-          },
-          "Stale session story refinement failed, using raw story"
-        );
-      }
-    }
-
-    await db
-      .update(schema.monitoringSessions)
-      .set({
-        status: "ready",
-        summarizationProgress: null,
-        ingestionStatus: "ingesting",
-        ...(finalSummary ? { finalSummary } : {}),
-        ...(taskBreakdown.length > 0 ? { taskBreakdown } : {}),
-        ...(accomplishments.length > 0 ? { accomplishments } : {}),
-        ...(blockers.length > 0 ? { blockers } : {}),
-      })
-      .where(eq(schema.monitoringSessions.id, sessionId));
-
-    logger.info({ sessionId }, "Stale session summarization completed");
+    // Refine master story and persist (shared with /end route)
+    const { taskBreakdown } = await sessionSummarizationService.refineAndPersistSession(
+      sessionId,
+      storyResult
+    );
+    logger.info(
+      { sessionId, taskCount: taskBreakdown.length },
+      "Stale session summarization completed"
+    );
   } catch (error) {
     logger.error(
       { sessionId, error: String(error) },
