@@ -343,7 +343,22 @@ export default function AgentView() {
 
         if (result.escalate) {
           // Layer 1 can't handle it — fall back to Layer 2 (Claude Code SDK)
-          await window.consoleAPI?.agentSendMessage(convId, trimmed);
+          // Build conversation history so Layer 2 has full context
+          // (e.g. user says "create a doc with this info" — Layer 2 needs the preceding response)
+          const recentHistory = messages
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .slice(-6) // last 3 exchanges max
+            .map((m) => `[${m.role}]: ${m.content}`)
+            .join("\n\n");
+
+          let enrichedMessage = trimmed;
+          if (recentHistory) {
+            enrichedMessage = `<conversation_history>\n${recentHistory}\n</conversation_history>\n\nUser's latest request: ${trimmed}`;
+          }
+          if (result.context) {
+            enrichedMessage += `\n\n<context_from_layer1>\n${result.context}\n</context_from_layer1>`;
+          }
+          await window.consoleAPI?.agentSendMessage(convId, enrichedMessage);
         } else if (result.response) {
           // Layer 1 handled it
           const assistantMsg: ChatMessage = {

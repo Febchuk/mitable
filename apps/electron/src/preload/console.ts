@@ -64,6 +64,8 @@ const IPC_CHANNELS = {
   AUTO_RECAP_SET: "auto-recap-set",
   AGENT_ENABLED_GET: "agent-enabled-get",
   AGENT_ENABLED_SET: "agent-enabled-set",
+  AGENT_SKILLS_GET: "agent-skills-get",
+  AGENT_SKILLS_DIR: "agent-skills-dir",
   PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
   PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
   THEME_GET: "theme-get",
@@ -644,6 +646,10 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   setAgentEnabled: (userId: string, enabled: boolean): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.AGENT_ENABLED_SET, userId, enabled),
+
+  getAgentSkills: (): Promise<unknown[]> => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SKILLS_GET),
+
+  getAgentSkillsDir: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.AGENT_SKILLS_DIR),
 
   // Agent system
   agentSendMessage: (conversationId: string, message: string): Promise<void> =>

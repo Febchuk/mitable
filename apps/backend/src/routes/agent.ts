@@ -732,8 +732,23 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
     }
 
     if (escalate) {
-      logger.info({ iterations, toolCalls }, "Agent query RLM escalating to SDK");
-      res.json({ escalate: true });
+      // Collect any data Layer 1 gathered via tool calls to enrich Layer 2's context
+      const gatheredContext = rlmMessages
+        .filter(
+          (m) =>
+            m.role === "user" && m.content.startsWith('Tool "') && m.content.includes("returned:")
+        )
+        .map((m) => m.content)
+        .join("\n\n");
+
+      logger.info(
+        { iterations, toolCalls, hasContext: gatheredContext.length > 0 },
+        "Agent query RLM escalating to SDK"
+      );
+      res.json({
+        escalate: true,
+        context: gatheredContext || undefined,
+      });
       return;
     }
 

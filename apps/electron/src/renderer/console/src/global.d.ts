@@ -288,6 +288,8 @@ interface ConsoleAPI {
   // Agent feature toggle (user-scoped)
   getAgentEnabled: (userId: string) => Promise<boolean>;
   setAgentEnabled: (userId: string, enabled: boolean) => Promise<{ success: boolean }>;
+  getAgentSkills: () => Promise<unknown[]>;
+  getAgentSkillsDir: () => Promise<string>;
 
   // Agent system
   agentSendMessage: (conversationId: string, message: string) => Promise<void>;

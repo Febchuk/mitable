@@ -27,6 +27,231 @@ const AGENT_DIR = path.join(app.getPath("home"), ".mitable", "agent");
 const SKILLS_DIR = path.join(AGENT_DIR, "skills");
 const MEMORY_DIR = path.join(AGENT_DIR, "memory");
 
+// ─── Executable Skill Definitions (.skill.json) ────────────────────────
+
+export interface SkillToolParameter {
+  type: string;
+  required: boolean;
+  description: string;
+  values?: string[];
+}
+
+export interface SkillTool {
+  name: string;
+  description: string;
+  confirmationRequired: boolean;
+  endpoint?: string;
+  method?: string;
+  runtime?: string;
+  parameters: Record<string, SkillToolParameter>;
+}
+
+export interface SkillDefinition {
+  name: string;
+  version: string;
+  source: "mitable-preset" | "auto-generated" | "user-created";
+  description: string;
+  packages?: string[];
+  runtime?: string;
+  auth?: {
+    type: string;
+    provider: string;
+    scopes: string[];
+    checkEndpoint: string;
+  };
+  tools: SkillTool[];
+}
+
+const PRESET_SKILLS: SkillDefinition[] = [
+  {
+    name: "google-suite",
+    version: "1.0.0",
+    source: "mitable-preset",
+    description:
+      "Send emails with attachments, manage Drive folders, upload files, create Google Docs",
+    auth: {
+      type: "oauth2",
+      provider: "google",
+      scopes: ["gmail.send", "gmail.readonly", "drive", "documents"],
+      checkEndpoint: "/api/agent/skills/google-auth-status",
+    },
+    tools: [
+      {
+        name: "send_email",
+        description:
+          "Send an email via Gmail. Supports optional file attachment via documentId from generate_document.",
+        confirmationRequired: true,
+        endpoint: "/api/agent/skills/send-email",
+        method: "POST",
+        parameters: {
+          to: { type: "string", required: true, description: "Recipient email address" },
+          subject: { type: "string", required: true, description: "Email subject line" },
+          body: { type: "string", required: true, description: "Email body (plain text)" },
+          documentId: {
+            type: "string",
+            required: false,
+            description: "Attach a generated document by reference ID",
+          },
+        },
+      },
+      {
+        name: "create_drive_folder",
+        description: "Create a new folder in Google Drive",
+        confirmationRequired: false,
+        endpoint: "/api/agent/skills/create-drive-folder",
+        method: "POST",
+        parameters: {
+          name: { type: "string", required: true, description: "Folder name" },
+          parentFolderId: {
+            type: "string",
+            required: false,
+            description: "Parent folder ID (root if omitted)",
+          },
+        },
+      },
+      {
+        name: "upload_to_drive",
+        description:
+          "Upload a file to Google Drive. Accepts documentId reference or raw base64 content.",
+        confirmationRequired: false,
+        endpoint: "/api/agent/skills/upload-to-drive",
+        method: "POST",
+        parameters: {
+          documentId: {
+            type: "string",
+            required: false,
+            description: "Reference to a generated document (preferred)",
+          },
+          fileName: { type: "string", required: true, description: "File name with extension" },
+          mimeType: { type: "string", required: false, description: "MIME type" },
+          folderId: {
+            type: "string",
+            required: false,
+            description: "Drive folder ID to upload into",
+          },
+        },
+      },
+      {
+        name: "list_drive_folders",
+        description: "List folders in Google Drive for file organization",
+        confirmationRequired: false,
+        endpoint: "/api/agent/skills/list-drive-folders",
+        method: "GET",
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: "document-generation",
+    version: "2.0.0",
+    source: "mitable-preset",
+    description:
+      "Create Word docs, PDFs, Excel spreadsheets, and calendar events locally on your device",
+    packages: ["docx@9.x", "pdf-lib@1.x", "exceljs@4.x", "ical-generator@10.x"],
+    runtime: "local",
+    tools: [
+      {
+        name: "generate_document",
+        description:
+          "Generate a Word .docx, PDF, or Google Doc from markdown content. Returns a documentId reference.",
+        confirmationRequired: false,
+        runtime: "electron",
+        parameters: {
+          title: { type: "string", required: true, description: "Document title" },
+          content: {
+            type: "string",
+            required: true,
+            description: "Document content (supports markdown)",
+          },
+          format: {
+            type: "enum",
+            required: false,
+            description: "Output format (default: docx)",
+            values: ["docx", "pdf", "google-doc"],
+          },
+          folderId: {
+            type: "string",
+            required: false,
+            description: "Google Drive folder ID (for google-doc format)",
+          },
+        },
+      },
+      {
+        name: "generate_spreadsheet",
+        description:
+          "Generate an Excel .xlsx spreadsheet from structured data. Returns a documentId reference.",
+        confirmationRequired: false,
+        runtime: "electron",
+        parameters: {
+          title: {
+            type: "string",
+            required: true,
+            description: "Spreadsheet title (used as filename)",
+          },
+          headers: { type: "array", required: true, description: "Column header names" },
+          rows: {
+            type: "array",
+            required: true,
+            description: "Array of rows, each row is an array of cell values",
+          },
+          sheetName: {
+            type: "string",
+            required: false,
+            description: "Worksheet name (defaults to title)",
+          },
+        },
+      },
+      {
+        name: "create_calendar_event",
+        description:
+          "Create a calendar event (.ics file) that can be saved, uploaded, or emailed as an invite.",
+        confirmationRequired: false,
+        runtime: "electron",
+        parameters: {
+          title: { type: "string", required: true, description: "Event title/summary" },
+          start: { type: "string", required: true, description: "Start time (ISO 8601)" },
+          end: { type: "string", required: true, description: "End time (ISO 8601)" },
+          description: {
+            type: "string",
+            required: false,
+            description: "Event description or agenda",
+          },
+          location: {
+            type: "string",
+            required: false,
+            description: "Event location or meeting link",
+          },
+          attendees: {
+            type: "array",
+            required: false,
+            description: "Email addresses of attendees",
+          },
+        },
+      },
+      {
+        name: "save_file_locally",
+        description: "Save a generated file to the user's Desktop, Documents, or Downloads folder.",
+        confirmationRequired: false,
+        runtime: "electron",
+        parameters: {
+          documentId: {
+            type: "string",
+            required: true,
+            description: "Reference ID from any generate tool",
+          },
+          fileName: { type: "string", required: false, description: "Override file name" },
+          location: {
+            type: "enum",
+            required: false,
+            description: "Save location (default: desktop)",
+            values: ["desktop", "documents", "downloads"],
+          },
+        },
+      },
+    ],
+  },
+];
+
 const MEMORY_TEMPLATE = `# Agent Memory
 
 This file persists across conversations. The Mitable Agent reads it for context.
@@ -64,6 +289,9 @@ class SkillsStore {
 
     // Migrate from old JSON format if needed
     await this.migrateFromJson();
+
+    // Sync preset executable skills (.skill.json)
+    await this.syncPresetSkills();
 
     this.initialized = true;
   }
@@ -314,6 +542,72 @@ class SkillsStore {
     } catch (e) {
       logger.error("Failed to migrate skills from JSON", e);
     }
+  }
+
+  // ─── Executable Skills (.skill.json) ──────────────────────────────────
+
+  /**
+   * Sync preset skills to the user's skills directory.
+   * Only writes if the file doesn't exist or the bundled version is newer.
+   */
+  private async syncPresetSkills(): Promise<void> {
+    for (const preset of PRESET_SKILLS) {
+      const fileName = `${preset.name}.skill.json`;
+      const filePath = path.join(SKILLS_DIR, fileName);
+
+      try {
+        if (fs.existsSync(filePath)) {
+          const existing = JSON.parse(
+            await fs.promises.readFile(filePath, "utf-8")
+          ) as SkillDefinition;
+
+          // Only overwrite if bundled version is newer
+          if (existing.version >= preset.version && existing.source === "mitable-preset") {
+            continue;
+          }
+        }
+
+        await fs.promises.writeFile(filePath, JSON.stringify(preset, null, 2), "utf-8");
+        logger.info(`Synced preset skill: ${fileName}`);
+      } catch (e) {
+        logger.error(`Failed to sync preset skill: ${fileName}`, e);
+      }
+    }
+  }
+
+  /**
+   * Read all executable skill definitions (.skill.json) from disk.
+   */
+  async getExecutableSkills(): Promise<SkillDefinition[]> {
+    await this.ensureDirectories();
+    const skills: SkillDefinition[] = [];
+
+    let files: string[];
+    try {
+      files = await fs.promises.readdir(SKILLS_DIR);
+    } catch {
+      return [];
+    }
+
+    for (const file of files) {
+      if (!file.endsWith(".skill.json")) continue;
+      try {
+        const content = await fs.promises.readFile(path.join(SKILLS_DIR, file), "utf-8");
+        const skill = JSON.parse(content) as SkillDefinition;
+        skills.push(skill);
+      } catch (e) {
+        logger.error(`Failed to parse skill file: ${file}`, e);
+      }
+    }
+
+    return skills;
+  }
+
+  /**
+   * Get the path to the skills directory (for display in UI).
+   */
+  getSkillsDirectory(): string {
+    return SKILLS_DIR;
   }
 }
 

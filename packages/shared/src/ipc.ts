@@ -90,6 +90,8 @@ export const IPC_CHANNELS = {
   AUTO_RECAP_SET: "auto-recap-set",
   AGENT_ENABLED_GET: "agent-enabled-get",
   AGENT_ENABLED_SET: "agent-enabled-set",
+  AGENT_SKILLS_GET: "agent-skills-get",
+  AGENT_SKILLS_DIR: "agent-skills-dir",
 
   // Summary preferences
   SUMMARY_PREFERENCES_GET: "summary-preferences-get",

@@ -2181,6 +2181,24 @@ function setupMonitoringSessionHandlers() {
     return preferencesService.getUserAgentEnabled(userId);
   });
 
+  ipcMain.handle(IPC_CHANNELS.AGENT_SKILLS_GET, async () => {
+    try {
+      return await skillsStore.getExecutableSkills();
+    } catch (err) {
+      console.error("Failed to get executable skills:", err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AGENT_SKILLS_DIR, () => {
+    try {
+      return skillsStore.getSkillsDirectory();
+    } catch (err) {
+      console.error("Failed to get skills directory:", err);
+      return "";
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.AGENT_ENABLED_SET, (_, userId: string, enabled: boolean) => {
     preferencesService.setUserAgentEnabled(userId, enabled);
     return { success: true };

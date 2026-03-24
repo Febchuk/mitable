@@ -8,6 +8,13 @@ import { createLogger } from "../lib/logger";
 import { skillsStore, type AgentSkill } from "./skillsStore";
 import { authManager } from "./authManager";
 import { browserBridgeService } from "./browserBridgeService";
+import {
+  generateDocxLocally,
+  generatePdfLocally,
+  generateSpreadsheetLocally,
+  generateCalendarEventLocally,
+  getTempDocument,
+} from "./localDocumentService";
 
 const logger = createLogger("AgentSdkService");
 
@@ -59,6 +66,9 @@ const READ_ONLY_TOOLS = [
   "mcp__mitable__browser_scroll",
   "mcp__mitable__browser_hover",
   "mcp__mitable__browser_read_element",
+  // Google Workspace skills (read-only: auth check, list folders)
+  "mcp__mitable__google_auth_status",
+  "mcp__mitable__list_drive_folders",
   // Admin analytics tools (only registered when user is admin, but always in allowlist)
   "mcp__mitable__list_team_members",
   "mcp__mitable__query_org_metrics",
@@ -81,6 +91,15 @@ const ALL_TOOLS = [
   "mcp__mitable__browser_tab_open",
   "mcp__mitable__browser_tab_close",
   "mcp__mitable__browser_keyboard",
+  // Google Workspace skills (write: send email, create folder, upload)
+  "mcp__mitable__send_email",
+  "mcp__mitable__create_drive_folder",
+  "mcp__mitable__upload_to_drive",
+  // Document generation skills (local: docx, pdf, xlsx, ics, save)
+  "mcp__mitable__generate_document",
+  "mcp__mitable__generate_spreadsheet",
+  "mcp__mitable__create_calendar_event",
+  "mcp__mitable__save_file_locally",
 ];
 
 const ACTION_PLAN_MARKER = "[ACTION_PLAN]";
@@ -1086,6 +1105,427 @@ class AgentSdkService {
       );
     }
 
+    // ── Google Workspace Skills ────────────────────────────────────────
+
+    const checkGoogleAuthTool = tool(
+      "google_auth_status",
+      "Check if the user has connected their Google account (Gmail, Drive, Docs). Returns { connected, email, needsReconnect }. ALWAYS call this before using any Google skill. If not connected, tell the user to connect Google in Settings > Integrations.",
+      {},
+      async () => {
+        try {
+          const freshToken = authManager.getAccessToken();
+          const headers = {
+            ...authHeaders,
+            ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+          };
+          const res = await fetch(`${apiUrl}/api/agent/skills/google-auth-status`, {
+            headers,
+          });
+          return { content: [{ type: "text" as const, text: await res.text() }] };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const sendEmailTool = tool(
+      "send_email",
+      "Send an email via the user's Gmail account. Supports optional file attachment via documentId (from generate_document). IMPORTANT: Always show the user a draft (to, subject, body, attachment name if any) and get explicit confirmation before calling this tool.",
+      {
+        to: z.string().describe("Recipient email address"),
+        subject: z.string().describe("Email subject line"),
+        body: z.string().describe("Email body text (plain text)"),
+        documentId: z
+          .string()
+          .optional()
+          .describe("Attach a generated document (documentId from generate_document)"),
+      },
+      async ({ to, subject, body, documentId }) => {
+        try {
+          const freshToken = authManager.getAccessToken();
+          const headers = {
+            ...authHeaders,
+            ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+          };
+
+          // If there's an attachment, read from local temp store and send as base64
+          let attachmentPayload:
+            | { fileName: string; mimeType: string; contentBase64: string }
+            | undefined;
+          if (documentId) {
+            const doc = getTempDocument(documentId);
+            if (!doc) {
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: "Error: Attachment document not found or expired. Generate it again with generate_document.",
+                  },
+                ],
+              };
+            }
+            attachmentPayload = {
+              fileName: doc.fileName,
+              mimeType: doc.mimeType,
+              contentBase64: doc.buffer.toString("base64"),
+            };
+          }
+
+          const res = await fetch(`${apiUrl}/api/agent/skills/send-email`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              to,
+              subject,
+              body,
+              ...(attachmentPayload ? { attachment: attachmentPayload } : {}),
+            }),
+          });
+          return { content: [{ type: "text" as const, text: await res.text() }] };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const createDriveFolderTool = tool(
+      "create_drive_folder",
+      "Create a new folder in the user's Google Drive. Returns the folder ID and URL.",
+      {
+        name: z.string().describe("Folder name"),
+        parentFolderId: z.string().optional().describe("Parent folder ID (omit for root of Drive)"),
+      },
+      async ({ name, parentFolderId }) => {
+        try {
+          const freshToken = authManager.getAccessToken();
+          const headers = {
+            ...authHeaders,
+            ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+          };
+          const res = await fetch(`${apiUrl}/api/agent/skills/create-drive-folder`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ name, parentFolderId }),
+          });
+          return { content: [{ type: "text" as const, text: await res.text() }] };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const listDriveFoldersTool = tool(
+      "list_drive_folders",
+      "List folders in the user's Google Drive. Useful for finding where to save files.",
+      {},
+      async () => {
+        try {
+          const freshToken = authManager.getAccessToken();
+          const headers = {
+            ...authHeaders,
+            ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+          };
+          const res = await fetch(`${apiUrl}/api/agent/skills/list-drive-folders`, {
+            headers,
+          });
+          return { content: [{ type: "text" as const, text: await res.text() }] };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const uploadToDriveTool = tool(
+      "upload_to_drive",
+      "Upload a file to Google Drive. Provide EITHER a documentId (from generate_document) OR raw contentBase64. Prefer documentId to avoid large payloads.",
+      {
+        documentId: z
+          .string()
+          .optional()
+          .describe("The documentId from generate_document (preferred)"),
+        fileName: z.string().describe("File name including extension"),
+        mimeType: z
+          .string()
+          .optional()
+          .describe("MIME type (auto-detected from documentId if omitted)"),
+        contentBase64: z
+          .string()
+          .optional()
+          .describe("Base64-encoded file content (only if no documentId)"),
+        folderId: z.string().optional().describe("Drive folder ID to upload into (omit for root)"),
+      },
+      async ({ documentId, fileName, mimeType, contentBase64, folderId }) => {
+        try {
+          const freshToken = authManager.getAccessToken();
+          const headers = {
+            ...authHeaders,
+            ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+          };
+
+          let actualBase64 = contentBase64;
+          let resolvedMimeType = mimeType;
+
+          // Read from local on-device temp store first
+          if (documentId && !actualBase64) {
+            const doc = getTempDocument(documentId);
+            if (doc) {
+              actualBase64 = doc.buffer.toString("base64");
+              resolvedMimeType = resolvedMimeType || doc.mimeType;
+            } else {
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: "Error: Document not found or expired. Generate it again with generate_document.",
+                  },
+                ],
+              };
+            }
+          }
+
+          if (!actualBase64) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Error: Provide either documentId or contentBase64",
+                },
+              ],
+            };
+          }
+
+          const res = await fetch(`${apiUrl}/api/agent/skills/upload-to-drive`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              fileName,
+              mimeType:
+                resolvedMimeType ||
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              contentBase64: actualBase64,
+              folderId,
+            }),
+          });
+          return { content: [{ type: "text" as const, text: await res.text() }] };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const generateDocumentTool = tool(
+      "generate_document",
+      "Generate a document from content. Supports Word (.docx), PDF (.pdf), or Google Doc. For docx/pdf, generates locally on-device and returns a documentId reference — use this ID with save_file_locally, upload_to_drive, or send_email. For Google Doc, creates it directly in Drive and returns the URL.",
+      {
+        title: z.string().describe("Document title"),
+        content: z
+          .string()
+          .describe("Document content (supports markdown: headings, bold, italic, bullets)"),
+        format: z
+          .enum(["docx", "pdf", "google-doc"])
+          .optional()
+          .describe("Output format: 'docx' (default), 'pdf', or 'google-doc'"),
+        folderId: z
+          .string()
+          .optional()
+          .describe("Google Drive folder ID to save into (optional, for google-doc)"),
+      },
+      async ({ title, content, format, folderId }) => {
+        try {
+          const effectiveFormat = format || "docx";
+
+          // Google Doc format needs backend (requires Google OAuth)
+          if (effectiveFormat === "google-doc") {
+            const freshToken = authManager.getAccessToken();
+            const headers = {
+              ...authHeaders,
+              ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+            };
+            const res = await fetch(`${apiUrl}/api/agent/skills/create-google-doc`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ title, content, folderId }),
+            });
+            return { content: [{ type: "text" as const, text: await res.text() }] };
+          }
+
+          // Local generation
+          const generator = effectiveFormat === "pdf" ? generatePdfLocally : generateDocxLocally;
+          const { documentId, fileName } = await generator(title, content);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: true,
+                  documentId,
+                  fileName,
+                  note: "Document generated locally. Use documentId with save_file_locally or upload_to_drive.",
+                }),
+              },
+            ],
+          };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const saveFileLocallyTool = tool(
+      "save_file_locally",
+      "Save a previously generated document to the user's local machine. Use the documentId returned by generate_document. Do NOT pass file content directly — always use the documentId reference.",
+      {
+        documentId: z.string().describe("The documentId returned by generate_document"),
+        fileName: z
+          .string()
+          .optional()
+          .describe("Override file name (default: name from generate_document)"),
+        location: z
+          .enum(["desktop", "documents", "downloads"])
+          .optional()
+          .describe("Where to save: 'desktop' (default), 'documents', or 'downloads'"),
+      },
+      async ({ documentId, fileName, location }) => {
+        try {
+          const { app: electronApp } = await import("electron");
+          const { writeFile, mkdir } = await import("fs/promises");
+          const { join: pathJoin } = await import("path");
+
+          // Read from local on-device temp store (no network call)
+          const doc = getTempDocument(documentId);
+          if (!doc) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Error: Document not found or expired. Generate it again with generate_document.",
+                },
+              ],
+            };
+          }
+
+          const actualFileName = fileName || doc.fileName;
+          const loc = location || "desktop";
+          let basePath: string;
+          switch (loc) {
+            case "documents":
+              basePath = electronApp.getPath("documents");
+              break;
+            case "downloads":
+              basePath = electronApp.getPath("downloads");
+              break;
+            default:
+              basePath = electronApp.getPath("desktop");
+          }
+
+          await mkdir(basePath, { recursive: true });
+          const filePath = pathJoin(basePath, actualFileName);
+          await writeFile(filePath, doc.buffer);
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: true,
+                  filePath,
+                  location: loc,
+                  fileName: actualFileName,
+                }),
+              },
+            ],
+          };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const generateSpreadsheetTool = tool(
+      "generate_spreadsheet",
+      "Generate an Excel (.xlsx) spreadsheet from structured data. Returns a documentId — use with save_file_locally, upload_to_drive, or send_email as attachment.",
+      {
+        title: z.string().describe("Spreadsheet title (used as filename)"),
+        headers: z.array(z.string()).describe("Column header names"),
+        rows: z
+          .array(z.array(z.string()))
+          .describe("Array of rows, each row is an array of cell values"),
+        sheetName: z.string().optional().describe("Worksheet name (defaults to title)"),
+      },
+      async ({ title, headers, rows, sheetName }) => {
+        try {
+          const { documentId, fileName } = await generateSpreadsheetLocally(
+            title,
+            headers,
+            rows,
+            sheetName
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: true,
+                  documentId,
+                  fileName,
+                  rowCount: rows.length,
+                  note: "Spreadsheet generated locally. Use documentId with save_file_locally or upload_to_drive.",
+                }),
+              },
+            ],
+          };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
+    const createCalendarEventTool = tool(
+      "create_calendar_event",
+      "Create a calendar event (.ics file) that can be saved locally, uploaded to Drive, or emailed as an attachment. The recipient can open the .ics file to add the event to their calendar app.",
+      {
+        title: z.string().describe("Event title/summary"),
+        start: z.string().describe("Start time as ISO 8601 datetime (e.g. '2026-03-25T10:00:00')"),
+        end: z.string().describe("End time as ISO 8601 datetime (e.g. '2026-03-25T11:00:00')"),
+        description: z.string().optional().describe("Event description or agenda"),
+        location: z
+          .string()
+          .optional()
+          .describe("Event location (physical address or virtual meeting link)"),
+        attendees: z
+          .array(z.string())
+          .optional()
+          .describe("Email addresses of attendees to invite"),
+      },
+      async ({ title, start, end, description, location, attendees }) => {
+        try {
+          const { documentId, fileName } = await generateCalendarEventLocally({
+            title,
+            start,
+            end,
+            description,
+            location,
+            attendees,
+          });
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: true,
+                  documentId,
+                  fileName,
+                  note: "Calendar event created locally. Use documentId with save_file_locally to download, or send_email to invite attendees.",
+                }),
+              },
+            ],
+          };
+        } catch (err) {
+          return { content: [{ type: "text" as const, text: `Error: ${err}` }] };
+        }
+      }
+    );
+
     return createSdkMcpServer({
       name: "mitable",
       tools: [
@@ -1109,6 +1549,17 @@ class AgentSdkService {
         browserTabOpenTool,
         browserTabCloseTool,
         browserKeyboardTool,
+        // Google Workspace skills
+        checkGoogleAuthTool,
+        sendEmailTool,
+        createDriveFolderTool,
+        listDriveFoldersTool,
+        uploadToDriveTool,
+        // Document generation skills (all local except google-doc)
+        generateDocumentTool,
+        generateSpreadsheetTool,
+        createCalendarEventTool,
+        saveFileLocallyTool,
         ...adminTools,
       ],
     });
@@ -1163,8 +1614,10 @@ ${memoryContent}`
 2. **Terminal**: Run shell commands via Bash
 3. **Web**: Search the web and fetch pages
 4. **Work context**: Access the user's captured work sessions, activity data, and daily summaries via Mitable tools
-5. **Integrations**: Send Slack messages (more integrations coming)
-6. **Browser control**: Navigate, screenshot, scroll, click, type, select, hover, keyboard, inspect elements, execute JS, manage tabs, and extract content in Chrome (requires Mitable Chrome Extension)${adminSection}
+5. **Integrations**: Send Slack messages, send emails via Gmail
+6. **Google Workspace**: Send emails, create Drive folders, upload files to Drive, generate Word docs or Google Docs — all using the user's connected Google account
+7. **Local file system**: Save generated documents to the user's Desktop, Documents, or Downloads folder
+8. **Browser control**: Navigate, screenshot, scroll, click, type, select, hover, keyboard, inspect elements, execute JS, manage tabs, and extract content in Chrome (requires Mitable Chrome Extension)${adminSection}
 
 ${memorySection}
 
@@ -1199,8 +1652,17 @@ ${skillsSection}
 - For analytical or reflective questions (overview, patterns, "tell me about my work"): be thorough and synthesize across data sources — the user wants insight, not a one-liner
 - Match the user's communication style from their skills when drafting messages
 
+### Google Workspace Workflow
+- Before using ANY Google skill (send_email, create_drive_folder, upload_to_drive, generate_document with google-doc format), ALWAYS call google_auth_status first
+- If the user is not connected, tell them: "You need to connect your Google account first. Go to Settings > Integrations > Gmail/Google Workspace and click Connect."
+- If the token needs reconnection (needsReconnect: true), tell the user to reconnect in Settings
+- For emails: ALWAYS draft the email first (show To, Subject, and Body to the user in chat) and ask for explicit confirmation before calling send_email. If the user wants edits, apply them and show the updated draft before sending.
+- For document generation: describe what you'll create and confirm with the user. After generating, report the file location or Drive URL.
+- For multi-step workflows (e.g. "create a doc, email it, and save to Drive"): break them down, confirm the plan, then execute step by step. Report progress after each step.
+
 ### Safety
-- For integration actions (Slack, Linear, Gmail), ALWAYS confirm the message content and target with the user before sending${adminRules}`;
+- For integration actions (Slack, Linear, Gmail, Drive), ALWAYS confirm the message/file content and target with the user before sending
+- Never send emails or upload files without user confirmation${adminRules}`;
 
     return isPlanPhase ? basePrompt + PLAN_MODE_INSTRUCTIONS : basePrompt;
   }

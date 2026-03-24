@@ -183,6 +183,72 @@ class GmailService {
   }
 
   /**
+   * Send an email with an optional file attachment via Gmail API.
+   * Builds a multipart MIME message when attachment is provided.
+   */
+  async sendEmailWithAttachment(
+    accessToken: string,
+    to: string,
+    subject: string,
+    body: string,
+    fromName?: string,
+    attachment?: { fileName: string; mimeType: string; content: Buffer }
+  ): Promise<GmailSendResult> {
+    if (!attachment) {
+      return this.sendEmail(accessToken, to, subject, body, fromName);
+    }
+
+    const profile = await this.getProfile(accessToken);
+    const fromEmail = profile.emailAddress;
+    const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+    const boundary = `mitable_boundary_${Date.now()}`;
+
+    const mimeMessage = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=utf-8`,
+      "",
+      body,
+      "",
+      `--${boundary}`,
+      `Content-Type: ${attachment.mimeType}; name="${attachment.fileName}"`,
+      `Content-Disposition: attachment; filename="${attachment.fileName}"`,
+      `Content-Transfer-Encoding: base64`,
+      "",
+      attachment.content.toString("base64"),
+      "",
+      `--${boundary}--`,
+    ].join("\r\n");
+
+    const encodedMessage = Buffer.from(mimeMessage)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const response = await fetch(`${GMAIL_API_URL}/users/me/messages/send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ raw: encodedMessage }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to send email with attachment: ${errorText}`);
+    }
+
+    return response.json() as Promise<GmailSendResult>;
+  }
+
+  /**
    * Check if Gmail OAuth is configured
    */
   isConfigured(): boolean {

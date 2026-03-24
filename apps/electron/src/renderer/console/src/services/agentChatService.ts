@@ -80,6 +80,7 @@ export async function addAgentMessage(
 export interface AgentQueryResult {
   response?: string;
   escalate?: boolean;
+  context?: string;
 }
 
 export async function askAgentQuery(
