@@ -118,10 +118,9 @@ async function cleanupAudioRecording(sessionId?: string): Promise<void> {
   // 3. Notify backend to stop tracking audio duration
   if (sessionId) {
     try {
-      await authManager.authenticatedFetch(
-        `/api/monitoring/sessions/${sessionId}/audio/stop`,
-        { method: "POST" }
-      );
+      await authManager.authenticatedFetch(`/api/monitoring/sessions/${sessionId}/audio/stop`, {
+        method: "POST",
+      });
     } catch (error) {
       monitoringLogger.error("Failed to notify backend of audio stop during cleanup:", error);
     }
@@ -1713,10 +1712,9 @@ function setupMonitoringSessionHandlers() {
       // Notify backend to stop tracking audio duration
       if (sessionState?.id) {
         authManager
-          .authenticatedFetch(
-            `/api/monitoring/sessions/${sessionState.id}/audio/stop`,
-            { method: "POST" }
-          )
+          .authenticatedFetch(`/api/monitoring/sessions/${sessionState.id}/audio/stop`, {
+            method: "POST",
+          })
           .catch((err) => monitoringLogger.error("Failed to stop audio on pause:", err));
       }
     }
