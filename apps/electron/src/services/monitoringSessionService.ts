@@ -981,8 +981,6 @@ class MonitoringSessionService {
   }
 
   /**
-   * Select Top-K frames based on importance scores
-  /**
    * Generate SHA-256 hash of screenshot data
    */
   private hashScreenshot(dataUrl: string): string {

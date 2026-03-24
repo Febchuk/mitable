@@ -229,31 +229,6 @@ export async function updateSession(
 }
 
 /**
- * End a session and trigger summary generation
- */
-export async function endSession(sessionId: string): Promise<{
-  success: boolean;
-  session: {
-    id: string;
-    status: string;
-    startedAt: string;
-    endedAt: string;
-    duration: {
-      totalMs: number;
-      activeMs: number;
-      pausedMs: number;
-      formatted: string;
-    };
-    captureCount: number;
-  };
-}> {
-  return apiRequest(`/monitoring/sessions/${sessionId}/end`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-/**
  * Delete a session
  */
 export async function deleteSession(sessionId: string): Promise<{ success: boolean }> {
@@ -458,30 +433,6 @@ export async function endMonitoringSession(): Promise<{
   error?: string;
 }> {
   return window.consoleAPI.endMonitoringSession();
-}
-
-/**
- * Upload captures to backend (call after ending Electron session, before triggering summarization)
- * Includes base64 imageData for backend AI analysis
- */
-export async function uploadCaptures(
-  sessionId: string,
-  captures: Array<{
-    sequenceNumber: number;
-    captureTrigger: "periodic" | "focus_change" | "manual";
-    capturedAt: number;
-    windowId?: string;
-    appName?: string;
-    windowTitle?: string;
-    screenshotPath?: string;
-    screenshotHash?: string;
-    imageData?: string;
-  }>
-): Promise<{ success: boolean; insertedCount?: number }> {
-  return apiRequest(`/monitoring/sessions/${sessionId}/captures`, {
-    method: "POST",
-    body: JSON.stringify({ captures }),
-  });
 }
 
 /**

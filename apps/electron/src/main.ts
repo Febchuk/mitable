@@ -118,20 +118,10 @@ async function cleanupAudioRecording(sessionId?: string): Promise<void> {
   // 3. Notify backend to stop tracking audio duration
   if (sessionId) {
     try {
-      const token = authTokens.accessToken;
-      const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
-      const backendUrl = app.isPackaged
-        ? PROD_API_URL
-        : process.env.VITE_API_URL || "http://localhost:3000";
-      if (token) {
-        await fetch(`${backendUrl}/api/monitoring/sessions/${sessionId}/audio/stop`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-      }
+      await authManager.authenticatedFetch(
+        `/api/monitoring/sessions/${sessionId}/audio/stop`,
+        { method: "POST" }
+      );
     } catch (error) {
       monitoringLogger.error("Failed to notify backend of audio stop during cleanup:", error);
     }
@@ -1722,17 +1712,12 @@ function setupMonitoringSessionHandlers() {
       }
       // Notify backend to stop tracking audio duration
       if (sessionState?.id) {
-        const token = authTokens.accessToken;
-        const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
-        const backendUrl = app.isPackaged
-          ? PROD_API_URL
-          : process.env.VITE_API_URL || "http://localhost:3000";
-        if (token) {
-          fetch(`${backendUrl}/api/monitoring/sessions/${sessionState.id}/audio/stop`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          }).catch((err) => monitoringLogger.error("Failed to stop audio on pause:", err));
-        }
+        authManager
+          .authenticatedFetch(
+            `/api/monitoring/sessions/${sessionState.id}/audio/stop`,
+            { method: "POST" }
+          )
+          .catch((err) => monitoringLogger.error("Failed to stop audio on pause:", err));
       }
     }
 
@@ -1813,28 +1798,13 @@ function setupMonitoringSessionHandlers() {
       monitoringLogger.info("Finalizing session:", sessionId, "captures:", captures.length);
 
       try {
-        const token = authTokens.accessToken;
-        if (!token) {
-          return { success: false, error: "No auth token available" };
-        }
-
-        // Production API URL (Railway) - must match renderer config
-        const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
-        const API_BASE_URL = app.isPackaged
-          ? PROD_API_URL
-          : process.env.VITE_API_URL || "http://localhost:3000";
-
         // Step 1: Upload captures to backend
         if (captures.length > 0) {
           monitoringLogger.info(" Uploading", captures.length, "captures to backend");
-          const uploadResponse = await fetch(
-            `${API_BASE_URL}/api/monitoring/sessions/${sessionId}/captures`,
+          const uploadResponse = await authManager.authenticatedFetch(
+            `/api/monitoring/sessions/${sessionId}/captures`,
             {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
               body: JSON.stringify({ captures }),
             }
           );
@@ -1852,14 +1822,10 @@ function setupMonitoringSessionHandlers() {
         const autoRecapForFinalize = currentUserContext?.userId
           ? preferencesService.getUserAutoRecap(currentUserContext.userId)
           : true;
-        const endResponse = await fetch(
-          `${API_BASE_URL}/api/monitoring/sessions/${sessionId}/end`,
+        const endResponse = await authManager.authenticatedFetch(
+          `/api/monitoring/sessions/${sessionId}/end`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
             body: JSON.stringify({ autoRecap: autoRecapForFinalize }),
           }
         );
@@ -2142,21 +2108,10 @@ function setupMonitoringSessionHandlers() {
     // Notify backend to stop tracking and accumulate duration
     if (sessionState?.id) {
       try {
-        const token = authTokens.accessToken;
-        // Note: VITE_* env vars are NOT available in main process at runtime
-        const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
-        const backendUrl = app.isPackaged
-          ? PROD_API_URL
-          : process.env.VITE_API_URL || "http://localhost:3000";
-        if (token) {
-          await fetch(`${backendUrl}/api/monitoring/sessions/${sessionState.id}/audio/stop`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          });
-        }
+        await authManager.authenticatedFetch(
+          `/api/monitoring/sessions/${sessionState.id}/audio/stop`,
+          { method: "POST" }
+        );
       } catch (error) {
         monitoringLogger.error("Failed to notify backend of audio stop:", error);
         // Don't fail the stop operation if backend notification fails

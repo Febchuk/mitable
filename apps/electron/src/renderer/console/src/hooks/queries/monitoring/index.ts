@@ -147,22 +147,6 @@ export function useSlackUsers() {
 }
 
 /**
- * End a session mutation
- */
-export function useEndSession() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: { sessionId: string }) => monitoringService.endSession(params.sessionId),
-    onSuccess: (_, params) => {
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(params.sessionId) });
-      queryClient.invalidateQueries({ queryKey: ["calendar"] });
-    },
-  });
-}
-
-/**
  * Update summary mutation
  */
 export function useUpdateSummary() {
