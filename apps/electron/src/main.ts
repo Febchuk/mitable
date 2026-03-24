@@ -1741,13 +1741,21 @@ function setupMonitoringSessionHandlers() {
   });
 
   // End the active session — returns immediately after stopping captures.
-  // Audio cleanup runs in the background so the UI updates fast.
+  // Audio WS is disconnected synchronously; backend notification runs in background.
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
     monitoringLogger.info(" Ending session");
     audioActiveBeforePause = false;
 
-    // Grab state before ending so we can clean up audio in background
+    // Grab state before ending so we can notify backend in background
     const preEndState = monitoringSessionService.getSessionState();
+
+    // Eagerly disconnect audio WS + kill AudioWorklet so a new session
+    // won't collide with stale audio infrastructure
+    audioCleanupDone = true;
+    audioWebSocketService.disconnect();
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP);
+    }
 
     // Stop captures / trackers — fast now that Top-K is removed
     const result = await monitoringSessionService.endSession();
@@ -1757,13 +1765,17 @@ function setupMonitoringSessionHandlers() {
       watchingPillWindow.hide();
     }
 
-    // Fire-and-forget: audio cleanup + passive monitoring resume
-    // These run after we've already returned the result to the renderer
+    // Fire-and-forget: backend audio-stop notification + passive monitoring resume
     (async () => {
-      try {
-        await cleanupAudioRecording(preEndState?.id);
-      } catch (err) {
-        monitoringLogger.error(" Background audio cleanup failed:", err);
+      if (preEndState?.id) {
+        try {
+          await authManager.authenticatedFetch(
+            `/api/monitoring/sessions/${preEndState.id}/audio/stop`,
+            { method: "POST" }
+          );
+        } catch (err) {
+          monitoringLogger.error(" Background audio stop notification failed:", err);
+        }
       }
       if (currentUserContext?.userId) {
         const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
@@ -2279,20 +2291,30 @@ function setupMonitoringSessionHandlers() {
   );
 
   // End session fully: stop Electron captures + upload + POST /end to backend
-  ipcMain.handle(IPC_CHANNELS.END_SESSION_WITH_PREFERENCES, async () => {
+  ipcMain.handle(IPC_CHANNELS.END_SESSION_FULL, async () => {
     monitoringLogger.info(" End session requested");
     audioActiveBeforePause = false;
 
-    // Grab state before ending so we can clean up audio in background
+    // Eagerly disconnect audio WS + kill AudioWorklet so a new session
+    // won't collide with stale audio infrastructure
     const preEndState = monitoringSessionService.getSessionState();
+    audioCleanupDone = true;
+    audioWebSocketService.disconnect();
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP);
+    }
 
     // End Electron-side capture loop — fast (no Top-K / base64)
     const result = await monitoringSessionService.endSession();
 
-    // Fire-and-forget: audio cleanup (non-blocking)
-    cleanupAudioRecording(preEndState?.id).catch((err) =>
-      monitoringLogger.error(" Background audio cleanup failed:", err)
-    );
+    // Fire-and-forget: backend audio-stop notification
+    if (preEndState?.id) {
+      authManager
+        .authenticatedFetch(`/api/monitoring/sessions/${preEndState.id}/audio/stop`, {
+          method: "POST",
+        })
+        .catch((err) => monitoringLogger.error(" Background audio stop notification failed:", err));
+    }
 
     if (!result.success || !result.sessionId) {
       return result;

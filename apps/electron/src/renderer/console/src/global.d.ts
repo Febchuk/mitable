@@ -242,7 +242,7 @@ interface ConsoleAPI {
   }) => Promise<{ success: boolean }>;
 
   // End session fully: stop captures + upload + trigger backend summarization
-  endSessionWithPreferences: () => Promise<{
+  endSessionFull: () => Promise<{
     success: boolean;
     sessionId?: string;
     captureCount?: number;

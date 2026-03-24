@@ -508,7 +508,7 @@ export default function SessionDetail() {
     try {
       if (wasExternallyTriggered) {
         logger.info("Ending session via pill trigger");
-        const result = await window.consoleAPI.endSessionWithPreferences();
+        const result = await window.consoleAPI.endSessionFull();
 
         if (!result.success) {
           throw new Error(result.error || "Failed to end session");
@@ -520,7 +520,7 @@ export default function SessionDetail() {
       } else {
         // Triggered from Console — use the unified IPC path too
         logger.info("Ending session via console");
-        const result = await window.consoleAPI.endSessionWithPreferences();
+        const result = await window.consoleAPI.endSessionFull();
 
         if (!result.success) {
           throw new Error(result.error || "Failed to end session");

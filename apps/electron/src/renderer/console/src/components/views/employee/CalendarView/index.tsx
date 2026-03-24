@@ -283,12 +283,12 @@ export default function CalendarView() {
 
     // 2. Full end flow: stop captures + upload + POST /end (same as pill/SessionDetail)
     try {
-      const result = await window.consoleAPI?.endSessionWithPreferences();
+      const result = await window.consoleAPI?.endSessionFull();
       if (result?.error) {
-        console.error("[CalendarView] endSessionWithPreferences error:", result.error);
+        console.error("[CalendarView] endSessionFull error:", result.error);
       }
     } catch (err) {
-      console.error("[CalendarView] endSessionWithPreferences failed:", err);
+      console.error("[CalendarView] endSessionFull failed:", err);
     }
 
     // 3. Refresh data now that backend has started summarization

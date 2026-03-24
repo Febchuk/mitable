@@ -84,7 +84,7 @@ const IPC_CHANNELS = {
   AUDIO_TEST_STOP: "audio-test-stop",
   // End session dialog coordination
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog",
-  END_SESSION_WITH_PREFERENCES: "end-session-with-preferences",
+  END_SESSION_FULL: "end-session-full",
   // Watching pill
   WATCHING_PILL_HIDE: "watching-pill-hide",
   // Auth session restore (main → renderer on startup)
@@ -563,12 +563,12 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.invoke(IPC_CHANNELS.AUDIO_PREFERENCES_SET, prefs),
 
   // End session fully: stop captures + upload + trigger backend summarization
-  endSessionWithPreferences: (): Promise<{
+  endSessionFull: (): Promise<{
     success: boolean;
     sessionId?: string;
     captureCount?: number;
     error?: string;
-  }> => ipcRenderer.invoke(IPC_CHANNELS.END_SESSION_WITH_PREFERENCES),
+  }> => ipcRenderer.invoke(IPC_CHANNELS.END_SESSION_FULL),
 
   // Listen for show end session dialog event (triggered from pill)
   onShowEndSessionDialog: (callback: () => void): (() => void) => {

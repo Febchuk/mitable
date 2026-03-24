@@ -118,7 +118,7 @@ export const IPC_CHANNELS = {
 
   // End session dialog coordination (pill → console)
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog
-  END_SESSION_WITH_PREFERENCES: "end-session-with-preferences", // Console → Main: end with prefs
+  END_SESSION_FULL: "end-session-full", // Console → Main: end captures + upload + summarize
 
   // Custom Notifications (Granola-style prompts)
   NOTIFICATION_SHOW: "notification-show", // Show notification with config
