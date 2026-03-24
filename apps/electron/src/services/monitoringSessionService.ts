@@ -357,59 +357,25 @@ class MonitoringSessionService {
     const sessionId = this.activeSession.id;
 
     try {
-      // Get manifest to access all frames
-      const manifest = await localFrameStorage.loadManifest(sessionId);
-      if (!manifest) {
-        throw new Error("Session manifest not found");
-      }
-
-      // Select Top-K frames based on importance scores
-      const topKFrameIds = this.selectTopKFrames(manifest.frames, 10);
-
-      // End session in local storage with Top-K selection
-      await localFrameStorage.endSession(sessionId, topKFrameIds);
-
-      // Get Top-K frames for upload
-      const topKFrames = await localFrameStorage.getTopKFrames(sessionId);
-
-      // Convert to upload format with base64 data
-      const captures = await Promise.all(
-        topKFrames.map(async ({ metadata, imageBuffer }) => ({
-          sequenceNumber: metadata.sequenceNumber,
-          captureTrigger: metadata.trigger,
-          capturedAt: new Date(metadata.timestamp).getTime(),
-          windowId: metadata.windowSourceId,
-          appName: metadata.appName,
-          windowTitle: metadata.windowTitle,
-          screenshotHash: metadata.hash,
-          imageData: imageBuffer.toString("base64"),
-          // Include analysis metadata
-          deltaChanged: metadata.deltaChanged,
-          deltaChangeType: metadata.deltaChangeType,
-          deltaChangeDescription: metadata.deltaChangeDescription,
-          deltaUserAction: metadata.deltaUserAction,
-          onTask: metadata.onTask,
-          taskRelevance: metadata.taskRelevance,
-          importanceScore: metadata.importanceScore,
-          importanceReason: metadata.importanceReason,
-        }))
-      );
-
-      const captureCount = manifest.totalFrameCount;
-
       // End checkpoint tracking (removes checkpoint file)
       await checkpointService.endSession();
+
+      // End session in local storage (no Top-K selection needed — captures
+      // are already analyzed and stored on the backend during the session)
+      const manifest = await localFrameStorage.loadManifest(sessionId);
+      const captureCount = manifest?.totalFrameCount ?? 0;
+      await localFrameStorage.endSession(sessionId, []);
 
       // Update internal state
       this.activeSession.status = "ended";
 
-      // Broadcast update
+      // Broadcast update immediately so renderer sees "ended"
       this.broadcastSessionUpdate();
 
+      const duration = Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs;
       logger.info(` Session ended: ${sessionId}`, {
         totalCaptureCount: captureCount,
-        uploadCount: captures.length,
-        duration: Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs,
+        duration,
       });
 
       // Cleanup session state
@@ -423,7 +389,7 @@ class MonitoringSessionService {
         10 * 60 * 1000
       );
 
-      return { success: true, sessionId, captureCount, captures };
+      return { success: true, sessionId, captureCount, captures: [] };
     } catch (error) {
       logger.error(" Failed to end session:", error);
       return {
@@ -1012,98 +978,6 @@ class MonitoringSessionService {
       // Log but don't throw - analysis failure shouldn't stop session
       logger.error(" Error analyzing frame:", error);
     }
-  }
-
-  /**
-   * Select Top-K frames based on importance scores
-   * Uses a combination of:
-   * 1. Importance score from frame analysis
-   * 2. Temporal diversity (avoid consecutive frames)
-   * 3. Always include first and last frames for context
-   */
-  private selectTopKFrames(
-    frames: Array<{
-      frameId: string;
-      timestamp: string;
-      importanceScore?: number;
-      sequenceNumber: number;
-    }>,
-    k: number = 10
-  ): string[] {
-    if (frames.length <= k) {
-      // If we have fewer frames than K, return all
-      return frames.map((f) => f.frameId);
-    }
-
-    const selectedIds: Set<string> = new Set();
-
-    // Always include first and last frame for context
-    const firstFrame = frames[0];
-    const lastFrame = frames[frames.length - 1];
-    selectedIds.add(firstFrame.frameId);
-    selectedIds.add(lastFrame.frameId);
-
-    // Sort remaining frames by importance score (descending)
-    const remainingFrames = frames
-      .filter((f) => f.frameId !== firstFrame.frameId && f.frameId !== lastFrame.frameId)
-      .map((f) => ({
-        ...f,
-        // Default to 0.5 if no importance score (unanalyzed frames)
-        score: f.importanceScore ?? 0.5,
-      }))
-      .sort((a, b) => b.score - a.score);
-
-    // Group by time buckets (15-minute intervals) to ensure temporal diversity
-    const BUCKET_SIZE_MS = 15 * 60 * 1000; // 15 minutes
-    const buckets = new Map<number, typeof remainingFrames>();
-
-    for (const frame of remainingFrames) {
-      const timestamp = new Date(frame.timestamp).getTime();
-      const bucketKey = Math.floor(timestamp / BUCKET_SIZE_MS);
-
-      if (!buckets.has(bucketKey)) {
-        buckets.set(bucketKey, []);
-      }
-      buckets.get(bucketKey)!.push(frame);
-    }
-
-    // Select from buckets to ensure temporal diversity
-    // Take max 2 frames per bucket, prioritize by importance score
-    const maxPerBucket = 2;
-    const sortedBucketKeys = [...buckets.keys()].sort((a, b) => a - b);
-
-    for (const bucketKey of sortedBucketKeys) {
-      if (selectedIds.size >= k) break;
-
-      const bucketFrames = buckets.get(bucketKey)!;
-      // Already sorted by score within the bucket (from earlier sort)
-      let selectedFromBucket = 0;
-
-      for (const frame of bucketFrames) {
-        if (selectedIds.size >= k) break;
-        if (selectedFromBucket >= maxPerBucket) break;
-
-        selectedIds.add(frame.frameId);
-        selectedFromBucket++;
-      }
-    }
-
-    // If still under K, add remaining highest-scored frames
-    for (const frame of remainingFrames) {
-      if (selectedIds.size >= k) break;
-      selectedIds.add(frame.frameId);
-    }
-
-    logger.info(
-      `[MonitoringSessionService] Selected ${selectedIds.size} top-K frames from ${frames.length} total`,
-      {
-        firstFrameId: firstFrame.frameId,
-        lastFrameId: lastFrame.frameId,
-        bucketCount: buckets.size,
-      }
-    );
-
-    return Array.from(selectedIds);
   }
 
   /**

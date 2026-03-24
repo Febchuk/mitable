@@ -147,31 +147,6 @@ export function useSlackUsers() {
 }
 
 /**
- * End a session mutation
- */
-export function useEndSession() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: {
-      sessionId: string;
-      preferences?: {
-        style: "verbose" | "concise";
-        format: "bullets" | "paragraphs";
-        includeScreenshots: boolean;
-      };
-    }) => monitoringService.endSession(params.sessionId, params.preferences),
-    onSuccess: (_, params) => {
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.session(params.sessionId) });
-      // Invalidate calendar so the block immediately shows "summarizing" instead of stale "active"
-      // Using raw key to avoid circular dependency (calendar imports from monitoring)
-      queryClient.invalidateQueries({ queryKey: ["calendar"] });
-    },
-  });
-}
-
-/**
  * Update summary mutation
  */
 export function useUpdateSummary() {

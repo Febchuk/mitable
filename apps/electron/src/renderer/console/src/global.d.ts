@@ -241,12 +241,8 @@ interface ConsoleAPI {
     systemAudioOutputId?: string | null;
   }) => Promise<{ success: boolean }>;
 
-  // End session with preferences (called from Console after dialog confirmation)
-  endSessionWithPreferences: (preferences: {
-    detailLevel: "concise" | "verbose";
-    format: "bullets" | "paragraphs";
-    includeScreenshots: boolean;
-  }) => Promise<{
+  // End session fully: stop captures + upload + trigger backend summarization
+  endSessionFull: () => Promise<{
     success: boolean;
     sessionId?: string;
     captureCount?: number;

@@ -96,7 +96,7 @@ export default function App() {
       setMenuDropdownOpen(false);
     });
 
-    // Main process forces audio stop when session ends without explicit mic toggle
+    // Main process forces audio stop when session ends or pauses
     const unsubForceStopAudio = window.watchingPillAPI.onForceStopAudio(async () => {
       logger.info("\uD83D\uDD07 Force-stop audio received from main process");
       const { audioCaptureService } = await import("./services/audioCapture");
@@ -104,6 +104,32 @@ export default function App() {
       setAudioRecordingEnabled(false);
       setAudioRecordingActive(false);
       audioRecordingActiveRef.current = false;
+    });
+
+    // Main process restarts audio after session resume (if it was recording before pause)
+    const unsubForceStartAudio = window.watchingPillAPI.onForceStartAudio(async () => {
+      logger.info("🎤 Force-start audio received from main process (resume)");
+
+      const result = await window.watchingPillAPI?.startAudioRecording();
+      if (!result?.success) {
+        logger.error("❌ Failed to restart audio after resume:", result?.error);
+        return;
+      }
+
+      const state = await window.watchingPillAPI?.getSessionState();
+      const { audioCaptureService } = await import("./services/audioCapture");
+      const captureResult = await audioCaptureService.startCapture(state?.id || "");
+
+      if (!captureResult.success) {
+        logger.error("❌ Failed to restart audio capture after resume:", captureResult.error);
+        await window.watchingPillAPI?.stopAudioRecording();
+        return;
+      }
+
+      logger.info("✅ Audio recording restarted after resume");
+      setAudioRecordingEnabled(true);
+      setAudioRecordingActive(true);
+      audioRecordingActiveRef.current = true;
     });
 
     // Listen for pill display mode changes from settings
@@ -119,6 +145,7 @@ export default function App() {
       unsubEyeClose();
       unsubMenuClose();
       unsubForceStopAudio();
+      unsubForceStartAudio();
       unsubPillMode();
     };
   }, []);

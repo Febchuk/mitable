@@ -229,54 +229,6 @@ export async function updateSession(
 }
 
 /**
- * End a session and trigger summary generation
- */
-export async function endSession(
-  sessionId: string,
-  preferences?: {
-    style: "verbose" | "concise";
-    format: "bullets" | "paragraphs";
-    includeScreenshots: boolean;
-  }
-): Promise<{
-  success: boolean;
-  session: {
-    id: string;
-    status: string;
-    startedAt: string;
-    endedAt: string;
-    duration: {
-      totalMs: number;
-      activeMs: number;
-      pausedMs: number;
-      formatted: string;
-    };
-    captureCount: number;
-  };
-}> {
-  const body: {
-    preferences?: {
-      detailLevel: "verbose" | "concise";
-      format: "bullets" | "paragraphs";
-      includeScreenshots: boolean;
-    };
-  } = {};
-
-  if (preferences) {
-    body.preferences = {
-      detailLevel: preferences.style, // Backend expects detailLevel, frontend uses style
-      format: preferences.format,
-      includeScreenshots: preferences.includeScreenshots,
-    };
-  }
-
-  return apiRequest(`/monitoring/sessions/${sessionId}/end`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-/**
  * Delete a session
  */
 export async function deleteSession(sessionId: string): Promise<{ success: boolean }> {
@@ -484,30 +436,6 @@ export async function endMonitoringSession(): Promise<{
 }
 
 /**
- * Upload captures to backend (call after ending Electron session, before triggering summarization)
- * Includes base64 imageData for backend AI analysis
- */
-export async function uploadCaptures(
-  sessionId: string,
-  captures: Array<{
-    sequenceNumber: number;
-    captureTrigger: "periodic" | "focus_change" | "manual";
-    capturedAt: number;
-    windowId?: string;
-    appName?: string;
-    windowTitle?: string;
-    screenshotPath?: string;
-    screenshotHash?: string;
-    imageData?: string;
-  }>
-): Promise<{ success: boolean; insertedCount?: number }> {
-  return apiRequest(`/monitoring/sessions/${sessionId}/captures`, {
-    method: "POST",
-    body: JSON.stringify({ captures }),
-  });
-}
-
-/**
  * Get current session state from Electron
  */
 export async function getMonitoringSessionState(): Promise<MonitoringSessionState | null> {
@@ -602,18 +530,6 @@ export async function disconnectGmail(): Promise<{ success: boolean }> {
   return apiRequest<{ success: boolean }>("/integrations/gmail/disconnect", {
     method: "DELETE",
   });
-}
-
-/**
- * DEV ONLY: Regenerate session summary
- */
-export async function regenerateSummary(
-  sessionId: string
-): Promise<{ success: boolean; message: string }> {
-  return apiRequest<{ success: boolean; message: string }>(
-    `/monitoring/sessions/${sessionId}/regenerate-summary`,
-    { method: "POST" }
-  );
 }
 
 // ===========================

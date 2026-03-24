@@ -59,7 +59,8 @@ export const IPC_CHANNELS = {
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
   MONITORING_AUDIO_START: "monitoring-audio-start", // Start audio recording for session
   MONITORING_AUDIO_STOP: "monitoring-audio-stop", // Stop audio recording for session
-  MONITORING_AUDIO_FORCE_STOP: "monitoring-audio-force-stop", // Main → Renderer: force stop AudioWorklet on session end
+  MONITORING_AUDIO_FORCE_STOP: "monitoring-audio-force-stop", // Main → Renderer: force stop AudioWorklet on session end/pause
+  MONITORING_AUDIO_FORCE_START: "monitoring-audio-force-start", // Main → Renderer: auto-restart AudioWorklet on session resume
 
   // Session Recovery (crash recovery)
   SESSION_GET_RECOVERABLE: "session-get-recoverable", // Get list of recoverable sessions
@@ -117,7 +118,7 @@ export const IPC_CHANNELS = {
 
   // End session dialog coordination (pill → console)
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog
-  END_SESSION_WITH_PREFERENCES: "end-session-with-preferences", // Console → Main: end with prefs
+  END_SESSION_FULL: "end-session-full", // Console → Main: end captures + upload + summarize
 
   // Custom Notifications (Granola-style prompts)
   NOTIFICATION_SHOW: "notification-show", // Show notification with config

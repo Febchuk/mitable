@@ -39,12 +39,6 @@ export interface SessionMetadata {
   endTime: Date;
 }
 
-export interface UserPreferences {
-  style: "verbose" | "concise";
-  format: "bullets" | "paragraphs";
-  includeScreenshots: boolean;
-}
-
 /**
  * StorytellerEnvironment
  *
@@ -56,9 +50,8 @@ export class StorytellerEnvironment {
 
   constructor(
     public readonly timeline: Activity[],
-    public readonly fullTranscriptText: string | undefined, // Complete audio transcripts for rich narrative
-    public readonly metadata: SessionMetadata,
-    public readonly preferences: UserPreferences
+    public readonly fullTranscriptText: string | undefined,
+    public readonly metadata: SessionMetadata
   ) {}
 
   /**

@@ -18,7 +18,6 @@ import {
   useUpdateSummary,
   useDeliverSummary,
   useDeleteSession,
-  useEndSession,
   useSlackChannels,
   useSlackUsers,
   useReviseSummary,
@@ -26,11 +25,7 @@ import {
   useTriggerIntermediateSummary,
   monitoringKeys,
 } from "@/console/src/hooks/queries/monitoring";
-import {
-  uploadCaptures,
-  checkGmailConnection,
-  startGmailOAuth,
-} from "@/console/src/services/monitoringService";
+import { checkGmailConnection, startGmailOAuth } from "@/console/src/services/monitoringService";
 import { API_BASE_URL } from "@/console/src/lib/config";
 import {
   ArrowLeft,
@@ -71,7 +66,6 @@ import { usePreferences } from "@/console/src/hooks/usePreferences";
 import LinearUpdateDialog from "./LinearUpdateDialog";
 // import ActivityTimeline from "./ActivityTimeline";
 import SessionTimeline from "./SessionTimeline";
-import EndSessionDialog from "./EndSessionDialog"; // Import the new dialog
 import SummarizationProgress from "./SummarizationProgress";
 import { SiLinear } from "react-icons/si";
 import { marked } from "marked";
@@ -113,10 +107,7 @@ export default function SessionDetail() {
     pollWhileSummarizing: true,
   });
   const sessionStatus = optimisticStatus ?? session?.status;
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [preRegenerateSummary, setPreRegenerateSummary] = useState<string | null>(null);
-  // Derive uiStatus early so we can pass it to useSessionSummary for polling
-  const summaryStatusForPolling = isRegenerating ? "summarizing" : sessionStatus;
+  const summaryStatusForPolling = sessionStatus;
   const { data: summaryData, isLoading: isLoadingSummary } = useSessionSummary(
     sessionId || "",
     summaryStatusForPolling // Polls every 2s when "summarizing" (including during regeneration)
@@ -137,27 +128,7 @@ export default function SessionDetail() {
     const result = marked.parse(summary);
     return typeof result === "string" ? DOMPurify.sanitize(result) : "";
   }, [summary]);
-  const uiStatus = isRegenerating ? "summarizing" : hasSummary ? "ready" : sessionStatus;
-
-  // When regenerating, detect when the summary actually changes (new summary arrived)
-  useEffect(() => {
-    if (isRegenerating && hasSummary && preRegenerateSummary && summary !== preRegenerateSummary) {
-      setIsRegenerating(false);
-      setPreRegenerateSummary(null);
-      toast({ title: "Summary regenerated!", duration: 3000 });
-    }
-  }, [isRegenerating, hasSummary, summary, preRegenerateSummary]);
-
-  // Safety timeout: stop regenerating after 90 seconds regardless
-  useEffect(() => {
-    if (!isRegenerating) return;
-    const timeout = setTimeout(() => {
-      setIsRegenerating(false);
-      setPreRegenerateSummary(null);
-      queryClient.invalidateQueries({ queryKey: monitoringKeys.summary(sessionId!) });
-    }, 90_000);
-    return () => clearTimeout(timeout);
-  }, [isRegenerating]);
+  const uiStatus = hasSummary ? "ready" : sessionStatus;
   const isEndingState = sessionStatus === "summarizing" && !hasSummary;
 
   // Fetch progressive story (polls while session is active/paused)
@@ -166,7 +137,6 @@ export default function SessionDetail() {
   const updateSummaryMutation = useUpdateSummary();
   const deliverSummaryMutation = useDeliverSummary();
   const deleteSessionMutation = useDeleteSession();
-  const endSessionMutation = useEndSession();
   const reviseSummaryMutation = useReviseSummary();
   const updateSessionMutation = useUpdateSession();
   const triggerIntermediateSummaryMutation = useTriggerIntermediateSummary();
@@ -188,9 +158,7 @@ export default function SessionDetail() {
   const [showSessionEndToast, setShowSessionEndToast] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
-  // End Session Dialog State
-  const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
-  const [isExternallyTriggered, setIsExternallyTriggered] = useState(false); // Track if triggered from pill
+  const [isExternallyTriggered, setIsExternallyTriggered] = useState(false);
 
   // Preferences for hide pill on session end
   const { hidePillOnSessionEnd, dontAskHidePillAgain, updatePreference } = usePreferences();
@@ -199,11 +167,11 @@ export default function SessionDetail() {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     if (searchParams.get("openEndDialog") === "true") {
-      logger.info("End session dialog triggered via URL param from pill");
+      logger.info("End session triggered via URL param from pill");
       setIsExternallyTriggered(true);
-      setIsEndDialogOpen(true);
-      // Clean up URL param (replace to avoid back button issues)
       navigate(`/monitoring/${sessionId}`, { replace: true });
+      // Directly end — no dialog needed
+      handleEndSession();
     }
   }, [location.search, sessionId, navigate]);
 
@@ -516,22 +484,11 @@ export default function SessionDetail() {
     }
   };
 
-  // Replaced handleEndSession with EndSessionDialog trigger
-  const handleEndButtonClick = () => {
-    setIsEndDialogOpen(true);
-  };
-
-  // Confirm handler for the dialog
-  const handleConfirmEndSession = async (preferences: {
-    style: "verbose" | "concise";
-    format: "bullets" | "paragraphs";
-    includeScreenshots: boolean;
-  }) => {
+  // End session — no preferences needed, Storyteller handles formatting
+  const handleEndSession = async () => {
     if (!sessionId) return;
 
-    // Immediately close dialog and show "Ending session..." in the main UI
     setOptimisticStatus("summarizing");
-    setIsEndDialogOpen(false);
     const wasExternallyTriggered = isExternallyTriggered;
     setIsExternallyTriggered(false);
 
@@ -540,7 +497,6 @@ export default function SessionDetail() {
       description: "Generating your master story...",
     });
 
-    // Handle pill hiding logic (only for non-externally triggered - pill handles its own hiding)
     if (!wasExternallyTriggered) {
       if (hidePillOnSessionEnd || dontAskHidePillAgain) {
         window.consoleAPI.hidePill();
@@ -549,50 +505,30 @@ export default function SessionDetail() {
       }
     }
 
-    // Map style to detailLevel for API
-    const apiPreferences = {
-      detailLevel: preferences.style as "verbose" | "concise",
-      format: preferences.format,
-      includeScreenshots: preferences.includeScreenshots,
-    };
-
-    // Run async work in background (dialog already closed, UI shows "Ending session...")
     try {
       if (wasExternallyTriggered) {
-        // Triggered from pill - use the unified IPC call that handles everything
-        // (Electron session end + upload + backend summary)
-        logger.info("Ending session via pill trigger (using endSessionWithPreferences)");
-        const result = await window.consoleAPI.endSessionWithPreferences(apiPreferences);
+        logger.info("Ending session via pill trigger");
+        const result = await window.consoleAPI.endSessionFull();
 
         if (!result.success) {
           throw new Error(result.error || "Failed to end session");
         }
 
-        // Invalidate React Query caches to refresh UI (pill flow bypasses mutation's onSuccess)
         queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
         queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
         queryClient.invalidateQueries({ queryKey: ["calendar"] });
-        logger.info("Invalidated session + calendar queries after external end");
       } else {
-        // Triggered from Console - use the original flow
-        // 1. Stop Electron capture
-        const electronResult = await window.consoleAPI.endMonitoringSession();
+        // Triggered from Console — use the unified IPC path too
+        logger.info("Ending session via console");
+        const result = await window.consoleAPI.endSessionFull();
 
-        // If Electron session is already ended (e.g., from pill), that's OK
-        if (electronResult.error && electronResult.error !== "No active session") {
-          throw new Error(electronResult.error);
+        if (!result.success) {
+          throw new Error(result.error || "Failed to end session");
         }
 
-        // 2. Upload captures if any
-        if (electronResult.captures && electronResult.captures.length > 0) {
-          await uploadCaptures(sessionId, electronResult.captures);
-        }
-
-        // 3. Trigger backend end + summary generation with preferences
-        await endSessionMutation.mutateAsync({
-          sessionId,
-          preferences, // Pass preferences to backend
-        });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+        queryClient.invalidateQueries({ queryKey: ["calendar"] });
       }
     } catch (error) {
       logger.error("Error ending session:", error);
@@ -795,7 +731,7 @@ export default function SessionDetail() {
                 Pause
               </Button>
               <Button
-                onClick={handleEndButtonClick}
+                onClick={handleEndSession}
                 className="gap-2 bg-status-error text-white hover:bg-status-error/90"
               >
                 <Square size={16} />
@@ -818,7 +754,7 @@ export default function SessionDetail() {
                 Resume
               </Button>
               <Button
-                onClick={handleEndButtonClick}
+                onClick={handleEndSession}
                 variant="outline"
                 className="gap-2 border-status-error text-status-error hover:bg-status-error/10"
               >
@@ -1059,38 +995,6 @@ export default function SessionDetail() {
             Summary
           </h2>
           <div className="flex items-center gap-2">
-            {/* DEV ONLY: Regenerate button - hidden in production */}
-            {import.meta.env.DEV && uiStatus === "ready" && (
-              <Button
-                variant="ghost"
-                onClick={async () => {
-                  try {
-                    const { regenerateSummary } =
-                      await import("@/console/src/services/monitoringService");
-                    setPreRegenerateSummary(summary);
-                    setIsRegenerating(true);
-                    await regenerateSummary(sessionId!);
-                    toast({
-                      title: "Regenerating summary...",
-                      description: "This may take up to 30 seconds.",
-                      duration: 5000,
-                    });
-                    // Start polling by invalidating queries — useSessionSummary polls when status is "summarizing"
-                    queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId!) });
-                  } catch (err) {
-                    toast({
-                      title: "Error",
-                      description: "Failed to regenerate",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-                className="gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
-              >
-                <RefreshCw size={16} />
-                Regenerate (Dev)
-              </Button>
-            )}
             {summary && (
               <Button
                 variant="ghost"
@@ -1119,11 +1023,7 @@ export default function SessionDetail() {
           </div>
         </div>
 
-        {isRegenerating ? (
-          <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
-            <SummarizationProgress progress={session.summarizationProgress ?? null} />
-          </div>
-        ) : summary ? (
+        {summary ? (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-6 max-h-[400px] overflow-y-auto">
             <div className="prose prose-invert prose-sm max-w-none break-words [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-white [&_h1]:mb-3 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-white [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-white/90 [&_h3]:mb-2 [&_p]:text-ink-primary [&_p]:text-sm [&_p]:leading-relaxed [&_p]:mb-3 [&_ul]:pl-5 [&_ul]:mb-3 [&_ul]:list-disc [&_ol]:pl-5 [&_ol]:mb-3 [&_ol]:list-decimal [&_li]:text-ink-primary [&_li]:text-sm [&_li]:leading-relaxed [&_li]:mb-1 [&_li]:marker:text-ink-tertiary [&_strong]:text-white [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-primary/80 [&_hr]:border-stroke-subtle [&_hr]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_blockquote]:italic [&_code]:bg-white/5 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-primary">
               <div dangerouslySetInnerHTML={{ __html: summaryHtml }} />
@@ -1413,20 +1313,6 @@ export default function SessionDetail() {
           queryClient.invalidateQueries({ queryKey: ["monitoring", "session", sessionId] });
           queryClient.invalidateQueries({ queryKey: ["monitoring", "sessions"] });
         }}
-      />
-
-      {/* End Session Dialog */}
-      <EndSessionDialog
-        open={isEndDialogOpen}
-        onOpenChange={(open) => {
-          setIsEndDialogOpen(open);
-          if (!open) {
-            // Reset external trigger flag when dialog closes
-            setIsExternallyTriggered(false);
-          }
-        }}
-        onConfirm={handleConfirmEndSession}
-        isProcessing={false}
       />
 
       {/* Session End Toast */}

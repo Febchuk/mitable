@@ -299,7 +299,6 @@ async function triggerSummarization(sessionId: string, userId: string): Promise<
         return masterStoryService.generateStory({
           sessionId,
           userId,
-          formatPreference: { style: "concise", format: "bullets", includeScreenshots: false },
         });
       })(),
     ]);

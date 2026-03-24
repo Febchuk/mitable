@@ -218,17 +218,11 @@ class IntermediateSummaryService {
         "Generating intermediate summary"
       );
 
-      // Use concise preferences for intermediate summaries (faster generation)
       const rlmResult = await storytellerRLMService.generateSummary({
         sessionId,
         timeline,
         fullTranscriptText,
         metadata,
-        preferences: {
-          style: "concise",
-          format: "paragraphs",
-          includeScreenshots: false,
-        },
       });
 
       const result: IntermediateSummaryResult = {
