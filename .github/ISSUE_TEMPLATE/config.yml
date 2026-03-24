@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Quick Question
+    url: https://github.com/YOUR-USERNAME/YOUR-REPO/discussions
+    about: For quick questions, use Discussions instead of creating an issue
