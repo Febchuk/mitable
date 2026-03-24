@@ -14,30 +14,59 @@ const logger = createLogger("AgentSdkService");
 /**
  * Resolve the Claude Code CLI bundled inside @anthropic-ai/claude-agent-sdk.
  * The SDK ships its own cli.js — no need to find a system-installed binary.
- * For packaged Electron builds, handles asar-unpacked paths.
+ *
+ * Uses multiple strategies because the main process is CJS-bundled and
+ * import.meta.url shims are unreliable inside packaged asar archives.
  */
+function resolveAsarUnpacked(cliPath: string): string {
+  if (cliPath.includes("app.asar")) {
+    return cliPath.replace("app.asar", "app.asar.unpacked");
+  }
+  return cliPath;
+}
+
 function findClaudeCodeExecutable(): string | undefined {
+  const sdkSubpath = join("node_modules", "@anthropic-ai", "claude-agent-sdk", "cli.js");
+
+  // Strategy 1: app.getAppPath() — deterministic in both dev and production.
+  // In production it returns the path to app.asar; in dev it returns the project root.
+  try {
+    const cliPath = resolveAsarUnpacked(join(app.getAppPath(), sdkSubpath));
+    if (existsSync(cliPath)) {
+      logger.info("Found Claude Code CLI via app.getAppPath()", { cliPath });
+      return cliPath;
+    }
+    logger.warn("CLI not found via app.getAppPath()", { tried: cliPath });
+  } catch (err) {
+    logger.warn("app.getAppPath() resolution failed", { error: String(err) });
+  }
+
+  // Strategy 2: require.resolve — works in dev with hoisted node_modules.
   try {
     const requireModule = createRequire(import.meta.url);
     const sdkEntry = requireModule.resolve("@anthropic-ai/claude-agent-sdk");
-    const sdkDir = join(sdkEntry, "..");
-    let cliPath = join(sdkDir, "cli.js");
-
-    // In packaged Electron, files inside asar can't be spawned directly
-    if (cliPath.includes("app.asar")) {
-      const unpackedPath = cliPath.replace("app.asar", "app.asar.unpacked");
-      if (existsSync(unpackedPath)) {
-        cliPath = unpackedPath;
-      }
-    }
-
+    const cliPath = resolveAsarUnpacked(join(sdkEntry, "..", "cli.js"));
     if (existsSync(cliPath)) {
+      logger.info("Found Claude Code CLI via require.resolve", { cliPath });
+      return cliPath;
+    }
+    logger.warn("CLI not found via require.resolve", { tried: cliPath });
+  } catch (err) {
+    logger.warn("require.resolve resolution failed", { error: String(err) });
+  }
+
+  // Strategy 3: __dirname — available in CJS output, relative to bundled main process.
+  try {
+    const cliPath = resolveAsarUnpacked(join(__dirname, "..", sdkSubpath));
+    if (existsSync(cliPath)) {
+      logger.info("Found Claude Code CLI via __dirname", { cliPath });
       return cliPath;
     }
   } catch (err) {
-    logger.warn("Failed to resolve SDK bundled CLI", { error: String(err) });
+    logger.warn("__dirname resolution failed", { error: String(err) });
   }
 
+  logger.error("Claude Code CLI not found via any strategy");
   return undefined;
 }
 
