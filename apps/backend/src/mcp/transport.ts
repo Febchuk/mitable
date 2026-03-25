@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createMcpServer } from "./index.js";
@@ -8,6 +8,26 @@ const router = Router();
 
 // All MCP requests require API key auth
 router.use(mcpAuthMiddleware);
+
+/**
+ * Ensure POST requests include both application/json and text/event-stream
+ * in the Accept header. mcp-remote may only send application/json, which
+ * causes the SDK to return 406.
+ */
+function ensureStreamableHttpAccept(req: Request, _res: Response, next: NextFunction): void {
+  if (req.method === "POST") {
+    const accept = req.headers.accept ?? "";
+    const parts: string[] = [];
+    if (!accept.includes("application/json")) parts.push("application/json");
+    if (!accept.includes("text/event-stream")) parts.push("text/event-stream");
+    if (parts.length > 0) {
+      req.headers.accept = accept ? `${accept}, ${parts.join(", ")}` : parts.join(", ");
+    }
+  }
+  next();
+}
+
+router.use(ensureStreamableHttpAccept);
 
 // Track active SSE sessions
 const sseTransports = new Map<string, SSEServerTransport>();
@@ -103,7 +123,7 @@ router.post("/sse", async (req, res) => {
   }
 
   try {
-    await transport.handlePostMessage(req, res);
+    await transport.handlePostMessage(req, res, req.body);
   } catch (error: any) {
     console.error("MCP SSE message error:", error);
     if (!res.headersSent) {

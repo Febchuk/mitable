@@ -4,10 +4,12 @@ Mitable exposes a [Model Context Protocol](https://modelcontextprotocol.io/) (MC
 
 ## Architecture
 
-The server is **stateless**: each HTTP request creates a fresh `McpServer` instance scoped to the authenticated organization. There is no session management or SSE streaming — just `POST /mcp` with a JSON-RPC body.
+The server is **stateless**: each HTTP request creates a fresh `McpServer` instance scoped to the authenticated organization. Two transports are available:
 
-**Endpoint:** `POST /mcp`
-**Auth:** Bearer token (API key)
+1. **Streamable HTTP** — `POST /mcp` with a JSON-RPC body. Best for Claude Code, Cursor, and other modern MCP clients.
+2. **SSE (Server-Sent Events)** — `GET /mcp/sse` opens a long-lived event stream; `POST /mcp/sse?sessionId=…` sends client messages. Required by Claude Desktop (via `mcp-remote` bridge).
+
+**Auth:** Bearer token (API key) on all endpoints.
 
 ## Authentication
 
@@ -33,7 +35,45 @@ All endpoints require admin authentication (JWT via `requireAuth` middleware).
 
 ### Claude Desktop
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
+
+**Recommended** — uses `mcp-remote` to bridge stdio to SSE:
+
+```json
+{
+  "mcpServers": {
+    "mitable": {
+      "command": "/opt/homebrew/bin/node",
+      "args": [
+        "/Users/YOU/.npm/_npx/HASH/node_modules/mcp-remote/dist/index.js",
+        "https://mitablebackend-production.up.railway.app/mcp/sse",
+        "--header",
+        "Authorization: Bearer mk_live_YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+Or via `npx` (may require clearing the npx cache if Node version changes):
+
+```json
+{
+  "mcpServers": {
+    "mitable": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mitablebackend-production.up.railway.app/mcp/sse",
+        "--header",
+        "Authorization: Bearer mk_live_YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+**Alternative** — native Streamable HTTP (if your Claude Desktop version supports `type: "http"`):
 
 ```json
 {
