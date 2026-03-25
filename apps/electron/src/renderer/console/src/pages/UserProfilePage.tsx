@@ -827,7 +827,6 @@ export default function UserProfilePage() {
     loadAudioPreferences,
   ]);
 
-
   // Listen for update events
   useEffect(() => {
     const unsubscribeAvailable = window.consoleAPI?.onUpdateAvailable((info) => {
@@ -1682,13 +1681,7 @@ export default function UserProfilePage() {
 
   // Tab state — honor ?tab= query param from sidebar menu
   const [searchParams] = useSearchParams();
-  const validTabs = [
-    "account",
-    "security",
-    "preferences",
-    "integrations",
-    "update",
-  ] as const;
+  const validTabs = ["account", "security", "preferences", "integrations", "update"] as const;
   type TabId = (typeof validTabs)[number];
   const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
     ? (searchParams.get("tab") as TabId)

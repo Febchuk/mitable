@@ -201,7 +201,9 @@ class DocGenerationService {
     }
   }
 
-  private async chatCompletion(prompt: string): Promise<{ content: string; model: string; tokens: number }> {
+  private async chatCompletion(
+    prompt: string
+  ): Promise<{ content: string; model: string; tokens: number }> {
     if (this.anthropic) {
       try {
         const response = await this.anthropic.messages.create({

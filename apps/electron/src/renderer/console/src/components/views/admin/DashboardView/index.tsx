@@ -344,10 +344,7 @@ export default function DashboardView() {
     return apiData.metrics.totalTeamSessionMinutes ?? 0;
   }, [apiData]);
 
-  const activeTimeDisplay = useMemo(
-    () => formatTopLevelDuration(totalMinutes),
-    [totalMinutes]
-  );
+  const activeTimeDisplay = useMemo(() => formatTopLevelDuration(totalMinutes), [totalMinutes]);
 
   const peopleActive = useMemo(() => {
     if (!apiData?.hasData) return "0";
