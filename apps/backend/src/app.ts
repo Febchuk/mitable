@@ -125,6 +125,15 @@ app.get("/health", (_req, res) => {
 // MCP endpoint — no rate limiter (API key auth handles access control)
 app.use("/mcp", mcpRouter);
 
+// OAuth discovery endpoints — mcp-remote 0.1.38+ probes these before connecting.
+// Return JSON 404s so it gracefully skips OAuth and uses the Bearer token header.
+app.get("/.well-known/oauth-authorization-server", (_req, res) => {
+  res.status(404).json({ error: "OAuth not supported" });
+});
+app.post("/register", (_req, res) => {
+  res.status(404).json({ error: "OAuth client registration not supported" });
+});
+
 // API routes with rate limiting
 app.use("/api", generalLimiter, router);
 
