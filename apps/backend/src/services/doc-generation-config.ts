@@ -5,9 +5,11 @@
  */
 
 // Model configuration
-export const DOC_GEN_MODEL = "openai/gpt-oss-120b"; // OpenAI GPT-OSS 120B on Groq
+// Primary: Claude Sonnet 4.5, Fallback: GPT-5, Last resort: DeepSeek
+// Actual model selection handled by document-generation/agent.ts fallback chain
+export const DOC_GEN_MODEL = "claude-sonnet-4-5-20250929";
 export const DOC_GEN_TEMPERATURE = 0.5;
-export const DOC_GEN_MAX_TOKENS = 4000;
+export const DOC_GEN_MAX_TOKENS = 16000;
 
 // RAG retrieval configuration
 export const SESSION_SEARCH_TOP_K = 30; // Number of session chunks to retrieve

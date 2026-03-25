@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDashboardMetrics } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
-import { formatDashboardDuration, dashboardDurationLabel } from "../shared/topLevelDuration";
+import { formatTopLevelDuration } from "../shared/topLevelDuration";
 
 type TimeFilter = "yesterday" | "week" | "month" | "ytd" | "all";
 
@@ -341,18 +341,12 @@ export default function DashboardView() {
 
   const totalMinutes = useMemo(() => {
     if (!apiData?.hasData) return 0;
-    return apiData.metrics.totalTeamWorkMinutes + apiData.metrics.totalTeamMeetingMinutes;
+    return apiData.metrics.totalTeamSessionMinutes ?? 0;
   }, [apiData]);
 
-  const userCount = apiData?.hasData ? apiData.metrics.totalUsersTracked : 1;
-
-  const durationDisplay = useMemo(
-    () => formatDashboardDuration(totalMinutes, filter, userCount),
-    [totalMinutes, filter, userCount]
-  );
-  const durationLabel = useMemo(
-    () => dashboardDurationLabel(totalMinutes, filter, userCount),
-    [totalMinutes, filter, userCount]
+  const activeTimeDisplay = useMemo(
+    () => formatTopLevelDuration(totalMinutes),
+    [totalMinutes]
   );
 
   const peopleActive = useMemo(() => {
@@ -450,7 +444,7 @@ export default function DashboardView() {
               fontFamily: "var(--font-sans)",
             }}
           >
-            {durationLabel}
+            Total active time
           </span>
           <span
             style={{
@@ -462,7 +456,7 @@ export default function DashboardView() {
               lineHeight: 1,
             }}
           >
-            {durationDisplay}
+            {activeTimeDisplay}
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -475,7 +469,7 @@ export default function DashboardView() {
               fontFamily: "var(--font-sans)",
             }}
           >
-            People active
+            People tracked
           </span>
           <span
             style={{

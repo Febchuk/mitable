@@ -75,8 +75,7 @@ const defaults: PreferencesSchema = {
   users: {},
 };
 
-// Default blocked apps (Electron, Messages, WhatsApp)
-const DEFAULT_BLOCKED_APPS = ["electron", "messages", "whatsapp"];
+const DEFAULT_BLOCKED_APPS = ["electron", "messages", "whatsapp", "spotify", "imessage"];
 
 class PreferencesService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -246,8 +245,7 @@ class PreferencesService {
   // Auto recap preference (user-scoped)
   getUserAutoRecap(userId: string): boolean {
     const userPrefs = this.store.get(`users.${userId}`, {});
-    // Default to true — auto-recap is on unless explicitly disabled
-    return userPrefs.autoRecap ?? true;
+    return userPrefs.autoRecap ?? false;
   }
 
   setUserAutoRecap(userId: string, enabled: boolean): void {
@@ -262,8 +260,7 @@ class PreferencesService {
   // Passive monitoring preference (user-scoped)
   getUserPassiveMonitoringEnabled(userId: string): boolean {
     const userPrefs = this.store.get(`users.${userId}`, {});
-    // Default to true — passive monitoring is enabled by default
-    return userPrefs.passiveMonitoringEnabled ?? true;
+    return userPrefs.passiveMonitoringEnabled ?? false;
   }
 
   setUserPassiveMonitoringEnabled(userId: string, enabled: boolean): void {

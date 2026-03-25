@@ -90,9 +90,22 @@ function normalizeAppName(appName: string): string {
     .replace(/\.AppImage$/i, ""); // Linux AppImage
 }
 
+// Apps that are always excluded from tracking.
+// Checked with `includes` so helper/renderer processes also match
+// (e.g. "WhatsApp Helper (Renderer)" still matches "whatsapp").
+const ALWAYS_EXCLUDED_APPS: { pattern: string; reason: string }[] = [
+  { pattern: "mitable", reason: "Mitable app" },
+  { pattern: "electron", reason: "Electron window" },
+  { pattern: "messages", reason: "Messages app" },
+  { pattern: "whatsapp", reason: "WhatsApp app" },
+  { pattern: "spotify", reason: "Spotify app" },
+  { pattern: "imessage", reason: "iMessage app" },
+];
+
 /**
- * Check if a window should be excluded from tracking
- * Excludes: Mitable windows, Electron windows, Messages, WhatsApp, policy-blocked windows, and Spotify
+ * Check if a window should be excluded from tracking.
+ * Uses `includes`-based matching so macOS helper/renderer processes
+ * (e.g. "WhatsApp Helper", "Spotify Helper (Renderer)") are caught.
  */
 function shouldExcludeWindow(
   windowTitle: string,
@@ -105,33 +118,17 @@ function shouldExcludeWindow(
     return { excluded: true, reason: "Mitable window" };
   }
 
-  // Check 2: Mitable windows by app name (normalized)
-  const normalizedAppName = normalizeAppName(appName);
-  if (normalizedAppName.toLowerCase() === "mitable") {
-    return { excluded: true, reason: "Mitable app" };
+  // Check 2: Always-excluded apps by name (includes-based for helper processes)
+  const lowerAppName = normalizeAppName(appName).toLowerCase();
+  const lowerTitle = (windowTitle || "").toLowerCase();
+
+  for (const { pattern, reason } of ALWAYS_EXCLUDED_APPS) {
+    if (lowerAppName.includes(pattern) || lowerTitle === pattern) {
+      return { excluded: true, reason };
+    }
   }
 
-  // Check 3: Electron windows (dev app windows)
-  if (normalizedAppName.toLowerCase() === "electron") {
-    return { excluded: true, reason: "Electron window" };
-  }
-
-  // Check 4: Messages app (macOS Messages)
-  if (normalizedAppName.toLowerCase() === "messages") {
-    return { excluded: true, reason: "Messages app" };
-  }
-
-  // Check 5: WhatsApp
-  if (normalizedAppName.toLowerCase() === "whatsapp") {
-    return { excluded: true, reason: "WhatsApp app" };
-  }
-
-  // Check 6: Spotify by app name (normalized)
-  if (normalizedAppName.toLowerCase() === "spotify") {
-    return { excluded: true, reason: "Spotify app" };
-  }
-
-  // Check 7: Policy-blocked windows (pass userId if available)
+  // Check 3: Policy-blocked windows + user block list
   const policyDecision = isBlockedByPolicy(windowTitle, appName, policy, undefined, userId);
   if (policyDecision.blocked) {
     return { excluded: true, reason: policyDecision.reason || "Policy-blocked" };

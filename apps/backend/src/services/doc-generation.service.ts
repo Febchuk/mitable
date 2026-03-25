@@ -8,7 +8,8 @@
  * - Troubleshooting Docs: Problem → Solution guides
  */
 
-import Groq from "groq-sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
@@ -16,16 +17,17 @@ import { eq, desc } from "drizzle-orm";
 import type { DocType, GenerateDocumentResponse, EnhanceDocumentResponse } from "@mitable/shared";
 import { sessionRetrieverService } from "./session-retriever.service.js";
 
-// Configuration
+const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+const OPENAI_MODEL = "gpt-5";
+
 const DOC_GEN_CONFIG = {
-  TEXT_MODEL: "openai/gpt-oss-120b", // OpenAI GPT-OSS 120B on Groq
   TEMPERATURE: 0.4,
-  MAX_TOKENS: 2000,
+  MAX_TOKENS: 16000,
 };
 
 // Prompt templates by doc type
 const DOC_TYPE_PROMPTS: Record<DocType, string> = {
-  "how-to": `You are an expert technical writer creating a how-to guide from a work session.
+  "how-to": `You are creating a how-to guide from a work session.
 
 Session Context:
 - Duration: {duration}
@@ -36,19 +38,16 @@ Session Context:
 Session Summary:
 {sessionSummary}
 
-Create a step-by-step how-to guide that:
-1. Has a clear, action-oriented title
-2. Includes a prerequisites section if applicable
-3. Breaks down the process into numbered steps
-4. Each step should have:
-   - Clear action instruction
-   - Expected outcome (when helpful)
-   - Tips or warnings if relevant
-5. Includes a troubleshooting section if blockers were mentioned
-6. Ends with verification/success criteria
+Write a how-to guide based on what was actually observed in this session. Structure it however best fits the content — you have full freedom over headings, ordering, and format.
 
-Format in Markdown. Use code blocks for any commands or code snippets.
-Keep it concise but comprehensive.
+ACCURACY RULES:
+- ONLY write about activities, steps, and details that appear in the session data above
+- Do NOT invent steps, outcomes, or details that aren't supported by the data
+- If information is missing or unclear, include a note in italics: *[Please fill in: description of what's needed]*
+- A short, accurate guide is better than a long, padded one — do not add filler content
+- Skip sections entirely if you have no data for them
+
+Format in Markdown.
 
 {additionalContext}`,
 
@@ -62,17 +61,16 @@ Session Context:
 Session Summary:
 {sessionSummary}
 
-Create a knowledge article that:
-1. Has an informative title explaining the topic
-2. Opens with a brief overview (2-3 sentences)
-3. Organizes content into logical sections with headers
-4. Explains concepts clearly for someone unfamiliar
-5. Includes practical examples from the session where applicable
-6. Adds relevant tips and best practices
-7. Notes any related topics or next steps
+Write a knowledge article based on what was actually observed. Choose the structure and sections that best fit the data — you have full freedom over format.
 
-Target audience: New team members learning this domain.
-Format in Markdown with proper heading hierarchy (##, ###).
+ACCURACY RULES:
+- ONLY write about topics, patterns, and details that appear in the session data above
+- Do NOT extrapolate or invent information to fill out sections
+- If information is missing or unclear, include a note in italics: *[Please fill in: description of what's needed]*
+- A short, focused article is better than a long, speculative one
+- Only include sections where you have real information
+
+Format in Markdown.
 
 {additionalContext}`,
 
@@ -87,17 +85,16 @@ Session Context:
 Session Summary:
 {sessionSummary}
 
-Create a troubleshooting guide that:
-1. Has a clear problem statement title
-2. Starts with symptoms section (how to recognize this issue)
-3. Lists potential causes in order of likelihood
-4. Provides diagnostic steps to identify the cause
-5. Gives solution steps for each cause
-6. Includes prevention tips
-7. Lists related issues that may appear similar
+Write a troubleshooting guide based on what was actually observed. Document the problem, what was tried, and any resolution found. Structure it however best fits the data.
 
-Format in Markdown with clear sections.
-Use bullet points for lists, code blocks for commands.
+ACCURACY RULES:
+- ONLY write about problems, symptoms, and solutions that appear in the session data above
+- Do NOT invent causes, diagnostic steps, or solutions that aren't in the data
+- If the root cause or resolution is unclear from the session, say so and mark it: *[Please fill in: what the resolution was]*
+- A short, accurate guide is better than a speculative one
+- Skip sections you don't have data for
+
+Format in Markdown.
 
 {additionalContext}`,
 };
@@ -192,10 +189,60 @@ interface SessionData {
 }
 
 class DocGenerationService {
-  private groq: Groq;
+  private anthropic: Anthropic | null = null;
+  private openai: OpenAI | null = null;
 
   constructor() {
-    this.groq = new Groq({ apiKey: config.groq.apiKey });
+    if (config.anthropic.apiKey) {
+      this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
+    }
+    if (config.openai.apiKey) {
+      this.openai = new OpenAI({ apiKey: config.openai.apiKey });
+    }
+  }
+
+  private async chatCompletion(prompt: string): Promise<{ content: string; model: string; tokens: number }> {
+    if (this.anthropic) {
+      try {
+        const response = await this.anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: DOC_GEN_CONFIG.MAX_TOKENS,
+          temperature: DOC_GEN_CONFIG.TEMPERATURE,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const text = response.content
+          .filter((b): b is Anthropic.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("");
+        return {
+          content: text,
+          model: CLAUDE_MODEL,
+          tokens: (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0),
+        };
+      } catch (err) {
+        console.warn("[DocGen] Claude failed, falling back to OpenAI:", String(err));
+      }
+    }
+
+    if (this.openai) {
+      try {
+        const completion = await this.openai.chat.completions.create({
+          model: OPENAI_MODEL,
+          messages: [{ role: "user", content: prompt }],
+          temperature: DOC_GEN_CONFIG.TEMPERATURE,
+          max_tokens: DOC_GEN_CONFIG.MAX_TOKENS,
+        });
+        return {
+          content: completion.choices[0]?.message?.content || "",
+          model: OPENAI_MODEL,
+          tokens: completion.usage?.total_tokens || 0,
+        };
+      } catch (err) {
+        console.warn("[DocGen] OpenAI also failed:", String(err));
+      }
+    }
+
+    throw new Error("No LLM available — both Anthropic and OpenAI failed or are unconfigured");
   }
 
   /**
@@ -214,15 +261,10 @@ class DocGenerationService {
     const prompt = this.buildGenerationPrompt(docType, sessionData, additionalContext);
 
     // Generate content
-    const completion = await this.groq.chat.completions.create({
-      model: DOC_GEN_CONFIG.TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: DOC_GEN_CONFIG.TEMPERATURE,
-      max_tokens: DOC_GEN_CONFIG.MAX_TOKENS,
-    });
+    const result = await this.chatCompletion(prompt);
 
-    const generatedContent = completion.choices[0]?.message?.content || "";
-    const tokenCount = completion.usage?.total_tokens || 0;
+    const generatedContent = result.content;
+    const tokenCount = result.tokens;
 
     // Extract title from content if not provided
     const docTitle = title || this.extractTitle(generatedContent, docType);
@@ -237,7 +279,7 @@ class DocGenerationService {
         docType,
         content: generatedContent,
         status: "draft",
-        generationModel: DOC_GEN_CONFIG.TEXT_MODEL,
+        generationModel: result.model,
         generationPromptVersion: 1,
       })
       .returning();
@@ -266,7 +308,7 @@ class DocGenerationService {
     return {
       document: document as any,
       generationMetadata: {
-        model: DOC_GEN_CONFIG.TEXT_MODEL,
+        model: result.model,
         tokenCount,
         generationTimeMs,
       },
@@ -304,14 +346,8 @@ class DocGenerationService {
     );
 
     // Generate enhanced content
-    const completion = await this.groq.chat.completions.create({
-      model: DOC_GEN_CONFIG.TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: DOC_GEN_CONFIG.TEMPERATURE,
-      max_tokens: DOC_GEN_CONFIG.MAX_TOKENS,
-    });
-
-    const enhancedContent = completion.choices[0]?.message?.content || "";
+    const enhanceResult = await this.chatCompletion(prompt);
+    const enhancedContent = enhanceResult.content;
 
     // Get latest version number
     const [latestVersion] = await db
@@ -392,14 +428,8 @@ Important:
 
 Revised document:`;
 
-    const completion = await this.groq.chat.completions.create({
-      model: DOC_GEN_CONFIG.TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
-      max_tokens: DOC_GEN_CONFIG.MAX_TOKENS,
-    });
-
-    return completion.choices[0]?.message?.content?.trim() || "";
+    const reviseResult = await this.chatCompletion(prompt);
+    return reviseResult.content.trim();
   }
 
   /**
@@ -508,23 +538,23 @@ Revised document:`;
     const appBreakdown =
       Object.entries(sessionData.timeBreakdown)
         .map(([app, ms]) => `${app}: ${this.formatDuration(ms)}`)
-        .join(", ") || "Various applications";
+        .join(", ") || "No app data available";
 
     // Format activities
     const keyActivities =
       sessionData.keyActivities
         .map((a) => (typeof a === "string" ? a : (a as any).activity || JSON.stringify(a)))
-        .join("\n- ") || "Work activities";
+        .join("\n- ") || "No activities recorded";
 
     const accomplishments =
       sessionData.accomplishments
         .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
-        .join("\n- ") || "Tasks completed";
+        .join("\n- ") || "No accomplishments recorded";
 
     const blockers =
       sessionData.blockers
         .map((b) => (typeof b === "string" ? b : JSON.stringify(b)))
-        .join("\n- ") || "None";
+        .join("\n- ") || "None recorded";
 
     // Replace placeholders
     prompt = prompt
