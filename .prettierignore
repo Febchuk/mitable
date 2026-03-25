@@ -7,3 +7,4 @@ out
 package-lock.json
 coverage
 .turbo
+.github

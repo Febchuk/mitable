@@ -857,9 +857,10 @@ Respond ONLY with JSON:
       }
 
       // Extract notes/summary from XML body if present
-      const notesXml = body.match(/<enhanced_notes>([\s\S]*?)<\/enhanced_notes>/)?.[1]?.trim()
-        || body.match(/<notes>([\s\S]*?)<\/notes>/)?.[1]?.trim()
-        || null;
+      const notesXml =
+        body.match(/<enhanced_notes>([\s\S]*?)<\/enhanced_notes>/)?.[1]?.trim() ||
+        body.match(/<notes>([\s\S]*?)<\/notes>/)?.[1]?.trim() ||
+        null;
       const summaryXml = body.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.trim() || null;
 
       meetings.push({
