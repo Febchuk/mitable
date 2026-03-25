@@ -337,6 +337,8 @@ function createWatchingPillWindow() {
     maximizable: false,
     skipTaskbar: true,
     show: false,
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    hasShadow: false,
     webPreferences: {
       preload: join(__dirname, "../preload/watchingPill.cjs"),
       contextIsolation: true,
@@ -346,7 +348,7 @@ function createWatchingPillWindow() {
 
   // Platform-specific always-on-top behavior
   if (process.platform === "darwin") {
-    watchingPillWindow.setAlwaysOnTop(true, "modal-panel");
+    watchingPillWindow.setAlwaysOnTop(true, "screen-saver");
     watchingPillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillWindow.setAlwaysOnTop(true, "normal", 1);
@@ -359,6 +361,9 @@ function createWatchingPillWindow() {
   }
 
   watchingPillWindow.on("closed", () => {
+    // Close dropdowns explicitly (no longer auto-closed without parent)
+    if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) watchingPillEyeDropdown.close();
+    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) watchingPillMenuDropdown.close();
     watchingPillWindow = null;
     stopClosedWindowCheck();
     stopPillCursorTracking();
@@ -412,19 +417,15 @@ function stopClosedWindowCheck() {
  * Show the pill window reliably — re-assert always-on-top and visibility flags after show().
  */
 function showPillReliably(win: BrowserWindow) {
-  win.show();
+  win.showInactive();
 
   // Re-assert always-on-top (macOS can drop the level)
   if (process.platform === "darwin") {
-    win.setAlwaysOnTop(true, "modal-panel");
+    win.setAlwaysOnTop(true, "screen-saver");
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     win.setAlwaysOnTop(true, "normal", 1);
   }
-
-  // Force into render tree without stealing focus
-  win.focus();
-  win.blur();
 }
 
 /**
@@ -528,7 +529,8 @@ function createWatchingPillEyeDropdown() {
     fullscreenable: false,
     maximizable: false,
     show: false,
-    parent: watchingPillWindow, // Child of pill window
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    hasShadow: false,
     webPreferences: {
       preload: join(__dirname, "../preload/watchingPillDropdown.cjs"),
       contextIsolation: true,
@@ -538,7 +540,8 @@ function createWatchingPillEyeDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillEyeDropdown.setAlwaysOnTop(true, "modal-panel");
+    watchingPillEyeDropdown.setAlwaysOnTop(true, "screen-saver");
+    watchingPillEyeDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillEyeDropdown.setAlwaysOnTop(true, "normal", 1);
   }
@@ -590,7 +593,8 @@ function createWatchingPillMenuDropdown() {
     fullscreenable: false,
     maximizable: false,
     show: false,
-    parent: watchingPillWindow, // Child of pill window
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    hasShadow: false,
     webPreferences: {
       preload: join(__dirname, "../preload/watchingPillDropdown.cjs"),
       contextIsolation: true,
@@ -600,7 +604,8 @@ function createWatchingPillMenuDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillMenuDropdown.setAlwaysOnTop(true, "modal-panel");
+    watchingPillMenuDropdown.setAlwaysOnTop(true, "screen-saver");
+    watchingPillMenuDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillMenuDropdown.setAlwaysOnTop(true, "normal", 1);
   }
