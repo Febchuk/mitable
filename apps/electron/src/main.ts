@@ -77,6 +77,10 @@ let menuDropdownReady = false;
 // Interval for checking if watched windows are still open
 let closedWindowCheckInterval: NodeJS.Timeout | null = null;
 
+// Pill cursor-tracking state (multi-monitor following)
+let pillCursorTrackingInterval: NodeJS.Timeout | null = null;
+let pillCurrentDisplayId: number | null = null;
+
 // Watch button windows tracking (module scope for cleanup from multiple handlers)
 const watchButtonWindows: Map<string, BrowserWindow> = new Map();
 
@@ -218,6 +222,7 @@ function createConsoleWindow() {
           },
         }),
     maximizable: true,
+    fullscreenable: false,
     // Platform-specific transparency and background
     ...(isMac && {
       transparent: true,
@@ -339,6 +344,8 @@ function createWatchingPillWindow() {
     transparent: true,
     alwaysOnTop: true,
     resizable: false,
+    fullscreenable: false,
+    maximizable: false,
     skipTaskbar: true,
     show: false,
     webPreferences: {
@@ -365,6 +372,7 @@ function createWatchingPillWindow() {
   watchingPillWindow.on("closed", () => {
     watchingPillWindow = null;
     stopClosedWindowCheck();
+    stopPillCursorTracking();
   });
 
   watchingPillLogger.info(" Window created at right edge, vertically centered");
@@ -411,6 +419,107 @@ function stopClosedWindowCheck() {
   }
 }
 
+/**
+ * Show the pill window reliably — re-assert always-on-top and visibility flags after show().
+ */
+function showPillReliably(win: BrowserWindow) {
+  win.show();
+
+  // Re-assert always-on-top (macOS can drop the level)
+  if (process.platform === "darwin") {
+    win.setAlwaysOnTop(true, "modal-panel");
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } else {
+    win.setAlwaysOnTop(true, "normal", 1);
+  }
+
+  // Force into render tree without stealing focus
+  win.focus();
+  win.blur();
+}
+
+/**
+ * Move the pill window to the right edge of the given display, vertically centered.
+ */
+function movePillToDisplay(display: Electron.Display) {
+  if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+
+  const { width: screenWidth, height: screenHeight, x: screenX, y: screenY } = display.bounds;
+  const windowWidth = 64;
+  const windowHeight = 200;
+  const rightMargin = 5;
+
+  watchingPillWindow.setBounds({
+    x: screenX + screenWidth - windowWidth - rightMargin,
+    y: screenY + Math.floor((screenHeight - windowHeight) / 2),
+    width: windowWidth,
+    height: windowHeight,
+  });
+
+  // Reposition any open dropdown windows relative to new pill location
+  const pillBounds = watchingPillWindow.getBounds();
+  if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed() && watchingPillEyeDropdown.isVisible()) {
+    watchingPillEyeDropdown.setBounds({
+      x: pillBounds.x - 250,
+      y: pillBounds.y + 40,
+      width: 240,
+      height: 280,
+    });
+  }
+  if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed() && watchingPillMenuDropdown.isVisible()) {
+    watchingPillMenuDropdown.setBounds({
+      x: pillBounds.x - 170,
+      y: pillBounds.y + 90,
+      width: 160,
+      height: 100,
+    });
+  }
+}
+
+/**
+ * Start tracking the cursor position to move the pill across monitors.
+ */
+function startPillCursorTracking() {
+  if (pillCursorTrackingInterval) return; // Already running
+
+  // Initialize with current display
+  if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+    const pillBounds = watchingPillWindow.getBounds();
+    const currentDisplay = screen.getDisplayNearestPoint({ x: pillBounds.x, y: pillBounds.y });
+    pillCurrentDisplayId = currentDisplay.id;
+  }
+
+  pillCursorTrackingInterval = setInterval(() => {
+    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+      stopPillCursorTracking();
+      return;
+    }
+
+    const cursor = screen.getCursorScreenPoint();
+    const cursorDisplay = screen.getDisplayNearestPoint(cursor);
+
+    if (cursorDisplay.id !== pillCurrentDisplayId) {
+      pillCurrentDisplayId = cursorDisplay.id;
+      movePillToDisplay(cursorDisplay);
+      watchingPillLogger.info(` Pill moved to display ${cursorDisplay.id}`);
+    }
+  }, 500);
+
+  watchingPillLogger.info(" Started pill cursor tracking");
+}
+
+/**
+ * Stop cursor tracking for the pill.
+ */
+function stopPillCursorTracking() {
+  if (pillCursorTrackingInterval) {
+    clearInterval(pillCursorTrackingInterval);
+    pillCursorTrackingInterval = null;
+    pillCurrentDisplayId = null;
+    watchingPillLogger.info(" Stopped pill cursor tracking");
+  }
+}
+
 function createWatchingPillEyeDropdown() {
   if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
 
@@ -427,6 +536,8 @@ function createWatchingPillEyeDropdown() {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
+    fullscreenable: false,
+    maximizable: false,
     show: false,
     parent: watchingPillWindow, // Child of pill window
     webPreferences: {
@@ -487,6 +598,8 @@ function createWatchingPillMenuDropdown() {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
+    fullscreenable: false,
+    maximizable: false,
     show: false,
     parent: watchingPillWindow, // Child of pill window
     webPreferences: {
@@ -892,6 +1005,7 @@ function setupIPC() {
   // Hide watching pill
   ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE, () => {
     watchingPillLogger.info(" Hide requested");
+    stopPillCursorTracking();
     if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
       watchingPillWindow.hide();
     }
@@ -904,7 +1018,8 @@ function setupIPC() {
       createWatchingPillWindow();
     }
     if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-      watchingPillWindow.show();
+      showPillReliably(watchingPillWindow);
+      startPillCursorTracking();
     }
   });
 
@@ -1697,7 +1812,8 @@ function setupMonitoringSessionHandlers() {
             createWatchingPillWindow();
           }
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-            watchingPillWindow.show();
+            showPillReliably(watchingPillWindow);
+            startPillCursorTracking();
           }
         }
       }
@@ -2577,7 +2693,8 @@ async function startSessionFromMain(sessionType: "focused" | "passive" = "focuse
           createWatchingPillWindow();
         }
         if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-          watchingPillWindow.show();
+          showPillReliably(watchingPillWindow);
+          startPillCursorTracking();
         }
       }
 
@@ -2762,9 +2879,11 @@ function registerGlobalShortcuts() {
 
       if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
         if (watchingPillWindow.isVisible()) {
+          stopPillCursorTracking();
           watchingPillWindow.hide();
         } else {
-          watchingPillWindow.show();
+          showPillReliably(watchingPillWindow);
+          startPillCursorTracking();
         }
       }
     } catch {
