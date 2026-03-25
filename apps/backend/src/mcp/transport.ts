@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createMcpServer } from "./index.js";
 import { mcpAuthMiddleware, type McpAuthContext } from "./auth.js";
 
@@ -7,6 +8,9 @@ const router = Router();
 
 // All MCP requests require API key auth
 router.use(mcpAuthMiddleware);
+
+// Track active SSE sessions
+const sseTransports = new Map<string, SSEServerTransport>();
 
 /**
  * POST /mcp — Streamable HTTP MCP endpoint (stateless).
@@ -41,7 +45,7 @@ router.post("/", async (req, res) => {
 router.get("/", (_req, res) => {
   res.status(405).json({
     error: "Method not allowed",
-    message: "This server operates in stateless mode. SSE streams are not supported.",
+    message: "This server operates in stateless mode. Use GET /mcp/sse for SSE transport.",
   });
 });
 
@@ -50,6 +54,61 @@ router.delete("/", (_req, res) => {
     error: "Method not allowed",
     message: "This server operates in stateless mode. Session termination is not needed.",
   });
+});
+
+/**
+ * GET /mcp/sse — SSE transport for Claude Desktop compatibility.
+ * Opens a long-lived SSE stream for server-to-client messages.
+ */
+router.get("/sse", async (req, res) => {
+  const { organizationId } = (req as any).mcpAuth as McpAuthContext;
+
+  try {
+    const server = createMcpServer(organizationId);
+    const transport = new SSEServerTransport("/mcp/sse", res);
+
+    sseTransports.set(transport.sessionId, transport);
+
+    res.on("close", () => {
+      sseTransports.delete(transport.sessionId);
+    });
+
+    await server.connect(transport);
+  } catch (error: any) {
+    console.error("MCP SSE connection error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "SSE connection failed" });
+    }
+  }
+});
+
+/**
+ * POST /mcp/sse — Receives client-to-server messages for an active SSE session.
+ * Session ID is passed as a query parameter.
+ */
+router.post("/sse", async (req, res) => {
+  const sessionId = req.query.sessionId as string;
+
+  if (!sessionId) {
+    res.status(400).json({ error: "Missing sessionId query parameter" });
+    return;
+  }
+
+  const transport = sseTransports.get(sessionId);
+
+  if (!transport) {
+    res.status(404).json({ error: "SSE session not found or expired" });
+    return;
+  }
+
+  try {
+    await transport.handlePostMessage(req, res);
+  } catch (error: any) {
+    console.error("MCP SSE message error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to handle message" });
+    }
+  }
 });
 
 export const mcpRouter = router;
