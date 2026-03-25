@@ -125,12 +125,14 @@ app.get("/health", (_req, res) => {
 // MCP endpoint — no rate limiter (API key auth handles access control)
 app.use("/mcp", mcpRouter);
 
-// OAuth discovery endpoints — mcp-remote 0.1.38+ probes these before connecting.
-// Return JSON 404s so it gracefully skips OAuth and uses the Bearer token header.
-app.get("/.well-known/oauth-authorization-server", (_req, res) => {
-  res.status(404).json({ error: "OAuth not supported" });
-});
+// mcp-remote probes OAuth endpoints before connecting. The well-known discovery
+// endpoint is left unhandled (Express default HTML 404) — mcp-remote correctly
+// ignores HTML 404 and skips OAuth. But if it does attempt client registration,
+// POST /register must return JSON (not HTML) to avoid a parse crash.
 app.post("/register", (_req, res) => {
+  res.status(404).json({ error: "OAuth client registration not supported" });
+});
+app.post("/mcp/register", (_req, res) => {
   res.status(404).json({ error: "OAuth client registration not supported" });
 });
 
