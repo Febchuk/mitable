@@ -345,8 +345,9 @@ function createWatchingPillWindow() {
   });
 
   // Platform-specific always-on-top behavior
+  // Use "screen-saver" level on macOS so the pill renders over fullscreen apps
   if (process.platform === "darwin") {
-    watchingPillWindow.setAlwaysOnTop(true, "modal-panel");
+    watchingPillWindow.setAlwaysOnTop(true, "screen-saver");
     watchingPillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillWindow.setAlwaysOnTop(true, "normal", 1);
@@ -415,8 +416,9 @@ function showPillReliably(win: BrowserWindow) {
   win.show();
 
   // Re-assert always-on-top (macOS can drop the level)
+  // Use "screen-saver" level so pill renders over fullscreen apps
   if (process.platform === "darwin") {
-    win.setAlwaysOnTop(true, "modal-panel");
+    win.setAlwaysOnTop(true, "screen-saver");
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     win.setAlwaysOnTop(true, "normal", 1);
