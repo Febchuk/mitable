@@ -90,7 +90,8 @@ router.post("/sse", async (req, res) => {
   const sessionId = req.query.sessionId as string;
 
   if (!sessionId) {
-    res.status(400).json({ error: "Missing sessionId query parameter" });
+    // Return 405 so Streamable HTTP clients (e.g. mcp-remote) fall back to SSE
+    res.status(405).json({ error: "Use GET /mcp/sse to establish an SSE session" });
     return;
   }
 
