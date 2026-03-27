@@ -16,6 +16,7 @@ import billingRouter from "./routes/billing.js";
 import stripeRouter from "./routes/stripe.js";
 import artifactsRouter from "./routes/artifacts.js";
 import apiKeysRouter from "./routes/api-keys.js";
+import myActivityRouter from "./routes/my-activity.js";
 import { authLimiter } from "./middleware/rateLimiter.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
 // import guidesRouter from "./routes/guides.routes.js";
@@ -40,6 +41,7 @@ router.use("/stripe", stripeRouter);
 router.use("/artifacts", artifactsRouter);
 router.use("/agent", agentRouter);
 router.use("/api-keys", apiKeysRouter);
+router.use("/my-activity", myActivityRouter);
 
 /**
  * DEPRECATED: /guides routes

@@ -12,7 +12,7 @@ import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw } from "lucide-rea
 import WeekStrip from "./WeekStrip";
 import ActivityBlock from "./ActivityBlock";
 import type { ActivityDay } from "./types";
-import { useCalendarDays, calendarKeys } from "../../../../hooks/queries/calendar";
+import { useCalendarDays, calendarKeys, type CalendarDateRange } from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
 import { deleteSession } from "../../../../services/monitoringService";
 import { monitoringKeys } from "../../../../hooks/queries/monitoring";
@@ -66,6 +66,20 @@ function deriveStatus(state: MonitoringSessionState | null): SessionStatus {
   return "idle";
 }
 
+/** Build the initial loaded range: 3 weeks back from today → end of today */
+function getInitialLoadedRange(): CalendarDateRange {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 21);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
 export default function CalendarView() {
   const queryClient = useQueryClient();
   const today = new Date();
@@ -73,6 +87,7 @@ export default function CalendarView() {
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("idle");
   const [summarizingBlockIds, setSummarizingBlockIds] = useState<Set<string>>(new Set());
+  const [loadedRange, setLoadedRange] = useState<CalendarDateRange>(getInitialLoadedRange);
 
   const { startSession, isStarting } = useStartSession({
     navigateOnSuccess: false,
@@ -161,7 +176,7 @@ export default function CalendarView() {
     return () => unsub?.();
   }, [queryClient, sessionStatus]);
 
-  const { data: realDays, isLoading, error } = useCalendarDays();
+  const { data: realDays, isLoading, error } = useCalendarDays(loadedRange);
   const allDays = realDays || [];
 
   const weekDays = useMemo(() => {
@@ -252,6 +267,14 @@ export default function CalendarView() {
     const newSelected = new Date(newStart);
     newSelected.setDate(newSelected.getDate() + dayOffset);
     setSelectedDate(newSelected);
+
+    // Expand loaded range if navigating before current start
+    const rangeStart = new Date(loadedRange.start);
+    if (newStart < rangeStart) {
+      const expandedStart = new Date(newStart);
+      expandedStart.setHours(0, 0, 0, 0);
+      setLoadedRange((prev) => ({ ...prev, start: expandedStart.toISOString() }));
+    }
   };
 
   const goToNextWeek = () => {

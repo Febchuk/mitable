@@ -39,6 +39,7 @@ import ReportsView from "./components/views/admin/ReportsView";
 import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
+import MeView from "./components/views/employee/MeView";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -305,6 +306,7 @@ function App() {
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
                         {/* Employee Routes */}
+                        <Route path="me" element={<MeView />} />
                         <Route path="docs" element={<DocsView />} />
                         <Route path="docs/:docId" element={<DocDetail />} />
                         <Route path="artefacts" element={<ArtifactsView />} />

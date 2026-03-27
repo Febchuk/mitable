@@ -13,6 +13,7 @@ export default function ConsoleLayout() {
   const location = useLocation();
   const isFullWidthPage =
     location.pathname === "/profile" ||
+    location.pathname === "/me" ||
     location.pathname === "/dashboard" ||
     location.pathname.startsWith("/people/") ||
     location.pathname.startsWith("/agent");

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, sql, desc, and, inArray, isNull, isNotNull } from "drizzle-orm";
+import { eq, sql, desc, and, inArray, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -290,12 +290,26 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
   const offset = (page - 1) * limit;
 
+  // Optional date-range filtering (ISO strings)
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+
   try {
+    // Build where conditions
+    const conditions = [eq(schema.monitoringSessions.userId, userId)];
+    if (startDate) {
+      conditions.push(gte(schema.monitoringSessions.startedAt, new Date(startDate)));
+    }
+    if (endDate) {
+      conditions.push(lte(schema.monitoringSessions.startedAt, new Date(endDate)));
+    }
+    const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+
     // Get total count
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(schema.monitoringSessions)
-      .where(eq(schema.monitoringSessions.userId, userId));
+      .where(whereClause);
 
     const totalPages = Math.ceil(count / limit);
 
@@ -319,7 +333,7 @@ router.get("/sessions", requireAuth, async (req: Request, res: Response): Promis
         createdAt: schema.monitoringSessions.createdAt,
       })
       .from(schema.monitoringSessions)
-      .where(eq(schema.monitoringSessions.userId, userId))
+      .where(whereClause)
       .orderBy(desc(schema.monitoringSessions.createdAt))
       .limit(limit)
       .offset(offset);

@@ -21,6 +21,7 @@ export default function Nav({ isAdminView = false }: NavProps) {
   return (
     <>
       <NavItem to="/calendar" icon={Calendar} label="Calendar" />
+      <NavItem to="/me" icon={User} label="Me" />
       <NavItem to="/agent" icon={MitableIcon} label="Agent" />
       <NavItem to="/docs" icon={FileText} label="Docs" />
       <NavItem to="/uploads" icon={Download} label="Uploads" />

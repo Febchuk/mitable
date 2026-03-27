@@ -164,11 +164,13 @@ export interface SessionsPagination {
  */
 export async function fetchSessions(
   page = 1,
-  limit = 20
+  limit = 20,
+  options?: { startDate?: string; endDate?: string }
 ): Promise<{ sessions: SessionListItem[]; pagination: SessionsPagination }> {
-  return apiRequest<{ sessions: SessionListItem[]; pagination: SessionsPagination }>(
-    `/monitoring/sessions?page=${page}&limit=${limit}`
-  );
+  let url = `/monitoring/sessions?page=${page}&limit=${limit}`;
+  if (options?.startDate) url += `&startDate=${encodeURIComponent(options.startDate)}`;
+  if (options?.endDate) url += `&endDate=${encodeURIComponent(options.endDate)}`;
+  return apiRequest<{ sessions: SessionListItem[]; pagination: SessionsPagination }>(url);
 }
 
 /**
@@ -188,6 +190,30 @@ export async function fetchAllSessions(): Promise<SessionListItem[]> {
   }
   if (page > MAX_PAGES) {
     logger.warn(`Session fetch capped at ${MAX_PAGES} pages (${all.length} sessions)`);
+  }
+  return all;
+}
+
+/**
+ * Fetch ALL sessions within a date range (auto-paginates with circuit breaker)
+ */
+export async function fetchSessionsByDateRange(
+  startDate: string,
+  endDate: string
+): Promise<SessionListItem[]> {
+  const all: SessionListItem[] = [];
+  let page = 1;
+  let hasMore = true;
+  const limit = 50;
+  const MAX_PAGES = 100;
+  while (hasMore && page <= MAX_PAGES) {
+    const { sessions, pagination } = await fetchSessions(page, limit, { startDate, endDate });
+    all.push(...sessions);
+    hasMore = pagination.hasNext;
+    page++;
+  }
+  if (page > MAX_PAGES) {
+    logger.warn(`Date-range session fetch capped at ${MAX_PAGES} pages (${all.length} sessions)`);
   }
   return all;
 }
