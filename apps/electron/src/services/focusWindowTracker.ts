@@ -246,6 +246,21 @@ class FocusWindowTracker {
   }
 
   /**
+   * Remove a window from the internal tracked map.
+   * Called when the user manually unselects a window from the watchlist UI
+   * so that the focus tracker doesn't silently re-add it on the next tick.
+   */
+  removeTrackedWindow(windowId: string): void {
+    const removed = this.trackedWindows.delete(windowId);
+    if (removed) {
+      logger.info(`[FS-DEBUG] removeTrackedWindow: removed ${windowId}`);
+      if (this.lastActiveWindowId === windowId) {
+        this.lastActiveWindowId = null;
+      }
+    }
+  }
+
+  /**
    * Get tracked window IDs only
    */
   getTrackedWindowIds(): string[] {
