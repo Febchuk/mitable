@@ -614,9 +614,10 @@ async function callAgentQueryLLM(
 
 agentRouter.post("/ask", async (req: Request, res: Response) => {
   try {
-    const { message, conversationId } = req.body as {
+    const { message, conversationId, timezone } = req.body as {
       message: string;
       conversationId?: string;
+      timezone?: string;
     };
 
     if (!message) {
@@ -661,7 +662,7 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
 
     const userName = user?.firstName || "there";
     const environment = new AgentQueryEnvironment(req.userId!, req.organizationId!);
-    const systemPrompt = getAgentQuerySystemPrompt(userName);
+    const systemPrompt = getAgentQuerySystemPrompt(userName, timezone);
 
     const rlmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
       ...conversationHistory,

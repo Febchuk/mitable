@@ -6,6 +6,7 @@
  */
 
 import type { AgentQueryEnvironment } from "./agent-query-environment.js";
+import { resolveDateExpression } from "@mitable/shared";
 
 export interface AgentQueryToolParam {
   name: string;
@@ -68,7 +69,39 @@ const GET_ACTIVITY_DETAIL: AgentQueryTool = {
     env.getActivityDetail(params.id, params.type as "block" | "session" | "document"),
 };
 
-export const AGENT_QUERY_TOOLS: AgentQueryTool[] = [GET_MY_ACTIVITY, GET_ACTIVITY_DETAIL];
+const RESOLVE_DATES: AgentQueryTool = {
+  name: "resolve_dates",
+  description:
+    "Convert a natural-language date expression into concrete YYYY-MM-DD date range. " +
+    "Use this when the user's request involves dates not covered by the <date_reference> block. " +
+    'Supports: "last 3 months", "since January", "week of March 10", "2 weeks ago", ' +
+    '"2026-01-01 to 2026-02-28", etc.',
+  parameters: [
+    {
+      name: "expression",
+      type: "string",
+      description:
+        'The date expression to resolve (e.g. "last 3 months", "since February", "week of March 10")',
+      required: true,
+    },
+    {
+      name: "timezone",
+      type: "string",
+      description: "IANA timezone (e.g. America/Chicago). Defaults to server timezone if omitted.",
+      required: false,
+    },
+  ],
+  execute: async (params) => {
+    const tz = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return resolveDateExpression(params.expression, tz);
+  },
+};
+
+export const AGENT_QUERY_TOOLS: AgentQueryTool[] = [
+  GET_MY_ACTIVITY,
+  GET_ACTIVITY_DETAIL,
+  RESOLVE_DATES,
+];
 
 export function getAgentQueryToolByName(name: string): AgentQueryTool | undefined {
   return AGENT_QUERY_TOOLS.find((t) => t.name === name);

@@ -8,6 +8,11 @@ import { createLogger } from "../lib/logger";
 import { skillsStore, type AgentSkill } from "./skillsStore";
 import { authManager } from "./authManager";
 import { browserBridgeService } from "./browserBridgeService";
+import {
+  buildDateContext,
+  formatDateContextForPrompt,
+  resolveDateExpression,
+} from "@mitable/shared";
 
 const logger = createLogger("AgentSdkService");
 
@@ -77,6 +82,7 @@ const READ_ONLY_TOOLS = [
   "Grep",
   "WebSearch",
   "WebFetch",
+  "mcp__mitable__resolve_dates",
   "mcp__mitable__get_my_activity",
   "mcp__mitable__get_activity_detail",
   "mcp__mitable__slack_list_channels",
@@ -435,6 +441,21 @@ class AgentSdkService {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
     };
+
+    const resolveDatesTool = tool(
+      "resolve_dates",
+      'Convert a natural-language date expression into a concrete YYYY-MM-DD date range. Use for expressions not covered by the <date_reference> block in the system prompt. Supports: "last 3 months", "since January", "week of March 10", "2 weeks ago", "2026-01-01 to 2026-02-28", etc.',
+      {
+        expression: z
+          .string()
+          .describe('The date expression to resolve (e.g. "last 3 months", "since February")'),
+      },
+      async ({ expression }) => {
+        const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const result = resolveDateExpression(expression, userTz);
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+      }
+    );
 
     const getMyActivityTool = tool(
       "get_my_activity",
@@ -1118,6 +1139,7 @@ class AgentSdkService {
     return createSdkMcpServer({
       name: "mitable",
       tools: [
+        resolveDatesTool,
         getMyActivityTool,
         getActivityDetailTool,
         slackChannelsTool,
@@ -1185,7 +1207,12 @@ ${memoryContent}`
 - Date ranges are capped at 31 days per query. For "last 3 months", make 3 separate monthly queries`
       : "";
 
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const dateBlock = formatDateContextForPrompt(buildDateContext(tz));
+
     const basePrompt = `You are Mitable Agent — a personal AI assistant that helps users take action based on their captured work context.
+
+${dateBlock}
 
 ## Your Capabilities
 1. **File operations**: Read, write, and edit files on the user's machine
@@ -1210,11 +1237,24 @@ ${skillsSection}
 
 ## Rules
 
+### Date Handling
+- ALWAYS use the <date_reference> block above for date calculations. NEVER compute dates yourself.
+- When the user says "last week", use the exact dates from "Last week" in the reference. Same for "this week", "this month", etc.
+- For complex date expressions (e.g. "last 3 months", "since January", "week of March 10"), call the resolve_dates tool.
+- Always pass explicit start_date and end_date to get_my_activity — never rely on defaults for time-sensitive queries.
+
 ### Data Retrieval
 - When the user asks about their work, ALWAYS call get_my_activity as your FIRST action — it returns ALL content types (sessions, meeting notes, activity blocks, documents) for a date range
 - Use get_activity_detail to drill into specific items when more detail is needed (e.g. meeting transcripts, task breakdowns, document content)
 - When asked about work patterns or time spent, use get_my_activity to give data-driven answers across ALL activity types, not just sessions
 - Pay attention to dailySummaries — they contain pre-computed metrics, category breakdowns, and accomplishments that give you a broad picture without needing raw detail
+
+### Attribution (CRITICAL)
+- Session data captures EVERYTHING the user saw on their screen, including other people's work during meetings, huddles, and screen shares.
+- If a session summary mentions someone else's name performing an action (e.g. "Aurel debugged X", "Mikun sent a message to Y"), that was THEIR action, not the user's.
+- When synthesizing, clearly distinguish between what the USER did vs what they OBSERVED others doing.
+- Do NOT present another person's actions as the user's accomplishments. Say "Participated in session where [Name] did X" instead of "You did X."
+- When listing accomplishments or blockers, only attribute to the user what THEY personally did.
 
 ### Broad Questions (overview, profile, "what do I do?", work patterns)
 - Call get_my_activity immediately with a broad range. Start with the default 30 days.
