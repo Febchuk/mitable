@@ -42,8 +42,13 @@ export interface CleanupResult {
  * Called by cron and by the client-startup endpoint.
  *
  * If userId is provided, only check sessions for that user (client startup).
+ * If forceEnd is true, skip staleness checks and end ALL active sessions
+ * for that user — used on app startup where any active session is orphaned.
  */
-export async function cleanupStaleSessions(userId?: string): Promise<CleanupResult> {
+export async function cleanupStaleSessions(
+  userId?: string,
+  forceEnd = false
+): Promise<CleanupResult> {
   const result: CleanupResult = {
     sessionsFound: 0,
     sessionsEnded: 0,
@@ -112,10 +117,11 @@ export async function cleanupStaleSessions(userId?: string): Promise<CleanupResu
         const activityGapMs = now - lastActivityMs;
 
         // Is this session stale?
+        // When forceEnd is true (app startup), skip the check — any active session is orphaned.
         const isOverDuration = elapsedMs > MAX_SESSION_DURATION_MS;
         const isActivityGapExceeded = activityGapMs > MAX_CAPTURE_GAP_MS;
 
-        if (!isOverDuration && !isActivityGapExceeded) continue;
+        if (!forceEnd && !isOverDuration && !isActivityGapExceeded) continue;
 
         result.sessionsFound++;
 

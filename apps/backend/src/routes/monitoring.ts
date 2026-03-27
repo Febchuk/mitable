@@ -3898,7 +3898,7 @@ router.post(
     const userId = req.userId!;
 
     try {
-      const result = await cleanupStaleSessions(userId);
+      const result = await cleanupStaleSessions(userId, true);
 
       if (result.sessionsEnded > 0) {
         logger.info(
