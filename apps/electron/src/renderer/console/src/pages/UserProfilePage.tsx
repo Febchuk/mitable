@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect, useLayoutEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -22,11 +22,12 @@ import {
   Monitor,
   Copy,
   Trash2,
+  Shield,
+  MousePointerClick,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { FirefliesIcon } from "../../../components/icons/integrations";
-import MitableIcon from "../components/icons/MitableIcon";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
@@ -35,6 +36,8 @@ import { BillingSection } from "@/console/src/components/billing";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
+import { usePermissions } from "../hooks/usePermissions";
+import { PermissionRow } from "./OnboardingPage";
 import {
   useOrganizationSettings,
   useUpdateOrganizationSettings,
@@ -141,10 +144,6 @@ export default function UserProfilePage() {
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
   const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
 
-  // Agent feature toggle
-  const [agentEnabled, setAgentEnabled] = useState(false);
-  const [isAgentLoading, setIsAgentLoading] = useState(true);
-
   // About / Version state
   const [appVersion, setAppVersion] = useState<string>("");
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
@@ -166,6 +165,16 @@ export default function UserProfilePage() {
     isLoading: isPreferencesLoading,
     updatePreference,
   } = usePreferences();
+
+  // Permissions hook
+  const {
+    screen: screenPermission,
+    accessibility: accessibilityPermission,
+    requestAccessibility,
+    openScreenRecording,
+  } = usePermissions();
+
+  const navigate = useNavigate();
 
   // Organization settings hooks (admin only)
   const isAdmin = user?.role === "admin";
@@ -831,20 +840,6 @@ export default function UserProfilePage() {
     loadPillDisplayMode,
     loadAudioPreferences,
   ]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    window.consoleAPI
-      ?.getAgentEnabled(user.id)
-      .then((enabled) => {
-        setAgentEnabled(enabled);
-        setIsAgentLoading(false);
-      })
-      .catch((err) => {
-        logger.error("Failed to load agent toggle:", err);
-        setIsAgentLoading(false);
-      });
-  }, [user?.id]);
 
   // Listen for update events
   useEffect(() => {
@@ -1700,14 +1695,7 @@ export default function UserProfilePage() {
 
   // Tab state — honor ?tab= query param from sidebar menu
   const [searchParams] = useSearchParams();
-  const validTabs = [
-    "account",
-    "security",
-    "preferences",
-    "beta",
-    "integrations",
-    "update",
-  ] as const;
+  const validTabs = ["account", "security", "permissions", "preferences", "integrations", "update"] as const;
   type TabId = (typeof validTabs)[number];
   const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
     ? (searchParams.get("tab") as TabId)
@@ -1724,8 +1712,8 @@ export default function UserProfilePage() {
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
     { id: "security" as const, label: "Security", icon: Lock },
+    { id: "permissions" as const, label: "Permissions", icon: Shield },
     { id: "preferences" as const, label: "Preferences", icon: Settings },
-    { id: "beta" as const, label: "Beta", icon: MitableIcon },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
     { id: "update" as const, label: "Update", icon: RefreshCw },
   ];
@@ -2406,6 +2394,88 @@ export default function UserProfilePage() {
             </div>
           )}
 
+          {/* Permissions Tab */}
+          {activeTab === "permissions" && (
+            <div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div>
+                    <h2
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        margin: 0,
+                      }}
+                    >
+                      macOS Permissions
+                    </h2>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text-tertiary)",
+                        margin: "4px 0 0",
+                      }}
+                    >
+                      Mitable needs these permissions to capture your work
+                    </p>
+                  </div>
+                  <div className="space-y-2.5">
+                    <PermissionRow
+                      icon={Monitor}
+                      label="Screen Recording"
+                      description="Required to capture screenshots"
+                      granted={screenPermission === "granted"}
+                      buttonLabel="Open Settings"
+                      onAction={openScreenRecording}
+                    />
+                    <PermissionRow
+                      icon={MousePointerClick}
+                      label="Accessibility"
+                      description="Required to track keyboard & mouse activity"
+                      granted={accessibilityPermission}
+                      buttonLabel="Grant Access"
+                      onAction={requestAccessibility}
+                    />
+                  </div>
+                </div>
+
+                {/* Re-run setup link */}
+                <div
+                  style={{
+                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+                    paddingTop: 16,
+                  }}
+                >
+                  <button
+                    onClick={async () => {
+                      if (user?.id) {
+                        await window.consoleAPI?.resetOnboarding(user.id);
+                        navigate("/onboarding");
+                      }
+                    }}
+                    style={{
+                      fontSize: 13,
+                      color: "var(--mi-accent)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "var(--mi-accent-light)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = "var(--mi-accent)")
+                    }
+                  >
+                    Re-run setup &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Preferences Tab */}
           {activeTab === "preferences" && (
             <div>
@@ -3002,73 +3072,6 @@ export default function UserProfilePage() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Beta Tab */}
-          {activeTab === "beta" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div
-                style={{
-                  paddingBottom: 16,
-                  borderBottom: "var(--border-hairline)",
-                }}
-              >
-                <h2
-                  style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}
-                >
-                  Beta Features
-                </h2>
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
-                  Toggle features that are still in development
-                </p>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 0",
-                }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <Label
-                    htmlFor="agent-toggle"
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Agent
-                  </Label>
-                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
-                    Enable the AI Agent in the sidebar for chat-based assistance
-                  </p>
-                </div>
-                {isAgentLoading ? (
-                  <Loader2 size={16} style={{ color: "#4B4740" }} className="animate-spin" />
-                ) : (
-                  <Switch
-                    id="agent-toggle"
-                    checked={agentEnabled}
-                    onCheckedChange={async (checked) => {
-                      if (!user?.id) return;
-                      setAgentEnabled(checked);
-                      await window.consoleAPI?.setAgentEnabled(user.id, checked);
-                      window.dispatchEvent(new Event("agent-enabled-changed"));
-                      toast({
-                        title: checked ? "Agent enabled" : "Agent disabled",
-                        description: checked
-                          ? "Agent is now available in the sidebar"
-                          : "Agent has been hidden from the sidebar",
-                      });
-                    }}
-                  />
-                )}
-              </div>
             </div>
           )}
 

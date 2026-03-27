@@ -156,10 +156,15 @@ class GranolaSyncService {
       getOrgName(user.organizationId),
     ]);
 
-    // Pre-fetch existing external IDs so we can skip already-ingested meetings
-    const existingExternalIds = new Set<string>();
+    // Pre-fetch existing blocks so we can skip fully-ingested meetings but
+    // re-process ones whose description is missing (enrichment may have failed).
+    const existingBlocks = new Map<string, { id: string; description: string | null }>();
     const existingRows = await db
-      .select({ externalId: schema.activityBlocks.externalId })
+      .select({
+        externalId: schema.activityBlocks.externalId,
+        id: schema.activityBlocks.id,
+        description: schema.activityBlocks.description,
+      })
       .from(schema.activityBlocks)
       .where(
         and(
@@ -168,13 +173,22 @@ class GranolaSyncService {
         )
       );
     for (const row of existingRows) {
-      if (row.externalId) existingExternalIds.add(row.externalId);
+      if (row.externalId) existingBlocks.set(row.externalId, row);
     }
 
-    // Only enrich new meetings with notes (skip already-ingested)
-    const newMeetings = meetings.filter((m) => !existingExternalIds.has(m.id));
-    if (newMeetings.length > 0) {
-      await this.enrichMeetingsWithNotes(accessToken, newMeetings);
+    // Enrich meetings that are new OR whose existing block has no description
+    // (previous enrichment may have silently failed)
+    const meetingsNeedingEnrichment = meetings.filter((m) => {
+      const existing = existingBlocks.get(m.id);
+      if (!existing) return true; // new meeting
+      return !existing.description || existing.description.trim().length === 0;
+    });
+    if (meetingsNeedingEnrichment.length > 0) {
+      await this.enrichMeetingsWithNotes(accessToken, meetingsNeedingEnrichment);
+      logger.info(
+        { total: meetingsNeedingEnrichment.length },
+        "Enriched meetings (new + missing-description backfill)"
+      );
     }
 
     // Process each meeting
@@ -183,9 +197,12 @@ class GranolaSyncService {
 
     for (const meeting of meetings) {
       try {
-        // Skip already-ingested meetings (no re-classification, no transcript refetch)
-        if (meeting.id && existingExternalIds.has(meeting.id)) {
-          logger.debug({ meetingId: meeting.id }, "Skipping already-ingested Granola meeting");
+        const existing = meeting.id ? existingBlocks.get(meeting.id) : undefined;
+
+        // Skip already-ingested meetings ONLY if they have a populated description.
+        // Re-process if description is empty (enrichment may have failed last time).
+        if (existing && existing.description && existing.description.trim().length > 0) {
+          logger.debug({ meetingId: meeting.id }, "Skipping fully-ingested Granola meeting");
           result.meetingsProcessed++;
           continue;
         }
@@ -652,9 +669,9 @@ Respond ONLY with JSON:
           "Enriched Granola meetings with notes via get_meetings"
         );
       } catch (err) {
-        logger.warn(
-          { batchStart: i, error: String(err) },
-          "Failed to enrich Granola meetings with notes"
+        logger.error(
+          { batchStart: i, batchSize: ids.length, error: String(err) },
+          "Failed to enrich Granola meetings with notes — blocks will have empty descriptions"
         );
       }
     }
@@ -839,11 +856,21 @@ Respond ONLY with JSON:
         }
       }
 
+      // Extract notes/summary from XML body if present
+      const notesXml =
+        body.match(/<enhanced_notes>([\s\S]*?)<\/enhanced_notes>/)?.[1]?.trim() ||
+        body.match(/<notes>([\s\S]*?)<\/notes>/)?.[1]?.trim() ||
+        null;
+      const summaryXml = body.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.trim() || null;
+
       meetings.push({
         id: attrs.id,
         title: attrs.title || null,
         start_time: attrs.date || null,
+        end_time: attrs.end_time || attrs.end || null,
         attendees,
+        notes: notesXml,
+        summary: summaryXml,
       });
     }
 

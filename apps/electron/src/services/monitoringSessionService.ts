@@ -691,8 +691,9 @@ class MonitoringSessionService {
       this.activeSession.consecutiveEmptyCaptures = 0;
       this.activeSession.lastSuccessfulCaptureAt = Date.now();
 
-      // Resolve accurate appName from focusWindowTracker (active-win)
-      // windowTitle is preserved separately — this only fixes the appName field
+      // Resolve accurate appName from focusWindowTracker (active-win).
+      // desktopCapturer only gives window titles, so appName from it is unreliable
+      // (e.g. "Slack Huddle" vs the real process name "Slack").
       const trackedWindows = focusWindowTracker.getTrackedWindows();
 
       // Process each screenshot
@@ -705,6 +706,16 @@ class MonitoringSessionService {
         const trackedMatch = trackedWindows.find((w) => w.windowId === normalizedId);
         if (trackedMatch?.appName) {
           screenshot.appName = trackedMatch.appName;
+        } else if (trackedWindows.length > 0) {
+          // Fallback: match by app name contained in the window title so that
+          // "Slack Huddle - Team Call" resolves to process name "Slack"
+          const titleLower = (screenshot.windowTitle || "").toLowerCase();
+          const appFallback = trackedWindows.find(
+            (w) => w.appName && titleLower.includes(w.appName.toLowerCase())
+          );
+          if (appFallback?.appName) {
+            screenshot.appName = appFallback.appName;
+          }
         }
         await this.processCapture(screenshot, trigger);
       }

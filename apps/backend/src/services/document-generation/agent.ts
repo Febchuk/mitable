@@ -213,10 +213,19 @@ export class DocumentGenerationAgent {
 
       // LLM returned content (no more tool calls)
       if (result.content) {
-        console.log(`[DocGenAgent] LLM returned content (${result.content.length} chars)`);
-        finalDocument = result.content;
+        console.log(`[DocGenAgent] LLM returned raw content (${result.content.length} chars)`);
 
-        yield { type: "content", content: result.content };
+        // Strip any preamble reasoning before the actual document.
+        // The document always starts with a markdown heading (#).
+        const headingMatch = result.content.match(/^(#{1,3}\s)/m);
+        if (headingMatch && headingMatch.index && headingMatch.index > 0) {
+          finalDocument = result.content.slice(headingMatch.index);
+          console.log(`[DocGenAgent] Stripped ${headingMatch.index} chars of preamble`);
+        } else {
+          finalDocument = result.content;
+        }
+
+        yield { type: "content", content: finalDocument };
         break;
       }
 
@@ -370,7 +379,7 @@ export class DocumentGenerationAgent {
               role: "system" as const,
               content:
                 systemMsg.content +
-                "\n\nIMPORTANT: Do NOT call any tools. Generate the complete document directly based on whatever context you have.",
+                "\n\nIMPORTANT: Do NOT call any tools. Generate the document directly based on the context already gathered in this conversation. Only write about what you can see in the conversation history — do NOT invent or extrapolate. If the context is thin, produce a shorter document and mark gaps with *[Please add your notes here]*.",
             },
           ]
         : []),
@@ -423,25 +432,30 @@ ${hasArtifacts ? `- ${environment.artifactIds!.length} uploaded document(s) avai
 **Your Process:**
 1. **Examine the data** — Use tools to explore sessions, timelines, summaries, and time breakdowns
 2. **Check for reference material** — If the user mentions a template, report format, or uploaded document, use get_artifact_content or search_artifacts to find it, then use parse_template_structure to extract its layout so you can replicate it
-3. **Identify key information** — Find accomplishments, activities, blockers, time spent on different tasks
-4. **Structure the document** — Organize findings according to the ${docType} format (or follow an uploaded template if one was found)
-5. **Generate content** — Create the complete document in Markdown format
+3. **Assess what you know** — Determine which topics have strong observational evidence and which are thin or missing
+4. **Structure the document freely** — Choose the structure and sections that best fit the actual data you found. Do NOT force a rigid template unless the user explicitly provided one
+5. **Generate honest content** — Write only what the data supports. For gaps, leave a clear prompt for the user to fill in
 
-**Document Type Guidance:**
-${docTypeInstructions}
+${docTypeInstructions ? `**Document Type Guidance:**\n${docTypeInstructions}\n` : ""}
+**Accuracy Rules (critical):**
+- Write ONLY what you have directly observed from session data, summaries, and artifacts
+- NEVER invent, extrapolate, or pad content to make the document longer or more "complete"
+- If a section has insufficient data, include a short note in italics like: *[No activity data found for this area — please add your notes here]*
+- It is perfectly fine for the document to be short. A concise, accurate document is always better than a long, padded one
+- The document does not need to fill every possible section — only include sections where you have real information
+- If the overall data is very sparse, say so up front and produce a shorter document focused on what IS known
 
 **Output Format:**
 - Use Markdown formatting (headings, lists, tables, code blocks)
-- Include specific details from the session data
-- Be concise but comprehensive
-- If a template was found via parse_template_structure, replicate its section headings, ordering, and formatting style
-- Never use placeholder text like "[Name]", "[Date]", or "[Your Name]" — use real data
+- Include specific details from the session data — timestamps, app names, durations, actual activities
+- Structure the document however best serves the content. You have full creative freedom over headings, ordering, and layout
+- If a template was found via parse_template_structure, follow its structure — but still leave gaps marked rather than filling them with invented content
+- Never use placeholder text like "[Name]", "[Date]", or "[Your Name]" — use real data or mark as a gap for the user
 
 **Important:**
 - Call tools to gather data BEFORE generating content
 - Use multiple tool calls to get a complete picture
-- Base your document ONLY on actual session data and artifact content (no hallucination)
-- When you have enough information, generate the complete document
+- When you have enough information, generate the document — even if it's short
 
 Begin by examining the session data using the available tools.`;
   }
@@ -449,32 +463,16 @@ Begin by examining the session data using the available tools.`;
   private getDocTypeInstructions(docType: DocType): string {
     switch (docType) {
       case "how-to":
-        return `A how-to guide should:
-- Start with a clear title describing what will be accomplished
-- Include prerequisites if needed
-- Present step-by-step instructions
-- Include specific examples from the session data
-- End with success criteria or next steps`;
+        return `This is a how-to guide. Consider including steps, prerequisites, and examples — but only for things you actually observed in the session data. Skip sections you don't have data for.`;
 
       case "knowledge-article":
-        return `A knowledge article should:
-- Start with an overview/introduction
-- Organize information into logical sections
-- Include practical examples from session activities
-- Use tables or lists for clarity
-- End with related topics or resources`;
+        return `This is a knowledge article. Organize what you found into logical sections. Use tables or lists where helpful. Only cover topics with real data behind them.`;
 
       case "troubleshooting":
-        return `A troubleshooting guide should:
-- Start with the problem statement
-- List symptoms observed
-- Present potential causes
-- Provide diagnostic steps
-- Give solution steps for each cause
-- Include prevention tips`;
+        return `This is a troubleshooting guide. Document the problem, symptoms, and solutions you found in the data. If diagnostic steps or causes aren't clear from the sessions, mark those as gaps for the user.`;
 
       default:
-        return `Follow best practices for ${docType} documents.`;
+        return "";
     }
   }
 }

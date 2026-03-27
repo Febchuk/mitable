@@ -295,6 +295,19 @@ interface ConsoleAPI {
   agentApprovePlan: (conversationId: string, approved: boolean) => Promise<void>;
   onAgentMessageEvent: (callback: (data: { type: string; data: unknown }) => void) => () => void;
 
+  // Permissions (macOS onboarding)
+  getPermissionStatus: () => Promise<{
+    screen: string;
+    accessibility: boolean;
+  }>;
+  requestAccessibilityPermission: () => Promise<void>;
+  openScreenRecordingSettings: () => Promise<void>;
+
+  // Onboarding
+  getOnboardingVersion: (userId: string) => Promise<number>;
+  setOnboardingVersion: (userId: string, version: number) => Promise<{ success: boolean }>;
+  resetOnboarding: (userId: string) => Promise<{ success: boolean }>;
+
   // Browser Bridge (Chrome Extension)
   getBrowserBridgeStatus: () => Promise<boolean>;
   getBrowserBridgeInfo: () => Promise<{ port: number; token: string; connected: boolean }>;

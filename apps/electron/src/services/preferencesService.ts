@@ -50,6 +50,7 @@ interface PreferencesSchema {
       autoSessionStart: boolean; // Auto-start session on powerMonitor resume
       autoRecap: boolean; // Auto-create recap after session ends
       passiveMonitoringEnabled: boolean; // Auto-detect activity and start/stop sessions
+      onboardingVersion: number; // Version of onboarding the user has completed (0 = never)
     };
   };
 }
@@ -75,8 +76,7 @@ const defaults: PreferencesSchema = {
   users: {},
 };
 
-// Default blocked apps (Electron, Messages, WhatsApp)
-const DEFAULT_BLOCKED_APPS = ["electron", "messages", "whatsapp"];
+const DEFAULT_BLOCKED_APPS = ["electron", "messages", "whatsapp", "spotify", "imessage"];
 
 class PreferencesService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -246,8 +246,7 @@ class PreferencesService {
   // Auto recap preference (user-scoped)
   getUserAutoRecap(userId: string): boolean {
     const userPrefs = this.store.get(`users.${userId}`, {});
-    // Default to true — auto-recap is on unless explicitly disabled
-    return userPrefs.autoRecap ?? true;
+    return userPrefs.autoRecap ?? false;
   }
 
   setUserAutoRecap(userId: string, enabled: boolean): void {
@@ -262,8 +261,7 @@ class PreferencesService {
   // Passive monitoring preference (user-scoped)
   getUserPassiveMonitoringEnabled(userId: string): boolean {
     const userPrefs = this.store.get(`users.${userId}`, {});
-    // Default to true — passive monitoring is enabled by default
-    return userPrefs.passiveMonitoringEnabled ?? true;
+    return userPrefs.passiveMonitoringEnabled ?? false;
   }
 
   setUserPassiveMonitoringEnabled(userId: string, enabled: boolean): void {
@@ -273,6 +271,21 @@ class PreferencesService {
       passiveMonitoringEnabled: enabled,
     });
     logger.info(` Passive monitoring for user ${userId} set to: ${enabled}`);
+  }
+
+  // Onboarding version preference (user-scoped)
+  getUserOnboardingVersion(userId: string): number {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    return userPrefs.onboardingVersion ?? 0;
+  }
+
+  setUserOnboardingVersion(userId: string, version: number): void {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    this.store.set(`users.${userId}`, {
+      ...userPrefs,
+      onboardingVersion: version,
+    });
+    logger.info(`Onboarding version for user ${userId} set to: ${version}`);
   }
 
   // Agent feature toggle (user-scoped, default OFF)

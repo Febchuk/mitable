@@ -14,6 +14,7 @@ import {
   powerMonitor,
   screen,
   shell,
+  systemPreferences,
 } from "electron";
 import { join } from "path";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
@@ -337,6 +338,8 @@ function createWatchingPillWindow() {
     maximizable: false,
     skipTaskbar: true,
     show: false,
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    hasShadow: false,
     webPreferences: {
       preload: join(__dirname, "../preload/watchingPill.cjs"),
       contextIsolation: true,
@@ -346,7 +349,7 @@ function createWatchingPillWindow() {
 
   // Platform-specific always-on-top behavior
   if (process.platform === "darwin") {
-    watchingPillWindow.setAlwaysOnTop(true, "modal-panel");
+    watchingPillWindow.setAlwaysOnTop(true, "floating");
     watchingPillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillWindow.setAlwaysOnTop(true, "normal", 1);
@@ -359,6 +362,9 @@ function createWatchingPillWindow() {
   }
 
   watchingPillWindow.on("closed", () => {
+    // Close dropdowns explicitly (no longer auto-closed without parent)
+    if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) watchingPillEyeDropdown.close();
+    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) watchingPillMenuDropdown.close();
     watchingPillWindow = null;
     stopClosedWindowCheck();
     stopPillCursorTracking();
@@ -412,19 +418,15 @@ function stopClosedWindowCheck() {
  * Show the pill window reliably — re-assert always-on-top and visibility flags after show().
  */
 function showPillReliably(win: BrowserWindow) {
-  win.show();
+  win.showInactive();
 
   // Re-assert always-on-top (macOS can drop the level)
   if (process.platform === "darwin") {
-    win.setAlwaysOnTop(true, "modal-panel");
+    win.setAlwaysOnTop(true, "floating");
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     win.setAlwaysOnTop(true, "normal", 1);
   }
-
-  // Force into render tree without stealing focus
-  win.focus();
-  win.blur();
 }
 
 /**
@@ -447,7 +449,11 @@ function movePillToDisplay(display: Electron.Display) {
 
   // Reposition any open dropdown windows relative to new pill location
   const pillBounds = watchingPillWindow.getBounds();
-  if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed() && watchingPillEyeDropdown.isVisible()) {
+  if (
+    watchingPillEyeDropdown &&
+    !watchingPillEyeDropdown.isDestroyed() &&
+    watchingPillEyeDropdown.isVisible()
+  ) {
     watchingPillEyeDropdown.setBounds({
       x: pillBounds.x - 250,
       y: pillBounds.y + 40,
@@ -455,7 +461,11 @@ function movePillToDisplay(display: Electron.Display) {
       height: 280,
     });
   }
-  if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed() && watchingPillMenuDropdown.isVisible()) {
+  if (
+    watchingPillMenuDropdown &&
+    !watchingPillMenuDropdown.isDestroyed() &&
+    watchingPillMenuDropdown.isVisible()
+  ) {
     watchingPillMenuDropdown.setBounds({
       x: pillBounds.x - 170,
       y: pillBounds.y + 90,
@@ -528,7 +538,8 @@ function createWatchingPillEyeDropdown() {
     fullscreenable: false,
     maximizable: false,
     show: false,
-    parent: watchingPillWindow, // Child of pill window
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    hasShadow: false,
     webPreferences: {
       preload: join(__dirname, "../preload/watchingPillDropdown.cjs"),
       contextIsolation: true,
@@ -538,7 +549,8 @@ function createWatchingPillEyeDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillEyeDropdown.setAlwaysOnTop(true, "modal-panel");
+    watchingPillEyeDropdown.setAlwaysOnTop(true, "floating");
+    watchingPillEyeDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillEyeDropdown.setAlwaysOnTop(true, "normal", 1);
   }
@@ -590,7 +602,8 @@ function createWatchingPillMenuDropdown() {
     fullscreenable: false,
     maximizable: false,
     show: false,
-    parent: watchingPillWindow, // Child of pill window
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    hasShadow: false,
     webPreferences: {
       preload: join(__dirname, "../preload/watchingPillDropdown.cjs"),
       contextIsolation: true,
@@ -600,7 +613,8 @@ function createWatchingPillMenuDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillMenuDropdown.setAlwaysOnTop(true, "modal-panel");
+    watchingPillMenuDropdown.setAlwaysOnTop(true, "floating");
+    watchingPillMenuDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillMenuDropdown.setAlwaysOnTop(true, "normal", 1);
   }
@@ -1651,6 +1665,8 @@ function setupWatchModeHandlers() {
     const windowToRemove = selectedWindows.find((w) => w.windowId === windowId);
 
     const removed = windowDetectionService.removeWindow(windowId);
+    // Also remove from focusWindowTracker so it doesn't silently re-add on next tick
+    focusWindowTracker.removeTrackedWindow(windowId);
 
     if (removed) {
       // Clear the cached screenshot for this window (keyed by windowTitle)
@@ -2264,6 +2280,42 @@ function setupMonitoringSessionHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.AGENT_ENABLED_SET, (_, userId: string, enabled: boolean) => {
     preferencesService.setUserAgentEnabled(userId, enabled);
+    return { success: true };
+  });
+
+  // Permissions IPC handlers (macOS onboarding)
+  ipcMain.handle(IPC_CHANNELS.PERMISSIONS_GET_STATUS, () => {
+    if (process.platform === "darwin") {
+      return {
+        screen: systemPreferences.getMediaAccessStatus("screen"),
+        accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+      };
+    }
+    // Non-macOS: report all granted
+    return { screen: "granted", accessibility: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PERMISSIONS_REQUEST_ACCESSIBILITY, () => {
+    if (process.platform === "darwin") {
+      systemPreferences.isTrustedAccessibilityClient(true);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PERMISSIONS_OPEN_SCREEN_RECORDING, async () => {
+    if (process.platform === "darwin") {
+      await shell.openExternal(
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+      );
+    }
+  });
+
+  // Onboarding IPC handlers
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_GET_VERSION, (_, userId: string) => {
+    return preferencesService.getUserOnboardingVersion(userId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_SET_VERSION, (_, userId: string, version: number) => {
+    preferencesService.setUserOnboardingVersion(userId, version);
     return { success: true };
   });
 

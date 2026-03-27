@@ -44,6 +44,7 @@ export const userDailyActivities = pgTable(
     totalWorkMinutes: integer("total_work_minutes").notNull().default(0),
     totalMeetingMinutes: integer("total_meeting_minutes").notNull().default(0),
     totalActiveMinutes: integer("total_active_minutes").notNull().default(0),
+    totalSessionMinutes: integer("total_session_minutes").notNull().default(0),
     totalSessions: integer("total_sessions").notNull().default(0),
     totalCaptures: integer("total_captures").notNull().default(0),
 
