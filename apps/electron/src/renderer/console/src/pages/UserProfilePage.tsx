@@ -37,6 +37,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { usePermissions } from "../hooks/usePermissions";
+import { PermissionRow } from "./OnboardingPage";
 import {
   useOrganizationSettings,
   useUpdateOrganizationSettings,
@@ -2419,128 +2420,23 @@ export default function UserProfilePage() {
                       Mitable needs these permissions to capture your work
                     </p>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {/* Screen Recording */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: 16,
-                        borderRadius: 8,
-                        background: "var(--bg-overlay)",
-                        border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 8,
-                            background: "rgba(var(--ui-rgb), 0.06)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Monitor size={18} style={{ color: "var(--text-secondary)" }} />
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
-                            Screen Recording
-                          </p>
-                          <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>
-                            Required to capture screenshots
-                          </p>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 500,
-                            padding: "2px 8px",
-                            borderRadius: 99,
-                            background:
-                              screenPermission === "granted"
-                                ? "rgba(var(--status-success-rgb), 0.10)"
-                                : "rgba(var(--status-warning-rgb), 0.10)",
-                            color:
-                              screenPermission === "granted"
-                                ? "var(--status-success)"
-                                : "var(--status-warning)",
-                          }}
-                        >
-                          {screenPermission === "granted" ? "Granted" : "Required"}
-                        </span>
-                        {screenPermission !== "granted" && (
-                          <ShadcnButton variant="outline" size="sm" onClick={openScreenRecording}>
-                            Open Settings
-                          </ShadcnButton>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Accessibility */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: 16,
-                        borderRadius: 8,
-                        background: "var(--bg-overlay)",
-                        border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 8,
-                            background: "rgba(var(--ui-rgb), 0.06)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <MousePointerClick size={18} style={{ color: "var(--text-secondary)" }} />
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
-                            Accessibility
-                          </p>
-                          <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>
-                            Required to track keyboard & mouse activity
-                          </p>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 500,
-                            padding: "2px 8px",
-                            borderRadius: 99,
-                            background: accessibilityPermission
-                              ? "rgba(var(--status-success-rgb), 0.10)"
-                              : "rgba(var(--status-warning-rgb), 0.10)",
-                            color: accessibilityPermission
-                              ? "var(--status-success)"
-                              : "var(--status-warning)",
-                          }}
-                        >
-                          {accessibilityPermission ? "Granted" : "Required"}
-                        </span>
-                        {!accessibilityPermission && (
-                          <ShadcnButton variant="outline" size="sm" onClick={requestAccessibility}>
-                            Grant Access
-                          </ShadcnButton>
-                        )}
-                      </div>
-                    </div>
+                  <div className="space-y-2.5">
+                    <PermissionRow
+                      icon={Monitor}
+                      label="Screen Recording"
+                      description="Required to capture screenshots"
+                      granted={screenPermission === "granted"}
+                      buttonLabel="Open Settings"
+                      onAction={openScreenRecording}
+                    />
+                    <PermissionRow
+                      icon={MousePointerClick}
+                      label="Accessibility"
+                      description="Required to track keyboard & mouse activity"
+                      granted={accessibilityPermission}
+                      buttonLabel="Grant Access"
+                      onAction={requestAccessibility}
+                    />
                   </div>
                 </div>
 

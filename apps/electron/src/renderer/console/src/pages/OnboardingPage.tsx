@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Monitor, MousePointerClick, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -25,6 +25,7 @@ function NavArrow({
   return (
     <button
       onClick={onClick}
+      aria-label={direction === "left" ? "Previous step" : "Next step"}
       className="transition-colors"
       style={{
         width: 36,
@@ -85,7 +86,7 @@ function StepDots({ current }: { current: number }) {
 // Permission row (Step 1)
 // ---------------------------------------------------------------------------
 
-function PermissionRow({
+export function PermissionRow({
   icon: Icon,
   label,
   description,
@@ -355,7 +356,7 @@ export default function OnboardingPage() {
     window.consoleAPI?.setPassiveMonitoringEnabled(enabled);
   };
 
-  const completeOnboarding = async () => {
+  const completeOnboarding = useCallback(async () => {
     if (user?.id) {
       await window.consoleAPI?.setOnboardingVersion(user.id, ONBOARDING_VERSION).catch(() => {});
     }
@@ -364,35 +365,38 @@ export default function OnboardingPage() {
     } else {
       navigate("/calendar", { replace: true });
     }
-  };
+  }, [user?.id, user?.role, navigate]);
 
-  const handleNext = () => {
-    if (step < TOTAL_STEPS - 1) {
-      setStep(step + 1);
+  const stepRef = useRef(step);
+  stepRef.current = step;
+
+  const handleNext = useCallback(() => {
+    if (stepRef.current < TOTAL_STEPS - 1) {
+      setStep(stepRef.current + 1);
     } else {
       completeOnboarding();
     }
-  };
+  }, [completeOnboarding]);
 
-  const handleBack = () => {
-    if (step > 0) {
-      setStep(step - 1);
+  const handleBack = useCallback(() => {
+    if (stepRef.current > 0) {
+      setStep(stepRef.current - 1);
     }
-  };
+  }, []);
 
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
     completeOnboarding();
-  };
+  }, [completeOnboarding]);
 
   // Keyboard navigation: ArrowLeft / ArrowRight
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") handleNext();
-      if (e.key === "ArrowLeft" && step > 0) handleBack();
+      if (e.key === "ArrowLeft") handleBack();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [step]);
+  }, [handleNext, handleBack]);
 
   const isFinalStep = step === TOTAL_STEPS - 1;
 

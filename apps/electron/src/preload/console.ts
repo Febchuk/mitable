@@ -674,7 +674,6 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   getPermissionStatus: (): Promise<{
     screen: string;
     accessibility: boolean;
-    microphone: string;
   }> => ipcRenderer.invoke(IPC_CHANNELS.PERMISSIONS_GET_STATUS),
 
   requestAccessibilityPermission: (): Promise<void> =>

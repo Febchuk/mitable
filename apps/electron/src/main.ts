@@ -2289,11 +2289,10 @@ function setupMonitoringSessionHandlers() {
       return {
         screen: systemPreferences.getMediaAccessStatus("screen"),
         accessibility: systemPreferences.isTrustedAccessibilityClient(false),
-        microphone: systemPreferences.getMediaAccessStatus("microphone"),
       };
     }
     // Non-macOS: report all granted
-    return { screen: "granted", accessibility: true, microphone: "granted" };
+    return { screen: "granted", accessibility: true };
   });
 
   ipcMain.handle(IPC_CHANNELS.PERMISSIONS_REQUEST_ACCESSIBILITY, () => {

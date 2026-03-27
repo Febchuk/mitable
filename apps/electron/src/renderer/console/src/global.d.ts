@@ -299,7 +299,6 @@ interface ConsoleAPI {
   getPermissionStatus: () => Promise<{
     screen: string;
     accessibility: boolean;
-    microphone: string;
   }>;
   requestAccessibilityPermission: () => Promise<void>;
   openScreenRecordingSettings: () => Promise<void>;

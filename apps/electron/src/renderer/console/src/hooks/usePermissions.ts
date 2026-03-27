@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from "react";
 interface PermissionStatus {
   screen: string;
   accessibility: boolean;
-  microphone: string;
   loading: boolean;
 }
 
@@ -11,7 +10,6 @@ export function usePermissions() {
   const [status, setStatus] = useState<PermissionStatus>({
     screen: "not-determined",
     accessibility: false,
-    microphone: "not-determined",
     loading: true,
   });
 
@@ -22,7 +20,6 @@ export function usePermissions() {
         setStatus({
           screen: result.screen,
           accessibility: result.accessibility,
-          microphone: result.microphone,
           loading: false,
         });
       }
@@ -33,7 +30,7 @@ export function usePermissions() {
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 2000);
+    const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
 

@@ -285,7 +285,7 @@ class PreferencesService {
       ...userPrefs,
       onboardingVersion: version,
     });
-    logger.info(` Onboarding version for user ${userId} set to: ${version}`);
+    logger.info(`Onboarding version for user ${userId} set to: ${version}`);
   }
 
   // Agent feature toggle (user-scoped, default OFF)
