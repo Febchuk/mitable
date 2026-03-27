@@ -157,8 +157,8 @@ export const IPC_CHANNELS = {
   PERMISSIONS_OPEN_SCREEN_RECORDING: "permissions:open-screen-recording",
 
   // Onboarding
-  ONBOARDING_GET_COMPLETED: "onboarding:get-completed",
-  ONBOARDING_SET_COMPLETED: "onboarding:set-completed",
+  ONBOARDING_GET_VERSION: "onboarding:get-version",
+  ONBOARDING_SET_VERSION: "onboarding:set-version",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

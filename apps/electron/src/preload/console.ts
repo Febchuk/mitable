@@ -115,8 +115,8 @@ const IPC_CHANNELS = {
   PERMISSIONS_REQUEST_ACCESSIBILITY: "permissions:request-accessibility",
   PERMISSIONS_OPEN_SCREEN_RECORDING: "permissions:open-screen-recording",
   // Onboarding
-  ONBOARDING_GET_COMPLETED: "onboarding:get-completed",
-  ONBOARDING_SET_COMPLETED: "onboarding:set-completed",
+  ONBOARDING_GET_VERSION: "onboarding:get-version",
+  ONBOARDING_SET_VERSION: "onboarding:set-version",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -684,14 +684,14 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.invoke(IPC_CHANNELS.PERMISSIONS_OPEN_SCREEN_RECORDING),
 
   // Onboarding
-  getOnboardingCompleted: (userId: string): Promise<boolean> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_GET_COMPLETED, userId),
+  getOnboardingVersion: (userId: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_GET_VERSION, userId),
 
-  setOnboardingCompleted: (userId: string, completed: boolean): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_SET_COMPLETED, userId, completed),
+  setOnboardingVersion: (userId: string, version: number): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_SET_VERSION, userId, version),
 
   resetOnboarding: (userId: string): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_SET_COMPLETED, userId, false),
+    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_SET_VERSION, userId, 0),
 
   // Browser Bridge
   getBrowserBridgeStatus: (): Promise<boolean> =>

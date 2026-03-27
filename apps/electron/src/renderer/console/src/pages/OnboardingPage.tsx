@@ -4,6 +4,7 @@ import { Monitor, MousePointerClick, ChevronLeft, ChevronRight, Check } from "lu
 import { Switch } from "@/components/ui/switch";
 import { useUser } from "../context/UserContext";
 import { usePermissions } from "../hooks/usePermissions";
+import { ONBOARDING_VERSION } from "../App";
 
 const TOTAL_STEPS = 3;
 
@@ -356,7 +357,7 @@ export default function OnboardingPage() {
 
   const completeOnboarding = async () => {
     if (user?.id) {
-      await window.consoleAPI?.setOnboardingCompleted(user.id, true).catch(() => {});
+      await window.consoleAPI?.setOnboardingVersion(user.id, ONBOARDING_VERSION).catch(() => {});
     }
     if (user?.role === "admin") {
       navigate("/dashboard", { replace: true });

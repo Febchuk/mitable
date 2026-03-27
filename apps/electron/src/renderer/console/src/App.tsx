@@ -180,6 +180,10 @@ function MonitoringSessionHandler() {
   return null;
 }
 
+// Bump this number to force all users through onboarding again
+const ONBOARDING_VERSION = 1;
+export { ONBOARDING_VERSION };
+
 // Default route -- checks onboarding status before redirecting
 function DefaultRoute() {
   const { user } = useUser();
@@ -189,9 +193,9 @@ function DefaultRoute() {
   useEffect(() => {
     if (!user?.id) return;
     window.consoleAPI
-      ?.getOnboardingCompleted(user.id)
-      .then((completed) => {
-        setNeedsOnboarding(!completed);
+      ?.getOnboardingVersion(user.id)
+      .then((version) => {
+        setNeedsOnboarding(version < ONBOARDING_VERSION);
         setChecked(true);
       })
       .catch(() => setChecked(true)); // fallback: skip onboarding if IPC fails

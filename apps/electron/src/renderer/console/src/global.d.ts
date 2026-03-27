@@ -305,8 +305,8 @@ interface ConsoleAPI {
   openScreenRecordingSettings: () => Promise<void>;
 
   // Onboarding
-  getOnboardingCompleted: (userId: string) => Promise<boolean>;
-  setOnboardingCompleted: (userId: string, completed: boolean) => Promise<{ success: boolean }>;
+  getOnboardingVersion: (userId: string) => Promise<number>;
+  setOnboardingVersion: (userId: string, version: number) => Promise<{ success: boolean }>;
   resetOnboarding: (userId: string) => Promise<{ success: boolean }>;
 
   // Browser Bridge (Chrome Extension)

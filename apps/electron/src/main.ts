@@ -2311,12 +2311,12 @@ function setupMonitoringSessionHandlers() {
   });
 
   // Onboarding IPC handlers
-  ipcMain.handle(IPC_CHANNELS.ONBOARDING_GET_COMPLETED, (_, userId: string) => {
-    return preferencesService.getUserOnboardingCompleted(userId);
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_GET_VERSION, (_, userId: string) => {
+    return preferencesService.getUserOnboardingVersion(userId);
   });
 
-  ipcMain.handle(IPC_CHANNELS.ONBOARDING_SET_COMPLETED, (_, userId: string, completed: boolean) => {
-    preferencesService.setUserOnboardingCompleted(userId, completed);
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_SET_VERSION, (_, userId: string, version: number) => {
+    preferencesService.setUserOnboardingVersion(userId, version);
     return { success: true };
   });
 
