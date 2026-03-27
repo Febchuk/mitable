@@ -27,8 +27,8 @@ import { sessionSummarizationService } from "./session-summarization.service";
 
 const logger = createLogger({ context: "stale-session-cleanup" });
 
-const MAX_SESSION_DURATION_MS = 12 * 60 * 60 * 1000; // 12 hours
-const MAX_CAPTURE_GAP_MS = 30 * 60 * 1000; // 30 minutes with no captures → stale
+const MAX_SESSION_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
+const MAX_CAPTURE_GAP_MS = 5 * 60 * 1000; // 5 minutes with no captures → stale
 
 export interface CleanupResult {
   sessionsFound: number;
