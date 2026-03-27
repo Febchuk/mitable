@@ -348,7 +348,7 @@ function createWatchingPillWindow() {
 
   // Platform-specific always-on-top behavior
   if (process.platform === "darwin") {
-    watchingPillWindow.setAlwaysOnTop(true, "screen-saver");
+    watchingPillWindow.setAlwaysOnTop(true, "floating");
     watchingPillWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillWindow.setAlwaysOnTop(true, "normal", 1);
@@ -421,7 +421,7 @@ function showPillReliably(win: BrowserWindow) {
 
   // Re-assert always-on-top (macOS can drop the level)
   if (process.platform === "darwin") {
-    win.setAlwaysOnTop(true, "screen-saver");
+    win.setAlwaysOnTop(true, "floating");
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     win.setAlwaysOnTop(true, "normal", 1);
@@ -540,7 +540,7 @@ function createWatchingPillEyeDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillEyeDropdown.setAlwaysOnTop(true, "screen-saver");
+    watchingPillEyeDropdown.setAlwaysOnTop(true, "floating");
     watchingPillEyeDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillEyeDropdown.setAlwaysOnTop(true, "normal", 1);
@@ -604,7 +604,7 @@ function createWatchingPillMenuDropdown() {
 
   // Platform-specific always-on-top
   if (process.platform === "darwin") {
-    watchingPillMenuDropdown.setAlwaysOnTop(true, "screen-saver");
+    watchingPillMenuDropdown.setAlwaysOnTop(true, "floating");
     watchingPillMenuDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } else {
     watchingPillMenuDropdown.setAlwaysOnTop(true, "normal", 1);
@@ -1656,6 +1656,8 @@ function setupWatchModeHandlers() {
     const windowToRemove = selectedWindows.find((w) => w.windowId === windowId);
 
     const removed = windowDetectionService.removeWindow(windowId);
+    // Also remove from focusWindowTracker so it doesn't silently re-add on next tick
+    focusWindowTracker.removeTrackedWindow(windowId);
 
     if (removed) {
       // Clear the cached screenshot for this window (keyed by windowTitle)
