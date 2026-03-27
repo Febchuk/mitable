@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect, useLayoutEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -22,6 +22,8 @@ import {
   Monitor,
   Copy,
   Trash2,
+  Shield,
+  MousePointerClick,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
@@ -34,6 +36,8 @@ import { BillingSection } from "@/console/src/components/billing";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
+import { usePermissions } from "../hooks/usePermissions";
+import { PermissionRow } from "./OnboardingPage";
 import {
   useOrganizationSettings,
   useUpdateOrganizationSettings,
@@ -161,6 +165,16 @@ export default function UserProfilePage() {
     isLoading: isPreferencesLoading,
     updatePreference,
   } = usePreferences();
+
+  // Permissions hook
+  const {
+    screen: screenPermission,
+    accessibility: accessibilityPermission,
+    requestAccessibility,
+    openScreenRecording,
+  } = usePermissions();
+
+  const navigate = useNavigate();
 
   // Organization settings hooks (admin only)
   const isAdmin = user?.role === "admin";
@@ -1681,7 +1695,7 @@ export default function UserProfilePage() {
 
   // Tab state — honor ?tab= query param from sidebar menu
   const [searchParams] = useSearchParams();
-  const validTabs = ["account", "security", "preferences", "integrations", "update"] as const;
+  const validTabs = ["account", "security", "permissions", "preferences", "integrations", "update"] as const;
   type TabId = (typeof validTabs)[number];
   const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
     ? (searchParams.get("tab") as TabId)
@@ -1698,6 +1712,7 @@ export default function UserProfilePage() {
   const tabs = [
     { id: "account" as const, label: "Account", icon: User },
     { id: "security" as const, label: "Security", icon: Lock },
+    { id: "permissions" as const, label: "Permissions", icon: Shield },
     { id: "preferences" as const, label: "Preferences", icon: Settings },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
     { id: "update" as const, label: "Update", icon: RefreshCw },
@@ -2375,6 +2390,88 @@ export default function UserProfilePage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Permissions Tab */}
+          {activeTab === "permissions" && (
+            <div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div>
+                    <h2
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        margin: 0,
+                      }}
+                    >
+                      macOS Permissions
+                    </h2>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text-tertiary)",
+                        margin: "4px 0 0",
+                      }}
+                    >
+                      Mitable needs these permissions to capture your work
+                    </p>
+                  </div>
+                  <div className="space-y-2.5">
+                    <PermissionRow
+                      icon={Monitor}
+                      label="Screen Recording"
+                      description="Required to capture screenshots"
+                      granted={screenPermission === "granted"}
+                      buttonLabel="Open Settings"
+                      onAction={openScreenRecording}
+                    />
+                    <PermissionRow
+                      icon={MousePointerClick}
+                      label="Accessibility"
+                      description="Required to track keyboard & mouse activity"
+                      granted={accessibilityPermission}
+                      buttonLabel="Grant Access"
+                      onAction={requestAccessibility}
+                    />
+                  </div>
+                </div>
+
+                {/* Re-run setup link */}
+                <div
+                  style={{
+                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+                    paddingTop: 16,
+                  }}
+                >
+                  <button
+                    onClick={async () => {
+                      if (user?.id) {
+                        await window.consoleAPI?.resetOnboarding(user.id);
+                        navigate("/onboarding");
+                      }
+                    }}
+                    style={{
+                      fontSize: 13,
+                      color: "var(--mi-accent)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "var(--mi-accent-light)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = "var(--mi-accent)")
+                    }
+                  >
+                    Re-run setup &rarr;
+                  </button>
+                </div>
               </div>
             </div>
           )}

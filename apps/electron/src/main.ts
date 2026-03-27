@@ -14,6 +14,7 @@ import {
   powerMonitor,
   screen,
   shell,
+  systemPreferences,
 } from "electron";
 import { join } from "path";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
@@ -2279,6 +2280,42 @@ function setupMonitoringSessionHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.AGENT_ENABLED_SET, (_, userId: string, enabled: boolean) => {
     preferencesService.setUserAgentEnabled(userId, enabled);
+    return { success: true };
+  });
+
+  // Permissions IPC handlers (macOS onboarding)
+  ipcMain.handle(IPC_CHANNELS.PERMISSIONS_GET_STATUS, () => {
+    if (process.platform === "darwin") {
+      return {
+        screen: systemPreferences.getMediaAccessStatus("screen"),
+        accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+      };
+    }
+    // Non-macOS: report all granted
+    return { screen: "granted", accessibility: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PERMISSIONS_REQUEST_ACCESSIBILITY, () => {
+    if (process.platform === "darwin") {
+      systemPreferences.isTrustedAccessibilityClient(true);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PERMISSIONS_OPEN_SCREEN_RECORDING, async () => {
+    if (process.platform === "darwin") {
+      await shell.openExternal(
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+      );
+    }
+  });
+
+  // Onboarding IPC handlers
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_GET_VERSION, (_, userId: string) => {
+    return preferencesService.getUserOnboardingVersion(userId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ONBOARDING_SET_VERSION, (_, userId: string, version: number) => {
+    preferencesService.setUserOnboardingVersion(userId, version);
     return { success: true };
   });
 
