@@ -342,9 +342,20 @@ class WindowDetectionService {
       .replace(/\.AppImage$/i, ""); // Linux AppImage
   }
 
+  // Apps always excluded from detection/watch list (includes-based for helper processes)
+  private static readonly ALWAYS_EXCLUDED_APPS: { pattern: string; reason: string }[] = [
+    { pattern: "mitable", reason: "Mitable app" },
+    { pattern: "electron", reason: "Electron window" },
+    { pattern: "messages", reason: "Messages app" },
+    { pattern: "whatsapp", reason: "WhatsApp app" },
+    { pattern: "spotify", reason: "Spotify app" },
+    { pattern: "imessage", reason: "iMessage app" },
+  ];
+
   /**
-   * Check if a window should be excluded from being added to the watch list
-   * Excludes: Mitable windows, Electron windows, Messages, WhatsApp, policy-blocked windows, and Spotify
+   * Check if a window should be excluded from being added to the watch list.
+   * Uses `includes`-based matching so macOS helper/renderer processes
+   * (e.g. "WhatsApp Helper", "Spotify Helper (Renderer)") are caught.
    */
   private shouldExcludeWindow(
     windowTitle: string,
@@ -355,33 +366,17 @@ class WindowDetectionService {
       return { excluded: true, reason: "Mitable window" };
     }
 
-    // Check 2: Mitable windows by app name (normalized)
-    const normalizedAppName = this.normalizeAppName(appName);
-    if (normalizedAppName.toLowerCase() === "mitable") {
-      return { excluded: true, reason: "Mitable app" };
+    // Check 2: Always-excluded apps by name (includes-based for helper processes)
+    const lowerAppName = this.normalizeAppName(appName).toLowerCase();
+    const lowerTitle = (windowTitle || "").toLowerCase();
+
+    for (const { pattern, reason } of WindowDetectionService.ALWAYS_EXCLUDED_APPS) {
+      if (lowerAppName.includes(pattern) || lowerTitle === pattern) {
+        return { excluded: true, reason };
+      }
     }
 
-    // Check 3: Electron windows (dev app windows)
-    if (normalizedAppName.toLowerCase() === "electron") {
-      return { excluded: true, reason: "Electron window" };
-    }
-
-    // Check 4: Messages app (macOS Messages)
-    if (normalizedAppName.toLowerCase() === "messages") {
-      return { excluded: true, reason: "Messages app" };
-    }
-
-    // Check 5: WhatsApp
-    if (normalizedAppName.toLowerCase() === "whatsapp") {
-      return { excluded: true, reason: "WhatsApp app" };
-    }
-
-    // Check 6: Spotify by app name (normalized)
-    if (normalizedAppName.toLowerCase() === "spotify") {
-      return { excluded: true, reason: "Spotify app" };
-    }
-
-    // Check 7: Policy-blocked windows
+    // Check 3: Policy-blocked windows
     const policy = getCapturePolicy();
     const policyDecision = isBlockedByPolicy(windowTitle, appName, policy);
     if (policyDecision.blocked) {

@@ -447,7 +447,11 @@ function movePillToDisplay(display: Electron.Display) {
 
   // Reposition any open dropdown windows relative to new pill location
   const pillBounds = watchingPillWindow.getBounds();
-  if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed() && watchingPillEyeDropdown.isVisible()) {
+  if (
+    watchingPillEyeDropdown &&
+    !watchingPillEyeDropdown.isDestroyed() &&
+    watchingPillEyeDropdown.isVisible()
+  ) {
     watchingPillEyeDropdown.setBounds({
       x: pillBounds.x - 250,
       y: pillBounds.y + 40,
@@ -455,7 +459,11 @@ function movePillToDisplay(display: Electron.Display) {
       height: 280,
     });
   }
-  if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed() && watchingPillMenuDropdown.isVisible()) {
+  if (
+    watchingPillMenuDropdown &&
+    !watchingPillMenuDropdown.isDestroyed() &&
+    watchingPillMenuDropdown.isVisible()
+  ) {
     watchingPillMenuDropdown.setBounds({
       x: pillBounds.x - 170,
       y: pillBounds.y + 90,

@@ -20,13 +20,51 @@
 
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { normalizeName } from "./normalize-name.js";
 import { syncSubscriberToGraph, syncTopicToGraph } from "./graph/graph-incremental-sync.service.js";
 import { getKnownCustomers } from "./known-customers.service.js";
 
 const logger = createLogger({ context: "activity-materializer" });
+
+/**
+ * Normalize a capture-level app name into a stable display name.
+ *
+ * desktopCapturer sometimes leaks window-title fragments as app names
+ * (e.g. "Slack Huddle", "Teams Meeting") instead of the process name ("Slack").
+ * This maps known variants back to their canonical name and strips
+ * OS extensions (.exe, .app).
+ */
+const APP_NAME_ALIASES: Record<string, string> = {
+  "slack huddle": "Slack",
+  "slack call": "Slack",
+  "teams meeting": "Microsoft Teams",
+  "teams call": "Microsoft Teams",
+};
+
+function normalizeAppDisplayName(raw: string): string {
+  if (!raw) return raw;
+
+  // Strip OS extensions
+  let name = raw
+    .replace(/\.exe$/i, "")
+    .replace(/\.app$/i, "")
+    .replace(/\.AppImage$/i, "")
+    .trim();
+
+  // Check alias table first
+  const alias = APP_NAME_ALIASES[name.toLowerCase()];
+  if (alias) return alias;
+
+  // If the name looks like a window-title fragment ("App Name - details"),
+  // keep only the first segment which is usually the app name.
+  if (name.includes(" - ")) {
+    name = name.split(" - ")[0].trim();
+  }
+
+  return name;
+}
 
 // ============================================================================
 // Types
@@ -177,13 +215,15 @@ export async function materializeSession(sessionId: string): Promise<void> {
       }
     }
 
-    // 4. Enrich blocks with app names from captures (for appBreakdown)
+    // 4. Enrich blocks with app names from captures (for appBreakdown).
+    // Normalize names so "Slack Huddle" and "Slack - #general" both roll up to "Slack".
     const captures = await db
       .select({ appName: schema.sessionCaptures.appName })
       .from(schema.sessionCaptures)
       .where(eq(schema.sessionCaptures.sessionId, sessionId));
 
-    const uniqueApps = [...new Set(captures.map((c) => c.appName).filter(Boolean))] as string[];
+    const rawApps = captures.map((c) => c.appName).filter(Boolean) as string[];
+    const uniqueApps = [...new Set(rawApps.map(normalizeAppDisplayName))];
     if (uniqueApps.length > 0) {
       for (const block of blocks) {
         block.apps = uniqueApps;
@@ -342,10 +382,11 @@ export async function recalculateDailyStats(
 
     if (block.sessionId) sessionIds.add(block.sessionId);
 
-    // App breakdown
-    const blockApps = (block.apps as string[]) || [];
-    const perAppMinutes = blockApps.length > 0 ? block.durationMinutes / blockApps.length : 0;
-    for (const app of blockApps) {
+    // App breakdown (normalize so "Slack Huddle" → "Slack")
+    const blockApps = ((block.apps as string[]) || []).map(normalizeAppDisplayName);
+    const dedupedApps = [...new Set(blockApps)];
+    const perAppMinutes = dedupedApps.length > 0 ? block.durationMinutes / dedupedApps.length : 0;
+    for (const app of dedupedApps) {
       appMinutes[app] = (appMinutes[app] || 0) + perAppMinutes;
     }
 
@@ -388,6 +429,28 @@ export async function recalculateDailyStats(
   const meetingPercentage =
     totalActiveMinutes > 0 ? (totalMeetingMinutes / totalActiveMinutes) * 100 : 0;
 
+  // Compute total session minutes from actual monitoring session durations
+  let totalSessionMinutes = 0;
+  const sessionIdArray = [...sessionIds];
+  if (sessionIdArray.length > 0) {
+    const sessions = await txOrDb
+      .select({
+        startedAt: schema.monitoringSessions.startedAt,
+        endedAt: schema.monitoringSessions.endedAt,
+      })
+      .from(schema.monitoringSessions)
+      .where(inArray(schema.monitoringSessions.id, sessionIdArray));
+
+    for (const s of sessions) {
+      if (s.startedAt && s.endedAt) {
+        totalSessionMinutes += Math.max(
+          0,
+          Math.round((new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime()) / 60000)
+        );
+      }
+    }
+  }
+
   // Build JSONB arrays
   const appBreakdown = Object.entries(appMinutes)
     .map(([app, minutes]) => ({ app, minutes: Math.round(minutes) }))
@@ -423,6 +486,7 @@ export async function recalculateDailyStats(
       totalWorkMinutes: Math.round(totalWorkMinutes),
       totalMeetingMinutes: Math.round(totalMeetingMinutes),
       totalActiveMinutes: Math.round(totalActiveMinutes),
+      totalSessionMinutes,
       totalSessions: sessionIds.size,
       totalCaptures: blocks.length,
       workPercentage: Math.round(workPercentage * 10) / 10,

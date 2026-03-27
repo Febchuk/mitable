@@ -26,7 +26,6 @@ import {
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
 import { FirefliesIcon } from "../../../components/icons/integrations";
-import MitableIcon from "../components/icons/MitableIcon";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
@@ -140,10 +139,6 @@ export default function UserProfilePage() {
   const [isCreatingKey, setIsCreatingKey] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
   const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
-
-  // Agent feature toggle
-  const [agentEnabled, setAgentEnabled] = useState(false);
-  const [isAgentLoading, setIsAgentLoading] = useState(true);
 
   // About / Version state
   const [appVersion, setAppVersion] = useState<string>("");
@@ -831,20 +826,6 @@ export default function UserProfilePage() {
     loadPillDisplayMode,
     loadAudioPreferences,
   ]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    window.consoleAPI
-      ?.getAgentEnabled(user.id)
-      .then((enabled) => {
-        setAgentEnabled(enabled);
-        setIsAgentLoading(false);
-      })
-      .catch((err) => {
-        logger.error("Failed to load agent toggle:", err);
-        setIsAgentLoading(false);
-      });
-  }, [user?.id]);
 
   // Listen for update events
   useEffect(() => {
@@ -1700,14 +1681,7 @@ export default function UserProfilePage() {
 
   // Tab state — honor ?tab= query param from sidebar menu
   const [searchParams] = useSearchParams();
-  const validTabs = [
-    "account",
-    "security",
-    "preferences",
-    "beta",
-    "integrations",
-    "update",
-  ] as const;
+  const validTabs = ["account", "security", "preferences", "integrations", "update"] as const;
   type TabId = (typeof validTabs)[number];
   const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
     ? (searchParams.get("tab") as TabId)
@@ -1725,7 +1699,6 @@ export default function UserProfilePage() {
     { id: "account" as const, label: "Account", icon: User },
     { id: "security" as const, label: "Security", icon: Lock },
     { id: "preferences" as const, label: "Preferences", icon: Settings },
-    { id: "beta" as const, label: "Beta", icon: MitableIcon },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
     { id: "update" as const, label: "Update", icon: RefreshCw },
   ];
@@ -3002,73 +2975,6 @@ export default function UserProfilePage() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Beta Tab */}
-          {activeTab === "beta" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div
-                style={{
-                  paddingBottom: 16,
-                  borderBottom: "var(--border-hairline)",
-                }}
-              >
-                <h2
-                  style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}
-                >
-                  Beta Features
-                </h2>
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
-                  Toggle features that are still in development
-                </p>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 0",
-                }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <Label
-                    htmlFor="agent-toggle"
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Agent
-                  </Label>
-                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
-                    Enable the AI Agent in the sidebar for chat-based assistance
-                  </p>
-                </div>
-                {isAgentLoading ? (
-                  <Loader2 size={16} style={{ color: "#4B4740" }} className="animate-spin" />
-                ) : (
-                  <Switch
-                    id="agent-toggle"
-                    checked={agentEnabled}
-                    onCheckedChange={async (checked) => {
-                      if (!user?.id) return;
-                      setAgentEnabled(checked);
-                      await window.consoleAPI?.setAgentEnabled(user.id, checked);
-                      window.dispatchEvent(new Event("agent-enabled-changed"));
-                      toast({
-                        title: checked ? "Agent enabled" : "Agent disabled",
-                        description: checked
-                          ? "Agent is now available in the sidebar"
-                          : "Agent has been hidden from the sidebar",
-                      });
-                    }}
-                  />
-                )}
-              </div>
             </div>
           )}
 

@@ -146,6 +146,7 @@ interface LiveOrgMetrics {
   totalUsersTracked: number;
   totalTeamWorkMinutes: number;
   totalTeamMeetingMinutes: number;
+  totalTeamSessionMinutes: number;
   activityDistribution: { category: string; totalMinutes: number; percentage: number }[];
   topApps: { app: string; totalMinutes: number; userCount: number }[];
   userSummaries: {
@@ -169,6 +170,7 @@ async function computeLiveOrgMetrics(
       totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
       totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
       totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+      totalSessionMinutes: schema.userDailyActivities.totalSessionMinutes,
       workPercentage: schema.userDailyActivities.workPercentage,
       meetingPercentage: schema.userDailyActivities.meetingPercentage,
       appBreakdown: schema.userDailyActivities.appBreakdown,
@@ -199,6 +201,7 @@ async function computeLiveOrgMetrics(
   // Totals
   const totalTeamWorkMinutes = userRows.reduce((s, r) => s + r.totalWorkMinutes, 0);
   const totalTeamMeetingMinutes = userRows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
+  const totalTeamSessionMinutes = userRows.reduce((s, r) => s + r.totalSessionMinutes, 0);
   const totalTeamActive = totalTeamWorkMinutes + totalTeamMeetingMinutes;
 
   // Activity distribution (aggregate category breakdowns)
@@ -298,6 +301,7 @@ async function computeLiveOrgMetrics(
     totalUsersTracked: count,
     totalTeamWorkMinutes,
     totalTeamMeetingMinutes,
+    totalTeamSessionMinutes,
     activityDistribution,
     topApps,
     userSummaries,
@@ -338,6 +342,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
             totalUsersTracked: 0,
             totalTeamWorkMinutes: 0,
             totalTeamMeetingMinutes: 0,
+            totalTeamSessionMinutes: 0,
           },
           activityDistribution: [],
           topApps: [],
@@ -360,6 +365,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
           totalUsersTracked: live.totalUsersTracked,
           totalTeamWorkMinutes: live.totalTeamWorkMinutes,
           totalTeamMeetingMinutes: live.totalTeamMeetingMinutes,
+          totalTeamSessionMinutes: live.totalTeamSessionMinutes,
         },
         activityDistribution: live.activityDistribution,
         topApps: live.topApps,
@@ -389,6 +395,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
         totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
         totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
         totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+        totalSessionMinutes: schema.userDailyActivities.totalSessionMinutes,
         workPercentage: schema.userDailyActivities.workPercentage,
         meetingPercentage: schema.userDailyActivities.meetingPercentage,
         categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
@@ -419,6 +426,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
           totalUsersTracked: 0,
           totalTeamWorkMinutes: 0,
           totalTeamMeetingMinutes: 0,
+          totalTeamSessionMinutes: 0,
         },
         activityDistribution: [],
         topApps: [],
@@ -447,6 +455,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
     }[] = [];
     let totalTeamWorkMinutes = 0;
     let totalTeamMeetingMinutes = 0;
+    let totalTeamSessionMinutes = 0;
     let maxUsers = 0;
     let sumAvgWork = 0;
     let sumAvgMeeting = 0;
@@ -472,6 +481,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
 
       totalTeamWorkMinutes += dayWork;
       totalTeamMeetingMinutes += dayMeeting;
+      totalTeamSessionMinutes += rows.reduce((s, r) => s + r.totalSessionMinutes, 0);
       sumAvgWork += avgDayWork;
       sumAvgMeeting += avgDayMeeting;
       sumAvgActive += avgDayActive;
@@ -569,6 +579,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
         totalUsersTracked: maxUsers,
         totalTeamWorkMinutes: totalTeamWorkMinutes,
         totalTeamMeetingMinutes: totalTeamMeetingMinutes,
+        totalTeamSessionMinutes: totalTeamSessionMinutes,
       },
       activityDistribution,
       topApps,
@@ -662,7 +673,6 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
       .orderBy(desc(schema.userDailyActivities.activityDate));
 
     // Step 2b: Fetch latest session per user for "Recent Highlight"
-    // (daySummary/keyAccomplishments are never populated by materializer)
     const userIds = orgUsers.map((u) => u.id);
     const latestSessions =
       userIds.length > 0
@@ -696,6 +706,51 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
           summary: s.finalSummary || s.rawActivitySummary || null,
           endedAt: s.endedAt,
         });
+      }
+    }
+
+    // Step 2c: Fetch latest document created per user
+    const latestDocs =
+      userIds.length > 0
+        ? await db
+            .select({
+              userId: schema.documents.createdBy,
+              createdAt: schema.documents.createdAt,
+            })
+            .from(schema.documents)
+            .where(
+              and(
+                eq(schema.documents.organizationId, admin.organizationId),
+                isNotNull(schema.documents.createdBy)
+              )
+            )
+            .orderBy(desc(schema.documents.createdAt))
+        : [];
+
+    const latestDocMap = new Map<string, Date>();
+    for (const d of latestDocs) {
+      if (d.userId && !latestDocMap.has(d.userId)) {
+        latestDocMap.set(d.userId, d.createdAt);
+      }
+    }
+
+    // Step 2d: Fetch latest agent conversation activity per user
+    const latestAgentChats =
+      userIds.length > 0
+        ? await db
+            .select({
+              userId: schema.agentConversations.userId,
+              updatedAt: schema.agentConversations.updatedAt,
+            })
+            .from(schema.agentConversations)
+            .where(eq(schema.agentConversations.organizationId, admin.organizationId))
+            .orderBy(desc(schema.agentConversations.updatedAt))
+        : [];
+
+    const latestAgentChatMap = new Map<string, Date>();
+    for (const c of latestAgentChats) {
+      if (!latestAgentChatMap.has(c.userId)) {
+        latestAgentChatMap.set(c.userId, c.updatedAt);
       }
     }
 
@@ -751,6 +806,19 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
       // Use latest session summary for "Recent Highlight"
       const latestSession = latestSessionMap.get(user.id);
 
+      // lastActiveAt = most recent of: session end, doc creation, agent chat
+      const candidates: Date[] = [];
+      if (latestSession?.endedAt) candidates.push(new Date(latestSession.endedAt));
+      const latestDoc = latestDocMap.get(user.id);
+      if (latestDoc) candidates.push(new Date(latestDoc));
+      const latestChat = latestAgentChatMap.get(user.id);
+      if (latestChat) candidates.push(new Date(latestChat));
+
+      const lastActiveAt =
+        candidates.length > 0
+          ? new Date(Math.max(...candidates.map((d) => d.getTime()))).toISOString()
+          : null;
+
       return {
         userId: user.id,
         name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
@@ -767,7 +835,7 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
         workPercentage: totalActive > 0 ? Math.round((totalWork / totalActive) * 100) : 0,
         meetingPercentage: totalActive > 0 ? Math.round((totalMeeting / totalActive) * 100) : 0,
         recentHighlight: latestSession?.summary || latestSession?.name || null,
-        lastActiveAt: latestSession?.endedAt?.toISOString() ?? null,
+        lastActiveAt,
         categoryBreakdown: aggregatedCategories,
         appBreakdown: aggregatedApps,
         daysTracked,

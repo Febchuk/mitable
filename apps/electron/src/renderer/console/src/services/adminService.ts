@@ -506,6 +506,7 @@ export interface DashboardMetrics {
     totalUsersTracked: number;
     totalTeamWorkMinutes: number;
     totalTeamMeetingMinutes: number;
+    totalTeamSessionMinutes: number;
   };
   activityDistribution: Array<{ category: string; percentage: number; totalMinutes: number }>;
   topApps: Array<{ app: string; totalMinutes: number; userCount: number }>;
