@@ -22,11 +22,19 @@ import type { SessionListItem, SessionCapture } from "../../../services/monitori
 // Query Keys
 export const calendarKeys = {
   all: ["calendar"] as const,
-  days: () => [...calendarKeys.all, "days"] as const,
-  day: (date: string) => [...calendarKeys.days(), date] as const,
+  days: (startDate?: string, endDate?: string) =>
+    startDate && endDate
+      ? ([...calendarKeys.all, "days", startDate, endDate] as const)
+      : ([...calendarKeys.all, "days"] as const),
+  day: (date: string) => [...calendarKeys.all, "days", date] as const,
   week: (weekStart: string) => [...calendarKeys.all, "week", weekStart] as const,
   blockCaptures: (blockId: string) => [...calendarKeys.all, "blockCaptures", blockId] as const,
 };
+
+export interface CalendarDateRange {
+  start: string; // ISO date string
+  end: string;   // ISO date string
+}
 
 /**
  * Map app name to activity type
@@ -470,17 +478,21 @@ function mergeIntegrationBlocksIntoDays(
 }
 
 /**
- * Hook to fetch all calendar days (transformed from sessions + integration blocks)
+ * Hook to fetch calendar days within a date range (transformed from sessions + integration blocks)
  * Returns ActivityDay[] sorted by date (most recent first)
+ *
+ * @param dateRange - Optional date range to fetch. If omitted, fetches ALL sessions (legacy behavior).
  */
-export function useCalendarDays() {
+export function useCalendarDays(dateRange?: CalendarDateRange) {
   const { user } = useUser();
 
   return useQuery({
-    queryKey: calendarKeys.days(),
+    queryKey: calendarKeys.days(dateRange?.start, dateRange?.end),
     queryFn: async () => {
       const [sessions, granolaBlocks, firefliesBlocks] = await Promise.all([
-        monitoringService.fetchAllSessions(),
+        dateRange
+          ? monitoringService.fetchSessionsByDateRange(dateRange.start, dateRange.end)
+          : monitoringService.fetchAllSessions(),
         fetchGranolaBlocks(),
         fetchFirefliesBlocks(),
       ]);
