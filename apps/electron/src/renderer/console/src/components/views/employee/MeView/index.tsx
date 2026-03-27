@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Search, Video, X, Zap, Monitor } from "lucide-react";
-import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
+import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Search, Video, X, Monitor } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
-import { apiRequest } from "@/console/src/services/api";
 import {
-  useCategoryActivities,
-  useDashboardPersonDetail,
-  useSubscriberActivities,
-  useUserDrillDown,
-} from "@/console/src/hooks/queries/admin";
+  useMyActivity,
+  useMyDrillDown,
+  useMyCategoryActivities,
+  useMySubscriberActivities,
+} from "@/console/src/hooks/queries/my-activity";
 import type {
   DashboardPeriod,
   DashboardPersonDetail as PersonDetailData,
@@ -18,9 +14,9 @@ import type {
 import { DocEditor } from "@/console/src/components/editor";
 import { useDocument } from "@/console/src/hooks/queries/documents";
 import { getLocale } from "@/console/src/lib/date";
-import DrillDownPanel from "../DashboardView/DrillDownPanel";
-import ActivityBlock from "../../employee/CalendarView/ActivityBlock";
-import type { WorkBlock } from "../../employee/CalendarView/types";
+import DrillDownPanel from "../../admin/DashboardView/DrillDownPanel";
+import ActivityBlock from "../CalendarView/ActivityBlock";
+import type { WorkBlock } from "../CalendarView/types";
 import {
   ACTIVITY_FILTERS,
   buildActivityChartData,
@@ -29,8 +25,10 @@ import {
   MEETINGS_COLOR,
   type ActivityTimeFilter as TimeRange,
   type ActivityTrendEntry,
-} from "../shared/activityChart";
-import { formatTopLevelDuration } from "../shared/topLevelDuration";
+} from "../../admin/shared/activityChart";
+import { formatTopLevelDuration } from "../../admin/shared/topLevelDuration";
+
+// ── Constants ────────────────────────────────────────────────
 
 const LABEL_TO_METRIC: Record<string, string> = {
   "Average Focus Time": "focus_time",
@@ -66,16 +64,7 @@ const BREAKDOWN_BAR_COLOR = "var(--mi-accent)";
 
 const RECENT_WORK_PAGE_SIZE = 10;
 
-type GranolaBlock = {
-  id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
-  description: string | null;
-  subscriberName: string | null;
-  participants: unknown;
-};
+// ── Types ────────────────────────────────────────────────────
 
 type RecentWorkFilter = "all" | "block" | "meeting" | "doc";
 
@@ -109,13 +98,6 @@ interface RecentWorkBlockItem {
 type RecentWorkItem = RecentWorkDocItem | RecentWorkBlockItem;
 
 interface PersonViewModel {
-  name: string;
-  role: string;
-  email: string;
-  startDate: string;
-  lastActive: string;
-  mood: string;
-  moodColor: string;
   metrics: Array<{ label: string; value: string }>;
   activities: Array<{ id: string; label: string; minutes: number; hours: number }>;
   chartEntries: ActivityTrendEntry[];
@@ -128,6 +110,8 @@ type CustomerTooltipPayload = {
   value: number;
   hours: number;
 };
+
+// ── Helpers ──────────────────────────────────────────────────
 
 function toPlainText(markdown: string): string {
   return markdown
@@ -157,45 +141,6 @@ function formatDateLabel(input: string): string {
 
 function formatTimeLabel(input: string): string {
   return new Date(input).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function formatLastActive(input?: string | null): string {
-  if (!input) return "—";
-  const date = new Date(input);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function matchesTimeRange(dateString: string, range: TimeRange): boolean {
-  if (range === "all") return true;
-
-  const date = new Date(dateString);
-  const end = new Date();
-  const start = new Date(end);
-
-  if (range === "yesterday") {
-    start.setDate(end.getDate() - 1);
-  } else if (range === "week") {
-    start.setDate(end.getDate() - 6);
-    start.setHours(0, 0, 0, 0);
-  } else if (range === "month") {
-    start.setDate(end.getDate() - 29);
-    start.setHours(0, 0, 0, 0);
-  } else if (range === "ytd") {
-    start.setMonth(0, 1);
-    start.setHours(0, 0, 0, 0);
-  }
-
-  return date >= start && date <= end;
 }
 
 function buildAppBreakdown(apps: string[] | null | undefined, durationMinutes: number) {
@@ -234,29 +179,6 @@ function createWorkBlockFromActivityBlock(block: PersonDetailData["blocks"][numb
       status: "ready",
     },
     blockNumber: block.sequenceNumber || 1,
-  };
-}
-
-function createWorkBlockFromGranolaBlock(block: GranolaBlock): WorkBlock {
-  const participants = Array.isArray(block.participants)
-    ? (block.participants as { name: string; email: string }[])
-    : [];
-
-  return {
-    id: block.id,
-    startTime: new Date(block.startTime),
-    endTime: block.endTime ? new Date(block.endTime) : null,
-    duration: block.durationMinutes,
-    idleGapBefore: null,
-    summary: block.description || "",
-    captures: [],
-    appBreakdown: [],
-    taskBreakdown: [],
-    name: block.name?.replace(/^\[Granola\]\s*/, "") || "Meeting",
-    status: "ready",
-    source: "granola",
-    participants,
-    subscriberName: block.subscriberName || undefined,
   };
 }
 
@@ -317,23 +239,6 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     }
     effectiveActiveMinutes = effectiveWorkMinutes + effectiveMeetingMinutes;
   }
-
-  const workPct =
-    effectiveActiveMinutes > 0
-      ? Math.round((effectiveWorkMinutes / effectiveActiveMinutes) * 100)
-      : 0;
-  const meetingPct =
-    effectiveActiveMinutes > 0
-      ? Math.round((effectiveMeetingMinutes / effectiveActiveMinutes) * 100)
-      : 0;
-
-  const moodLabel = meetingPct > 50 ? "Meeting-heavy" : workPct > 70 ? "Focused" : "Collaborative";
-  const moodColor =
-    meetingPct > 50
-      ? "bg-yellow-500/15 text-yellow-400"
-      : workPct > 70
-        ? "bg-emerald/15 text-emerald"
-        : "bg-indigo/15 text-indigo-light";
 
   const categoryMinutes = new Map<string, number>();
   for (const day of api.dailyActivities) {
@@ -411,7 +316,7 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
       label,
       value: totalCustomerMinutes > 0 ? Math.round((minutes / totalCustomerMinutes) * 100) : 0,
       hours: Math.round((minutes / 60) * 10) / 10,
-      color: CUSTOMER_COLORS[index % CUSTOMER_COLORS.length] || CUSTOMER_COLORS[0],
+      color: CUSTOMER_COLORS[index % CUSTOMER_COLORS.length] || CUSTOMER_COLORS[0]!,
     }));
 
   const recentWork: RecentWorkItem[] = [];
@@ -460,22 +365,7 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     return dateB - dateA;
   });
 
-  const latestActivityAt =
-    [...api.blocks].sort(
-      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-    )[0]?.startTime ||
-    api.documents[0]?.createdAt ||
-    api.sessionActivities[0]?.startedAt ||
-    null;
-
   return {
-    name: api.user.name,
-    role: api.user.jobTitle || api.user.role || "Employee",
-    email: api.user.email,
-    startDate: "—",
-    lastActive: formatLastActive(latestActivityAt),
-    mood: moodLabel,
-    moodColor,
     metrics: [
       {
         label: "Average Focus Time",
@@ -493,17 +383,9 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
   };
 }
 
-function RecentWorkIcon({
-  kind,
-  source,
-}: {
-  kind: RecentWorkFilter;
-  source?: "granola" | "fireflies" | "session";
-}) {
-  if (kind === "meeting" && source === "granola") {
-    return <GranolaIcon size="md" />;
-  }
+// ── Sub-components ───────────────────────────────────────────
 
+function RecentWorkIcon({ kind }: { kind: RecentWorkFilter }) {
   const icon =
     kind === "doc" ? (
       <FileText size={18} />
@@ -547,10 +429,9 @@ function CustomerWorkTooltip({ active, payload }: TooltipProps<number, string>) 
   );
 }
 
-export default function PersonDetail() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+// ── Main Component ───────────────────────────────────────────
 
+export default function MeView() {
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -561,36 +442,24 @@ export default function PersonDetail() {
   const [workSearchQuery, setWorkSearchQuery] = useState("");
   const [workPage, setWorkPage] = useState(0);
 
+  // Reset to first page when filter or search changes
   useEffect(() => {
     setWorkPage(0);
   }, [workFilter, workSearchQuery]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { data: apiDetail } = useDashboardPersonDetail(id || "", FILTER_TO_PERIOD[timeRange]);
-  const { data: drillDownData } = useUserDrillDown(
-    id || "",
-    drillDownMetric,
-    FILTER_TO_PERIOD[timeRange]
-  );
-  const { data: categoryData } = useCategoryActivities(
-    id || "",
+  const { data: apiDetail } = useMyActivity(FILTER_TO_PERIOD[timeRange]);
+  const { data: drillDownData } = useMyDrillDown(drillDownMetric, FILTER_TO_PERIOD[timeRange]);
+  const { data: categoryData } = useMyCategoryActivities(
     selectedCategory,
     FILTER_TO_PERIOD[timeRange]
   );
-  const { data: subscriberData } = useSubscriberActivities(
-    id || "",
+  const { data: subscriberData } = useMySubscriberActivities(
     selectedSubscriber,
     FILTER_TO_PERIOD[timeRange]
   );
   const { data: docData, isLoading: docLoading } = useDocument(selectedDocId || "");
-
-  const { data: granolaData } = useQuery({
-    queryKey: ["granola-blocks", id],
-    queryFn: () =>
-      apiRequest<{ blocks: GranolaBlock[] }>(`/integrations/granola/blocks?userId=${id}`),
-    enabled: !!id,
-  });
 
   const handleDrillDown = (label: string) => {
     const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
@@ -611,38 +480,8 @@ export default function PersonDetail() {
 
   const person = useMemo(() => {
     if (!apiDetail) return null;
-    const vm = transformApiToPersonViewModel(apiDetail, timeRange);
-
-    for (const block of granolaData?.blocks || []) {
-      if (!matchesTimeRange(block.startTime, timeRange)) continue;
-      const workBlock = createWorkBlockFromGranolaBlock(block);
-      const preview = toPlainText(block.description || "");
-
-      vm.recentWork.push({
-        kind: "meeting",
-        id: block.id,
-        title: workBlock.name || "Meeting",
-        preview,
-        date: formatDateLabel(block.startTime),
-        time: formatTimeLabel(block.startTime),
-        durationMinutes: block.durationMinutes,
-        category: "Meeting",
-        subscriberName: block.subscriberName || undefined,
-        participants: workBlock.participants,
-        block: workBlock,
-        blockNumber: 0,
-        source: "granola",
-      });
-    }
-
-    vm.recentWork.sort((a, b) => {
-      const dateA = new Date(`${a.date} ${a.time}`).getTime();
-      const dateB = new Date(`${b.date} ${b.time}`).getTime();
-      return dateB - dateA;
-    });
-
-    return vm;
-  }, [apiDetail, granolaData, timeRange]);
+    return transformApiToPersonViewModel(apiDetail, timeRange);
+  }, [apiDetail, timeRange]);
 
   const chartData = useMemo(() => {
     if (!person) return [];
@@ -665,48 +504,7 @@ export default function PersonDetail() {
     return () => window.removeEventListener("resize", handleResize);
   }, [chartData]);
 
-  if (!person) {
-    return (
-      <div style={{ height: "100vh", overflowY: "auto", padding: "32px 36px" }}>
-        <button
-          onClick={() => navigate("/people")}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            background: "none",
-            border: "none",
-            padding: 0,
-            color: "var(--text-secondary)",
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-        >
-          <ArrowLeft size={15} />
-          Back to People
-        </button>
-
-        <div style={{ display: "flex", justifyContent: "center", padding: "120px 0" }}>
-          <div style={{ textAlign: "center" }}>
-            <div
-              style={{
-                width: 24,
-                height: 24,
-                margin: "0 auto 12px",
-                borderRadius: "50%",
-                border: "2px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.35)",
-                borderTopColor: "var(--mi-accent)",
-                animation: "spin 1s linear infinite",
-              }}
-            />
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
-              Loading activity data...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ── Doc view ──────────────────────────────────────────────
 
   if (selectedDocId) {
     const docTypeLabels: Record<string, string> = {
@@ -797,6 +595,8 @@ export default function PersonDetail() {
     );
   }
 
+  // ── Work block detail view ────────────────────────────────
+
   if (selectedWork) {
     return (
       <div style={{ height: "100vh", overflowY: "auto", padding: "32px 36px" }}>
@@ -863,6 +663,48 @@ export default function PersonDetail() {
     );
   }
 
+  // ── Empty / loading state ────────────────────────────────
+
+  if (!person) {
+    return (
+      <div style={{ height: "100vh", overflowY: "auto", padding: "32px 36px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 20,
+            marginBottom: 32,
+          }}
+        >
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 26,
+              color: "var(--text-primary)",
+              fontWeight: 400,
+              letterSpacing: "-0.3px",
+              margin: 0,
+            }}
+          >
+            My Activity
+          </h1>
+        </div>
+
+        <div style={{ textAlign: "center", padding: "120px 0" }}>
+          <p style={{ fontSize: 15, color: "var(--text-secondary)", margin: 0 }}>
+            No activity data yet
+          </p>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0" }}>
+            Your activity metrics will appear here as you work.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main view ────────────────────────────────────────────
+
   const totalActivityMinutes = person.activities.reduce((sum, entry) => sum + entry.minutes, 0);
   const showCustomerWork = person.customerBreakdown.length > 0;
 
@@ -904,25 +746,7 @@ export default function PersonDetail() {
           gap: 32,
         }}
       >
-        <button
-          onClick={() => navigate("/people")}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            width: "fit-content",
-            background: "none",
-            border: "none",
-            padding: 0,
-            color: "var(--text-secondary)",
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-        >
-          <ArrowLeft size={15} />
-          Back to People
-        </button>
-
+        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -931,84 +755,20 @@ export default function PersonDetail() {
             gap: 20,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div
-              style={{
-                width: 54,
-                height: 54,
-                borderRadius: 999,
-                background: "rgba(var(--ui-rgb), 0.1)",
-                color: "var(--text-primary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 17,
-                fontWeight: 600,
-                flexShrink: 0,
-              }}
-            >
-              {(person.name?.charAt(0) || "U").toUpperCase()}
-            </div>
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 26,
+              color: "var(--text-primary)",
+              fontWeight: 400,
+              letterSpacing: "-0.3px",
+              margin: 0,
+            }}
+          >
+            My Activity
+          </h1>
 
-            <div>
-              <h1
-                style={{
-                  fontFamily: "var(--font-serif)",
-                  fontSize: 26,
-                  color: "var(--text-primary)",
-                  fontWeight: 400,
-                  letterSpacing: "-0.3px",
-                  margin: 0,
-                }}
-              >
-                {person.name}
-              </h1>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  marginTop: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{person.role}</span>
-                <span
-                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${person.moodColor}`}
-                >
-                  {person.mood}
-                </span>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    fontSize: 12,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  <Zap size={11} style={{ color: "#54705F" }} />
-                  {person.lastActive}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: "var(--text-tertiary)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span>{person.email}</span>
-                <span style={{ opacity: 0.5 }}>•</span>
-                <span>Started {person.startDate}</span>
-              </div>
-            </div>
-          </div>
-
+          {/* Time range filter */}
           <div
             style={{
               display: "flex",
@@ -1028,7 +788,8 @@ export default function PersonDetail() {
                   borderRadius: 5,
                   fontSize: 11,
                   fontFamily: "var(--font-sans)",
-                  color: timeRange === filter.key ? "var(--text-primary)" : "var(--text-secondary)",
+                  color:
+                    timeRange === filter.key ? "var(--text-primary)" : "var(--text-secondary)",
                   background: timeRange === filter.key ? "var(--bg-overlay)" : "transparent",
                   border: "none",
                   cursor: "pointer",
@@ -1040,6 +801,7 @@ export default function PersonDetail() {
           </div>
         </div>
 
+        {/* Metrics — big numbers */}
         <div style={{ display: "flex", gap: 56, alignItems: "flex-end", padding: "0 2px" }}>
           {person.metrics.map((metric) => (
             <button
@@ -1082,6 +844,7 @@ export default function PersonDetail() {
           ))}
         </div>
 
+        {/* Customer Work + Activity Breakdown */}
         <div
           style={{
             display: "grid",
@@ -1177,7 +940,9 @@ export default function PersonDetail() {
                         textAlign: "left",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
+                      >
                         <div
                           style={{
                             width: 16,
@@ -1199,7 +964,9 @@ export default function PersonDetail() {
                           {entry.label}
                         </span>
                       </div>
-                      <span style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0 }}>
+                      <span
+                        style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0 }}
+                      >
                         {entry.hours}h ({entry.value}%)
                       </span>
                     </button>
@@ -1209,6 +976,7 @@ export default function PersonDetail() {
             </div>
           )}
 
+          {/* Activity Breakdown */}
           <div
             style={{
               background: "var(--bg-raised)",
@@ -1348,6 +1116,7 @@ export default function PersonDetail() {
           </div>
         </div>
 
+        {/* Active Time chart */}
         <div
           style={{
             background: "var(--bg-raised)",
@@ -1405,10 +1174,14 @@ export default function PersonDetail() {
           </div>
 
           <div style={{ flex: 1, minHeight: 240 }}>
-            <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+            <canvas
+              ref={canvasRef}
+              style={{ width: "100%", height: "100%", display: "block" }}
+            />
           </div>
         </div>
 
+        {/* Recent Work */}
         <div
           style={{
             background: "var(--bg-raised)",
@@ -1439,6 +1212,7 @@ export default function PersonDetail() {
                 gap: 16,
               }}
             >
+              {/* Search */}
               <div style={{ position: "relative", flex: 1, maxWidth: 340 }}>
                 <Search
                   size={14}
@@ -1488,6 +1262,7 @@ export default function PersonDetail() {
                 ) : null}
               </div>
 
+              {/* Work filter tabs */}
               <div
                 style={{
                   display: "flex",
@@ -1523,7 +1298,8 @@ export default function PersonDetail() {
                           workFilter === filter.key
                             ? "var(--text-primary)"
                             : "var(--text-secondary)",
-                        background: workFilter === filter.key ? "var(--bg-overlay)" : "transparent",
+                        background:
+                          workFilter === filter.key ? "var(--bg-overlay)" : "transparent",
                         border: "none",
                         cursor: "pointer",
                       }}
@@ -1537,6 +1313,7 @@ export default function PersonDetail() {
             </div>
           </div>
 
+          {/* Work items */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filteredRecentWork.length === 0 ? (
               <p
@@ -1557,7 +1334,7 @@ export default function PersonDetail() {
                 <button
                   key={`${item.kind}-${item.id}`}
                   onClick={() =>
-                    item.kind === "doc" ? setSelectedDocId(item.id) : setSelectedWork(item)
+                    item.kind === "doc" ? setSelectedDocId(item.id) : setSelectedWork(item as RecentWorkBlockItem)
                   }
                   style={{
                     width: "100%",
@@ -1576,28 +1353,28 @@ export default function PersonDetail() {
                     kind={
                       item.kind === "doc" ? "doc" : item.kind === "meeting" ? "meeting" : "block"
                     }
-                    source={"source" in item ? item.source : undefined}
                   />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
                     >
-                      <span style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>
+                      <span
+                        style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}
+                      >
                         {item.title}
                       </span>
                       {item.kind === "meeting" ? (
                         <span
                           style={{
                             fontSize: 10,
-                            color:
-                              "source" in item && item.source === "granola"
-                                ? "#C8E64A"
-                                : "var(--text-secondary)",
-                            background:
-                              "source" in item && item.source === "granola"
-                                ? "rgba(200, 230, 74, 0.1)"
-                                : "rgba(var(--ui-rgb), 0.06)",
+                            color: "var(--text-secondary)",
+                            background: "rgba(var(--ui-rgb), 0.06)",
                             borderRadius: 999,
                             padding: "3px 8px",
                             textTransform: "uppercase",
@@ -1730,6 +1507,7 @@ export default function PersonDetail() {
         </div>
       </div>
 
+      {/* Drill-down panels */}
       {drillDownMetric && drillDownData && (
         <div className="absolute top-0 right-0 h-full w-[420px] p-4 z-20">
           <DrillDownPanel data={drillDownData} onClose={closeDrillDown} />
