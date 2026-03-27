@@ -507,9 +507,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         if (!s.endedAt) return true; // still active
         const activeMs = Math.max(
           0,
-          new Date(s.endedAt).getTime() -
-            new Date(s.startedAt).getTime() -
-            (s.totalPausedMs || 0)
+          new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime() - (s.totalPausedMs || 0)
         );
         return activeMs >= MIN_SESSION_DURATION_MS;
       })

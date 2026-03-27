@@ -12,7 +12,11 @@ import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw } from "lucide-rea
 import WeekStrip from "./WeekStrip";
 import ActivityBlock from "./ActivityBlock";
 import type { ActivityDay } from "./types";
-import { useCalendarDays, calendarKeys, type CalendarDateRange } from "../../../../hooks/queries/calendar";
+import {
+  useCalendarDays,
+  calendarKeys,
+  type CalendarDateRange,
+} from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
 import { deleteSession } from "../../../../services/monitoringService";
 import { monitoringKeys } from "../../../../hooks/queries/monitoring";
