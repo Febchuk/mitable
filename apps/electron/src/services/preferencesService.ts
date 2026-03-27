@@ -50,6 +50,7 @@ interface PreferencesSchema {
       autoSessionStart: boolean; // Auto-start session on powerMonitor resume
       autoRecap: boolean; // Auto-create recap after session ends
       passiveMonitoringEnabled: boolean; // Auto-detect activity and start/stop sessions
+      onboardingCompleted: boolean; // Whether user has completed onboarding flow
     };
   };
 }
@@ -270,6 +271,21 @@ class PreferencesService {
       passiveMonitoringEnabled: enabled,
     });
     logger.info(` Passive monitoring for user ${userId} set to: ${enabled}`);
+  }
+
+  // Onboarding completed preference (user-scoped)
+  getUserOnboardingCompleted(userId: string): boolean {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    return userPrefs.onboardingCompleted ?? false;
+  }
+
+  setUserOnboardingCompleted(userId: string, completed: boolean): void {
+    const userPrefs = this.store.get(`users.${userId}`, {});
+    this.store.set(`users.${userId}`, {
+      ...userPrefs,
+      onboardingCompleted: completed,
+    });
+    logger.info(` Onboarding completed for user ${userId} set to: ${completed}`);
   }
 
   // Agent feature toggle (user-scoped, default OFF)

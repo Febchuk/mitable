@@ -39,8 +39,9 @@ import ReportsView from "./components/views/admin/ReportsView";
 import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
+import OnboardingPage from "./pages/OnboardingPage";
 
 // Applies stored theme class to <html> on mount and syncs across windows
 function ThemeInitializer() {
@@ -179,14 +180,33 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Default route
+// Default route -- checks onboarding status before redirecting
 function DefaultRoute() {
   const { user } = useUser();
+  const [checked, setChecked] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
-  if (user?.role === "admin") {
-    return <Navigate to="/dashboard" replace />;
+  useEffect(() => {
+    if (!user?.id) return;
+    window.consoleAPI
+      ?.getOnboardingCompleted(user.id)
+      .then((completed) => {
+        setNeedsOnboarding(!completed);
+        setChecked(true);
+      })
+      .catch(() => setChecked(true)); // fallback: skip onboarding if IPC fails
+  }, [user?.id]);
+
+  if (!checked) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
+  if (user?.role === "admin") return <Navigate to="/dashboard" replace />;
   return <Navigate to="/calendar" replace />;
 }
 
@@ -250,6 +270,15 @@ function App() {
                       <Route path="/signup-organization" element={<SignupOrganizationPage />} />
                       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                       <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      {/* Onboarding (full-page, no sidebar) */}
+                      <Route
+                        path="/onboarding"
+                        element={
+                          <ProtectedRoute>
+                            <OnboardingPage />
+                          </ProtectedRoute>
+                        }
+                      />
                       {/* Protected routes */}
                       <Route
                         path="/"

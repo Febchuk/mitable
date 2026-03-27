@@ -53,12 +53,8 @@ export default function LoginPage() {
         organizationId: response.profile.organizationId || "",
       });
 
-      // Redirect based on role
-      if (response.profile.role === "admin") {
-        navigate("/dashboard");
-      } else {
-        navigate("/calendar");
-      }
+      // Redirect to default route (handles onboarding check)
+      navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
