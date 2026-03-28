@@ -40,6 +40,8 @@ import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
 import MeView from "./components/views/employee/MeView";
+import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
+import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -303,6 +305,8 @@ function App() {
                         <Route path="ask" element={<Navigate to="/reports" replace />} />
                         <Route path="reports" element={<ReportsView />} />
                         <Route path="reports/:docId" element={<DocDetail />} />
+                        <Route path="benchmarks" element={<BenchmarksRouter />} />
+                        <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
                         {/* Employee Routes */}
