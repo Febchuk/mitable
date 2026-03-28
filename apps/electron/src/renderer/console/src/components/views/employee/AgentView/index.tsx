@@ -72,7 +72,6 @@ export default function AgentView() {
   const navigate = useNavigate();
   const { chatId } = useParams<{ chatId: string }>();
   const firstName = user?.firstName || user?.name?.split(" ")[0] || "";
-  const [agentAllowed, setAgentAllowed] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -121,18 +120,6 @@ export default function AgentView() {
     setPendingPlan(false);
     setActiveTool(null);
   }, [chatId, chatData]);
-
-  // Route guard: redirect if agent feature is disabled
-  useEffect(() => {
-    if (!user?.id) return;
-    window.consoleAPI?.getAgentEnabled(user.id).then((enabled) => {
-      if (!enabled) {
-        navigate("/calendar", { replace: true });
-      } else {
-        setAgentAllowed(true);
-      }
-    });
-  }, [user?.id, navigate]);
 
   const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
 
@@ -454,8 +441,6 @@ export default function AgentView() {
       sendMessage(input);
     }
   };
-
-  if (agentAllowed === null) return null;
 
   const isEmpty = messages.length === 0 && !chatId;
   const inputDisabled = isLoading || pendingPlan;
