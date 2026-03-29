@@ -1,45 +1,48 @@
 import { useMemo, useState } from "react";
 import { useBenchmarks } from "@/console/src/hooks/queries/benchmarks";
-import type { BenchmarkCategory } from "@/console/src/services/benchmarkService";
+import type { BenchmarkPeriod } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
 
-type CategoryFilter = "all" | BenchmarkCategory;
+type PeriodFilter = "all" | BenchmarkPeriod;
 
-const CATEGORY_FILTERS: { key: CategoryFilter; label: string }[] = [
+const PERIOD_FILTERS: { key: PeriodFilter; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "productivity", label: "Productivity" },
-  { key: "collaboration", label: "Collaboration" },
-  { key: "growth", label: "Growth" },
-  { key: "quality", label: "Quality" },
+  { key: "weekly", label: "Weekly" },
+  { key: "monthly", label: "Monthly" },
+  { key: "quarterly", label: "Quarterly" },
 ];
 
 const SPINNER_COLOR = "#82C0CC";
 
 export default function BenchmarksView() {
   const { data: benchmarks = [], isLoading } = useBenchmarks();
-  const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all");
+  const [activePeriod, setActivePeriod] = useState<PeriodFilter>("all");
 
   const filtered = useMemo(() => {
-    if (activeCategory === "all") return benchmarks;
-    return benchmarks.filter((b) => b.category === activeCategory);
-  }, [benchmarks, activeCategory]);
+    if (activePeriod === "all") return benchmarks;
+    return benchmarks.filter((b) => b.period === activePeriod);
+  }, [benchmarks, activePeriod]);
 
-  const activeBenchmarks = benchmarks.filter((b) => b.isActive).length;
+  // Score: avg completion across filtered benchmarks
+  const score = useMemo(() => {
+    if (!filtered.length) return 0;
+    const total = filtered.reduce((sum, b) => sum + b.avgProgress, 0);
+    return Math.round(total / filtered.length);
+  }, [filtered]);
 
-  const totalAssigned = useMemo(() => {
-    const ids = new Set<string>();
-    for (const b of benchmarks) {
-      // assignedCount is a count, not IDs — sum of unique assignments as best approximation
-      if (b.assignedCount > 0) ids.add(`${b.id}`);
-    }
-    return benchmarks.reduce((sum, b) => sum + b.assignedCount, 0);
-  }, [benchmarks]);
-
-  const avgCompletion = useMemo(() => {
-    if (!benchmarks.length) return 0;
-    const total = benchmarks.reduce((sum, b) => sum + b.avgProgress, 0);
-    return Math.round(total / benchmarks.length);
-  }, [benchmarks]);
+  // Trend: net avg delta across filtered benchmarks
+  const trendLabel = useMemo(() => {
+    if (!filtered.length) return "0%";
+    const avgDelta = Math.round(
+      filtered.reduce((sum, b) => {
+        if (b.trend === "improving") return sum + b.trendDelta;
+        if (b.trend === "declining") return sum - b.trendDelta;
+        return sum;
+      }, 0) / filtered.length
+    );
+    if (avgDelta > 0) return `+${avgDelta}%`;
+    return `${avgDelta}%`;
+  }, [filtered]);
 
   return (
     <div
@@ -54,7 +57,7 @@ export default function BenchmarksView() {
         boxSizing: "border-box",
       }}
     >
-      {/* Header */}
+      {/* Header row: title + period toggle */}
       <div
         style={{
           display: "flex",
@@ -77,7 +80,6 @@ export default function BenchmarksView() {
           Benchmarks
         </h1>
 
-        {/* Category filter toggle bar */}
         <div
           style={{
             display: "flex",
@@ -87,21 +89,21 @@ export default function BenchmarksView() {
             padding: 3,
           }}
         >
-          {CATEGORY_FILTERS.map((f) => (
+          {PERIOD_FILTERS.map((f) => (
             <button
               key={f.key}
-              onClick={() => setActiveCategory(f.key)}
+              onClick={() => setActivePeriod(f.key)}
               style={{
                 padding: "4px 12px",
                 borderRadius: 5,
                 fontSize: 11,
                 fontFamily: "var(--font-sans)",
                 color:
-                  activeCategory === f.key
+                  activePeriod === f.key
                     ? "var(--text-primary)"
                     : "var(--text-tertiary)",
                 background:
-                  activeCategory === f.key
+                  activePeriod === f.key
                     ? "rgba(255,255,255,0.08)"
                     : "transparent",
                 border: "none",
@@ -115,51 +117,59 @@ export default function BenchmarksView() {
         </div>
       </div>
 
-      {/* Stats row */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        {[
-          { label: "Active Benchmarks", value: activeBenchmarks },
-          { label: "People Assigned", value: totalAssigned },
-          { label: "Avg Completion", value: `${avgCompletion}%` },
-        ].map(({ label, value }) => (
-          <div
-            key={label}
+      {/* Inline metrics row — like dashboard */}
+      <div style={{ display: "flex", gap: 48, alignItems: "baseline" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span
             style={{
-              background: "var(--bg-raised)",
-              border: "var(--border-hairline)",
-              borderRadius: 12,
-              padding: "22px 24px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              flex: "1 1 160px",
+              fontSize: 10,
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.09em",
+              fontFamily: "var(--font-sans)",
             }}
           >
-            <span
-              style={{
-                fontSize: 10,
-                color: "var(--text-tertiary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.09em",
-                fontFamily: "var(--font-sans)",
-              }}
-            >
-              {label}
-            </span>
-            <span
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: 48,
-                fontWeight: 300,
-                color: "var(--text-primary)",
-                letterSpacing: -2,
-                lineHeight: 1,
-              }}
-            >
-              {value}
-            </span>
-          </div>
-        ))}
+            Score
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 48,
+              fontWeight: 300,
+              color: "var(--text-primary)",
+              letterSpacing: -2,
+              lineHeight: 1,
+            }}
+          >
+            {score}%
+          </span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.09em",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            Trend
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 48,
+              fontWeight: 300,
+              color: "var(--text-primary)",
+              letterSpacing: -2,
+              lineHeight: 1,
+            }}
+          >
+            {trendLabel}
+          </span>
+        </div>
       </div>
 
       {/* Benchmark grid */}
@@ -189,9 +199,9 @@ export default function BenchmarksView() {
             color: "var(--text-secondary)",
           }}
         >
-          {activeCategory === "all"
+          {activePeriod === "all"
             ? "No benchmarks found."
-            : `No ${activeCategory} benchmarks found.`}
+            : `No ${activePeriod} benchmarks found.`}
         </div>
       ) : (
         <div

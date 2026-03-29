@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMyBenchmarkDetail } from "@/console/src/hooks/queries/benchmarks";
+import { usePersonBenchmarkDetail } from "@/console/src/hooks/queries/benchmarks";
 import type { BenchmarkSnapshot } from "@/console/src/services/benchmarkService";
 
-// ── Chart drawing ─────────────────────────────────────────────
+// ── Chart ─────────────────────────────────────────────────────
 
 function abbreviateDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -15,28 +15,9 @@ function getCssColor(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-function niceSteps(maxVal: number, targetSteps: number): number[] {
-  const rough = maxVal / targetSteps;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
-  const residual = rough / magnitude;
-  let nice: number;
-  if (residual <= 1.5) nice = 1;
-  else if (residual <= 3) nice = 2;
-  else if (residual <= 7) nice = 5;
-  else nice = 10;
-  const step = nice * magnitude;
-  const steps: number[] = [];
-  for (let v = 0; v <= maxVal; v += step) {
-    steps.push(Math.round(v * 100) / 100);
-  }
-  if (steps[steps.length - 1] < maxVal) steps.push(steps[steps.length - 1] + step);
-  return steps;
-}
-
 function drawBarChart(
   canvas: HTMLCanvasElement,
   snapshots: BenchmarkSnapshot[],
-  targetValue: number,
 ): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -49,11 +30,9 @@ function drawBarChart(
 
   const W = rect.width;
   const H = rect.height;
-
   ctx.clearRect(0, 0, W, H);
 
   const textTertiary = getCssColor("--text-tertiary", "#6B665C");
-  const textFaint = getCssColor("--text-faint", "#4A4640");
   const barColor = "#B8DDE4";
 
   if (!snapshots.length) {
@@ -80,25 +59,23 @@ function drawBarChart(
   const barW = Math.min(Math.max(6, barGroupW * 0.4), 20);
   const barOffset = (barGroupW - barW) / 2;
 
-  // Horizontal grid lines + Y-axis labels
+  // Grid lines + Y labels
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   ctx.font = "11px Inter, sans-serif";
   for (const step of steps) {
     const y = PADDING_TOP + chartH - (step / maxValue) * chartH;
-    // Grid line
-    ctx.strokeStyle = `rgba(236, 232, 224, 0.06)`;
+    ctx.strokeStyle = "rgba(236, 232, 224, 0.06)";
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(PADDING_LEFT, y);
     ctx.lineTo(W - PADDING_RIGHT, y);
     ctx.stroke();
-    // Label
     ctx.fillStyle = textTertiary;
-    ctx.fillText(String(Math.round(step)), PADDING_LEFT - 10, y);
+    ctx.fillText(String(step), PADDING_LEFT - 10, y);
   }
 
-  // Draw bars
+  // Bars
   snapshots.forEach((snap, i) => {
     const barH = Math.max(2, (snap.value / maxValue) * chartH);
     const x = PADDING_LEFT + i * barGroupW + barOffset;
@@ -109,19 +86,7 @@ function drawBarChart(
     ctx.fill();
   });
 
-  // Dashed target line
-  const targetY = PADDING_TOP + chartH - (targetValue / maxValue) * chartH;
-  ctx.save();
-  ctx.setLineDash([6, 4]);
-  ctx.strokeStyle = textFaint;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(PADDING_LEFT, targetY);
-  ctx.lineTo(W - PADDING_RIGHT, targetY);
-  ctx.stroke();
-  ctx.restore();
-
-  // X-axis labels
+  // X labels
   ctx.fillStyle = textTertiary;
   ctx.font = "11px Inter, sans-serif";
   ctx.textAlign = "center";
@@ -132,25 +97,30 @@ function drawBarChart(
   });
 }
 
+// ── Helper ────────────────────────────────────────────────────
+
+function getInitial(name: string): string {
+  return (name?.charAt(0) || "U").toUpperCase();
+}
+
 // ── Component ─────────────────────────────────────────────────
 
-export function BenchmarkDetailView() {
-  const { id } = useParams<{ id: string }>();
+export default function PersonBenchmarkView() {
+  const { id: benchmarkId, userId } = useParams<{ id: string; userId: string }>();
   const navigate = useNavigate();
-  const { data: detail, isLoading } = useMyBenchmarkDetail(id ?? "");
+  const { data: detail, isLoading } = usePersonBenchmarkDetail(benchmarkId, userId);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!detail || !canvasRef.current) return;
-    drawBarChart(canvasRef.current, detail.history, detail.targetValue);
+    drawBarChart(canvasRef.current, detail.history);
   }, [detail]);
 
   if (isLoading) {
     return (
       <div
         style={{
-          height: "100vh",
-          overflowY: "auto",
+          height: "100%",
           padding: "28px 0",
           color: "var(--text-tertiary)",
           fontSize: 13,
@@ -186,7 +156,7 @@ export function BenchmarkDetailView() {
     >
       {/* Back link */}
       <button
-        onClick={() => navigate("/benchmarks")}
+        onClick={() => navigate(`/benchmarks/${benchmarkId}`)}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -209,37 +179,62 @@ export function BenchmarkDetailView() {
         }}
       >
         <ArrowLeft size={14} />
-        My Benchmarks
+        {detail.benchmarkName}
       </button>
 
-      {/* Name */}
-      <h1
-        style={{
-          fontFamily: "var(--font-serif)",
-          fontSize: 26,
-          fontWeight: 400,
-          color: "var(--text-primary)",
-          letterSpacing: "-0.3px",
-          margin: 0,
-        }}
-      >
-        {detail.name}
-      </h1>
-
-      {/* Description */}
-      {detail.description && (
-        <p
+      {/* Person header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div
           style={{
-            fontSize: 13,
-            color: "var(--text-secondary)",
-            margin: 0,
-            lineHeight: 1.6,
-            fontFamily: "var(--font-sans)",
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            background: "rgba(var(--ui-rgb), 0.1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 15,
+            fontWeight: 500,
+            color: "var(--text-primary)",
+            flexShrink: 0,
+            overflow: "hidden",
           }}
         >
-          {detail.description}
-        </p>
-      )}
+          {detail.userAvatarUrl ? (
+            <img
+              src={detail.userAvatarUrl}
+              alt={detail.userName}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            getInitial(detail.userName)
+          )}
+        </div>
+        <div>
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 26,
+              fontWeight: 400,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.3px",
+              margin: 0,
+            }}
+          >
+            {detail.userName}
+          </h1>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--text-tertiary)",
+              marginTop: 4,
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            {detail.userEmail}
+          </div>
+        </div>
+      </div>
 
       {/* Inline metrics — Score + Trend */}
       <div style={{ display: "flex", gap: 48, alignItems: "baseline" }}>
@@ -301,7 +296,7 @@ export function BenchmarkDetailView() {
         </div>
       </div>
 
-      {/* Historical trend chart */}
+      {/* Chart */}
       <div
         style={{
           background: "var(--bg-raised)",

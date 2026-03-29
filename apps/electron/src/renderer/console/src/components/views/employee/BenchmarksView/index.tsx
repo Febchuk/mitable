@@ -1,39 +1,49 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMyBenchmarks } from "@/console/src/hooks/queries/benchmarks";
-import type { MyBenchmark } from "@/console/src/services/benchmarkService";
+import type { MyBenchmark, BenchmarkPeriod } from "@/console/src/services/benchmarkService";
 import { BenchmarkProgressCard } from "./BenchmarkProgressCard";
 
-// ── Types ─────────────────────────────────────────────────────
-
-type PeriodFilter = "weekly" | "monthly" | "all";
+type PeriodFilter = "all" | BenchmarkPeriod;
 
 const PERIOD_FILTERS: { key: PeriodFilter; label: string }[] = [
-  { key: "weekly", label: "This Week" },
-  { key: "monthly", label: "This Month" },
-  { key: "all", label: "All Time" },
+  { key: "all", label: "All" },
+  { key: "weekly", label: "Weekly" },
+  { key: "monthly", label: "Monthly" },
+  { key: "quarterly", label: "Quarterly" },
 ];
-
-// ── Helpers ───────────────────────────────────────────────────
-
-function filterByPeriod(benchmarks: MyBenchmark[], period: PeriodFilter): MyBenchmark[] {
-  if (period === "all") return benchmarks;
-  return benchmarks.filter((b) => b.period === period);
-}
-
-// ── Component ─────────────────────────────────────────────────
 
 export default function BenchmarksView() {
   const navigate = useNavigate();
-  const [period, setPeriod] = useState<PeriodFilter>("all");
+  const [activePeriod, setActivePeriod] = useState<PeriodFilter>("all");
   const { data: benchmarks = [], isLoading } = useMyBenchmarks();
 
-  const visible = filterByPeriod(benchmarks, period);
+  const filtered = useMemo(() => {
+    if (activePeriod === "all") return benchmarks;
+    return benchmarks.filter((b) => b.period === activePeriod);
+  }, [benchmarks, activePeriod]);
 
-  const onTrack = visible.filter((b) => b.progress >= 80).length;
-  const inProgress = visible.filter((b) => b.progress >= 50 && b.progress < 80).length;
-  const needsAttention = visible.filter((b) => b.progress < 50).length;
+  // Score: avg progress across filtered
+  const score = useMemo(() => {
+    if (!filtered.length) return 0;
+    const total = filtered.reduce((sum, b) => sum + b.progress, 0);
+    return Math.round(total / filtered.length);
+  }, [filtered]);
+
+  // Trend: net avg delta across filtered
+  const trendLabel = useMemo(() => {
+    if (!filtered.length) return "0%";
+    const avgDelta = Math.round(
+      filtered.reduce((sum, b) => {
+        if (b.trend === "improving") return sum + b.trendDelta;
+        if (b.trend === "declining") return sum - b.trendDelta;
+        return sum;
+      }, 0) / filtered.length
+    );
+    if (avgDelta > 0) return `+${avgDelta}%`;
+    return `${avgDelta}%`;
+  }, [filtered]);
 
   return (
     <div
@@ -41,15 +51,19 @@ export default function BenchmarksView() {
         height: "100%",
         overflowY: "auto",
         padding: "28px 0",
+        display: "flex",
+        flexDirection: "column",
+        gap: 24,
       }}
     >
-      {/* Header */}
+      {/* Header: title + period toggle */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 24,
+          gap: 16,
+          flexWrap: "wrap",
         }}
       >
         <h1
@@ -65,11 +79,10 @@ export default function BenchmarksView() {
           My Benchmarks
         </h1>
 
-        {/* Period toggle */}
         <div
           style={{
             display: "flex",
-            gap: 1,
+            gap: 4,
             background: "rgba(var(--ui-rgb), 0.05)",
             borderRadius: 7,
             padding: 3,
@@ -78,14 +91,20 @@ export default function BenchmarksView() {
           {PERIOD_FILTERS.map((f) => (
             <button
               key={f.key}
-              onClick={() => setPeriod(f.key)}
+              onClick={() => setActivePeriod(f.key)}
               style={{
                 padding: "4px 12px",
                 borderRadius: 5,
                 fontSize: 11,
                 fontFamily: "var(--font-sans)",
-                color: period === f.key ? "var(--text-primary)" : "var(--text-tertiary)",
-                background: period === f.key ? "rgba(255,255,255,0.08)" : "transparent",
+                color:
+                  activePeriod === f.key
+                    ? "var(--text-primary)"
+                    : "var(--text-tertiary)",
+                background:
+                  activePeriod === f.key
+                    ? "rgba(255,255,255,0.08)"
+                    : "transparent",
                 border: "none",
                 cursor: "pointer",
                 transition: "background 0.1s, color 0.1s",
@@ -97,61 +116,62 @@ export default function BenchmarksView() {
         </div>
       </div>
 
-      {/* Summary stats row */}
-      {!isLoading && visible.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          {[
-            { label: "On Track", value: onTrack },
-            { label: "In Progress", value: inProgress },
-            { label: "Needs Attention", value: needsAttention },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              style={{
-                flex: 1,
-                background: "var(--bg-raised)",
-                border: "1px solid var(--border-hairline)",
-                borderRadius: 12,
-                padding: "16px 20px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-serif)",
-                  fontSize: 28,
-                  fontWeight: 400,
-                  color: "var(--text-primary)",
-                  lineHeight: 1,
-                }}
-              >
-                {value}
-              </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontFamily: "var(--font-sans)",
-                  color: "var(--text-tertiary)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.09em",
-                }}
-              >
-                {label}
-              </span>
-            </div>
-          ))}
+      {/* Inline metrics — Score + Trend */}
+      <div style={{ display: "flex", gap: 48, alignItems: "baseline" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.09em",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            Score
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 48,
+              fontWeight: 300,
+              color: "var(--text-primary)",
+              letterSpacing: -2,
+              lineHeight: 1,
+            }}
+          >
+            {score}%
+          </span>
         </div>
-      )}
 
-      {/* Loading state */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.09em",
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            Trend
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 48,
+              fontWeight: 300,
+              color: "var(--text-primary)",
+              letterSpacing: -2,
+              lineHeight: 1,
+            }}
+          >
+            {trendLabel}
+          </span>
+        </div>
+      </div>
+
+      {/* Loading */}
       {isLoading && (
         <div
           style={{
@@ -167,7 +187,7 @@ export default function BenchmarksView() {
       )}
 
       {/* Empty state */}
-      {!isLoading && visible.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div
           style={{
             textAlign: "center",
@@ -187,7 +207,9 @@ export default function BenchmarksView() {
               margin: 0,
             }}
           >
-            No benchmarks assigned yet
+            {activePeriod === "all"
+              ? "No benchmarks assigned yet"
+              : `No ${activePeriod} benchmarks assigned`}
           </p>
           <p
             style={{
@@ -202,10 +224,10 @@ export default function BenchmarksView() {
         </div>
       )}
 
-      {/* Benchmark list */}
-      {!isLoading && visible.length > 0 && (
+      {/* Benchmark cards */}
+      {!isLoading && filtered.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {visible.map((b) => (
+          {filtered.map((b) => (
             <BenchmarkProgressCard
               key={b.id}
               benchmark={b}

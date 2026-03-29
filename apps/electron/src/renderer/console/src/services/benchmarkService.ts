@@ -183,6 +183,43 @@ export async function updateAssignment(
   }
 }
 
+export interface PersonBenchmarkDetail {
+  benchmarkId: string;
+  benchmarkName: string;
+  benchmarkDescription: string;
+  benchmarkCategory: BenchmarkCategory;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAvatarUrl: string | null;
+  currentValue: number;
+  targetValue: number;
+  unit: string;
+  progress: number;
+  percentile: PercentileTier;
+  trend: TrendDirection;
+  trendDelta: number;
+  period: BenchmarkPeriod;
+  history: BenchmarkSnapshot[];
+  suggestions: AISuggestion[];
+  accomplishments: Accomplishment[];
+}
+
+export async function fetchPersonBenchmarkDetail(
+  benchmarkId: string,
+  userId: string
+): Promise<PersonBenchmarkDetail> {
+  try {
+    const response = await apiRequest<{ detail: PersonBenchmarkDetail }>(
+      `/admin/benchmarks/${benchmarkId}/person/${userId}`
+    );
+    return response.detail;
+  } catch (error) {
+    logger.error("Error fetching person benchmark detail:", error);
+    throw error;
+  }
+}
+
 // ── Employee API ───────────────────────────────────────────
 
 export async function fetchMyBenchmarks(): Promise<MyBenchmark[]> {

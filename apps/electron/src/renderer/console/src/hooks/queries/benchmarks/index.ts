@@ -9,3 +9,4 @@ export {
 } from "./useBenchmarkMutations";
 export { useMyBenchmarks } from "./useMyBenchmarks";
 export { useMyBenchmarkDetail } from "./useMyBenchmarkDetail";
+export { usePersonBenchmarkDetail } from "./usePersonBenchmarkDetail";

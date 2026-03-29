@@ -12,6 +12,7 @@ import type {
   BenchmarkDetail,
   MyBenchmark,
   MyBenchmarkDetail,
+  PersonBenchmarkDetail,
 } from "../../../services/benchmarkService";
 
 // ── Admin: benchmark list ───────────────────────────────────
@@ -562,4 +563,58 @@ for (const mb of MOCK_MY_BENCHMARKS) {
       ],
     };
   }
+}
+
+// ── Admin: person benchmark detail (generated from existing mocks) ──
+
+export function getMockPersonBenchmarkDetail(
+  benchmarkId: string,
+  userId: string
+): PersonBenchmarkDetail | null {
+  const bmDetail = MOCK_BENCHMARK_DETAILS[benchmarkId];
+  if (!bmDetail) return null;
+
+  const assignment = bmDetail.assignments.find((a) => a.userId === userId);
+  if (!assignment) return null;
+
+  const bm = MOCK_BENCHMARKS.find((b) => b.id === benchmarkId);
+  if (!bm) return null;
+
+  return {
+    benchmarkId: bm.id,
+    benchmarkName: bm.name,
+    benchmarkDescription: bm.description,
+    benchmarkCategory: bm.category,
+    userId: assignment.userId,
+    userName: assignment.userName,
+    userEmail: assignment.userEmail,
+    userAvatarUrl: assignment.userAvatarUrl,
+    currentValue: assignment.currentValue,
+    targetValue: assignment.targetValue,
+    unit: bm.unit,
+    progress: assignment.progress,
+    percentile: assignment.percentile,
+    trend: assignment.trend,
+    trendDelta: assignment.trendDelta,
+    period: bm.period,
+    history: Array.from({ length: 8 }, (_, i) => ({
+      date: new Date(2026, 1, 2 + i * 7).toISOString().slice(0, 10),
+      value: Math.min(100, Math.round(assignment.progress * (0.5 + i * 0.07) + Math.random() * 8)),
+      target: 100,
+    })),
+    suggestions: [
+      {
+        id: `ps-${benchmarkId}-${userId}-1`,
+        text: `${assignment.userName} is ${assignment.trend === "improving" ? "on an upward trajectory" : "holding steady"} on ${bm.name}. ${assignment.progress >= 80 ? "Great work — keep it up!" : "A few more consistent weeks will make a big difference."}`,
+        category: "encouragement",
+      },
+    ],
+    accomplishments: [
+      {
+        id: `pa-${benchmarkId}-${userId}-1`,
+        text: `Current score: ${Math.round(assignment.progress)}/100 (${assignment.percentile.replace("_", " ")})`,
+        date: "2026-03-26",
+      },
+    ],
+  };
 }
