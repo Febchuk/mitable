@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Manrope } from "next/font/google";
+import { DM_Sans, Inter, JetBrains_Mono, Manrope, Newsreader } from "next/font/google";
 import { RouteProvider } from "@/providers/router-provider";
 import { Theme } from "@/providers/theme";
 import "@/styles/globals.css";
+import "@/styles/landing.css";
 import { cx } from "@/utils/cx";
 
 const inter = Inter({
@@ -24,15 +25,30 @@ const jetbrainsMono = JetBrains_Mono({
     variable: "--font-jetbrains",
 });
 
+const newsreader = Newsreader({
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-newsreader",
+    weight: ["300", "400", "500", "600"],
+    style: ["normal", "italic"],
+});
+
+const dmSans = DM_Sans({
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-dm-sans",
+    weight: ["300", "400", "500", "600"],
+});
+
 export const metadata: Metadata = {
-    title: "Mitable - Your work, documented automatically",
+    title: "Mitable — Performance, measured.",
     description:
-        "Mitable watches your screen during work sessions, generates AI summaries, creates process docs, and builds smart to-do lists. Never forget what you worked on.",
+        "Knowing if your team is spending their time on the right things is the hardest part of management. Mitable makes it simple.",
 };
 
 export const viewport: Viewport = {
-    themeColor: "#8A61F7",
-    colorScheme: "light dark",
+    themeColor: "#1A1916",
+    colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -42,7 +58,16 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={cx(inter.variable, manrope.variable, jetbrainsMono.variable, "bg-primary antialiased")}>
+            <body
+                className={cx(
+                    inter.variable,
+                    manrope.variable,
+                    jetbrainsMono.variable,
+                    newsreader.variable,
+                    dmSans.variable,
+                    "bg-primary antialiased",
+                )}
+            >
                 <RouteProvider>
                     <Theme>{children}</Theme>
                 </RouteProvider>

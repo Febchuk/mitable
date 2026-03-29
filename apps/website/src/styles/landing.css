@@ -1,0 +1,204 @@
+/* ═══════════════════════════════════════════
+   MITABLE LANDING PAGE — Design Tokens
+   Warm dark palette with teal accent.
+   Fonts: Newsreader (display), DM Sans (body)
+   ═══════════════════════════════════════════ */
+
+:root {
+    --l-bg: #1A1916;
+    --l-bg-raised: #211F1B;
+    --l-bg-overlay: #2A2824;
+    --l-bg-muted: #33312B;
+
+    --l-accent: #82C0CC;
+    --l-accent-dark: #3A7A87;
+    --l-accent-muted: rgba(130, 192, 204, 0.12);
+    --l-accent-dim: rgba(130, 192, 204, 0.06);
+
+    --l-text: #ECE8E0;
+    --l-text-secondary: #A09A8E;
+    --l-text-muted: #706B60;
+    --l-text-faint: #4A4640;
+
+    --l-border: #33312B;
+    --l-border-subtle: #2A2824;
+    --l-ui-rgb: 236, 232, 224;
+
+    --l-serif: var(--font-newsreader, "Newsreader"), Georgia, serif;
+    --l-sans: var(--font-dm-sans, "DM Sans"), system-ui, sans-serif;
+
+    /* Electron token aliases so production components can render faithfully */
+    --bg-base: var(--l-bg);
+    --bg-raised: var(--l-bg-raised);
+    --bg-overlay: var(--l-bg-overlay);
+    --bg-muted: var(--l-bg-muted);
+    --text-primary: var(--l-text);
+    --text-secondary: var(--l-text-secondary);
+    --text-tertiary: var(--l-text-muted);
+    --text-faint: var(--l-text-faint);
+    --mi-accent: var(--l-accent);
+    --mi-accent-rgb: 130, 192, 204;
+    --mi-accent-dark: #3A7A87;
+    --status-success: #3A9B6B;
+    --status-success-rgb: 58, 155, 107;
+    --status-error: #E87474;
+    --status-error-rgb: 232, 116, 116;
+    --ui-rgb: var(--l-ui-rgb);
+    --border-hairline: 0.5px solid rgba(var(--ui-rgb), 0.08);
+    --border-subtle: 1px solid rgba(var(--ui-rgb), 0.06);
+    --font-serif: var(--l-serif);
+    --font-sans: var(--l-sans);
+    --font-mono: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, monospace;
+}
+
+/* ── Landing page base ── */
+.landing {
+    font-family: var(--l-sans);
+    background: var(--l-bg);
+    color: var(--l-text);
+    -webkit-font-smoothing: antialiased;
+}
+
+.landing * {
+    box-sizing: border-box;
+}
+
+/* ── Scroll reveal ── */
+.l-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.l-reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.l-reveal-d1 { transition-delay: 0.08s; }
+.l-reveal-d2 { transition-delay: 0.16s; }
+.l-reveal-d3 { transition-delay: 0.24s; }
+
+/* ── macOS window shell (always dark) ── */
+.mac-window {
+    background: var(--l-bg);
+    border-radius: 12px;
+    border: 1px solid var(--l-border);
+    overflow: hidden;
+    box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.45),
+        0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.mac-titlebar {
+    display: flex;
+    align-items: center;
+    padding: 11px 14px;
+    gap: 7px;
+    background: var(--l-bg-raised);
+    border-bottom: 1px solid var(--l-border);
+}
+
+.mac-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+.mac-dot-r { background: #ff5f57; }
+.mac-dot-y { background: #febc2e; }
+.mac-dot-g { background: #28c840; }
+
+/* ── Mock sidebar ── */
+.mock-sidebar {
+    width: 154px;
+    background: var(--l-bg-raised);
+    border-right: 1px solid var(--l-border);
+    padding: 14px 0;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.mock-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--l-text-secondary);
+    cursor: default;
+}
+.mock-sidebar-item.active {
+    background: var(--l-accent-muted);
+    color: var(--l-accent);
+}
+
+/* ── Screenshot frame with accent padding ── */
+.screenshot-frame {
+    background: rgba(130, 192, 204, 0.04);
+    border: 1px solid rgba(130, 192, 204, 0.08);
+    border-radius: 16px;
+    padding: 16px;
+    transition: border-color 0.3s;
+}
+.screenshot-frame:hover {
+    border-color: rgba(130, 192, 204, 0.15);
+}
+.screenshot-frame img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    display: block;
+}
+
+/* ── Activity bar animation ── */
+.act-fill {
+    height: 100%;
+    background: var(--l-accent);
+    border-radius: 2px;
+    width: 0;
+    transition: width 1.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Logo strip ── */
+.logo-strip img {
+    height: 24px;
+    width: auto;
+    filter: brightness(0) invert(1);
+    opacity: 0.4;
+    transition: opacity 0.3s;
+}
+.logo-strip img:hover {
+    opacity: 0.7;
+}
+
+/* ── Spinner ── */
+@keyframes l-spin {
+    to { transform: rotate(360deg); }
+}
+.l-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--l-border);
+    border-top-color: var(--l-accent);
+    border-radius: 50%;
+    animation: l-spin 1s linear infinite;
+}
+
+/* ── Responsive ── */
+@media (max-width: 960px) {
+    .mock-sidebar { width: 120px; }
+
+    .l-feature-section {
+        grid-template-columns: 1fr !important;
+        gap: 36px !important;
+        padding: 60px 24px !important;
+    }
+
+    .l-cards-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .l-hero-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
