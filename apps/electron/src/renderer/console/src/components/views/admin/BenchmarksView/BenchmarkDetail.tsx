@@ -367,7 +367,7 @@ export function BenchmarkDetail() {
               lineHeight: 1,
             }}
           >
-            {Math.round(benchmark.teamAverage)}%
+            {Math.round(benchmark.teamAverage)}
           </span>
         </div>
 

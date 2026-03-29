@@ -260,7 +260,7 @@ export default function PersonBenchmarkView() {
               lineHeight: 1,
             }}
           >
-            {Math.round(detail.progress)}%
+            {Math.round(detail.progress)}
           </span>
         </div>
 

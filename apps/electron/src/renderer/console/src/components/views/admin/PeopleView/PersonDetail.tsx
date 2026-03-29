@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Search, Video, X, Zap, Monitor } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  Search,
+  Video,
+  X,
+  Zap,
+  Monitor,
+} from "lucide-react";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
 import { apiRequest } from "@/console/src/services/api";
@@ -65,6 +77,73 @@ const CUSTOMER_COLORS = [
 const BREAKDOWN_BAR_COLOR = "var(--mi-accent)";
 
 const RECENT_WORK_PAGE_SIZE = 10;
+
+const BMR_SIZE = 32;
+const BMR_STROKE = 3;
+const BMR_R = (BMR_SIZE - BMR_STROKE) / 2;
+const BMR_C = 2 * Math.PI * BMR_R;
+
+function BenchmarkMiniRing({ progress }: { progress: number }) {
+  const clamped = Math.min(100, Math.max(0, progress));
+  const offset = BMR_C - (clamped / 100) * BMR_C;
+  let strokeColor: string;
+  if (clamped >= 70) {
+    const l = 52 - ((clamped - 70) / 30) * 12;
+    strokeColor = `hsl(150, 45%, ${l}%)`;
+  } else if (clamped >= 40) {
+    const l = 62 - ((70 - clamped) / 30) * 10;
+    strokeColor = `hsl(28, 55%, ${l}%)`;
+  } else {
+    const l = 55 - ((40 - clamped) / 40) * 12;
+    strokeColor = `hsl(0, 55%, ${l}%)`;
+  }
+  return (
+    <div style={{ position: "relative", width: BMR_SIZE, height: BMR_SIZE, flexShrink: 0 }}>
+      <svg width={BMR_SIZE} height={BMR_SIZE} style={{ transform: "rotate(-90deg)" }}>
+        <circle
+          cx={BMR_SIZE / 2}
+          cy={BMR_SIZE / 2}
+          r={BMR_R}
+          fill="none"
+          stroke="rgba(236,232,224,0.06)"
+          strokeWidth={BMR_STROKE}
+        />
+        <circle
+          cx={BMR_SIZE / 2}
+          cy={BMR_SIZE / 2}
+          r={BMR_R}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={BMR_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={BMR_C}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.6s ease" }}
+        />
+      </svg>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 11,
+            color: "var(--text-primary)",
+            lineHeight: 1,
+          }}
+        >
+          {Math.round(clamped)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 type GranolaBlock = {
   id: string;
@@ -592,6 +671,17 @@ export default function PersonDetail() {
     enabled: !!id,
   });
 
+  const strengths = [
+    { name: "Deep Focus Work", progress: 92, benchmarkId: "bm-deep-focus" },
+    { name: "Consistent Engagement", progress: 88, benchmarkId: "bm-engagement" },
+    { name: "Meeting Efficiency", progress: 85, benchmarkId: "bm-meeting-eff" },
+  ];
+  const toImprove = [
+    { name: "Cross-functional Collaboration", progress: 52, benchmarkId: "bm-cross-collab" },
+    { name: "AI Adoption & Tool Usage", progress: 58, benchmarkId: "bm-ai-adoption" },
+    { name: "Mentorship & Development", progress: 62, benchmarkId: "bm-mentorship" },
+  ];
+
   const handleDrillDown = (label: string) => {
     const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
     if (LABEL_TO_METRIC[label]) {
@@ -1085,9 +1175,8 @@ export default function PersonDetail() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: showCustomerWork
-              ? "minmax(0, 1fr) minmax(0, 1fr)"
-              : "minmax(0, 1fr)",
+            direction: "ltr",
+            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
             gap: 16,
           }}
         >
@@ -1346,6 +1435,110 @@ export default function PersonDetail() {
               })}
             </div>
           </div>
+
+          {/* Strengths */}
+          {strengths.length > 0 && (
+            <div
+              style={{
+                background: "var(--bg-raised)",
+                border: "var(--border-hairline)",
+                borderRadius: 12,
+                padding: "22px 24px",
+                alignSelf: "start",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.09em",
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-sans)",
+                  display: "block",
+                  marginBottom: 14,
+                }}
+              >
+                Strengths
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {strengths.map((s) => (
+                  <div
+                    key={s.benchmarkId}
+                    onClick={() => navigate(`/benchmarks/${s.benchmarkId}/person/${id}`)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      cursor: "pointer",
+                      padding: "10px 0",
+                      borderBottom: "var(--border-hairline)",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <BenchmarkMiniRing progress={s.progress} />
+                    <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>{s.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Opportunities */}
+          {toImprove.length > 0 && (
+            <div
+              style={{
+                background: "var(--bg-raised)",
+                border: "var(--border-hairline)",
+                borderRadius: 12,
+                padding: "22px 24px",
+                alignSelf: "start",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.09em",
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-sans)",
+                  display: "block",
+                  marginBottom: 14,
+                }}
+              >
+                Opportunities
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {toImprove.map((s) => (
+                  <div
+                    key={s.benchmarkId}
+                    onClick={() => navigate(`/benchmarks/${s.benchmarkId}/person/${id}`)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      cursor: "pointer",
+                      padding: "10px 0",
+                      borderBottom: "var(--border-hairline)",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <BenchmarkMiniRing progress={s.progress} />
+                    <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>
+                      {s.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div
@@ -1679,8 +1872,8 @@ export default function PersonDetail() {
             >
               <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                 {workPage * RECENT_WORK_PAGE_SIZE + 1}–
-                {Math.min((workPage + 1) * RECENT_WORK_PAGE_SIZE, filteredRecentWork.length)}
-                {" "}of {filteredRecentWork.length}
+                {Math.min((workPage + 1) * RECENT_WORK_PAGE_SIZE, filteredRecentWork.length)} of{" "}
+                {filteredRecentWork.length}
               </span>
               <div style={{ display: "flex", gap: 4 }}>
                 <button

@@ -140,7 +140,7 @@ export default function BenchmarksView() {
               lineHeight: 1,
             }}
           >
-            {score}%
+            {score}
           </span>
         </div>
 
