@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CTASection, FeaturesSection, Footer, HeroSection, PricingSection, PrivacySection, TimelineSection } from "@/components/landing";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import {
+    HeroSection,
+    SocialProofSection,
+    FeatureSection,
+    CardsSection,
+    ClosingCtaSection,
+    LandingNav,
+    LandingFooter,
+} from "@/components/landing";
+import { BenchmarkMockup } from "@/components/landing/mockups/benchmark-mockup";
 import { supabase } from "@/lib/supabase";
-
-// import { UseCasesSection } from "@/components/landing/use-cases-section";
 
 export const HomeScreen = () => {
     const router = useRouter();
@@ -24,46 +30,77 @@ export const HomeScreen = () => {
 
     if (checking) {
         return (
-            <div className="flex min-h-dvh items-center justify-center bg-ink">
-                <div className="size-8 animate-spin rounded-full border-2 border-gray-700 border-t-brand-500" />
+            <div
+                className="landing"
+                style={{
+                    display: "flex",
+                    minHeight: "100dvh",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "var(--l-bg, #1A1916)",
+                }}
+            >
+                <div className="l-spinner" />
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-dvh flex-col bg-ink">
-            {/* Header */}
-            <MitableHeader />
+        <div className="landing" style={{ minHeight: "100dvh", background: "var(--l-bg, #1A1916)" }}>
+            <LandingNav />
 
-            {/* Main content - pt accounts for fixed header */}
-            <main className="flex-1 pt-18 md:pt-20">
-                {/* Hero Section - "Work in the flow. Leave the receipts to us." */}
+            <main>
+                {/* Hero — headline + Granola-style side-by-side mockups */}
                 <HeroSection />
 
-                {/* Flow Comparison - "Context switching kills momentum" */}
-                {/* <FlowComparisonSection /> */}
+                {/* Social proof — logo strip */}
+                <SocialProofSection />
 
-                {/* Use Cases Section - "Built for makers" */}
-                {/* <UseCasesSection /> */}
+                {/* Feature 1: Benchmarks — built component */}
+                <FeatureSection
+                    title="Set the standard."
+                    description="Define what good looks like for every role on your team. Mitable uses those benchmarks to evaluate work as it happens, not after the quarter ends."
+                    linkText="Learn how benchmarks work →"
+                    mockup={<BenchmarkMockup />}
+                />
 
-                {/* Features Section - Sessions, Docs, To-Dos */}
-                <FeaturesSection />
+                {/* Feature 2: Calendar/Activity — screenshot */}
+                <FeatureSection
+                    title="Get full visibility."
+                    description="Mitable captures everything your team works on and surfaces what actually got done, without anyone filing a report."
+                    linkText="See the work feed →"
+                    screenshot="/screenshots/calendar-view.png"
+                    screenshotAlt="Mitable Calendar View showing daily activity blocks and meetings"
+                    reverse
+                />
 
-                {/* Timeline Section - "Perfect Memory. Zero Effort." */}
-                <TimelineSection />
+                {/* Feature 3: My Activity / Performance — screenshot */}
+                <FeatureSection
+                    title="Performance feedback, on demand."
+                    description="Employees get a live view of their own performance against the benchmarks you've set. Give everyone on your team the clarity that only your top performers usually find on their own."
+                    linkText="See the employee view →"
+                    screenshot="/screenshots/me-view.png"
+                    screenshotAlt="Mitable My Activity view showing personal performance analytics"
+                />
 
-                {/* Privacy Section - "Private by design" */}
-                <PrivacySection />
+                {/* Feature 4: Reports — screenshot */}
+                <FeatureSection
+                    title="More robust reporting."
+                    description="Know exactly how your team's time is being spent, broken down by person and type of work. Pull it up in the dashboard or export it for deeper analysis."
+                    linkText="See reports →"
+                    screenshot="/screenshots/reports-view.png"
+                    screenshotAlt="Mitable Weekly Work Report with executive overview"
+                    reverse
+                />
 
-                {/* Pricing Section - "Invest in your attention span" */}
-                <PricingSection />
+                {/* 3-column cards */}
+                <CardsSection />
 
-                {/* CTA Section - "Your work, documented automatically" */}
-                <CTASection />
+                {/* Closing CTA */}
+                <ClosingCtaSection />
             </main>
 
-            {/* Footer */}
-            <Footer />
+            <LandingFooter />
         </div>
     );
 };
