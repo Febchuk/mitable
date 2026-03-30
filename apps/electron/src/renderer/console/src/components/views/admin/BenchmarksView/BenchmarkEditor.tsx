@@ -358,7 +358,7 @@ export default function BenchmarkEditor() {
     >
       {/* Back link */}
       <button
-        onClick={() => (isEditMode && id ? navigate(`/benchmarks/${id}`) : navigate("/benchmarks"))}
+        onClick={() => navigate(-1)}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -381,7 +381,7 @@ export default function BenchmarkEditor() {
         }}
       >
         <ArrowLeft size={14} />
-        {isEditMode ? "Benchmark" : "Benchmarks"}
+        Back
       </button>
 
       {/* Title */}
