@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Mic, Pause } from "lucide-react";
+import { ChevronDown, Mic, Pause } from "lucide-react";
 import { MitableLogoMinimal } from "@/components/foundations/logo/mitable-logo";
 import { MacWindow } from "./mockups/mac-window";
 
@@ -193,8 +193,6 @@ function InputSpreadsheet({ frame }: { frame: Frame }) {
         ["Alex Rivera", frame.company || "—", frame.status, frame.role || "—"],
         ["Sara Kim", "Notion", "Follow Up", "PM"],
         ["Leo Chen", "Vercel", "Negotiation", "SE"],
-        ["Priya Shah", "Figma", "Lost", "Design"],
-        ["Ben Ortiz", "OpenAI", "Initial Screen", "Ops"],
     ];
 
     return (
@@ -335,58 +333,131 @@ function InputSpreadsheet({ frame }: { frame: Frame }) {
     );
 }
 
-const BarRow = ({ label, pct, time, large }: { label: string; pct: number; time: string; large?: boolean }) => (
-    <div style={{ display: "flex", alignItems: "center", gap: large ? 10 : 6, fontSize: large ? 13 : 10 }}>
-        <span
-            style={{
-                width: large ? 160 : 108,
-                color: large ? C.text : C.textSec,
-                fontWeight: large ? 500 : 400,
-                flexShrink: 0,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-            }}
-        >
-            {label}
-        </span>
-        <div style={{ flex: 1, height: large ? 4 : 3, background: C.muted, borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${pct}%`, background: C.accent, borderRadius: 2 }} />
-        </div>
-        <span
-            style={{
-                width: large ? 36 : 28,
-                textAlign: "right",
-                color: C.textMuted,
-                fontSize: large ? 11 : 9,
-                flexShrink: 0,
-            }}
-        >
-            {time}
-        </span>
-        <span
-            style={{
-                width: large ? 28 : 22,
-                textAlign: "right",
-                color: C.textMuted,
-                fontSize: large ? 11 : 9,
-                flexShrink: 0,
-            }}
-        >
-            {pct}%
-        </span>
-    </div>
-);
+type BarVariant = "default" | "hero" | "appHero";
 
-function OutputActivityBlock() {
-    const sectionLabel = (label: string) => (
+const BarRow = ({
+    label,
+    pct,
+    time,
+    variant = "default",
+}: {
+    label: string;
+    pct: number;
+    time: string;
+    variant?: BarVariant;
+}) => {
+    const v =
+        variant === "hero"
+            ? {
+                  gap: 12,
+                  labelSize: 15,
+                  labelWeight: 600 as const,
+                  labelColor: C.text,
+                  labelFlex: true as const,
+                  labelW: 0,
+                  barH: 6,
+                  metaSize: 13,
+                  metaW: 44,
+                  pctW: 36,
+              }
+            : variant === "appHero"
+              ? {
+                    gap: 10,
+                    labelSize: 12,
+                    labelWeight: 500 as const,
+                    labelColor: C.textSec,
+                    labelFlex: false as const,
+                    labelW: 140,
+                    barH: 5,
+                    metaSize: 11,
+                    metaW: 40,
+                    pctW: 32,
+                }
+              : {
+                    gap: 6,
+                    labelSize: 10,
+                    labelWeight: 400 as const,
+                    labelColor: C.textSec,
+                    labelFlex: false as const,
+                    labelW: 108,
+                    barH: 3,
+                    metaSize: 9,
+                    metaW: 28,
+                    pctW: 22,
+                };
+
+    const labelStyle = v.labelFlex
+        ? { flex: 1 as const, minWidth: 0 as const }
+        : { width: v.labelW, flexShrink: 0 as const };
+
+    return (
         <div
             style={{
-                fontSize: 9,
+                display: "flex",
+                alignItems: "center",
+                gap: v.gap,
+                fontSize: v.labelSize,
+            }}
+        >
+            <span
+                style={{
+                    ...labelStyle,
+                    color: v.labelColor,
+                    fontWeight: v.labelWeight,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                {label}
+            </span>
+            <div
+                style={{
+                    flex: 1,
+                    height: v.barH,
+                    background: C.muted,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    minWidth: variant === "hero" ? 80 : 24,
+                }}
+            >
+                <div style={{ height: "100%", width: `${pct}%`, background: C.accent, borderRadius: 3 }} />
+            </div>
+            <span
+                style={{
+                    width: v.metaW,
+                    textAlign: "right",
+                    color: C.textMuted,
+                    fontSize: v.metaSize,
+                    flexShrink: 0,
+                }}
+            >
+                {time}
+            </span>
+            <span
+                style={{
+                    width: v.pctW,
+                    textAlign: "right",
+                    color: C.textMuted,
+                    fontSize: v.metaSize,
+                    flexShrink: 0,
+                }}
+            >
+                {pct}%
+            </span>
+        </div>
+    );
+};
+
+function OutputActivityBlock() {
+    const sectionLabel = (label: string, prominent?: boolean) => (
+        <div
+            style={{
+                fontSize: prominent ? 11 : 9,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
                 color: C.textMuted,
-                marginBottom: 8,
+                marginBottom: prominent ? 12 : 8,
                 fontFamily: C.sans,
             }}
         >
@@ -408,15 +479,14 @@ function OutputActivityBlock() {
                     background: C.raised,
                     border: `1px solid ${C.border}`,
                     borderRadius: 10,
-                    padding: "12px 14px",
+                    padding: "14px 16px",
                 }}
             >
-                {/* Block header */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                    <ChevronDown size={12} style={{ color: C.accent }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                    <ChevronDown size={14} style={{ color: C.accent }} />
                     <span
                         style={{
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: 600,
                             color: C.accent,
                             textTransform: "uppercase",
@@ -425,12 +495,12 @@ function OutputActivityBlock() {
                     >
                         Block 1
                     </span>
-                    <span style={{ fontSize: 10, color: C.textSec }}>2:03 PM – 3:28 PM</span>
-                    <span style={{ marginLeft: "auto", fontSize: 10, color: C.textMuted }}>1h 25m</span>
+                    <span style={{ fontSize: 11, color: C.textSec }}>2:03 PM – 3:28 PM</span>
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: C.textMuted }}>1h 25m</span>
                     <span
                         style={{
-                            fontSize: 9,
-                            padding: "2px 8px",
+                            fontSize: 10,
+                            padding: "3px 9px",
                             background: "rgba(236,232,224,0.06)",
                             color: C.textMuted,
                             borderRadius: 4,
@@ -442,52 +512,33 @@ function OutputActivityBlock() {
                     </span>
                 </div>
 
-                {/* Tasks section */}
-                {sectionLabel("≈ Tasks")}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
-                    {/* Expanded task */}
-                    <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <ChevronDown size={11} style={{ color: C.accent, flexShrink: 0 }} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <BarRow label="Lead pipeline updates" pct={46} time="39m" />
-                            </div>
-                        </div>
-                        <div
-                            style={{
-                                fontSize: 12,
-                                color: C.textSec,
-                                lineHeight: 1.55,
-                                padding: "6px 0 6px 17px",
-                                fontFamily: C.sans,
-                            }}
-                        >
-                            {FINAL_SUMMARY}
+                {sectionLabel("≈ Tasks", true)}
+                <div style={{ marginBottom: 18 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <ChevronDown size={16} style={{ color: C.accent, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <BarRow label="Lead pipeline updates" pct={100} time="1h 25m" variant="hero" />
                         </div>
                     </div>
-
-                    {/* Collapsed tasks */}
-                    {[
-                        { label: "Dashboard and tracker update", pct: 28, time: "24m" },
-                        { label: "Cursor Product Exploration", pct: 15, time: "13m" },
-                        { label: "Design Resource Curation", pct: 11, time: "9m" },
-                    ].map((task) => (
-                        <div key={task.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <ChevronRight size={11} style={{ color: C.textMuted, flexShrink: 0 }} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <BarRow label={task.label} pct={task.pct} time={task.time} />
-                            </div>
-                        </div>
-                    ))}
+                    <div
+                        style={{
+                            fontSize: 15,
+                            color: C.textSec,
+                            lineHeight: 1.55,
+                            padding: "10px 0 4px 26px",
+                            fontFamily: C.sans,
+                        }}
+                    >
+                        {FINAL_SUMMARY}
+                    </div>
                 </div>
 
-                {/* App Breakdown section */}
-                {sectionLabel("⊞ App Breakdown")}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 17 }}>
-                    <BarRow label="Chrome" pct={42} time="36m" />
-                    <BarRow label="Claude" pct={28} time="24m" />
-                    <BarRow label="Slack" pct={18} time="15m" />
-                    <BarRow label="Cursor" pct={12} time="10m" />
+                {sectionLabel("⊞ App Breakdown", true)}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 4 }}>
+                    <BarRow label="Chrome" pct={42} time="36m" variant="appHero" />
+                    <BarRow label="Claude" pct={28} time="24m" variant="appHero" />
+                    <BarRow label="Slack" pct={18} time="15m" variant="appHero" />
+                    <BarRow label="Cursor" pct={12} time="10m" variant="appHero" />
                 </div>
             </div>
         </div>
