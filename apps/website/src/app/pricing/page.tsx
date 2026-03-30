@@ -1,106 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { PRICING_TIERS, type PricingRegion } from "@mitable/shared";
-import { Check as CheckIcon } from "@untitledui/icons";
-import { motion } from "motion/react";
-import { Button } from "@/components/base/buttons/button";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { useState } from "react";
+import { PRICING_TIERS } from "@mitable/shared";
+import { LandingNav } from "@/components/landing/landing-nav";
+import { LandingFooter } from "@/components/landing";
 import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
-import { cx } from "@/utils/cx";
 
-// Cast to fix React 19 type compat with @untitledui/icons
-const Check = CheckIcon as React.FC<{ className?: string }>;
-
-type DisplayRegion = "US/AUS" | "Nigeria";
-
-const displayRegionToPricing: Record<DisplayRegion, PricingRegion> = {
-    "US/AUS": "global",
-    Nigeria: "ng",
+const C = {
+    bg: "var(--l-bg, #1A1916)",
+    raised: "var(--l-bg-raised, #211F1B)",
+    text: "var(--l-text, #ECE8E0)",
+    textSec: "var(--l-text-secondary, #A09A8E)",
+    textTer: "var(--l-text-tertiary, #6B665C)",
+    accent: "var(--l-accent, #82C0CC)",
+    border: "var(--l-border, #33312B)",
+    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
 
-function detectRegion(): DisplayRegion {
-    try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-        if (tz.includes("Lagos") || tz.includes("Africa")) return "Nigeria";
-    } catch {
-        // ignore
-    }
-    return "US/AUS";
-}
-
-function getRegionCookie(): DisplayRegion | null {
-    if (typeof document === "undefined") return null;
-    const match = document.cookie.match(/(?:^|;\s*)mitable-region=(\w+)/);
-    if (match) {
-        const val = match[1];
-        if (val === "US/AUS" || val === "Nigeria") return val;
-    }
-    return null;
-}
-
-function setRegionCookie(region: DisplayRegion) {
-    if (typeof document === "undefined") return;
-    document.cookie = `mitable-region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax`;
-}
-
 export default function PricingPage() {
-    const [region, setRegion] = useState<DisplayRegion>("US/AUS");
     const [loading, setLoading] = useState<string | null>(null);
-
-    useEffect(() => {
-        const saved = getRegionCookie();
-        if (saved) {
-            setRegion(saved);
-        } else {
-            const detected = detectRegion();
-            setRegion(detected);
-            setRegionCookie(detected);
-        }
-    }, []);
-
-    const handleRegionToggle = (r: DisplayRegion) => {
-        setRegion(r);
-        setRegionCookie(r);
-    };
 
     const handleCheckout = async (stripePriceId: string | null, tierId: string) => {
         if (!stripePriceId) return;
-
         setLoading(tierId);
         try {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-            if (!session) {
-                window.location.href = "/login?redirect=/pricing";
-                return;
-            }
-
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) { window.location.href = "/login?redirect=/pricing"; return; }
             const res = await fetch(`${API_URL}/api/stripe/create-checkout-session`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${session.access_token}`,
-                },
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
                 body: JSON.stringify({
                     priceId: stripePriceId,
                     successUrl: `${window.location.origin}/checkout/success`,
                     cancelUrl: `${window.location.origin}/checkout/cancel`,
                 }),
             });
-
-            if (res.status === 401) {
-                await supabase.auth.signOut();
-                window.location.href = "/login?redirect=/pricing";
-                return;
-            }
-
+            if (res.status === 401) { await supabase.auth.signOut(); window.location.href = "/login?redirect=/pricing"; return; }
             const data = await res.json();
-            if (data.url) {
-                window.location.href = data.url;
-            }
+            if (data.url) window.location.href = data.url;
         } catch (error) {
             console.error("Checkout error:", error);
         } finally {
@@ -108,167 +47,178 @@ export default function PricingPage() {
         }
     };
 
-    const pricingRegion = displayRegionToPricing[region];
-
     return (
-        <div className="flex min-h-dvh flex-col bg-ink">
-            <MitableHeader />
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+            <LandingNav />
 
-            <main className="flex-1 pt-18 md:pt-20">
-                <section className="relative overflow-hidden">
-                    {/* Background glow */}
-                    <div
-                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            <main style={{ padding: "180px 48px 80px", maxWidth: 1080, margin: "0 auto" }}>
+                {/* Header */}
+                <div style={{ textAlign: "center", marginBottom: 48 }}>
+                    <h1
                         style={{
-                            width: "800px",
-                            height: "600px",
-                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            fontFamily: C.serif,
+                            fontSize: 44,
+                            fontWeight: 400,
+                            color: C.text,
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.2,
+                            margin: "0 0 14px",
                         }}
-                    />
+                    >
+                        Your focus is priceless.
+                    </h1>
+                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
+                        Start free, upgrade when you need more.
+                    </p>
+                </div>
 
-                    <div className="relative mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-32">
-                        {/* Section header */}
-                        <div className="mb-14 text-center md:mb-20">
-                            <motion.p
-                                className="mb-4 font-mono text-xs tracking-widest text-brand-400 uppercase"
-                                initial={{ opacity: 0, y: 12 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ duration: 0.5 }}
-                            >
-                                Pricing
-                            </motion.p>
-                            <motion.h1
-                                className="mb-5 font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl lg:text-6xl"
-                                initial={{ opacity: 0, y: 16 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ duration: 0.5, delay: 0.1 }}
-                            >
-                                Your focus is priceless.
-                            </motion.h1>
-                            <motion.p
-                                className="mx-auto max-w-xl text-lg text-gray-400"
-                                initial={{ opacity: 0, y: 16 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ duration: 0.5, delay: 0.15 }}
-                            >
-                                Start free, upgrade when you need more.
-                            </motion.p>
+                {/* Cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 64 }}>
+                    {PRICING_TIERS.map((tier) => {
+                        const regionPrice = tier.pricing.global;
+                        const isHighlighted = tier.highlighted;
 
-                            {/* Region toggle */}
-                            <motion.div
-                                className="mt-8 flex items-center justify-center"
-                                initial={{ opacity: 0, y: 12 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ duration: 0.5, delay: 0.2 }}
+                        return (
+                            <div
+                                key={tier.id}
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    padding: "32px 28px",
+                                    borderRadius: 16,
+                                    background: C.raised,
+                                    border: isHighlighted
+                                        ? "1px solid rgba(130, 192, 204, 0.2)"
+                                        : `1px solid ${C.border}`,
+                                    position: "relative",
+                                }}
                             >
-                                <div className="inline-flex items-center rounded-full border border-gray-800/60 bg-gray-900/50 p-1">
-                                    {(["US/AUS", "Nigeria"] as const).map((r) => (
-                                        <button
-                                            key={r}
-                                            onClick={() => handleRegionToggle(r)}
-                                            className={cx(
-                                                "rounded-full px-5 py-2 font-mono text-xs font-medium tracking-wider uppercase transition-all duration-200",
-                                                region === r ? "bg-brand-600 text-white shadow-sm" : "text-gray-400 hover:text-white",
-                                            )}
-                                        >
-                                            {r}
-                                        </button>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        </div>
-
-                        {/* Pricing cards */}
-                        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3 lg:gap-8">
-                            {PRICING_TIERS.map((tier, index) => {
-                                const regionPrice = tier.pricing[pricingRegion];
-                                return (
-                                    <motion.div
-                                        key={tier.id}
-                                        className={cx(
-                                            "relative flex flex-col overflow-hidden rounded-2xl border p-6 transition-all duration-300 md:p-8",
-                                            tier.highlighted
-                                                ? "border-brand-500/40 bg-brand-950/20 shadow-[0_0_40px_rgba(138,97,247,0.08)]"
-                                                : "border-gray-800/60 bg-gray-900/30 hover:border-gray-700/60",
-                                        )}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        whileInView={{ opacity: 1, y: 0 }}
-                                        viewport={{ once: true }}
-                                        transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
+                                {isHighlighted && (
+                                    <span
+                                        style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 6,
+                                            fontSize: 10,
+                                            fontWeight: 500,
+                                            color: C.accent,
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.09em",
+                                            marginBottom: 16,
+                                        }}
                                     >
-                                        {tier.highlighted && (
-                                            <div className="absolute -top-px right-0 left-0 h-px bg-gradient-to-r from-transparent via-brand-400 to-transparent" />
-                                        )}
+                                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.accent }} />
+                                        Most Popular
+                                    </span>
+                                )}
 
-                                        {tier.highlighted && (
-                                            <span className="mb-5 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-900/40 px-3 py-1 font-mono text-[10px] tracking-widest text-brand-400 uppercase">
-                                                <span className="size-1.5 rounded-full bg-brand-400" />
-                                                Most Popular
-                                            </span>
-                                        )}
+                                <span
+                                    style={{
+                                        fontSize: 10,
+                                        fontWeight: 600,
+                                        color: isHighlighted ? C.accent : C.textTer,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.09em",
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    {tier.name}
+                                </span>
 
-                                        <h3 className="mb-2 font-mono text-xs font-semibold tracking-widest text-brand-400 uppercase">{tier.name}</h3>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 6 }}>
+                                    <span style={{ fontFamily: C.serif, fontSize: 40, fontWeight: 300, color: C.text, letterSpacing: -2, lineHeight: 1 }}>
+                                        {regionPrice.displayPrice}
+                                    </span>
+                                    {regionPrice.period && (
+                                        <span style={{ fontSize: 13, color: C.textTer }}>{regionPrice.period}</span>
+                                    )}
+                                </div>
 
-                                        <div className="mb-1 flex items-baseline gap-1">
-                                            <span className="font-display text-4xl font-extrabold tracking-tight text-white">{regionPrice.displayPrice}</span>
-                                            {regionPrice.period && <span className="font-mono text-sm text-gray-500">{regionPrice.period}</span>}
-                                        </div>
+                                <p style={{ fontSize: 13, color: C.textSec, margin: "0 0 24px", lineHeight: 1.5 }}>
+                                    {tier.description}
+                                </p>
 
-                                        <p className="mb-6 text-sm text-gray-500">{tier.description}</p>
+                                {/* CTA */}
+                                {tier.contactSales ? (
+                                    <a
+                                        href="/contact"
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            padding: "11px 0",
+                                            borderRadius: 10,
+                                            fontSize: 14,
+                                            fontWeight: 500,
+                                            textDecoration: "none",
+                                            marginBottom: 24,
+                                            color: C.text,
+                                            border: `1px solid ${C.border}`,
+                                            background: "transparent",
+                                            transition: "border-color 0.15s",
+                                        }}
+                                    >
+                                        {tier.cta}
+                                    </a>
+                                ) : (
+                                    <button
+                                        onClick={() => regionPrice.stripePriceId ? handleCheckout(regionPrice.stripePriceId, tier.id) : (window.location.href = "/download")}
+                                        disabled={loading === tier.id}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            padding: "11px 0",
+                                            borderRadius: 10,
+                                            fontSize: 14,
+                                            fontWeight: 500,
+                                            cursor: "pointer",
+                                            marginBottom: 24,
+                                            color: isHighlighted ? "#1A1916" : C.text,
+                                            background: isHighlighted ? C.text : "transparent",
+                                            border: isHighlighted ? "none" : `1px solid ${C.border}`,
+                                            transition: "opacity 0.15s",
+                                            width: "100%",
+                                        }}
+                                    >
+                                        {loading === tier.id ? "Redirecting..." : tier.cta}
+                                    </button>
+                                )}
 
-                                        {tier.contactSales ? (
-                                            <Button color="secondary" size="lg" className="btn-pill mb-7 w-full" href="/contact">
-                                                {tier.cta}
-                                            </Button>
-                                        ) : regionPrice.stripePriceId ? (
-                                            <Button
-                                                color={tier.highlighted ? "primary" : "secondary"}
-                                                size="lg"
-                                                className="btn-pill mb-7 w-full"
-                                                onClick={() => handleCheckout(regionPrice.stripePriceId, tier.id)}
-                                                isDisabled={loading === tier.id}
+                                <div style={{ height: 1, background: `rgba(236, 232, 224, 0.04)`, marginBottom: 20 }} />
+
+                                {/* Features */}
+                                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
+                                    {tier.features.map((feature) => (
+                                        <li key={feature} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                            <div
+                                                style={{
+                                                    width: 18,
+                                                    height: 18,
+                                                    borderRadius: "50%",
+                                                    background: isHighlighted ? "rgba(130, 192, 204, 0.12)" : `rgba(236, 232, 224, 0.04)`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    flexShrink: 0,
+                                                    marginTop: 1,
+                                                }}
                                             >
-                                                {loading === tier.id ? "Redirecting..." : tier.cta}
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                color={tier.highlighted ? "primary" : "secondary"}
-                                                size="lg"
-                                                className="btn-pill mb-7 w-full"
-                                                href="/download"
-                                            >
-                                                {tier.cta}
-                                            </Button>
-                                        )}
-
-                                        <div className="mb-6 h-px bg-gray-800/40" />
-
-                                        <ul className="flex flex-1 flex-col gap-3">
-                                            {tier.features.map((feature) => (
-                                                <li key={feature} className="flex items-start gap-3">
-                                                    <div
-                                                        className={cx(
-                                                            "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full",
-                                                            tier.highlighted ? "bg-brand-900/40" : "bg-gray-800/60",
-                                                        )}
-                                                    >
-                                                        <Check className={cx("size-3", tier.highlighted ? "text-brand-400" : "text-gray-500")} />
-                                                    </div>
-                                                    <span className="text-sm text-gray-300">{feature}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </motion.div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </section>
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={isHighlighted ? C.accent : C.textTer} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M20 6L9 17l-5-5" />
+                                                </svg>
+                                            </div>
+                                            <span style={{ fontSize: 13, color: C.textSec, lineHeight: 1.45 }}>{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        );
+                    })}
+                </div>
             </main>
+
+            <LandingFooter />
         </div>
     );
 }

@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CTASection, FeaturesSection, Footer, HeroSection, PricingSection, PrivacySection, TimelineSection } from "@/components/landing";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import {
+    HeroSection,
+    SocialProofSection,
+    FeatureSection,
+    CardsSection,
+    ClosingCtaSection,
+    LandingNav,
+    LandingFooter,
+} from "@/components/landing";
+import { BenchmarkMockup } from "@/components/landing/mockups/benchmark-mockup";
+import { WorkMontageMockup } from "@/components/landing/mockups/work-montage-mockup";
+import { EvaluationMockup } from "@/components/landing/mockups/evaluation-mockup";
+import { PersonDetailMockup } from "@/components/landing/mockups/person-detail-mockup";
 import { supabase } from "@/lib/supabase";
-
-// import { UseCasesSection } from "@/components/landing/use-cases-section";
 
 export const HomeScreen = () => {
     const router = useRouter();
@@ -22,48 +31,83 @@ export const HomeScreen = () => {
         });
     }, [router]);
 
+    useEffect(() => {
+        if (checking) return;
+        const hash = window.location.hash.replace("#", "");
+        if (!hash) return;
+        requestAnimationFrame(() => {
+            document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
+        });
+    }, [checking]);
+
     if (checking) {
         return (
-            <div className="flex min-h-dvh items-center justify-center bg-ink">
-                <div className="size-8 animate-spin rounded-full border-2 border-gray-700 border-t-brand-500" />
+            <div
+                className="landing"
+                style={{
+                    display: "flex",
+                    minHeight: "100dvh",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "var(--l-bg, #1A1916)",
+                }}
+            >
+                <div className="l-spinner" />
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-dvh flex-col bg-ink">
-            {/* Header */}
-            <MitableHeader />
+        <div className="landing" style={{ minHeight: "100dvh", background: "var(--l-bg, #1A1916)" }}>
+            <LandingNav />
 
-            {/* Main content - pt accounts for fixed header */}
-            <main className="flex-1 pt-18 md:pt-20">
-                {/* Hero Section - "Work in the flow. Leave the receipts to us." */}
+            <main>
                 <HeroSection />
 
-                {/* Flow Comparison - "Context switching kills momentum" */}
-                {/* <FlowComparisonSection /> */}
+                <SocialProofSection />
 
-                {/* Use Cases Section - "Built for makers" */}
-                {/* <UseCasesSection /> */}
+                {/* Feature 1: Benchmarks */}
+                <FeatureSection
+                    id="how-it-works"
+                    title="Set the standard."
+                    description="Define what good looks like for every role. Mitable's AI generates scoring parameters from a simple description, so benchmarks take minutes to create."
+                    linkText="Learn how benchmarks work →"
+                    mockup={<BenchmarkMockup />}
+                />
 
-                {/* Features Section - Sessions, Docs, To-Dos */}
-                <FeaturesSection />
+                {/* Feature 2: Multi-app work montage */}
+                <FeatureSection
+                    title="Your team just works."
+                    description="Slack, browsers, terminals, docs — Mitable captures work across every app on your team's computer. No manual time tracking. No status updates."
+                    linkText="See how capture works →"
+                    mockup={<WorkMontageMockup />}
+                    rawMockup
+                    reverse
+                />
 
-                {/* Timeline Section - "Perfect Memory. Zero Effort." */}
-                <TimelineSection />
+                {/* Feature 3: Evaluation */}
+                <FeatureSection
+                    title="Evaluate performance more accurately."
+                    description="Get a live, AI-generated score for every person on your team — measured against the benchmarks you set. No more guessing who's on track and who needs support."
+                    linkText="See the employee view →"
+                    mockup={<EvaluationMockup />}
+                />
 
-                {/* Privacy Section - "Private by design" */}
-                <PrivacySection />
+                {/* Feature 4: Person Detail */}
+                <FeatureSection
+                    title="More robust reporting."
+                    description="See exactly how each person spends their time — which customers they serve, how their focus and meeting hours break down, and where they're most effective."
+                    linkText="See the full dashboard →"
+                    mockup={<PersonDetailMockup />}
+                    reverse
+                />
 
-                {/* Pricing Section - "Invest in your attention span" */}
-                <PricingSection />
+                <CardsSection />
 
-                {/* CTA Section - "Your work, documented automatically" */}
-                <CTASection />
+                <ClosingCtaSection />
             </main>
 
-            {/* Footer */}
-            <Footer />
+            <LandingFooter />
         </div>
     );
 };

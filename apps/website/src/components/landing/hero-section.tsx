@@ -1,241 +1,109 @@
 "use client";
 
-import { motion } from "motion/react";
-import { Button } from "@/components/base/buttons/button";
-import { siteContent } from "@/config/site-content";
-import { cx } from "@/utils/cx";
+import { useEffect, useRef } from "react";
+import { useOsDetection } from "@/hooks/use-os-detection";
 
-/* ─── VS Code icon (simplified for the pill) ─── */
-const VSCodeIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" className="size-4">
-        <path d="M17.5 0L7.5 8.5L3 5.5L0 7l7.5 5.5L0 18l3 1.5 4.5-3L17.5 25l4.5-2V2L17.5 0zm0 3.5v18l-7-5.5V9l7-5.5z" fill="currentColor" />
-    </svg>
-);
+const C = {
+    text: "var(--l-text, #ECE8E0)",
+    textSec: "var(--l-text-secondary, #A09A8E)",
+    accent: "var(--l-accent, #82C0CC)",
+    bg: "var(--l-bg, #1A1916)",
+    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+};
 
-/* ─── Download icon ─── */
-const DownloadIcon = () => (
-    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <polyline points="7 10 12 15 17 10" />
-        <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-);
+export const HeroSection = () => {
+    const heroRef = useRef<HTMLElement>(null);
+    const os = useOsDetection();
 
-/* ─── Decorative grid dots for the background ─── */
-const GridPattern = () => (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.03]">
-        <svg className="absolute inset-0 size-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <pattern id="hero-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-                    <circle cx="1" cy="1" r="1" fill="white" />
-                </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#hero-grid)" />
-        </svg>
-    </div>
-);
+    useEffect(() => {
+        const els = heroRef.current?.querySelectorAll(".hero-reveal");
+        if (!els) return;
 
-interface HeroSectionProps {
-    className?: string;
-}
-
-export const HeroSection = ({ className }: HeroSectionProps) => {
-    const { hero } = siteContent;
+        els.forEach((el, i) => {
+            const htmlEl = el as HTMLElement;
+            setTimeout(() => {
+                htmlEl.style.opacity = "1";
+                htmlEl.style.transform = "translateY(0)";
+            }, 100 + i * 120);
+        });
+    }, []);
 
     return (
-        <section className={cx("relative overflow-hidden bg-ink", className)}>
-            <GridPattern />
-
-            {/* Radial glow behind pill */}
-            <div
-                className="pointer-events-none absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2"
+        <section
+            ref={heroRef}
+            style={{
+                fontFamily: C.sans,
+                padding: "200px 48px 120px",
+                maxWidth: 1100,
+                margin: "0 auto",
+                textAlign: "center",
+            }}
+        >
+            <h1
+                className="hero-reveal"
                 style={{
-                    width: "800px",
-                    height: "600px",
-                    background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.08) 0%, rgba(138,97,247,0.02) 50%, transparent 100%)",
+                    fontFamily: C.serif,
+                    fontSize: 48,
+                    fontWeight: 400,
+                    lineHeight: 1.22,
+                    color: C.text,
+                    letterSpacing: "-0.02em",
+                    margin: "0 0 22px 0",
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transition: "opacity 0.7s ease, transform 0.7s ease",
                 }}
-            />
-
-            <div className="relative mx-auto max-w-container px-4 pt-14 pb-20 md:px-8 md:pt-24 md:pb-28 lg:pt-28 lg:pb-36">
-                <div className="flex flex-col items-center text-center">
-                    {/* ── Badge ── */}
-                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-                        <span className="inline-flex items-center gap-2 rounded-full border border-gray-800 bg-gray-900/60 px-4 py-1.5 font-mono text-[11px] tracking-widest text-gray-400 uppercase backdrop-blur-sm">
-                            <span className="size-1.5 rounded-full bg-brand-400" />
-                            {hero.badge}
-                        </span>
-                    </motion.div>
-
-                    {/* ── Headline ── */}
-                    <motion.h1
-                        className="mt-8 max-w-5xl font-display text-4xl leading-[1.05] font-extrabold tracking-tight text-white uppercase sm:text-5xl md:text-6xl lg:text-[5rem]"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.1 }}
-                    >
-                        {hero.headline} <span className="underline-accent text-brand-400">{hero.headlineAccent}</span>
-                    </motion.h1>
-
-                    {/* ── Subheadline ── */}
-                    <motion.p
-                        className="mt-6 max-w-2xl text-lg leading-relaxed text-gray-400 md:text-xl"
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.3 }}
-                    >
-                        {hero.subheadline}
-                    </motion.p>
-
-                    {/* ── CTAs ── */}
-                    <motion.div
-                        className="mt-10 flex flex-col gap-4 sm:flex-row"
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.4 }}
-                    >
-                        <Button color="primary" size="xl" href="/download" className="btn-pill">
-                            <span className="inline-flex items-center gap-2">
-                                <DownloadIcon />
-                                {hero.primaryCta}
-                            </span>
-                        </Button>
-                    </motion.div>
-
-                    {/* ═══════════════════════════════════════════
-                        HERO VISUAL — THE WATCHPILL
-                        A floating pill widget built in pure CSS,
-                        angled, glowing, hovering over a grid.
-                    ═══════════════════════════════════════════ */}
-                    <motion.div
-                        className="relative mt-20 w-full max-w-2xl md:mt-28"
-                        initial={{ opacity: 0, y: 40 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.5, type: "spring", damping: 20 }}
-                    >
-                        {/* Glow layers behind the pill */}
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                            <motion.div
-                                className="absolute rounded-full"
-                                style={{
-                                    width: "420px",
-                                    height: "120px",
-                                    background: "radial-gradient(ellipse at center, rgba(138,97,247,0.15) 0%, transparent 70%)",
-                                    filter: "blur(40px)",
-                                }}
-                                animate={{
-                                    scale: [1, 1.08, 1],
-                                    opacity: [0.6, 1, 0.6],
-                                }}
-                                transition={{
-                                    duration: 4,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                }}
-                            />
-                        </div>
-
-                        {/* Perspective container for the angled pill */}
-                        <div className="relative mx-auto" style={{ perspective: "1200px" }}>
-                            {/* The Pill */}
-                            <motion.div
-                                className="relative mx-auto w-fit"
-                                style={{
-                                    transformStyle: "preserve-3d",
-                                }}
-                                animate={{
-                                    rotateX: [2, -1, 2],
-                                    y: [0, -6, 0],
-                                }}
-                                transition={{
-                                    duration: 6,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                }}
-                            >
-                                {/* Pill body */}
-                                <div
-                                    className="relative flex items-center gap-4 rounded-full border border-gray-700/60 bg-gray-900/90 px-5 py-3 shadow-2xl backdrop-blur-xl sm:gap-5 sm:px-7 sm:py-4"
-                                    style={{
-                                        boxShadow:
-                                            "0 0 0 1px rgba(138,97,247,0.08), 0 4px 24px -4px rgba(0,0,0,0.5), 0 12px 48px -8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
-                                    }}
-                                >
-                                    {/* Recording indicator */}
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="relative">
-                                            <motion.div
-                                                className="absolute -inset-1 rounded-full bg-red-500/30"
-                                                animate={{ scale: [1, 1.6, 1], opacity: [0.6, 0, 0.6] }}
-                                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                                            />
-                                            <div className="relative size-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
-                                        </div>
-                                        <span className="font-mono text-[11px] font-medium tracking-wider text-red-400 uppercase">REC</span>
-                                    </div>
-
-                                    {/* Divider */}
-                                    <div className="h-5 w-px bg-gray-700/50" />
-
-                                    {/* Timer */}
-                                    <div className="font-mono text-base font-semibold tracking-tight text-white tabular-nums sm:text-lg">02:15:33</div>
-
-                                    {/* Divider */}
-                                    <div className="h-5 w-px bg-gray-700/50" />
-
-                                    {/* Active app */}
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex size-7 items-center justify-center rounded-lg bg-[#007ACC]/20 text-[#4FC1FF]">
-                                            <VSCodeIcon />
-                                        </div>
-                                        <span className="hidden font-mono text-xs text-gray-400 sm:inline">VS Code</span>
-                                    </div>
-
-                                    {/* Divider */}
-                                    <div className="hidden h-5 w-px bg-gray-700/50 sm:block" />
-
-                                    {/* Stop button */}
-                                    <button className="hidden items-center gap-1.5 rounded-full bg-gray-800 px-3 py-1.5 font-mono text-[11px] tracking-wider text-gray-300 uppercase transition-colors hover:bg-gray-700 sm:flex">
-                                        <div className="size-2 rounded-sm bg-gray-400" />
-                                        Stop
-                                    </button>
-                                </div>
-
-                                {/* Reflection / glass edge at bottom */}
-                                <div
-                                    className="pointer-events-none absolute right-6 -bottom-px left-6 h-px"
-                                    style={{
-                                        background: "linear-gradient(90deg, transparent, rgba(138,97,247,0.2), transparent)",
-                                    }}
-                                />
-                            </motion.div>
-                        </div>
-
-                        {/* Ghost sessions beneath - depth cue */}
-                        <div className="mt-6 flex flex-col items-center gap-2 opacity-30">
-                            <div className="flex h-8 w-64 items-center justify-center gap-3 rounded-full border border-gray-800/40 bg-gray-900/40 sm:w-72">
-                                <div className="size-2 rounded-full bg-gray-600" />
-                                <span className="font-mono text-[10px] text-gray-600">01:45:12</span>
-                                <span className="font-mono text-[10px] text-gray-700">Figma</span>
-                            </div>
-                            <div className="flex h-7 w-56 items-center justify-center gap-3 rounded-full border border-gray-800/20 bg-gray-900/20 sm:w-60">
-                                <div className="size-2 rounded-full bg-gray-700" />
-                                <span className="font-mono text-[10px] text-gray-700">00:32:08</span>
-                                <span className="font-mono text-[10px] text-gray-800">Slack</span>
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    {/* ── Tagline ── */}
-                    <motion.p
-                        className="mt-12 font-mono text-xs tracking-wide text-brand-400/70 sm:text-sm"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.6, delay: 0.8 }}
-                    >
-                        {hero.tagline}
-                    </motion.p>
-                </div>
-            </div>
+            >
+                Knowing if your team is spending their time on the right things is the{" "}
+                <strong style={{ fontWeight: 600 }}>hardest</strong>{" "}
+                part of management.
+                <br />
+                <em style={{ fontStyle: "italic", color: C.accent }}> Mitable makes it <strong style={{ fontWeight: 600 }}>simple</strong>.</em>
+            </h1>
+            <p
+                className="hero-reveal"
+                style={{
+                    fontSize: 17,
+                    color: C.textSec,
+                    lineHeight: 1.65,
+                    margin: "0 auto 44px",
+                    maxWidth: 560,
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transition: "opacity 0.7s ease, transform 0.7s ease",
+                    transitionDelay: "0.08s",
+                }}
+            >
+                Measuring what gets done against the goals you set, in real time.
+            </p>
+            <a
+                href="/download"
+                className="hero-reveal"
+                style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: C.text,
+                    color: C.bg,
+                    padding: "14px 28px",
+                    borderRadius: 10,
+                    textDecoration: "none",
+                    fontWeight: 500,
+                    fontSize: 15,
+                    transition: "opacity 0.2s, all 0.7s ease",
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transitionDelay: "0.16s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+            >
+                {os.label}
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M8 3v10M8 13l-3-3M8 13l3-3" />
+                </svg>
+            </a>
         </section>
     );
 };
