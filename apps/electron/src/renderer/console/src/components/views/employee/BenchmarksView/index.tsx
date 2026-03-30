@@ -80,6 +80,7 @@ export default function BenchmarksView() {
           My Benchmarks
         </h1>
 
+        {/* Frequency filters — hidden for now
         <div
           style={{
             display: "flex",
@@ -115,6 +116,7 @@ export default function BenchmarksView() {
             </button>
           ))}
         </div>
+        */}
       </div>
 
       {/* Inline metrics — Score + Trend */}

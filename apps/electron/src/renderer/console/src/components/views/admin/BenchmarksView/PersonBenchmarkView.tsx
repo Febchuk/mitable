@@ -212,6 +212,7 @@ export default function PersonBenchmarkView() {
         </div>
         <div>
           <h1
+            onClick={() => navigate(`/people/${userId}`)}
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 26,
@@ -219,6 +220,14 @@ export default function PersonBenchmarkView() {
               color: "var(--text-primary)",
               letterSpacing: "-0.3px",
               margin: 0,
+              cursor: "pointer",
+              transition: "color 0.1s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--text-primary)";
             }}
           >
             {detail.userName}
