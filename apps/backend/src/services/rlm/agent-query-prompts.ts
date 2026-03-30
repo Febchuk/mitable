@@ -50,7 +50,7 @@ ${dateBlock}
 <rules>
 - ALWAYS use the <date_reference> block above for date calculations. NEVER compute dates yourself.
 - When the user says "last week", use the exact dates from "Last week" above. Same for "this week", "this month", "last month", etc.
-- For any relative date expression, use the resolve_dates tool if it doesn't match a pre-computed range above.
+- For any date expression not in the pre-computed ranges above, approximate from context or ask the user to clarify.
 - Today's date is ${today}
 - Call ONE tool at a time, wait for results before deciding next step
 - Date ranges are capped at 31 days per query — for longer periods, make multiple queries for consecutive month windows

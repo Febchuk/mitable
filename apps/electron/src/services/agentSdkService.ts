@@ -8,11 +8,7 @@ import { createLogger } from "../lib/logger";
 import { skillsStore, type AgentSkill } from "./skillsStore";
 import { authManager } from "./authManager";
 import { browserBridgeService } from "./browserBridgeService";
-import {
-  buildDateContext,
-  formatDateContextForPrompt,
-  resolveDateExpression,
-} from "@mitable/shared";
+import { buildDateContext, formatDateContextForPrompt } from "@mitable/shared";
 
 const logger = createLogger("AgentSdkService");
 
@@ -82,7 +78,6 @@ const READ_ONLY_TOOLS = [
   "Grep",
   "WebSearch",
   "WebFetch",
-  "mcp__mitable__resolve_dates",
   "mcp__mitable__get_my_activity",
   "mcp__mitable__get_activity_detail",
   "mcp__mitable__slack_list_channels",
@@ -441,21 +436,6 @@ class AgentSdkService {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
     };
-
-    const resolveDatesTool = tool(
-      "resolve_dates",
-      'Convert a natural-language date expression into a concrete YYYY-MM-DD date range. Use for expressions not covered by the <date_reference> block in the system prompt. Supports: "last 3 months", "since January", "week of March 10", "2 weeks ago", "2026-01-01 to 2026-02-28", etc.',
-      {
-        expression: z
-          .string()
-          .describe('The date expression to resolve (e.g. "last 3 months", "since February")'),
-      },
-      async ({ expression }) => {
-        const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const result = resolveDateExpression(expression, userTz);
-        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-      }
-    );
 
     const getMyActivityTool = tool(
       "get_my_activity",
@@ -1139,7 +1119,6 @@ class AgentSdkService {
     return createSdkMcpServer({
       name: "mitable",
       tools: [
-        resolveDatesTool,
         getMyActivityTool,
         getActivityDetailTool,
         slackChannelsTool,
@@ -1240,7 +1219,7 @@ ${skillsSection}
 ### Date Handling
 - ALWAYS use the <date_reference> block above for date calculations. NEVER compute dates yourself.
 - When the user says "last week", use the exact dates from "Last week" in the reference. Same for "this week", "this month", etc.
-- For complex date expressions (e.g. "last 3 months", "since January", "week of March 10"), call the resolve_dates tool.
+- For date expressions not in the pre-computed ranges above, approximate from context or ask the user to clarify.
 - Always pass explicit start_date and end_date to get_my_activity — never rely on defaults for time-sensitive queries.
 
 ### Data Retrieval
