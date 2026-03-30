@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ProductDemoSection } from "./product-demo-section";
 
 const C = {
     text: "var(--l-text, #ECE8E0)",
@@ -29,77 +28,80 @@ export const HeroSection = () => {
     }, []);
 
     return (
-        <section ref={heroRef} style={{ fontFamily: C.sans }}>
-            {/* Text area */}
-            <div style={{ padding: "180px 48px 80px", maxWidth: 760 }}>
-                <h1
-                    className="hero-reveal"
-                    style={{
-                        fontFamily: C.serif,
-                        fontSize: 44,
-                        fontWeight: 400,
-                        lineHeight: 1.28,
-                        color: C.text,
-                        letterSpacing: "-0.015em",
-                        marginBottom: 20,
-                        opacity: 0,
-                        transform: "translateY(28px)",
-                        transition: "opacity 0.7s ease, transform 0.7s ease",
-                        margin: "0 0 20px 0",
-                    }}
-                >
-                    Knowing if your team is spending their time on the right things is the hardest
-                    part of management.
-                    <br />
-                    <em style={{ fontStyle: "italic", color: C.accent }}> Mitable makes it simple.</em>
-                </h1>
-                <p
-                    className="hero-reveal"
-                    style={{
-                        fontSize: 17,
-                        color: C.textSec,
-                        lineHeight: 1.65,
-                        marginBottom: 40,
-                        maxWidth: 560,
-                        opacity: 0,
-                        transform: "translateY(28px)",
-                        transition: "opacity 0.7s ease, transform 0.7s ease",
-                        transitionDelay: "0.08s",
-                        margin: "0 0 40px 0",
-                    }}
-                >
-                    Measuring what gets done against the goals you set, in real time.
-                </p>
-                <a
-                    href="/download"
-                    className="hero-reveal"
-                    style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        background: C.text,
-                        color: C.bg,
-                        padding: "14px 28px",
-                        borderRadius: 10,
-                        textDecoration: "none",
-                        fontWeight: 500,
-                        fontSize: 15,
-                        transition: "opacity 0.2s, all 0.7s ease",
-                        opacity: 0,
-                        transform: "translateY(28px)",
-                        transitionDelay: "0.16s",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
-                >
-                    Download for macOS
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <path d="M8 3v10M8 13l-3-3M8 13l3-3" />
-                    </svg>
-                </a>
-            </div>
-
-            <ProductDemoSection />
+        <section
+            ref={heroRef}
+            style={{
+                fontFamily: C.sans,
+                padding: "200px 48px 120px",
+                maxWidth: 1100,
+                margin: "0 auto",
+                textAlign: "center",
+            }}
+        >
+            <h1
+                className="hero-reveal"
+                style={{
+                    fontFamily: C.serif,
+                    fontSize: 48,
+                    fontWeight: 400,
+                    lineHeight: 1.22,
+                    color: C.text,
+                    letterSpacing: "-0.02em",
+                    margin: "0 0 22px 0",
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transition: "opacity 0.7s ease, transform 0.7s ease",
+                }}
+            >
+                Knowing if your team is spending their time on the right things is the{" "}
+                <strong style={{ fontWeight: 600 }}>hardest</strong>{" "}
+                part of management.
+                <br />
+                <em style={{ fontStyle: "italic", color: C.accent }}> Mitable makes it <strong style={{ fontWeight: 600 }}>simple</strong>.</em>
+            </h1>
+            <p
+                className="hero-reveal"
+                style={{
+                    fontSize: 17,
+                    color: C.textSec,
+                    lineHeight: 1.65,
+                    margin: "0 auto 44px",
+                    maxWidth: 560,
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transition: "opacity 0.7s ease, transform 0.7s ease",
+                    transitionDelay: "0.08s",
+                }}
+            >
+                Measuring what gets done against the goals you set, in real time.
+            </p>
+            <a
+                href="/download"
+                className="hero-reveal"
+                style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: C.text,
+                    color: C.bg,
+                    padding: "14px 28px",
+                    borderRadius: 10,
+                    textDecoration: "none",
+                    fontWeight: 500,
+                    fontSize: 15,
+                    transition: "opacity 0.2s, all 0.7s ease",
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transitionDelay: "0.16s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+            >
+                Download for macOS
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M8 3v10M8 13l-3-3M8 13l3-3" />
+                </svg>
+            </a>
         </section>
     );
 };

@@ -21,6 +21,8 @@ interface FeatureSectionProps {
     screenshot?: string;
     screenshotAlt?: string;
     mockup?: ReactNode;
+    /** Render mockup without MacWindow wrapper */
+    rawMockup?: boolean;
 }
 
 export const FeatureSection = ({
@@ -32,6 +34,7 @@ export const FeatureSection = ({
     screenshot,
     screenshotAlt = "Feature screenshot",
     mockup,
+    rawMockup = false,
 }: FeatureSectionProps) => {
     const ref = useRef<HTMLElement>(null);
 
@@ -97,7 +100,7 @@ export const FeatureSection = ({
     );
 
     const visualBlock = (
-        <div>
+        <div style={{ overflow: "visible" }}>
             {screenshot ? (
                 <div
                     style={{
@@ -125,7 +128,7 @@ export const FeatureSection = ({
                     />
                 </div>
             ) : mockup ? (
-                <MacWindow>{mockup}</MacWindow>
+                rawMockup ? mockup : <MacWindow>{mockup}</MacWindow>
             ) : null}
         </div>
     );
@@ -139,8 +142,8 @@ export const FeatureSection = ({
                 maxWidth: 1240,
                 margin: "0 auto",
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 72,
+                gridTemplateColumns: reverse ? "3fr 2fr" : "2fr 3fr",
+                gap: 64,
                 alignItems: "center",
                 opacity: 0,
                 transform: "translateY(28px)",

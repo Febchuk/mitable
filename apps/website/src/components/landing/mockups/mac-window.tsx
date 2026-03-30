@@ -1,5 +1,8 @@
 "use client";
 
+/** Single source of truth for all landing page screen mockup proportions */
+export const SCREEN_ASPECT_RATIO = "16 / 10";
+
 interface MacWindowProps {
     children: React.ReactNode;
     className?: string;
@@ -45,6 +48,6 @@ export const MacWindow = ({ children, className = "", title }: MacWindowProps) =
                 </span>
             ) : null}
         </div>
-        <div style={{ overflow: "hidden" }}>{children}</div>
+        <div style={{ overflow: "hidden", aspectRatio: SCREEN_ASPECT_RATIO }}>{children}</div>
     </div>
 );

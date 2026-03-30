@@ -146,8 +146,8 @@ export const SocialProofSection = () => (
                     top: 0,
                     left: 0,
                     bottom: 0,
-                    width: 120,
-                    background: "linear-gradient(to right, var(--l-bg, #1A1916), transparent)",
+                    width: 180,
+                    background: "linear-gradient(to right, var(--l-bg, #1A1916) 26%, transparent)",
                     pointerEvents: "none",
                     zIndex: 1,
                 }}
@@ -159,8 +159,8 @@ export const SocialProofSection = () => (
                     top: 0,
                     right: 0,
                     bottom: 0,
-                    width: 120,
-                    background: "linear-gradient(to left, var(--l-bg, #1A1916), transparent)",
+                    width: 180,
+                    background: "linear-gradient(to left, var(--l-bg, #1A1916) 26%, transparent)",
                     pointerEvents: "none",
                     zIndex: 1,
                 }}
