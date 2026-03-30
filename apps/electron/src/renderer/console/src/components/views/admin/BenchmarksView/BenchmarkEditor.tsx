@@ -1,8 +1,16 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Minus, Loader2 } from "lucide-react";
-import { useCreateBenchmark } from "@/console/src/hooks/queries/benchmarks";
-import { generateBenchmarkParameters } from "@/console/src/services/benchmarkService";
+import {
+  useBenchmarkDetail,
+  useCreateBenchmark,
+  useUpdateBenchmark,
+  useUpdateBenchmarkParameters,
+} from "@/console/src/hooks/queries/benchmarks";
+import {
+  generateBenchmarkParameters,
+  fetchBenchmarkParameters,
+} from "@/console/src/services/benchmarkService";
 import type {
   BenchmarkParameter,
   BenchmarkFrequency,
@@ -239,7 +247,17 @@ function IconButton({
 
 export default function BenchmarkEditor() {
   const navigate = useNavigate();
-  const { mutateAsync: create, isPending: isSaving } = useCreateBenchmark();
+  const { id } = useParams<{ id?: string }>();
+  const isEditMode = !!id;
+
+  const { mutateAsync: create, isPending: isCreating } = useCreateBenchmark();
+  const { mutateAsync: updateBenchmark, isPending: isUpdatingBenchmark } = useUpdateBenchmark();
+  const { mutateAsync: updateParams, isPending: isUpdatingParams } = useUpdateBenchmarkParameters();
+
+  const isSaving = isCreating || isUpdatingBenchmark || isUpdatingParams;
+
+  // Fetch existing benchmark in edit mode
+  const { data: existingBenchmark } = useBenchmarkDetail(isEditMode ? id! : "");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -247,6 +265,29 @@ export default function BenchmarkEditor() {
   const [params, setParams] = useState<BenchmarkParameter[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
+  const [paramsLoaded, setParamsLoaded] = useState(false);
+
+  // Pre-populate fields from existing benchmark
+  useEffect(() => {
+    if (existingBenchmark) {
+      setName(existingBenchmark.name);
+      setDescription(existingBenchmark.description || "");
+      setFrequency(existingBenchmark.frequency);
+    }
+  }, [existingBenchmark]);
+
+  // Load existing parameters in edit mode
+  useEffect(() => {
+    if (!isEditMode || !id || paramsLoaded) return;
+    fetchBenchmarkParameters(id)
+      .then((loaded) => {
+        setParams(loaded);
+        setParamsLoaded(true);
+      })
+      .catch(() => {
+        setParamsLoaded(true);
+      });
+  }, [id, isEditMode, paramsLoaded]);
 
   const handleGenerate = async () => {
     if (!description.trim()) return;
@@ -271,24 +312,30 @@ export default function BenchmarkEditor() {
     ]);
   };
 
-  const handleRemoveParam = (id: string) => {
-    setParams((prev) => prev.filter((a) => a.id !== id));
+  const handleRemoveParam = (paramId: string) => {
+    setParams((prev) => prev.filter((a) => a.id !== paramId));
     if (params.length <= 2) setRemoveMode(false);
   };
 
-  const handleUpdateParam = (id: string, updates: Partial<BenchmarkParameter>) => {
+  const handleUpdateParam = (paramId: string, updates: Partial<BenchmarkParameter>) => {
     setParams((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+      prev.map((a) => (a.id === paramId ? { ...a, ...updates } : a))
     );
   };
 
   const handleSave = async () => {
     if (!name.trim() || params.length === 0) return;
     try {
-      await create({ name, description, frequency, parameters: params });
-      navigate("/benchmarks");
+      if (isEditMode && id) {
+        await updateBenchmark({ id, payload: { name, description, frequency } });
+        await updateParams({ benchmarkId: id, parameters: params });
+        navigate(`/benchmarks/${id}`);
+      } else {
+        await create({ name, description, frequency, parameters: params });
+        navigate("/benchmarks");
+      }
     } catch {
-      // Error handled by mutation
+      // Error handled by mutations
     }
   };
 
@@ -309,7 +356,7 @@ export default function BenchmarkEditor() {
     >
       {/* Back link */}
       <button
-        onClick={() => navigate("/benchmarks")}
+        onClick={() => (isEditMode && id ? navigate(`/benchmarks/${id}`) : navigate("/benchmarks"))}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -332,7 +379,7 @@ export default function BenchmarkEditor() {
         }}
       >
         <ArrowLeft size={14} />
-        Benchmarks
+        {isEditMode ? "Benchmark" : "Benchmarks"}
       </button>
 
       {/* Title */}
@@ -346,7 +393,7 @@ export default function BenchmarkEditor() {
           margin: 0,
         }}
       >
-        New Benchmark
+        {isEditMode ? "Edit Benchmark" : "New Benchmark"}
       </h1>
 
       {/* Name input */}

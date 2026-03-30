@@ -1,6 +1,6 @@
 import { pgTable, uuid, varchar, timestamp, jsonb, char } from "drizzle-orm/pg-core";
-import { organizations } from "./organizations.schema.js";
-import { users } from "./users.schema.js";
+import { organizations } from "./organizations.schema";
+import { users } from "./users.schema";
 
 export const apiKeys = pgTable("api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
-import { useBenchmarks } from "@/console/src/hooks/queries/benchmarks";
-import type { BenchmarkFrequency } from "@/console/src/services/benchmarkService";
+import { useBenchmarks, useDeleteBenchmark } from "@/console/src/hooks/queries/benchmarks";
+import type { Benchmark, BenchmarkFrequency } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
 
 type FrequencyFilter = "all" | BenchmarkFrequency;
@@ -19,7 +19,11 @@ const SPINNER_COLOR = "#82C0CC";
 export default function BenchmarksView() {
   const navigate = useNavigate();
   const { data: benchmarks = [], isLoading } = useBenchmarks();
+  const { mutate: deleteBenchmark } = useDeleteBenchmark();
   const [activeFrequency, setActiveFrequency] = useState<FrequencyFilter>("all");
+
+  // Delete confirmation state
+  const [deletingBenchmark, setDeletingBenchmark] = useState<Benchmark | null>(null);
 
   const filtered = useMemo(() => {
     if (activeFrequency === "all") return benchmarks;
@@ -46,6 +50,16 @@ export default function BenchmarksView() {
     if (avgDelta > 0) return `+${avgDelta}%`;
     return `${avgDelta}%`;
   }, [filtered]);
+
+  function handleDelete(benchmark: Benchmark) {
+    setDeletingBenchmark(benchmark);
+  }
+
+  function confirmDelete() {
+    if (!deletingBenchmark) return;
+    deleteBenchmark(deletingBenchmark.id);
+    setDeletingBenchmark(null);
+  }
 
   return (
     <div
@@ -243,8 +257,94 @@ export default function BenchmarksView() {
           }}
         >
           {filtered.map((benchmark) => (
-            <BenchmarkCard key={benchmark.id} benchmark={benchmark} />
+            <BenchmarkCard
+              key={benchmark.id}
+              benchmark={benchmark}
+              onDelete={handleDelete}
+            />
           ))}
+        </div>
+      )}
+
+      {/* Delete confirmation dialog */}
+      {deletingBenchmark && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.5)",
+          }}
+          onClick={() => setDeletingBenchmark(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-raised)",
+              border: "var(--border-hairline)",
+              borderRadius: 14,
+              padding: 24,
+              maxWidth: 380,
+              width: "100%",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
+            }}
+          >
+            <h3
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 18,
+                fontWeight: 400,
+                color: "var(--text-primary)",
+                margin: "0 0 8px",
+              }}
+            >
+              Delete Benchmark
+            </h3>
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--text-secondary)",
+                lineHeight: 1.5,
+                margin: "0 0 20px",
+              }}
+            >
+              Are you sure you want to delete <strong>{deletingBenchmark.name}</strong>? This will remove all assignments, scores, and history. This action cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => setDeletingBenchmark(null)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  border: "var(--border-hairline)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  border: "none",
+                  background: "#c04040",
+                  color: "#fff",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

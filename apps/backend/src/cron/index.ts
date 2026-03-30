@@ -16,6 +16,7 @@ import { createLogger } from "../lib/logger";
 import { runGraphSyncJob } from "./jobs/graph-sync.job";
 import { runGranolaSyncJob } from "./jobs/granola-sync.job";
 import { runFirefliesSyncJob } from "./jobs/fireflies-sync.job";
+import { runBenchmarkScoreJob } from "./jobs/benchmark-score.job";
 import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });
@@ -129,7 +130,40 @@ export function initCronJobs(): void {
     }
   });
 
+  // ──────────────────────────────────────────────
+  // Benchmark Score Computation: Nightly at 02:30
+  // Computes scores for all active benchmarks using
+  // AI parameter grading and weighted scoring.
+  // ──────────────────────────────────────────────
+  let isBenchmarkScoreRunning = false;
+
+  cron.schedule("30 2 * * *", async () => {
+    if (isBenchmarkScoreRunning) {
+      logger.warn("Benchmark score job still running — skipping");
+      return;
+    }
+
+    isBenchmarkScoreRunning = true;
+    try {
+      const result = await runBenchmarkScoreJob();
+      if (result.benchmarksProcessed > 0 || result.benchmarksFailed > 0) {
+        logger.info(
+          {
+            processed: result.benchmarksProcessed,
+            failed: result.benchmarksFailed,
+            timeMs: result.totalTimeMs,
+          },
+          "Benchmark score job completed"
+        );
+      }
+    } catch (error) {
+      logger.error({ error: String(error) }, "Benchmark score job failed");
+    } finally {
+      isBenchmarkScoreRunning = false;
+    }
+  });
+
   logger.info(
-    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min"
+    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min, Benchmark scores nightly at 02:30"
   );
 }
