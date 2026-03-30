@@ -527,65 +527,28 @@ export default function BenchmarkEditor() {
         </div>
       </div>
 
-      {/* Generate button */}
-      <button
-        onClick={handleGenerate}
-        disabled={!description.trim() || isGenerating}
-        style={{
-          alignSelf: "flex-start",
-          height: 36,
-          padding: "0 20px",
-          borderRadius: 8,
-          fontSize: 12,
-          fontFamily: "var(--font-sans)",
-          fontWeight: 500,
-          border: "var(--border-hairline)",
-          cursor: !description.trim() || isGenerating ? "not-allowed" : "pointer",
-          background:
-            description.trim() && !isGenerating
-              ? "rgba(var(--ui-rgb), 0.06)"
-              : "transparent",
-          color:
-            description.trim() && !isGenerating
-              ? "var(--text-primary)"
-              : "var(--text-faint)",
-          transition: "all 0.15s",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        {isGenerating && (
-          <Loader2
-            size={13}
-            className="animate-spin"
-          />
-        )}
-        {isGenerating ? "Generating..." : "Generate Parameters"}
-      </button>
-
-      {/* Parameters section */}
-      {params.length > 0 && (
-        <div>
-          <div
+      {/* Parameters section — always visible */}
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 12,
+          }}
+        >
+          <span
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 12,
+              fontSize: 10,
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.09em",
+              fontFamily: "var(--font-sans)",
             }}
           >
-            <span
-              style={{
-                fontSize: 10,
-                color: "var(--text-tertiary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.09em",
-                fontFamily: "var(--font-sans)",
-              }}
-            >
-              Parameters
-            </span>
+            Parameters
+          </span>
+          {params.length > 0 && (
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {removeMode ? (
                 <button
@@ -620,7 +583,77 @@ export default function BenchmarkEditor() {
                 </>
               )}
             </div>
+          )}
+        </div>
+
+        {params.length === 0 ? (
+          /* Empty state */
+          <div
+            style={{
+              border: "var(--border-hairline)",
+              borderRadius: 10,
+              padding: "32px 24px",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                No parameters yet
+              </span>
+              <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                Add parameters manually or generate them from your description.
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button
+                onClick={handleAddParam}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "var(--border-hairline)",
+                  cursor: "pointer",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  transition: "background 0.1s",
+                }}
+              >
+                Add Manually
+              </button>
+              <button
+                onClick={handleGenerate}
+                disabled={!description.trim() || isGenerating}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: !description.trim() || isGenerating ? "not-allowed" : "pointer",
+                  background: description.trim() && !isGenerating ? "#82C0CC" : "rgba(var(--ui-rgb), 0.08)",
+                  color: description.trim() && !isGenerating ? "#1A1916" : "var(--text-faint)",
+                  transition: "all 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {isGenerating && <Loader2 size={12} className="animate-spin" />}
+                {isGenerating ? "Generating..." : "Generate from Description"}
+              </button>
+            </div>
           </div>
+        ) : (
+          /* Parameter list */
           <div style={{ borderTop: "var(--border-hairline)" }}>
             {params.map((p) => (
               <ParameterRow
@@ -632,8 +665,8 @@ export default function BenchmarkEditor() {
               />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Save button */}
       <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 8 }}>
@@ -649,12 +682,8 @@ export default function BenchmarkEditor() {
             fontWeight: 500,
             border: "none",
             cursor: canSave ? "pointer" : "not-allowed",
-            background: canSave
-              ? "var(--text-primary)"
-              : "rgba(var(--ui-rgb), 0.08)",
-            color: canSave
-              ? "var(--bg-primary)"
-              : "var(--text-faint)",
+            background: canSave ? "#82C0CC" : "rgba(var(--ui-rgb), 0.08)",
+            color: canSave ? "#1A1916" : "var(--text-faint)",
             transition: "all 0.15s",
             display: "flex",
             alignItems: "center",
