@@ -5,8 +5,9 @@ import {
   updateBenchmark,
   updateAssignment,
   triggerCompute,
+  createBenchmark,
 } from "../../../services/benchmarkService";
-import type { BenchmarkPeriod } from "../../../services/benchmarkService";
+import type { BenchmarkPeriod, CreateBenchmarkPayload } from "../../../services/benchmarkService";
 
 export function useAssignBenchmark() {
   const queryClient = useQueryClient();
@@ -74,6 +75,17 @@ export function useUpdateAssignment() {
     }) => updateAssignment(benchmarkId, userId, payload),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "benchmarks", variables.benchmarkId] });
+    },
+  });
+}
+
+export function useCreateBenchmark() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateBenchmarkPayload) => createBenchmark(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "benchmarks"] });
     },
   });
 }

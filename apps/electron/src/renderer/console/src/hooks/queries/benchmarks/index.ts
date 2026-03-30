@@ -6,6 +6,7 @@ export {
   useUpdateBenchmark,
   useUpdateAssignment,
   useTriggerCompute,
+  useCreateBenchmark,
 } from "./useBenchmarkMutations";
 export { useMyBenchmarks } from "./useMyBenchmarks";
 export { useMyBenchmarkDetail } from "./useMyBenchmarkDetail";

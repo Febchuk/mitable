@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { useBenchmarks } from "@/console/src/hooks/queries/benchmarks";
 import type { BenchmarkPeriod } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
@@ -15,6 +17,7 @@ const PERIOD_FILTERS: { key: PeriodFilter; label: string }[] = [
 const SPINNER_COLOR = "#82C0CC";
 
 export default function BenchmarksView() {
+  const navigate = useNavigate();
   const { data: benchmarks = [], isLoading } = useBenchmarks();
   const [activePeriod, setActivePeriod] = useState<PeriodFilter>("all");
 
@@ -169,6 +172,34 @@ export default function BenchmarksView() {
           >
             {trendLabel}
           </span>
+        </div>
+
+        <div style={{ marginLeft: "auto", alignSelf: "flex-end" }}>
+          <button
+            onClick={() => navigate("/benchmarks/new")}
+            title="New Benchmark"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: "var(--border-hairline)",
+              background: "transparent",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+              transition: "background 0.1s",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <Plus size={14} />
+          </button>
         </div>
       </div>
 

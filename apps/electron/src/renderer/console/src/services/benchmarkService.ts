@@ -220,6 +220,112 @@ export async function fetchPersonBenchmarkDetail(
   }
 }
 
+// ── Custom Benchmark Types ─────────────────────────────────
+
+export interface BenchmarkAxis {
+  id: string;
+  name: string;
+  description: string;
+  importance: number; // 1-5 (user-facing)
+}
+
+export interface CreateBenchmarkPayload {
+  name: string;
+  description: string;
+  category: BenchmarkCategory;
+  period: BenchmarkPeriod;
+  axes: BenchmarkAxis[];
+}
+
+// ── Custom Benchmark API ──────────────────────────────────
+
+const MOCK_AXIS_TEMPLATES: Record<string, { name: string; description: string }[]> = {
+  code: [
+    { name: "Code Quality", description: "Measures code review scores, test coverage, and adherence to coding standards" },
+    { name: "Velocity", description: "Rate of feature delivery and story point completion" },
+    { name: "Technical Debt", description: "Reduction of legacy code issues and maintenance burden" },
+  ],
+  communication: [
+    { name: "Communication", description: "Frequency and clarity of updates shared with the team" },
+    { name: "Responsiveness", description: "Timeliness of replies to messages and review requests" },
+    { name: "Documentation", description: "Quality and completeness of written documentation" },
+  ],
+  leadership: [
+    { name: "Initiative", description: "Proactive problem-solving and self-directed work" },
+    { name: "Mentorship", description: "Time spent helping teammates grow and learn" },
+    { name: "Decision Making", description: "Quality and timeliness of technical decisions" },
+  ],
+  default: [
+    { name: "Output Quality", description: "Overall quality of work produced" },
+    { name: "Collaboration", description: "Effectiveness of working with teammates" },
+    { name: "Growth", description: "Progress in developing new skills and knowledge" },
+    { name: "Reliability", description: "Consistency in meeting commitments and deadlines" },
+  ],
+};
+
+export async function generateBenchmarkAxes(description: string): Promise<BenchmarkAxis[]> {
+  try {
+    const response = await apiRequest<{ axes: BenchmarkAxis[] }>("/admin/benchmarks/generate-axes", {
+      method: "POST",
+      body: JSON.stringify({ description }),
+    });
+    return response.axes;
+  } catch {
+    // Mock fallback: keyword-based axis generation
+    logger.info("Using mock axis generation (backend not available)");
+    await new Promise((r) => setTimeout(r, 500));
+
+    const lower = description.toLowerCase();
+    let templates = MOCK_AXIS_TEMPLATES.default;
+    if (lower.includes("code") || lower.includes("engineer") || lower.includes("development")) {
+      templates = MOCK_AXIS_TEMPLATES.code;
+    } else if (lower.includes("communicat") || lower.includes("writing") || lower.includes("update")) {
+      templates = MOCK_AXIS_TEMPLATES.communication;
+    } else if (lower.includes("lead") || lower.includes("manag") || lower.includes("senior")) {
+      templates = MOCK_AXIS_TEMPLATES.leadership;
+    }
+
+    return templates.map((t, i) => ({
+      id: `ax-${Date.now()}-${i}`,
+      name: t.name,
+      description: t.description,
+      importance: 3,
+    }));
+  }
+}
+
+export async function createBenchmark(payload: CreateBenchmarkPayload): Promise<Benchmark> {
+  try {
+    const response = await apiRequest<{ benchmark: Benchmark }>("/admin/benchmarks", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response.benchmark;
+  } catch {
+    // Mock fallback: return a fake benchmark
+    logger.info("Using mock benchmark creation (backend not available)");
+    const now = new Date().toISOString();
+    return {
+      id: `bm-${Date.now()}`,
+      organizationId: "mock-org",
+      name: payload.name,
+      description: payload.description,
+      category: payload.category,
+      metric: "weighted_axes",
+      targetValue: 100,
+      unit: "score",
+      period: payload.period,
+      isActive: true,
+      assignedCount: 0,
+      avgProgress: 0,
+      trend: "new",
+      trendDelta: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+}
+
 // ── Employee API ───────────────────────────────────────────
 
 export async function fetchMyBenchmarks(): Promise<MyBenchmark[]> {
