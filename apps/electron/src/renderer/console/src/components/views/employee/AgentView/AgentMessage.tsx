@@ -1,4 +1,5 @@
-import { Loader2, Terminal, FileText, Globe, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Terminal, FileText, Globe, AlertCircle, Copy, Check } from "lucide-react";
 import { Response } from "../../../../../../components/ui/ai-response";
 
 interface AgentMessageProps {
@@ -6,6 +7,40 @@ interface AgentMessageProps {
   content: string;
   toolName?: string;
   isPlan?: boolean;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const Icon = copied ? Check : Copy;
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? "Copied!" : "Copy message"}
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: 4,
+        borderRadius: 6,
+        color: copied ? "var(--mi-accent)" : "var(--text-tertiary)",
+        opacity: copied ? 1 : 0,
+        transition: "opacity 150ms, color 150ms",
+        display: "flex",
+        alignItems: "center",
+      }}
+      className="copy-btn"
+    >
+      <Icon size={14} />
+    </button>
+  );
 }
 
 export default function AgentMessage({ role, content, toolName, isPlan }: AgentMessageProps) {
@@ -61,7 +96,7 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
 
   if (isPlan && !isUser) {
     return (
-      <div style={{ padding: "14px 0" }}>
+      <div className="msg-row" style={{ padding: "14px 0", position: "relative" }}>
         <div
           style={{
             display: "flex",
@@ -86,6 +121,9 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
           }}
         >
           <Response>{content}</Response>
+        </div>
+        <div style={{ position: "absolute", top: 14, right: 0 }}>
+          <CopyButton text={content} />
         </div>
       </div>
     );
@@ -115,6 +153,7 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
 
   return (
     <div
+      className="msg-row"
       style={{
         padding: "14px 0",
         fontSize: 15,
@@ -122,9 +161,13 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
         color: "var(--text-primary)",
         letterSpacing: "-0.01em",
         wordBreak: "break-word",
+        position: "relative",
       }}
     >
       <Response>{content}</Response>
+      <div style={{ position: "absolute", top: 14, right: 0 }}>
+        <CopyButton text={content} />
+      </div>
     </div>
   );
 }

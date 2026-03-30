@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Search, Video, X, Zap, Monitor } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  Search,
+  Video,
+  X,
+  Zap,
+  Monitor,
+} from "lucide-react";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
 import { apiRequest } from "@/console/src/services/api";
@@ -1679,8 +1691,8 @@ export default function PersonDetail() {
             >
               <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                 {workPage * RECENT_WORK_PAGE_SIZE + 1}–
-                {Math.min((workPage + 1) * RECENT_WORK_PAGE_SIZE, filteredRecentWork.length)}
-                {" "}of {filteredRecentWork.length}
+                {Math.min((workPage + 1) * RECENT_WORK_PAGE_SIZE, filteredRecentWork.length)} of{" "}
+                {filteredRecentWork.length}
               </span>
               <div style={{ display: "flex", gap: 4 }}>
                 <button

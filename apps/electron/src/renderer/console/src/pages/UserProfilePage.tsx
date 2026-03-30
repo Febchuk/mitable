@@ -1695,7 +1695,14 @@ export default function UserProfilePage() {
 
   // Tab state — honor ?tab= query param from sidebar menu
   const [searchParams] = useSearchParams();
-  const validTabs = ["account", "security", "permissions", "preferences", "integrations", "update"] as const;
+  const validTabs = [
+    "account",
+    "security",
+    "permissions",
+    "preferences",
+    "integrations",
+    "update",
+  ] as const;
   type TabId = (typeof validTabs)[number];
   const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
     ? (searchParams.get("tab") as TabId)
@@ -2462,12 +2469,8 @@ export default function UserProfilePage() {
                       cursor: "pointer",
                       padding: 0,
                     }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.color = "var(--mi-accent-light)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.color = "var(--mi-accent)")
-                    }
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--mi-accent-light)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--mi-accent)")}
                   >
                     Re-run setup &rarr;
                   </button>

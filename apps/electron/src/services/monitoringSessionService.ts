@@ -67,15 +67,27 @@ interface ActiveSession {
 // MonitoringSessionService Class
 // ===========================
 
+type MaxDurationCallback = (sessionId: string) => void;
+
 class MonitoringSessionService {
   private activeSession: ActiveSession | null = null;
   private captureTimer: NodeJS.Timeout | null = null;
   private cleanupTimer: NodeJS.Timeout | null = null;
+  private maxDurationTimer: NodeJS.Timeout | null = null;
+  private onMaxDurationReached: MaxDurationCallback | null = null;
 
   constructor() {
     logger.info(
       "[MonitoringSessionService] Initialized with LocalFrameStorage + CheckpointService"
     );
+  }
+
+  /**
+   * Register a callback that fires when a session hits the maximum duration.
+   * Called once from main.ts — the callback should end the session and notify the user.
+   */
+  setMaxDurationHandler(handler: MaxDurationCallback): void {
+    this.onMaxDurationReached = handler;
   }
 
   /**
@@ -575,6 +587,9 @@ class MonitoringSessionService {
     // Set up periodic cleanup of closed windows (every 10 seconds)
     this.startWindowCleanupLoop();
 
+    // Start max-duration timer (auto-ends session after 6 hours)
+    this.startMaxDurationTimer();
+
     logger.info(` Capture loop started (interval: ${intervalMs}ms)`);
   }
 
@@ -586,8 +601,54 @@ class MonitoringSessionService {
       clearInterval(this.captureTimer);
       this.captureTimer = null;
     }
+    if (this.maxDurationTimer) {
+      clearTimeout(this.maxDurationTimer);
+      this.maxDurationTimer = null;
+    }
     this.stopWindowCleanupLoop();
     logger.info(" Capture loop stopped");
+  }
+
+  /**
+   * Start a one-shot timer that fires when the session exceeds MAX_DURATION_MS.
+   * Accounts for time already elapsed (e.g. crash-recovered sessions).
+   */
+  private startMaxDurationTimer(): void {
+    if (this.maxDurationTimer) {
+      clearTimeout(this.maxDurationTimer);
+    }
+
+    if (!this.activeSession) return;
+
+    const elapsed = Date.now() - this.activeSession.startedAt;
+    const remaining = SESSION_DEFAULTS.MAX_DURATION_MS - elapsed;
+
+    if (remaining <= 0) {
+      logger.warn("Session already exceeded max duration — triggering auto-end now");
+      this.fireMaxDurationCallback();
+      return;
+    }
+
+    const hours = Math.round((remaining / 3600000) * 10) / 10;
+    logger.info(`Max-duration timer set: ${hours}h remaining`);
+
+    this.maxDurationTimer = setTimeout(() => {
+      this.maxDurationTimer = null;
+      this.fireMaxDurationCallback();
+    }, remaining);
+  }
+
+  private fireMaxDurationCallback(): void {
+    const sessionId = this.activeSession?.id;
+    if (!sessionId) return;
+
+    logger.info(`Session reached max duration (6h) — auto-ending: ${sessionId}`);
+
+    if (this.onMaxDurationReached) {
+      this.onMaxDurationReached(sessionId);
+    } else {
+      logger.warn("No max-duration handler registered — session will stay active");
+    }
   }
 
   /**
