@@ -140,8 +140,8 @@ export const PersonDetailMockup = () => (
                         {CUSTOMERS.map((c) => (
                             <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <div style={{ width: 14, height: 3, borderRadius: 999, background: c.color, flexShrink: 0 }} />
-                                <span style={{ fontSize: 12, color: C.text, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</span>
-                                <span style={{ fontSize: 11, color: C.textSec, flexShrink: 0 }}>{c.hours}h ({c.pct}%)</span>
+                                <span style={{ fontSize: 12, color: C.text, whiteSpace: "nowrap" }}>{c.label}</span>
+                                <span style={{ fontSize: 11, color: C.textSec, flexShrink: 0, marginLeft: "auto" }}>{c.hours}h</span>
                             </div>
                         ))}
                     </div>

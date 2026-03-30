@@ -17,12 +17,19 @@
 
     --l-text: #ECE8E0;
     --l-text-secondary: #A09A8E;
+    --l-text-tertiary: #6B665C;
     --l-text-muted: #706B60;
     --l-text-faint: #4A4640;
 
     --l-border: #33312B;
     --l-border-subtle: #2A2824;
     --l-ui-rgb: 236, 232, 224;
+
+    --l-nav-bg: rgba(26, 25, 22, 0.82);
+    --l-nav-border: rgba(236, 232, 224, 0.06);
+    --l-nav-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15);
+    --l-nav-divider: rgba(236, 232, 224, 0.1);
+    --l-nav-hover-bg: rgba(236, 232, 224, 0.06);
 
     --l-serif: var(--font-newsreader, "Newsreader"), Georgia, serif;
     --l-sans: var(--font-dm-sans, "DM Sans"), system-ui, sans-serif;
@@ -51,6 +58,43 @@
     --font-mono: var(--font-jetbrains, "JetBrains Mono"), ui-monospace, monospace;
 }
 
+/* Light mode overrides (from Electron .light class) */
+.landing-light {
+    --l-bg: #F5F1ED;
+    --l-bg-raised: #FAF8F6;
+    --l-bg-overlay: #FDFCFB;
+    --l-bg-muted: #E8E2DC;
+
+    --l-accent: #2A7F8E;
+    --l-accent-dark: #16697A;
+    --l-accent-muted: rgba(42, 127, 142, 0.08);
+    --l-accent-dim: rgba(42, 127, 142, 0.04);
+
+    --l-text: #1C2B33;
+    --l-text-secondary: #5C6B73;
+    --l-text-tertiary: #8A9199;
+    --l-text-muted: #8A9199;
+    --l-text-faint: #B0B7BC;
+
+    --l-border: #E0D9D1;
+    --l-border-subtle: #E8E2DC;
+    --l-ui-rgb: 28, 43, 51;
+
+    --l-nav-bg: rgba(245, 241, 237, 0.82);
+    --l-nav-border: rgba(28, 43, 51, 0.08);
+    --l-nav-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+    --l-nav-divider: rgba(28, 43, 51, 0.1);
+    --l-nav-hover-bg: rgba(28, 43, 51, 0.06);
+
+    --mi-accent: #2A7F8E;
+    --mi-accent-rgb: 42, 127, 142;
+    --mi-accent-dark: #16697A;
+    --status-success: #2D8659;
+    --status-success-rgb: 45, 134, 89;
+    --status-error: #D45555;
+    --status-error-rgb: 212, 85, 85;
+}
+
 /* ── Landing page base ── */
 .landing {
     font-family: var(--l-sans);
@@ -61,6 +105,11 @@
 
 .landing * {
     box-sizing: border-box;
+}
+
+/* ── Scroll offset for anchor links (clears floating nav) ── */
+.l-feature-section {
+    scroll-margin-top: 80px;
 }
 
 /* ── Scroll reveal ── */
@@ -77,15 +126,21 @@
 .l-reveal-d2 { transition-delay: 0.16s; }
 .l-reveal-d3 { transition-delay: 0.24s; }
 
-/* ── macOS window shell (always dark) ── */
+/* ── macOS window shell (always dark, simulates the app) ── */
 .mac-window {
-    background: var(--l-bg);
+    background: #1A1916;
     border-radius: 12px;
-    border: 1px solid var(--l-border);
+    border: 1px solid #33312B;
     overflow: hidden;
     box-shadow:
         0 24px 80px rgba(0, 0, 0, 0.45),
         0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.landing-light .mac-window {
+    box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.12),
+        0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .mac-titlebar {
@@ -93,8 +148,8 @@
     align-items: center;
     padding: 11px 14px;
     gap: 7px;
-    background: var(--l-bg-raised);
-    border-bottom: 1px solid var(--l-border);
+    background: #211F1B;
+    border-bottom: 1px solid #33312B;
 }
 
 .mac-dot {
@@ -109,8 +164,8 @@
 /* ── Mock sidebar ── */
 .mock-sidebar {
     width: 154px;
-    background: var(--l-bg-raised);
-    border-right: 1px solid var(--l-border);
+    background: #211F1B;
+    border-right: 1px solid #33312B;
     padding: 14px 0;
     flex-shrink: 0;
     position: relative;
@@ -122,12 +177,12 @@
     gap: 8px;
     padding: 6px 14px;
     font-size: 12px;
-    color: var(--l-text-secondary);
+    color: #A09A8E;
     cursor: default;
 }
 .mock-sidebar-item.active {
-    background: var(--l-accent-muted);
-    color: var(--l-accent);
+    background: rgba(130, 192, 204, 0.12);
+    color: #82C0CC;
 }
 
 /* ── Screenshot frame with accent padding ── */
@@ -167,6 +222,10 @@
 }
 .logo-strip img:hover {
     opacity: 0.7;
+}
+
+.landing-light .logo-strip img {
+    filter: brightness(0);
 }
 
 /* ── Spinner ── */

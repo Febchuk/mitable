@@ -31,6 +31,15 @@ export const HomeScreen = () => {
         });
     }, [router]);
 
+    useEffect(() => {
+        if (checking) return;
+        const hash = window.location.hash.replace("#", "");
+        if (!hash) return;
+        requestAnimationFrame(() => {
+            document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
+        });
+    }, [checking]);
+
     if (checking) {
         return (
             <div
@@ -59,8 +68,9 @@ export const HomeScreen = () => {
 
                 {/* Feature 1: Benchmarks */}
                 <FeatureSection
+                    id="how-it-works"
                     title="Set the standard."
-                    description="Define what good looks like for every role. Mitable's AI generates scoring parameters from a simple description, so benchmarks take minutes to create — not days."
+                    description="Define what good looks like for every role. Mitable's AI generates scoring parameters from a simple description, so benchmarks take minutes to create."
                     linkText="Learn how benchmarks work →"
                     mockup={<BenchmarkMockup />}
                 />
@@ -68,7 +78,7 @@ export const HomeScreen = () => {
                 {/* Feature 2: Multi-app work montage */}
                 <FeatureSection
                     title="Your team just works."
-                    description="Slack, browsers, terminals, docs — Mitable captures work across every app on your team's computer. No manual time tracking. No status updates. Just work."
+                    description="Slack, browsers, terminals, docs — Mitable captures work across every app on your team's computer. No manual time tracking. No status updates."
                     linkText="See how capture works →"
                     mockup={<WorkMontageMockup />}
                     rawMockup

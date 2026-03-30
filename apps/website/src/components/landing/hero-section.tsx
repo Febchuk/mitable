@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useOsDetection } from "@/hooks/use-os-detection";
 
 const C = {
     text: "var(--l-text, #ECE8E0)",
@@ -13,6 +14,7 @@ const C = {
 
 export const HeroSection = () => {
     const heroRef = useRef<HTMLElement>(null);
+    const os = useOsDetection();
 
     useEffect(() => {
         const els = heroRef.current?.querySelectorAll(".hero-reveal");
@@ -97,7 +99,7 @@ export const HeroSection = () => {
                 onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
             >
-                Download for macOS
+                {os.label}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M8 3v10M8 13l-3-3M8 13l3-3" />
                 </svg>

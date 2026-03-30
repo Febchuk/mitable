@@ -1,21 +1,57 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+import { useTheme } from "@/hooks/use-theme";
+
 const C = {
-    bg: "var(--l-bg, #1A1916)",
-    text: "var(--l-text, #ECE8E0)",
-    textSec: "var(--l-text-secondary, #A09A8E)",
-    border: "var(--l-border, #33312B)",
+    text: "var(--l-text)",
+    textSec: "var(--l-text-secondary)",
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
 
 const navLinks = [
-    { label: "How it works", href: "#" },
+    { label: "How it works", href: "/#how-it-works" },
     { label: "Pricing", href: "/pricing" },
     { label: "About", href: "#" },
-    { label: "FAQs", href: "#" },
+    { label: "FAQs", href: "/faq" },
 ];
 
-export const LandingNav = () => (
+const SunIcon = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5" />
+        <line x1="12" y1="1" x2="12" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="23" />
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+        <line x1="1" y1="12" x2="3" y2="12" />
+        <line x1="21" y1="12" x2="23" y2="12" />
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+);
+
+const MoonIcon = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+);
+
+export const LandingNav = () => {
+    const pathname = usePathname();
+    const { theme, toggle } = useTheme();
+
+    const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+        if (href === "/#how-it-works") {
+            e.preventDefault();
+            if (pathname === "/") {
+                document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
+            } else {
+                window.location.href = "/#how-it-works";
+            }
+        }
+    };
+
+    return (
     <nav
         style={{
             position: "fixed",
@@ -28,12 +64,12 @@ export const LandingNav = () => (
             gap: 6,
             padding: "6px 6px 6px 20px",
             borderRadius: 999,
-            background: "rgba(26, 25, 22, 0.82)",
+            background: "var(--l-nav-bg)",
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
-            border: `1px solid rgba(236, 232, 224, 0.06)`,
+            border: "1px solid var(--l-nav-border)",
             fontFamily: C.sans,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)",
+            boxShadow: "var(--l-nav-shadow)",
         }}
     >
         {/* Logo */}
@@ -70,7 +106,7 @@ export const LandingNav = () => (
         </a>
 
         {/* Divider */}
-        <div style={{ width: 1, height: 16, background: "rgba(236, 232, 224, 0.1)", flexShrink: 0 }} />
+        <div style={{ width: 1, height: 16, background: "var(--l-nav-divider)", flexShrink: 0 }} />
 
         {/* Links */}
         <div style={{ display: "flex", alignItems: "center", gap: 4 }} className="landing-nav-links">
@@ -78,6 +114,7 @@ export const LandingNav = () => (
                 <a
                     key={link.label}
                     href={link.href}
+                    onClick={(e) => handleClick(e, link.href)}
                     style={{
                         color: C.textSec,
                         textDecoration: "none",
@@ -88,11 +125,11 @@ export const LandingNav = () => (
                         transition: "color 0.15s, background 0.15s",
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.color = C.text;
-                        e.currentTarget.style.background = "rgba(236, 232, 224, 0.06)";
+                        e.currentTarget.style.color = "var(--l-text)";
+                        e.currentTarget.style.background = "var(--l-nav-hover-bg)";
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "var(--l-text-secondary, #A09A8E)";
+                        e.currentTarget.style.color = "var(--l-text-secondary)";
                         e.currentTarget.style.background = "transparent";
                     }}
                 >
@@ -101,12 +138,42 @@ export const LandingNav = () => (
             ))}
         </div>
 
+        {/* Theme toggle */}
+        <button
+            onClick={toggle}
+            aria-label="Toggle theme"
+            style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 30,
+                height: 30,
+                borderRadius: 999,
+                border: "none",
+                background: "transparent",
+                color: C.textSec,
+                cursor: "pointer",
+                flexShrink: 0,
+                transition: "color 0.15s, background 0.15s",
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.color = "var(--l-text)";
+                e.currentTarget.style.background = "var(--l-nav-hover-bg)";
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.color = "var(--l-text-secondary)";
+                e.currentTarget.style.background = "transparent";
+            }}
+        >
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+        </button>
+
         {/* CTA */}
         <a
             href="/download"
             style={{
                 background: C.text,
-                color: C.bg,
+                color: "var(--l-bg)",
                 padding: "7px 18px",
                 borderRadius: 999,
                 fontWeight: 500,
@@ -127,4 +194,5 @@ export const LandingNav = () => (
             }
         `}</style>
     </nav>
-);
+    );
+};

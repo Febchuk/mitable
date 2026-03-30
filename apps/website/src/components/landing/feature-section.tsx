@@ -13,6 +13,7 @@ const C = {
 };
 
 interface FeatureSectionProps {
+    id?: string;
     title: string;
     description: string;
     linkText: string;
@@ -26,6 +27,7 @@ interface FeatureSectionProps {
 }
 
 export const FeatureSection = ({
+    id,
     title,
     description,
     linkText,
@@ -135,6 +137,7 @@ export const FeatureSection = ({
 
     return (
         <section
+            id={id}
             ref={ref}
             className="l-feature-section"
             style={{
