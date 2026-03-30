@@ -2,24 +2,16 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Minus, Loader2 } from "lucide-react";
 import { useCreateBenchmark } from "@/console/src/hooks/queries/benchmarks";
-import { generateBenchmarkAxes } from "@/console/src/services/benchmarkService";
+import { generateBenchmarkParameters } from "@/console/src/services/benchmarkService";
 import type {
-  BenchmarkAxis,
-  BenchmarkCategory,
-  BenchmarkPeriod,
+  BenchmarkParameter,
+  BenchmarkFrequency,
 } from "@/console/src/services/benchmarkService";
 
-const PERIODS: { key: BenchmarkPeriod; label: string }[] = [
+const FREQUENCIES: { key: BenchmarkFrequency; label: string }[] = [
   { key: "weekly", label: "Weekly" },
   { key: "monthly", label: "Monthly" },
   { key: "quarterly", label: "Quarterly" },
-];
-
-const CATEGORIES: { key: BenchmarkCategory; label: string }[] = [
-  { key: "productivity", label: "Productivity" },
-  { key: "collaboration", label: "Collaboration" },
-  { key: "growth", label: "Growth" },
-  { key: "quality", label: "Quality" },
 ];
 
 function ImportanceDots({
@@ -61,14 +53,14 @@ function ImportanceDots({
   );
 }
 
-function AxisRow({
-  axis,
+function ParameterRow({
+  param,
   onUpdate,
   onRemove,
   removeMode,
 }: {
-  axis: BenchmarkAxis;
-  onUpdate: (updates: Partial<BenchmarkAxis>) => void;
+  param: BenchmarkParameter;
+  onUpdate: (updates: Partial<BenchmarkParameter>) => void;
   onRemove: () => void;
   removeMode: boolean;
 }) {
@@ -92,14 +84,14 @@ function AxisRow({
         {editingName ? (
           <input
             autoFocus
-            defaultValue={axis.name}
+            defaultValue={param.name}
             onBlur={(e) => {
-              onUpdate({ name: e.target.value || axis.name });
+              onUpdate({ name: e.target.value || param.name });
               setEditingName(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                onUpdate({ name: (e.target as HTMLInputElement).value || axis.name });
+                onUpdate({ name: (e.target as HTMLInputElement).value || param.name });
                 setEditingName(false);
               }
             }}
@@ -127,20 +119,20 @@ function AxisRow({
               cursor: "text",
             }}
           >
-            {axis.name}
+            {param.name}
           </div>
         )}
         {editingDesc ? (
           <input
             autoFocus
-            defaultValue={axis.description}
+            defaultValue={param.description}
             onBlur={(e) => {
-              onUpdate({ description: e.target.value || axis.description });
+              onUpdate({ description: e.target.value || param.description });
               setEditingDesc(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                onUpdate({ description: (e.target as HTMLInputElement).value || axis.description });
+                onUpdate({ description: (e.target as HTMLInputElement).value || param.description });
                 setEditingDesc(false);
               }
             }}
@@ -168,14 +160,14 @@ function AxisRow({
               lineHeight: 1.4,
             }}
           >
-            {axis.description}
+            {param.description}
           </div>
         )}
       </div>
 
       {/* Importance dots */}
       <ImportanceDots
-        value={axis.importance}
+        value={param.importance}
         onChange={(v) => onUpdate({ importance: v })}
       />
 
@@ -183,7 +175,7 @@ function AxisRow({
       {removeMode && (
         <button
           onClick={onRemove}
-          title="Remove axis"
+          title="Remove parameter"
           style={{
             width: 24,
             height: 24,
@@ -251,9 +243,8 @@ export default function BenchmarkEditor() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<BenchmarkCategory>("productivity");
-  const [period, setPeriod] = useState<BenchmarkPeriod>("monthly");
-  const [axes, setAxes] = useState<BenchmarkAxis[]>([]);
+  const [frequency, setFrequency] = useState<BenchmarkFrequency>("monthly");
+  const [params, setParams] = useState<BenchmarkParameter[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
 
@@ -261,47 +252,47 @@ export default function BenchmarkEditor() {
     if (!description.trim()) return;
     setIsGenerating(true);
     try {
-      const generated = await generateBenchmarkAxes(description);
-      setAxes(generated);
+      const generated = await generateBenchmarkParameters(description);
+      setParams(generated);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleAddAxis = () => {
-    setAxes((prev) => [
+  const handleAddParam = () => {
+    setParams((prev) => [
       ...prev,
       {
-        id: `ax-${Date.now()}`,
-        name: "New Axis",
+        id: `param-${Date.now()}`,
+        name: "New Parameter",
         description: "Click to edit description",
         importance: 3,
       },
     ]);
   };
 
-  const handleRemoveAxis = (id: string) => {
-    setAxes((prev) => prev.filter((a) => a.id !== id));
-    if (axes.length <= 2) setRemoveMode(false);
+  const handleRemoveParam = (id: string) => {
+    setParams((prev) => prev.filter((a) => a.id !== id));
+    if (params.length <= 2) setRemoveMode(false);
   };
 
-  const handleUpdateAxis = (id: string, updates: Partial<BenchmarkAxis>) => {
-    setAxes((prev) =>
+  const handleUpdateParam = (id: string, updates: Partial<BenchmarkParameter>) => {
+    setParams((prev) =>
       prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
     );
   };
 
   const handleSave = async () => {
-    if (!name.trim() || axes.length === 0) return;
+    if (!name.trim() || params.length === 0) return;
     try {
-      await create({ name, description, category, period, axes });
+      await create({ name, description, frequency, parameters: params });
       navigate("/benchmarks");
     } catch {
       // Error handled by mutation
     }
   };
 
-  const canSave = name.trim().length > 0 && axes.length > 0 && !isSaving;
+  const canSave = name.trim().length > 0 && params.length > 0 && !isSaving;
 
   return (
     <div
@@ -411,7 +402,7 @@ export default function BenchmarkEditor() {
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Describe what this benchmark measures. AI will generate scoring axes from this."
+          placeholder="Describe what this benchmark measures. AI will generate scoring parameters from this."
           rows={3}
           style={{
             fontSize: 14,
@@ -435,9 +426,9 @@ export default function BenchmarkEditor() {
         />
       </div>
 
-      {/* Category + Period toggles */}
+      {/* Frequency toggle */}
       <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-        {/* Category */}
+        {/* Frequency */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label
             style={{
@@ -448,7 +439,7 @@ export default function BenchmarkEditor() {
               fontFamily: "var(--font-sans)",
             }}
           >
-            Category
+            Frequency
           </label>
           <div
             style={{
@@ -459,21 +450,21 @@ export default function BenchmarkEditor() {
               padding: 3,
             }}
           >
-            {CATEGORIES.map((c) => (
+            {FREQUENCIES.map((f) => (
               <button
-                key={c.key}
-                onClick={() => setCategory(c.key)}
+                key={f.key}
+                onClick={() => setFrequency(f.key)}
                 style={{
                   padding: "4px 12px",
                   borderRadius: 5,
                   fontSize: 11,
                   fontFamily: "var(--font-sans)",
                   color:
-                    category === c.key
+                    frequency === f.key
                       ? "var(--text-primary)"
                       : "var(--text-tertiary)",
                   background:
-                    category === c.key
+                    frequency === f.key
                       ? "rgba(255,255,255,0.08)"
                       : "transparent",
                   border: "none",
@@ -481,57 +472,7 @@ export default function BenchmarkEditor() {
                   transition: "background 0.1s, color 0.1s",
                 }}
               >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Period */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label
-            style={{
-              fontSize: 10,
-              color: "var(--text-tertiary)",
-              textTransform: "uppercase",
-              letterSpacing: "0.09em",
-              fontFamily: "var(--font-sans)",
-            }}
-          >
-            Period
-          </label>
-          <div
-            style={{
-              display: "flex",
-              gap: 4,
-              background: "rgba(var(--ui-rgb), 0.05)",
-              borderRadius: 7,
-              padding: 3,
-            }}
-          >
-            {PERIODS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPeriod(p.key)}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: 5,
-                  fontSize: 11,
-                  fontFamily: "var(--font-sans)",
-                  color:
-                    period === p.key
-                      ? "var(--text-primary)"
-                      : "var(--text-tertiary)",
-                  background:
-                    period === p.key
-                      ? "rgba(255,255,255,0.08)"
-                      : "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "background 0.1s, color 0.1s",
-                }}
-              >
-                {p.label}
+                {f.label}
               </button>
             ))}
           </div>
@@ -572,11 +513,11 @@ export default function BenchmarkEditor() {
             className="animate-spin"
           />
         )}
-        {isGenerating ? "Generating..." : "Generate Axes"}
+        {isGenerating ? "Generating..." : "Generate Parameters"}
       </button>
 
-      {/* Axes section */}
-      {axes.length > 0 && (
+      {/* Parameters section */}
+      {params.length > 0 && (
         <div>
           <div
             style={{
@@ -595,7 +536,7 @@ export default function BenchmarkEditor() {
                 fontFamily: "var(--font-sans)",
               }}
             >
-              Axes
+              Parameters
             </span>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {removeMode ? (
@@ -618,13 +559,13 @@ export default function BenchmarkEditor() {
                 </button>
               ) : (
                 <>
-                  <IconButton onClick={handleAddAxis} title="Add axis">
+                  <IconButton onClick={handleAddParam} title="Add parameter">
                     <Plus size={14} />
                   </IconButton>
                   <IconButton
                     onClick={() => setRemoveMode(true)}
-                    title="Remove axes"
-                    disabled={axes.length <= 1}
+                    title="Remove parameters"
+                    disabled={params.length <= 1}
                   >
                     <Minus size={14} />
                   </IconButton>
@@ -633,12 +574,12 @@ export default function BenchmarkEditor() {
             </div>
           </div>
           <div style={{ borderTop: "var(--border-hairline)" }}>
-            {axes.map((axis) => (
-              <AxisRow
-                key={axis.id}
-                axis={axis}
-                onUpdate={(updates) => handleUpdateAxis(axis.id, updates)}
-                onRemove={() => handleRemoveAxis(axis.id)}
+            {params.map((p) => (
+              <ParameterRow
+                key={p.id}
+                param={p}
+                onUpdate={(updates) => handleUpdateParam(p.id, updates)}
+                onRemove={() => handleRemoveParam(p.id)}
                 removeMode={removeMode}
               />
             ))}

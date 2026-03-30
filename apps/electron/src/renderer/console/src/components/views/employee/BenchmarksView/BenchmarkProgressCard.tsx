@@ -153,7 +153,7 @@ export function BenchmarkProgressCard({ benchmark, onClick }: BenchmarkProgressC
         {/* Footer: frequency + trend */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
           <span style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "capitalize" }}>
-            {benchmark.period}
+            {benchmark.frequency}
           </span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: trendColor }}>
             {benchmark.trend === "improving" ? (

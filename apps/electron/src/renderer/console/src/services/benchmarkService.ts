@@ -6,7 +6,7 @@ const logger = createLogger("BenchmarkService");
 // ── Types ──────────────────────────────────────────────────
 
 export type BenchmarkCategory = "productivity" | "collaboration" | "growth" | "quality";
-export type BenchmarkPeriod = "weekly" | "monthly" | "quarterly";
+export type BenchmarkFrequency = "weekly" | "monthly" | "quarterly";
 export type TrendDirection = "improving" | "declining" | "stable" | "new";
 export type PercentileTier = "top_1" | "top_10" | "top_25" | "top_50" | "bottom_half";
 
@@ -19,7 +19,7 @@ export interface Benchmark {
   metric: string;
   targetValue: number;
   unit: string;
-  period: BenchmarkPeriod;
+  frequency: BenchmarkFrequency;
   isActive: boolean;
   assignedCount: number;
   avgProgress: number;
@@ -82,7 +82,7 @@ export interface MyBenchmark {
   percentile: PercentileTier;
   trend: TrendDirection;
   trendDelta: number;
-  period: BenchmarkPeriod;
+  frequency: BenchmarkFrequency;
   topAccomplishment: string | null;
 }
 
@@ -116,7 +116,7 @@ export async function fetchBenchmarkDetail(id: string): Promise<BenchmarkDetail>
 
 export async function updateBenchmark(
   id: string,
-  payload: { targetValue?: number; period?: BenchmarkPeriod; isActive?: boolean }
+  payload: { targetValue?: number; frequency?: BenchmarkFrequency; isActive?: boolean }
 ): Promise<Benchmark> {
   try {
     const response = await apiRequest<{ benchmark: Benchmark }>(`/admin/benchmarks/${id}`, {
@@ -199,7 +199,7 @@ export interface PersonBenchmarkDetail {
   percentile: PercentileTier;
   trend: TrendDirection;
   trendDelta: number;
-  period: BenchmarkPeriod;
+  frequency: BenchmarkFrequency;
   history: BenchmarkSnapshot[];
   suggestions: AISuggestion[];
   accomplishments: Accomplishment[];
@@ -222,7 +222,7 @@ export async function fetchPersonBenchmarkDetail(
 
 // ── Custom Benchmark Types ─────────────────────────────────
 
-export interface BenchmarkAxis {
+export interface BenchmarkParameter {
   id: string;
   name: string;
   description: string;
@@ -232,14 +232,13 @@ export interface BenchmarkAxis {
 export interface CreateBenchmarkPayload {
   name: string;
   description: string;
-  category: BenchmarkCategory;
-  period: BenchmarkPeriod;
-  axes: BenchmarkAxis[];
+  frequency: BenchmarkFrequency;
+  parameters: BenchmarkParameter[];
 }
 
 // ── Custom Benchmark API ──────────────────────────────────
 
-const MOCK_AXIS_TEMPLATES: Record<string, { name: string; description: string }[]> = {
+const MOCK_PARAM_TEMPLATES: Record<string, { name: string; description: string }[]> = {
   code: [
     { name: "Code Quality", description: "Measures code review scores, test coverage, and adherence to coding standards" },
     { name: "Velocity", description: "Rate of feature delivery and story point completion" },
@@ -263,30 +262,30 @@ const MOCK_AXIS_TEMPLATES: Record<string, { name: string; description: string }[
   ],
 };
 
-export async function generateBenchmarkAxes(description: string): Promise<BenchmarkAxis[]> {
+export async function generateBenchmarkParameters(description: string): Promise<BenchmarkParameter[]> {
   try {
-    const response = await apiRequest<{ axes: BenchmarkAxis[] }>("/admin/benchmarks/generate-axes", {
+    const response = await apiRequest<{ parameters: BenchmarkParameter[] }>("/admin/benchmarks/generate-parameters", {
       method: "POST",
       body: JSON.stringify({ description }),
     });
-    return response.axes;
+    return response.parameters;
   } catch {
-    // Mock fallback: keyword-based axis generation
-    logger.info("Using mock axis generation (backend not available)");
+    // Mock fallback: keyword-based parameter generation
+    logger.info("Using mock parameter generation (backend not available)");
     await new Promise((r) => setTimeout(r, 500));
 
     const lower = description.toLowerCase();
-    let templates = MOCK_AXIS_TEMPLATES.default;
+    let templates = MOCK_PARAM_TEMPLATES.default;
     if (lower.includes("code") || lower.includes("engineer") || lower.includes("development")) {
-      templates = MOCK_AXIS_TEMPLATES.code;
+      templates = MOCK_PARAM_TEMPLATES.code;
     } else if (lower.includes("communicat") || lower.includes("writing") || lower.includes("update")) {
-      templates = MOCK_AXIS_TEMPLATES.communication;
+      templates = MOCK_PARAM_TEMPLATES.communication;
     } else if (lower.includes("lead") || lower.includes("manag") || lower.includes("senior")) {
-      templates = MOCK_AXIS_TEMPLATES.leadership;
+      templates = MOCK_PARAM_TEMPLATES.leadership;
     }
 
     return templates.map((t, i) => ({
-      id: `ax-${Date.now()}-${i}`,
+      id: `param-${Date.now()}-${i}`,
       name: t.name,
       description: t.description,
       importance: 3,
@@ -310,11 +309,11 @@ export async function createBenchmark(payload: CreateBenchmarkPayload): Promise<
       organizationId: "mock-org",
       name: payload.name,
       description: payload.description,
-      category: payload.category,
-      metric: "weighted_axes",
+      category: "productivity",
+      metric: "weighted_parameters",
       targetValue: 100,
       unit: "score",
-      period: payload.period,
+      frequency: payload.frequency,
       isActive: true,
       assignedCount: 0,
       avgProgress: 0,

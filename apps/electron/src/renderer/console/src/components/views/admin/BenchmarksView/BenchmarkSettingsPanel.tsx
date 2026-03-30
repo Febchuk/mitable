@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useUpdateBenchmark } from "@/console/src/hooks/queries/benchmarks";
-import type { Benchmark, BenchmarkPeriod } from "@/console/src/services/benchmarkService";
+import type { Benchmark, BenchmarkFrequency } from "@/console/src/services/benchmarkService";
 
 interface BenchmarkSettingsPanelProps {
   open: boolean;
@@ -14,7 +14,7 @@ interface BenchmarkSettingsPanelProps {
   benchmark: Benchmark;
 }
 
-const PERIOD_OPTIONS: { value: BenchmarkPeriod; label: string }[] = [
+const FREQUENCY_OPTIONS: { value: BenchmarkFrequency; label: string }[] = [
   { value: "weekly", label: "Weekly" },
   { value: "monthly", label: "Monthly" },
   { value: "quarterly", label: "Quarterly" },
@@ -28,14 +28,14 @@ export function BenchmarkSettingsPanel({
   const { mutate: updateBenchmark, isPending } = useUpdateBenchmark();
 
   const [targetValue, setTargetValue] = useState(String(benchmark.targetValue));
-  const [period, setPeriod] = useState<BenchmarkPeriod>(benchmark.period);
+  const [frequency, setFrequency] = useState<BenchmarkFrequency>(benchmark.frequency);
   const [isActive, setIsActive] = useState(benchmark.isActive);
 
   // Sync with benchmark prop when it changes or dialog opens
   useEffect(() => {
     if (open) {
       setTargetValue(String(benchmark.targetValue));
-      setPeriod(benchmark.period);
+      setFrequency(benchmark.frequency);
       setIsActive(benchmark.isActive);
     }
   }, [open, benchmark]);
@@ -47,7 +47,7 @@ export function BenchmarkSettingsPanel({
         id: benchmark.id,
         payload: {
           targetValue: isNaN(parsedTarget) ? undefined : parsedTarget,
-          period,
+          frequency,
           isActive,
         },
       },
@@ -161,11 +161,11 @@ export function BenchmarkSettingsPanel({
                 fontFamily: "var(--font-sans)",
               }}
             >
-              Period
+              Frequency
             </label>
             <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as BenchmarkPeriod)}
+              value={frequency}
+              onChange={(e) => setFrequency(e.target.value as BenchmarkFrequency)}
               style={{
                 width: "100%",
                 height: 38,
@@ -181,7 +181,7 @@ export function BenchmarkSettingsPanel({
                 WebkitAppearance: "none",
               }}
             >
-              {PERIOD_OPTIONS.map((opt) => (
+              {FREQUENCY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { useBenchmarks } from "@/console/src/hooks/queries/benchmarks";
-import type { BenchmarkPeriod } from "@/console/src/services/benchmarkService";
+import type { BenchmarkFrequency } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
 
-type PeriodFilter = "all" | BenchmarkPeriod;
+type FrequencyFilter = "all" | BenchmarkFrequency;
 
-const PERIOD_FILTERS: { key: PeriodFilter; label: string }[] = [
+const FREQUENCY_FILTERS: { key: FrequencyFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "weekly", label: "Weekly" },
   { key: "monthly", label: "Monthly" },
@@ -19,12 +19,12 @@ const SPINNER_COLOR = "#82C0CC";
 export default function BenchmarksView() {
   const navigate = useNavigate();
   const { data: benchmarks = [], isLoading } = useBenchmarks();
-  const [activePeriod, setActivePeriod] = useState<PeriodFilter>("all");
+  const [activeFrequency, setActiveFrequency] = useState<FrequencyFilter>("all");
 
   const filtered = useMemo(() => {
-    if (activePeriod === "all") return benchmarks;
-    return benchmarks.filter((b) => b.period === activePeriod);
-  }, [benchmarks, activePeriod]);
+    if (activeFrequency === "all") return benchmarks;
+    return benchmarks.filter((b) => b.frequency === activeFrequency);
+  }, [benchmarks, activeFrequency]);
 
   // Score: avg completion across filtered benchmarks
   const score = useMemo(() => {
@@ -92,21 +92,21 @@ export default function BenchmarksView() {
             padding: 3,
           }}
         >
-          {PERIOD_FILTERS.map((f) => (
+          {FREQUENCY_FILTERS.map((f) => (
             <button
               key={f.key}
-              onClick={() => setActivePeriod(f.key)}
+              onClick={() => setActiveFrequency(f.key)}
               style={{
                 padding: "4px 12px",
                 borderRadius: 5,
                 fontSize: 11,
                 fontFamily: "var(--font-sans)",
                 color:
-                  activePeriod === f.key
+                  activeFrequency === f.key
                     ? "var(--text-primary)"
                     : "var(--text-tertiary)",
                 background:
-                  activePeriod === f.key
+                  activeFrequency === f.key
                     ? "rgba(255,255,255,0.08)"
                     : "transparent",
                 border: "none",
@@ -230,9 +230,9 @@ export default function BenchmarksView() {
             color: "var(--text-secondary)",
           }}
         >
-          {activePeriod === "all"
+          {activeFrequency === "all"
             ? "No benchmarks found."
-            : `No ${activePeriod} benchmarks found.`}
+            : `No ${activeFrequency} benchmarks found.`}
         </div>
       ) : (
         <div

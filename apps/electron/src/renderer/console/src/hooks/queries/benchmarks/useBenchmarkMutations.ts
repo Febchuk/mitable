@@ -7,7 +7,7 @@ import {
   triggerCompute,
   createBenchmark,
 } from "../../../services/benchmarkService";
-import type { BenchmarkPeriod, CreateBenchmarkPayload } from "../../../services/benchmarkService";
+import type { BenchmarkFrequency, CreateBenchmarkPayload } from "../../../services/benchmarkService";
 
 export function useAssignBenchmark() {
   const queryClient = useQueryClient();
@@ -51,7 +51,7 @@ export function useUpdateBenchmark() {
       payload,
     }: {
       id: string;
-      payload: { targetValue?: number; period?: BenchmarkPeriod; isActive?: boolean };
+      payload: { targetValue?: number; frequency?: BenchmarkFrequency; isActive?: boolean };
     }) => updateBenchmark(id, payload),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "benchmarks", variables.id] });
