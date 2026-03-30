@@ -13,13 +13,18 @@
 
 import { db } from "../../db/client.js";
 import { benchmarks } from "../../db/schema/benchmarks.schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { benchmarkComputeService } from "../../services/benchmark-compute.service.js";
 import { createLogger } from "../../lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-score-job" });
 
-export async function runBenchmarkScoreJob(): Promise<{
+/**
+ * Compute scores for active benchmarks.
+ * @param frequencies - If provided, only compute benchmarks with matching frequency.
+ *                      If omitted, compute all active benchmarks (used by backfill script).
+ */
+export async function runBenchmarkScoreJob(frequencies?: string[]): Promise<{
   benchmarksProcessed: number;
   benchmarksFailed: number;
   totalTimeMs: number;
@@ -29,22 +34,31 @@ export async function runBenchmarkScoreJob(): Promise<{
   let failed = 0;
 
   try {
-    // Fetch all active benchmarks across all orgs
+    // Fetch active benchmarks, optionally filtered by frequency
+    const conditions = [eq(benchmarks.isActive, true)];
+    if (frequencies && frequencies.length > 0) {
+      conditions.push(inArray(benchmarks.frequency, frequencies));
+    }
+
     const activeBenchmarks = await db
       .select({
         id: benchmarks.id,
         name: benchmarks.name,
+        frequency: benchmarks.frequency,
         organizationId: benchmarks.organizationId,
       })
       .from(benchmarks)
-      .where(eq(benchmarks.isActive, true));
+      .where(and(...conditions));
 
     if (activeBenchmarks.length === 0) {
       logger.info("No active benchmarks to compute");
       return { benchmarksProcessed: 0, benchmarksFailed: 0, totalTimeMs: Date.now() - startTime };
     }
 
-    logger.info({ count: activeBenchmarks.length }, "Starting benchmark score computation");
+    logger.info(
+      { count: activeBenchmarks.length, frequencies: frequencies ?? "all" },
+      "Starting benchmark score computation"
+    );
 
     // Process each benchmark sequentially to avoid overwhelming the LLM
     for (const bm of activeBenchmarks) {
