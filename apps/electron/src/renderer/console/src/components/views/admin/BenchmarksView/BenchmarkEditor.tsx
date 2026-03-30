@@ -73,9 +73,6 @@ function ParameterRow({
   onRemove: () => void;
   removeMode: boolean;
 }) {
-  const [editingName, setEditingName] = useState(false);
-  const [editingDesc, setEditingDesc] = useState(false);
-
   return (
     <div
       style={{
@@ -88,90 +85,47 @@ function ParameterRow({
         transition: "opacity 0.15s",
       }}
     >
-      {/* Name + description */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {editingName ? (
-          <input
-            autoFocus
-            defaultValue={param.name}
-            onBlur={(e) => {
-              onUpdate({ name: e.target.value || param.name });
-              setEditingName(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                onUpdate({ name: (e.target as HTMLInputElement).value || param.name });
-                setEditingName(false);
-              }
-            }}
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              background: "rgba(var(--ui-rgb), 0.04)",
-              border: "var(--border-hairline)",
-              borderRadius: 4,
-              padding: "2px 6px",
-              fontFamily: "var(--font-sans)",
-              width: "100%",
-              outline: "none",
-            }}
-          />
-        ) : (
-          <div
-            onClick={() => setEditingName(true)}
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              lineHeight: 1.2,
-              cursor: "text",
-            }}
-          >
-            {param.name}
-          </div>
-        )}
-        {editingDesc ? (
-          <input
-            autoFocus
-            defaultValue={param.description}
-            onBlur={(e) => {
-              onUpdate({ description: e.target.value || param.description });
-              setEditingDesc(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                onUpdate({ description: (e.target as HTMLInputElement).value || param.description });
-                setEditingDesc(false);
-              }
-            }}
-            style={{
-              fontSize: 11,
-              color: "var(--text-tertiary)",
-              background: "rgba(var(--ui-rgb), 0.04)",
-              border: "var(--border-hairline)",
-              borderRadius: 4,
-              padding: "2px 6px",
-              fontFamily: "var(--font-sans)",
-              width: "100%",
-              outline: "none",
-              marginTop: 4,
-            }}
-          />
-        ) : (
-          <div
-            onClick={() => setEditingDesc(true)}
-            style={{
-              fontSize: 11,
-              color: "var(--text-tertiary)",
-              marginTop: 5,
-              cursor: "text",
-              lineHeight: 1.4,
-            }}
-          >
-            {param.description}
-          </div>
-        )}
+      {/* Name + description — always editable inputs */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+        <input
+          value={param.name}
+          onChange={(e) => onUpdate({ name: e.target.value })}
+          placeholder="Parameter name"
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--text-primary)",
+            background: "transparent",
+            border: "none",
+            borderBottom: "1px solid rgba(var(--ui-rgb), 0.08)",
+            padding: "2px 0",
+            fontFamily: "var(--font-sans)",
+            width: "100%",
+            outline: "none",
+            transition: "border-color 0.15s",
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderBottomColor = "rgba(var(--ui-rgb), 0.25)"; }}
+          onBlur={(e) => { e.currentTarget.style.borderBottomColor = "rgba(var(--ui-rgb), 0.08)"; }}
+        />
+        <input
+          value={param.description}
+          onChange={(e) => onUpdate({ description: e.target.value })}
+          placeholder="What does this parameter measure?"
+          style={{
+            fontSize: 11,
+            color: "var(--text-tertiary)",
+            background: "transparent",
+            border: "none",
+            borderBottom: "1px solid rgba(var(--ui-rgb), 0.06)",
+            padding: "2px 0",
+            fontFamily: "var(--font-sans)",
+            width: "100%",
+            outline: "none",
+            transition: "border-color 0.15s",
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderBottomColor = "rgba(var(--ui-rgb), 0.2)"; }}
+          onBlur={(e) => { e.currentTarget.style.borderBottomColor = "rgba(var(--ui-rgb), 0.06)"; }}
+        />
       </div>
 
       {/* Importance dots */}
