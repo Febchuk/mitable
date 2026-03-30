@@ -15,6 +15,7 @@ interface BenchmarkSettingsPanelProps {
 }
 
 const FREQUENCY_OPTIONS: { value: BenchmarkFrequency; label: string }[] = [
+  { value: "daily", label: "Daily" },
   { value: "weekly", label: "Weekly" },
   { value: "monthly", label: "Monthly" },
   { value: "quarterly", label: "Quarterly" },

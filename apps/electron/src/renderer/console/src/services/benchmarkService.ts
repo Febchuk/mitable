@@ -6,7 +6,7 @@ const logger = createLogger("BenchmarkService");
 // ── Types ──────────────────────────────────────────────────
 
 export type BenchmarkCategory = "productivity" | "collaboration" | "growth" | "quality";
-export type BenchmarkFrequency = "weekly" | "monthly" | "quarterly";
+export type BenchmarkFrequency = "daily" | "weekly" | "monthly" | "quarterly";
 export type TrendDirection = "improving" | "declining" | "stable" | "new";
 export type PercentileTier = "top_1" | "top_10" | "top_25" | "top_50" | "bottom_half";
 

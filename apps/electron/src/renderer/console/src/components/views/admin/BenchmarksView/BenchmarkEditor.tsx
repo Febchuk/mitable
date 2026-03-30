@@ -17,6 +17,7 @@ import type {
 } from "@/console/src/services/benchmarkService";
 
 const FREQUENCIES: { key: BenchmarkFrequency; label: string }[] = [
+  { key: "daily", label: "Daily" },
   { key: "weekly", label: "Weekly" },
   { key: "monthly", label: "Monthly" },
   { key: "quarterly", label: "Quarterly" },

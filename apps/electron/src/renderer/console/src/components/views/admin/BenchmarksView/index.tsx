@@ -9,6 +9,7 @@ type FrequencyFilter = "all" | BenchmarkFrequency;
 
 const FREQUENCY_FILTERS: { key: FrequencyFilter; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "daily", label: "Daily" },
   { key: "weekly", label: "Weekly" },
   { key: "monthly", label: "Monthly" },
   { key: "quarterly", label: "Quarterly" },

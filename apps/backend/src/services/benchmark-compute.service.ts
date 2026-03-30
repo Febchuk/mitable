@@ -61,6 +61,8 @@ export interface PeriodActivitySummary {
 
 function getPeriodDays(frequency: string): number {
   switch (frequency) {
+    case "daily":
+      return 1;
     case "weekly":
       return 7;
     case "monthly":
