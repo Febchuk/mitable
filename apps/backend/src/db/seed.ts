@@ -2362,20 +2362,20 @@ async function seedBenchmarks(organizationId: string, users: schema.User[]) {
 
       totalAssignments++;
 
-      // Insert 8 weekly snapshots
+      // Insert 8 weekly snapshots (values are 0-100 progress scale)
       const snapshots = [];
       for (let week = 7; week >= 0; week--) {
         const snapshotDate = new Date(today);
         snapshotDate.setDate(today.getDate() - week * 7);
-        const baseValue = cfg.currentValue * 0.6;
+        const baseProgress = cfg.progress * 0.7;
         const progression = (7 - week) / 7;
-        const rawValue = baseValue + (cfg.currentValue - baseValue) * progression + (Math.random() * 10 - 5);
-        const snapshotValue = Math.max(0, Math.round(rawValue * 10) / 10);
+        const rawProgress = baseProgress + (cfg.progress - baseProgress) * progression + (Math.random() * 6 - 3);
+        const snapshotValue = Math.min(100, Math.max(0, Math.round(rawProgress * 10) / 10));
         snapshots.push({
           assignmentId: assignment.id,
           date: formatDate(snapshotDate),
           value: snapshotValue,
-          target: bm.targetValue,
+          target: 100,
         });
       }
       await db.insert(schema.benchmarkSnapshots).values(snapshots);

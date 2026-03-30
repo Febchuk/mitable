@@ -495,13 +495,12 @@ async function computeScores(
         );
       }
 
-      // 9. Insert snapshot
+      // 9. Insert snapshot (store progress 0-100 so charts are consistent)
       await db.insert(benchmarkSnapshots).values({
         assignmentId: result.assignmentId,
         date: today,
-        value: result.currentValue,
-        target: assignments.find((a) => a.id === result.assignmentId)?.targetValue ??
-          benchmark.targetValue,
+        value: result.progress,
+        target: 100,
       });
 
       // 10. Generate suggestions and accomplishments via AI
