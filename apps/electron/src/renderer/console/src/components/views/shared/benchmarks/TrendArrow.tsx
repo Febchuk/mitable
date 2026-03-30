@@ -33,7 +33,7 @@ export function TrendArrow({ trend, delta }: TrendArrowProps) {
         style={{ color: "#3A9B6B" }}
       >
         <TrendingUp size={14} strokeWidth={2} />
-        +{Math.abs(delta)}%
+        +{Math.abs(delta).toFixed(1)}%
       </span>
     );
   }
@@ -45,7 +45,7 @@ export function TrendArrow({ trend, delta }: TrendArrowProps) {
       style={{ color: "#D4A27A" }}
     >
       <TrendingDown size={14} strokeWidth={2} />
-      -{Math.abs(delta)}%
+      -{Math.abs(delta).toFixed(1)}%
     </span>
   );
 }

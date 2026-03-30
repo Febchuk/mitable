@@ -399,9 +399,9 @@ export function BenchmarkDetail() {
             }}
           >
             {benchmark.trend === "improving"
-              ? `+${Math.abs(benchmark.trendDelta)}%`
+              ? `+${Math.abs(benchmark.trendDelta).toFixed(1)}%`
               : benchmark.trend === "declining"
-                ? `-${Math.abs(benchmark.trendDelta)}%`
+                ? `-${Math.abs(benchmark.trendDelta).toFixed(1)}%`
                 : "0%"}
           </span>
         </div>

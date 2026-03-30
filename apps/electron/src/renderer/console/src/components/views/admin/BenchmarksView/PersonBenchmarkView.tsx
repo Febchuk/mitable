@@ -138,9 +138,9 @@ export default function PersonBenchmarkView() {
 
   const trendValue =
     detail.trend === "improving"
-      ? `+${Math.abs(detail.trendDelta)}%`
+      ? `+${Math.abs(detail.trendDelta).toFixed(1)}%`
       : detail.trend === "declining"
-        ? `-${Math.abs(detail.trendDelta)}%`
+        ? `-${Math.abs(detail.trendDelta).toFixed(1)}%`
         : "0%";
 
   return (
