@@ -308,11 +308,22 @@
   }
 }
 
+.msg-row {
+  border-radius: 10px;
+  margin: 0 -12px;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  transition: background 200ms ease;
+}
+.msg-row:hover {
+  background: rgba(var(--ui-rgb), 0.04);
+}
 .msg-row:hover .copy-btn {
-  opacity: 1 !important;
+  opacity: 0.7 !important;
 }
 .copy-btn:hover {
-  background: rgba(var(--ui-rgb), 0.08) !important;
+  opacity: 1 !important;
+  background: rgba(var(--ui-rgb), 0.1) !important;
 }
 
 /* Reveal animations (kept) */
