@@ -206,9 +206,9 @@ export const MOCK_BENCHMARK_DETAILS: Record<string, BenchmarkDetail> = {
         userName: "Sarah Chen",
         userEmail: "sarah@company.com",
         userAvatarUrl: null,
-        currentValue: 142,
+        currentValue: 116,
         targetValue: 120,
-        progress: 118,
+        progress: 97,
         percentile: "top_1",
         trend: "improving",
         trendDelta: 12,
@@ -288,9 +288,9 @@ export const MOCK_BENCHMARK_DETAILS: Record<string, BenchmarkDetail> = {
         userName: "Sarah Chen",
         userEmail: "sarah@company.com",
         userAvatarUrl: null,
-        currentValue: 4.2,
+        currentValue: 3.8,
         targetValue: 4,
-        progress: 105,
+        progress: 95,
         percentile: "top_1",
         trend: "improving",
         trendDelta: 10,
@@ -360,9 +360,9 @@ for (const bm of MOCK_BENCHMARKS) {
           userName: "Sarah Chen",
           userEmail: "sarah@company.com",
           userAvatarUrl: null,
-          currentValue: bm.targetValue * 1.05,
+          currentValue: bm.targetValue * 0.95,
           targetValue: bm.targetValue,
-          progress: 105,
+          progress: 95,
           percentile: "top_10",
           trend: "improving",
           trendDelta: 6,
@@ -580,7 +580,7 @@ export function getMockPersonBenchmarkDetail(
   if (!bm) return null;
 
   // Use real assignment if found, otherwise generate synthetic data for any userId
-  const progress = assignment?.progress ?? Math.round(bm.avgProgress + (Math.random() * 20 - 10));
+  const progress = Math.min(100, assignment?.progress ?? Math.round(bm.avgProgress + (Math.random() * 20 - 10)));
 
   return {
     benchmarkId: bm.id,
