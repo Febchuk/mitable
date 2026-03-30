@@ -87,9 +87,10 @@ export async function askAgentQuery(
   conversationId?: string,
   signal?: AbortSignal
 ): Promise<AgentQueryResult> {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return apiRequest("/agent/ask", {
     method: "POST",
-    body: JSON.stringify({ message, conversationId }),
+    body: JSON.stringify({ message, conversationId, timezone }),
     signal,
   });
 }

@@ -33,7 +33,7 @@ export const calendarKeys = {
 
 export interface CalendarDateRange {
   start: string; // ISO date string
-  end: string;   // ISO date string
+  end: string; // ISO date string
 }
 
 /**

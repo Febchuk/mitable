@@ -26,10 +26,7 @@ export function useMyDrillDown(metric: string | null, period: DashboardPeriod = 
   });
 }
 
-export function useMyCategoryActivities(
-  category: string | null,
-  period: DashboardPeriod = "all"
-) {
+export function useMyCategoryActivities(category: string | null, period: DashboardPeriod = "all") {
   const { user } = useUser();
   return useQuery({
     queryKey: ["my-activity", "category-activities", category, period],

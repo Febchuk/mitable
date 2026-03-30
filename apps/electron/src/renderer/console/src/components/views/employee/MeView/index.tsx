@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Search, Video, X, Monitor } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  Search,
+  Video,
+  X,
+  Monitor,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
 import {
@@ -833,8 +844,7 @@ export default function MeView() {
                   borderRadius: 5,
                   fontSize: 11,
                   fontFamily: "var(--font-sans)",
-                  color:
-                    timeRange === filter.key ? "var(--text-primary)" : "var(--text-secondary)",
+                  color: timeRange === filter.key ? "var(--text-primary)" : "var(--text-secondary)",
                   background: timeRange === filter.key ? "var(--bg-overlay)" : "transparent",
                   border: "none",
                   cursor: "pointer",
@@ -983,9 +993,7 @@ export default function MeView() {
                         textAlign: "left",
                       }}
                     >
-                      <div
-                        style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
-                      >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         <div
                           style={{
                             width: 16,
@@ -1007,9 +1015,7 @@ export default function MeView() {
                           {entry.label}
                         </span>
                       </div>
-                      <span
-                        style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0 }}
-                      >
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0 }}>
                         {entry.hours}h ({entry.value}%)
                       </span>
                     </button>
@@ -1311,10 +1317,7 @@ export default function MeView() {
           </div>
 
           <div style={{ flex: 1, minHeight: 240 }}>
-            <canvas
-              ref={canvasRef}
-              style={{ width: "100%", height: "100%", display: "block" }}
-            />
+            <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
           </div>
         </div>
 
@@ -1435,8 +1438,7 @@ export default function MeView() {
                           workFilter === filter.key
                             ? "var(--text-primary)"
                             : "var(--text-secondary)",
-                        background:
-                          workFilter === filter.key ? "var(--bg-overlay)" : "transparent",
+                        background: workFilter === filter.key ? "var(--bg-overlay)" : "transparent",
                         border: "none",
                         cursor: "pointer",
                       }}
@@ -1471,7 +1473,9 @@ export default function MeView() {
                 <button
                   key={`${item.kind}-${item.id}`}
                   onClick={() =>
-                    item.kind === "doc" ? setSelectedDocId(item.id) : setSelectedWork(item as RecentWorkBlockItem)
+                    item.kind === "doc"
+                      ? setSelectedDocId(item.id)
+                      : setSelectedWork(item as RecentWorkBlockItem)
                   }
                   style={{
                     width: "100%",
@@ -1501,9 +1505,7 @@ export default function MeView() {
                         flexWrap: "wrap",
                       }}
                     >
-                      <span
-                        style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}
-                      >
+                      <span style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>
                         {item.title}
                       </span>
                       {item.kind === "meeting" ? (
@@ -1593,8 +1595,8 @@ export default function MeView() {
             >
               <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                 {workPage * RECENT_WORK_PAGE_SIZE + 1}–
-                {Math.min((workPage + 1) * RECENT_WORK_PAGE_SIZE, filteredRecentWork.length)}
-                {" "}of {filteredRecentWork.length}
+                {Math.min((workPage + 1) * RECENT_WORK_PAGE_SIZE, filteredRecentWork.length)} of{" "}
+                {filteredRecentWork.length}
               </span>
               <div style={{ display: "flex", gap: 4 }}>
                 <button

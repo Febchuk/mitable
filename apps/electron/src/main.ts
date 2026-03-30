@@ -363,8 +363,10 @@ function createWatchingPillWindow() {
 
   watchingPillWindow.on("closed", () => {
     // Close dropdowns explicitly (no longer auto-closed without parent)
-    if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) watchingPillEyeDropdown.close();
-    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) watchingPillMenuDropdown.close();
+    if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed())
+      watchingPillEyeDropdown.close();
+    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed())
+      watchingPillMenuDropdown.close();
     watchingPillWindow = null;
     stopClosedWindowCheck();
     stopPillCursorTracking();
@@ -2966,6 +2968,59 @@ app.whenReady().then(async () => {
   // Wire centralized notification service
   notificationService.setClickHandler(handleNotificationAction);
   notificationService.setUserIdProvider(() => currentUserContext?.userId ?? null);
+
+  // Wire max-duration handler: auto-end session after 6 hours with OS notification
+  monitoringSessionService.setMaxDurationHandler(async (sessionId) => {
+    const maxDurLogger = createLogger("MaxDuration");
+    maxDurLogger.info(`Session hit 6h cap — auto-ending: ${sessionId}`);
+
+    try {
+      audioActiveBeforePause = false;
+      audioCleanupDone = true;
+      audioWebSocketService.disconnect();
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP);
+      }
+
+      const result = await monitoringSessionService.endSession();
+
+      if (result.success && result.sessionId) {
+        if (result.captures && result.captures.length > 0) {
+          await authManager.authenticatedFetch(
+            `/api/monitoring/sessions/${result.sessionId}/captures`,
+            { method: "POST", body: JSON.stringify({ captures: result.captures }) }
+          );
+        }
+
+        const autoRecap = currentUserContext?.userId
+          ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+          : true;
+        await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
+          method: "POST",
+          body: JSON.stringify({ autoRecap }),
+        });
+      }
+
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.hide();
+      }
+
+      // Broadcast to Console renderer so the UI updates
+      if (consoleWindow && !consoleWindow.isDestroyed()) {
+        consoleWindow.webContents.send("session-auto-ended", { sessionId, reason: "max_duration" });
+      }
+    } catch (err) {
+      maxDurLogger.error("Failed to auto-end max-duration session:", String(err));
+    }
+
+    notificationService.show({
+      title: "Session Ended — 6 Hour Limit",
+      body: "Your session reached the maximum length and was saved automatically. Start a new session to keep tracking.",
+      category: "session",
+      dedupeKey: `max-duration-${sessionId}`,
+      clickAction: "focus",
+    });
+  });
 
   // Wire update service → notification service (OS notifications on update events)
   updateService.setOnUpdateAvailable((version) =>
