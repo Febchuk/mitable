@@ -84,9 +84,9 @@ export function BenchmarkProgressCard({ benchmark, onClick }: BenchmarkProgressC
 
   const trendLabel =
     benchmark.trend === "improving"
-      ? `+${benchmark.trendDelta}%`
+      ? `+${Math.abs(benchmark.trendDelta)}%`
       : benchmark.trend === "declining"
-        ? `-${benchmark.trendDelta}%`
+        ? `-${Math.abs(benchmark.trendDelta)}%`
         : benchmark.trend === "new"
           ? "New"
           : "0%";

@@ -168,9 +168,9 @@ export function BenchmarkDetailView() {
 
   const trendValue =
     detail.trend === "improving"
-      ? `+${detail.trendDelta}%`
+      ? `+${Math.abs(detail.trendDelta)}%`
       : detail.trend === "declining"
-        ? `-${detail.trendDelta}%`
+        ? `-${Math.abs(detail.trendDelta)}%`
         : "0%";
 
   return (
