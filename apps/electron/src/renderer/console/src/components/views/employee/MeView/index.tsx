@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, Clock, FileText, Search, Video, X, Monitor } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
 import {
   useMyActivity,
@@ -475,6 +476,7 @@ function CustomerWorkTooltip({ active, payload }: TooltipProps<number, string>) 
 // ── Main Component ───────────────────────────────────────────
 
 export default function MeView() {
+  const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [drillDownMetric, setDrillDownMetric] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

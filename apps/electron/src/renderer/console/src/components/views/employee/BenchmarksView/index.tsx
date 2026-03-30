@@ -1,29 +1,18 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMyBenchmarks } from "@/console/src/hooks/queries/benchmarks";
-import type { MyBenchmark, BenchmarkFrequency } from "@/console/src/services/benchmarkService";
 import { BenchmarkProgressCard } from "./BenchmarkProgressCard";
 
-type FrequencyFilter = "all" | BenchmarkFrequency;
-
-const FREQUENCY_FILTERS: { key: FrequencyFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "daily", label: "Daily" },
-  { key: "weekly", label: "Weekly" },
-  { key: "monthly", label: "Monthly" },
-  { key: "quarterly", label: "Quarterly" },
-];
+// Frequency filters — commented out in UI for now
+// type FrequencyFilter = "all" | BenchmarkFrequency;
+// const FREQUENCY_FILTERS = [...];
 
 export default function BenchmarksView() {
   const navigate = useNavigate();
-  const [activeFrequency, setActiveFrequency] = useState<FrequencyFilter>("all");
   const { data: benchmarks = [], isLoading } = useMyBenchmarks();
 
-  const filtered = useMemo(() => {
-    if (activeFrequency === "all") return benchmarks;
-    return benchmarks.filter((b) => b.frequency === activeFrequency);
-  }, [benchmarks, activeFrequency]);
+  const filtered = benchmarks; // No frequency filtering for now
 
   // Score: avg progress across filtered
   const score = useMemo(() => {
@@ -210,9 +199,7 @@ export default function BenchmarksView() {
               margin: 0,
             }}
           >
-            {activeFrequency === "all"
-              ? "No benchmarks assigned yet"
-              : `No ${activeFrequency} benchmarks assigned`}
+            No benchmarks assigned yet
           </p>
           <p
             style={{

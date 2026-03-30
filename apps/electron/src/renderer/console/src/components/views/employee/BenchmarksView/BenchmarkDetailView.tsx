@@ -15,24 +15,6 @@ function getCssColor(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-function niceSteps(maxVal: number, targetSteps: number): number[] {
-  const rough = maxVal / targetSteps;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
-  const residual = rough / magnitude;
-  let nice: number;
-  if (residual <= 1.5) nice = 1;
-  else if (residual <= 3) nice = 2;
-  else if (residual <= 7) nice = 5;
-  else nice = 10;
-  const step = nice * magnitude;
-  const steps: number[] = [];
-  for (let v = 0; v <= maxVal; v += step) {
-    steps.push(Math.round(v * 100) / 100);
-  }
-  if (steps[steps.length - 1] < maxVal) steps.push(steps[steps.length - 1] + step);
-  return steps;
-}
-
 function drawBarChart(
   canvas: HTMLCanvasElement,
   snapshots: BenchmarkSnapshot[],

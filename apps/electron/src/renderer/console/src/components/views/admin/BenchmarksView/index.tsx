@@ -1,19 +1,19 @@
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { useBenchmarks, useDeleteBenchmark } from "@/console/src/hooks/queries/benchmarks";
-import type { Benchmark, BenchmarkFrequency } from "@/console/src/services/benchmarkService";
+import type { Benchmark } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
 
-type FrequencyFilter = "all" | BenchmarkFrequency;
-
-const FREQUENCY_FILTERS: { key: FrequencyFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "daily", label: "Daily" },
-  { key: "weekly", label: "Weekly" },
-  { key: "monthly", label: "Monthly" },
-  { key: "quarterly", label: "Quarterly" },
-];
+// Frequency filters — commented out in UI for now
+// type FrequencyFilter = "all" | BenchmarkFrequency;
+// const FREQUENCY_FILTERS = [
+//   { key: "all", label: "All" },
+//   { key: "daily", label: "Daily" },
+//   { key: "weekly", label: "Weekly" },
+//   { key: "monthly", label: "Monthly" },
+//   { key: "quarterly", label: "Quarterly" },
+// ];
 
 const SPINNER_COLOR = "#82C0CC";
 
@@ -21,15 +21,12 @@ export default function BenchmarksView() {
   const navigate = useNavigate();
   const { data: benchmarks = [], isLoading } = useBenchmarks();
   const { mutate: deleteBenchmark } = useDeleteBenchmark();
-  const [activeFrequency, setActiveFrequency] = useState<FrequencyFilter>("all");
+  // const [activeFrequency, setActiveFrequency] = useState<FrequencyFilter>("all");
 
   // Delete confirmation state
   const [deletingBenchmark, setDeletingBenchmark] = useState<Benchmark | null>(null);
 
-  const filtered = useMemo(() => {
-    if (activeFrequency === "all") return benchmarks;
-    return benchmarks.filter((b) => b.frequency === activeFrequency);
-  }, [benchmarks, activeFrequency]);
+  const filtered = benchmarks; // No frequency filtering for now
 
   // Score: avg completion across filtered benchmarks
   const score = useMemo(() => {
@@ -320,7 +317,7 @@ export default function BenchmarksView() {
             color: "var(--text-secondary)",
           }}
         >
-          No {activeFrequency} benchmarks found.
+          No matching benchmarks found.
         </div>
       ) : (
         <div
