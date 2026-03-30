@@ -1935,6 +1935,492 @@ async function seedConversations(users: schema.User[]) {
   return { conversations, messages };
 }
 
+async function seedBenchmarks(organizationId: string, users: schema.User[]) {
+  console.log("🎯 Seeding benchmarks...");
+
+  // ── Benchmark definitions ──────────────────────────────────────────────
+
+  const BENCHMARKS = [
+    {
+      id: "bm-deep-focus",
+      name: "Deep Focus Work",
+      description: "Measures sustained periods of concentrated work without interruptions",
+      category: "productivity",
+      metric: "minutes",
+      targetValue: 120,
+      unit: "min/day",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-meeting-efficiency",
+      name: "Meeting Efficiency",
+      description: "Evaluates the ratio of productive meeting time to total meeting time",
+      category: "productivity",
+      metric: "percentage",
+      targetValue: 80,
+      unit: "%",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-consistent-engagement",
+      name: "Consistent Engagement",
+      description: "Tracks regular work activity across the week",
+      category: "productivity",
+      metric: "count",
+      targetValue: 5,
+      unit: "days/week",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-clear-communication",
+      name: "Clear Communication",
+      description: "Measures time spent on clear, structured communication with team members",
+      category: "collaboration",
+      metric: "minutes",
+      targetValue: 60,
+      unit: "min/week",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-cross-functional",
+      name: "Cross-functional Collaboration",
+      description: "Tracks percentage of work involving cross-team collaboration",
+      category: "collaboration",
+      metric: "percentage",
+      targetValue: 30,
+      unit: "%",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-ai-adoption",
+      name: "AI Adoption & Tool Usage",
+      description: "Measures adoption and effective use of AI tools in daily workflow",
+      category: "growth",
+      metric: "score",
+      targetValue: 5,
+      unit: "score 1-5",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-mentorship",
+      name: "Mentorship & Development",
+      description: "Time invested in mentoring and developing team members",
+      category: "growth",
+      metric: "minutes",
+      targetValue: 45,
+      unit: "min/week",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-proactive",
+      name: "Proactive vs Reactive Work",
+      description: "Ratio of self-initiated work to reactive/requested work",
+      category: "quality",
+      metric: "score",
+      targetValue: 4,
+      unit: "score 1-5",
+      frequency: "weekly",
+    },
+    {
+      id: "bm-work-life",
+      name: "Work-Life Balance",
+      description: "Maintains healthy work hours without excessive overtime",
+      category: "quality",
+      metric: "hours",
+      targetValue: 8,
+      unit: "hrs/day",
+      frequency: "weekly",
+    },
+  ];
+
+  // ── Parameters per benchmark ───────────────────────────────────────────
+
+  const BENCHMARK_PARAMETERS: Record<string, { name: string; description: string; importance: number }[]> = {
+    "bm-deep-focus": [
+      { name: "Session Length", description: "Average duration of uninterrupted focus sessions", importance: 5 },
+      { name: "Distraction Resistance", description: "Ability to maintain focus without app-switching", importance: 4 },
+      { name: "Flow State Entry", description: "Speed of reaching deep focus after starting work", importance: 3 },
+    ],
+    "bm-meeting-efficiency": [
+      { name: "On-Agenda Rate", description: "Percentage of meeting time spent on planned agenda items", importance: 5 },
+      { name: "Meeting Preparation", description: "Frequency of arriving prepared with notes or pre-reads", importance: 4 },
+      { name: "Action Item Completion", description: "Rate of completing follow-up tasks from meetings", importance: 4 },
+      { name: "Meeting Duration Adherence", description: "How often meetings end on time or early", importance: 3 },
+    ],
+    "bm-consistent-engagement": [
+      { name: "Active Days Per Week", description: "Number of days with meaningful tracked activity", importance: 5 },
+      { name: "Session Start Consistency", description: "Regularity of starting work at consistent times", importance: 3 },
+      { name: "Weekend Boundary", description: "Avoidance of working outside contracted hours", importance: 2 },
+    ],
+    "bm-clear-communication": [
+      { name: "Message Clarity", description: "Feedback score on written communication quality", importance: 5 },
+      { name: "Response Timeliness", description: "Speed of responding to team messages and threads", importance: 4 },
+      { name: "Documentation Contributions", description: "Frequency of writing and updating shared documentation", importance: 3 },
+    ],
+    "bm-cross-functional": [
+      { name: "Cross-Team Interactions", description: "Number of collaborative sessions with people outside primary team", importance: 5 },
+      { name: "Shared Project Involvement", description: "Percentage of work tied to multi-team initiatives", importance: 4 },
+      { name: "Knowledge Sharing", description: "Frequency of sharing learnings across team boundaries", importance: 3 },
+    ],
+    "bm-ai-adoption": [
+      { name: "Tool Usage Frequency", description: "How often AI tools are used in daily workflow", importance: 5 },
+      { name: "Prompt Quality", description: "Effectiveness of prompts crafted for AI tools", importance: 4 },
+      { name: "Workflow Integration", description: "Degree to which AI is embedded in standard tasks", importance: 4 },
+      { name: "Continuous Learning", description: "Exploration of new AI capabilities and features", importance: 3 },
+    ],
+    "bm-mentorship": [
+      { name: "1-on-1 Time", description: "Regular one-on-one sessions held with mentees", importance: 5 },
+      { name: "Code Review Quality", description: "Depth and educational value of code reviews provided", importance: 4 },
+      { name: "Pair Programming Sessions", description: "Time spent pairing to transfer knowledge", importance: 3 },
+    ],
+    "bm-proactive": [
+      { name: "Self-Initiated Work Ratio", description: "Proportion of tasks started without external prompting", importance: 5 },
+      { name: "Blocker Resolution Speed", description: "How quickly self-identified blockers are resolved proactively", importance: 4 },
+      { name: "Planning Ahead", description: "Evidence of forward-looking task planning and preparation", importance: 3 },
+    ],
+    "bm-work-life": [
+      { name: "Daily Hours Consistency", description: "Variance in daily active hours — lower is healthier", importance: 5 },
+      { name: "Off-Hours Activity", description: "Absence of work activity outside agreed working hours", importance: 4 },
+      { name: "Break Frequency", description: "Regular short breaks taken throughout the working day", importance: 3 },
+    ],
+  };
+
+  // ── Assignment configs per benchmark (5 users, percentile-distributed) ─
+
+  type AssignmentConfig = {
+    userIndex: number;
+    currentValue: number;
+    progress: number;
+    percentile: string;
+    trend: string;
+    trendDelta: number;
+  };
+
+  // currentValue is always 1-5 (AI weighted score), progress = (currentValue/5)*100
+  const ASSIGNMENT_CONFIGS: Record<string, AssignmentConfig[]> = {
+    "bm-deep-focus": [
+      { userIndex: 0, currentValue: 4.6, progress: 92,  percentile: "top_1",    trend: "improving", trendDelta: 5  },
+      { userIndex: 1, currentValue: 4.2, progress: 84,  percentile: "top_10",   trend: "improving", trendDelta: 3  },
+      { userIndex: 2, currentValue: 3.7, progress: 74,  percentile: "top_25",   trend: "stable",    trendDelta: 1  },
+      { userIndex: 3, currentValue: 3.0, progress: 60,  percentile: "top_50",   trend: "stable",    trendDelta: 0  },
+      { userIndex: 4, currentValue: 2.3, progress: 46,  percentile: "bottom_half", trend: "improving", trendDelta: 4 },
+    ],
+    "bm-meeting-efficiency": [
+      { userIndex: 0, currentValue: 4.4, progress: 88,  percentile: "top_1",    trend: "improving", trendDelta: 6  },
+      { userIndex: 1, currentValue: 4.0, progress: 80,  percentile: "top_10",   trend: "stable",    trendDelta: 1  },
+      { userIndex: 2, currentValue: 3.5, progress: 70,  percentile: "top_25",   trend: "improving", trendDelta: 4  },
+      { userIndex: 3, currentValue: 2.8, progress: 56,  percentile: "top_50",   trend: "stable",    trendDelta: 0  },
+    ],
+    "bm-consistent-engagement": [
+      { userIndex: 0, currentValue: 4.8, progress: 96,  percentile: "top_10",   trend: "stable",    trendDelta: 0  },
+      { userIndex: 1, currentValue: 4.5, progress: 90,  percentile: "top_10",   trend: "stable",    trendDelta: 0  },
+      { userIndex: 2, currentValue: 3.8, progress: 76,  percentile: "top_25",   trend: "stable",    trendDelta: 1  },
+      { userIndex: 3, currentValue: 3.2, progress: 64,  percentile: "top_50",   trend: "improving", trendDelta: 3  },
+      { userIndex: 4, currentValue: 2.5, progress: 50,  percentile: "bottom_half", trend: "improving", trendDelta: 2 },
+    ],
+    "bm-clear-communication": [
+      { userIndex: 0, currentValue: 4.3, progress: 86,  percentile: "top_1",    trend: "improving", trendDelta: 7  },
+      { userIndex: 1, currentValue: 3.9, progress: 78,  percentile: "top_10",   trend: "stable",    trendDelta: 2  },
+      { userIndex: 2, currentValue: 3.4, progress: 68,  percentile: "top_25",   trend: "improving", trendDelta: 4  },
+      { userIndex: 3, currentValue: 2.6, progress: 52,  percentile: "top_50",   trend: "stable",    trendDelta: 0  },
+    ],
+    "bm-cross-functional": [
+      { userIndex: 0, currentValue: 4.5, progress: 90,  percentile: "top_1",    trend: "improving", trendDelta: 5  },
+      { userIndex: 1, currentValue: 3.8, progress: 76,  percentile: "top_10",   trend: "stable",    trendDelta: 1  },
+      { userIndex: 2, currentValue: 3.2, progress: 64,  percentile: "top_25",   trend: "improving", trendDelta: 3  },
+      { userIndex: 3, currentValue: 2.2, progress: 44,  percentile: "bottom_half", trend: "improving", trendDelta: 2 },
+    ],
+    "bm-ai-adoption": [
+      { userIndex: 0, currentValue: 4.8, progress: 96,  percentile: "top_1",    trend: "improving", trendDelta: 4  },
+      { userIndex: 1, currentValue: 4.1, progress: 82,  percentile: "top_10",   trend: "improving", trendDelta: 6  },
+      { userIndex: 2, currentValue: 3.5, progress: 70,  percentile: "top_25",   trend: "stable",    trendDelta: 0  },
+      { userIndex: 3, currentValue: 2.8, progress: 56,  percentile: "top_50",   trend: "improving", trendDelta: 4  },
+      { userIndex: 4, currentValue: 2.0, progress: 40,  percentile: "bottom_half", trend: "improving", trendDelta: 3 },
+    ],
+    "bm-mentorship": [
+      { userIndex: 0, currentValue: 4.4, progress: 88,  percentile: "top_1",    trend: "improving", trendDelta: 5  },
+      { userIndex: 1, currentValue: 3.9, progress: 78,  percentile: "top_10",   trend: "stable",    trendDelta: 1  },
+      { userIndex: 2, currentValue: 3.3, progress: 66,  percentile: "top_25",   trend: "improving", trendDelta: 4  },
+    ],
+    "bm-proactive": [
+      { userIndex: 0, currentValue: 4.5, progress: 90,  percentile: "top_1",    trend: "improving", trendDelta: 6  },
+      { userIndex: 1, currentValue: 3.8, progress: 76,  percentile: "top_10",   trend: "stable",    trendDelta: 1  },
+      { userIndex: 2, currentValue: 3.4, progress: 68,  percentile: "top_25",   trend: "improving", trendDelta: 3  },
+      { userIndex: 3, currentValue: 2.5, progress: 50,  percentile: "top_50",   trend: "stable",    trendDelta: 0  },
+    ],
+    "bm-work-life": [
+      { userIndex: 0, currentValue: 4.7, progress: 94,  percentile: "top_10",   trend: "stable",    trendDelta: 0  },
+      { userIndex: 1, currentValue: 4.3, progress: 86,  percentile: "top_10",   trend: "stable",    trendDelta: 1  },
+      { userIndex: 2, currentValue: 3.8, progress: 76,  percentile: "top_25",   trend: "improving", trendDelta: 4  },
+      { userIndex: 3, currentValue: 3.2, progress: 64,  percentile: "top_25",   trend: "stable",    trendDelta: 0  },
+      { userIndex: 4, currentValue: 2.6, progress: 52,  percentile: "top_50",   trend: "improving", trendDelta: 3  },
+    ],
+  };
+
+  // ── Suggestions per benchmark category ────────────────────────────────
+
+  const SUGGESTIONS_BY_BENCHMARK: Record<string, { text: string; category: string }[]> = {
+    "bm-deep-focus": [
+      { text: "Try scheduling 2-hour focus blocks in the morning before checking messages", category: "scheduling" },
+      { text: "Use the Pomodoro technique with 45-minute intervals for complex tasks", category: "habits" },
+      { text: "Your focus sessions have been trending upward — keep it going!", category: "encouragement" },
+    ],
+    "bm-meeting-efficiency": [
+      { text: "Block 10 minutes before each meeting to review the agenda and come prepared", category: "scheduling" },
+      { text: "Designate the last 5 minutes of every meeting for action item capture", category: "habits" },
+      { text: "Your on-time meeting end rate is improving — great work staying disciplined!", category: "encouragement" },
+    ],
+    "bm-consistent-engagement": [
+      { text: "Set a consistent start-of-day ritual to signal the beginning of your work session", category: "habits" },
+      { text: "Protect your core working hours by blocking focus time early each week", category: "scheduling" },
+      { text: "You've logged activity every day this week — excellent consistency!", category: "encouragement" },
+    ],
+    "bm-clear-communication": [
+      { text: "Before sending a long message, ask yourself: can this be condensed to 3 bullet points?", category: "habits" },
+      { text: "Batch async communication into two daily windows to reduce fragmented replies", category: "scheduling" },
+      { text: "Your teammates have noticed the clarity in your recent updates — keep it up!", category: "encouragement" },
+    ],
+    "bm-cross-functional": [
+      { text: "Reach out to one person outside your team each week for a 15-minute knowledge exchange", category: "habits" },
+      { text: "Volunteer for at least one cross-team initiative per quarter to broaden your network", category: "scheduling" },
+      { text: "Your cross-team collaboration ratio is in the top 25% — you're setting a great example!", category: "encouragement" },
+    ],
+    "bm-ai-adoption": [
+      { text: "Dedicate 30 minutes each Friday to exploring a new AI feature or workflow", category: "habits" },
+      { text: "Pair with a colleague who scores highly on this benchmark to discover new tool patterns", category: "habits" },
+      { text: "Your AI tool usage has grown week-over-week — you're building a real competitive edge!", category: "encouragement" },
+    ],
+    "bm-mentorship": [
+      { text: "Schedule a recurring weekly 30-minute 1-on-1 with your mentee to maintain momentum", category: "scheduling" },
+      { text: "Turn code reviews into teaching moments by explaining the 'why' behind your feedback", category: "habits" },
+      { text: "Your investment in developing others is paying off — your mentee's output has improved!", category: "encouragement" },
+    ],
+    "bm-proactive": [
+      { text: "Each Monday, identify the top 3 things you can move forward without being asked", category: "habits" },
+      { text: "When you spot a blocker, flag it immediately with a proposed solution rather than waiting", category: "habits" },
+      { text: "Your proactive-to-reactive ratio has shifted positively over the past two weeks — great momentum!", category: "encouragement" },
+    ],
+    "bm-work-life": [
+      { text: "Set a hard stop alarm 15 minutes before your desired end time to wrap up gracefully", category: "habits" },
+      { text: "Keep your calendar end-of-day boundary visible to your manager so they can respect it", category: "scheduling" },
+      { text: "Your hours have been consistently healthy this week — well done protecting your energy!", category: "encouragement" },
+    ],
+  };
+
+  // ── Accomplishments per benchmark ──────────────────────────────────────
+
+  const ACCOMPLISHMENTS_BY_BENCHMARK: Record<string, string[]> = {
+    "bm-deep-focus": [
+      "3 deep focus sessions over 90 minutes this week",
+      "Maintained 85% on-task rate during focus blocks",
+      "Completed sprint tasks ahead of schedule",
+      "Longest uninterrupted session: 2h 20m on Thursday",
+    ],
+    "bm-meeting-efficiency": [
+      "All meetings ended on time or early this week",
+      "Prepared written agenda for every meeting attended",
+      "Completed 100% of action items from last week's meetings",
+      "Reduced average meeting duration by 10 minutes through tighter facilitation",
+    ],
+    "bm-consistent-engagement": [
+      "Active on all 5 working days this week",
+      "Started work within the same 30-minute window every day",
+      "Zero weekend activity — healthy boundary maintained",
+      "Consistent 7+ hour active days without overtime",
+    ],
+    "bm-clear-communication": [
+      "Received positive feedback on sprint update clarity",
+      "All async messages answered within 2 hours during working hours",
+      "Updated team wiki with 2 new process documents",
+      "Concise standup updates appreciated by the team",
+    ],
+    "bm-cross-functional": [
+      "Collaborated with Design, Backend, and QA teams this week",
+      "Shared learnings from external conference with broader org",
+      "Drove a cross-team alignment session that unblocked two teams",
+      "Joined a working group outside primary team scope",
+    ],
+    "bm-ai-adoption": [
+      "Used Copilot in 12 coding sessions this week",
+      "Generated first draft of technical spec with AI assistance",
+      "Automated a manual reporting task using an AI workflow",
+      "Shared AI prompt template with team that saved 3 hours collectively",
+    ],
+    "bm-mentorship": [
+      "Held 2 structured 1-on-1s with mentee this week",
+      "Delivered in-depth code review that mentee called most helpful ever",
+      "Pair-programmed for 90 minutes on a tricky architecture problem",
+      "Mentee shipped their first independent feature after coaching sessions",
+    ],
+    "bm-proactive": [
+      "Identified and resolved a production risk before it became an incident",
+      "Proposed a process improvement that was adopted by the team",
+      "Completed stretch tasks without being asked",
+      "Flagged a dependency risk two sprints early, enabling proactive planning",
+    ],
+    "bm-work-life": [
+      "Healthy work hours all 5 days — no sessions past 6:30pm",
+      "Took regular breaks throughout each day",
+      "Zero work activity on the weekend",
+      "Maintained consistent 7.5-8 hour days all week",
+    ],
+  };
+
+  // ── Insert benchmarks (UUIDs auto-generated) ────────────────────────
+
+  const insertedBenchmarks = await db
+    .insert(schema.benchmarks)
+    .values(
+      BENCHMARKS.map((bm) => ({
+        organizationId,
+        name: bm.name,
+        description: bm.description,
+        category: bm.category,
+        metric: bm.metric,
+        targetValue: bm.targetValue,
+        unit: bm.unit,
+        frequency: bm.frequency,
+        isActive: true,
+      }))
+    )
+    .returning();
+
+  // Map original slug IDs to real UUIDs for lookup in config maps
+  const slugToUuid: Record<string, string> = {};
+  BENCHMARKS.forEach((bm, i) => {
+    slugToUuid[bm.id] = insertedBenchmarks[i].id;
+  });
+
+  console.log(`  ✓ Created ${insertedBenchmarks.length} benchmarks`);
+
+  // ── Insert parameters for each benchmark ──────────────────────────────
+
+  let totalParameters = 0;
+  for (let i = 0; i < insertedBenchmarks.length; i++) {
+    const bm = insertedBenchmarks[i];
+    const slug = BENCHMARKS[i].id;
+    const params = BENCHMARK_PARAMETERS[slug];
+    if (!params || params.length === 0) continue;
+    await db.insert(schema.benchmarkParameters).values(
+      params.map((p) => ({
+        benchmarkId: bm.id,
+        name: p.name,
+        description: p.description,
+        importance: p.importance,
+      }))
+    );
+    totalParameters += params.length;
+  }
+
+  console.log(`  ✓ Created ${totalParameters} benchmark parameters`);
+
+  // ── Insert assignments, snapshots, suggestions, and accomplishments ────
+
+  let totalAssignments = 0;
+  let totalSnapshots = 0;
+  let totalSuggestions = 0;
+  let totalAccomplishments = 0;
+
+  const today = new Date();
+  const recentDate1 = new Date(today);
+  recentDate1.setDate(today.getDate() - 2);
+  const recentDate2 = new Date(today);
+  recentDate2.setDate(today.getDate() - 5);
+  const recentDate3 = new Date(today);
+  recentDate3.setDate(today.getDate() - 9);
+  const recentDate4 = new Date(today);
+  recentDate4.setDate(today.getDate() - 13);
+
+  const recentDates = [recentDate1, recentDate2, recentDate3, recentDate4];
+
+  const formatDate = (d: Date) => d.toISOString().slice(0, 10);
+
+  for (let bmIdx = 0; bmIdx < insertedBenchmarks.length; bmIdx++) {
+    const bm = insertedBenchmarks[bmIdx];
+    const slug = BENCHMARKS[bmIdx].id;
+    const configs = ASSIGNMENT_CONFIGS[slug];
+    if (!configs || configs.length === 0) continue;
+
+    for (const cfg of configs) {
+      const user = users[cfg.userIndex];
+      if (!user) continue;
+
+      // Insert assignment
+      const [assignment] = await db
+        .insert(schema.benchmarkAssignments)
+        .values({
+          benchmarkId: bm.id,
+          userId: user.id,
+          targetValue: bm.targetValue,
+          currentValue: cfg.currentValue,
+          progress: cfg.progress,
+          percentile: cfg.percentile,
+          trend: cfg.trend,
+          trendDelta: cfg.trendDelta,
+        })
+        .returning();
+
+      totalAssignments++;
+
+      // Insert 8 weekly snapshots (values are 0-100 progress scale)
+      const snapshots = [];
+      for (let week = 7; week >= 0; week--) {
+        const snapshotDate = new Date(today);
+        snapshotDate.setDate(today.getDate() - week * 7);
+        const baseProgress = cfg.progress * 0.7;
+        const progression = (7 - week) / 7;
+        const rawProgress = baseProgress + (cfg.progress - baseProgress) * progression + (Math.random() * 6 - 3);
+        const snapshotValue = Math.min(100, Math.max(0, Math.round(rawProgress * 10) / 10));
+        snapshots.push({
+          assignmentId: assignment.id,
+          date: formatDate(snapshotDate),
+          value: snapshotValue,
+          target: 100,
+        });
+      }
+      await db.insert(schema.benchmarkSnapshots).values(snapshots);
+      totalSnapshots += snapshots.length;
+
+      // Insert suggestions
+      const suggestions = SUGGESTIONS_BY_BENCHMARK[slug] ?? [];
+      if (suggestions.length > 0) {
+        await db.insert(schema.benchmarkSuggestions).values(
+          suggestions.map((s) => ({
+            assignmentId: assignment.id,
+            text: s.text,
+            category: s.category,
+          }))
+        );
+        totalSuggestions += suggestions.length;
+      }
+
+      // Insert accomplishments (2-4 based on available text list)
+      const allAccomplishments = ACCOMPLISHMENTS_BY_BENCHMARK[slug] ?? [];
+      // Give higher-progress users more accomplishments
+      const count = cfg.progress >= 90 ? 4 : cfg.progress >= 70 ? 3 : 2;
+      const selectedAccomplishments = allAccomplishments.slice(0, count);
+      if (selectedAccomplishments.length > 0) {
+        await db.insert(schema.benchmarkAccomplishments).values(
+          selectedAccomplishments.map((text, i) => ({
+            assignmentId: assignment.id,
+            text,
+            date: formatDate(recentDates[i % recentDates.length]),
+          }))
+        );
+        totalAccomplishments += selectedAccomplishments.length;
+      }
+    }
+  }
+
+  console.log(`  ✓ Created ${totalAssignments} benchmark assignments`);
+  console.log(`  ✓ Created ${totalSnapshots} benchmark snapshots`);
+  console.log(`  ✓ Created ${totalSuggestions} benchmark suggestions`);
+  console.log(`  ✓ Created ${totalAccomplishments} benchmark accomplishments`);
+  console.log(`✅ Benchmarks seeded successfully`);
+
+  return { benchmarks: insertedBenchmarks, totalAssignments, totalSnapshots };
+}
+
 async function seedIntegrations(organizationId: string) {
   console.log("🔌 Seeding integrations...");
 
@@ -2021,6 +2507,7 @@ async function seed() {
     const userTasks = await seedUserTasks(users, templates);
     const { conversations, messages } = await seedConversations(users);
     const integrations = await seedIntegrations(organization.id);
+    const benchmarkResult = await seedBenchmarks(organization.id, users);
 
     console.log("\n📊 Seed Summary:");
     console.log(`  - Organization: ${organization.name}`);
@@ -2034,6 +2521,9 @@ async function seed() {
     console.log(`  - Conversations: ${conversations.length}`);
     console.log(`  - Messages: ${messages.length}`);
     console.log(`  - Integrations: ${integrations.length}`);
+    console.log(`  - Benchmarks: ${benchmarkResult.benchmarks.length}`);
+    console.log(`  - Benchmark Assignments: ${benchmarkResult.totalAssignments}`);
+    console.log(`  - Benchmark Snapshots: ${benchmarkResult.totalSnapshots}`);
 
     console.log("\n🎉 Database seeded successfully!");
   } catch (error) {

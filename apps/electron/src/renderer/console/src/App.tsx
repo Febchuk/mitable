@@ -40,6 +40,10 @@ import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
 import MeView from "./components/views/employee/MeView";
+import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
+import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
+import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
+import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEditor";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -237,6 +241,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useUser();
+  if (user?.role !== "admin") return <Navigate to="/benchmarks" replace />;
+  return <>{children}</>;
+}
+
 // Variant wrapper - provides organization variant context from user's org settings
 function VariantWrapper({ children }: { children: React.ReactNode }) {
   const { organization } = useUser();
@@ -303,6 +313,11 @@ function App() {
                         <Route path="ask" element={<Navigate to="/reports" replace />} />
                         <Route path="reports" element={<ReportsView />} />
                         <Route path="reports/:docId" element={<DocDetail />} />
+                        <Route path="benchmarks" element={<BenchmarksRouter />} />
+                        <Route path="benchmarks/new" element={<AdminOnlyRoute><BenchmarkEditor /></AdminOnlyRoute>} />
+                        <Route path="benchmarks/:id/edit" element={<AdminOnlyRoute><BenchmarkEditor /></AdminOnlyRoute>} />
+                        <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
+                        <Route path="benchmarks/:id/person/:userId" element={<AdminOnlyRoute><PersonBenchmarkView /></AdminOnlyRoute>} />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
                         {/* Employee Routes */}

@@ -17,6 +17,8 @@ import stripeRouter from "./routes/stripe.js";
 import artifactsRouter from "./routes/artifacts.js";
 import apiKeysRouter from "./routes/api-keys.js";
 import myActivityRouter from "./routes/my-activity.js";
+import myBenchmarksRouter from "./routes/my-benchmarks.js";
+import adminBenchmarksRouter from "./routes/admin-benchmarks.js";
 import { authLimiter } from "./middleware/rateLimiter.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
 // import guidesRouter from "./routes/guides.routes.js";
@@ -32,6 +34,7 @@ router.use("/roadmaps", roadmapsRouter);
 // router.use("/conversations", conversationsRouter);
 router.use("/admin", adminRouter);
 router.use("/admin", adminDashboardRouter);
+router.use("/admin/benchmarks", adminBenchmarksRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/pii", piiRouter);
 router.use("/monitoring", monitoringRouter);
@@ -42,6 +45,7 @@ router.use("/artifacts", artifactsRouter);
 router.use("/agent", agentRouter);
 router.use("/api-keys", apiKeysRouter);
 router.use("/my-activity", myActivityRouter);
+router.use("/my/benchmarks", myBenchmarksRouter);
 
 /**
  * DEPRECATED: /guides routes

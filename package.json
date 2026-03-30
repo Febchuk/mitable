@@ -33,6 +33,7 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "drizzle-orm": "^0.44.6",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@types/jest": "^30.0.0",

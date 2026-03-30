@@ -16,6 +16,7 @@ import { createLogger } from "../lib/logger";
 import { runGraphSyncJob } from "./jobs/graph-sync.job";
 import { runGranolaSyncJob } from "./jobs/granola-sync.job";
 import { runFirefliesSyncJob } from "./jobs/fireflies-sync.job";
+import { runBenchmarkScoreJob } from "./jobs/benchmark-score.job";
 import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });
@@ -129,7 +130,56 @@ export function initCronJobs(): void {
     }
   });
 
+  // ──────────────────────────────────────────────
+  // Benchmark Score Computation
+  // Frequency-matched scheduling:
+  //   daily      → every night at 02:30 UTC
+  //   weekly     → Mondays at 02:30 UTC
+  //   monthly    → 1st of month at 02:30 UTC
+  //   quarterly  → 1st of Jan/Apr/Jul/Oct at 02:30 UTC
+  // ──────────────────────────────────────────────
+  let isBenchmarkScoreRunning = false;
+
+  const runBenchmarks = async (frequencies: string[], label: string) => {
+    if (isBenchmarkScoreRunning) {
+      logger.warn({ label }, "Benchmark score job still running — skipping");
+      return;
+    }
+
+    isBenchmarkScoreRunning = true;
+    try {
+      const result = await runBenchmarkScoreJob(frequencies);
+      if (result.benchmarksProcessed > 0 || result.benchmarksFailed > 0) {
+        logger.info(
+          {
+            label,
+            processed: result.benchmarksProcessed,
+            failed: result.benchmarksFailed,
+            timeMs: result.totalTimeMs,
+          },
+          "Benchmark score job completed"
+        );
+      }
+    } catch (error) {
+      logger.error({ error: String(error), label }, "Benchmark score job failed");
+    } finally {
+      isBenchmarkScoreRunning = false;
+    }
+  };
+
+  // Daily benchmarks — every night at 02:30
+  cron.schedule("30 2 * * *", () => runBenchmarks(["daily"], "daily"));
+
+  // Weekly benchmarks — Mondays at 02:30
+  cron.schedule("30 2 * * 1", () => runBenchmarks(["weekly"], "weekly"));
+
+  // Monthly benchmarks — 1st of each month at 02:30
+  cron.schedule("30 2 1 * *", () => runBenchmarks(["monthly"], "monthly"));
+
+  // Quarterly benchmarks — 1st of Jan, Apr, Jul, Oct at 02:30
+  cron.schedule("30 2 1 1,4,7,10 *", () => runBenchmarks(["quarterly"], "quarterly"));
+
   logger.info(
-    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min"
+    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min, Benchmarks: daily/weekly/monthly/quarterly"
   );
 }
