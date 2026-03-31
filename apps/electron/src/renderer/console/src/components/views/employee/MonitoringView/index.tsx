@@ -21,6 +21,7 @@ import {
   Activity,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/EmptyState";
 import SessionRow from "./SessionRow";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
 
@@ -338,19 +339,16 @@ export default function MonitoringView() {
             )}
           </div>
         ) : (
-          /* Empty State - Minimal, elegant */
-          <div className="py-16 text-center stagger-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-overlay border border-stroke-subtle mb-4">
-              <Activity size={28} className="text-ink-tertiary" />
-            </div>
-            <h3 className="font-display text-lg font-medium text-ink-primary mb-1">
-              {searchQuery ? "No matches" : "No sessions yet"}
-            </h3>
-            <p className="text-ink-tertiary text-sm max-w-xs mx-auto">
-              {searchQuery
-                ? `Nothing found for "${searchQuery}"`
-                : "Start your first session to begin tracking your work"}
-            </p>
+          /* Empty State */
+          <div style={{ padding: "48px 0" }}>
+            <EmptyState
+              title={searchQuery ? "No matches" : "No sessions yet"}
+              description={
+                searchQuery
+                  ? `Nothing found for "${searchQuery}"`
+                  : "Start your first session to begin tracking your work"
+              }
+            />
           </div>
         )}
       </div>

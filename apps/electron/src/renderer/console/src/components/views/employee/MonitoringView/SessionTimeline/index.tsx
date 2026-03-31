@@ -8,6 +8,7 @@
 
 import { useState, useCallback } from "react";
 import { ChevronDown, ChevronUp, Loader2, RefreshCw } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useSessionWorkstreams } from "./hooks/useSessionWorkstreams";
 import type { Workstream } from "./utils/types";
 import { WORKSTREAM_COLOR_MAP } from "./utils/types";
@@ -174,22 +175,18 @@ export default function SessionTimeline({
 
           {/* Empty state */}
           {transformedData && transformedData.workstreams.length === 0 && !isLoading && (
-            <div className="text-center py-8">
-              <p className="text-sm text-ink-secondary">
-                {isSessionActive
-                  ? "Waiting for activity to be recorded..."
-                  : "No workstream activity recorded."}
-              </p>
-            </div>
+            <EmptyState
+              variant="inline"
+              title={isSessionActive ? "Waiting for activity to be recorded..." : "No workstream activity recorded."}
+            />
           )}
 
           {/* No data state */}
           {!transformedData && !isLoading && !error && (
-            <div className="text-center py-8">
-              <p className="text-sm text-ink-secondary">
-                {isSessionActive ? "Recording activity..." : "No activity data available."}
-              </p>
-            </div>
+            <EmptyState
+              variant="inline"
+              title={isSessionActive ? "Recording activity..." : "No activity data available."}
+            />
           )}
         </div>
       )}

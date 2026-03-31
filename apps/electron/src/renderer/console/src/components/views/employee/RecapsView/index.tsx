@@ -6,7 +6,8 @@
  */
 
 import { useNavigate } from "react-router-dom";
-import { History, Send, ChevronRight, Clock, Calendar, Plus } from "lucide-react";
+import { History, ChevronRight, Clock, Calendar, Plus } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useRecaps, type Recap } from "../../../../context/RecapsContext";
 
 function formatDuration(minutes: number): string {
@@ -128,21 +129,35 @@ export default function RecapsView() {
       <div className="px-8 pb-8">
         <div className="stagger-2">
           {recaps.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-muted mb-4">
-                <Send size={24} className="text-ink-tertiary" />
-              </div>
-              <h3 className="text-lg font-medium text-ink-primary mb-2">No recaps yet</h3>
-              <p className="text-sm text-ink-tertiary max-w-sm mx-auto mb-6">
-                Create a recap from your work blocks to share progress with your team.
-              </p>
-              <button
-                onClick={() => navigate("/recaps/new")}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo text-white font-medium text-sm hover:bg-indigo/90 transition-colors"
-              >
-                <Plus size={16} />
-                <span>Create your first recap</span>
-              </button>
+            <div style={{ padding: "48px 0" }}>
+              <EmptyState
+                title="No recaps yet"
+                description="Create a recap from your work blocks to share progress with your team."
+                actions={
+                  <button
+                    onClick={() => navigate("/recaps/new")}
+                    style={{
+                      height: 34,
+                      padding: "0 16px",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontFamily: "var(--font-sans)",
+                      fontWeight: 500,
+                      border: "none",
+                      cursor: "pointer",
+                      background: "#82C0CC",
+                      color: "#1A1916",
+                      transition: "opacity 0.15s",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Plus size={14} />
+                    Create your first recap
+                  </button>
+                }
+              />
             </div>
           ) : (
             <div className="space-y-8">

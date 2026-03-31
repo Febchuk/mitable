@@ -8,7 +8,8 @@
 
 import { useState, useMemo } from "react";
 import { useArtifacts, useDeleteArtifact } from "@/console/src/hooks/queries/artifacts";
-import { Search, Paperclip, Plus, ChevronRight, Filter } from "lucide-react";
+import { Search, Plus, ChevronRight, Filter } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -292,18 +293,15 @@ export default function ArtifactsView() {
           </div>
         ) : (
           /* Empty State */
-          <div className="py-16 text-center stagger-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-overlay border border-stroke-subtle mb-4">
-              <Paperclip size={28} className="text-ink-tertiary" />
-            </div>
-            <h3 className="font-display text-lg font-medium text-ink-primary mb-1">
-              {searchQuery || hasActiveFilters ? "No matches" : labels.noArtifactsYet}
-            </h3>
-            <p className="text-ink-tertiary text-sm max-w-xs mx-auto">
-              {searchQuery || hasActiveFilters
-                ? "Try adjusting your search or filters"
-                : "Upload documents to use as context for document generation"}
-            </p>
+          <div style={{ padding: "48px 0" }}>
+            <EmptyState
+              title={searchQuery || hasActiveFilters ? "No matches" : labels.noArtifactsYet}
+              description={
+                searchQuery || hasActiveFilters
+                  ? "Try adjusting your search or filters"
+                  : "Upload documents to use as context for document generation"
+              }
+            />
           </div>
         )}
       </div>

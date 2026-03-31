@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, AlertCircle, Plus, Lock } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useDocuments } from "@/console/src/hooks/queries/documents";
 import CreateDocumentModal from "../../employee/DocsView/dialogs/CreateDocumentModal";
 import { groupByDay } from "@/console/src/components/shared/groupByDay";
@@ -145,6 +146,39 @@ export default function ReportsView() {
           New
         </button>
       </div>
+
+      {groupedReports.length === 0 && (
+        <div style={{ paddingTop: 40 }}>
+          <EmptyState
+            title="No reports yet"
+            description="Generate a report on any work done by your team."
+            actions={
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "#82C0CC",
+                  color: "#1A1916",
+                  transition: "opacity 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Plus size={14} />
+                New Report
+              </button>
+            }
+          />
+        </div>
+      )}
 
       {groupedReports.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

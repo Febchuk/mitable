@@ -4,7 +4,8 @@
  * List of work blocks for a day, displayed as a timeline.
  */
 
-import { Clock, Zap, Coffee } from "lucide-react";
+import { Clock, Zap } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { WorkBlock } from "./types";
 import WorkBlockDetail from "./WorkBlockDetail";
 
@@ -29,16 +30,11 @@ export default function WorkBlockList({
 }: WorkBlockListProps) {
   if (blocks.length === 0) {
     return (
-      <div className="py-16 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-canvas-overlay border border-stroke-subtle mb-4">
-          <Coffee size={28} className="text-ink-tertiary" />
-        </div>
-        <h3 className="font-display text-lg font-medium text-ink-primary mb-1">
-          No activity recorded
-        </h3>
-        <p className="text-ink-tertiary text-sm max-w-xs mx-auto">
-          Work blocks will appear here as you use your computer. Activity is automatically detected.
-        </p>
+      <div style={{ padding: "48px 0" }}>
+        <EmptyState
+          title="No activity recorded"
+          description="Work blocks will appear here as you use your computer. Activity is automatically detected."
+        />
       </div>
     );
   }

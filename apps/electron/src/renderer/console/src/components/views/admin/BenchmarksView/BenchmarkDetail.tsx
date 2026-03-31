@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Minus, ChevronRight, X } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useBenchmarkDetail } from "@/console/src/hooks/queries/benchmarks";
 import { useUnassignBenchmark } from "@/console/src/hooks/queries/benchmarks";
 
@@ -488,15 +489,35 @@ export function BenchmarkDetail() {
           </div>
         </div>
       ) : (
-        <div
-          style={{
-            padding: "48px 0",
-            textAlign: "center",
-            fontSize: 13,
-            color: "var(--text-secondary)",
-          }}
-        >
-          No people assigned yet. Hit + to get started.
+        <div style={{ padding: "80px 0" }}>
+          <EmptyState
+            title="No people assigned yet"
+            description="Assign team members to this benchmark to start tracking their progress."
+            actions={
+              <button
+                onClick={() => setAssignModalOpen(true)}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "#82C0CC",
+                  color: "#1A1916",
+                  transition: "opacity 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Plus size={14} />
+                Assign People
+              </button>
+            }
+          />
         </div>
       )}
 
