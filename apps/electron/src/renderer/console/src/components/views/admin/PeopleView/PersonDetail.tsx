@@ -1180,36 +1180,36 @@ export default function PersonDetail() {
             gap: 16,
           }}
         >
-          {showCustomerWork && (
+          <div
+            style={{
+              background: "var(--bg-raised)",
+              border: "var(--border-hairline)",
+              borderRadius: 12,
+              padding: "22px 24px",
+            }}
+          >
             <div
               style={{
-                background: "var(--bg-raised)",
-                border: "var(--border-hairline)",
-                borderRadius: 12,
-                padding: "22px 24px",
+                display: "flex",
+                alignItems: "center",
+                marginBottom: 18,
+                gap: 12,
               }}
             >
-              <div
+              <span
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  marginBottom: 18,
-                  gap: 12,
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.09em",
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-sans)",
                 }}
               >
-                <span
-                  style={{
-                    fontSize: 10,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.09em",
-                    color: "var(--text-secondary)",
-                    fontFamily: "var(--font-sans)",
-                  }}
-                >
-                  Customer Work
-                </span>
-              </div>
+                Customer Work
+              </span>
+            </div>
 
+            {showCustomerWork ? (
               <div style={{ display: "flex", alignItems: "center", gap: 24, minHeight: 180 }}>
                 <div style={{ width: 156, height: 156, flexShrink: 0 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -1295,8 +1295,21 @@ export default function PersonDetail() {
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: 180,
+                }}
+              >
+                <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                  No customer work detected
+                </span>
+              </div>
+            )}
+          </div>
 
           <div
             style={{
