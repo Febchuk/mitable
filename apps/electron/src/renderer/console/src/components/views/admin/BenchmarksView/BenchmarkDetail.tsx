@@ -134,18 +134,9 @@ function PersonRow({
           fontWeight: 500,
           color: "var(--text-primary)",
           flexShrink: 0,
-          overflow: "hidden",
         }}
       >
-        {assignment.userAvatarUrl ? (
-          <img
-            src={assignment.userAvatarUrl}
-            alt={assignment.userName}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          getInitial(assignment.userName)
-        )}
+        {getInitial(assignment.userName)}
       </div>
 
       {/* Name + role */}

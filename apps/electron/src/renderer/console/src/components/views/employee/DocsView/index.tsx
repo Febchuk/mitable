@@ -284,6 +284,30 @@ export default function DocsView() {
           <EmptyState
             title="No documents yet"
             description="Create your first document or generate one from a work session."
+            actions={
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "#82C0CC",
+                  color: "#1A1916",
+                  transition: "opacity 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Plus size={14} />
+                Create your first doc
+              </button>
+            }
           />
         </div>
       )}

@@ -173,7 +173,7 @@ export default function ReportsView() {
                 }}
               >
                 <Plus size={14} />
-                New Report
+                Create your first report
               </button>
             }
           />

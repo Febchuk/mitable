@@ -50,7 +50,7 @@ export default function Sidebar() {
         width: open ? 220 : 0,
         minWidth: open ? 220 : 0,
         opacity: open ? 1 : 0,
-        background: "var(--bg-muted)",
+        background: "rgba(0, 0, 0, 0.08)",
         borderRight: open ? "var(--border-hairline)" : "none",
         display: "flex",
         flexDirection: "column",
