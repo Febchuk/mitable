@@ -7,6 +7,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import { Loader2, AlertCircle, Plus, Trash2, Check, Clock } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useArtifacts } from "../../../../hooks/queries/artifacts";
 import { useUploadArtifact } from "../../../../hooks/queries/artifacts";
 import { useDeleteArtifact } from "../../../../hooks/queries/artifacts";
@@ -220,7 +221,38 @@ export default function UploadsView() {
       </div>
 
       {/* File list */}
-      {groupedArtifacts.length > 0 ? (
+      {groupedArtifacts.length === 0 ? (
+        <div style={{ paddingTop: 40 }}>
+          <EmptyState
+            title="No uploads yet"
+            description="Upload files for Mitable to use as context alongside your activity data."
+            actions={
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "#82C0CC",
+                  color: "#1A1916",
+                  transition: "opacity 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Plus size={14} />
+                Upload
+              </button>
+            }
+          />
+        </div>
+      ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {groupedArtifacts.map((group) => (
             <div key={group.label}>
@@ -384,7 +416,7 @@ export default function UploadsView() {
             </div>
           ))}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

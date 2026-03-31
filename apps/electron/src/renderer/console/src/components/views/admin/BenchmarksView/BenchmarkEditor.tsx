@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Minus, Loader2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   useBenchmarkDetail,
   useCreateBenchmark,
@@ -588,70 +589,55 @@ export default function BenchmarkEditor() {
 
         {params.length === 0 ? (
           /* Empty state */
-          <div
-            style={{
-              border: "var(--border-hairline)",
-              borderRadius: 10,
-              padding: "32px 24px",
-              textAlign: "center",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 16,
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                No parameters yet
-              </span>
-              <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                Add parameters manually or generate them from your description.
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <button
-                onClick={handleAddParam}
-                style={{
-                  height: 34,
-                  padding: "0 16px",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 500,
-                  border: "var(--border-hairline)",
-                  cursor: "pointer",
-                  background: "transparent",
-                  color: "var(--text-secondary)",
-                  transition: "background 0.1s",
-                }}
-              >
-                Add Manually
-              </button>
-              <button
-                onClick={handleGenerate}
-                disabled={!description.trim() || isGenerating}
-                style={{
-                  height: 34,
-                  padding: "0 16px",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 500,
-                  border: "none",
-                  cursor: !description.trim() || isGenerating ? "not-allowed" : "pointer",
-                  background: description.trim() && !isGenerating ? "#82C0CC" : "rgba(var(--ui-rgb), 0.08)",
-                  color: description.trim() && !isGenerating ? "#1A1916" : "var(--text-faint)",
-                  transition: "all 0.15s",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                {isGenerating && <Loader2 size={12} className="animate-spin" />}
-                {isGenerating ? "Generating..." : "Generate from Description"}
-              </button>
-            </div>
-          </div>
+          <EmptyState
+            title="No parameters yet"
+            description="Add parameters manually or generate them from your description."
+            actions={
+              <>
+                <button
+                  onClick={handleAddParam}
+                  style={{
+                    height: 34,
+                    padding: "0 16px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontFamily: "var(--font-sans)",
+                    fontWeight: 500,
+                    border: "var(--border-hairline)",
+                    cursor: "pointer",
+                    background: "transparent",
+                    color: "var(--text-secondary)",
+                    transition: "background 0.1s",
+                  }}
+                >
+                  Add Manually
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={!description.trim() || isGenerating}
+                  style={{
+                    height: 34,
+                    padding: "0 16px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontFamily: "var(--font-sans)",
+                    fontWeight: 500,
+                    border: "none",
+                    cursor: !description.trim() || isGenerating ? "not-allowed" : "pointer",
+                    background: description.trim() && !isGenerating ? "#82C0CC" : "rgba(var(--ui-rgb), 0.08)",
+                    color: description.trim() && !isGenerating ? "#1A1916" : "var(--text-faint)",
+                    transition: "all 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {isGenerating && <Loader2 size={12} className="animate-spin" />}
+                  {isGenerating ? "Generating..." : "Generate from Description"}
+                </button>
+              </>
+            }
+          />
         ) : (
           /* Parameter list */
           <div style={{ borderTop: "var(--border-hairline)" }}>

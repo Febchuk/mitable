@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useSessionCaptures } from "@/console/src/hooks/queries/monitoring";
 import { useTimelineTransform } from "@/console/src/hooks/useTimelineTransform";
 import TimelineGroup from "./TimelineGroup";
@@ -91,13 +92,10 @@ export default function ActivityTimeline({
 
           {/* Empty state */}
           {timeline && timeline.groups.length === 0 && !isLoading && (
-            <div className="text-center py-8">
-              <p className="text-sm text-ink-secondary">
-                {isSessionActive
-                  ? "Waiting for activity to be recorded..."
-                  : "No recorded activity yet."}
-              </p>
-            </div>
+            <EmptyState
+              variant="inline"
+              title={isSessionActive ? "Waiting for activity to be recorded..." : "No recorded activity yet."}
+            />
           )}
         </div>
       )}

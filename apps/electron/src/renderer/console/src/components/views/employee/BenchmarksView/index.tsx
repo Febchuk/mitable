@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Target } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { useMyBenchmarks } from "@/console/src/hooks/queries/benchmarks";
 import { BenchmarkProgressCard } from "./BenchmarkProgressCard";
@@ -180,37 +180,11 @@ export default function BenchmarksView() {
 
       {/* Empty state */}
       {!isLoading && filtered.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "120px 0",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <Target size={40} color="var(--text-tertiary)" />
-          <p
-            style={{
-              fontSize: 14,
-              color: "var(--text-tertiary)",
-              fontFamily: "var(--font-sans)",
-              margin: 0,
-            }}
-          >
-            No benchmarks assigned yet
-          </p>
-          <p
-            style={{
-              fontSize: 12,
-              color: "var(--text-tertiary)",
-              fontFamily: "var(--font-sans)",
-              margin: 0,
-            }}
-          >
-            Your manager will assign benchmarks to help track your growth.
-          </p>
+        <div style={{ padding: "80px 0" }}>
+          <EmptyState
+            title="No benchmarks assigned yet"
+            description="Your manager will assign benchmarks to help track your growth."
+          />
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRoadmap, useToggleTask } from "@/console/src/hooks/queries/roadmap";
 import { useNavigate } from "react-router-dom";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -120,7 +121,7 @@ export default function RoadmapView() {
                   </div>
                 ))
               ) : (
-                <p className="text-text-secondary text-center py-8">No tasks for this week yet</p>
+                <EmptyState variant="inline" title="No tasks for this week yet" />
               )}
             </TabsContent>
           ))}

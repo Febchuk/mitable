@@ -9,6 +9,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import WeekStrip from "./WeekStrip";
 import ActivityBlock from "./ActivityBlock";
 import type { ActivityDay } from "./types";
@@ -632,6 +633,15 @@ export default function CalendarView() {
             <p style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
               {error instanceof Error ? error.message : "An error occurred"}
             </p>
+          </div>
+        )}
+
+        {!isLoading && !error && selectedDay.workBlocks.length === 0 && (
+          <div style={{ padding: "48px 0" }}>
+            <EmptyState
+              title="No activity recorded"
+              description="Work blocks will appear here as activity is detected throughout the day."
+            />
           </div>
         )}
 

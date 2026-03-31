@@ -25,6 +25,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import type { Capture, ActivityType } from "./types";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface CaptureTimelineProps {
   captures: Capture[];
@@ -393,10 +394,7 @@ export default function CaptureTimeline({ captures, maxVisible = 100 }: CaptureT
 
   if (captures.length === 0) {
     return (
-      <div className="py-8 text-center">
-        <Clock size={24} className="mx-auto text-ink-tertiary/40 mb-2" />
-        <p className="text-sm text-ink-tertiary">No captures in this block</p>
-      </div>
+      <EmptyState variant="inline" title="No captures in this block" />
     );
   }
 

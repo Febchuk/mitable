@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useBenchmarks, useDeleteBenchmark } from "@/console/src/hooks/queries/benchmarks";
 import type { Benchmark } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
@@ -236,77 +237,36 @@ export default function BenchmarksView() {
           </div>
         </div>
       ) : benchmarks.length === 0 ? (
-        /* Empty state hero — no benchmarks created yet */
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "80px 32px",
-            gap: 20,
-          }}
-        >
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 16,
-              background: "rgba(130, 192, 204, 0.08)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Plus size={28} style={{ color: "#82C0CC" }} />
-          </div>
-          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 8 }}>
-            <h2
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: 22,
-                fontWeight: 400,
-                color: "var(--text-primary)",
-                margin: 0,
-                letterSpacing: "-0.2px",
-              }}
-            >
-              Create your first benchmark
-            </h2>
-            <p
-              style={{
-                fontSize: 13,
-                color: "var(--text-tertiary)",
-                margin: 0,
-                lineHeight: 1.5,
-                maxWidth: 380,
-              }}
-            >
-              Benchmarks use AI to score your team across custom parameters. Define what matters and track progress over time.
-            </p>
-          </div>
-          <button
-            onClick={() => navigate("/benchmarks/new")}
-            style={{
-              height: 40,
-              padding: "0 24px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontFamily: "var(--font-sans)",
-              fontWeight: 500,
-              border: "none",
-              cursor: "pointer",
-              background: "#82C0CC",
-              color: "#1A1916",
-              transition: "opacity 0.15s",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <Plus size={15} />
-            New Benchmark
-          </button>
+        /* Empty state — no benchmarks created yet */
+        <div style={{ padding: "80px 0" }}>
+          <EmptyState
+            title="Create your first benchmark"
+            description="Benchmarks use AI to score your team across custom parameters. Define what matters and track progress over time."
+            actions={
+              <button
+                onClick={() => navigate("/benchmarks/new")}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "#82C0CC",
+                  color: "#1A1916",
+                  transition: "opacity 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Plus size={14} />
+                New Benchmark
+              </button>
+            }
+          />
         </div>
       ) : filtered.length === 0 ? (
         <div

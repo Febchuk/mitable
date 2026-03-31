@@ -1,10 +1,6 @@
-import { useState, useMemo } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { X, Check } from "lucide-react";
 import { useUsers } from "@/console/src/hooks/queries/admin";
 import { useAssignBenchmark } from "@/console/src/hooks/queries/benchmarks";
 
@@ -29,9 +25,19 @@ export function AssignBenchmarkModal({
   const { mutate: assignBenchmark, isPending } = useAssignBenchmark();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [targetOverride, setTargetOverride] = useState<string>("");
+  const [visible, setVisible] = useState(false);
 
   const existingSet = useMemo(() => new Set(existingUserIds), [existingUserIds]);
+
+  // Animate in/out
+  useEffect(() => {
+    if (open) {
+      // Small delay so the DOM renders before we trigger the transition
+      requestAnimationFrame(() => setVisible(true));
+    } else {
+      setVisible(false);
+    }
+  }, [open]);
 
   function toggleUser(userId: string) {
     if (existingSet.has(userId)) return;
@@ -50,71 +56,115 @@ export function AssignBenchmarkModal({
     const userIds = Array.from(selectedIds);
     if (!userIds.length) return;
 
-    const payload: { benchmarkId: string; userIds: string[]; targetOverride?: number } = {
-      benchmarkId,
-      userIds,
-    };
-
-    const parsed = parseFloat(targetOverride);
-    if (!isNaN(parsed) && targetOverride.trim() !== "") {
-      payload.targetOverride = parsed;
-    }
-
-    assignBenchmark(payload, {
+    assignBenchmark({ benchmarkId, userIds }, {
       onSuccess: () => {
         setSelectedIds(new Set());
-        setTargetOverride("");
         onOpenChange(false);
       },
     });
   }
 
-  function handleCancel() {
+  function handleClose() {
     setSelectedIds(new Set());
-    setTargetOverride("");
     onOpenChange(false);
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
+  if (!open) return null;
+
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={handleClose}
         style={{
+          position: "fixed",
+          inset: 0,
+          background: visible ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0)",
+          transition: "background 0.25s ease",
+          zIndex: 50,
+        }}
+      />
+
+      {/* Drawer */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 400,
+          maxWidth: "90vw",
           background: "var(--bg-raised)",
-          border: "var(--border-hairline)",
-          borderRadius: 14,
-          padding: 0,
-          maxWidth: 460,
-          width: "100%",
-          overflow: "hidden",
+          borderLeft: "var(--border-hairline)",
+          zIndex: 51,
+          display: "flex",
+          flexDirection: "column",
+          transform: visible ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 0.25s ease",
         }}
       >
-        <DialogHeader style={{ padding: "24px 24px 0" }}>
-          <DialogTitle
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "24px 24px 16px",
+            borderBottom: "var(--border-hairline)",
+            flexShrink: 0,
+          }}
+        >
+          <h2
             style={{
               fontFamily: "var(--font-serif)",
               fontSize: 20,
               fontWeight: 400,
               color: "var(--text-primary)",
               letterSpacing: "-0.2px",
+              margin: 0,
             }}
           >
             Assign People
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+          <button
+            onClick={handleClose}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: "var(--text-tertiary)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
 
-        <div style={{ padding: "16px 24px 0" }}>
+        {/* Description */}
+        <div style={{ padding: "16px 24px 0", flexShrink: 0 }}>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
             Select people to assign to this benchmark.
           </p>
         </div>
 
-        {/* User list */}
+        {/* User list — scrollable */}
         <div
           style={{
-            maxHeight: 320,
+            flex: 1,
             overflowY: "auto",
-            margin: "16px 0 0",
-            padding: "0 24px",
+            padding: "16px 24px",
             display: "flex",
             flexDirection: "column",
             gap: 2,
@@ -126,8 +176,9 @@ export function AssignBenchmarkModal({
             const checked = isExisting || isSelected;
 
             return (
-              <label
+              <div
                 key={user.id}
+                onClick={() => toggleUser(user.id)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -147,19 +198,29 @@ export function AssignBenchmarkModal({
                   e.currentTarget.style.background = "transparent";
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={isExisting}
-                  onChange={() => toggleUser(user.id)}
+                <div
                   style={{
-                    width: 15,
-                    height: 15,
-                    accentColor: "#82C0CC",
-                    cursor: isExisting ? "default" : "pointer",
+                    width: 18,
+                    height: 18,
+                    borderRadius: 5,
+                    border: checked
+                      ? "1.5px solid rgba(255,255,255,0.25)"
+                      : "1.5px solid rgba(255,255,255,0.12)",
+                    background: checked
+                      ? "rgba(255,255,255,0.1)"
+                      : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     flexShrink: 0,
+                    transition: "all 0.15s ease",
+                    cursor: isExisting ? "default" : "pointer",
                   }}
-                />
+                >
+                  {checked && (
+                    <Check size={12} style={{ color: "var(--text-primary)", strokeWidth: 2.5 }} />
+                  )}
+                </div>
 
                 {/* Avatar */}
                 <div
@@ -167,7 +228,7 @@ export function AssignBenchmarkModal({
                     width: 32,
                     height: 32,
                     borderRadius: "50%",
-                    background: "var(--bg-base)",
+                    background: "rgba(var(--ui-rgb), 0.1)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -175,18 +236,9 @@ export function AssignBenchmarkModal({
                     fontWeight: 500,
                     color: "var(--text-primary)",
                     flexShrink: 0,
-                    overflow: "hidden",
                   }}
                 >
-                  {user.avatarUrl ? (
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  ) : (
-                    getInitial(user.name)
-                  )}
+                  {getInitial(user.name)}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -227,50 +279,9 @@ export function AssignBenchmarkModal({
                     {user.email}
                   </div>
                 </div>
-              </label>
+              </div>
             );
           })}
-        </div>
-
-        {/* Target override */}
-        <div style={{ padding: "16px 24px 0" }}>
-          <label
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                color: "var(--text-tertiary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.09em",
-                fontFamily: "var(--font-sans)",
-              }}
-            >
-              Target Override (optional)
-            </span>
-            <input
-              type="number"
-              value={targetOverride}
-              onChange={(e) => setTargetOverride(e.target.value)}
-              placeholder="Use benchmark default"
-              style={{
-                width: "100%",
-                height: 36,
-                padding: "0 12px",
-                borderRadius: 8,
-                border: "var(--border-hairline)",
-                background: "var(--bg-base)",
-                color: "var(--text-primary)",
-                fontSize: 13,
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
-          </label>
         </div>
 
         {/* Footer */}
@@ -279,11 +290,12 @@ export function AssignBenchmarkModal({
             display: "flex",
             justifyContent: "flex-end",
             gap: 8,
-            padding: "20px 24px 24px",
+            padding: "16px 24px 24px",
+            flexShrink: 0,
           }}
         >
           <button
-            onClick={handleCancel}
+            onClick={handleClose}
             style={{
               padding: "8px 16px",
               borderRadius: 8,
@@ -321,7 +333,8 @@ export function AssignBenchmarkModal({
             {isPending ? "Assigning..." : `Assign${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
           </button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </>,
+    document.body
   );
 }

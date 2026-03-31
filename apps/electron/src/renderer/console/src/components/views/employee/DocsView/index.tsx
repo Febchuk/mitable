@@ -8,7 +8,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocuments } from "@/console/src/hooks/queries/documents";
-import { Loader2, AlertCircle, FileText, Plus, Lock } from "lucide-react";
+import { Loader2, AlertCircle, Plus, Lock } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import CreateDocumentModal from "./dialogs/CreateDocumentModal";
 import { groupByDay } from "@/console/src/components/shared/groupByDay";
 import type { Document } from "@mitable/shared";
@@ -278,42 +279,36 @@ export default function DocsView() {
           ))}
         </div>
       ) : (
-        /* Empty state — clean, no icon */
+        /* Empty state */
         <div style={{ paddingTop: 40 }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "48px 0",
-              borderRadius: 12,
-              border: "0.5px dashed rgba(var(--ui-rgb), 0.1)",
-            }}
-          >
-            <FileText size={20} style={{ color: "var(--text-tertiary)", marginBottom: 12 }} />
-            <p
-              style={{
-                color: "var(--text-secondary)",
-                fontSize: 13,
-                fontWeight: 500,
-                marginBottom: 4,
-              }}
-            >
-              No documents yet
-            </p>
-            <p
-              style={{
-                color: "var(--text-tertiary)",
-                fontSize: 12,
-                textAlign: "center",
-                maxWidth: 260,
-                lineHeight: 1.5,
-              }}
-            >
-              Create your first document or generate one from a work session.
-            </p>
-          </div>
+          <EmptyState
+            title="No documents yet"
+            description="Create your first document or generate one from a work session."
+            actions={
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                style={{
+                  height: 34,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "#82C0CC",
+                  color: "#1A1916",
+                  transition: "opacity 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Plus size={14} />
+                Create your first doc
+              </button>
+            }
+          />
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, MessageSquare } from "lucide-react";
+import { Plus, Search } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { groupByDay } from "@/console/src/components/shared/groupByDay";
 
 interface DemoChat {
@@ -220,40 +221,10 @@ export default function ChatsView() {
         </div>
       ) : (
         <div style={{ paddingTop: 40 }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "48px 0",
-              borderRadius: 12,
-              border: "0.5px dashed rgba(var(--ui-rgb), 0.1)",
-            }}
-          >
-            <MessageSquare size={20} style={{ color: "var(--text-tertiary)", marginBottom: 12 }} />
-            <p
-              style={{
-                color: "var(--text-secondary)",
-                fontSize: 13,
-                fontWeight: 500,
-                marginBottom: 4,
-              }}
-            >
-              No chats matching &ldquo;{searchQuery}&rdquo;
-            </p>
-            <p
-              style={{
-                color: "var(--text-tertiary)",
-                fontSize: 12,
-                textAlign: "center",
-                maxWidth: 260,
-                lineHeight: 1.5,
-              }}
-            >
-              Try a different search term
-            </p>
-          </div>
+          <EmptyState
+            title={`No chats matching \u201C${searchQuery}\u201D`}
+            description="Try a different search term"
+          />
         </div>
       )}
     </div>
