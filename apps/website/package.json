@@ -6,6 +6,7 @@
         "dev": "next dev --port 3003",
         "build": "next build",
         "start": "next start",
+        "start:railway": "node .next/standalone/apps/website/server.js",
         "typecheck": "tsc --noEmit || true",
         "lint": "next lint || true"
     },

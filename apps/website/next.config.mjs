@@ -4,6 +4,7 @@ const websiteDir = import.meta.dirname;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    output: "standalone",
     experimental: {
         optimizePackageImports: ["@untitledui/icons"],
     },
