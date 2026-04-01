@@ -33,3 +33,4 @@ export * from "./github/github-commits.schema";
 export * from "./github/github-pull-requests.schema";
 export * from "./github/github-issues.schema";
 export * from "./benchmarks.schema";
+export * from "./bragbook.schema";

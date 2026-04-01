@@ -40,6 +40,7 @@ import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
 import MeView from "./components/views/employee/MeView";
+import BragbookView from "./components/views/employee/BragbookView";
 import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
 import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
 import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
@@ -322,6 +323,7 @@ function App() {
                         <Route path="setup" element={<SetupView />} />
                         {/* Employee Routes */}
                         <Route path="me" element={<MeView />} />
+                        <Route path="bragbook" element={<BragbookView />} />
                         <Route path="docs" element={<DocsView />} />
                         <Route path="docs/:docId" element={<DocDetail />} />
                         <Route path="artefacts" element={<ArtifactsView />} />
