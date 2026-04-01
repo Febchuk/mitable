@@ -18,6 +18,7 @@ import artifactsRouter from "./routes/artifacts.js";
 import apiKeysRouter from "./routes/api-keys.js";
 import myActivityRouter from "./routes/my-activity.js";
 import myBenchmarksRouter from "./routes/my-benchmarks.js";
+import myBragbookRouter from "./routes/my-bragbook.js";
 import adminBenchmarksRouter from "./routes/admin-benchmarks.js";
 import { authLimiter } from "./middleware/rateLimiter.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
@@ -46,6 +47,7 @@ router.use("/agent", agentRouter);
 router.use("/api-keys", apiKeysRouter);
 router.use("/my-activity", myActivityRouter);
 router.use("/my/benchmarks", myBenchmarksRouter);
+router.use("/my-bragbook", myBragbookRouter);
 
 /**
  * DEPRECATED: /guides routes

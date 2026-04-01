@@ -17,6 +17,7 @@ import { runGraphSyncJob } from "./jobs/graph-sync.job";
 import { runGranolaSyncJob } from "./jobs/granola-sync.job";
 import { runFirefliesSyncJob } from "./jobs/fireflies-sync.job";
 import { runBenchmarkScoreJob } from "./jobs/benchmark-score.job";
+import { runBragbookGenerateJob } from "./jobs/bragbook-generate.job";
 import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });
@@ -179,7 +180,54 @@ export function initCronJobs(): void {
   // Quarterly benchmarks — 1st of Jan, Apr, Jul, Oct at 02:30
   cron.schedule("30 2 1 1,4,7,10 *", () => runBenchmarks(["quarterly"], "quarterly"));
 
+  // ──────────────────────────────────────────────
+  // Bragbook Generation
+  // AI-polished accomplishment summaries per period.
+  // Runs after benchmarks to let activity data settle.
+  //   weekly     → Mondays at 03:00 UTC
+  //   monthly    → 1st of month at 03:00 UTC
+  //   quarterly  → 1st of Jan/Apr/Jul/Oct at 03:00 UTC
+  // ──────────────────────────────────────────────
+  let isBragbookGenerateRunning = false;
+
+  const runBragbook = async (periodTypes: Array<"weekly" | "monthly" | "quarterly">, label: string) => {
+    if (isBragbookGenerateRunning) {
+      logger.warn({ label }, "Bragbook generate job still running — skipping");
+      return;
+    }
+
+    isBragbookGenerateRunning = true;
+    try {
+      const result = await runBragbookGenerateJob(periodTypes);
+      if (result.usersProcessed > 0 || result.usersFailed > 0) {
+        logger.info(
+          {
+            label,
+            processed: result.usersProcessed,
+            skipped: result.usersSkipped,
+            failed: result.usersFailed,
+            timeMs: result.totalTimeMs,
+          },
+          "Bragbook generate job completed"
+        );
+      }
+    } catch (error) {
+      logger.error({ error: String(error), label }, "Bragbook generate job failed");
+    } finally {
+      isBragbookGenerateRunning = false;
+    }
+  };
+
+  // Weekly bragbook — Mondays at 03:00
+  cron.schedule("0 3 * * 1", () => runBragbook(["weekly"], "weekly"));
+
+  // Monthly bragbook — 1st of each month at 03:00
+  cron.schedule("0 3 1 * *", () => runBragbook(["monthly"], "monthly"));
+
+  // Quarterly bragbook — 1st of Jan, Apr, Jul, Oct at 03:00
+  cron.schedule("0 3 1 1,4,7,10 *", () => runBragbook(["quarterly"], "quarterly"));
+
   logger.info(
-    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min, Benchmarks: daily/weekly/monthly/quarterly"
+    "Cron scheduler initialized — Stale cleanup every 15min, Granola sync every 15min, Fireflies sync every 15min, Benchmarks: daily/weekly/monthly/quarterly, Bragbook: weekly/monthly/quarterly"
   );
 }
