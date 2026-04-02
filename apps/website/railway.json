@@ -5,6 +5,6 @@
     "buildCommand": "npm run build --workspace=packages/shared && npm run build --workspace=apps/website && cp -r apps/website/public apps/website/.next/standalone/apps/website/public && cp -r apps/website/.next/static apps/website/.next/standalone/apps/website/.next/static"
   },
   "deploy": {
-    "startCommand": "cd apps/website && node .next/standalone/apps/website/server.js"
+    "startCommand": "HOSTNAME=0.0.0.0 node apps/website/.next/standalone/apps/website/server.js"
   }
 }
