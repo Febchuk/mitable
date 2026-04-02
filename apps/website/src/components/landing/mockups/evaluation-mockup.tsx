@@ -1,18 +1,6 @@
 "use client";
 
-const C = {
-    bg: "#1A1916",
-    raised: "#211F1B",
-    uiRgb: "236,232,224",
-    accent: "#82C0CC",
-    text: "#ECE8E0",
-    textSec: "#A09A8E",
-    textTer: "#6B665C",
-    green: "#3A9B6B",
-    amber: "#D4A27A",
-    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
-    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
-};
+import { getMockupColors, type MockupVariant } from "./colors";
 
 const MINI_RING = 32;
 const MINI_SW = 2.5;
@@ -25,7 +13,7 @@ function strokeColor(score: number) {
     return `hsl(0, 55%, ${55 - ((40 - score) / 40) * 12}%)`;
 }
 
-const ScoreRing = ({ score, size, sw, r, c }: { score: number; size: number; sw: number; r: number; c: number }) => {
+const ScoreRing = ({ score, size, sw, r, c, C }: { score: number; size: number; sw: number; r: number; c: number; C: ReturnType<typeof getMockupColors> }) => {
     const offset = c - (score / 100) * c;
     return (
         <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
@@ -40,7 +28,7 @@ const ScoreRing = ({ score, size, sw, r, c }: { score: number; size: number; sw:
     );
 };
 
-const TrendBadge = ({ delta, improving }: { delta: number; improving: boolean }) => (
+const TrendBadge = ({ delta, improving, C }: { delta: number; improving: boolean; C: ReturnType<typeof getMockupColors> }) => (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 500, color: improving ? C.green : C.amber }}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {improving
@@ -59,7 +47,7 @@ const PEOPLE = [
     { name: "Maya Chen", role: "Senior Engineer", score: 77, delta: 6, improving: true },
 ];
 
-const PersonRow = ({ name, role, score, delta, improving, isLast }: typeof PEOPLE[0] & { isLast: boolean }) => (
+const PersonRow = ({ name, role, score, delta, improving, isLast, C }: typeof PEOPLE[0] & { isLast: boolean; C: ReturnType<typeof getMockupColors> }) => (
     <div
         style={{
             display: "flex",
@@ -76,64 +64,65 @@ const PersonRow = ({ name, role, score, delta, improving, isLast }: typeof PEOPL
             <div style={{ fontSize: 13, fontWeight: 500, color: C.text, lineHeight: 1.2 }}>{name}</div>
             <div style={{ fontSize: 11, color: C.textTer, marginTop: 3 }}>{role}</div>
         </div>
-        <ScoreRing score={score} size={MINI_RING} sw={MINI_SW} r={MINI_R} c={MINI_C} />
+        <ScoreRing score={score} size={MINI_RING} sw={MINI_SW} r={MINI_R} c={MINI_C} C={C} />
         <div style={{ minWidth: 52, textAlign: "right" }}>
-            <TrendBadge delta={delta} improving={improving} />
+            <TrendBadge delta={delta} improving={improving} C={C} />
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textTer} strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
     </div>
 );
 
-export const EvaluationMockup = () => (
-    <div
-        style={{
-            width: "100%",
-            height: "100%",
-            padding: "22px 28px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            fontFamily: C.sans,
-            boxSizing: "border-box",
-            background: C.bg,
-            overflow: "hidden",
-        }}
-    >
-        {/* Title */}
-        <h1 style={{ fontFamily: C.serif, fontSize: 22, color: C.text, fontWeight: 400, letterSpacing: "-0.3px", margin: 0 }}>
-            Engineering Excellence
-        </h1>
+export const EvaluationMockup = ({ variant = "dark" }: { variant?: MockupVariant }) => {
+    const C = getMockupColors(variant);
 
-        {/* Score + Trend */}
-        <div style={{ display: "flex", gap: 40, alignItems: "baseline" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em" }}>Score</span>
-                <span style={{ fontFamily: C.serif, fontSize: 42, fontWeight: 300, color: C.text, letterSpacing: -2, lineHeight: 1 }}>79</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em" }}>Trend</span>
-                <span style={{ fontFamily: C.serif, fontSize: 42, fontWeight: 300, letterSpacing: -2, lineHeight: 1, color: C.green }}>+3%</span>
-            </div>
-        </div>
+    return (
+        <div
+            style={{
+                width: "100%",
+                height: "100%",
+                padding: "22px 28px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 18,
+                fontFamily: C.sans,
+                boxSizing: "border-box",
+                background: C.bg,
+                overflow: "hidden",
+            }}
+        >
+            <h1 style={{ fontFamily: C.serif, fontSize: 22, color: C.text, fontWeight: 400, letterSpacing: "-0.3px", margin: 0 }}>
+                Engineering Excellence
+            </h1>
 
-        {/* People list */}
-        <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em" }}>People</span>
-                <div style={{ display: "flex", gap: 5 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid rgba(${C.uiRgb}, 0.08)`, display: "flex", alignItems: "center", justifyContent: "center", color: C.textSec }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-                    </div>
-                    <div style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid rgba(${C.uiRgb}, 0.08)`, display: "flex", alignItems: "center", justifyContent: "center", color: C.textSec }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
-                    </div>
+            <div style={{ display: "flex", gap: 40, alignItems: "baseline" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em" }}>Score</span>
+                    <span style={{ fontFamily: C.serif, fontSize: 42, fontWeight: 300, color: C.text, letterSpacing: -2, lineHeight: 1 }}>79</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em" }}>Trend</span>
+                    <span style={{ fontFamily: C.serif, fontSize: 42, fontWeight: 300, letterSpacing: -2, lineHeight: 1, color: C.green }}>+3%</span>
                 </div>
             </div>
-            <div style={{ borderTop: `1px solid rgba(${C.uiRgb}, 0.06)` }}>
-                {PEOPLE.map((p, i) => (
-                    <PersonRow key={p.name} {...p} isLast={i === PEOPLE.length - 1} />
-                ))}
+
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em" }}>People</span>
+                    <div style={{ display: "flex", gap: 5 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid rgba(${C.uiRgb}, 0.08)`, display: "flex", alignItems: "center", justifyContent: "center", color: C.textSec }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                        </div>
+                        <div style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid rgba(${C.uiRgb}, 0.08)`, display: "flex", alignItems: "center", justifyContent: "center", color: C.textSec }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
+                        </div>
+                    </div>
+                </div>
+                <div style={{ borderTop: `1px solid rgba(${C.uiRgb}, 0.06)` }}>
+                    {PEOPLE.map((p, i) => (
+                        <PersonRow key={p.name} {...p} isLast={i === PEOPLE.length - 1} C={C} />
+                    ))}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};

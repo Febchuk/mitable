@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import { MacWindow } from "./mockups/mac-window";
+import type { MockupVariant } from "./mockups/colors";
 
 const C = {
     text: "var(--l-text, #ECE8E0)",
@@ -24,6 +25,7 @@ interface FeatureSectionProps {
     mockup?: ReactNode;
     /** Render mockup without MacWindow wrapper */
     rawMockup?: boolean;
+    variant?: MockupVariant;
 }
 
 export const FeatureSection = ({
@@ -37,6 +39,7 @@ export const FeatureSection = ({
     screenshotAlt = "Feature screenshot",
     mockup,
     rawMockup = false,
+    variant = "dark",
 }: FeatureSectionProps) => {
     const ref = useRef<HTMLElement>(null);
 
@@ -130,7 +133,7 @@ export const FeatureSection = ({
                     />
                 </div>
             ) : mockup ? (
-                rawMockup ? mockup : <MacWindow>{mockup}</MacWindow>
+                rawMockup ? mockup : <MacWindow variant={variant}>{mockup}</MacWindow>
             ) : null}
         </div>
     );

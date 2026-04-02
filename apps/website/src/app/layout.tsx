@@ -47,8 +47,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-    themeColor: "#1A1916",
-    colorScheme: "dark",
+    themeColor: [
+        { media: "(prefers-color-scheme: dark)", color: "#1A1916" },
+        { media: "(prefers-color-scheme: light)", color: "#F5F1ED" },
+    ],
+    colorScheme: "dark light",
 };
 
 export default function RootLayout({
@@ -65,8 +68,9 @@ export default function RootLayout({
                     jetbrainsMono.variable,
                     newsreader.variable,
                     dmSans.variable,
-                    "bg-primary antialiased",
+                    "antialiased",
                 )}
+                style={{ background: "var(--l-bg, #1A1916)" }}
             >
                 <RouteProvider>
                     <Theme>{children}</Theme>

@@ -95,13 +95,13 @@ const logos = [
 function LogoItem({ Component }: { Component: React.ComponentType }) {
     return (
         <div
+            className="logo-marquee-item"
             style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
                 padding: "0 56px",
-                color: "rgba(236, 232, 224, 0.55)",
             }}
         >
             <Component />

@@ -15,11 +15,15 @@ import { BenchmarkMockup } from "@/components/landing/mockups/benchmark-mockup";
 import { WorkMontageMockup } from "@/components/landing/mockups/work-montage-mockup";
 import { EvaluationMockup } from "@/components/landing/mockups/evaluation-mockup";
 import { PersonDetailMockup } from "@/components/landing/mockups/person-detail-mockup";
+import { useTheme } from "@/hooks/use-theme";
 import { supabase } from "@/lib/supabase";
+import type { MockupVariant } from "@/components/landing/mockups/colors";
 
 export const HomeScreen = () => {
     const router = useRouter();
     const [checking, setChecking] = useState(true);
+    const { theme } = useTheme();
+    const variant: MockupVariant = theme === "light" ? "light" : "dark";
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -66,13 +70,48 @@ export const HomeScreen = () => {
 
                 <SocialProofSection />
 
+                {/* ── How it works bridge ── */}
+                <section
+                    id="how-it-works"
+                    className="l-feature-section"
+                    style={{
+                        textAlign: "center",
+                        padding: "80px 48px 20px",
+                        maxWidth: 900,
+                        margin: "0 auto",
+                    }}
+                >
+                    <h2
+                        style={{
+                            fontFamily: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+                            fontSize: 36,
+                            fontWeight: 400,
+                            color: "var(--l-text, #ECE8E0)",
+                            letterSpacing: "-0.01em",
+                            margin: "0 0 14px 0",
+                        }}
+                    >
+                        How it works.
+                    </h2>
+                    <p
+                        style={{
+                            fontSize: 16,
+                            lineHeight: 1.65,
+                            color: "var(--l-text-secondary, #A09A8E)",
+                            margin: 0,
+                        }}
+                    >
+                        A simple system that turns your team&rsquo;s everyday work into a clear measure of performance.
+                    </p>
+                </section>
+
                 {/* Feature 1: Benchmarks */}
                 <FeatureSection
-                    id="how-it-works"
                     title="Set the standard."
                     description="Define what good looks like for every role. Mitable's AI generates scoring parameters from a simple description, so benchmarks take minutes to create."
                     linkText="Learn how benchmarks work →"
-                    mockup={<BenchmarkMockup />}
+                    mockup={<BenchmarkMockup variant={variant} />}
+                    variant={variant}
                 />
 
                 {/* Feature 2: Multi-app work montage */}
@@ -80,9 +119,10 @@ export const HomeScreen = () => {
                     title="Your team just works."
                     description="Slack, browsers, terminals, docs — Mitable captures work across every app on your team's computer. No manual time tracking. No status updates."
                     linkText="See how capture works →"
-                    mockup={<WorkMontageMockup />}
+                    mockup={<WorkMontageMockup variant={variant} />}
                     rawMockup
                     reverse
+                    variant={variant}
                 />
 
                 {/* Feature 3: Evaluation */}
@@ -90,7 +130,8 @@ export const HomeScreen = () => {
                     title="Evaluate performance more accurately."
                     description="Get a live, AI-generated score for every person on your team — measured against the benchmarks you set. No more guessing who's on track and who needs support."
                     linkText="See the employee view →"
-                    mockup={<EvaluationMockup />}
+                    mockup={<EvaluationMockup variant={variant} />}
+                    variant={variant}
                 />
 
                 {/* Feature 4: Person Detail */}
@@ -98,8 +139,9 @@ export const HomeScreen = () => {
                     title="More robust reporting."
                     description="See exactly how each person spends their time — which customers they serve, how their focus and meeting hours break down, and where they're most effective."
                     linkText="See the full dashboard →"
-                    mockup={<PersonDetailMockup />}
+                    mockup={<PersonDetailMockup variant={variant} />}
                     reverse
+                    variant={variant}
                 />
 
                 <CardsSection />

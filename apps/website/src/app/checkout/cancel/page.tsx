@@ -1,31 +1,92 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Button } from "@/components/base/buttons/button";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { LandingNav } from "@/components/landing/landing-nav";
+import { LandingFooter } from "@/components/landing";
+
+const C = {
+    bg: "var(--l-bg, #1A1916)",
+    text: "var(--l-text, #ECE8E0)",
+    textSec: "var(--l-text-secondary, #A09A8E)",
+    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+};
+
+const buttonPrimary: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "13px 28px",
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 500,
+    background: "var(--l-text, #ECE8E0)",
+    color: "var(--l-bg, #1A1916)",
+    border: "none",
+    textDecoration: "none",
+    fontFamily: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+    transition: "opacity 0.15s",
+    cursor: "pointer",
+};
+
+const buttonSecondary: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "13px 28px",
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 500,
+    background: "rgba(var(--l-ui-rgb, 236,232,224), 0.06)",
+    color: "var(--l-text, #ECE8E0)",
+    border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
+    textDecoration: "none",
+    fontFamily: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+    transition: "opacity 0.15s",
+    cursor: "pointer",
+};
 
 export default function CheckoutCancelPage() {
     return (
-        <div className="flex min-h-dvh flex-col bg-ink">
-            <MitableHeader />
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+            <LandingNav />
 
-            <main className="flex flex-1 items-center justify-center pt-18 md:pt-20">
-                <div className="mx-auto max-w-lg px-4 py-20 text-center md:px-8">
-                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
-                        <h1 className="mb-3 font-display text-3xl font-extrabold tracking-tight text-white uppercase md:text-4xl">Checkout cancelled</h1>
-                        <p className="mb-8 text-lg text-gray-400">No worries — you can upgrade anytime. Your free plan is still active.</p>
+            <main style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", padding: "180px 32px 80px" }}>
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                    style={{ maxWidth: 520, textAlign: "center" }}
+                >
+                    <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
+                        Checkout cancelled
+                    </h1>
+                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: "0 0 32px" }}>
+                        No worries &mdash; you can upgrade anytime. Your free plan is still active.
+                    </p>
 
-                        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-                            <Button color="primary" size="lg" className="btn-pill" href="/pricing">
-                                View Plans
-                            </Button>
-                            <Button color="secondary" size="lg" className="btn-pill" href="/">
-                                Back to Home
-                            </Button>
-                        </div>
-                    </motion.div>
-                </div>
+                    <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                        <a
+                            href="/pricing"
+                            style={buttonPrimary}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                        >
+                            View Plans
+                        </a>
+                        <a
+                            href="/"
+                            style={buttonSecondary}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                        >
+                            Back to Home
+                        </a>
+                    </div>
+                </motion.div>
             </main>
+
+            <LandingFooter />
         </div>
     );
 }

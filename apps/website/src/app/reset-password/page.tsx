@@ -1,25 +1,58 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { Button } from "@/components/base/buttons/button";
-import { Input } from "@/components/base/input/input";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { LandingNav } from "@/components/landing/landing-nav";
+import { LandingFooter } from "@/components/landing";
 import { supabase } from "@/lib/supabase";
 
-const darkInput = {
-    wrapperClassName: "!bg-gray-900/50 !ring-gray-800/60 focus-within:!ring-brand",
-    inputClassName: "!text-white !placeholder-gray-500",
+const C = {
+    bg: "var(--l-bg, #1A1916)",
+    text: "var(--l-text, #ECE8E0)",
+    textSec: "var(--l-text-secondary, #A09A8E)",
+    textTer: "var(--l-text-tertiary, #6B665C)",
+    accent: "var(--l-accent, #82C0CC)",
+    border: "var(--l-border, #33312B)",
+    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+};
+
+const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 14px",
+    paddingRight: 44,
+    fontSize: 14,
+    color: "var(--l-text, #ECE8E0)",
+    background: "rgba(var(--l-ui-rgb, 236, 232, 224), 0.04)",
+    border: "1px solid rgba(var(--l-ui-rgb, 236, 232, 224), 0.08)",
+    borderRadius: 10,
+    outline: "none",
+    fontFamily: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+    transition: "border-color 0.15s",
+};
+
+const eyeButtonStyle: React.CSSProperties = {
+    position: "absolute",
+    right: 12,
+    top: "50%",
+    transform: "translateY(-50%)",
+    background: "none",
+    border: "none",
+    color: "var(--l-text-tertiary, #6B665C)",
+    cursor: "pointer",
+    padding: 4,
+    display: "flex",
+    alignItems: "center",
 };
 
 const EyeIcon = () => (
-    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
         <circle cx="12" cy="12" r="3" />
     </svg>
 );
 
 const EyeOffIcon = () => (
-    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
         <line x1="1" y1="1" x2="23" y2="23" />
     </svg>
@@ -34,25 +67,18 @@ export default function ResetPasswordPage() {
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
-        // Listen for auth state changes (Supabase sets session from URL hash)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event) => {
-            if (event === "PASSWORD_RECOVERY") {
-                setStatus("ready");
-            } else if (event === "SIGNED_IN") {
-                // User might already be signed in from the recovery flow
+            if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
                 setStatus("ready");
             }
         });
 
-        // Check if there's already a session (in case the event already fired)
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) {
                 setStatus("ready");
             } else {
-                // No session yet, might still be processing the hash
-                // Give it a moment, then show error if no session
                 setTimeout(() => {
                     supabase.auth.getSession().then(({ data: { session: s } }) => {
                         if (!s && status === "loading") {
@@ -83,12 +109,10 @@ export default function ResetPasswordPage() {
 
         try {
             const { error } = await supabase.auth.updateUser({ password });
-
             if (error) {
                 setErrorMessage(error.message);
                 return;
             }
-
             setStatus("success");
         } catch {
             setErrorMessage("An unexpected error occurred. Please try again.");
@@ -96,168 +120,229 @@ export default function ResetPasswordPage() {
     };
 
     return (
-        <div className="flex min-h-dvh flex-col bg-ink">
-            <MitableHeader />
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+            <LandingNav />
 
-            <main className="flex-1 pt-18 md:pt-20">
-                <section className="relative overflow-hidden">
-                    {/* Background glow */}
-                    <div
-                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                        style={{
-                            width: "800px",
-                            height: "600px",
-                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
-                        }}
-                    />
+            <main style={{ padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto" }}>
+                <a
+                    href="/"
+                    style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 13,
+                        color: C.textTer,
+                        textDecoration: "none",
+                        marginBottom: 40,
+                        transition: "color 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--l-text)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--l-text-tertiary, #6B665C)"; }}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12" />
+                        <polyline points="12 19 5 12 12 5" />
+                    </svg>
+                    Back to home
+                </a>
 
-                    <div className="relative mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-36">
-                        {/* Back link */}
-                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
-                            <svg
-                                className="size-4"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
+                <div style={{ textAlign: "center", marginBottom: 48 }}>
+                    <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
+                        {status === "success" ? "Password Updated" : "Set New Password"}
+                    </h1>
+                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
+                        {status === "loading" && "Verifying your reset link..."}
+                        {status === "ready" && "Enter your new password below."}
+                        {status === "success" && "Your password has been successfully updated."}
+                        {status === "error" && "There was a problem with your reset link."}
+                    </p>
+                </div>
+
+                <div style={{ maxWidth: 400, margin: "0 auto" }}>
+                    {status === "loading" && (
+                        <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+                            <div
+                                style={{
+                                    width: 32,
+                                    height: 32,
+                                    border: "2px solid rgba(var(--l-ui-rgb, 236,232,224), 0.15)",
+                                    borderTop: `2px solid ${C.accent}`,
+                                    borderRadius: "50%",
+                                    animation: "spin 0.8s linear infinite",
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {status === "ready" && (
+                        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                            <div>
+                                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>New Password *</label>
+                                <div style={{ position: "relative" }}>
+                                    <input
+                                        required
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Enter new password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        style={inputStyle}
+                                    />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={eyeButtonStyle} aria-label={showPassword ? "Hide password" : "Show password"}>
+                                        {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Confirm Password *</label>
+                                <div style={{ position: "relative" }}>
+                                    <input
+                                        required
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        placeholder="Confirm new password"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        style={inputStyle}
+                                    />
+                                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={eyeButtonStyle} aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                                        {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {errorMessage && <p style={{ fontSize: 13, color: "var(--status-error, #E87474)", margin: 0 }}>{errorMessage}</p>}
+
+                            <button
+                                type="submit"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    padding: "13px 0",
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    background: C.text,
+                                    color: C.bg,
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontFamily: C.sans,
+                                    transition: "opacity 0.15s",
+                                    width: "100%",
+                                    marginTop: 4,
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
                             >
-                                <line x1="19" y1="12" x2="5" y2="12" />
-                                <polyline points="12 19 5 12 12 5" />
-                            </svg>
-                            Back to home
-                        </a>
+                                Update Password
+                            </button>
+                        </form>
+                    )}
 
-                        {/* Headline */}
-                        <div className="mb-12 text-center">
-                            <h1 className="font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl lg:text-6xl">
-                                {status === "success" ? "Password Updated" : "Set New Password"}
-                            </h1>
-                            <p className="mt-4 text-lg text-gray-400 md:text-xl">
-                                {status === "loading" && "Verifying your reset link..."}
-                                {status === "ready" && "Enter your new password below."}
-                                {status === "success" && "Your password has been successfully updated."}
-                                {status === "error" && "There was a problem with your reset link."}
-                            </p>
+                    {status === "success" && (
+                        <div
+                            style={{
+                                borderRadius: 16,
+                                border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
+                                background: "rgba(var(--l-ui-rgb, 236,232,224), 0.03)",
+                                padding: 32,
+                                textAlign: "center",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: "50%",
+                                    background: "rgba(58,155,107,0.15)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    margin: "0 auto 16px",
+                                }}
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-success, #3A9B6B)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                            </div>
+                            <p style={{ fontSize: 15, color: C.textSec, marginBottom: 24 }}>You can now sign in with your new password.</p>
+                            <a
+                                href="/"
+                                style={{
+                                    display: "inline-flex",
+                                    padding: "10px 24px",
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    background: C.text,
+                                    color: C.bg,
+                                    textDecoration: "none",
+                                    fontFamily: C.sans,
+                                    transition: "opacity 0.15s",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                            >
+                                Back to Home
+                            </a>
                         </div>
+                    )}
 
-                        {/* Content */}
-                        <div className="mx-auto max-w-md">
-                            {status === "loading" && (
-                                <div className="flex justify-center">
-                                    <svg className="size-8 animate-spin text-brand-400" viewBox="0 0 24 24" fill="none">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path
-                                            className="opacity-75"
-                                            fill="currentColor"
-                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                        />
-                                    </svg>
-                                </div>
-                            )}
-
-                            {status === "ready" && (
-                                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-                                    <div className="relative">
-                                        <Input
-                                            label="New Password"
-                                            placeholder="Enter new password"
-                                            type={showPassword ? "text" : "password"}
-                                            isRequired
-                                            value={password}
-                                            onChange={setPassword}
-                                            wrapperClassName={darkInput.wrapperClassName}
-                                            inputClassName={`${darkInput.inputClassName} !pr-12`}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute top-[38px] right-3 text-gray-400 transition-colors hover:text-white"
-                                            aria-label={showPassword ? "Hide password" : "Show password"}
-                                        >
-                                            {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                                        </button>
-                                    </div>
-
-                                    <div className="relative">
-                                        <Input
-                                            label="Confirm Password"
-                                            placeholder="Confirm new password"
-                                            type={showConfirmPassword ? "text" : "password"}
-                                            isRequired
-                                            value={confirmPassword}
-                                            onChange={setConfirmPassword}
-                                            wrapperClassName={darkInput.wrapperClassName}
-                                            inputClassName={`${darkInput.inputClassName} !pr-12`}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className="absolute top-[38px] right-3 text-gray-400 transition-colors hover:text-white"
-                                            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                                        >
-                                            {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
-                                        </button>
-                                    </div>
-
-                                    {errorMessage && <p className="text-sm text-red-400">{errorMessage}</p>}
-
-                                    <Button type="submit" color="primary" size="lg" className="btn-pill mt-2 w-full">
-                                        Update Password
-                                    </Button>
-                                </form>
-                            )}
-
-                            {status === "success" && (
-                                <div className="rounded-2xl border border-gray-800/60 bg-gray-900/50 p-8 text-center">
-                                    <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-brand-900/40">
-                                        <svg
-                                            className="size-6 text-brand-400"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <polyline points="20 6 9 17 4 12" />
-                                        </svg>
-                                    </div>
-                                    <p className="mb-6 text-gray-300">You can now sign in with your new password.</p>
-                                    <Button color="primary" className="btn-pill" href="/">
-                                        Back to Home
-                                    </Button>
-                                </div>
-                            )}
-
-                            {status === "error" && (
-                                <div className="rounded-2xl border border-red-900/40 bg-red-950/20 p-8 text-center">
-                                    <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-red-900/40">
-                                        <svg
-                                            className="size-6 text-red-400"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <circle cx="12" cy="12" r="10" />
-                                            <line x1="15" y1="9" x2="9" y2="15" />
-                                            <line x1="9" y1="9" x2="15" y2="15" />
-                                        </svg>
-                                    </div>
-                                    <p className="mb-6 text-gray-300">{errorMessage}</p>
-                                    <Button color="secondary" className="btn-pill" href="/">
-                                        Back to Home
-                                    </Button>
-                                </div>
-                            )}
+                    {status === "error" && (
+                        <div
+                            style={{
+                                borderRadius: 16,
+                                border: "1px solid rgba(232,116,116,0.2)",
+                                background: "rgba(232,116,116,0.05)",
+                                padding: 32,
+                                textAlign: "center",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: "50%",
+                                    background: "rgba(232,116,116,0.15)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    margin: "0 auto 16px",
+                                }}
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-error, #E87474)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="15" y1="9" x2="9" y2="15" />
+                                    <line x1="9" y1="9" x2="15" y2="15" />
+                                </svg>
+                            </div>
+                            <p style={{ fontSize: 15, color: C.textSec, marginBottom: 24 }}>{errorMessage}</p>
+                            <a
+                                href="/"
+                                style={{
+                                    display: "inline-flex",
+                                    padding: "10px 24px",
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    background: "rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
+                                    color: C.text,
+                                    textDecoration: "none",
+                                    fontFamily: C.sans,
+                                    transition: "opacity 0.15s",
+                                    border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                            >
+                                Back to Home
+                            </a>
                         </div>
-                    </div>
-                </section>
+                    )}
+                </div>
             </main>
+
+            <LandingFooter />
         </div>
     );
 }

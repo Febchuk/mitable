@@ -11,6 +11,7 @@
     --l-bg-muted: #33312B;
 
     --l-accent: #82C0CC;
+    --l-accent-rgb: 130, 192, 204;
     --l-accent-dark: #3A7A87;
     --l-accent-muted: rgba(130, 192, 204, 0.12);
     --l-accent-dim: rgba(130, 192, 204, 0.06);
@@ -30,6 +31,10 @@
     --l-nav-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15);
     --l-nav-divider: rgba(236, 232, 224, 0.1);
     --l-nav-hover-bg: rgba(236, 232, 224, 0.06);
+
+    --l-logo-color: #ECE8E0;
+    --l-logo-opacity: 0.55;
+    --l-logo-hover-opacity: 0.8;
 
     --l-serif: var(--font-newsreader, "Newsreader"), Georgia, serif;
     --l-sans: var(--font-dm-sans, "DM Sans"), system-ui, sans-serif;
@@ -66,6 +71,7 @@
     --l-bg-muted: #E8E2DC;
 
     --l-accent: #2A7F8E;
+    --l-accent-rgb: 42, 127, 142;
     --l-accent-dark: #16697A;
     --l-accent-muted: rgba(42, 127, 142, 0.08);
     --l-accent-dim: rgba(42, 127, 142, 0.04);
@@ -86,6 +92,10 @@
     --l-nav-divider: rgba(28, 43, 51, 0.1);
     --l-nav-hover-bg: rgba(28, 43, 51, 0.06);
 
+    --l-logo-color: #1C2B33;
+    --l-logo-opacity: 0.6;
+    --l-logo-hover-opacity: 0.9;
+
     --mi-accent: #2A7F8E;
     --mi-accent-rgb: 42, 127, 142;
     --mi-accent-dark: #16697A;
@@ -102,6 +112,47 @@
     color: var(--l-text);
     -webkit-font-smoothing: antialiased;
 }
+
+/* ── Light-mode overrides for hardcoded Tailwind dark classes ──
+   Many landing section components use fixed dark Tailwind utilities
+   (bg-ink, text-white, text-gray-*, bg-gray-*). These overrides remap
+   them to --l-* tokens when .landing-light is active so every section
+   responds to the theme toggle without per-file rewrites. */
+.landing-light .bg-ink     { background-color: var(--l-bg) !important; }
+.landing-light .bg-surface { background-color: var(--l-bg) !important; }
+
+.landing-light .text-white  { color: var(--l-text) !important; }
+.landing-light .text-gray-300 { color: var(--l-text) !important; }
+.landing-light .text-gray-400 { color: var(--l-text-secondary) !important; }
+.landing-light .text-gray-500 { color: var(--l-text-tertiary) !important; }
+.landing-light .text-gray-600 { color: var(--l-text-faint) !important; }
+.landing-light .text-gray-700 { color: var(--l-text-faint) !important; }
+
+.landing-light .bg-gray-700   { background-color: rgba(var(--l-ui-rgb), 0.18) !important; }
+.landing-light .bg-gray-800   { background-color: rgba(var(--l-ui-rgb), 0.08) !important; }
+.landing-light .bg-gray-800\/50 { background-color: rgba(var(--l-ui-rgb), 0.06) !important; }
+.landing-light .bg-gray-800\/60 { background-color: rgba(var(--l-ui-rgb), 0.06) !important; }
+.landing-light .bg-gray-900\/30 { background-color: rgba(var(--l-ui-rgb), 0.03) !important; }
+.landing-light .bg-gray-900\/40 { background-color: rgba(var(--l-ui-rgb), 0.04) !important; }
+.landing-light .bg-gray-900\/50 { background-color: rgba(var(--l-ui-rgb), 0.04) !important; }
+.landing-light .bg-gray-950\/50 { background-color: rgba(var(--l-ui-rgb), 0.03) !important; }
+
+.landing-light .border-gray-700\/60 { border-color: rgba(var(--l-ui-rgb), 0.1) !important; }
+.landing-light .border-gray-800\/40 { border-color: rgba(var(--l-ui-rgb), 0.08) !important; }
+.landing-light .border-gray-800\/60 { border-color: rgba(var(--l-ui-rgb), 0.1) !important; }
+.landing-light .border-gray-800      { border-color: rgba(var(--l-ui-rgb), 0.1) !important; }
+
+.landing-light .bg-gray-700\/50 { background-color: rgba(var(--l-ui-rgb), 0.12) !important; }
+.landing-light .bg-gray-800\/40 { background-color: rgba(var(--l-ui-rgb), 0.06) !important; }
+.landing-light .bg-gray-900     { background-color: rgba(var(--l-ui-rgb), 0.04) !important; }
+
+.landing-light .border-gray-700 { border-color: rgba(var(--l-ui-rgb), 0.1) !important; }
+.landing-light .border-red-900\/20 { border-color: rgba(212, 85, 85, 0.12) !important; }
+
+.landing-light .hover\:border-gray-700\/60:hover { border-color: rgba(var(--l-ui-rgb), 0.15) !important; }
+.landing-light .hover\:bg-gray-800\/60:hover     { background-color: rgba(var(--l-ui-rgb), 0.08) !important; }
+.landing-light .hover\:text-white:hover           { color: var(--l-text) !important; }
+.landing-light .hover\:text-gray-300:hover        { color: var(--l-text) !important; }
 
 .landing * {
     box-sizing: border-box;
@@ -224,12 +275,26 @@
     opacity: 0.7;
 }
 
+/* ── Logo marquee ── */
+.logo-marquee-item {
+    color: var(--l-logo-color);
+    opacity: var(--l-logo-opacity);
+    transition: opacity 0.3s;
+}
+.logo-marquee-item:hover {
+    opacity: var(--l-logo-hover-opacity);
+}
+
 .landing-light .logo-strip img {
     filter: brightness(0);
 }
 
+
 /* ── Spinner ── */
 @keyframes l-spin {
+    to { transform: rotate(360deg); }
+}
+@keyframes spin {
     to { transform: rotate(360deg); }
 }
 .l-spinner {

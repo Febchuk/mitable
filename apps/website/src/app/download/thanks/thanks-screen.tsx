@@ -82,8 +82,8 @@ const DownloadsFolderIllustration = () => (
             style={{
                 width: 100,
                 height: 72,
-                background: "rgba(130, 192, 204, 0.12)",
-                border: "1px solid rgba(130, 192, 204, 0.2)",
+                background: "rgba(var(--l-accent-rgb, 130,192,204), 0.12)",
+                border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                 borderRadius: 10,
                 display: "flex",
                 flexDirection: "column",
@@ -99,28 +99,26 @@ const DownloadsFolderIllustration = () => (
                     left: 8,
                     width: 36,
                     height: 14,
-                    background: "rgba(130, 192, 204, 0.18)",
+                    background: "rgba(var(--l-accent-rgb, 130,192,204), 0.18)",
                     borderRadius: "6px 6px 0 0",
-                    border: "1px solid rgba(130, 192, 204, 0.2)",
+                    border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                     borderBottom: "none",
                 }}
             />
             <div
                 style={{
-                    width: 42,
-                    height: 48,
-                    background: C.overlay,
-                    borderRadius: 6,
-                    border: `1px solid ${C.border}`,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 14,
+                    background: "rgba(var(--l-accent-rgb, 130,192,204), 0.12)",
+                    border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 4,
+                    color: C.accent,
                 }}
             >
                 <MitableLogo />
-                <span style={{ fontSize: 7, color: C.textTer, fontFamily: C.sans }}>.dmg</span>
             </div>
         </div>
         <span style={{ fontSize: 10, color: C.textTer, fontFamily: C.sans, textTransform: "uppercase", letterSpacing: "0.06em" }}>Downloads</span>
@@ -135,8 +133,8 @@ const DragToAppsIllustration = () => (
                 width: 56,
                 height: 56,
                 borderRadius: 14,
-                background: "rgba(130, 192, 204, 0.12)",
-                border: "1px solid rgba(130, 192, 204, 0.2)",
+                background: "rgba(var(--l-accent-rgb, 130,192,204), 0.12)",
+                border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -197,8 +195,8 @@ const OpenFromAppsIllustration = () => (
                     alignItems: "center",
                     gap: 10,
                     padding: "8px 14px",
-                    background: app.active ? "rgba(130, 192, 204, 0.12)" : C.raised,
-                    border: `1px solid ${app.active ? "rgba(130, 192, 204, 0.2)" : C.border}`,
+                    background: app.active ? "rgba(var(--l-accent-rgb, 130,192,204), 0.12)" : C.raised,
+                    border: `1px solid ${app.active ? "rgba(var(--l-accent-rgb, 130,192,204), 0.2)" : C.border}`,
                     borderTop: "none",
                     fontSize: 12,
                     color: app.active ? C.accent : C.textSec,
@@ -210,7 +208,7 @@ const OpenFromAppsIllustration = () => (
                         width: 20,
                         height: 20,
                         borderRadius: 5,
-                        background: app.active ? "rgba(130, 192, 204, 0.15)" : "rgba(236, 232, 224, 0.04)",
+                        background: app.active ? "rgba(var(--l-accent-rgb, 130,192,204), 0.15)" : "rgba(var(--l-ui-rgb, 236,232,224), 0.04)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",

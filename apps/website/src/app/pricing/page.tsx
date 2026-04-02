@@ -88,7 +88,7 @@ export default function PricingPage() {
                                     borderRadius: 16,
                                     background: C.raised,
                                     border: isHighlighted
-                                        ? "1px solid rgba(130, 192, 204, 0.2)"
+                                        ? "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)"
                                         : `1px solid ${C.border}`,
                                     position: "relative",
                                 }}
@@ -174,7 +174,7 @@ export default function PricingPage() {
                                             fontWeight: 500,
                                             cursor: "pointer",
                                             marginBottom: 24,
-                                            color: isHighlighted ? "#1A1916" : C.text,
+                                            color: isHighlighted ? C.bg : C.text,
                                             background: isHighlighted ? C.text : "transparent",
                                             border: isHighlighted ? "none" : `1px solid ${C.border}`,
                                             transition: "opacity 0.15s",
@@ -185,7 +185,7 @@ export default function PricingPage() {
                                     </button>
                                 )}
 
-                                <div style={{ height: 1, background: `rgba(236, 232, 224, 0.04)`, marginBottom: 20 }} />
+                                <div style={{ height: 1, background: "rgba(var(--l-ui-rgb, 236,232,224), 0.04)", marginBottom: 20 }} />
 
                                 {/* Features */}
                                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
@@ -196,7 +196,7 @@ export default function PricingPage() {
                                                     width: 18,
                                                     height: 18,
                                                     borderRadius: "50%",
-                                                    background: isHighlighted ? "rgba(130, 192, 204, 0.12)" : `rgba(236, 232, 224, 0.04)`,
+                                                    background: isHighlighted ? "rgba(var(--l-accent-rgb, 130,192,204), 0.12)" : "rgba(var(--l-ui-rgb, 236,232,224), 0.04)",
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
