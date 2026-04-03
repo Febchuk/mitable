@@ -3,7 +3,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, sql, count, desc, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requireAdmin } from "../middleware/authorization.js";
+import { requireAdmin, requireManagerOrAdmin, requireAccessToUser } from "../middleware/authorization.js";
 import { wouldCreateCycle } from "../services/permissions.service.js";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
@@ -156,7 +156,7 @@ function formatTimestamp(date: Date): string {
  *     security:
  *       - BearerAuth: []
  */
-router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/users/:id", requireAuth, requireManagerOrAdmin, requireAccessToUser("id"), async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const targetUserId = req.params.id;
@@ -381,7 +381,7 @@ router.get("/users/:id", requireAuth, async (req: Request, res: Response): Promi
  *     security:
  *       - BearerAuth: []
  */
-router.get("/users", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/users", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
 

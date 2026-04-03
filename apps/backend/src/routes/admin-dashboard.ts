@@ -12,6 +12,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, desc, asc, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { requireManagerOrAdmin, requireAccessToUser } from "../middleware/authorization.js";
 import { createLogger } from "../lib/logger";
 import { normalizeName } from "../services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -315,7 +316,7 @@ async function computeLiveOrgMetrics(
 //   - "today": computed on-the-fly from user_daily_activities (always fresh)
 //   - "week/month/ytd": historical days from org_daily_metrics + today on-the-fly
 // ============================================================================
-router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/dashboard", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
     if (!admin) return;
@@ -625,7 +626,7 @@ router.get("/dashboard", requireAuth, async (req: Request, res: Response): Promi
 // Returns ALL org users with lifetime activity summaries for the People tab.
 // Date filtering is NOT applied here — it belongs in the per-user drill-down.
 // ============================================================================
-router.get("/dashboard/people", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/dashboard/people", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
     if (!admin) return;
@@ -867,6 +868,8 @@ router.get("/dashboard/people", requireAuth, async (req: Request, res: Response)
 router.get(
   "/dashboard/people/:id",
   requireAuth,
+  requireManagerOrAdmin,
+  requireAccessToUser("id"),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -1142,6 +1145,7 @@ router.get(
 router.get(
   "/dashboard/drill-down/subscriber/:name",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -1303,6 +1307,7 @@ router.get(
 router.get(
   "/dashboard/drill-down/:metric",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -1720,6 +1725,8 @@ function buildCategoryDrillDown(
 router.get(
   "/dashboard/people/:id/drill-down/:metric",
   requireAuth,
+  requireManagerOrAdmin,
+  requireAccessToUser("id"),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -1816,6 +1823,8 @@ router.get(
 router.get(
   "/dashboard/people/:id/category-activities/:category",
   requireAuth,
+  requireManagerOrAdmin,
+  requireAccessToUser("id"),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -1905,6 +1914,8 @@ router.get(
 router.get(
   "/dashboard/people/:id/subscriber-activities/:subscriber",
   requireAuth,
+  requireManagerOrAdmin,
+  requireAccessToUser("id"),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -2184,7 +2195,7 @@ async function callAskLLM(
   throw new Error("No LLM available — all providers exhausted");
 }
 
-router.post("/dashboard/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/dashboard/chat", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
     if (!admin) return;
@@ -2354,7 +2365,7 @@ function parseAskResponse(raw: string): {
 }
 
 // ── GET /admin/ask/threads — list all threads for this admin ──
-router.get("/ask/threads", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/ask/threads", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
     if (!admin) return;
@@ -2381,6 +2392,7 @@ router.get("/ask/threads", requireAuth, async (req: Request, res: Response): Pro
 router.get(
   "/ask/threads/:id/messages",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -2418,6 +2430,7 @@ router.get(
 router.delete(
   "/ask/threads/:id",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -2448,6 +2461,7 @@ router.delete(
 router.patch(
   "/ask/messages/:id/report",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -2504,7 +2518,7 @@ router.patch(
 // instead of receiving everything in a single context dump.
 const ASK_MAX_ITERATIONS = 10;
 
-router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/ask/chat", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
     if (!admin) return;
@@ -2678,6 +2692,8 @@ router.post("/ask/chat", requireAuth, async (req: Request, res: Response): Promi
 router.get(
   "/graph/users/:userId/work-insights",
   requireAuth,
+  requireManagerOrAdmin,
+  requireAccessToUser("userId"),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -2736,6 +2752,7 @@ router.get(
 router.get(
   "/graph/orgs/:orgId/common-tasks",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -2797,6 +2814,7 @@ router.get(
 router.get(
   "/graph/orgs/:orgId/workflow-insights",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -2997,7 +3015,7 @@ router.get(
  * POST /admin/graph/sync
  * Triggers a manual graph sync run for admin troubleshooting and refresh.
  */
-router.post("/graph/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/graph/sync", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = await verifyAdmin(req, res);
     if (!admin) return;
@@ -3031,6 +3049,8 @@ router.post("/graph/sync", requireAuth, async (req: Request, res: Response): Pro
 router.get(
   "/graph/users/:userId/workflow-patterns",
   requireAuth,
+  requireManagerOrAdmin,
+  requireAccessToUser("userId"),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);
@@ -3088,6 +3108,7 @@ router.get(
 router.get(
   "/dashboard/subscribers",
   requireAuth,
+  requireManagerOrAdmin,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const admin = await verifyAdmin(req, res);

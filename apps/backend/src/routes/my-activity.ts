@@ -16,6 +16,8 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { requireAccessToUser } from "../middleware/authorization.js";
+import { getDirectReports, canViewUserData } from "../services/permissions.service.js";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger({ context: "my-activity-routes" });
@@ -910,6 +912,97 @@ router.get(
       res
         .status(500)
         .json({ error: "Internal Server Error", message: "Failed to fetch subscriber activities" });
+    }
+  }
+);
+
+// ============================================================================
+// Manager Endpoints — View reports' data
+// ============================================================================
+
+/**
+ * GET /me/reports — List the authenticated user's direct reports.
+ * Returns empty array for non-managers.
+ */
+router.get("/reports", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const reports = await getDirectReports(req.userId!);
+    res.json({ reports });
+  } catch (error) {
+    logger.error({ err: error }, "Error fetching direct reports");
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch reports" });
+  }
+});
+
+/**
+ * GET /me/reports/:id/activity — View a report's activity summary.
+ * Validates manager has access to this user.
+ */
+router.get(
+  "/reports/:id/activity",
+  requireAuth,
+  requireAccessToUser("id"),
+  async (req: Request, res: Response) => {
+    try {
+      const targetUserId = req.params.id;
+
+      // Verify access
+      const hasAccess = await canViewUserData(
+        req.userId!,
+        targetUserId,
+        req.userRole || "employee",
+        req.organizationId!
+      );
+      if (!hasAccess) {
+        res.status(403).json({ error: "Forbidden", message: "You cannot view this user's data" });
+        return;
+      }
+
+      const [userProfile] = await db
+        .select({
+          id: schema.users.id,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          email: schema.users.email,
+          role: schema.users.role,
+          jobTitle: schema.users.jobTitle,
+          avatarUrl: schema.users.avatarUrl,
+          department: schema.users.department,
+          teamId: schema.users.teamId,
+          status: schema.users.status,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, targetUserId))
+        .limit(1);
+
+      if (!userProfile) {
+        res.status(404).json({ error: "Not Found", message: "User not found" });
+        return;
+      }
+
+      // Get recent activities for this user
+      const activities = await db
+        .select()
+        .from(schema.userDailyActivities)
+        .where(
+          and(
+            eq(schema.userDailyActivities.userId, targetUserId),
+            eq(schema.userDailyActivities.organizationId, req.organizationId!)
+          )
+        )
+        .orderBy(desc(schema.userDailyActivities.activityDate))
+        .limit(7);
+
+      res.json({
+        user: userProfile,
+        activities,
+      });
+    } catch (error) {
+      logger.error({ err: error }, "Error fetching report activity");
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to fetch report activity",
+      });
     }
   }
 );
