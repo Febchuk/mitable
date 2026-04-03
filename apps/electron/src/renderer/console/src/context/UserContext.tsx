@@ -1,6 +1,6 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useState, useMemo } from "react";
 import { authService } from "../services/authService";
-import type { User } from "../types";
+import type { User, ViewMode } from "../types";
 import { createLogger } from "../../../lib/logger";
 import type { OrgSettings } from "@mitable/shared";
 
@@ -22,6 +22,9 @@ interface UserContextType {
   organization: Organization | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  viewMode: ViewMode;
+  availableViewModes: ViewMode[];
+  setViewMode: (mode: ViewMode) => void;
   updateUser: (user: User) => void;
   updateOrganization: (org: Organization) => void;
   logout: () => Promise<void>;
@@ -30,11 +33,51 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+function getAvailableViewModes(user: User | null): ViewMode[] {
+  if (!user) return ["employee"];
+  const modes: ViewMode[] = ["employee"];
+  if (user.isManager) modes.push("manager");
+  if (user.role === "admin" || user.originalRole === "admin") modes.push("admin");
+  return modes;
+}
+
+function getInitialViewMode(user: User | null): ViewMode {
+  const saved = localStorage.getItem("mitable:viewMode") as ViewMode | null;
+  // Migrate old key
+  if (!saved) {
+    const oldMode = localStorage.getItem("mitable:lastMode");
+    if (oldMode === "admin") return "admin";
+    if (oldMode === "employee") return "employee";
+  }
+  if (saved) {
+    const available = getAvailableViewModes(user);
+    if (available.includes(saved)) return saved;
+  }
+  // Default: admin goes to admin, manager to manager, else employee
+  if (user?.role === "admin" || user?.originalRole === "admin") return "admin";
+  if (user?.isManager) return "manager";
+  return "employee";
+}
+
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [viewMode, setViewModeState] = useState<ViewMode>("employee");
+
+  const availableViewModes = useMemo(() => getAvailableViewModes(user), [user]);
+
+  const setViewMode = (mode: ViewMode) => {
+    if (!availableViewModes.includes(mode)) return;
+    setViewModeState(mode);
+    localStorage.setItem("mitable:viewMode", mode);
+    // Also update the legacy role field for backward compat with components that read user.role
+    if (user) {
+      const newRole = mode === "admin" ? "admin" : (user.originalRole === "admin" ? "employee" : user.role);
+      setUser({ ...user, role: newRole as "admin" | "employee", originalRole: user.originalRole ?? user.role });
+    }
+  };
 
   // Helper: given an access token, fetch user profile and populate state
   const hydrateUser = async (accessToken: string) => {
@@ -44,17 +87,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const savedMode = localStorage.getItem("mitable:lastMode") as "admin" | "employee" | null;
     const effectiveRole = dbRole === "admin" && savedMode ? savedMode : dbRole;
 
-    setUser({
-      id: response.profile.id,
-      name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
-      firstName: response.profile.firstName || "",
-      email: response.profile.email || undefined,
-      avatarUrl: response.profile.avatarUrl || undefined,
-      currentWeek: response.profile.currentWeek || 1,
+    // The profile may include hierarchy fields added in the hierarchy migration
+    const profile = response.profile as Record<string, any>;
+    const newUser: User = {
+      id: profile.id,
+      name: `${profile.firstName || ""} ${profile.lastName || ""}`.trim(),
+      firstName: profile.firstName || "",
+      email: profile.email || undefined,
+      avatarUrl: profile.avatarUrl || undefined,
+      currentWeek: profile.currentWeek || 1,
       role: effectiveRole,
       originalRole: dbRole,
-      organizationId: response.profile.organizationId || "",
-    });
+      organizationId: profile.organizationId || "",
+      isManager: profile.isManager ?? false,
+      managerId: profile.managerId ?? null,
+      teamId: profile.teamId ?? null,
+      department: profile.department ?? null,
+      directReportCount: profile.directReportCount ?? 0,
+    };
+    setUser(newUser);
+    setViewModeState(getInitialViewMode(newUser));
 
     // Set organization if returned from API
     if (response.organization) {
@@ -249,6 +301,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         organization,
         isLoading,
         isAuthenticated,
+        viewMode,
+        availableViewModes,
+        setViewMode,
         updateUser,
         updateOrganization,
         logout,
