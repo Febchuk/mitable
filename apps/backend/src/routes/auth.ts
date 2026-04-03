@@ -3,7 +3,7 @@ import { supabase, supabaseAdmin } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { subscriptionService } from "../services/subscription.service.js";
 import { usageService } from "../services/usage.service.js";
 import { config } from "../config.js";
@@ -849,9 +849,28 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
       .where(eq(schema.organizations.id, userProfile.organizationId))
       .limit(1);
 
+    // Check if user has any direct reports (is a manager)
+    const reportCheck = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.managerId, req.userId!))
+      .limit(1);
+
+    const directReportCount = reportCheck.length > 0
+      ? (await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(schema.users)
+          .where(eq(schema.users.managerId, req.userId!))
+        )[0]?.count ?? 0
+      : 0;
+
     res.json({
       user: req.user,
-      profile: userProfile,
+      profile: {
+        ...userProfile,
+        isManager: reportCheck.length > 0,
+        directReportCount,
+      },
       organization: organization
         ? {
             id: organization.id,

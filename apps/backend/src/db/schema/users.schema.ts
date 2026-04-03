@@ -1,6 +1,7 @@
-import { pgTable, uuid, varchar, integer, timestamp, date, text, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, timestamp, date, text, jsonb, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations.schema";
+import { teams } from "./teams.schema"; // Safe: teams doesn't import users
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -51,15 +52,32 @@ export const users = pgTable("users", {
   firefliesApiKeyEncrypted: text("fireflies_api_key_encrypted"),
   firefliesLastSyncedAt: timestamp("fireflies_last_synced_at"),
 
+  // Hierarchy fields
+  managerId: uuid("manager_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+  department: varchar("department", { length: 100 }),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Relations
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [users.organizationId],
     references: [organizations.id],
+  }),
+  manager: one(users, {
+    fields: [users.managerId],
+    references: [users.id],
+    relationName: "managerReports",
+  }),
+  directReports: many(users, {
+    relationName: "managerReports",
+  }),
+  team: one(teams, {
+    fields: [users.teamId],
+    references: [teams.id],
   }),
 }));
 

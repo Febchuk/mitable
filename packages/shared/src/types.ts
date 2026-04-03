@@ -143,7 +143,10 @@ export const UserSchema = z.object({
   email: z.string().email(),
   name: z.string(),
   role: z.string(),
-  department: z.string().optional(),
+  department: z.string().optional().nullable(),
+  managerId: z.string().optional().nullable(),
+  teamId: z.string().optional().nullable(),
+  isManager: z.boolean().optional(),
   startDate: z.string().datetime(),
   createdAt: z.string().datetime(),
 });

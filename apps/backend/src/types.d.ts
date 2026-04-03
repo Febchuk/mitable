@@ -7,6 +7,9 @@ declare global {
       userId?: string;
       organizationId?: string;
       correlationId?: string;
+      userRole?: string;
+      isManager?: boolean;
+      _visibleUserIds?: string[];
     }
   }
 }

@@ -3,6 +3,8 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, sql, count, desc, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { requireAdmin } from "../middleware/authorization.js";
+import { wouldCreateCycle } from "../services/permissions.service.js";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
 import { notionService } from "../services/notion.service.js";
@@ -2620,6 +2622,161 @@ router.patch(
           code: "INTERNAL_ERROR",
           message: "Failed to update organization settings",
         },
+      });
+    }
+  }
+);
+
+// ============================================
+// Hierarchy Management Endpoints
+// ============================================
+
+/**
+ * PUT /admin/users/:id/manager — Set or clear a user's manager
+ * Admin-only. Validates same org, no self-reference, no cycles.
+ */
+router.put(
+  "/users/:id/manager",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const targetUserId = req.params.id;
+      const { managerId } = req.body as { managerId: string | null };
+
+      // Verify target user exists and is in the same org
+      const [targetUser] = await db
+        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, targetUserId));
+
+      if (!targetUser) {
+        res.status(404).json({ error: "Not Found", message: "User not found" });
+        return;
+      }
+
+      if (targetUser.organizationId !== req.organizationId) {
+        res.status(403).json({ error: "Forbidden", message: "User is not in your organization" });
+        return;
+      }
+
+      // Clear manager if null
+      if (managerId === null || managerId === undefined) {
+        await db
+          .update(schema.users)
+          .set({ managerId: null, updatedAt: new Date() })
+          .where(eq(schema.users.id, targetUserId));
+
+        res.json({ success: true, message: "Manager cleared" });
+        return;
+      }
+
+      // Validate manager exists and is in same org
+      const [managerUser] = await db
+        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, managerId));
+
+      if (!managerUser) {
+        res.status(404).json({ error: "Not Found", message: "Manager not found" });
+        return;
+      }
+
+      if (managerUser.organizationId !== req.organizationId) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Manager must be in the same organization",
+        });
+        return;
+      }
+
+      // Check for self-reference
+      if (targetUserId === managerId) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "A user cannot be their own manager",
+        });
+        return;
+      }
+
+      // Check for circular reference
+      const isCycle = await wouldCreateCycle(targetUserId, managerId);
+      if (isCycle) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "This assignment would create a circular reporting chain",
+        });
+        return;
+      }
+
+      // Assign manager
+      await db
+        .update(schema.users)
+        .set({ managerId, updatedAt: new Date() })
+        .where(eq(schema.users.id, targetUserId));
+
+      res.json({ success: true, message: "Manager assigned" });
+    } catch (error) {
+      console.error("Error assigning manager:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to assign manager",
+      });
+    }
+  }
+);
+
+/**
+ * GET /admin/org-tree — Get the full organizational hierarchy as a nested tree
+ * Admin-only.
+ */
+router.get(
+  "/org-tree",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      // Fetch all users in org
+      const orgUsers = await db
+        .select({
+          id: schema.users.id,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          email: schema.users.email,
+          role: schema.users.role,
+          jobTitle: schema.users.jobTitle,
+          avatarUrl: schema.users.avatarUrl,
+          managerId: schema.users.managerId,
+          teamId: schema.users.teamId,
+          department: schema.users.department,
+          status: schema.users.status,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.organizationId, req.organizationId!))
+        .orderBy(asc(schema.users.firstName));
+
+      // Build tree in-memory
+      const userMap = new Map<string, any>();
+      for (const user of orgUsers) {
+        userMap.set(user.id, { ...user, directReports: [] });
+      }
+
+      const roots: any[] = [];
+      for (const user of orgUsers) {
+        const node = userMap.get(user.id)!;
+        if (user.managerId && userMap.has(user.managerId)) {
+          userMap.get(user.managerId)!.directReports.push(node);
+        } else {
+          roots.push(node);
+        }
+      }
+
+      res.json({ tree: roots, totalUsers: orgUsers.length });
+    } catch (error) {
+      console.error("Error fetching org tree:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to fetch organization tree",
       });
     }
   }

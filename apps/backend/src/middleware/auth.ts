@@ -40,15 +40,24 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.user = user;
     req.userId = user.id;
 
-    // Lookup user's organization from database
+    // Lookup user's organization and role from database
     const userRecord = await db
-      .select({ organizationId: users.organizationId })
+      .select({ organizationId: users.organizationId, role: users.role })
       .from(users)
       .where(eq(users.id, user.id))
       .limit(1);
 
     if (userRecord[0]) {
       req.organizationId = userRecord[0].organizationId;
+      req.userRole = userRecord[0].role;
+
+      // Check if user has any direct reports (lightweight check)
+      const reportCheck = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.managerId, user.id))
+        .limit(1);
+      req.isManager = reportCheck.length > 0;
     }
 
     next();
