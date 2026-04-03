@@ -48,6 +48,8 @@ import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEd
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
 import OnboardingPage from "./pages/OnboardingPage";
+import OrgChartView from "./components/views/admin/OrgChartView";
+import TeamsView from "./components/views/admin/TeamsView";
 
 // Applies stored theme class to <html> on mount and syncs across windows
 function ThemeInitializer() {
@@ -326,6 +328,9 @@ function App() {
                         <Route path="benchmarks/:id/person/:userId" element={<RoleGate requireManager><PersonBenchmarkView /></RoleGate>} />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
+                        {/* Hierarchy Management Routes (admin only) */}
+                        <Route path="org-chart" element={<RoleGate requireAdmin><OrgChartView /></RoleGate>} />
+                        <Route path="teams" element={<RoleGate requireAdmin><TeamsView /></RoleGate>} />
                         {/* Employee Routes */}
                         <Route path="me" element={<MeView />} />
                         <Route path="bragbook" element={<BragbookView />} />
