@@ -8,6 +8,251 @@ Give admins a visual interface to manage the organizational hierarchy — assign
 
 ---
 
+## UI Mockups
+
+### Org Chart — Tree View (default)
+
+Interactive hierarchy visualization. Nodes are expandable/collapsible. Admins can click a node to edit or drag to reassign.
+
+```
+ ┌─── Sidebar ──────────┬─── Main Content ──────────────────────────────────────────────┐
+ │                       │                                                               │
+ │  ◆ mitable            │  Organization Chart                    [· List] [▪ Tree]       │
+ │                       │                                          ↑ toggle              │
+ │  ┌─────────────────┐  │  Search people...                                  [Expand All]│
+ │  │[My ][Team][ Org]│  │                                                               │
+ │  └─────────────────┘  │  ┌─────────────────────────────────────────────┐               │
+ │                       │  │  ┌─────────────────────────────────┐        │               │
+ │  📊  Org Dashboard    │  │  │ 👤  Emily Torres                │        │               │
+ │  👥  People           │  │  │     CEO · Admin                 │        │               │
+ │  🎯  Benchmarks       │  │  │     3 direct reports            │        │               │
+ │  📈  Reports          │  │  └──────────────┬──────────────────┘        │               │
+ │  🗂️  Org Chart    ←   │  │        ┌────────┼────────┐                  │               │
+ │  👥  Teams            │  │        ▼        ▼        ▼                  │               │
+ │  🤖  Agent            │  │  ┌──────────┐┌──────────┐┌──────────┐      │               │
+ │                       │  │  │ 👤 David  ││ 👤 Rachel ││ 👤 Mike   │      │               │
+ │                       │  │  │ VP Eng    ││ VP Sales ││ VP Ops   │      │               │
+ │                       │  │  │ ▼ 4 rpts  ││ ▼ 3 rpts ││   1 rpt  │      │               │
+ │                       │  │  └─────┬────┘└──────────┘└──────────┘      │               │
+ │                       │  │    ┌───┴───────────────┐                    │               │
+ │                       │  │    ▼         ▼         ▼                    │               │
+ │                       │  │ ┌────────┐┌────────┐┌────────┐             │               │
+ │                       │  │ │Alex Kim││Mia Wong││Jordan L│             │               │
+ │                       │  │ │Lead FE ││Lead BE ││Lead QA │             │               │
+ │                       │  │ │  2 rpts││  1 rpt ││  0 rpts│             │               │
+ │                       │  │ └────────┘└────────┘└────────┘             │               │
+ │  ── ACCOUNT ────────  │  │                                             │               │
+ │  Emily Torres         │  └─────────────────────────────────────────────┘               │
+ │  Admin                │                                                               │
+ └───────────────────────┴───────────────────────────────────────────────────────────────┘
+```
+
+**Node detail on click:**
+
+```
+ ┌──────────────────────────────────────────┐
+ │  👤  David Park                      ✕   │
+ │  ─────────────────────────────────────── │
+ │  Role:       VP Engineering              │
+ │  Department: Engineering                 │
+ │  Team:       Platform                    │
+ │                                          │
+ │  Reports to: ┌──────────────────────┐    │
+ │              │ Emily Torres      ▾  │    │
+ │              └──────────────────────┘    │
+ │                                          │
+ │  Direct reports (4):                     │
+ │   · Alex Kim — Lead Frontend             │
+ │   · Mia Wong — Lead Backend              │
+ │   · Jordan Lee — Lead QA                 │
+ │   · Sam Patel — Senior DevOps            │
+ │                                          │
+ │  [ View Profile ]  [ Edit ]              │
+ └──────────────────────────────────────────┘
+```
+
+---
+
+### Org Chart — List View
+
+Table format for bulk editing. Inline dropdowns for manager/team reassignment.
+
+```
+ ┌─── Main Content ─────────────────────────────────────────────────────────────────┐
+ │                                                                                   │
+ │  Organization Chart                              [· List] [▪ Tree]                │
+ │                                                                                   │
+ │  Search people...              Group by: [None ▾]  Filter: [All Teams ▾]          │
+ │                                                                                   │
+ │  ☐ │ Name            │ Job Title       │ Manager        │ Team         │ Reports  │
+ │  ──┼─────────────────┼─────────────────┼────────────────┼──────────────┼────────  │
+ │  ☐ │ Emily Torres    │ CEO             │ —              │ —            │ 3        │
+ │  ☐ │ David Park      │ VP Engineering  │ Emily Torres ▾ │ Platform  ▾  │ 4        │
+ │  ☐ │ Rachel Adams    │ VP Sales        │ Emily Torres ▾ │ Sales     ▾  │ 3        │
+ │  ☐ │ Mike Chen       │ VP Operations   │ Emily Torres ▾ │ Ops       ▾  │ 1        │
+ │  ☐ │ Alex Kim        │ Lead Frontend   │ David Park   ▾ │ Frontend  ▾  │ 2        │
+ │  ☐ │ Mia Wong        │ Lead Backend    │ David Park   ▾ │ Backend   ▾  │ 1        │
+ │  ☐ │ Jordan Lee      │ Lead QA         │ David Park   ▾ │ QA        ▾  │ 0        │
+ │  ☐ │ Sam Patel       │ Sr DevOps       │ David Park   ▾ │ Platform  ▾  │ 0        │
+ │  ──┴─────────────────┴─────────────────┴────────────────┴──────────────┴────────  │
+ │                                                                                   │
+ │  ── Bulk Actions (when rows selected) ─────────────────────────────────────────── │
+ │  3 selected:  [ Assign Manager ▾ ]  [ Assign Team ▾ ]  [ Set Department ▾ ]      │
+ │                                                                                   │
+ └───────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Teams Management Page
+
+Admin-only. Cards for each team with member count, lead, and sub-teams.
+
+```
+ ┌─── Sidebar ──────────┬─── Main Content ──────────────────────────────────────────────┐
+ │                       │                                                               │
+ │  ◆ mitable            │  Teams                                       [+ Create Team]  │
+ │                       │                                                               │
+ │  ┌─────────────────┐  │  Search teams...                                              │
+ │  │[My ][Team][ Org]│  │                                                               │
+ │  └─────────────────┘  │  ┌──────────────────────────────────────────────────────────┐ │
+ │                       │  │                                                          │ │
+ │  📊  Org Dashboard    │  │  Engineering                                    8 members │ │
+ │  👥  People           │  │  Lead: David Park                                        │ │
+ │  🎯  Benchmarks       │  │                                                          │ │
+ │  📈  Reports          │  │  Sub-teams:                                               │ │
+ │  🗂️  Org Chart        │  │   ┌──────────────┐ ┌──────────────┐ ┌──────────────┐    │ │
+ │  👥  Teams        ←   │  │   │ Frontend     │ │ Backend      │ │ QA           │    │ │
+ │  🤖  Agent            │  │   │ 3 members    │ │ 2 members    │ │ 2 members    │    │ │
+ │                       │  │   │ Lead: Alex K │ │ Lead: Mia W  │ │ Lead: Jordan │    │ │
+ │                       │  │   └──────────────┘ └──────────────┘ └──────────────┘    │ │
+ │                       │  │                                                          │ │
+ │                       │  │  [ Edit ]  [ Add Member ]                     [ Delete ] │ │
+ │                       │  └──────────────────────────────────────────────────────────┘ │
+ │                       │                                                               │
+ │                       │  ┌──────────────────────────────────────────────────────────┐ │
+ │                       │  │                                                          │ │
+ │                       │  │  Sales                                         5 members │ │
+ │                       │  │  Lead: Rachel Adams                                      │ │
+ │  ── ACCOUNT ────────  │  │                                                          │ │
+ │  Emily Torres         │  │  No sub-teams                                            │ │
+ │  Admin                │  │                                                          │ │
+ │                       │  │  [ Edit ]  [ Add Member ]                     [ Delete ] │ │
+ │                       │  └──────────────────────────────────────────────────────────┘ │
+ │                       │                                                               │
+ └───────────────────────┴───────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Create Team Dialog
+
+```
+ ┌──────────────────────────────────────────────┐
+ │  Create Team                            ✕    │
+ │  ─────────────────────────────────────────── │
+ │                                              │
+ │  Team Name *                                 │
+ │  ┌──────────────────────────────────────┐    │
+ │  │ Frontend                             │    │
+ │  └──────────────────────────────────────┘    │
+ │                                              │
+ │  Description                                 │
+ │  ┌──────────────────────────────────────┐    │
+ │  │ Client-side engineering team         │    │
+ │  └──────────────────────────────────────┘    │
+ │                                              │
+ │  Team Lead                                   │
+ │  ┌──────────────────────────────────────┐    │
+ │  │ 👤 Alex Kim — Lead Frontend       ▾  │    │
+ │  └──────────────────────────────────────┘    │
+ │                                              │
+ │  Parent Team                                 │
+ │  ┌──────────────────────────────────────┐    │
+ │  │ Engineering                       ▾  │    │
+ │  └──────────────────────────────────────┘    │
+ │                                              │
+ │              [ Cancel ]  [ Create Team ]     │
+ │                                              │
+ └──────────────────────────────────────────────┘
+```
+
+---
+
+### Team Detail Panel (slide-out)
+
+```
+ ┌──────────────────────────────────────────────────┐
+ │  Engineering                           [ Edit ]  │
+ │  Lead: David Park · 8 members                    │
+ │  Parent: — (top-level)                           │
+ │  ────────────────────────────────────────────── │
+ │                                                  │
+ │  Members                          [ + Add ]      │
+ │                                                  │
+ │  👤  David Park        VP Engineering    [Lead]  │
+ │  👤  Alex Kim          Lead Frontend        ✕    │
+ │  👤  Mia Wong          Lead Backend         ✕    │
+ │  👤  Jordan Lee        Lead QA              ✕    │
+ │  👤  Sam Patel         Sr DevOps            ✕    │
+ │  👤  Chris Ng          Frontend Dev         ✕    │
+ │  👤  Taylor Rao        Backend Dev          ✕    │
+ │  👤  Riley Santos      QA Engineer          ✕    │
+ │                                                  │
+ │  ────────────────────────────────────────────── │
+ │  Sub-teams                                       │
+ │  ┌────────────┐ ┌────────────┐ ┌────────────┐   │
+ │  │ Frontend   │ │ Backend    │ │ QA         │   │
+ │  │ 3 members  │ │ 2 members  │ │ 2 members  │   │
+ │  └────────────┘ └────────────┘ └────────────┘   │
+ │                                                  │
+ └──────────────────────────────────────────────────┘
+```
+
+---
+
+### User Edit Form — Hierarchy Fields
+
+Added to the existing user profile edit form:
+
+```
+ ┌──────────────────────────────────────────────────────┐
+ │  Edit Profile: Alex Kim                         ✕    │
+ │  ──────────────────────────────────────────────────  │
+ │                                                      │
+ │  ── Personal Info ────────────────────────────────── │
+ │                                                      │
+ │  First Name              Last Name                   │
+ │  ┌─────────────────┐     ┌─────────────────┐        │
+ │  │ Alex             │     │ Kim              │        │
+ │  └─────────────────┘     └─────────────────┘        │
+ │                                                      │
+ │  Email                   Job Title                   │
+ │  ┌─────────────────┐     ┌─────────────────┐        │
+ │  │ alex@company.com│     │ Lead Frontend    │        │
+ │  └─────────────────┘     └─────────────────┘        │
+ │                                                      │
+ │  ── Organization ─────────────────────────────────── │
+ │                                                      │
+ │  Reports To                                          │
+ │  ┌──────────────────────────────────────────────┐   │
+ │  │ 👤  David Park — VP Engineering           ▾  │   │
+ │  └──────────────────────────────────────────────┘   │
+ │                                                      │
+ │  Team                       Department               │
+ │  ┌─────────────────────┐    ┌─────────────────────┐  │
+ │  │ Frontend          ▾ │    │ Engineering       ▾  │  │
+ │  └─────────────────────┘    └─────────────────────┘  │
+ │                              ↑ autocomplete from      │
+ │                                existing departments   │
+ │                                                      │
+ │                [ Cancel ]  [ Save Changes ]          │
+ │                                                      │
+ └──────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 1. New API Endpoints
 
 ### 1.1 Teams CRUD

@@ -8,6 +8,148 @@ Give managers a dedicated view in the Electron console app where they can see th
 
 ---
 
+## UI Mockups
+
+### View Switcher (Sidebar Component)
+
+Segmented control sits at the top of the sidebar, below the logo. Only shows modes available to the current user.
+
+```
+ ┌─── Sidebar (dark bg: #1a1a2e) ──────────────┐
+ │                                               │
+ │   ◆ mitable                                  │
+ │                                               │
+ │  ┌─────────────────────────────────────────┐  │
+ │  │ ┌──────────┐┌───────────┐┌──────────┐  │  │
+ │  │ │ My View  ││ Team View ││ Org View │  │  │
+ │  │ └──────────┘└───────────┘└──────────┘  │  │
+ │  └─────────────────────────────────────────┘  │
+ │        ↑ active = white bg, dark text         │
+ │        ↑ inactive = transparent, gray text    │
+ │                                               │
+ │  ── Navigation ─────────────────────────────  │
+ │   (changes based on active view mode)         │
+ │                                               │
+ └───────────────────────────────────────────────┘
+```
+
+**Variations by user type:**
+
+```
+ Admin + Manager:     [ My View ] [ Team View ] [ Org View ]
+ Admin (no reports):  [ My View ] [ Org View ]
+ Manager (non-admin): [ My View ] [ Team View ]
+ Employee:            (no switcher shown)
+```
+
+---
+
+### Employee — "My View"
+
+Personal productivity. This is the default landing for employees.
+
+```
+ ┌─── Sidebar ──────────┬─── Main Content ──────────────────────────────────────┐
+ │                       │                                                       │
+ │  ◆ mitable            │  Calendar                                  Apr 2026   │
+ │                       │                                                       │
+ │  ▸ No view switcher   │  ┌─── Mon 6 ──┬─── Tue 7 ──┬─── Wed 8 ──┬─── Thu 9 │
+ │                       │  │             │             │             │           │
+ │  ── NAV ────────────  │  │  9:00       │  9:00       │  9:30       │  9:00     │
+ │                       │  │  VS Code    │  Figma      │  VS Code    │  Slack    │
+ │  📅  Calendar    ←    │  │  2h 15m     │  1h 40m     │  3h 05m     │  45m      │
+ │  👤  Me               │  │             │             │             │           │
+ │  🤖  Agent            │  │  11:30      │  11:00      │  1:00       │  10:00    │
+ │  🎯  Benchmarks       │  │  Slack      │  Zoom       │  Notion     │  VS Code  │
+ │  📄  Docs             │  │  35m        │  55m        │  40m        │  2h 30m   │
+ │  📤  Uploads          │  │             │             │             │           │
+ │                       │  │  2:00       │  2:00       │  3:00       │  2:00     │
+ │                       │  │  Chrome     │  VS Code    │  Terminal   │  Zoom     │
+ │                       │  │  1h 10m     │  2h 20m     │  1h 15m     │  1h 00m   │
+ │                       │  │             │             │             │           │
+ │                       │  └─────────────┴─────────────┴─────────────┴───────── │
+ │                       │                                                       │
+ │  ── ACCOUNT ────────  │  Today: 6h 42m active   │   Top app: VS Code (3h 5m) │
+ │  Sarah Chen           │                                                       │
+ │  Engineer             │                                                       │
+ └───────────────────────┴───────────────────────────────────────────────────────┘
+```
+
+---
+
+### Manager — "Team View"
+
+Team oversight. Dashboard and people scoped to the manager's direct + transitive reports.
+
+```
+ ┌─── Sidebar ──────────┬─── Main Content ──────────────────────────────────────┐
+ │                       │                                                       │
+ │  ◆ mitable            │  Team Dashboard                          This Week ▾  │
+ │                       │                                                       │
+ │  ┌─────────────────┐  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │
+ │  │[My ][Team][    ]│  │  │  4 reports   │ │  28h 15m    │ │  85%        │     │
+ │  └─────────────────┘  │  │  active      │ │  total time │ │  benchmark  │     │
+ │       ↑ active         │  └─────────────┘ └─────────────┘ └─────────────┘     │
+ │                       │                                                       │
+ │  ── NAV ────────────  │  ── My Reports ─────────────────────────────────────  │
+ │                       │                                                       │
+ │  📊  Team Dashboard ← │  │ Name          │ Active Today │ Top App    │ Bench │
+ │  👥  My Reports       │  ├───────────────┼──────────────┼────────────┼───────│
+ │  🎯  Benchmarks       │  │ ●  Alex Kim   │ 5h 32m       │ VS Code    │ 72%   │
+ │  📈  Reports          │  │ ●  Jordan Lee │ 4h 18m       │ Figma      │ 88%   │
+ │  ─────────────────    │  │ ○  Sam Patel  │ —            │ —          │ 65%   │
+ │  📅  Calendar         │  │ ●  Mia Wong   │ 6h 05m       │ Chrome     │ 91%   │
+ │  👤  Me               │  │                                                   │
+ │  🤖  Agent            │  ● = active now   ○ = not active                      │
+ │                       │                                                       │
+ │                       │  ── Activity Trend ─────────────────────────────────  │
+ │                       │                                                       │
+ │                       │  Mon  ████████████████████  32h                       │
+ │  ── ACCOUNT ────────  │  Tue  ██████████████████    28h                       │
+ │  David Park           │  Wed  ████████████████████████  36h                   │
+ │  Engineering Lead     │  Thu  ██████████████        22h (today)               │
+ │                       │                                                       │
+ └───────────────────────┴───────────────────────────────────────────────────────┘
+```
+
+---
+
+### Admin — "Org View"
+
+Configuration and org-wide analytics. No personal features (calendar, me) — switch to My View for those.
+
+```
+ ┌─── Sidebar ──────────┬─── Main Content ──────────────────────────────────────┐
+ │                       │                                                       │
+ │  ◆ mitable            │  Organization Dashboard                  This Week ▾  │
+ │                       │                                                       │
+ │  ┌─────────────────┐  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │
+ │  │[My ][Team][ Org]│  │  │  24 people   │ │  186h total │ │  78% avg    │     │
+ │  └─────────────────┘  │  │  in org      │ │  active     │ │  benchmark  │     │
+ │       ↑ active         │  └─────────────┘ └─────────────┘ └─────────────┘     │
+ │                       │                                                       │
+ │  ── NAV ────────────  │  ── Departments ────────────────────────────────────  │
+ │                       │                                                       │
+ │  📊  Org Dashboard ←  │  │ Department    │ People │ Avg Active │ Benchmark │  │
+ │  👥  People           │  ├───────────────┼────────┼────────────┼───────────│  │
+ │  🎯  Benchmarks       │  │ Engineering   │ 12     │ 6h 22m     │ 82%       │  │
+ │  📈  Reports          │  │ Design        │ 4      │ 5h 48m     │ 76%       │  │
+ │  🗂️  Org Chart        │  │ Sales         │ 5      │ 4h 15m     │ 71%       │  │
+ │  👥  Teams            │  │ Operations    │ 3      │ 5h 30m     │ 85%       │  │
+ │  🤖  Agent            │  │                                                   │
+ │                       │  ── Top Apps (Org-wide) ────────────────────────────  │
+ │                       │                                                       │
+ │                       │  VS Code    ████████████████████████  42%             │
+ │                       │  Chrome     ██████████████            24%             │
+ │  ── ACCOUNT ────────  │  Slack      ████████████              18%             │
+ │  Emily Torres         │  Figma      ██████                    10%             │
+ │  Admin                │  Other      ████                       6%             │
+ │                       │                                                       │
+ └───────────────────────┴───────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 1. Type Updates
 
 ### 1.1 Electron renderer types
