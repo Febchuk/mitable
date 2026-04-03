@@ -70,43 +70,10 @@ export const HomeScreen = () => {
 
                 <SocialProofSection />
 
-                {/* ── How it works bridge ── */}
-                <section
-                    id="how-it-works"
-                    className="l-feature-section"
-                    style={{
-                        textAlign: "center",
-                        padding: "80px 48px 20px",
-                        maxWidth: 900,
-                        margin: "0 auto",
-                    }}
-                >
-                    <h2
-                        style={{
-                            fontFamily: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
-                            fontSize: 36,
-                            fontWeight: 400,
-                            color: "var(--l-text, #ECE8E0)",
-                            letterSpacing: "-0.01em",
-                            margin: "0 0 14px 0",
-                        }}
-                    >
-                        How it works.
-                    </h2>
-                    <p
-                        style={{
-                            fontSize: 16,
-                            lineHeight: 1.65,
-                            color: "var(--l-text-secondary, #A09A8E)",
-                            margin: 0,
-                        }}
-                    >
-                        A simple system that turns your team&rsquo;s everyday work into a clear measure of performance.
-                    </p>
-                </section>
-
                 {/* Feature 1: Benchmarks */}
                 <FeatureSection
+                    id="how-it-works"
+                    stepNumber={1}
                     title="Set the standard."
                     description="Define what good looks like for every role. Mitable's AI generates scoring parameters from a simple description, so benchmarks take minutes to create."
                     linkText="Learn how benchmarks work →"
@@ -116,6 +83,7 @@ export const HomeScreen = () => {
 
                 {/* Feature 2: Multi-app work montage */}
                 <FeatureSection
+                    stepNumber={2}
                     title="Your team just works."
                     description="Slack, browsers, terminals, docs — Mitable captures work across every app on your team's computer. No manual time tracking. No status updates."
                     linkText="See how capture works →"
@@ -127,6 +95,7 @@ export const HomeScreen = () => {
 
                 {/* Feature 3: Evaluation */}
                 <FeatureSection
+                    stepNumber={3}
                     title="Evaluate performance more accurately."
                     description="Get a live, AI-generated score for every person on your team — measured against the benchmarks you set. No more guessing who's on track and who needs support."
                     linkText="See the employee view →"
@@ -136,6 +105,7 @@ export const HomeScreen = () => {
 
                 {/* Feature 4: Person Detail */}
                 <FeatureSection
+                    stepNumber={4}
                     title="More robust reporting."
                     description="See exactly how each person spends their time — which customers they serve, how their focus and meeting hours break down, and where they're most effective."
                     linkText="See the full dashboard →"

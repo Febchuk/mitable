@@ -34,7 +34,7 @@ export const HeroSection = () => {
             ref={heroRef}
             style={{
                 fontFamily: C.sans,
-                padding: "200px 48px 120px",
+                padding: "200px 48px 60px",
                 maxWidth: 1100,
                 margin: "0 auto",
                 textAlign: "center",

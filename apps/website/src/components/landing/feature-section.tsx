@@ -15,6 +15,7 @@ const C = {
 
 interface FeatureSectionProps {
     id?: string;
+    stepNumber?: number;
     title: string;
     description: string;
     linkText: string;
@@ -30,6 +31,7 @@ interface FeatureSectionProps {
 
 export const FeatureSection = ({
     id,
+    stepNumber,
     title,
     description,
     linkText,
@@ -61,6 +63,21 @@ export const FeatureSection = ({
 
     const textBlock = (
         <div style={{ fontFamily: C.sans }}>
+            {stepNumber != null && (
+                <div
+                    style={{
+                        fontFamily: C.sans,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase" as const,
+                        color: C.accent,
+                        marginBottom: 10,
+                    }}
+                >
+                    Step {stepNumber}
+                </div>
+            )}
             <h2
                 style={{
                     fontFamily: C.serif,

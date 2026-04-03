@@ -112,7 +112,7 @@ function LogoItem({ Component }: { Component: React.ComponentType }) {
 export const SocialProofSection = () => (
     <section
         style={{
-            padding: "80px 0",
+            padding: "40px 0 80px",
             textAlign: "center",
             fontFamily: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
             overflow: "hidden",

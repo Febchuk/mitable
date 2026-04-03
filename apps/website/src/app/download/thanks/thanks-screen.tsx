@@ -107,9 +107,9 @@ const DownloadsFolderIllustration = () => (
             />
             <div
                 style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 14,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
                     background: "rgba(var(--l-accent-rgb, 130,192,204), 0.12)",
                     border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                     display: "flex",
@@ -118,7 +118,11 @@ const DownloadsFolderIllustration = () => (
                     color: C.accent,
                 }}
             >
-                <MitableLogo />
+                <svg width="22" height="22" viewBox="0 0 91 102" fill="currentColor">
+                    <path d="M2 20H13.5C20.6797 20 26.5 25.8203 26.5 33V71C26.5 78.1797 20.6797 84 13.5 84C6.3203 84 0.5 78.1797 0.5 71V21.5L0.507812 21.3467C0.58461 20.5903 1.22334 20 2 20Z" />
+                    <rect x="33.5" y="2.5" width="25" height="99" rx="12.5" />
+                    <rect x="65.5" y="20" width="26" height="64" rx="13" />
+                </svg>
             </div>
         </div>
         <span style={{ fontSize: 10, color: C.textTer, fontFamily: C.sans, textTransform: "uppercase", letterSpacing: "0.06em" }}>Downloads</span>
