@@ -699,10 +699,29 @@ authRouter.post("/login", async (req: Request, res: Response) => {
       return;
     }
 
+    // Check if user has any direct reports (is a manager)
+    const reportCheck = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.managerId, data.user.id))
+      .limit(1);
+
+    const directReportCount = reportCheck.length > 0
+      ? (await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(schema.users)
+          .where(eq(schema.users.managerId, data.user.id))
+        )[0]?.count ?? 0
+      : 0;
+
     res.json({
       user: data.user,
       session: data.session,
-      profile: userProfile,
+      profile: {
+        ...userProfile,
+        isManager: reportCheck.length > 0,
+        directReportCount,
+      },
     });
   } catch (error) {
     console.error("Login error:", error);
