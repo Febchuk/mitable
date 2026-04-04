@@ -74,7 +74,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   // Fetch admin data from APIs
   const fetchAdminData = async () => {
-    if (!user || user.role !== "admin") return;
+    if (!user || (user.role !== "admin" && !user.isManager)) return;
 
     setLoading(true);
     setError(null);
