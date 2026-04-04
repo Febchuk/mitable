@@ -17,7 +17,7 @@ import * as schema from "../db/schema/index";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { requireAccessToUser } from "../middleware/authorization.js";
-import { getDirectReports, canViewUserData } from "../services/permissions.service.js";
+import { getDirectReports, getTransitiveReportIds, canViewUserData } from "../services/permissions.service.js";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger({ context: "my-activity-routes" });
@@ -921,15 +921,63 @@ router.get(
 // ============================================================================
 
 /**
- * GET /me/reports — List the authenticated user's direct reports.
+ * GET /me/reports — List the authenticated user's reports.
+ * ?transitive=true returns all transitive reports (for Team view People page).
  * Returns empty array for non-managers.
  */
 router.get("/reports", requireAuth, async (req: Request, res: Response) => {
   try {
-    const reports = await getDirectReports(req.userId!);
-    res.json({ reports });
+    const transitive = req.query.transitive === "true";
+
+    if (transitive) {
+      // Get all transitive report IDs, then fetch their profiles
+      const reportIds = await getTransitiveReportIds(req.userId!);
+      if (reportIds.length === 0) {
+        res.json({ reports: [] });
+        return;
+      }
+
+      const { inArray } = await import("drizzle-orm");
+      const reports = await db
+        .select({
+          id: schema.users.id,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          email: schema.users.email,
+          role: schema.users.role,
+          jobTitle: schema.users.jobTitle,
+          status: schema.users.status,
+          avatarUrl: schema.users.avatarUrl,
+          department: schema.users.department,
+          managerId: schema.users.managerId,
+          createdAt: schema.users.createdAt,
+        })
+        .from(schema.users)
+        .where(inArray(schema.users.id, reportIds))
+        .orderBy(asc(schema.users.firstName));
+
+      // Format to match /admin/users shape
+      const formatted = reports.map((u) => ({
+        id: u.id,
+        name: [u.firstName, u.lastName].filter(Boolean).join(" ") || "Unknown",
+        email: u.email,
+        role: u.role,
+        jobTitle: u.jobTitle,
+        status: u.status || "active",
+        avatarUrl: u.avatarUrl,
+        department: u.department,
+        managerId: u.managerId,
+        createdAt: u.createdAt,
+      }));
+
+      res.json({ reports: formatted });
+    } else {
+      // Direct reports only
+      const reports = await getDirectReports(req.userId!);
+      res.json({ reports });
+    }
   } catch (error) {
-    logger.error({ err: error }, "Error fetching direct reports");
+    logger.error({ err: error }, "Error fetching reports");
     res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch reports" });
   }
 });

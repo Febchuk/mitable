@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, asc, inArray } from "drizzle-orm";
+import { eq, sql, count, desc, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requireAdmin, requireManagerOrAdmin, requireAccessToUser, getCachedVisibleUserIds } from "../middleware/authorization.js";
+import { requireAdmin, requireManagerOrAdmin, requireAccessToUser } from "../middleware/authorization.js";
 import { wouldCreateCycle } from "../services/permissions.service.js";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
@@ -381,11 +381,9 @@ router.get("/users/:id", requireAuth, requireManagerOrAdmin, requireAccessToUser
  *     security:
  *       - BearerAuth: []
  */
-router.get("/users", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get("/users", requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Get visible user IDs — admins see all in org, managers see their reports
-    const visibleUserIds = await getCachedVisibleUserIds(req);
-
+    // Admin-only: fetch all users in the org
     const orgUsers = await db
       .select({
         id: schema.users.id,
@@ -399,7 +397,7 @@ router.get("/users", requireAuth, requireManagerOrAdmin, async (req: Request, re
         createdAt: schema.users.createdAt,
       })
       .from(schema.users)
-      .where(inArray(schema.users.id, visibleUserIds))
+      .where(eq(schema.users.organizationId, req.organizationId!))
       .orderBy(schema.users.firstName, schema.users.lastName);
 
     const usersFormatted = orgUsers.map((user) => ({

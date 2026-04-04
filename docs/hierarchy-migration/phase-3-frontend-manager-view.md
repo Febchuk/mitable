@@ -500,38 +500,26 @@ const { data: integrations } = useQuery({
 
 ## 6.4 View-mode-aware data fetching
 
-**Critical pattern**: React Query hooks that serve both admin and manager views must:
+**Critical pattern**: Use separate endpoints for admin vs manager data:
 
-1. **Enable for managers**: `enabled: user.role === "admin" || user.isManager`
-2. **Include `viewMode` in query key**: So data refetches when switching views
-3. **Let the backend scope**: The backend uses `getCachedVisibleUserIds(req)` to return
-   only the users the actor can see — admins get all, managers get their reports
+- `GET /admin/users` — admin only, returns all org users (Org view)
+- `GET /me/reports?transitive=true` — any auth user, returns transitive reports (Team view)
 
-**Example — `useUsers` hook:**
+The `useUsers` hook selects the right endpoint based on `viewMode`:
 
 ```typescript
 export function useUsers() {
   const { user, viewMode } = useUser();
   return useQuery({
-    queryKey: ["admin", "users", viewMode],
-    queryFn: fetchUsers,
-    enabled: !!user && (user.role === "admin" || !!user.isManager),
+    queryKey: ["users", viewMode],
+    queryFn: viewMode === "admin" ? fetchUsers : fetchMyReports,
+    enabled: !!user && (viewMode === "admin" ? isAdmin : isManager),
   });
 }
 ```
 
-**Backend scoping pattern (`GET /admin/users`):**
-
-```typescript
-router.get("/users", requireAuth, requireManagerOrAdmin, async (req, res) => {
-  const visibleUserIds = await getCachedVisibleUserIds(req);
-  const users = await db.select(...).from(users).where(inArray(users.id, visibleUserIds));
-  // ...
-});
-```
-
-This pattern replaces the old inline `role !== "admin"` checks. Apply it to any
-endpoint that serves data in both admin and manager views.
+This avoids overloading a single endpoint with scoping logic. Each endpoint has a
+clear purpose and authorization model.
 
 ---
 
