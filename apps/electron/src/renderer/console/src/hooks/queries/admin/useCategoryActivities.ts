@@ -13,6 +13,6 @@ export function useCategoryActivities(
   return useQuery({
     queryKey: ["admin", "dashboard", "people", userId, "category-activities", category, period],
     queryFn: () => fetchCategoryActivities(userId, category!, period),
-    enabled: !!user && user.role === "admin" && !!userId && !!category,
+    enabled: !!user && (user.role === "admin" || !!user.isManager) && !!userId && !!category,
   });
 }

@@ -12,6 +12,6 @@ export function useSubscriberDrillDown(
   return useQuery({
     queryKey: ["admin", "dashboard", "drill-down", "subscriber", subscriberName, period],
     queryFn: () => fetchSubscriberDrillDown(subscriberName!, period),
-    enabled: !!user && user.role === "admin" && !!subscriberName,
+    enabled: !!user && (user.role === "admin" || !!user.isManager) && !!subscriberName,
   });
 }

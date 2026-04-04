@@ -8,7 +8,7 @@ export function useDashboardPeople() {
   return useQuery({
     queryKey: ["admin", "dashboard", "people"],
     queryFn: fetchDashboardPeople,
-    enabled: !!user && user.role === "admin",
+    enabled: !!user && (user.role === "admin" || !!user.isManager),
     refetchInterval: 5 * 60 * 1000,
   });
 }

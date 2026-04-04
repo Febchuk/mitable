@@ -3,9 +3,10 @@ import BenchmarksView from "../admin/BenchmarksView";
 import EmployeeBenchmarksView from "../employee/BenchmarksView";
 
 export default function BenchmarksRouter() {
-  const { user } = useUser();
+  const { user, viewMode } = useUser();
 
-  if (user?.role === "admin") {
+  // Admin or manager views get the full benchmarks management view
+  if (user?.role === "admin" || user?.isManager || viewMode === "admin" || viewMode === "manager") {
     return <BenchmarksView />;
   }
 

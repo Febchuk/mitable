@@ -9,7 +9,7 @@ export function useDashboardMetrics(period: DashboardPeriod = "today") {
   return useQuery({
     queryKey: ["admin", "dashboard", "metrics", period],
     queryFn: () => fetchDashboardMetrics(period),
-    enabled: !!user && user.role === "admin",
+    enabled: !!user && (user.role === "admin" || !!user.isManager),
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
   });
 }
