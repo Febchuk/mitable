@@ -29,10 +29,6 @@ export default function Nav({ viewMode }: NavProps) {
         <NavItem to="/people" icon={Users} label="My Reports" />
         <NavItem to="/benchmarks" icon={Target} label="Benchmarks" />
         <NavItem to="/reports" icon={BarChart2} label="Reports" />
-        <NavItem to="/calendar" icon={Calendar} label="Calendar" />
-        <NavGroup to="/me" icon={User} label="Me">
-          <NavItem to="/bragbook" icon={Award} label="Bragbook" />
-        </NavGroup>
         <NavItem to="/agent" icon={MitableIcon} label="Agent" />
       </>
     );
