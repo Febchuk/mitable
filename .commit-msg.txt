@@ -1,0 +1,9 @@
+feat(feedback): add feedback button with AI-curated log analysis
+
+- Add Send Feedback button to sidebar (above Switch to Admin)
+- FeedbackDialog modal with textarea for describing issues
+- Backend POST /api/feedback route sends email via Resend to mikun@mitable.ai
+- Haiku 4.5 agent searches electron logs with tools (search_logs, get_log_range)
+- Email includes user message, AI-curated log snippets, and raw logs as attachment
+- IPC channel to collect last 2000 lines of electron main.log from user machine
+- Response sent immediately to user; analysis + email happens in background

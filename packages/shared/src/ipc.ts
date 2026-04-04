@@ -159,6 +159,9 @@ export const IPC_CHANNELS = {
   // Onboarding
   ONBOARDING_GET_VERSION: "onboarding:get-version",
   ONBOARDING_SET_VERSION: "onboarding:set-version",
+
+  // Feedback
+  FEEDBACK_GET_LOGS: "feedback:get-logs",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

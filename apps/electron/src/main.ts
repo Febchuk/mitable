@@ -2965,6 +2965,24 @@ app.whenReady().then(async () => {
     return browserBridgeService.getConnectionInfo();
   });
 
+  // Feedback: read electron log file for attachment
+  ipcMain.handle(IPC_CHANNELS.FEEDBACK_GET_LOGS, async () => {
+    try {
+      const electronLog = await import("electron-log/main");
+      const logFile = electronLog.default.transports.file.getFile();
+      const logPath = logFile?.path;
+      if (!logPath) return { success: false, logs: "", error: "Log file path not found" };
+
+      const fs = await import("fs/promises");
+      const content = await fs.readFile(logPath, "utf-8");
+      const lines = content.split("\n");
+      const tail = lines.slice(-2000).join("\n");
+      return { success: true, logs: tail };
+    } catch (err) {
+      return { success: false, logs: "", error: String(err) };
+    }
+  });
+
   // Wire centralized notification service
   notificationService.setClickHandler(handleNotificationAction);
   notificationService.setUserIdProvider(() => currentUserContext?.userId ?? null);
