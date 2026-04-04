@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
+    raised: "var(--l-bg-raised, #211F1B)",
     text: "var(--l-text, #ECE8E0)",
     textSec: "var(--l-text-secondary, #A09A8E)",
     textTer: "var(--l-text-tertiary, #6B665C)",
@@ -120,32 +121,10 @@ export default function ResetPasswordPage() {
     };
 
     return (
-        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />
 
-            <main style={{ padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto" }}>
-                <a
-                    href="/"
-                    style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        fontSize: 13,
-                        color: C.textTer,
-                        textDecoration: "none",
-                        marginBottom: 40,
-                        transition: "color 0.15s",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--l-text)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--l-text-tertiary, #6B665C)"; }}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12" />
-                        <polyline points="12 19 5 12 12 5" />
-                    </svg>
-                    Back to home
-                </a>
-
+            <main style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}>
                 <div style={{ textAlign: "center", marginBottom: 48 }}>
                     <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
                         {status === "success" ? "Password Updated" : "Set New Password"}
@@ -243,8 +222,8 @@ export default function ResetPasswordPage() {
                         <div
                             style={{
                                 borderRadius: 16,
-                                border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
-                                background: "rgba(var(--l-ui-rgb, 236,232,224), 0.03)",
+                                border: `1px solid ${C.border}`,
+                                background: C.raised,
                                 padding: 32,
                                 textAlign: "center",
                             }}
@@ -267,10 +246,10 @@ export default function ResetPasswordPage() {
                             </div>
                             <p style={{ fontSize: 15, color: C.textSec, marginBottom: 24 }}>You can now sign in with your new password.</p>
                             <a
-                                href="/"
+                                href="/login"
                                 style={{
                                     display: "inline-flex",
-                                    padding: "10px 24px",
+                                    padding: "13px 28px",
                                     borderRadius: 10,
                                     fontSize: 14,
                                     fontWeight: 500,
@@ -283,7 +262,7 @@ export default function ResetPasswordPage() {
                                 onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
                             >
-                                Back to Home
+                                Sign in
                             </a>
                         </div>
                     )}
@@ -317,26 +296,47 @@ export default function ResetPasswordPage() {
                                 </svg>
                             </div>
                             <p style={{ fontSize: 15, color: C.textSec, marginBottom: 24 }}>{errorMessage}</p>
-                            <a
-                                href="/"
-                                style={{
-                                    display: "inline-flex",
-                                    padding: "10px 24px",
-                                    borderRadius: 10,
-                                    fontSize: 14,
-                                    fontWeight: 500,
-                                    background: "rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
-                                    color: C.text,
-                                    textDecoration: "none",
-                                    fontFamily: C.sans,
-                                    transition: "opacity 0.15s",
-                                    border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
-                            >
-                                Back to Home
-                            </a>
+                            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                                <a
+                                    href="/login"
+                                    style={{
+                                        display: "inline-flex",
+                                        padding: "13px 28px",
+                                        borderRadius: 10,
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        background: C.text,
+                                        color: C.bg,
+                                        textDecoration: "none",
+                                        fontFamily: C.sans,
+                                        transition: "opacity 0.15s",
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                >
+                                    Sign in
+                                </a>
+                                <a
+                                    href="/"
+                                    style={{
+                                        display: "inline-flex",
+                                        padding: "13px 28px",
+                                        borderRadius: 10,
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        background: "rgba(var(--l-ui-rgb, 236,232,224), 0.06)",
+                                        color: C.text,
+                                        textDecoration: "none",
+                                        fontFamily: C.sans,
+                                        transition: "opacity 0.15s",
+                                        border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                >
+                                    Home
+                                </a>
+                            </div>
                         </div>
                     )}
                 </div>

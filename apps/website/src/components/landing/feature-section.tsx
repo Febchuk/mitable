@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import React, { useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { MacWindow } from "./mockups/mac-window";
@@ -114,8 +114,8 @@ export const FeatureSection = ({
                     fontWeight: 500,
                     transition: "opacity 0.2s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.75"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.opacity = "0.75"; }}
+                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.opacity = "1"; }}
             >
                 {linkText}
             </Link>

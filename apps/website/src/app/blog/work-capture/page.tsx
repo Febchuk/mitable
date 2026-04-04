@@ -32,13 +32,9 @@ export default function WorkCapturePost() {
                 <li><strong>Employee Control:</strong> If you need to step away or handle personal business, you can pause capture with a single click.</li>
             </ul>
 
-            <blockquote>
-                "The goal isn't to watch people work. The goal is to make the work they do visible without them having to explain it."
-            </blockquote>
-
-            <h2>From Raw Data to Master Stories</h2>
+            <h2>From Raw Data to Comprehensive Summaries</h2>
             <p>
-                We use an architecture called Recursive Language Models (RLMs). Specifically, our <code>Storyteller</code> RLM takes the raw timeline of app usage and groups it into logical "workstreams." It turns "Opened VS Code, opened Terminal, opened Slack" into "Spent 2 hours resolving the database migration issue and communicating with DevOps."
+                We use an advanced AI agent architecture that processes information in a continuous loop. This system takes the raw timeline of app usage and intelligently groups it into logical "workstreams." It turns "Opened IDE, opened Terminal, opened Slack" into "Spent 2 hours resolving the database migration issue and communicating with DevOps."
             </p>
             <p>
                 This means at the end of the week, Mitable generates a beautifully accurate Bragbook of your accomplishments, and you didn't have to lift a finger.

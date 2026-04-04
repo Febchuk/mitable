@@ -6,8 +6,10 @@ import { LandingFooter } from "@/components/landing";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
+    raised: "var(--l-bg-raised, #211F1B)",
     text: "var(--l-text, #ECE8E0)",
     textSec: "var(--l-text-secondary, #A09A8E)",
+    border: "var(--l-border, #33312B)",
     serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
@@ -48,15 +50,23 @@ const buttonSecondary: React.CSSProperties = {
 
 export default function CheckoutSuccessPage() {
     return (
-        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />
 
-            <main style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", padding: "180px 32px 80px" }}>
+            <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "180px 48px 80px", width: "100%", boxSizing: "border-box" as const }}>
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.5 }}
-                    style={{ maxWidth: 520, textAlign: "center" }}
+                    style={{
+                        maxWidth: 560,
+                        width: "100%",
+                        textAlign: "center",
+                        padding: "40px 32px",
+                        background: C.raised,
+                        borderRadius: 16,
+                        border: `1px solid ${C.border}`,
+                    }}
                 >
                     <div
                         style={{

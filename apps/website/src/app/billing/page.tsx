@@ -20,22 +20,21 @@ const C = {
     border: "var(--l-border, #33312B)",
     serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
-    mono: 'var(--font-jetbrains-mono, "JetBrains Mono"), "Fira Code", monospace',
 };
 
 const cardStyle: React.CSSProperties = {
     overflow: "hidden",
     borderRadius: 16,
-    border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
-    background: "rgba(var(--l-ui-rgb, 236,232,224), 0.03)",
-    padding: "24px 32px",
+    border: `1px solid ${C.border}`,
+    background: C.raised,
+    padding: "28px 32px",
 };
 
 const buttonPrimary: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "10px 24px",
+    padding: "13px 28px",
     borderRadius: 10,
     fontSize: 14,
     fontWeight: 500,
@@ -52,7 +51,7 @@ const buttonSecondary: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "10px 24px",
+    padding: "13px 28px",
     borderRadius: 10,
     fontSize: 14,
     fontWeight: 500,
@@ -77,7 +76,7 @@ function UsageBar({ label, used, limit, percent }: { label: string; used: number
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
                 <span style={{ color: C.textSec }}>{label}</span>
-                <span style={{ fontFamily: C.mono, color: C.textSec, fontSize: 12 }}>
+                <span style={{ fontFamily: C.sans, color: C.textSec, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
                     {used.toLocaleString()} / {limit === null ? "Unlimited" : limit.toLocaleString()}
                 </span>
             </div>
@@ -99,9 +98,10 @@ function statusBadgeStyle(status: string): React.CSSProperties {
         display: "inline-block",
         padding: "4px 12px",
         borderRadius: 100,
-        fontFamily: C.mono,
+        fontFamily: C.sans,
         fontSize: 11,
-        letterSpacing: "0.05em",
+        fontWeight: 600,
+        letterSpacing: "0.06em",
         textTransform: "uppercase",
         background: c.bg,
         color: c.text,
@@ -191,26 +191,28 @@ export default function BillingPage() {
     const status = data.subscription?.subscription?.status || "active";
 
     return (
-        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />
 
-            <main style={{ padding: "160px 32px 80px", maxWidth: 720, margin: "0 auto" }}>
-                <motion.h1
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 8px" }}
-                >
-                    Billing
-                </motion.h1>
-                <motion.p
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                    style={{ fontSize: 16, color: C.textSec, marginBottom: 48 }}
-                >
-                    Manage your subscription and view usage.
-                </motion.p>
+            <main style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}>
+                <div style={{ marginBottom: 56 }}>
+                    <motion.h1
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}
+                    >
+                        Billing
+                    </motion.h1>
+                    <motion.p
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.1 }}
+                        style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}
+                    >
+                        Manage your subscription and view usage.
+                    </motion.p>
+                </div>
 
                 {loading ? (
                     <div style={{ display: "flex", justifyContent: "center", padding: "80px 0" }}>
@@ -236,7 +238,7 @@ export default function BillingPage() {
                         >
                             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
                                 <div>
-                                    <p style={{ fontFamily: C.mono, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: C.textTer, marginBottom: 6 }}>Current Plan</p>
+                                    <p style={{ fontFamily: C.sans, fontSize: 10, fontWeight: 600, letterSpacing: "0.09em", textTransform: "uppercase", color: C.textTer, marginBottom: 6 }}>Current Plan</p>
                                     <h2 style={{ fontFamily: C.serif, fontSize: 24, fontWeight: 400, color: C.text, margin: 0 }}>{tierConfig?.name || "Free"}</h2>
                                 </div>
                                 <span style={statusBadgeStyle(status)}>{status.replace("_", " ")}</span>
@@ -281,7 +283,7 @@ export default function BillingPage() {
                                 transition={{ duration: 0.5, delay: 0.25 }}
                                 style={cardStyle}
                             >
-                                <h2 style={{ fontFamily: C.serif, fontSize: 18, fontWeight: 400, color: C.text, margin: "0 0 20px" }}>Usage This Period</h2>
+                                <h2 style={{ fontFamily: C.serif, fontSize: 22, fontWeight: 400, color: C.text, margin: "0 0 20px", letterSpacing: "-0.02em" }}>Usage This Period</h2>
 
                                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                                     <UsageBar label="AI Queries" used={data.quota.aiQueries.used} limit={data.quota.aiQueries.limit} percent={data.quota.aiQueries.percentUsed} />

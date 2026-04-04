@@ -22,17 +22,8 @@ export default function BenchmarksPost() {
 
             <h2>How Mitable Generates Benchmarks</h2>
             <p>
-                Our approach to benchmarks uses a hybrid AI system:
+                We've reduced the complexity of creating benchmarks down to a simple description. You define what good looks like for a role in plain English, and Mitable's AI handles the rest, automatically generating the necessary scoring parameters in minutes instead of weeks.
             </p>
-            <ul>
-                <li><strong>Ingestion:</strong> We ingest your existing documentation, job descriptions, and past performance reviews to understand your company's unique context.</li>
-                <li><strong>Extraction:</strong> Using <code>gemini-2.5-flash-lite</code>, we extract structured tasks and expectations from your raw text.</li>
-                <li><strong>Scoring Parameters:</strong> We convert these expectations into measurable, quantitative scoring parameters that our agent can observe in the background.</li>
-            </ul>
-
-            <blockquote>
-                "Benchmarks shouldn't be a destination; they should be a live baseline that evolves with your team's capability."
-            </blockquote>
 
             <h2>Real-world Application</h2>
             <p>
@@ -41,7 +32,7 @@ export default function BenchmarksPost() {
 
             <h3>What's Next?</h3>
             <p>
-                We're currently experimenting with recursive language models (RLMs) to continuously refine these benchmarks based on the top performers in your organization. If your best engineers are adopting a new tool or workflow, Mitable will suggest updating the benchmark to reflect this new standard.
+                We're currently experimenting with advanced AI agent architectures to continuously refine these benchmarks based on the top performers in your organization. If your best engineers are adopting a new tool or workflow, Mitable will suggest updating the benchmark to reflect this new standard.
             </p>
         </BlogPostLayout>
     );

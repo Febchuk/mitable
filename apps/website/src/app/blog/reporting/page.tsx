@@ -24,20 +24,15 @@ export default function ReportingPost() {
 
             <h2>Under the Hood: Intent Detection</h2>
             <p>
-                To generate these insights, we rely heavily on our <code>IntentService</code> and <code>GeminiVisionService</code>. 
+                To generate these insights, we rely heavily on advanced intent detection and vision-based AI models.
             </p>
             <p>
                 When Mitable captures screen activity, it's not just logging window titles. It analyzes the context of the work. If an employee is in Salesforce, our AI determines which account they're working on. If they're in GitHub, it knows which repository and issue they're addressing.
             </p>
 
-            <code>
-                // Example of our RRF Search combining keyword and semantic meaning
-                const searchResults = await SearchService.hybridSearch(query);
-            </code>
-
             <h3>Visualizing the Data</h3>
             <p>
-                We use custom HTML5 Canvas charts to render this data without bogging down the browser's DOM. This allows us to show highly granular, minute-by-minute breakdowns of a day without sacrificing performance.
+                We use custom, highly-optimized charting technologies to render this data smoothly. This allows us to show highly granular, minute-by-minute breakdowns of a day without sacrificing performance in your browser.
             </p>
             <p>
                 The dashboard splits focus into clear categories:
@@ -47,10 +42,6 @@ export default function ReportingPost() {
                 <li><strong>Communication:</strong> Time spent in Slack, email, or Zoom.</li>
                 <li><strong>Context Switching:</strong> The penalty time lost when rapidly moving between disconnected tasks.</li>
             </ul>
-
-            <blockquote>
-                "Reporting shouldn't tell you that your team is working. It should tell you if they're working on the right things."
-            </blockquote>
 
             <h2>Empowering the Employee</h2>
             <p>

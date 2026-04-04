@@ -1,19 +1,43 @@
 "use client";
 
+import React from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { useTheme } from "@/hooks/use-theme";
 
 const C = {
     text: "var(--l-text)",
     textSec: "var(--l-text-secondary)",
+    accent: "var(--l-accent, #82C0CC)",
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
+
+/** Accent for current route; no item is active on the home page (`/`). */
+function isNavLinkActive(pathname: string, href: string): boolean {
+    if (pathname === "/") return false;
+    if (href === "/#how-it-works") return false;
+    if (href === "/pricing") return pathname === "/pricing" || pathname.startsWith("/pricing/");
+    if (href === "/blog") return pathname === "/blog" || pathname.startsWith("/blog/");
+    if (href === "/about") return pathname === "/about";
+    if (href === "/faq") return pathname === "/faq";
+    return false;
+}
+
+function isAccountFlowActive(pathname: string): boolean {
+    return (
+        pathname === "/login" ||
+        pathname === "/signup" ||
+        pathname.startsWith("/billing") ||
+        pathname.startsWith("/checkout") ||
+        pathname.startsWith("/reset-password")
+    );
+}
 
 const navLinks = [
     { label: "How it works", href: "/#how-it-works" },
     { label: "Pricing", href: "/pricing" },
     { label: "Blog", href: "/blog" },
-    { label: "About", href: "#" },
+    { label: "About", href: "/about" },
     { label: "FAQs", href: "/faq" },
 ];
 
@@ -74,7 +98,7 @@ export const LandingNav = () => {
         }}
     >
         {/* Logo */}
-        <a
+        <Link
             href="/"
             style={{
                 display: "flex",
@@ -104,39 +128,54 @@ export const LandingNav = () => {
                     </clipPath>
                 </defs>
             </svg>
-        </a>
+        </Link>
 
         {/* Divider */}
         <div style={{ width: 1, height: 16, background: "var(--l-nav-divider)", flexShrink: 0 }} />
 
         {/* Links */}
         <div style={{ display: "flex", alignItems: "center", gap: 4 }} className="landing-nav-links">
-            {navLinks.map((link) => (
-                <a
-                    key={link.label}
-                    href={link.href}
-                    onClick={(e) => handleClick(e, link.href)}
-                    style={{
-                        color: C.textSec,
-                        textDecoration: "none",
-                        fontSize: 13,
-                        fontWeight: 400,
-                        padding: "6px 12px",
-                        borderRadius: 999,
-                        transition: "color 0.15s, background 0.15s",
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "var(--l-text)";
-                        e.currentTarget.style.background = "var(--l-nav-hover-bg)";
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "var(--l-text-secondary)";
-                        e.currentTarget.style.background = "transparent";
-                    }}
-                >
-                    {link.label}
-                </a>
-            ))}
+            {navLinks.map((link) => {
+                const active = isNavLinkActive(pathname, link.href);
+                return (
+                    <Link
+                        key={link.label}
+                        href={link.href}
+                        aria-current={active ? "page" : undefined}
+                        onClick={(e) => handleClick(e, link.href)}
+                        style={{
+                            color: active ? C.accent : C.textSec,
+                            textDecoration: "none",
+                            fontSize: 13,
+                            fontWeight: active ? 600 : 400,
+                            padding: "6px 12px",
+                            borderRadius: 999,
+                            transition: "color 0.15s, background 0.15s",
+                            background: active ? "rgba(var(--l-accent-rgb, 130, 192, 204), 0.12)" : "transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                            if (active) {
+                                e.currentTarget.style.color = C.accent;
+                                e.currentTarget.style.background = "rgba(var(--l-accent-rgb, 130, 192, 204), 0.2)";
+                            } else {
+                                e.currentTarget.style.color = "var(--l-text)";
+                                e.currentTarget.style.background = "var(--l-nav-hover-bg)";
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (active) {
+                                e.currentTarget.style.color = C.accent;
+                                e.currentTarget.style.background = "rgba(var(--l-accent-rgb, 130, 192, 204), 0.12)";
+                            } else {
+                                e.currentTarget.style.color = "var(--l-text-secondary)";
+                                e.currentTarget.style.background = "transparent";
+                            }
+                        }}
+                    >
+                        {link.label}
+                    </Link>
+                );
+            })}
         </div>
 
         {/* Theme toggle */}
@@ -168,6 +207,47 @@ export const LandingNav = () => {
         >
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
         </button>
+
+        {/* Sign in — account / billing (default redirect after login is /billing) */}
+        <Link
+            href="/login"
+            aria-current={isAccountFlowActive(pathname) ? "page" : undefined}
+            style={{
+                color: isAccountFlowActive(pathname) ? C.accent : C.textSec,
+                textDecoration: "none",
+                fontSize: 13,
+                fontWeight: isAccountFlowActive(pathname) ? 600 : 500,
+                padding: "7px 14px",
+                borderRadius: 999,
+                flexShrink: 0,
+                transition: "color 0.15s, background 0.15s",
+                background: isAccountFlowActive(pathname)
+                    ? "rgba(var(--l-accent-rgb, 130, 192, 204), 0.12)"
+                    : "transparent",
+            }}
+            onMouseEnter={(e) => {
+                const on = isAccountFlowActive(pathname);
+                if (on) {
+                    e.currentTarget.style.color = C.accent;
+                    e.currentTarget.style.background = "rgba(var(--l-accent-rgb, 130, 192, 204), 0.2)";
+                } else {
+                    e.currentTarget.style.color = "var(--l-text)";
+                    e.currentTarget.style.background = "var(--l-nav-hover-bg)";
+                }
+            }}
+            onMouseLeave={(e) => {
+                const on = isAccountFlowActive(pathname);
+                if (on) {
+                    e.currentTarget.style.color = C.accent;
+                    e.currentTarget.style.background = "rgba(var(--l-accent-rgb, 130, 192, 204), 0.12)";
+                } else {
+                    e.currentTarget.style.color = "var(--l-text-secondary)";
+                    e.currentTarget.style.background = "transparent";
+                }
+            }}
+        >
+            Sign in
+        </Link>
 
         {/* CTA */}
         <a

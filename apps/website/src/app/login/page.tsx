@@ -182,32 +182,10 @@ function LoginForm() {
 
 export default function LoginPage() {
     return (
-        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />
 
-            <main style={{ padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto" }}>
-                <a
-                    href="/"
-                    style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        fontSize: 13,
-                        color: C.textTer,
-                        textDecoration: "none",
-                        marginBottom: 40,
-                        transition: "color 0.15s",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--l-text)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--l-text-tertiary, #6B665C)"; }}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12" />
-                        <polyline points="12 19 5 12 12 5" />
-                    </svg>
-                    Back to home
-                </a>
-
+            <main style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}>
                 <div style={{ textAlign: "center", marginBottom: 48 }}>
                     <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
                         Sign In
