@@ -74,8 +74,8 @@ export default function Sidebar() {
               display: "flex",
               gap: 1,
               background: "rgba(var(--ui-rgb), 0.05)",
-              borderRadius: 7,
-              padding: 3,
+              borderRadius: 6,
+              padding: 2,
             }}
           >
             {availableViewModes.map((mode) => (
@@ -84,11 +84,10 @@ export default function Sidebar() {
                 onClick={() => handleViewModeChange(mode)}
                 style={{
                   flex: 1,
-                  padding: "4px 12px",
-                  borderRadius: 5,
-                  fontSize: 11,
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 400,
+                  padding: "3px 6px",
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: 500,
                   border: "none",
                   cursor: "pointer",
                   transition: "background 0.1s, color 0.1s",
