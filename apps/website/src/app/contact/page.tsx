@@ -51,7 +51,7 @@ export default function ContactPage() {
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
             <LandingNav />
 
-            <main style={{ padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto" }}>
+            <main style={{ padding: "140px 48px 64px", maxWidth: 640, margin: "0 auto" }}>
                 <a
                     href="/"
                     style={{
@@ -61,7 +61,7 @@ export default function ContactPage() {
                         fontSize: 13,
                         color: C.textTer,
                         textDecoration: "none",
-                        marginBottom: 40,
+                        marginBottom: 20,
                         transition: "color 0.15s",
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "var(--l-text)"; }}
@@ -74,7 +74,7 @@ export default function ContactPage() {
                     Back to home
                 </a>
 
-                <div style={{ textAlign: "center", marginBottom: 48 }}>
+                <div style={{ textAlign: "center", marginBottom: 32 }}>
                     <h1
                         style={{
                             fontFamily: C.serif,

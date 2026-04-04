@@ -77,6 +77,7 @@ export const HomeScreen = () => {
                     title="Set the standard."
                     description="Define what good looks like for every role. Mitable's AI generates scoring parameters from a simple description, so benchmarks take minutes to create."
                     linkText="Learn how benchmarks work →"
+                    linkHref="/blog/benchmarks"
                     mockup={<BenchmarkMockup variant={variant} />}
                     variant={variant}
                 />
@@ -87,6 +88,7 @@ export const HomeScreen = () => {
                     title="Your team just works."
                     description="Slack, browsers, terminals, docs — Mitable captures work across every app on your team's computer. No manual time tracking. No status updates."
                     linkText="See how capture works →"
+                    linkHref="/blog/work-capture"
                     mockup={<WorkMontageMockup variant={variant} />}
                     rawMockup
                     reverse
@@ -98,7 +100,8 @@ export const HomeScreen = () => {
                     stepNumber={3}
                     title="Evaluate performance more accurately."
                     description="Get a live, AI-generated score for every person on your team — measured against the benchmarks you set. No more guessing who's on track and who needs support."
-                    linkText="See the employee view →"
+                    linkText="See how we evaluate performance →"
+                    linkHref="/blog/evaluations"
                     mockup={<EvaluationMockup variant={variant} />}
                     variant={variant}
                 />
@@ -108,7 +111,8 @@ export const HomeScreen = () => {
                     stepNumber={4}
                     title="More robust reporting."
                     description="See exactly how each person spends their time — which customers they serve, how their focus and meeting hours break down, and where they're most effective."
-                    linkText="See the full dashboard →"
+                    linkText="Read about our reporting →"
+                    linkHref="/blog/reporting"
                     mockup={<PersonDetailMockup variant={variant} />}
                     reverse
                     variant={variant}

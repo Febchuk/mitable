@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { MacWindow } from "./mockups/mac-window";
 import type { MockupVariant } from "./mockups/colors";
 
@@ -104,7 +105,7 @@ export const FeatureSection = ({
             >
                 {description}
             </p>
-            <a
+            <Link
                 href={linkHref}
                 style={{
                     color: C.accent,
@@ -117,7 +118,7 @@ export const FeatureSection = ({
                 onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
             >
                 {linkText}
-            </a>
+            </Link>
         </div>
     );
 

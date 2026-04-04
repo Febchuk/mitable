@@ -7,9 +7,9 @@ export function Theme({ children }: { children: React.ReactNode }) {
         <ThemeProvider
             attribute="class"
             value={{ light: "landing-light", dark: "landing-dark" }}
-            defaultTheme="dark"
+            defaultTheme="system"
             storageKey="mitable-theme"
-            enableSystem={false}
+            enableSystem
             disableTransitionOnChange
         >
             {children}

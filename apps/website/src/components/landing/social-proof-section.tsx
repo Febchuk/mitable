@@ -81,13 +81,13 @@ const OracleLogo = () => (
 );
 
 const logos = [
-    { name: "Meta", Component: MetaLogo },
-    { name: "Apple", Component: AppleLogo },
+    { name: "Leidos", Component: LeidosLogo },
+    { name: "EY", Component: EYLogo },
     { name: "Salesforce", Component: SalesforceLogo },
     { name: "Oracle", Component: OracleLogo },
     { name: "Lorikeet", Component: LorikeetLogo },
-    { name: "Leidos", Component: LeidosLogo },
-    { name: "EY", Component: EYLogo },
+    { name: "Meta", Component: MetaLogo },
+    { name: "Apple", Component: AppleLogo },
     { name: "KPMG", Component: KPMGLogo },
     { name: "Macquarie", Component: MacquarieLogo },
 ];

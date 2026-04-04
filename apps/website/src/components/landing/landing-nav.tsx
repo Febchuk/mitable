@@ -12,6 +12,7 @@ const C = {
 const navLinks = [
     { label: "How it works", href: "/#how-it-works" },
     { label: "Pricing", href: "/pricing" },
+    { label: "Blog", href: "/blog" },
     { label: "About", href: "#" },
     { label: "FAQs", href: "/faq" },
 ];
