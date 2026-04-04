@@ -17,8 +17,8 @@ Interactive hierarchy visualization. Nodes are expandable/collapsible. Admins ca
 ```
  ┌─── Sidebar ──────────┬─── Main Content ──────────────────────────────────────────────┐
  │                       │                                                               │
- │  ◆ mitable            │  Organization Chart                    [· List] [▪ Tree]       │
- │                       │                                          ↑ toggle              │
+ │  ◆ mitable            │  Organization Chart                                [▪ Tree]  │
+ │                       │                                                               │
  │  ┌─────────────────┐  │  Search people...                                  [Expand All]│
  │  │[My ][Team][ Org]│  │                                                               │
  │  └─────────────────┘  │  ┌─────────────────────────────────────────────┐               │
@@ -100,43 +100,20 @@ and re-fetches the org tree so the hierarchy updates in real time.
 
 ---
 
-### Org Chart — List View
+### Org Chart — List View (REMOVED)
 
-Table format for bulk editing. The Manager column has an **inline dropdown** —
-clicking the manager name opens a searchable user selector. Changing it calls
-`PUT /api/admin/users/:id/manager` and refreshes the table.
+> **Shipped decision:** List view was removed in favor of tree-only with the node
+> detail panel. Clicking any node in the tree opens a slide-out panel (see above)
+> where the admin can view and edit the user's "Reports to" assignment via a
+> searchable dropdown. This replaced both the list-view table and the inline
+> manager dropdown that the list view originally proposed. The tree view also
+> includes a search bar for quickly locating people by name.
 
-```
- ┌─── Main Content ─────────────────────────────────────────────────────────────────┐
- │                                                                                   │
- │  Organization Chart                              [· List] [▪ Tree]                │
- │                                                                                   │
- │  Search people...              Group by: [None ▾]  Filter: [All Teams ▾]          │
- │                                                                                   │
- │  ☐ │ Name            │ Job Title       │ Manager        │ Team         │ Reports  │
- │  ──┼─────────────────┼─────────────────┼────────────────┼──────────────┼────────  │
- │  ☐ │ Emily Torres    │ CEO             │ —              │ —            │ 3        │
- │  ☐ │ David Park      │ VP Engineering  │ Emily Torres ▾ │ Platform  ▾  │ 4        │
- │  ☐ │ Rachel Adams    │ VP Sales        │ Emily Torres ▾ │ Sales     ▾  │ 3        │
- │  ☐ │ Mike Chen       │ VP Operations   │ Emily Torres ▾ │ Ops       ▾  │ 1        │
- │  ☐ │ Alex Kim        │ Lead Frontend   │ David Park   ▾ │ Frontend  ▾  │ 2        │
- │  ☐ │ Mia Wong        │ Lead Backend    │ David Park   ▾ │ Backend   ▾  │ 1        │
- │  ☐ │ Jordan Lee      │ Lead QA         │ David Park   ▾ │ QA        ▾  │ 0        │
- │  ☐ │ Sam Patel       │ Sr DevOps       │ David Park   ▾ │ Platform  ▾  │ 0        │
- │  ──┴─────────────────┴─────────────────┴────────────────┴──────────────┴────────  │
- │                                                                                   │
- │  ── Bulk Actions (when rows selected) ─────────────────────────────────────────── │
- │  3 selected:  [ Assign Manager ▾ ]  [ Assign Team ▾ ]  [ Set Department ▾ ]      │
- │                                                                                   │
- └───────────────────────────────────────────────────────────────────────────────────┘
-```
-
-**List view manager assignment:**
-- Clicking the manager name in any row opens an inline dropdown
-- Dropdown is searchable, shows all org users except the row's user and their reports
-- "None" option clears the manager (`managerId: null`)
-- On select: `PUT /api/admin/users/:id/manager`, then refetch table
-- Bulk actions: select multiple rows → "Assign Manager" dropdown assigns the same manager to all selected
+> **Manager assignment:** All manager reassignment is done via the node detail
+> panel in tree view. Clicking a node opens a slide-out panel with a "Reports to"
+> dropdown. Changing the dropdown value calls `PUT /api/admin/users/:id/manager`
+> and re-fetches the org tree so the hierarchy updates in real time. See the
+> "Node detail on click" section above for full implementation details.
 
 ---
 
@@ -362,7 +339,7 @@ Admin-only page accessible from "Org View" navigation.
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Organization Chart                    [List] [Tree]  │
+│  Organization Chart                          [Tree]   │
 ├──────────────────────────────────────────────────────┤
 │                                                       │
 │              ┌──────────┐                             │
@@ -381,22 +358,17 @@ Admin-only page accessible from "Org View" navigation.
 └──────────────────────────────────────────────────────┘
 ```
 
-### 2.3 Two view modes
+### 2.3 View mode
 
-**Tree view:** Visual hierarchy (default). Each node shows:
+**Tree view (only view):** Visual hierarchy. Each node shows:
 - Avatar + name
 - Job title
 - Team name (if assigned)
 - Number of direct reports
 - Click to expand/collapse subtree
+- Click a node to open the detail panel (see "Node detail on click" mockup above)
 
-**List view:** Table format for bulk operations. Columns:
-- Name
-- Role
-- Manager (dropdown to change)
-- Team (dropdown to change)
-- Department (editable)
-- Direct reports count
+> **Note:** List view was removed. See the "Org Chart — List View (REMOVED)" section above.
 
 ### 2.4 Implementation approach
 
@@ -595,10 +567,16 @@ Add to admin routes:
 { path: "/org-chart", label: "Org Chart", icon: NetworkIcon }
 ```
 
-### 7.2 Add Teams to admin nav
+### 7.2 Add Teams to admin nav — DEFERRED (hidden from nav)
+
+> **Shipped decision:** The Teams tab is hidden from the sidebar navigation, but
+> the route `/teams` is still accessible. The hierarchy works via `managerId`
+> alone and teams are optional grouping reserved for later. When teams are
+> promoted to a first-class feature, the nav entry can be un-hidden.
 
 ```typescript
-{ path: "/teams", label: "Teams", icon: UsersIcon }
+// NOT added to sidebar nav items — route exists but is not linked
+// { path: "/teams", label: "Teams", icon: UsersIcon }
 ```
 
 ### 7.3 Route definitions
@@ -673,8 +651,9 @@ export function useBulkAssignManagers() { /* ... */ }
 
 ## Verification Checklist
 
-- [ ] Admin can view org chart (tree and list views)
-- [ ] Admin can assign a manager to a user via org chart
+- [ ] Admin can view org chart (tree view with search)
+- [ ] Node detail panel opens on click with editable Reports To dropdown
+- [ ] Admin can assign a manager to a user via org chart node detail panel
 - [ ] Admin can assign a manager via user edit form
 - [ ] Circular manager assignment is rejected with clear error
 - [ ] Admin can create, edit, delete teams
@@ -686,6 +665,7 @@ export function useBulkAssignManagers() { /* ... */ }
 - [ ] People page shows manager, team, department columns
 - [ ] People page grouping/filtering by team and department works
 - [ ] Non-admin users cannot access org chart or teams pages
+- [ ] Teams tab hidden from nav but accessible via /teams route
 - [ ] `npm run typecheck --workspace=apps/electron` passes
 
 ---

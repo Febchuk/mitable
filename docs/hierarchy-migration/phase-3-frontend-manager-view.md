@@ -21,7 +21,7 @@ Segmented control sits at the top of the sidebar, below the logo. Only shows mod
  │                                               │
  │  ┌─────────────────────────────────────────┐  │
  │  │ ┌──────────┐┌───────────┐┌──────────┐  │  │
- │  │ │ My View  ││ Team View ││ Org View │  │  │
+ │  │ │   Me     ││   Team    ││   Org    │  │  │
  │  │ └──────────┘└───────────┘└──────────┘  │  │
  │  └─────────────────────────────────────────┘  │
  │        ↑ active = white bg, dark text         │
@@ -36,15 +36,15 @@ Segmented control sits at the top of the sidebar, below the logo. Only shows mod
 **Variations by user type:**
 
 ```
- Admin + Manager:     [ My View ] [ Team View ] [ Org View ]
- Admin (no reports):  [ My View ] [ Org View ]
- Manager (non-admin): [ My View ] [ Team View ]
+ Admin + Manager:     [ Me ] [ Team ] [ Org ]
+ Admin (no reports):  [ Me ] [ Org ]
+ Manager (non-admin): [ Me ] [ Team ]
  Employee:            (no switcher shown)
 ```
 
 ---
 
-### Employee — "My View"
+### Employee — "Me"
 
 Personal productivity. This is the default landing for employees.
 
@@ -77,7 +77,7 @@ Personal productivity. This is the default landing for employees.
 
 ---
 
-### Manager — "Team View"
+### Manager — "Team"
 
 Team oversight. Dashboard and people scoped to the manager's direct + transitive reports.
 
@@ -87,20 +87,20 @@ Team oversight. Dashboard and people scoped to the manager's direct + transitive
  │  ◆ mitable            │  Team Dashboard                          This Week ▾  │
  │                       │                                                       │
  │  ┌─────────────────┐  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │
- │  │[My ][Team][    ]│  │  │  4 reports   │ │  28h 15m    │ │  85%        │     │
+ │  │[Me  ][Team][    ]│  │  │  4 reports   │ │  28h 15m    │ │  85%        │     │
  │  └─────────────────┘  │  │  active      │ │  total time │ │  benchmark  │     │
  │       ↑ active         │  └─────────────┘ └─────────────┘ └─────────────┘     │
  │                       │                                                       │
  │  ── NAV ────────────  │  ── My Reports ─────────────────────────────────────  │
  │                       │                                                       │
- │  📊  Team Dashboard ← │  │ Name          │ Active Today │ Top App    │ Bench │
- │  👥  My Reports       │  ├───────────────┼──────────────┼────────────┼───────│
+ │  📊  Dashboard    ←   │  │ Name          │ Active Today │ Top App    │ Bench │
+ │  👥  People           │  ├───────────────┼──────────────┼────────────┼───────│
  │  🎯  Benchmarks       │  │ ●  Alex Kim   │ 5h 32m       │ VS Code    │ 72%   │
  │  📈  Reports          │  │ ●  Jordan Lee │ 4h 18m       │ Figma      │ 88%   │
- │  ─────────────────    │  │ ○  Sam Patel  │ —            │ —          │ 65%   │
- │  📅  Calendar         │  │ ●  Mia Wong   │ 6h 05m       │ Chrome     │ 91%   │
- │  👤  Me               │  │                                                   │
- │  🤖  Agent            │  ● = active now   ○ = not active                      │
+ │                       │  │ ○  Sam Patel  │ —            │ —          │ 65%   │
+ │  🤖  Agent            │  │ ●  Mia Wong   │ 6h 05m       │ Chrome     │ 91%   │
+ │                       │  │                                                   │
+ │                       │  ● = active now   ○ = not active                      │
  │                       │                                                       │
  │                       │  ── Activity Trend ─────────────────────────────────  │
  │                       │                                                       │
@@ -114,9 +114,9 @@ Team oversight. Dashboard and people scoped to the manager's direct + transitive
 
 ---
 
-### Admin — "Org View"
+### Admin — "Org"
 
-Configuration and org-wide analytics. No personal features (calendar, me) — switch to My View for those.
+Configuration and org-wide analytics. No personal features (calendar, me) — switch to Me view for those.
 
 ```
  ┌─── Sidebar ──────────┬─── Main Content ──────────────────────────────────────┐
@@ -124,7 +124,7 @@ Configuration and org-wide analytics. No personal features (calendar, me) — sw
  │  ◆ mitable            │  Organization Dashboard                  This Week ▾  │
  │                       │                                                       │
  │  ┌─────────────────┐  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │
- │  │[My ][Team][ Org]│  │  │  24 people   │ │  186h total │ │  78% avg    │     │
+ │  │[Me  ][Team][ Org]│  │  │  24 people   │ │  186h total │ │  78% avg    │     │
  │  └─────────────────┘  │  │  in org      │ │  active     │ │  benchmark  │     │
  │       ↑ active         │  └─────────────┘ └─────────────┘ └─────────────┘     │
  │                       │                                                       │
@@ -231,6 +231,12 @@ function getAvailableViewModes(user: User): ViewMode[] {
 - If `localStorage.mitable:lastMode` exists (old key), migrate to `localStorage.mitable:viewMode`
 - If stored viewMode is "manager" but user is no longer a manager (reports reassigned), fall back to "employee"
 
+### 2.4 Stale viewMode prevention
+
+`getInitialViewMode` always validates the saved localStorage value against the user's
+available modes. If an admin logs out and an employee logs in, the stale `"admin"` value
+is rejected and the employee gets `"employee"` mode. This prevents nav leaking between users.
+
 ---
 
 ## 3. Sidebar View Switcher
@@ -275,7 +281,7 @@ function ViewModeSwitcher() {
               : "text-gray-500 hover:text-gray-700"
           )}
         >
-          {mode === "employee" ? "My View" : mode === "manager" ? "Team View" : "Org View"}
+          {mode === "employee" ? "Me" : mode === "manager" ? "Team" : "Org"}
         </button>
       ))}
     </div>
@@ -284,9 +290,9 @@ function ViewModeSwitcher() {
 ```
 
 **Labels:**
-- `employee` → "My View" (personal data)
-- `manager` → "Team View" (reports' data)
-- `admin` → "Org View" (org-wide data)
+- `employee` → "Me" (personal data)
+- `manager` → "Team" (reports' data)
+- `admin` → "Org" (org-wide data)
 
 ---
 
@@ -296,10 +302,10 @@ function ViewModeSwitcher() {
 
 ### 4.1 Three-tier navigation
 
-| Route | Employee (My View) | Manager (Team View) | Admin (Org View) |
+| Route | Employee (Me) | Manager (Team) | Admin (Org) |
 |-------|-------------------|--------------------|--------------------|
-| `/calendar` | yes | yes | — |
-| `/me` | yes | yes | — |
+| `/calendar` | yes | — | — |
+| `/me` | yes | — | — |
 | `/agent` | yes | yes | yes |
 | `/docs` | yes | — | — |
 | `/uploads` | yes | — | — |
@@ -313,9 +319,9 @@ function ViewModeSwitcher() {
 | `/teams` | — | — | yes |
 
 **Design rationale:**
-- **Admin (Org View)** is configuration-focused — no `/calendar`, `/me`. Admins switch to My View for personal features.
-- **Manager (Team View)** gets full benchmark CRUD and reports, scoped to their reports.
-- **Employee (My View)** is personal productivity only.
+- **Admin (Org)** is configuration-focused — no `/calendar`, `/me`. Admins switch to Me view for personal features.
+- **Manager (Team)** gets full benchmark CRUD and reports, scoped to their reports. No `/calendar` or `/me` — managers switch to Me view for personal features.
+- **Employee (Me)** is personal productivity only.
 
 ### 4.2 Implementation
 
@@ -337,23 +343,20 @@ function Nav({ viewMode }: NavProps) {
   ];
 
   const managerRoutes = [
-    { path: "/dashboard", label: "Team Dashboard", icon: LayoutIcon },
-    { path: "/people", label: "My Reports", icon: UsersIcon },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutIcon },
+    { path: "/people", label: "People", icon: UsersIcon },
     { path: "/benchmarks", label: "Benchmarks", icon: TargetIcon },
     { path: "/reports", label: "Reports", icon: ChartIcon },
-    { path: "/calendar", label: "Calendar", icon: CalendarIcon },
-    { path: "/me", label: "Me", icon: UserIcon },
-    { path: "/agent", label: "Agent", icon: BotIcon },
+    { path: "/agent", label: "Agent", icon: MitableIcon },
   ];
 
   const adminRoutes = [
-    { path: "/dashboard", label: "Org Dashboard", icon: LayoutIcon },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutIcon },
     { path: "/people", label: "People", icon: UsersIcon },
     { path: "/benchmarks", label: "Benchmarks", icon: TargetIcon },
     { path: "/reports", label: "Reports", icon: ChartIcon },
     { path: "/org-chart", label: "Org Chart", icon: NetworkIcon },
-    { path: "/teams", label: "Teams", icon: FolderIcon },
-    { path: "/agent", label: "Agent", icon: BotIcon },
+    { path: "/agent", label: "Agent", icon: MitableIcon },
   ];
 
   const routes = viewMode === "admin" ? adminRoutes
@@ -370,7 +373,11 @@ function Nav({ viewMode }: NavProps) {
 
 **File:** `apps/electron/src/renderer/console/src/App.tsx`
 
-### 5.1 Replace `AdminOnlyRoute` with `ProtectedRoute`
+> **Note:** Both `GET /auth/me` and `POST /auth/login` return `isManager` and `directReportCount`
+> in the response payload. The login response includes these fields so the frontend can
+> determine available view modes immediately without a separate `/auth/me` round-trip.
+
+### 5.1 Replace `AdminOnlyRoute` with `RoleGate`
 
 **Current** (line 245):
 ```typescript
@@ -383,13 +390,13 @@ function AdminOnlyRoute({ children }) {
 
 **Replace with:**
 ```typescript
-interface ProtectedRouteProps {
+interface RoleGateProps {
   requireAdmin?: boolean;
   requireManager?: boolean;  // manager OR admin
   children: React.ReactNode;
 }
 
-function ProtectedRoute({ requireAdmin, requireManager, children }: ProtectedRouteProps) {
+function RoleGate({ requireAdmin, requireManager, children }: RoleGateProps) {
   const { user } = useUser();
 
   if (requireAdmin && user?.role !== "admin") {
@@ -408,32 +415,33 @@ function ProtectedRoute({ requireAdmin, requireManager, children }: ProtectedRou
 
 ```tsx
 <Route path="/dashboard" element={
-  <ProtectedRoute requireManager>
+  <RoleGate requireManager>
     <DashboardPage />
-  </ProtectedRoute>
+  </RoleGate>
 } />
 
 <Route path="/people" element={
-  <ProtectedRoute requireManager>
+  <RoleGate requireManager>
     <PeoplePage />
-  </ProtectedRoute>
+  </RoleGate>
 } />
 
 <Route path="/benchmarks/new" element={
-  <ProtectedRoute requireManager>
+  <RoleGate requireManager>
     <CreateBenchmarkPage />
-  </ProtectedRoute>
+  </RoleGate>
 } />
 
 <Route path="/benchmarks/:id/edit" element={
-  <ProtectedRoute requireManager>
+  <RoleGate requireManager>
     <EditBenchmarkPage />
-  </ProtectedRoute>
+  </RoleGate>
+} />
 
 <Route path="/reports" element={
-  <ProtectedRoute requireManager>
+  <RoleGate requireManager>
     <ReportsPage />
-  </ProtectedRoute>
+  </RoleGate>
 } />
 ```
 
@@ -445,7 +453,7 @@ function ProtectedRoute({ requireAdmin, requireManager, children }: ProtectedRou
 ```typescript
 if (user.role === "admin") navigate("/dashboard");
 else if (user.isManager) navigate("/dashboard");  // managers go to team dashboard
-else navigate("/calendar");
+else navigate("/calendar");  // employees land on calendar
 ```
 
 ---
@@ -563,19 +571,19 @@ queryKey: ["dashboard", "people"]
 queryKey: ["dashboard", "people", viewMode]
 ```
 
-This ensures an admin switching between "Team View" and "Org View" sees correctly scoped data without stale cache.
+This ensures an admin switching between "Team" and "Org" sees correctly scoped data without stale cache.
 
 ---
 
 ## Verification Checklist
 
-- [ ] Regular employee: sees "My View" only, no view switcher, no dashboard route
-- [ ] Manager (non-admin): sees "My View" and "Team View" switcher
+- [ ] Regular employee: sees "Me" only, no view switcher, no dashboard route
+- [ ] Manager (non-admin): sees "Me" and "Team" switcher
 - [ ] Manager team dashboard: shows only their reports' metrics
 - [ ] Manager people page: shows only their direct + transitive reports
 - [ ] Admin: sees all three views, can switch between them
-- [ ] Admin "Team View": if admin has reports, shows only their reports
-- [ ] Admin "Org View": shows all org data (unchanged from today)
+- [ ] Admin "Team": if admin has reports, shows only their reports
+- [ ] Admin "Org": shows all org data (unchanged from today)
 - [ ] View mode persists across app restarts via localStorage
 - [ ] Navigating to `/dashboard` as employee redirects to `/calendar`
 - [ ] React Query refetches data when view mode changes
