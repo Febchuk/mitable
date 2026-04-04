@@ -91,7 +91,7 @@ export default function Sidebar() {
                   border: "none",
                   cursor: "pointer",
                   transition: "background 0.1s, color 0.1s",
-                  background: viewMode === mode ? "var(--bg-overlay)" : "transparent",
+                  background: viewMode === mode ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
                   color: viewMode === mode ? "var(--text-primary)" : "var(--text-secondary)",
                 }}
               >
