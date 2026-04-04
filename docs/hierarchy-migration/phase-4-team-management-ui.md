@@ -47,19 +47,27 @@ Interactive hierarchy visualization. Nodes are expandable/collapsible. Admins ca
  └───────────────────────┴───────────────────────────────────────────────────────────────┘
 ```
 
-**Node detail on click:**
+**Node detail on click — with inline manager assignment:**
+
+Clicking any node in the tree opens a slide-out panel. The "Reports to" field is an
+**editable dropdown** — changing it immediately calls `PUT /admin/users/:id/manager`
+and re-fetches the org tree so the hierarchy updates in real time.
 
 ```
  ┌──────────────────────────────────────────┐
  │  👤  David Park                      ✕   │
  │  ─────────────────────────────────────── │
  │  Role:       VP Engineering              │
- │  Department: Engineering                 │
- │  Team:       Platform                    │
+ │  Department: ┌──────────────────────┐    │
+ │              │ Engineering       ▾  │    │
+ │              └──────────────────────┘    │
  │                                          │
  │  Reports to: ┌──────────────────────┐    │
- │              │ Emily Torres      ▾  │    │
+ │              │ Emily Torres      ▾  │ ← editable, searchable dropdown
  │              └──────────────────────┘    │
+ │              Changing this calls:        │
+ │              PUT /admin/users/:id/manager│
+ │              { managerId: <selected> }   │
  │                                          │
  │  Direct reports (4):                     │
  │   · Alex Kim — Lead Frontend             │
@@ -67,15 +75,36 @@ Interactive hierarchy visualization. Nodes are expandable/collapsible. Admins ca
  │   · Jordan Lee — Lead QA                 │
  │   · Sam Patel — Senior DevOps            │
  │                                          │
- │  [ View Profile ]  [ Edit ]              │
+ │  [ View Profile ]                        │
  └──────────────────────────────────────────┘
 ```
+
+**Implementation details:**
+
+1. **Manager dropdown**: Shows all users in the org (fetched from `/admin/org-tree`),
+   excluding the user themselves and their transitive reports (to prevent cycles).
+   Includes a "None (top-level)" option to clear the manager.
+
+2. **On change**: Call `PUT /api/admin/users/:id/manager` with `{ managerId }`.
+   The backend validates no cycles. On success, invalidate the org-tree query
+   so the tree re-renders with the new hierarchy.
+
+3. **Department field**: Editable combobox with autocomplete from existing department
+   values in the org. Calls `PATCH /api/admin/users/:id` on blur/change.
+
+4. **Error handling**: If the backend rejects (cycle detected, same-org violation),
+   show an inline error message and revert the dropdown to the previous value.
+
+5. **Optimistic update**: Optionally move the node in the tree immediately, then
+   revert if the API call fails. Or just show a loading spinner on the node.
 
 ---
 
 ### Org Chart — List View
 
-Table format for bulk editing. Inline dropdowns for manager/team reassignment.
+Table format for bulk editing. The Manager column has an **inline dropdown** —
+clicking the manager name opens a searchable user selector. Changing it calls
+`PUT /api/admin/users/:id/manager` and refreshes the table.
 
 ```
  ┌─── Main Content ─────────────────────────────────────────────────────────────────┐
@@ -101,6 +130,13 @@ Table format for bulk editing. Inline dropdowns for manager/team reassignment.
  │                                                                                   │
  └───────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+**List view manager assignment:**
+- Clicking the manager name in any row opens an inline dropdown
+- Dropdown is searchable, shows all org users except the row's user and their reports
+- "None" option clears the manager (`managerId: null`)
+- On select: `PUT /api/admin/users/:id/manager`, then refetch table
+- Bulk actions: select multiple rows → "Assign Manager" dropdown assigns the same manager to all selected
 
 ---
 
