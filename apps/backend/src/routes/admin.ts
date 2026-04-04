@@ -2782,4 +2782,254 @@ router.get(
   }
 );
 
+// ============================================
+// Teams CRUD Endpoints
+// ============================================
+
+/**
+ * GET /admin/teams — List all teams in the organization
+ */
+router.get(
+  "/teams",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const orgTeams = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.organizationId, req.organizationId!))
+        .orderBy(asc(schema.teams.name));
+
+      // Enrich with member count and leader name
+      const enriched = await Promise.all(
+        orgTeams.map(async (team) => {
+          const [memberCount] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(schema.users)
+            .where(eq(schema.users.teamId, team.id));
+
+          let leaderName = null;
+          if (team.leaderId) {
+            const [leader] = await db
+              .select({ firstName: schema.users.firstName, lastName: schema.users.lastName })
+              .from(schema.users)
+              .where(eq(schema.users.id, team.leaderId));
+            if (leader) {
+              leaderName = `${leader.firstName || ""} ${leader.lastName || ""}`.trim();
+            }
+          }
+
+          // Find sub-teams
+          const subTeams = orgTeams
+            .filter((t) => t.parentTeamId === team.id)
+            .map((t) => ({ id: t.id, name: t.name }));
+
+          return {
+            ...team,
+            memberCount: memberCount?.count ?? 0,
+            leaderName,
+            subTeams,
+          };
+        })
+      );
+
+      res.json({ teams: enriched });
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch teams" });
+    }
+  }
+);
+
+/**
+ * POST /admin/teams — Create a new team
+ */
+router.post(
+  "/teams",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { name, description, leaderId, parentTeamId } = req.body as {
+        name?: string;
+        description?: string;
+        leaderId?: string;
+        parentTeamId?: string;
+      };
+
+      if (!name || !name.trim()) {
+        res.status(400).json({ error: "Bad Request", message: "Team name is required" });
+        return;
+      }
+
+      // Validate leader is in same org
+      if (leaderId) {
+        const [leader] = await db
+          .select({ organizationId: schema.users.organizationId })
+          .from(schema.users)
+          .where(eq(schema.users.id, leaderId));
+        if (!leader || leader.organizationId !== req.organizationId) {
+          res.status(400).json({ error: "Bad Request", message: "Leader must be in your organization" });
+          return;
+        }
+      }
+
+      // Validate parent team is in same org
+      if (parentTeamId) {
+        const [parent] = await db
+          .select({ organizationId: schema.teams.organizationId })
+          .from(schema.teams)
+          .where(eq(schema.teams.id, parentTeamId));
+        if (!parent || parent.organizationId !== req.organizationId) {
+          res.status(400).json({ error: "Bad Request", message: "Parent team must be in your organization" });
+          return;
+        }
+      }
+
+      const [created] = await db
+        .insert(schema.teams)
+        .values({
+          organizationId: req.organizationId!,
+          name: name.trim(),
+          description: description?.trim() || null,
+          leaderId: leaderId || null,
+          parentTeamId: parentTeamId || null,
+        })
+        .returning();
+
+      res.status(201).json({ team: created });
+    } catch (error) {
+      console.error("Error creating team:", error);
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to create team" });
+    }
+  }
+);
+
+/**
+ * GET /admin/teams/:id — Get team detail with members
+ */
+router.get(
+  "/teams/:id",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const [team] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, req.params.id));
+
+      if (!team || team.organizationId !== req.organizationId) {
+        res.status(404).json({ error: "Not Found", message: "Team not found" });
+        return;
+      }
+
+      const members = await db
+        .select({
+          id: schema.users.id,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          email: schema.users.email,
+          role: schema.users.role,
+          jobTitle: schema.users.jobTitle,
+          avatarUrl: schema.users.avatarUrl,
+          status: schema.users.status,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.teamId, team.id))
+        .orderBy(asc(schema.users.firstName));
+
+      res.json({ team, members });
+    } catch (error) {
+      console.error("Error fetching team detail:", error);
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch team" });
+    }
+  }
+);
+
+/**
+ * PATCH /admin/teams/:id — Update a team
+ */
+router.patch(
+  "/teams/:id",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const [team] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, req.params.id));
+
+      if (!team || team.organizationId !== req.organizationId) {
+        res.status(404).json({ error: "Not Found", message: "Team not found" });
+        return;
+      }
+
+      const { name, description, leaderId, parentTeamId } = req.body as {
+        name?: string;
+        description?: string;
+        leaderId?: string | null;
+        parentTeamId?: string | null;
+      };
+
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name.trim();
+      if (description !== undefined) updates.description = description?.trim() || null;
+      if (leaderId !== undefined) updates.leaderId = leaderId;
+      if (parentTeamId !== undefined) updates.parentTeamId = parentTeamId;
+
+      const [updated] = await db
+        .update(schema.teams)
+        .set(updates)
+        .where(eq(schema.teams.id, req.params.id))
+        .returning();
+
+      res.json({ team: updated });
+    } catch (error) {
+      console.error("Error updating team:", error);
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to update team" });
+    }
+  }
+);
+
+/**
+ * DELETE /admin/teams/:id — Delete a team
+ */
+router.delete(
+  "/teams/:id",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const [team] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, req.params.id));
+
+      if (!team || team.organizationId !== req.organizationId) {
+        res.status(404).json({ error: "Not Found", message: "Team not found" });
+        return;
+      }
+
+      // Unassign all members from this team
+      await db
+        .update(schema.users)
+        .set({ teamId: null, updatedAt: new Date() })
+        .where(eq(schema.users.teamId, team.id));
+
+      // Delete the team
+      await db
+        .delete(schema.teams)
+        .where(eq(schema.teams.id, req.params.id));
+
+      res.json({ success: true, message: "Team deleted" });
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to delete team" });
+    }
+  }
+);
+
 export default router;
