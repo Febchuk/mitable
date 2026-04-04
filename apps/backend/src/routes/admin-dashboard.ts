@@ -20,6 +20,7 @@ import OpenAI from "openai";
 import { config } from "../config";
 import { graphRetrievalService } from "../services/graph/graph-retrieval.service";
 import { graphSyncService } from "../services/graph/graph-sync.service";
+// DEPRECATED — Ask RLM only (callAskLLM, parseAskResponse, /admin/ask/*). Slated for deletion.
 import { AskEnvironment } from "../services/rlm/ask-environment";
 import { getAskToolByName } from "../services/rlm/ask-tools";
 import { getAskSystemPrompt } from "../services/rlm/ask-rlm-prompts";
@@ -2144,6 +2145,11 @@ async function callDashboardLLM(
   throw new Error("No LLM available — need ANTHROPIC_API_KEY or DEEPSEEK_API_KEY");
 }
 
+// =============================================================================
+// DEPRECATED — Ask RLM (unused). Includes callAskLLM, parseAskResponse, /admin/ask/* routes.
+// Scheduled for deletion in app cleanup. Do not extend.
+// =============================================================================
+
 async function callAskLLM(
   systemPrompt: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>
@@ -2342,6 +2348,8 @@ router.post("/dashboard/chat", requireAuth, requireManagerOrAdmin, async (req: R
   }
 });
 
+// ── Ask RLM (deprecated): response parsing for /admin/ask/chat ──────────────
+
 function parseAskResponse(raw: string): {
   message: string;
   report?: { title: string; subtitle: string; html: string };
@@ -2370,6 +2378,8 @@ function parseAskResponse(raw: string): {
   }
   return { message: raw.trim() };
 }
+
+// ── DEPRECATED: /admin/ask/* — Ask RLM HTTP API (slated for deletion) ────────
 
 // ── GET /admin/ask/threads — list all threads for this admin ──
 router.get("/ask/threads", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {

@@ -234,9 +234,7 @@ export default function BenchmarksView() {
               borderTopColor: SPINNER_COLOR,
             }}
           />
-          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Loading benchmarks...
-          </div>
+          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading benchmarks...</div>
         </div>
       ) : benchmarks.length === 0 ? (
         /* Empty state — no benchmarks created yet */
@@ -290,11 +288,7 @@ export default function BenchmarksView() {
           }}
         >
           {filtered.map((benchmark) => (
-            <BenchmarkCard
-              key={benchmark.id}
-              benchmark={benchmark}
-              onDelete={handleDelete}
-            />
+            <BenchmarkCard key={benchmark.id} benchmark={benchmark} onDelete={handleDelete} />
           ))}
         </div>
       )}
@@ -344,7 +338,8 @@ export default function BenchmarksView() {
                 margin: "0 0 20px",
               }}
             >
-              Are you sure you want to delete <strong>{deletingBenchmark.name}</strong>? This will remove all assignments, scores, and history. This action cannot be undone.
+              Are you sure you want to delete <strong>{deletingBenchmark.name}</strong>? This will
+              remove all assignments, scores, and history. This action cannot be undone.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button

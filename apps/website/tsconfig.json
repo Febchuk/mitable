@@ -17,8 +17,7 @@
         "paths": {
             "@/*": ["./src/*"],
             "@mitable/shared": ["../../packages/shared/dist/index.d.ts"]
-        },
-        "types": ["node"]
+        }
     },
     "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts", "next.config.mjs", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
     "exclude": ["node_modules"]

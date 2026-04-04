@@ -74,10 +74,7 @@ function getPeriodDays(frequency: string): number {
   }
 }
 
-function calculatePercentile(
-  userProgress: number,
-  allProgresses: number[],
-): PercentileTier {
+function calculatePercentile(userProgress: number, allProgresses: number[]): PercentileTier {
   if (allProgresses.length <= 1) return "top_1";
 
   const sorted = [...allProgresses].sort((a, b) => b - a);
@@ -93,7 +90,7 @@ function calculatePercentile(
 
 function calculateTrend(
   current: number,
-  previous: number | null,
+  previous: number | null
 ): { trend: TrendDirection; trendDelta: number } {
   if (previous === null) return { trend: "new", trendDelta: 0 };
   const delta = current - previous;
@@ -118,7 +115,7 @@ function periodStartDate(frequency: string): string {
 
 async function gatherPeriodActivity(
   userId: string,
-  frequency: string,
+  frequency: string
 ): Promise<PeriodActivitySummary> {
   const startDate = periodStartDate(frequency);
   const endDate = todayDateString();
@@ -140,8 +137,8 @@ async function gatherPeriodActivity(
         eq(userDailyActivities.userId, userId),
         eq(userDailyActivities.periodType, "daily"),
         gte(userDailyActivities.activityDate, startDate),
-        lte(userDailyActivities.activityDate, endDate),
-      ),
+        lte(userDailyActivities.activityDate, endDate)
+      )
     );
 
   let totalWorkMinutes = 0;
@@ -179,8 +176,7 @@ async function gatherPeriodActivity(
   }
 
   const daysActive = activeDates.size || 1;
-  const avgWorkPercentage =
-    dailyRows.length > 0 ? workPercentageSum / dailyRows.length : 0;
+  const avgWorkPercentage = dailyRows.length > 0 ? workPercentageSum / dailyRows.length : 0;
 
   // 2. Query activityBlocks for deep focus and collaboration metrics
   const blockRows = await db
@@ -194,8 +190,8 @@ async function gatherPeriodActivity(
       and(
         eq(activityBlocks.userId, userId),
         gte(activityBlocks.startTime, new Date(startDate)),
-        lte(activityBlocks.startTime, new Date(endDate + "T23:59:59Z")),
-      ),
+        lte(activityBlocks.startTime, new Date(endDate + "T23:59:59Z"))
+      )
     );
 
   let deepFocusMinutes = 0;
@@ -254,7 +250,7 @@ function computeDirectMetric(
   metric: string,
   unit: string,
   _category: string,
-  summary: PeriodActivitySummary,
+  summary: PeriodActivitySummary
 ): number {
   let raw: number;
 
@@ -302,10 +298,7 @@ function computeDirectMetric(
 // computeScores — main pipeline
 // ---------------------------------------------------------------------------
 
-async function computeScores(
-  benchmarkId: string,
-  organizationId: string,
-): Promise<void> {
+async function computeScores(benchmarkId: string, organizationId: string): Promise<void> {
   try {
     logger.info({ benchmarkId, organizationId }, "Starting benchmark score computation");
 
@@ -313,9 +306,7 @@ async function computeScores(
     const [benchmark] = await db
       .select()
       .from(benchmarks)
-      .where(
-        and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId)),
-      )
+      .where(and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId)))
       .limit(1);
 
     if (!benchmark) {
@@ -367,10 +358,7 @@ async function computeScores(
       const userName =
         [assignment.firstName, assignment.lastName].filter(Boolean).join(" ") || "User";
 
-      const periodSummary = await gatherPeriodActivity(
-        assignment.userId,
-        benchmark.frequency,
-      );
+      const periodSummary = await gatherPeriodActivity(assignment.userId, benchmark.frequency);
 
       let currentValue: number;
       let parameterScores: Array<{
@@ -404,7 +392,7 @@ async function computeScores(
         } catch (err) {
           logger.error(
             { err, benchmarkId, assignmentId: assignment.id },
-            "AI parameter scoring failed, falling back to rule-based",
+            "AI parameter scoring failed, falling back to rule-based"
           );
           // Fallback: use avgWorkPercentage mapped to 1-5 scale
           currentValue = Math.max(1, Math.min(5, (periodSummary.avgWorkPercentage / 100) * 5));
@@ -415,7 +403,7 @@ async function computeScores(
           benchmark.metric,
           benchmark.unit,
           benchmark.category,
-          periodSummary,
+          periodSummary
         );
       }
 
@@ -447,15 +435,15 @@ async function computeScores(
         .where(
           and(
             eq(benchmarkSnapshots.assignmentId, result.assignmentId),
-            lte(benchmarkSnapshots.date, today),
-          ),
+            lte(benchmarkSnapshots.date, today)
+          )
         )
         .orderBy(desc(benchmarkSnapshots.date))
         .limit(1);
 
       const { trend, trendDelta } = calculateTrend(
         result.currentValue,
-        previousSnapshot?.value ?? null,
+        previousSnapshot?.value ?? null
       );
 
       // 7. Update assignment row
@@ -472,18 +460,15 @@ async function computeScores(
         .where(eq(benchmarkAssignments.id, result.assignmentId));
 
       // 8. Insert parameter scores (for weighted_parameters)
-      if (
-        benchmark.metric === "weighted_parameters" &&
-        result.parameterScores.length > 0
-      ) {
+      if (benchmark.metric === "weighted_parameters" && result.parameterScores.length > 0) {
         // Delete old scores for this period
         await db
           .delete(benchmarkParameterScores)
           .where(
             and(
               eq(benchmarkParameterScores.assignmentId, result.assignmentId),
-              eq(benchmarkParameterScores.periodStart, pStart),
-            ),
+              eq(benchmarkParameterScores.periodStart, pStart)
+            )
           );
 
         await db.insert(benchmarkParameterScores).values(
@@ -493,7 +478,7 @@ async function computeScores(
             score: ps.score,
             reasoning: ps.reasoning,
             periodStart: pStart,
-          })),
+          }))
         );
       }
 
@@ -511,8 +496,7 @@ async function computeScores(
 
         // Map parameters to PriorityParam shape expected by the AI service
         const priorities = parameters.map((p) => {
-          const paramScore =
-            result.parameterScores.find((ps) => ps.parameterId === p.id);
+          const paramScore = result.parameterScores.find((ps) => ps.parameterId === p.id);
           const score = paramScore?.score ?? 3;
           return {
             name: p.name,
@@ -527,15 +511,8 @@ async function computeScores(
           Array<{ text: string; category: string }>,
           Array<{ text: string }>,
         ] = await Promise.all([
-          benchmarkAIService.generateSuggestions(
-            priorities,
-            result.periodSummary,
-            result.userName,
-          ),
-          benchmarkAIService.detectAccomplishments(
-            result.periodSummary,
-            result.userName,
-          ),
+          benchmarkAIService.generateSuggestions(priorities, result.periodSummary, result.userName),
+          benchmarkAIService.detectAccomplishments(result.periodSummary, result.userName),
         ]);
 
         // Delete old suggestions and accomplishments for this assignment
@@ -545,9 +522,7 @@ async function computeScores(
             .where(eq(benchmarkSuggestions.assignmentId, result.assignmentId)),
           db
             .delete(benchmarkAccomplishments)
-            .where(
-              eq(benchmarkAccomplishments.assignmentId, result.assignmentId),
-            ),
+            .where(eq(benchmarkAccomplishments.assignmentId, result.assignmentId)),
         ]);
 
         // Insert new suggestions
@@ -557,7 +532,7 @@ async function computeScores(
               assignmentId: result.assignmentId,
               text: s.text,
               category: s.category,
-            })),
+            }))
           );
         }
 
@@ -568,13 +543,13 @@ async function computeScores(
               assignmentId: result.assignmentId,
               text: a.text,
               date: today,
-            })),
+            }))
           );
         }
       } catch (err) {
         logger.error(
           { err, assignmentId: result.assignmentId },
-          "Failed to generate AI suggestions/accomplishments, skipping",
+          "Failed to generate AI suggestions/accomplishments, skipping"
         );
       }
     }
@@ -584,7 +559,7 @@ async function computeScores(
         benchmarkId,
         assignmentCount: results.length,
       },
-      "Benchmark score computation completed",
+      "Benchmark score computation completed"
     );
   } catch (error) {
     logger.error(
@@ -593,7 +568,7 @@ async function computeScores(
         organizationId,
         error: error instanceof Error ? error.message : String(error),
       },
-      "Benchmark score computation failed",
+      "Benchmark score computation failed"
     );
     throw error;
   }

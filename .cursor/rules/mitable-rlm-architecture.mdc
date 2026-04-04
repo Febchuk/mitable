@@ -52,3 +52,6 @@ Each iteration returns ONE JSON object: `{ tool, parameters, reasoning }` or `{ 
 
 ## Planned: Day Analyzer RLM
 Fed a user's entire day (all sessions, classifier data, master stories, transcripts) → reconstructs structured daily activity timeline with work/meeting blocks for the People tab in admin dashboard.
+
+## Deprecated: Admin Ask RLM (not in use — slated for deletion)
+Legacy `/admin/ask/*` tool loop, `ask-*` RLM files, `ask_threads` / `ask_messages`, Electron `AskView`. See `agent-two-layer-architecture.mdc` for details. Do not extend; cleanup planned.

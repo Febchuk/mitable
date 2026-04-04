@@ -2,8 +2,10 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "r
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
+import { installConsoleCaptureForFeedback } from "../../lib/feedback-log-buffer";
 import { createLogger } from "../../lib/logger";
 
+installConsoleCaptureForFeedback();
 const logger = createLogger("ConsoleApp");
 import { UserProvider, useUser } from "./context/UserContext";
 import { UpdateProvider } from "./context/UpdateContext";
@@ -319,6 +321,7 @@ function App() {
                         <Route path="people" element={<PeopleView />} />
                         <Route path="people/new" element={<AddNewUser />} />
                         <Route path="people/:id" element={<PersonDetail />} />
+                        {/* DEPRECATED Ask RLM: old path redirects; AskView unused — slated for deletion */}
                         <Route path="ask" element={<Navigate to="/reports" replace />} />
                         <Route path="reports" element={<ReportsView />} />
                         <Route path="reports/:docId" element={<DocDetail />} />

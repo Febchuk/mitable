@@ -212,8 +212,7 @@ agentRouter.post("/tools/slack/send", async (req: Request, res: Response) => {
 });
 
 // ── Admin Analytics Tool Endpoints ───────────────────────────────────
-// These endpoints are admin-only and reuse the AskEnvironment for bounded data.
-// The Electron-side agent conditionally registers these tools based on user role.
+// Admin-only HTTP helpers for the SDK agent; same bounded queries as Layer 1 admin tools.
 
 async function requireAdminRole(req: Request, res: Response): Promise<boolean> {
   const [user] = await db
@@ -655,14 +654,15 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
 
     // Resolve user name for the prompt
     const [user] = await db
-      .select({ firstName: schema.users.firstName })
+      .select({ firstName: schema.users.firstName, role: schema.users.role })
       .from(schema.users)
       .where(eq(schema.users.id, req.userId!))
       .limit(1);
 
     const userName = user?.firstName || "there";
-    const environment = new AgentQueryEnvironment(req.userId!, req.organizationId!);
-    const systemPrompt = getAgentQuerySystemPrompt(userName, timezone);
+    const isAdmin = user?.role === "admin";
+    const environment = new AgentQueryEnvironment(req.userId!, req.organizationId!, isAdmin);
+    const systemPrompt = getAgentQuerySystemPrompt(userName, timezone, isAdmin);
 
     const rlmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
       ...conversationHistory,
@@ -710,11 +710,11 @@ agentRouter.post("/ask", async (req: Request, res: Response) => {
       }
 
       if (decision.tool && decision.parameters !== undefined) {
-        const tool = getAgentQueryToolByName(decision.tool);
+        const tool = getAgentQueryToolByName(decision.tool, isAdmin);
         if (!tool) {
           rlmMessages.push({
             role: "user",
-            content: `Error: Unknown tool "${decision.tool}". Available: get_my_activity, get_activity_detail.`,
+            content: `Error: Unknown tool "${decision.tool}". Use only tools listed in <available_tools> in the system prompt.`,
           });
           continue;
         }

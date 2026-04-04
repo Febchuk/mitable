@@ -288,9 +288,7 @@ export const benchmarkService = {
     const bmRows = await db
       .select()
       .from(benchmarks)
-      .where(
-        and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId))
-      )
+      .where(and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId)))
       .limit(1);
 
     const bm = bmRows[0];
@@ -393,7 +391,13 @@ export const benchmarkService = {
   async update(
     benchmarkId: string,
     organizationId: string,
-    payload: { name?: string; description?: string; targetValue?: number; frequency?: string; isActive?: boolean }
+    payload: {
+      name?: string;
+      description?: string;
+      targetValue?: number;
+      frequency?: string;
+      isActive?: boolean;
+    }
   ): Promise<BenchmarkWithAggregates | null> {
     logger.info({ benchmarkId, organizationId, payload }, "updating benchmark");
 
@@ -401,9 +405,7 @@ export const benchmarkService = {
     const existing = await db
       .select()
       .from(benchmarks)
-      .where(
-        and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId))
-      )
+      .where(and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId)))
       .limit(1);
 
     if (!existing[0]) return null;
@@ -490,9 +492,7 @@ export const benchmarkService = {
     const bmRows = await db
       .select()
       .from(benchmarks)
-      .where(
-        and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId))
-      )
+      .where(and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId)))
       .limit(1);
 
     if (!bmRows[0]) {
@@ -529,12 +529,7 @@ export const benchmarkService = {
 
     await db
       .delete(benchmarks)
-      .where(
-        and(
-          eq(benchmarks.id, benchmarkId),
-          eq(benchmarks.organizationId, organizationId)
-        )
-      );
+      .where(and(eq(benchmarks.id, benchmarkId), eq(benchmarks.organizationId, organizationId)));
   },
 
   async unassign(benchmarkId: string, userId: string): Promise<void> {
@@ -611,9 +606,7 @@ export const benchmarkService = {
     const row = rows[0];
     if (!row) return null;
 
-    const { history, suggestions, accomplishments } = await getAssignmentExtras(
-      row.assignment.id
-    );
+    const { history, suggestions, accomplishments } = await getAssignmentExtras(row.assignment.id);
 
     return {
       benchmarkId: row.benchmark.id,
@@ -621,8 +614,7 @@ export const benchmarkService = {
       benchmarkDescription: row.benchmark.description,
       benchmarkCategory: row.benchmark.category,
       userId: row.assignment.userId,
-      userName:
-        `${row.user.firstName ?? ""} ${row.user.lastName ?? ""}`.trim() || row.user.email,
+      userName: `${row.user.firstName ?? ""} ${row.user.lastName ?? ""}`.trim() || row.user.email,
       userEmail: row.user.email,
       userAvatarUrl: row.user.avatarUrl,
       currentValue: row.assignment.currentValue,
@@ -712,9 +704,7 @@ export const benchmarkService = {
     const row = rows[0];
     if (!row) return null;
 
-    const { history, suggestions, accomplishments } = await getAssignmentExtras(
-      row.assignment.id
-    );
+    const { history, suggestions, accomplishments } = await getAssignmentExtras(row.assignment.id);
 
     // Get most recent accomplishment for topAccomplishment field
     const topAccomplishment = accomplishments.length > 0 ? accomplishments[0].text : null;

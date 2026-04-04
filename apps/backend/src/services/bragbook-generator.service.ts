@@ -8,7 +8,7 @@
 import Groq from "groq-sdk";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and, gte, lte, ne } from "drizzle-orm";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { config } from "../config.js";
 import { createLogger } from "../lib/logger.js";
 
@@ -144,7 +144,9 @@ Respond with valid JSON only:
 
     const parsed = JSON.parse(content) as { accomplishments?: string[] };
     const accomplishments = Array.isArray(parsed.accomplishments)
-      ? parsed.accomplishments.filter((a): a is string => typeof a === "string" && a.trim().length > 0)
+      ? parsed.accomplishments.filter(
+          (a): a is string => typeof a === "string" && a.trim().length > 0
+        )
       : [];
 
     // Upsert into bragbook_entries

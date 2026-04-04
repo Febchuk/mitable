@@ -32,46 +32,47 @@ Examples: A "Mentorship" benchmark detects 15min mentee meetings and suggests 30
 
 ### Table: `benchmarks` (pre-built benchmark definitions)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| organizationId | uuid FK → organizations | CASCADE |
-| createdByUserId | uuid FK → users | SET NULL |
-| name | varchar(255) | e.g., "Deep Focus Work" |
-| description | text | What this measures |
-| category | varchar(50) | productivity, collaboration, growth, quality |
-| metricType | varchar(20) | "quantitative" or "qualitative" |
-| measurementType | varchar(20) | "percentage_of_time" or "instance_based" |
-| metricConfig | jsonb | Source mapping + computation details |
-| targetValue | real | Numeric target (e.g., 30 for 30%, or 30 for 30 min) |
-| targetUnit | varchar(50) | "percent", "minutes_per_week", "minutes_per_day", "count_per_week", "score" |
-| targetDirection | varchar(10) | "higher_is_better", "lower_is_better", "in_range" |
-| period | varchar(20) | "daily", "weekly", "monthly" |
-| isActive | boolean | default true |
-| isBuiltIn | boolean | default true (all benchmarks are pre-built for now) |
-| displayOrder | integer | |
-| createdAt/updatedAt | timestamp | |
+| Column              | Type                    | Notes                                                                       |
+| ------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| id                  | uuid PK                 |                                                                             |
+| organizationId      | uuid FK → organizations | CASCADE                                                                     |
+| createdByUserId     | uuid FK → users         | SET NULL                                                                    |
+| name                | varchar(255)            | e.g., "Deep Focus Work"                                                     |
+| description         | text                    | What this measures                                                          |
+| category            | varchar(50)             | productivity, collaboration, growth, quality                                |
+| metricType          | varchar(20)             | "quantitative" or "qualitative"                                             |
+| measurementType     | varchar(20)             | "percentage_of_time" or "instance_based"                                    |
+| metricConfig        | jsonb                   | Source mapping + computation details                                        |
+| targetValue         | real                    | Numeric target (e.g., 30 for 30%, or 30 for 30 min)                         |
+| targetUnit          | varchar(50)             | "percent", "minutes_per_week", "minutes_per_day", "count_per_week", "score" |
+| targetDirection     | varchar(10)             | "higher_is_better", "lower_is_better", "in_range"                           |
+| period              | varchar(20)             | "daily", "weekly", "monthly"                                                |
+| isActive            | boolean                 | default true                                                                |
+| isBuiltIn           | boolean                 | default true (all benchmarks are pre-built for now)                         |
+| displayOrder        | integer                 |                                                                             |
+| createdAt/updatedAt | timestamp               |                                                                             |
 
 ### Table: `benchmark_assignments` (person-by-person assignment)
 
 Admins assign specific benchmarks to specific people. A benchmark only applies to a user if there's an assignment row.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| benchmarkId | uuid FK → benchmarks | CASCADE |
-| userId | uuid FK → users | CASCADE |
-| organizationId | uuid FK → organizations | CASCADE |
-| assignedByUserId | uuid FK → users | SET NULL |
-| targetOverride | real | Optional per-person target override (null = use benchmark default) |
-| isActive | boolean | default true |
-| assignedAt | timestamp | |
-| createdAt/updatedAt | timestamp | |
-| **UNIQUE** | (benchmarkId, userId) | |
+| Column              | Type                    | Notes                                                              |
+| ------------------- | ----------------------- | ------------------------------------------------------------------ |
+| id                  | uuid PK                 |                                                                    |
+| benchmarkId         | uuid FK → benchmarks    | CASCADE                                                            |
+| userId              | uuid FK → users         | CASCADE                                                            |
+| organizationId      | uuid FK → organizations | CASCADE                                                            |
+| assignedByUserId    | uuid FK → users         | SET NULL                                                           |
+| targetOverride      | real                    | Optional per-person target override (null = use benchmark default) |
+| isActive            | boolean                 | default true                                                       |
+| assignedAt          | timestamp               |                                                                    |
+| createdAt/updatedAt | timestamp               |                                                                    |
+| **UNIQUE**          | (benchmarkId, userId)   |                                                                    |
 
 **Why person-by-person:** Different people have different roles and growth areas. An engineer might get "AI Adoption" + "Mentorship" while a PM gets "Cross-functional Collaboration" + "Clear Communication". This also allows per-person target overrides (a senior engineer might have a higher mentorship target than a mid-level).
 
 **metricConfig examples:**
+
 ```jsonc
 // Percentage of time: cross-functional collaboration
 {
@@ -102,29 +103,29 @@ Admins assign specific benchmarks to specific people. A benchmark only applies t
 
 ### Table: `benchmark_snapshots` (computed progress per user per period)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| benchmarkId | uuid FK → benchmarks | CASCADE |
-| userId | uuid FK → users | CASCADE |
-| organizationId | uuid FK → organizations | CASCADE |
-| periodStart | date | |
-| periodEnd | date | |
-| currentValue | real | Computed metric value |
-| targetValue | real | Snapshotted target |
-| progressPercent | real | 0-100+ |
-| percentileRank | real | 0-100, where user stands vs org (e.g., 92 = top 8%) |
-| percentileLabel | varchar(20) | "top_1", "top_10", "top_25", "top_50", "bottom_half" |
-| trend | varchar(20) | improving, declining, stable, new |
-| trendDelta | real | Change from previous period |
-| rawData | jsonb | Source data for audit |
-| aiInsight | text | AI-generated positive insight |
-| aiSuggestions | jsonb | `["Try blocking 2hr focus slots..."]` |
-| accomplishments | jsonb | `["4 deep focus sessions over 90min"]` |
-| status | varchar(20) | pending, computed, failed |
-| computedAt | timestamp | |
-| createdAt | timestamp | |
-| **UNIQUE** | (benchmarkId, userId, periodStart) | |
+| Column          | Type                               | Notes                                                |
+| --------------- | ---------------------------------- | ---------------------------------------------------- |
+| id              | uuid PK                            |                                                      |
+| benchmarkId     | uuid FK → benchmarks               | CASCADE                                              |
+| userId          | uuid FK → users                    | CASCADE                                              |
+| organizationId  | uuid FK → organizations            | CASCADE                                              |
+| periodStart     | date                               |                                                      |
+| periodEnd       | date                               |                                                      |
+| currentValue    | real                               | Computed metric value                                |
+| targetValue     | real                               | Snapshotted target                                   |
+| progressPercent | real                               | 0-100+                                               |
+| percentileRank  | real                               | 0-100, where user stands vs org (e.g., 92 = top 8%)  |
+| percentileLabel | varchar(20)                        | "top_1", "top_10", "top_25", "top_50", "bottom_half" |
+| trend           | varchar(20)                        | improving, declining, stable, new                    |
+| trendDelta      | real                               | Change from previous period                          |
+| rawData         | jsonb                              | Source data for audit                                |
+| aiInsight       | text                               | AI-generated positive insight                        |
+| aiSuggestions   | jsonb                              | `["Try blocking 2hr focus slots..."]`                |
+| accomplishments | jsonb                              | `["4 deep focus sessions over 90min"]`               |
+| status          | varchar(20)                        | pending, computed, failed                            |
+| computedAt      | timestamp                          |                                                      |
+| createdAt       | timestamp                          |                                                      |
+| **UNIQUE**      | (benchmarkId, userId, periodStart) |                                                      |
 
 **Percentile computation:** After all users' `currentValue` is computed for a period, rank them and assign `percentileRank` (0-100 scale where 100 = best). `percentileLabel` is derived: >=99 → "top_1", >=90 → "top_10", >=75 → "top_25", >=50 → "top_50", else "bottom_half".
 
@@ -147,12 +148,14 @@ Admins assign specific benchmarks to specific people. A benchmark only applies t
 Follow patterns from `apps/backend/src/routes/admin-dashboard.ts` (uses `requireAuth`, `db`, Drizzle queries).
 
 **Admin endpoints (require admin role):**
+
 - `GET /api/admin/benchmarks` — List all org benchmarks (pre-built) with org-wide stats
 - `GET /api/admin/benchmarks/:id` — Detail + per-person breakdown (names, values, rankings)
 - `PUT /api/admin/benchmarks/:id` — Update target value/period
 - `POST /api/admin/benchmarks/:id/compute` — Manually trigger computation
 
 **Admin assignment endpoints:**
+
 - `GET /api/admin/benchmarks/:id/assignments` — List who is assigned to this benchmark
 - `POST /api/admin/benchmarks/:id/assign` — Assign benchmark to specific users `{ userIds: [...], targetOverride?: number }`
 - `DELETE /api/admin/benchmarks/:id/assign/:userId` — Unassign from a user
@@ -160,6 +163,7 @@ Follow patterns from `apps/backend/src/routes/admin-dashboard.ts` (uses `require
 - `GET /api/admin/people/:id/benchmarks` — All benchmarks assigned to a specific person
 
 **Employee endpoints (self-scoped, no other users' data exposed):**
+
 - `GET /api/my-benchmarks` — All benchmarks assigned to me + latest snapshot (includes `percentileLabel` but NO other users' names/values)
 - `GET /api/my-benchmarks/:id` — Detail with trend history + percentile rank
 - `GET /api/my-benchmarks/:id/history` — Historical snapshots for charting (own data only)
@@ -171,6 +175,7 @@ Follow patterns from `apps/backend/src/routes/admin-dashboard.ts` (uses `require
 **New file:** `apps/backend/src/services/benchmark-computation.service.ts`
 
 **Quantitative computation flow:**
+
 1. Read `metricConfig` to determine source table + field + aggregation
 2. Query `userDailyActivities` (or `activityBlocks`) for the benchmark period
 3. Compute aggregate (avg, sum, count, etc.)
@@ -179,19 +184,20 @@ Follow patterns from `apps/backend/src/routes/admin-dashboard.ts` (uses `require
 
 **Supported quantitative mappings (all from existing data):**
 
-| Benchmark | Source | Computation |
-|-----------|--------|-------------|
-| Deep Focus Work | `userDailyActivities` | `totalWorkMinutes - totalMeetingMinutes` avg/day |
-| Meeting Load | `userDailyActivities` | `totalMeetingMinutes` avg/day |
-| Active Days | `userDailyActivities` | COUNT rows WHERE totalActiveMinutes > 30 |
+| Benchmark               | Source                                   | Computation                                                                                              |
+| ----------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Deep Focus Work         | `userDailyActivities`                    | `totalWorkMinutes - totalMeetingMinutes` avg/day                                                         |
+| Meeting Load            | `userDailyActivities`                    | `totalMeetingMinutes` avg/day                                                                            |
+| Active Days             | `userDailyActivities`                    | COUNT rows WHERE totalActiveMinutes > 30                                                                 |
 | Cross-functional Collab | `activityBlocks` + `userDailyActivities` | Diversity score: COUNT DISTINCT topics (weight 0.5) + categories (0.3) + apps (0.2), normalized to 0-100 |
-| App Diversity | `userDailyActivities` | JSON array length of `appBreakdown` |
+| App Diversity           | `userDailyActivities`                    | JSON array length of `appBreakdown`                                                                      |
 
 ### AI Insight Service
 
 **New file:** `apps/backend/src/services/benchmark-insight.service.ts`
 
 **For ALL benchmarks** (after computing value), call Claude Haiku 4.5 (with GPT-5 → DeepSeek fallback) to generate:
+
 - Accomplishment highlights (positive framing)
 - Actionable suggestions
 - For qualitative benchmarks: score (1-5) + textual assessment
@@ -220,6 +226,7 @@ cron.schedule("0 4 1 * *", () => runBenchmarkCompute("monthly"));
 Guard with `isRunning` flag per period type (pattern from existing cron jobs). Register in `apps/backend/src/cron/index.ts`.
 
 **Period boundaries:**
+
 - Daily: yesterday (00:00–23:59)
 - Weekly: previous Monday–Sunday
 - Monthly: previous calendar month (1st to last day)
@@ -233,11 +240,13 @@ Admin manual trigger via `POST /api/admin/benchmarks/:id/compute` remains availa
 ### Navigation
 
 **File:** `apps/electron/src/renderer/console/src/components/navigation/Nav.tsx`
+
 - Add `<NavItem to="/benchmarks" icon={Target} label="Benchmarks" />` in the admin nav block (between Reports and People)
 
 ### Routes
 
 **File:** `apps/electron/src/renderer/console/src/App.tsx`
+
 - `/benchmarks` → `<BenchmarksView />`
 - `/benchmarks/new` → `<BenchmarkForm />`
 - `/benchmarks/:id` → `<BenchmarkDetail />`
@@ -247,20 +256,22 @@ Admin manual trigger via `POST /api/admin/benchmarks/:id/compute` remains availa
 
 **New directory:** `apps/electron/src/renderer/console/src/components/views/admin/BenchmarksView/`
 
-| File | Purpose |
-|------|---------|
-| `index.tsx` | List view — grid of pre-built benchmark cards, filter by category |
-| `BenchmarkCard.tsx` | Summary card: name, category badge, assigned count, team avg progress bar, trend arrow |
-| `BenchmarkDetail.tsx` | Single benchmark — org-wide stats, per-person table (name, value, progress%, percentile, trend, insight) |
-| `AssignBenchmarkModal.tsx` | Modal to assign benchmark to people — multi-select user list with optional target override |
-| `BenchmarkSettingsPanel.tsx` | Edit target value/period for a benchmark |
+| File                         | Purpose                                                                                                  |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `index.tsx`                  | List view — grid of pre-built benchmark cards, filter by category                                        |
+| `BenchmarkCard.tsx`          | Summary card: name, category badge, assigned count, team avg progress bar, trend arrow                   |
+| `BenchmarkDetail.tsx`        | Single benchmark — org-wide stats, per-person table (name, value, progress%, percentile, trend, insight) |
+| `AssignBenchmarkModal.tsx`   | Modal to assign benchmark to people — multi-select user list with optional target override               |
+| `BenchmarkSettingsPanel.tsx` | Edit target value/period for a benchmark                                                                 |
 
 ### Hooks + Service
 
 **New file:** `apps/electron/src/renderer/console/src/services/benchmarkService.ts`
+
 - API functions: `fetchBenchmarks()`, `updateBenchmark()`, `fetchBenchmarkDetail()`, `assignBenchmark()`, `unassignBenchmark()`, `updateAssignment()`, `fetchPersonBenchmarks()`
 
 **New directory:** `apps/electron/src/renderer/console/src/hooks/queries/benchmarks/`
+
 - `useBenchmarks.ts` — admin list
 - `useBenchmarkDetail.ts` — admin detail with people breakdown
 - `useBenchmarkAssignments.ts` — manage assignments
@@ -273,24 +284,27 @@ Admin manual trigger via `POST /api/admin/benchmarks/:id/compute` remains availa
 ### Navigation
 
 **File:** `apps/electron/src/renderer/console/src/components/navigation/Nav.tsx`
+
 - Add `<NavItem to="/benchmarks" icon={Target} label="Benchmarks" />` in employee nav (between Me and Agent)
 
 ### Routes
 
 **File:** `apps/electron/src/renderer/console/src/App.tsx`
+
 - `/benchmarks` → `<MyBenchmarksView />` (employee) or `<BenchmarksView />` (admin) — route renders based on `isAdminView`
 
 ### Components
 
 **New directory:** `apps/electron/src/renderer/console/src/components/views/employee/BenchmarksView/`
 
-| File | Purpose |
-|------|---------|
-| `index.tsx` | List of my benchmarks with progress cards, period selector |
+| File                        | Purpose                                                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `index.tsx`                 | List of my benchmarks with progress cards, period selector                                                            |
 | `BenchmarkProgressCard.tsx` | Name, progress bar (green >80%, yellow 50-80%, neutral below), current vs target, trend arrow, accomplishment callout |
-| `BenchmarkDetailView.tsx` | Single benchmark — historical trend chart, AI suggestions, accomplishment timeline |
+| `BenchmarkDetailView.tsx`   | Single benchmark — historical trend chart, AI suggestions, accomplishment timeline                                    |
 
 **Key UX elements:**
+
 - Celebration moments when benchmarks exceeded (confetti/badge)
 - Accomplishment highlights front and center ("You had 4 deep focus sessions this week!")
 - Actionable suggestions framed as growth opportunities, not deficiencies
@@ -299,6 +313,7 @@ Admin manual trigger via `POST /api/admin/benchmarks/:id/compute` remains availa
 ### Hooks
 
 **New files in:** `apps/electron/src/renderer/console/src/hooks/queries/benchmarks/`
+
 - `useMyBenchmarks.ts` — employee's benchmark list + latest snapshots
 - `useMyBenchmarkDetail.ts` — single benchmark with history
 
@@ -311,17 +326,14 @@ Admin manual trigger via `POST /api/admin/benchmarks/:id/compute` remains availa
 Ship with these pre-built benchmarks (seeded into `benchmarks` table with `isBuiltIn = true`):
 
 **Core EPD Benchmarks:**
+
 1. **AI Adoption & Tool Usage** (qualitative) — AI evaluates usage of AI tools from app data; how effectively they leverage AI in workflows
 2. **Clear Communication** (instance-based) — minutes spent on communication activities (Slack, email, docs, standups) per week; frequency of proactive status updates
 3. **Cross-functional Collaboration** (diversity score) — composite score measuring topic/category/app diversity as a proxy for collaboration breadth (no team/department field exists on users; `subscriberName` = external client, not internal team)
 4. **Mentorship & Development** (instance-based) — minutes of 1:1s, coaching sessions, code review walkthroughs per week
 5. **Proactive vs Reactive Work** (qualitative) — AI evaluates ratio of planned/proactive work vs interrupt-driven/reactive work from task patterns
 
-**Supporting Benchmarks:**
-6. **Deep Focus Work** (instance-based) — avg daily focus minutes (work minus meetings)
-7. **Meeting Efficiency** (percentage of time) — meeting time as % of active time
-8. **Consistent Engagement** (instance-based) — active working days per week
-9. **Work-Life Balance** (instance-based) — daily active hours in healthy range
+**Supporting Benchmarks:** 6. **Deep Focus Work** (instance-based) — avg daily focus minutes (work minus meetings) 7. **Meeting Efficiency** (percentage of time) — meeting time as % of active time 8. **Consistent Engagement** (instance-based) — active working days per week 9. **Work-Life Balance** (instance-based) — daily active hours in healthy range
 
 Seed via `npm run db:seed --workspace=apps/backend` or auto-insert on first org admin visit.
 
@@ -338,11 +350,13 @@ Each template below includes: what it measures, exactly how it's computed from e
 **Measurement type:** Score (1-5, mapped to 0-100%)
 
 **Data sources:**
+
 - `userDailyActivities.appBreakdown` — filter for AI-related apps
 - `activityBlocks` — blocks where `apps` array contains AI tools
 - `activityBlocks.description` — mentions of AI-assisted work
 
 **Computation:**
+
 ```sql
 -- Gather app usage data
 SELECT activity_date, app_breakdown, category_breakdown
@@ -362,12 +376,29 @@ WHERE ab.user_id = $userId
 The service filters `appBreakdown` entries matching known AI tool names (`["Copilot", "ChatGPT", "Claude", "Gemini", "Cursor", "Windsurf", "v0", "Replit", "Cody", "Tabnine", "Amazon Q"]`), computes total AI tool minutes, then passes all context to the LLM for scoring.
 
 **metricConfig:**
+
 ```json
 {
   "evaluationPrompt": "Evaluate AI tool adoption and effectiveness in the employee's workflow...",
-  "dataSourceHints": ["userDailyActivities.appBreakdown", "activityBlocks.apps", "activityBlocks.description"],
+  "dataSourceHints": [
+    "userDailyActivities.appBreakdown",
+    "activityBlocks.apps",
+    "activityBlocks.description"
+  ],
   "scoringRubric": "1-5: 1=no AI usage, 2=occasional/passive, 3=regular integrated usage, 4=AI-augmented productivity across tools, 5=AI-first workflow with measurable efficiency gains",
-  "aiToolPatterns": ["Copilot", "ChatGPT", "Claude", "Gemini", "Cursor", "Windsurf", "v0", "Replit", "Cody", "Tabnine", "Amazon Q"]
+  "aiToolPatterns": [
+    "Copilot",
+    "ChatGPT",
+    "Claude",
+    "Gemini",
+    "Cursor",
+    "Windsurf",
+    "v0",
+    "Replit",
+    "Cody",
+    "Tabnine",
+    "Amazon Q"
+  ]
 }
 ```
 
@@ -376,6 +407,7 @@ The service filters `appBreakdown` entries matching known AI tool names (`["Copi
 **Score → percentage:** `(score / 5) * 100` = progressPercent
 
 **Example AI insights:**
+
 - "Used Copilot in 12 coding sessions — try extending to code reviews too"
 - "Great ChatGPT usage for research! Consider using Claude for longer document drafts"
 
@@ -388,11 +420,13 @@ The service filters `appBreakdown` entries matching known AI tool names (`["Copi
 **Measurement type:** Minutes per week
 
 **Data sources:**
+
 - `activityBlocks` — blocks where `apps` include communication tools OR `category` involves communication
 - `userDailyActivities.appBreakdown` — minutes in Slack, Gmail, Outlook, Teams
 - `userDailyActivities.categoryBreakdown` — "communication" category minutes
 
 **Computation:**
+
 ```sql
 -- Option A: Sum communication category minutes from daily activities
 SELECT SUM(
@@ -418,6 +452,7 @@ WHERE ab.user_id = $userId
 ```
 
 **metricConfig:**
+
 ```json
 {
   "measurementType": "instance_based",
@@ -446,11 +481,13 @@ WHERE ab.user_id = $userId
 **Measurement type:** Composite score (0-100)
 
 **Data sources:**
+
 - `activityBlocks.topicName` — count distinct topics worked on
 - `activityBlocks.category` — count distinct work categories
 - `userDailyActivities.appBreakdown` — count distinct apps used
 
 **Computation:**
+
 ```sql
 -- Count distinct topics in period
 SELECT COUNT(DISTINCT topic_name) as topic_count
@@ -480,6 +517,7 @@ WHERE ab.user_id = $userId
 ```
 
 **metricConfig:**
+
 ```json
 {
   "measurementType": "percentage_of_time",
@@ -509,6 +547,7 @@ WHERE ab.user_id = $userId
 **Data source:** `activityBlocks` — meeting blocks matching mentorship patterns
 
 **Computation:**
+
 ```sql
 -- Sum minutes of mentorship-related activity blocks
 SELECT SUM(duration_minutes) as mentorship_minutes
@@ -531,6 +570,7 @@ WHERE ab.user_id = $userId
 **Note on task-level analysis:** We use activity blocks (tasks) not raw captures. The Day Analyzer RLM already classifies blocks with names, descriptions, and categories that indicate mentorship activity. This gives much more accurate results than trying to parse raw screenshots. We rely solely on name/description pattern matching — `participants` JSONB is only populated by Granola/Fireflies integrations and would be empty for most users.
 
 **metricConfig:**
+
 ```json
 {
   "measurementType": "instance_based",
@@ -539,7 +579,13 @@ WHERE ab.user_id = $userId
   "filter": {
     "blockType": ["meeting", "granola", "fireflies"],
     "nameMatch": ["1:1", "1-on-1", "one on one", "mentorship", "coaching", "onboarding"],
-    "descriptionMatch": ["mentor", "coach", "pair program", "code review walkthrough", "knowledge sharing"],
+    "descriptionMatch": [
+      "mentor",
+      "coach",
+      "pair program",
+      "code review walkthrough",
+      "knowledge sharing"
+    ],
     "categoryMatch": ["mentor", "review"]
   },
   "aggregation": "sum_per_period"
@@ -559,6 +605,7 @@ WHERE ab.user_id = $userId
 **Measurement type:** Score (1-5, mapped to 0-100%)
 
 **Data sources:**
+
 - `activityBlocks` — block names, descriptions, timing patterns, category
 - `userDailyActivities` — daily summaries, key accomplishments
 - `activityBlocks` sequence and timing — frequent short blocks suggest reactive work; long sustained blocks suggest proactive
@@ -566,6 +613,7 @@ WHERE ab.user_id = $userId
 **How the AI evaluates this:**
 
 The AI examines several signals from task-level data:
+
 1. **Block duration distribution** — Many short blocks (<15 min) suggest reactive/interrupt-driven work. Longer blocks (>45 min) suggest planned, proactive work.
 2. **Block descriptions** — Words like "fix", "urgent", "bug", "firefight", "ad-hoc" suggest reactive. Words like "implement", "design", "plan", "research", "milestone" suggest proactive.
 3. **Context switches** — High count of distinct topics/apps per hour suggests reactive mode.
@@ -573,6 +621,7 @@ The AI examines several signals from task-level data:
 5. **Time-of-day patterns** — Reactive workers often have fragmented mornings; proactive workers have sustained focus blocks.
 
 **Computation:**
+
 ```sql
 -- Get all activity blocks for the period with timing details
 SELECT
@@ -594,6 +643,7 @@ WHERE user_id = $userId
 ```
 
 **AI evaluation prompt:**
+
 ```
 System: You are evaluating the balance of proactive vs reactive work patterns.
 
@@ -619,12 +669,27 @@ Respond as JSON: { "score": number, "reasoning": string, "accomplishments": stri
 ```
 
 **metricConfig:**
+
 ```json
 {
   "evaluationPrompt": "Evaluate proactive vs reactive work balance from activity patterns...",
-  "dataSourceHints": ["activityBlocks.name", "activityBlocks.description", "activityBlocks.durationMinutes", "activityBlocks.startTime", "userDailyActivities.daySummary"],
+  "dataSourceHints": [
+    "activityBlocks.name",
+    "activityBlocks.description",
+    "activityBlocks.durationMinutes",
+    "activityBlocks.startTime",
+    "userDailyActivities.daySummary"
+  ],
   "scoringRubric": "1-5: 1=mostly reactive/firefighting, 3=balanced, 5=highly proactive/strategic",
-  "proactiveSignals": ["implement", "design", "plan", "research", "milestone", "spec", "architecture"],
+  "proactiveSignals": [
+    "implement",
+    "design",
+    "plan",
+    "research",
+    "milestone",
+    "spec",
+    "architecture"
+  ],
   "reactiveSignals": ["fix", "urgent", "bug", "firefight", "ad-hoc", "hotfix", "escalation"]
 }
 ```
@@ -632,6 +697,7 @@ Respond as JSON: { "score": number, "reasoning": string, "accomplishments": stri
 **Target:** 4/5 score (higher is better)
 
 **Example AI insights:**
+
 - "72% of your work blocks this week were sustained focus sessions (>45 min) — strong proactive pattern"
 - "Tuesday had 8 context switches before noon — consider batching Slack responses to reduce interruptions"
 - "Your Friday was highly proactive with a 3-hour design sprint — more of that!"
@@ -647,6 +713,7 @@ Respond as JSON: { "score": number, "reasoning": string, "accomplishments": stri
 **Data source:** `userDailyActivities`
 
 **Computation:**
+
 ```sql
 SELECT AVG(total_work_minutes - total_meeting_minutes) as focus_avg
 FROM user_daily_activities
@@ -657,6 +724,7 @@ WHERE user_id = $userId
 ```
 
 **metricConfig:**
+
 ```json
 {
   "measurementType": "instance_based",
@@ -681,6 +749,7 @@ WHERE user_id = $userId
 **Data source:** `userDailyActivities`
 
 **Computation:**
+
 ```sql
 SELECT AVG(meeting_percentage) as avg_meeting_pct
 FROM user_daily_activities
@@ -691,6 +760,7 @@ WHERE user_id = $userId
 ```
 
 **metricConfig:**
+
 ```json
 {
   "measurementType": "percentage_of_time",
@@ -715,6 +785,7 @@ WHERE user_id = $userId
 **Data source:** `userDailyActivities`
 
 **Computation:**
+
 ```sql
 SELECT COUNT(*) as active_days
 FROM user_daily_activities
@@ -726,6 +797,7 @@ WHERE user_id = $userId
 ```
 
 **metricConfig:**
+
 ```json
 {
   "measurementType": "instance_based",
@@ -748,6 +820,7 @@ WHERE user_id = $userId
 **Data source:** `userDailyActivities`
 
 **Computation:**
+
 ```sql
 SELECT AVG(total_active_minutes / 60.0) as avg_hours
 FROM user_daily_activities
@@ -759,6 +832,7 @@ WHERE user_id = $userId
 ```
 
 **metricConfig:**
+
 ```json
 {
   "measurementType": "instance_based",
@@ -780,6 +854,7 @@ WHERE user_id = $userId
 ### How Benchmark Computation Works End-to-End
 
 **New files:**
+
 - `apps/backend/src/services/benchmark-computation.service.ts` — orchestrator
 - `apps/backend/src/services/benchmark-insight.service.ts` — AI evaluation + insights
 - `apps/backend/src/services/benchmark-environment.ts` — stateful context (follows RLM environment pattern)
@@ -964,12 +1039,12 @@ Phase 1 ships with the 9 pre-built benchmarks only. Admins can adjust targets an
 
 **Future (Phase 2):** Add a custom benchmark builder where admins can define new benchmarks by selecting from available data sources:
 
-| Source | Fields Available |
-|--------|-----------------|
-| `userDailyActivities` | totalWorkMinutes, totalMeetingMinutes, totalActiveMinutes, workPercentage, meetingPercentage |
-| `userDailyActivities` JSONB | appBreakdown, categoryBreakdown, topicBreakdown, subscriberBreakdown |
-| `activityBlocks` | blockType, name, durationMinutes, apps, category, participants, subscriberName, topicName |
-| `activityBlocks.rawTranscript` | Meeting transcripts (qualitative only) |
+| Source                         | Fields Available                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------- |
+| `userDailyActivities`          | totalWorkMinutes, totalMeetingMinutes, totalActiveMinutes, workPercentage, meetingPercentage |
+| `userDailyActivities` JSONB    | appBreakdown, categoryBreakdown, topicBreakdown, subscriberBreakdown                         |
+| `activityBlocks`               | blockType, name, durationMinutes, apps, category, participants, subscriberName, topicName    |
+| `activityBlocks.rawTranscript` | Meeting transcripts (qualitative only)                                                       |
 
 ---
 

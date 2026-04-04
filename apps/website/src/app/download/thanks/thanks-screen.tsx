@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { DOWNLOAD_URLS, type OsPlatform } from "@/hooks/use-os-detection";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { MITABLE_VERSION } from "@/config/content/base";
+import { DOWNLOAD_URLS, type OsPlatform } from "@/hooks/use-os-detection";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
@@ -306,14 +306,11 @@ export const ThanksScreen = () => {
                 </div>
 
                 <p style={{ textAlign: "center", fontSize: 15, color: C.textSec, lineHeight: 1.6, margin: "0 auto 56px", maxWidth: 480 }}>
-                    Your download will begin automatically.{" "}
-                    If it didn&apos;t start,{" "}
-                    <a
-                        href={downloadUrl}
-                        style={{ color: C.accent, textDecoration: "underline", textUnderlineOffset: 3 }}
-                    >
+                    Your download will begin automatically. If it didn&apos;t start,{" "}
+                    <a href={downloadUrl} style={{ color: C.accent, textDecoration: "underline", textUnderlineOffset: 3 }}>
                         download Mitable manually
-                    </a>.
+                    </a>
+                    .
                 </p>
 
                 {/* Steps */}
@@ -363,9 +360,7 @@ export const ThanksScreen = () => {
                 </div>
 
                 {/* Version */}
-                <p style={{ textAlign: "center", fontSize: 12, color: C.textTer }}>
-                    Version {MITABLE_VERSION}
-                </p>
+                <p style={{ textAlign: "center", fontSize: 12, color: C.textTer }}>Version {MITABLE_VERSION}</p>
             </main>
 
             <LandingFooter />

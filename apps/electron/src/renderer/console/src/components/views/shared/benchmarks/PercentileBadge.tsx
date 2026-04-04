@@ -4,10 +4,7 @@ interface PercentileBadgeProps {
   percentile: Percentile;
 }
 
-const PERCENTILE_CONFIG: Record<
-  Percentile,
-  { label: string; className: string }
-> = {
+const PERCENTILE_CONFIG: Record<Percentile, { label: string; className: string }> = {
   top_1: {
     label: "Top 1%",
     className: "bg-[#3A9B6B]/15 text-[#3A9B6B]",

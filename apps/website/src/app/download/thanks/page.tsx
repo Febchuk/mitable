@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { ThanksScreen } from "./thanks-screen";
 
 export const metadata: Metadata = {

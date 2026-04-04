@@ -68,8 +68,72 @@ const GET_ACTIVITY_DETAIL: AgentQueryTool = {
     env.getActivityDetail(params.id, params.type as "block" | "session" | "document"),
 };
 
-export const AGENT_QUERY_TOOLS: AgentQueryTool[] = [GET_MY_ACTIVITY, GET_ACTIVITY_DETAIL];
+const LIST_TEAM_MEMBERS: AgentQueryTool = {
+  name: "list_team_members",
+  description:
+    "List all team members in the organization (names, emails, roles). Call first when the user asks about a person by name so you can match spelling.",
+  parameters: [],
+  execute: async (_params, env) => env.listTeamMembers(),
+};
 
-export function getAgentQueryToolByName(name: string): AgentQueryTool | undefined {
-  return AGENT_QUERY_TOOLS.find((t) => t.name === name);
+const QUERY_ORG_METRICS: AgentQueryTool = {
+  name: "query_org_metrics",
+  description:
+    "Org-wide productivity metrics for a date range (max 31 days): averages, category mix, daily trend across the team.",
+  parameters: [
+    { name: "start_date", type: "string", description: "Start YYYY-MM-DD", required: true },
+    { name: "end_date", type: "string", description: "End YYYY-MM-DD", required: true },
+  ],
+  execute: async (params, env) => env.queryOrgMetrics(params.start_date, params.end_date),
+};
+
+const QUERY_USER_METRICS: AgentQueryTool = {
+  name: "query_user_metrics",
+  description:
+    "Daily productivity metrics for one team member (max 31 days): focus/meeting hours, categories, day summaries. Use user_name from list_team_members.",
+  parameters: [
+    {
+      name: "user_name",
+      type: "string",
+      description: "First name, last name, or full name (fuzzy-matched in org)",
+      required: true,
+    },
+    { name: "start_date", type: "string", description: "Start YYYY-MM-DD", required: true },
+    { name: "end_date", type: "string", description: "End YYYY-MM-DD", required: true },
+  ],
+  execute: async (params, env) =>
+    env.queryUserMetrics(params.user_name, params.start_date, params.end_date),
+};
+
+const QUERY_SESSION_SUMMARIES: AgentQueryTool = {
+  name: "query_session_summaries",
+  description:
+    "Up to 20 work session narratives for one team member in a date range (max 31 days). Deeper than daily metrics alone.",
+  parameters: [
+    { name: "user_name", type: "string", description: "Team member name", required: true },
+    { name: "start_date", type: "string", description: "Start YYYY-MM-DD", required: true },
+    { name: "end_date", type: "string", description: "End YYYY-MM-DD", required: true },
+  ],
+  execute: async (params, env) =>
+    env.querySessionSummaries(params.user_name, params.start_date, params.end_date),
+};
+
+const ADMIN_AGENT_QUERY_TOOLS: AgentQueryTool[] = [
+  LIST_TEAM_MEMBERS,
+  QUERY_ORG_METRICS,
+  QUERY_USER_METRICS,
+  QUERY_SESSION_SUMMARIES,
+];
+
+const BASE_AGENT_QUERY_TOOLS: AgentQueryTool[] = [GET_MY_ACTIVITY, GET_ACTIVITY_DETAIL];
+
+export function getAgentQueryTools(isAdmin: boolean): AgentQueryTool[] {
+  return isAdmin ? [...BASE_AGENT_QUERY_TOOLS, ...ADMIN_AGENT_QUERY_TOOLS] : BASE_AGENT_QUERY_TOOLS;
+}
+
+/** @deprecated Use getAgentQueryTools(false) */
+export const AGENT_QUERY_TOOLS: AgentQueryTool[] = BASE_AGENT_QUERY_TOOLS;
+
+export function getAgentQueryToolByName(name: string, isAdmin: boolean): AgentQueryTool | undefined {
+  return getAgentQueryTools(isAdmin).find((t) => t.name === name);
 }

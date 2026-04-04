@@ -4,7 +4,7 @@
  * List of work blocks for a day, displayed as a timeline.
  */
 
-import { Clock, Zap } from "lucide-react";
+import { Clock, Coffee, Zap } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { WorkBlock } from "./types";
 import WorkBlockDetail from "./WorkBlockDetail";

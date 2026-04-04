@@ -16,7 +16,16 @@ import {
   shell,
   systemPreferences,
 } from "electron";
-import { join } from "path";
+import {
+  appendFileSync,
+  existsSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "path";
+import electronLogMain from "electron-log/main";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
 import { createLogger } from "./lib/logger";
 import { audioWebSocketService } from "./services/audioWebSocketService";
@@ -2965,21 +2974,90 @@ app.whenReady().then(async () => {
     return browserBridgeService.getConnectionInfo();
   });
 
-  // Feedback: read electron log file for attachment
+  // Feedback: main.log tail + renderer.log (DevTools/console stream persisted on disk next to main.log)
+  const FEEDBACK_MAIN_LOG_TAIL_LINES = 10_000;
+  const FEEDBACK_RENDERER_LOG_TAIL_LINES = 10_000;
+  const RENDERER_LOG_MAX_BYTES = 12 * 1024 * 1024;
+  const RENDERER_LOG_READ_MAX_BYTES = 6 * 1024 * 1024;
+
+  const getRendererLogPath = (): string | null => {
+    const mainPath = electronLogMain.transports.file.getFile()?.path;
+    if (!mainPath) return null;
+    return join(dirname(mainPath), "renderer.log");
+  };
+
+  ipcMain.on(IPC_CHANNELS.FEEDBACK_APPEND_RENDERER_LOG, (_event, chunk: unknown) => {
+    if (typeof chunk !== "string" || chunk.length === 0) return;
+    if (chunk.length > 1_500_000) return;
+    try {
+      const rPath = getRendererLogPath();
+      if (!rPath) return;
+      appendFileSync(rPath, chunk, "utf8");
+      const st = statSync(rPath);
+      if (st.size > RENDERER_LOG_MAX_BYTES) {
+        const bak = `${rPath}.1`;
+        if (existsSync(bak)) unlinkSync(bak);
+        renameSync(rPath, bak);
+        writeFileSync(
+          rPath,
+          `${new Date().toISOString()} [console.log] [renderer] Older lines rotated to renderer.log.1 (size cap)\n`,
+          "utf8"
+        );
+      }
+    } catch {
+      /* avoid breaking renderer */
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.FEEDBACK_GET_LOGS, async () => {
     try {
-      const electronLog = await import("electron-log/main");
-      const logFile = electronLog.default.transports.file.getFile();
-      const logPath = logFile?.path;
-      if (!logPath) return { success: false, logs: "", error: "Log file path not found" };
+      const mainPath = electronLogMain.transports.file.getFile()?.path;
+      if (!mainPath) {
+        return { success: false, logs: "", rendererLogs: "", error: "Log file path not found" };
+      }
 
-      const fs = await import("fs/promises");
-      const content = await fs.readFile(logPath, "utf-8");
+      const fsp = await import("fs/promises");
+      const content = await fsp.readFile(mainPath, "utf-8");
       const lines = content.split("\n");
-      const tail = lines.slice(-2000).join("\n");
-      return { success: true, logs: tail };
+      const mainTail = lines.slice(-FEEDBACK_MAIN_LOG_TAIL_LINES).join("\n");
+
+      let rendererLogs = "";
+      const rPath = getRendererLogPath();
+      if (rPath) {
+        try {
+          const st = await fsp.stat(rPath).catch(() => null);
+          if (st && st.size > 0) {
+            if (st.size <= RENDERER_LOG_READ_MAX_BYTES) {
+              rendererLogs = await fsp.readFile(rPath, "utf-8");
+            } else {
+              const fh = await fsp.open(rPath, "r");
+              try {
+                const start = Number(st.size) - RENDERER_LOG_READ_MAX_BYTES;
+                const buf = Buffer.alloc(RENDERER_LOG_READ_MAX_BYTES);
+                await fh.read(buf, 0, RENDERER_LOG_READ_MAX_BYTES, start);
+                let s = buf.toString("utf8");
+                const nl = s.indexOf("\n");
+                if (nl !== -1) s = s.slice(nl + 1);
+                rendererLogs =
+                  `...[renderer.log: last ~${Math.round(RENDERER_LOG_READ_MAX_BYTES / 1024)}KB of file]\n\n` +
+                  s;
+              } finally {
+                await fh.close();
+              }
+            }
+          }
+        } catch {
+          rendererLogs = "";
+        }
+        if (rendererLogs) {
+          const rl = rendererLogs.split("\n");
+          rendererLogs = rl.slice(-FEEDBACK_RENDERER_LOG_TAIL_LINES).join("\n");
+        }
+      }
+
+      return { success: true, logs: mainTail, rendererLogs };
     } catch (err) {
-      return { success: false, logs: "", error: String(err) };
+      return { success: false, logs: "", rendererLogs: "", error: String(err) };
     }
   });
 

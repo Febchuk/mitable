@@ -56,12 +56,15 @@ export function AssignBenchmarkModal({
     const userIds = Array.from(selectedIds);
     if (!userIds.length) return;
 
-    assignBenchmark({ benchmarkId, userIds }, {
-      onSuccess: () => {
-        setSelectedIds(new Set());
-        onOpenChange(false);
-      },
-    });
+    assignBenchmark(
+      { benchmarkId, userIds },
+      {
+        onSuccess: () => {
+          setSelectedIds(new Set());
+          onOpenChange(false);
+        },
+      }
+    );
   }
 
   function handleClose() {
@@ -206,9 +209,7 @@ export function AssignBenchmarkModal({
                     border: checked
                       ? "1.5px solid rgba(255,255,255,0.25)"
                       : "1.5px solid rgba(255,255,255,0.12)",
-                    background: checked
-                      ? "rgba(255,255,255,0.1)"
-                      : "transparent",
+                    background: checked ? "rgba(255,255,255,0.1)" : "transparent",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -330,7 +331,9 @@ export function AssignBenchmarkModal({
               transition: "background 0.1s, opacity 0.1s",
             }}
           >
-            {isPending ? "Assigning..." : `Assign${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+            {isPending
+              ? "Assigning..."
+              : `Assign${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
           </button>
         </div>
       </div>

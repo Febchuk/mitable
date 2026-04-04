@@ -119,6 +119,7 @@ const IPC_CHANNELS = {
   ONBOARDING_SET_VERSION: "onboarding:set-version",
   // Feedback
   FEEDBACK_GET_LOGS: "feedback:get-logs",
+  FEEDBACK_APPEND_RENDERER_LOG: "feedback:append-renderer-log",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -710,9 +711,16 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_BRIDGE_CONNECTION_UPDATE, handler);
   },
 
-  // Feedback — collect electron logs for bug reports
-  getElectronLogs: (): Promise<{ success: boolean; logs: string; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_GET_LOGS),
+  // Feedback — main.log tail + renderer.log (DevTools stream, written by main)
+  appendRendererLogChunk: (chunk: string): void => {
+    ipcRenderer.send(IPC_CHANNELS.FEEDBACK_APPEND_RENDERER_LOG, chunk);
+  },
+  getElectronLogs: (): Promise<{
+    success: boolean;
+    logs: string;
+    rendererLogs: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_GET_LOGS),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

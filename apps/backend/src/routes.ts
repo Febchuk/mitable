@@ -4,7 +4,7 @@ import { requireAuth, optionalAuth } from "./middleware/auth.js";
 import agentRouter from "./routes/agent.js";
 import roadmapsRouter from "./routes/roadmaps.js";
 // DEPRECATED: Old multi-agent chat system (OrchestratorService → KnowledgeAgent/Groq)
-// Admin Ask now uses /admin/ask/chat (Claude). Employees have no chat UI.
+// DEPRECATED: Admin Ask RLM — /admin/ask/* (unused; slated for deletion). Not extending.
 // import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import adminDashboardRouter from "./routes/admin-dashboard.js";

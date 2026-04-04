@@ -1,3 +1,4 @@
+/* DEPRECATED — Ask RLM admin UI. Not in active use; slated for deletion in app cleanup. */
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import {

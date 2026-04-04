@@ -1,9 +1,9 @@
-/**
- * Ask RLM Prompts
+/* =============================================================================
+ * DEPRECATED — Ask RLM prompts (/admin/ask/chat tool-calling loop).
+ * Not in active use. Scheduled for deletion in an upcoming cleanup. Do not extend.
+ * =============================================================================
  *
- * System and user prompt templates for the Ask AI tool-calling loop.
- * The LLM fetches data on demand via tools instead of receiving
- * everything in a single context dump.
+ * System prompt for the legacy Ask AI tool loop.
  */
 
 import { ASK_TOOLS } from "./ask-tools";

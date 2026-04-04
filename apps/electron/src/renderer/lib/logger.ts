@@ -5,7 +5,7 @@
  * Uses console-based logging since electron-log/renderer doesn't work well when bundled by Vite.
  * Logs are visible in DevTools console.
  *
- * Note: In production builds, electron-log/renderer may work, but for dev mode we use console.
+ * Console-window feedback capture is installed from `console/src/App.tsx` (needs `consoleAPI`).
  */
 
 // Console-based logger (works reliably in all environments)
@@ -16,11 +16,10 @@ const log = {
   error: (msg: string, ...args: unknown[]) => console.error(`[ERROR] ${msg}`, ...args),
 };
 
-// Set up global error handlers for the renderer
 if (typeof window !== "undefined") {
   window.onerror = (msg, url, line, col, error) => {
     log.error("[Window Error]", { msg, url, line, col, error });
-    return false; // Don't prevent default error handling
+    return false;
   };
 
   window.onunhandledrejection = (event) => {
@@ -30,15 +29,6 @@ if (typeof window !== "undefined") {
 
 /**
  * Create a scoped logger for a specific module
- *
- * @example
- * ```typescript
- * import { createLogger } from "../../lib/logger";
- * const logger = createLogger("ChatService");
- *
- * logger.info("Message sent:", messageId);
- * logger.error("Failed to send message:", error);
- * ```
  */
 export function createLogger(scope: string) {
   return {

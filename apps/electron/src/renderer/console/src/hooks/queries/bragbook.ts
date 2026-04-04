@@ -39,13 +39,8 @@ export function useSaveBragbookPeriod() {
 export function useGenerateBragbookPeriod() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      periodType,
-      periodStart,
-    }: {
-      periodType: BragbookView;
-      periodStart: string;
-    }) => generateBragbookPeriod(periodType, periodStart),
+    mutationFn: ({ periodType, periodStart }: { periodType: BragbookView; periodStart: string }) =>
+      generateBragbookPeriod(periodType, periodStart),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bragbook"] });
     },
@@ -55,13 +50,8 @@ export function useGenerateBragbookPeriod() {
 export function useResetBragbookPeriod() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      periodType,
-      periodStart,
-    }: {
-      periodType: BragbookView;
-      periodStart: string;
-    }) => resetBragbookPeriod(periodType, periodStart),
+    mutationFn: ({ periodType, periodStart }: { periodType: BragbookView; periodStart: string }) =>
+      resetBragbookPeriod(periodType, periodStart),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bragbook"] });
     },

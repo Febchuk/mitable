@@ -117,7 +117,13 @@ export async function fetchBenchmarkDetail(id: string): Promise<BenchmarkDetail>
 
 export async function updateBenchmark(
   id: string,
-  payload: { name?: string; description?: string; targetValue?: number; frequency?: BenchmarkFrequency; isActive?: boolean }
+  payload: {
+    name?: string;
+    description?: string;
+    targetValue?: number;
+    frequency?: BenchmarkFrequency;
+    isActive?: boolean;
+  }
 ): Promise<Benchmark> {
   try {
     const response = await apiRequest<{ benchmark: Benchmark }>(`/admin/benchmarks/${id}`, {
@@ -232,7 +238,9 @@ export async function fetchPersonBenchmarkDetail(
 
 export async function fetchBenchmarkParameters(benchmarkId: string): Promise<BenchmarkParameter[]> {
   try {
-    const response = await apiRequest<{ parameters: BenchmarkParameter[] }>(`/admin/benchmarks/${benchmarkId}/parameters`);
+    const response = await apiRequest<{ parameters: BenchmarkParameter[] }>(
+      `/admin/benchmarks/${benchmarkId}/parameters`
+    );
     return response.parameters;
   } catch (error) {
     logger.error("Error fetching benchmark parameters:", error);
@@ -240,7 +248,10 @@ export async function fetchBenchmarkParameters(benchmarkId: string): Promise<Ben
   }
 }
 
-export async function updateBenchmarkParameters(benchmarkId: string, parameters: BenchmarkParameter[]): Promise<void> {
+export async function updateBenchmarkParameters(
+  benchmarkId: string,
+  parameters: BenchmarkParameter[]
+): Promise<void> {
   try {
     await apiRequest(`/admin/benchmarks/${benchmarkId}/parameters`, {
       method: "PUT",
@@ -270,12 +281,17 @@ export interface CreateBenchmarkPayload {
 
 // ── Custom Benchmark API ──────────────────────────────────
 
-export async function generateBenchmarkParameters(description: string): Promise<BenchmarkParameter[]> {
+export async function generateBenchmarkParameters(
+  description: string
+): Promise<BenchmarkParameter[]> {
   try {
-    const response = await apiRequest<{ parameters: BenchmarkParameter[] }>("/admin/benchmarks/generate-parameters", {
-      method: "POST",
-      body: JSON.stringify({ description }),
-    });
+    const response = await apiRequest<{ parameters: BenchmarkParameter[] }>(
+      "/admin/benchmarks/generate-parameters",
+      {
+        method: "POST",
+        body: JSON.stringify({ description }),
+      }
+    );
     return response.parameters;
   } catch (error) {
     logger.error("Error generating benchmark parameters:", error);

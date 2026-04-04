@@ -177,7 +177,11 @@ export default function SessionTimeline({
           {transformedData && transformedData.workstreams.length === 0 && !isLoading && (
             <EmptyState
               variant="inline"
-              title={isSessionActive ? "Waiting for activity to be recorded..." : "No workstream activity recorded."}
+              title={
+                isSessionActive
+                  ? "Waiting for activity to be recorded..."
+                  : "No workstream activity recorded."
+              }
             />
           )}
 
