@@ -498,6 +498,43 @@ const { data: integrations } = useQuery({
 
 ---
 
+## 6.4 View-mode-aware data fetching
+
+**Critical pattern**: React Query hooks that serve both admin and manager views must:
+
+1. **Enable for managers**: `enabled: user.role === "admin" || user.isManager`
+2. **Include `viewMode` in query key**: So data refetches when switching views
+3. **Let the backend scope**: The backend uses `getCachedVisibleUserIds(req)` to return
+   only the users the actor can see — admins get all, managers get their reports
+
+**Example — `useUsers` hook:**
+
+```typescript
+export function useUsers() {
+  const { user, viewMode } = useUser();
+  return useQuery({
+    queryKey: ["admin", "users", viewMode],
+    queryFn: fetchUsers,
+    enabled: !!user && (user.role === "admin" || !!user.isManager),
+  });
+}
+```
+
+**Backend scoping pattern (`GET /admin/users`):**
+
+```typescript
+router.get("/users", requireAuth, requireManagerOrAdmin, async (req, res) => {
+  const visibleUserIds = await getCachedVisibleUserIds(req);
+  const users = await db.select(...).from(users).where(inArray(users.id, visibleUserIds));
+  // ...
+});
+```
+
+This pattern replaces the old inline `role !== "admin"` checks. Apply it to any
+endpoint that serves data in both admin and manager views.
+
+---
+
 ## 7. Dashboard Components
 
 ### 7.1 Dashboard header

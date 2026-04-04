@@ -3,11 +3,11 @@ import { fetchUsers } from "../../../services/adminService";
 import { useUser } from "../../../context/UserContext";
 
 export function useUsers() {
-  const { user } = useUser();
+  const { user, viewMode } = useUser();
 
   return useQuery({
-    queryKey: ["admin", "users"],
+    queryKey: ["admin", "users", viewMode],
     queryFn: fetchUsers,
-    enabled: !!user && user.role === "admin", // Only fetch for admin users
+    enabled: !!user && (user.role === "admin" || !!user.isManager),
   });
 }

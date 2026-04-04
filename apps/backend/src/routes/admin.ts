@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, asc } from "drizzle-orm";
+import { eq, sql, count, desc, and, asc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requireAdmin, requireManagerOrAdmin, requireAccessToUser } from "../middleware/authorization.js";
+import { requireAdmin, requireManagerOrAdmin, requireAccessToUser, getCachedVisibleUserIds } from "../middleware/authorization.js";
 import { wouldCreateCycle } from "../services/permissions.service.js";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
@@ -383,24 +383,9 @@ router.get("/users/:id", requireAuth, requireManagerOrAdmin, requireAccessToUser
  */
 router.get("/users", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.userId!;
+    // Get visible user IDs — admins see all in org, managers see their reports
+    const visibleUserIds = await getCachedVisibleUserIds(req);
 
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
-
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "Admin access required",
-      });
-      return;
-    }
-
-    // Fetch ALL users in the org (including admins — they can have sessions too)
     const orgUsers = await db
       .select({
         id: schema.users.id,
@@ -414,7 +399,7 @@ router.get("/users", requireAuth, requireManagerOrAdmin, async (req: Request, re
         createdAt: schema.users.createdAt,
       })
       .from(schema.users)
-      .where(eq(schema.users.organizationId, currentUser.organizationId))
+      .where(inArray(schema.users.id, visibleUserIds))
       .orderBy(schema.users.firstName, schema.users.lastName);
 
     const usersFormatted = orgUsers.map((user) => ({
