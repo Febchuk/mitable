@@ -1,3 +1,16 @@
+/**
+ * Railway environment logs (GraphQL `environmentLogs`) for feedback and ops.
+ *
+ * Auth (see config.railway):
+ * - **Project access token** (`RAILWAY_PROJECT_ACCESS_TOKEN`): uses `Project-Access-Token` header.
+ *   Environment id is resolved automatically via Railway’s `projectToken { environmentId }` query
+ *   (same as Public API docs) and cached for the process — `RAILWAY_ENVIRONMENT_ID` is optional.
+ * - **Account/workspace token** (`RAILWAY_TOKEN` / `RAILWAY_API_TOKEN`): `Authorization: Bearer`.
+ *   You must set `RAILWAY_ENVIRONMENT_ID` explicitly; projectToken resolution is not used with Bearer.
+ *
+ * Optional: `RAILWAY_BACKEND_SERVICE_ID` for `@service:` log filters.
+ */
+
 import { config } from "../config.js";
 import { getDevBackendLogsForUser } from "../lib/dev-log-buffer.js";
 import { createLogger } from "../lib/logger.js";
@@ -32,6 +45,53 @@ type GqlLogsResponse = {
   data?: { environmentLogs?: RailwayLogRow[] | null };
   errors?: { message: string }[];
 };
+
+type GqlProjectTokenResponse = {
+  data?: { projectToken?: { projectId?: string; environmentId?: string } | null };
+  errors?: { message: string }[];
+};
+
+/** Project tokens are scoped to one env; Railway exposes its id via this query (no RAILWAY_ENVIRONMENT_ID needed). */
+let cachedEnvironmentIdFromProjectToken: string | undefined;
+
+async function resolveEnvironmentIdFromProjectToken(): Promise<string> {
+  if (cachedEnvironmentIdFromProjectToken !== undefined) {
+    return cachedEnvironmentIdFromProjectToken;
+  }
+  const pt = config.railway.projectAccessToken;
+  if (!pt) {
+    cachedEnvironmentIdFromProjectToken = "";
+    return "";
+  }
+  const res = await fetch(RAILWAY_GQL_URL, {
+    method: "POST",
+    headers: { "Project-Access-Token": pt, "Content-Type": "application/json" },
+    body: JSON.stringify({ query: "query { projectToken { projectId environmentId } }" }),
+  });
+  if (!res.ok) {
+    log.warn({ status: res.status }, "Railway projectToken GraphQL HTTP error");
+    cachedEnvironmentIdFromProjectToken = "";
+    return "";
+  }
+  const json = (await res.json()) as GqlProjectTokenResponse;
+  if (json.errors?.length) {
+    log.warn({ errors: json.errors.map((e) => e.message) }, "Railway projectToken GraphQL errors");
+    cachedEnvironmentIdFromProjectToken = "";
+    return "";
+  }
+  const id = json.data?.projectToken?.environmentId?.trim() ?? "";
+  cachedEnvironmentIdFromProjectToken = id;
+  if (!id) {
+    log.warn("Railway projectToken returned no environmentId");
+  }
+  return id;
+}
+
+async function getRailwayEnvironmentId(): Promise<string> {
+  const explicit = config.railway.environmentId.trim();
+  if (explicit) return explicit;
+  return resolveEnvironmentIdFromProjectToken();
+}
 
 function railwayHeaders(): Record<string, string> | null {
   const pt = config.railway.projectAccessToken;
@@ -74,7 +134,8 @@ async function postGraphql(body: object): Promise<GqlLogsResponse> {
  *
  * Uses Railway's Public GraphQL API (same as the dashboard). Requires either
  * RAILWAY_TOKEN or RAILWAY_API_TOKEN (account/workspace, Bearer) or RAILWAY_PROJECT_ACCESS_TOKEN
- * (Project-Access-Token header), plus RAILWAY_ENVIRONMENT_ID and optionally
+ * (Project-Access-Token header). Environment id: set RAILWAY_ENVIRONMENT_ID, or omit it when using
+ * a project access token (Railway returns it via `projectToken { environmentId }`). Optional:
  * RAILWAY_BACKEND_SERVICE_ID for @service filtering.
  */
 export async function fetchRecentBackendLogsForUser(options: {
@@ -83,7 +144,7 @@ export async function fetchRecentBackendLogsForUser(options: {
   maxLines?: number;
 }): Promise<string> {
   const { userId, hoursBack = 4, maxLines = 2500 } = options;
-  const envId = config.railway.environmentId.trim();
+  const envId = await getRailwayEnvironmentId();
   const serviceId = config.railway.backendServiceId.trim();
 
   if (!envId || !railwayHeaders()) {
