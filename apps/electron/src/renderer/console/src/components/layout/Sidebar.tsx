@@ -68,7 +68,7 @@ export default function Sidebar() {
 
       {/* View Mode Switcher */}
       {availableViewModes.length > 1 && (
-        <div style={{ padding: "0 8px 4px" }}>
+        <div style={{ padding: "0 8px", marginBottom: 8 }}>
           <div
             style={{
               display: "flex",
