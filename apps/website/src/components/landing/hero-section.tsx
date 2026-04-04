@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { useOsDetection } from "@/hooks/use-os-detection";
 
 const C = {
@@ -113,6 +114,35 @@ export const HeroSection = () => {
                     <path d="M8 3v10M8 13l-3-3M8 13l3-3" />
                 </svg>
             </a>
+            <Link
+                href="/login"
+                className="hero-reveal hero-get-started-cta"
+                style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    background: C.text,
+                    color: C.bg,
+                    padding: "14px 28px",
+                    borderRadius: 10,
+                    textDecoration: "none",
+                    fontWeight: 500,
+                    fontSize: 15,
+                    transition: "opacity 0.2s, all 0.7s ease",
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transitionDelay: "0.16s",
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
+            >
+                Get Started
+            </Link>
         </section>
     );
 };

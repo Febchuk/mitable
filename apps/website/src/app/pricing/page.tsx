@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import { getPricingTier } from "@mitable/shared";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -19,8 +20,6 @@ const C = {
     border: "var(--l-border, #33312B)",
     serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
-    /** Legible on solid accent fills (not themed — accent is brand cyan in both modes). */
-    onAccentText: "#0F2529",
 };
 
 type BillingPeriod = "monthly" | "yearly";
@@ -82,6 +81,8 @@ function CheckBullet({ children, accent }: { children: ReactNode; accent?: boole
 
 export default function PricingPage() {
     const { theme: colorMode } = useTheme();
+    const isDesktop = useBreakpoint("md");
+    const isMobilePricing = !isDesktop;
     const [billing, setBilling] = useState<BillingPeriod>("yearly");
     const [loading, setLoading] = useState<string | null>(null);
 
@@ -174,14 +175,14 @@ export default function PricingPage() {
         height: "100%",
     });
 
-    /** Section headings above plan rows — high contrast vs page background. */
+    /** Section headings above plan rows — match main “Pricing.” title colour (not accent). */
     const plansSectionLabel = {
         fontFamily: C.sans,
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: "0.12em",
         textTransform: "uppercase" as const,
-        color: C.accent,
+        color: C.text,
         marginBottom: 12,
         marginTop: 0,
     };
@@ -332,16 +333,15 @@ export default function PricingPage() {
                                             fontWeight: 700,
                                             letterSpacing: "0.07em",
                                             textTransform: "uppercase" as const,
-                                            color: C.onAccentText,
-                                            background: C.accent,
+                                            color: C.bg,
+                                            background: C.text,
                                             padding: "4px 7px",
                                             borderRadius: 6,
                                             lineHeight: 1.2,
                                             whiteSpace: "nowrap",
                                             pointerEvents: "none",
-                                            border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.45)",
-                                            boxShadow: "0 12px 28px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2)",
-                                            backdropFilter: "blur(10px)",
+                                            border: `1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.12)`,
+                                            boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
                                         }}
                                     >
                                         20% OFF
@@ -365,24 +365,45 @@ export default function PricingPage() {
                                 <span style={priceNum}>$0</span>
                             </div>
                         </div>
-                        <a
-                            href="/download"
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                ...ctaPad,
-                                borderRadius: 10,
-                                fontSize: 14,
-                                fontWeight: 500,
-                                textDecoration: "none",
-                                color: C.text,
-                                border: `1px solid ${C.border}`,
-                                background: "transparent",
-                            }}
-                        >
-                            Download
-                        </a>
+                        {isMobilePricing ? (
+                            <a
+                                href="/login?redirect=/pricing"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    ...ctaPad,
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    textDecoration: "none",
+                                    color: C.text,
+                                    border: `1px solid ${C.border}`,
+                                    background: "transparent",
+                                }}
+                            >
+                                Get Started
+                            </a>
+                        ) : (
+                            <a
+                                href="/download"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    ...ctaPad,
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    textDecoration: "none",
+                                    color: C.text,
+                                    border: `1px solid ${C.border}`,
+                                    background: "transparent",
+                                }}
+                            >
+                                Download
+                            </a>
+                        )}
                         <div style={{ height: 1, background: "rgba(var(--l-ui-rgb, 236,232,224), 0.04)", marginBottom: 8 }} />
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
                             {FREE_BULLETS.map((t) => (
@@ -422,28 +443,50 @@ export default function PricingPage() {
                             </div>
                             <span style={recommendedPill}>Recommended</span>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => proPriceId && handleCheckout(proPriceId, "pro")}
-                            disabled={loading === "pro" || !proPriceId}
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                ...ctaPad,
-                                borderRadius: 10,
-                                fontSize: 14,
-                                fontWeight: 500,
-                                cursor: proPriceId ? "pointer" : "not-allowed",
-                                color: C.bg,
-                                background: C.text,
-                                border: "none",
-                                width: "100%",
-                                opacity: proPriceId ? 1 : 0.5,
-                            }}
-                        >
-                            {loading === "pro" ? "Redirecting..." : "Get Pro"}
-                        </button>
+                        {isMobilePricing ? (
+                            <a
+                                href="/login?redirect=/pricing"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    ...ctaPad,
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    textDecoration: "none",
+                                    color: C.bg,
+                                    background: C.text,
+                                    border: "none",
+                                    width: "100%",
+                                }}
+                            >
+                                Get Started
+                            </a>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => proPriceId && handleCheckout(proPriceId, "pro")}
+                                disabled={loading === "pro" || !proPriceId}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    ...ctaPad,
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    cursor: proPriceId ? "pointer" : "not-allowed",
+                                    color: C.bg,
+                                    background: C.text,
+                                    border: "none",
+                                    width: "100%",
+                                    opacity: proPriceId ? 1 : 0.5,
+                                }}
+                            >
+                                {loading === "pro" ? "Redirecting..." : "Get Pro"}
+                            </button>
+                        )}
                         <div style={{ height: 1, background: "rgba(var(--l-ui-rgb, 236,232,224), 0.04)", marginBottom: 8 }} />
                         <p style={{ fontSize: 12, fontWeight: 600, color: C.textSec, margin: "0 0 6px", lineHeight: 1.35 }}>Everything in Free, plus:</p>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
@@ -489,7 +532,27 @@ export default function PricingPage() {
                                 <span style={{ fontSize: 13, color: C.textSec }}>{teamsDisplay.period}</span>
                             </div>
                         </div>
-                        {teamPriceId ? (
+                        {isMobilePricing ? (
+                            <a
+                                href="/login?redirect=/pricing"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    ...ctaPad,
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    textDecoration: "none",
+                                    color: C.text,
+                                    background: "transparent",
+                                    border: `1px solid ${C.border}`,
+                                    width: "100%",
+                                }}
+                            >
+                                Get Started
+                            </a>
+                        ) : teamPriceId ? (
                             <button
                                 type="button"
                                 onClick={() => handleCheckout(teamPriceId, "teams")}

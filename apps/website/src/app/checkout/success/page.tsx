@@ -53,8 +53,12 @@ export default function CheckoutSuccessPage() {
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />
 
-            <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "180px 48px 80px", width: "100%", boxSizing: "border-box" as const }}>
+            <main
+                className="l-account-page-main l-account-page-main--checkout"
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "180px 48px 80px", width: "100%", boxSizing: "border-box" as const }}
+            >
                 <motion.div
+                    className="l-account-checkout-card"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.5 }}
@@ -88,7 +92,7 @@ export default function CheckoutSuccessPage() {
                     <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
                         You&apos;re all set!
                     </h1>
-                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: "0 0 32px" }}>
+                    <p className="l-account-page-subtitle" style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: "0 0 32px" }}>
                         Your subscription is active. Download Mitable to start using your Pro features.
                     </p>
 

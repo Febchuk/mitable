@@ -22,6 +22,7 @@ const links = [
 
 export const LandingFooter = () => (
     <footer
+        className="l-landing-footer"
         style={{
             borderTop: `1px solid ${C.borderSubtle}`,
             padding: "40px 48px",
@@ -35,7 +36,7 @@ export const LandingFooter = () => (
             gap: 20,
         }}
     >
-        <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+        <div className="l-landing-footer-links" style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             {links.map((link) => (
                 <Link
                     key={link.label}

@@ -194,8 +194,11 @@ export default function BillingPage() {
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />
 
-            <main style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}>
-                <div style={{ marginBottom: 56 }}>
+            <main
+                className="l-account-page-main"
+                style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}
+            >
+                <div className="l-account-page-header" style={{ marginBottom: 56 }}>
                     <motion.h1
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -205,6 +208,7 @@ export default function BillingPage() {
                         Billing
                     </motion.h1>
                     <motion.p
+                        className="l-account-page-subtitle"
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.1 }}
@@ -231,6 +235,7 @@ export default function BillingPage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
                         {/* Current Plan */}
                         <motion.div
+                            className="l-billing-card"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.15 }}
@@ -278,6 +283,7 @@ export default function BillingPage() {
                         {/* Usage */}
                         {data.quota && (
                             <motion.div
+                                className="l-billing-card"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.5, delay: 0.25 }}

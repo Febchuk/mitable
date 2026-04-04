@@ -18,7 +18,7 @@ export const MacWindow = ({ children, className = "", title, variant = "dark" }:
 
     return (
         <div
-            className={className}
+            className={`l-mac-window ${className}`.trim()}
             style={{
                 background: C.bg,
                 borderRadius: 12,
@@ -57,7 +57,7 @@ export const MacWindow = ({ children, className = "", title, variant = "dark" }:
                     </span>
                 ) : null}
             </div>
-            <div style={{ overflow: "hidden", aspectRatio: SCREEN_ASPECT_RATIO }}>{children}</div>
+            <div className="l-mac-window-body" style={{ overflow: "hidden", aspectRatio: SCREEN_ASPECT_RATIO }}>{children}</div>
         </div>
     );
 };

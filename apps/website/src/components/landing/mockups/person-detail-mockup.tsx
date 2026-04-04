@@ -81,6 +81,7 @@ export const PersonDetailMockup = ({ variant = "dark" }: { variant?: MockupVaria
 
     return (
         <div
+            className="l-person-detail-mockup"
             style={{
                 width: "100%",
                 height: "100%",
@@ -94,12 +95,12 @@ export const PersonDetailMockup = ({ variant = "dark" }: { variant?: MockupVaria
                 overflow: "hidden",
             }}
         >
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div className="l-pd-header" style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 42, height: 42, borderRadius: 999, background: `rgba(${C.uiRgb}, 0.1)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 600, color: C.text, flexShrink: 0 }}>
-                    A
+                    K
                 </div>
                 <div>
-                    <h1 style={{ fontFamily: C.serif, fontSize: 22, fontWeight: 400, color: C.text, letterSpacing: "-0.3px", margin: 0 }}>Alex Rivera</h1>
+                    <h1 style={{ fontFamily: C.serif, fontSize: 22, fontWeight: 400, color: C.text, letterSpacing: "-0.3px", margin: 0 }}>Kemi Adebayo</h1>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
                         <span style={{ fontSize: 12, color: C.textSec }}>Senior Engineer</span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: C.textSec }}>
@@ -110,7 +111,7 @@ export const PersonDetailMockup = ({ variant = "dark" }: { variant?: MockupVaria
                 </div>
             </div>
 
-            <div style={{ display: "flex", gap: 48, alignItems: "baseline" }}>
+            <div className="l-pd-stats" style={{ display: "flex", gap: 48, alignItems: "baseline" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em" }}>Average Focus Time</span>
                     <span style={{ fontFamily: C.serif, fontSize: 36, fontWeight: 300, color: C.text, letterSpacing: -2, lineHeight: 1 }}>5.2h</span>
@@ -121,10 +122,10 @@ export const PersonDetailMockup = ({ variant = "dark" }: { variant?: MockupVaria
                 </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, flex: 1, minHeight: 0, overflow: "hidden" }}>
+            <div className="l-pd-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, flex: 1, minHeight: 0, overflow: "hidden" }}>
                 <div style={{ background: C.raised, border: `1px solid rgba(${C.uiRgb}, 0.04)`, borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.09em", color: C.textSec, marginBottom: 14 }}>Customer Work</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 18, flex: 1, minHeight: 0 }}>
+                    <div className="l-pd-card-body" style={{ display: "flex", alignItems: "center", gap: 18, flex: 1, minHeight: 0 }}>
                         <DonutChart C={C} />
                         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, overflow: "hidden" }}>
                             {CUSTOMERS.map((c, i) => (
@@ -140,7 +141,7 @@ export const PersonDetailMockup = ({ variant = "dark" }: { variant?: MockupVaria
 
                 <div style={{ background: C.raised, border: `1px solid rgba(${C.uiRgb}, 0.04)`, borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.09em", color: C.textSec, marginBottom: 14 }}>Activity Breakdown</span>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0, overflow: "hidden" }}>
+                    <div className="l-pd-card-body" style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0, overflow: "hidden" }}>
                         {ACTIVITIES.map((a) => (
                             <BarRow key={a.label} {...a} C={C} />
                         ))}

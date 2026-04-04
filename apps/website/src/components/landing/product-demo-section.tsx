@@ -15,8 +15,11 @@ type Frame = {
     durationMs: number;
 };
 
+/** Row the demo animates — keep in sync with spreadsheet data below */
+const DEMO_FOCUS_NAME = "Chiamaka Obi";
+
 const FINAL_SUMMARY =
-    "Processed updates for Alex Rivera (Google). Transitioned lead status from New Lead to In Progress and identified role as Forward Deployed Engineer.";
+    "Processed updates for Chiamaka Obi (Google). Transitioned lead status from New Lead to In Progress and identified role as Forward Deployed Engineer.";
 
 const DROPDOWN_OPTIONS = ["New Lead", "In Progress", "Closed Won", "Lost"];
 
@@ -253,19 +256,19 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                     </div>
 
                     {rows.map(([name, company, status, role], index) => {
-                        const isAlex = name === "Alex Rivera";
+                        const isFocusRow = name === DEMO_FOCUS_NAME;
 
                         return (
                             <div key={`${name}-${index}`} style={{ display: "flex" }}>
-                                <SpreadsheetCell width={COL.name} color={isAlex ? C.text : undefined} C={C}>
+                                <SpreadsheetCell width={COL.name} color={isFocusRow ? C.text : undefined} C={C}>
                                     {name}
                                 </SpreadsheetCell>
-                                <SpreadsheetCell width={COL.company} active={isAlex && frame.activeCell === "company"} C={C}>
+                                <SpreadsheetCell width={COL.company} active={isFocusRow && frame.activeCell === "company"} C={C}>
                                     {company}
                                 </SpreadsheetCell>
-                                <SpreadsheetCell width={COL.status} active={isAlex && frame.activeCell === "status"} C={C}>
+                                <SpreadsheetCell width={COL.status} active={isFocusRow && frame.activeCell === "status"} C={C}>
                                     {status}
-                                    {isAlex && frame.dropdownOpen ? (
+                                    {isFocusRow && frame.dropdownOpen ? (
                                         <div
                                             style={{
                                                 position: "absolute",
@@ -300,7 +303,7 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                                         </div>
                                     ) : null}
                                 </SpreadsheetCell>
-                                <SpreadsheetCell width={COL.role} active={isAlex && frame.activeCell === "role"} C={C}>
+                                <SpreadsheetCell width={COL.role} active={isFocusRow && frame.activeCell === "role"} C={C}>
                                     {role}
                                 </SpreadsheetCell>
                             </div>

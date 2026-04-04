@@ -410,6 +410,12 @@
     }
 }
 
+/* Mobile-only “Get Started” CTAs (desktop uses download buttons) */
+.hero-get-started-cta,
+.closing-get-started-cta {
+    display: none !important;
+}
+
 @media (max-width: 768px) {
     .l-hero-grid {
         grid-template-columns: 1fr !important;
@@ -425,10 +431,6 @@
         margin-bottom: 14px !important;
     }
 
-    .l-hero-section h1 br {
-        display: none;
-    }
-
     .l-hero-section p {
         font-size: 15px !important;
         margin-bottom: 28px !important;
@@ -438,6 +440,64 @@
     .hero-download-cta,
     .closing-download-cta {
         display: none !important;
+    }
+
+    .hero-get-started-cta,
+    .closing-get-started-cta {
+        display: inline-flex !important;
+    }
+
+    /* Shorter mockup chrome on mobile — less vertical scroll between feature sections */
+    .l-feature-visual-mobile .l-mac-window-body {
+        aspect-ratio: 16 / 7.5 !important;
+    }
+
+    /*
+     * Person detail mockup: keep profile + headline stats readable; clip lower donut / activity rows.
+     * Removes flex stretch that created empty space; :has() scopes only this mockup.
+     */
+    .l-feature-visual-mobile .l-mac-window:has(.l-person-detail-mockup) .l-mac-window-body {
+        aspect-ratio: unset !important;
+        /* Taller than before so padding/gaps can breathe; bottom of charts still clips */
+        max-height: min(304px, 84vw);
+        overflow: hidden;
+    }
+
+    .l-person-detail-mockup {
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 18px 20px !important;
+        gap: 16px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-header {
+        gap: 16px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-stats {
+        gap: 36px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-grid {
+        flex: none !important;
+        min-height: 0 !important;
+        gap: 12px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-grid > div {
+        padding: 16px 15px !important;
+        border-radius: 14px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-grid > div > span:first-child {
+        margin-bottom: 16px !important;
+        display: block;
+    }
+
+    .l-person-detail-mockup .l-pd-card-body {
+        flex: none !important;
+        min-height: 0 !important;
+        gap: 12px !important;
     }
 
     /* Global mobile padding: reduce 48px horizontal to 20px on all pages */
@@ -467,6 +527,7 @@
         overflow: hidden;
     }
 
+
     .l-closing-cta {
         padding: 60px 0 !important;
     }
@@ -493,5 +554,78 @@
 
     .l-card {
         padding: 22px !important;
+    }
+
+    /* Auth, billing, FAQ, checkout — align with blog / about mobile rhythm */
+    .l-account-page-main {
+        padding-top: 100px !important;
+        padding-bottom: 80px !important;
+    }
+
+    .l-account-page-main--checkout {
+        padding-top: 96px !important;
+        align-items: flex-start !important;
+    }
+
+    .l-account-checkout-card {
+        padding: 24px 20px !important;
+    }
+
+    .l-account-page-main--checkout h1 {
+        font-size: 28px !important;
+    }
+
+    .l-account-page-header {
+        text-align: left !important;
+        margin-bottom: 28px !important;
+    }
+
+    .l-account-page-main h1 {
+        font-size: 30px !important;
+    }
+
+    .l-account-page-subtitle {
+        font-size: 15px !important;
+    }
+
+    .l-faq-page-header {
+        margin-bottom: 28px !important;
+    }
+
+    .l-faq-item button {
+        padding: 16px 0 !important;
+        gap: 16px !important;
+    }
+
+    .l-faq-item button span:first-of-type {
+        font-size: 15px !important;
+    }
+
+    .l-faq-item .l-faq-answer {
+        font-size: 14px !important;
+        padding-bottom: 16px !important;
+        padding-right: 0 !important;
+    }
+
+    .l-faq-bottom-cta {
+        margin-top: 40px !important;
+        padding: 24px 20px !important;
+        text-align: left !important;
+    }
+
+    .l-faq-bottom-cta h2 {
+        font-size: 22px !important;
+    }
+
+    .l-billing-card {
+        padding: 20px 18px !important;
+    }
+
+    .l-account-page-main .l-billing-card h2 {
+        font-size: 20px !important;
+    }
+
+    .l-landing-footer {
+        padding: 36px 20px !important;
     }
 }

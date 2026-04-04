@@ -44,7 +44,7 @@ const PEOPLE = [
     { name: "Alex Rivera", role: "Senior Engineer", score: 82, delta: 4, improving: true },
     { name: "Sarah Kim", role: "Staff Engineer", score: 91, delta: 2, improving: true },
     { name: "James Lee", role: "Engineer II", score: 68, delta: 3, improving: false },
-    { name: "Maya Chen", role: "Senior Engineer", score: 77, delta: 6, improving: true },
+    { name: "Kunle Fashola", role: "Senior Engineer", score: 77, delta: 6, improving: true },
 ];
 
 const PersonRow = ({ name, role, score, delta, improving, isLast, C }: typeof PEOPLE[0] & { isLast: boolean; C: ReturnType<typeof getMockupColors> }) => (

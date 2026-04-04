@@ -9,6 +9,7 @@ const C = {
     text: "var(--l-text)",
     textSec: "var(--l-text-secondary)",
     accent: "var(--l-accent, #82C0CC)",
+    bg: "var(--l-bg)",
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
 
@@ -404,6 +405,29 @@ export const LandingNav = () => {
                                 </Link>
                             );
                         })}
+                    </div>
+
+                    <div style={{ padding: "0 24px 16px" }}>
+                        <Link
+                            href="/login"
+                            onClick={closeMobileMenu}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: "100%",
+                                padding: "14px 24px",
+                                borderRadius: 10,
+                                fontSize: 15,
+                                fontWeight: 500,
+                                textDecoration: "none",
+                                background: C.text,
+                                color: C.bg,
+                                boxSizing: "border-box",
+                            }}
+                        >
+                            Get Started
+                        </Link>
                     </div>
 
                     <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: 12 }}>

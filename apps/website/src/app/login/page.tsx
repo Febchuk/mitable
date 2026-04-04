@@ -185,12 +185,15 @@ export default function LoginPage() {
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />
 
-            <main style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}>
-                <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <main
+                className="l-account-page-main"
+                style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}
+            >
+                <div className="l-account-page-header" style={{ textAlign: "center", marginBottom: 48 }}>
                     <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
                         Sign In
                     </h1>
-                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
+                    <p className="l-account-page-subtitle" style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
                         Sign in to manage your subscription and billing.
                     </p>
                 </div>

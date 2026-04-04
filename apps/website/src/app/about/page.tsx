@@ -1,6 +1,7 @@
 "use client";
 
 import { ClosingCtaSection, LandingFooter } from "@/components/landing";
+import { AboutTeamSection } from "@/components/landing/about-team-section";
 import { LandingNav } from "@/components/landing/landing-nav";
 
 const C = {
@@ -14,29 +15,6 @@ const C = {
     serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
-
-/* Leadership team — restore with section below in a later commit.
-const TEAM_MEMBERS = [
-    {
-        name: "Mikun Adeniran",
-        role: "Founder",
-        companies: ["Microsoft", "AWS"],
-        image: "https://ui-avatars.com/api/?name=Mikun+Adeniran&background=random&color=fff&size=400"
-    },
-    {
-        name: "Jason Smith",
-        role: "Founding Engineer",
-        companies: ["Stripe", "Vercel"],
-        image: "https://ui-avatars.com/api/?name=Jason+Smith&background=random&color=fff&size=400"
-    },
-    {
-        name: "Sarah Chen",
-        role: "Head of Product",
-        companies: ["Figma", "Linear"],
-        image: "https://ui-avatars.com/api/?name=Sarah+Chen&background=random&color=fff&size=400"
-    }
-];
-*/
 
 export default function AboutPage() {
     return (
@@ -104,7 +82,7 @@ export default function AboutPage() {
 
                 .about-team {
                     padding: 80px 32px 120px;
-                    max-width: 1100px;
+                    max-width: 1120px;
                     margin: 0 auto;
                 }
                 .about-team h2 {
@@ -113,62 +91,123 @@ export default function AboutPage() {
                     font-size: 40px;
                     font-weight: 400;
                     color: ${C.text};
-                    margin: 0 0 64px;
+                    margin: 0 0 48px;
                 }
-                .team-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                    gap: 32px;
+                .about-team-rows {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 28px;
+                }
+                .about-team-row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 24px;
                 }
                 .team-card {
-                    background: ${C.raised};
+                    background: var(--l-bg-overlay, #2A2824);
                     border: 1px solid ${C.border};
                     border-radius: 16px;
                     overflow: hidden;
                     display: flex;
                     flex-direction: column;
+                    flex: 0 1 280px;
+                    max-width: 300px;
+                    width: 100%;
+                }
+                .team-card-visual {
+                    padding: 10px 10px 0;
                 }
                 .team-card-img {
                     width: 100%;
-                    aspect-ratio: 1 / 1;
+                    aspect-ratio: 3 / 4;
                     object-fit: cover;
+                    object-position: center top;
+                    border-radius: 10px;
                     background: ${C.border};
+                    display: block;
                 }
                 .team-card-content {
-                    padding: 24px;
+                    padding: 16px 16px 18px;
+                }
+                .team-card-head {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 8px;
+                    margin-bottom: 6px;
                 }
                 .team-name {
-                    font-size: 20px;
+                    font-size: 17px;
                     font-weight: 600;
                     color: ${C.text};
-                    margin: 0 0 4px;
+                    margin: 0 0 2px;
+                    line-height: 1.25;
                 }
                 .team-role {
-                    font-size: 14px;
+                    font-size: 10px;
                     color: ${C.accent};
-                    font-weight: 500;
-                    margin: 0 0 20px;
-                }
-                .team-prev-label {
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    color: ${C.textTer};
-                    margin: 0 0 12px;
                     font-weight: 600;
+                    letter-spacing: 0.1em;
+                    text-transform: uppercase;
+                    margin: 0;
                 }
-                .team-companies {
+                .team-linkedin {
+                    flex-shrink: 0;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: ${C.textTer};
+                    background: rgba(var(--l-ui-rgb, 236, 232, 224), 0.06);
+                    transition: color 0.15s ease, background 0.15s ease;
+                }
+                .team-linkedin:hover {
+                    color: ${C.textSec};
+                    background: rgba(var(--l-ui-rgb, 236, 232, 224), 0.1);
+                }
+                .team-previous-line {
+                    font-size: 13px;
+                    line-height: 1.45;
+                    color: ${C.textSec};
+                    margin: 0 0 14px;
+                }
+                .team-logo-row {
                     display: flex;
                     flex-wrap: wrap;
-                    gap: 12px;
                     align-items: center;
+                    gap: 10px;
                 }
-                .company-logo-text {
-                    font-size: 14px;
-                    font-weight: 700;
+                .team-logo-link {
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    overflow: hidden;
+                    background: rgba(var(--l-ui-rgb, 236, 232, 224), 0.07);
+                    border: 1px solid rgba(var(--l-ui-rgb, 236, 232, 224), 0.1);
                     color: ${C.textSec};
-                    letter-spacing: -0.02em;
-                    opacity: 0.8;
+                    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+                }
+                .team-logo-link:hover {
+                    background: rgba(var(--l-ui-rgb, 236, 232, 224), 0.11);
+                    border-color: rgba(var(--l-ui-rgb, 236, 232, 224), 0.16);
+                    color: ${C.text};
+                }
+                .team-logo-link-inner {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    height: 100%;
+                }
+                .team-logo-link-inner svg {
+                    width: 55%;
+                    height: 55%;
                 }
 
                 @media (max-width: 768px) {
@@ -190,6 +229,44 @@ export default function AboutPage() {
                     }
                     .about-section h2, .about-team h2 {
                         font-size: 26px;
+                    }
+                    .about-team {
+                        padding: 48px 20px 80px;
+                    }
+                    .about-team h2 {
+                        margin-bottom: 32px;
+                    }
+                    .team-card {
+                        max-width: none;
+                        flex: 1 1 auto;
+                    }
+                    .about-team-row {
+                        flex-direction: column;
+                        align-items: stretch;
+                        gap: 20px;
+                    }
+                    .team-card-visual {
+                        padding: 12px 12px 0;
+                    }
+                    .team-card-img {
+                        aspect-ratio: 4 / 5;
+                        object-position: center center;
+                        border-radius: 14px;
+                    }
+                    .team-card-content {
+                        padding: 18px 20px 22px;
+                    }
+                    .team-previous-line {
+                        font-size: 14px;
+                        margin-bottom: 16px;
+                    }
+                    .team-logo-link {
+                        width: 48px;
+                        height: 48px;
+                    }
+                    .team-logo-link-inner {
+                        width: 36px;
+                        height: 36px;
                     }
                     .about-section p {
                         font-size: 15px;
@@ -248,31 +325,7 @@ export default function AboutPage() {
                     <p>We've been managers. We've been managed. We started Mitable because both sides deserve better than the way things work today.</p>
                 </section>
 
-                {/* Leadership Team — uncomment TEAM_MEMBERS + this block in a later commit.
-                <section className="about-team">
-                    <h2>Leadership Team</h2>
-                    <div className="team-grid">
-                        {TEAM_MEMBERS.map((member) => (
-                            <div key={member.name} className="team-card">
-                                <img src={member.image} alt={member.name} className="team-card-img" />
-                                <div className="team-card-content">
-                                    <h3 className="team-name">{member.name}</h3>
-                                    <p className="team-role">{member.role}</p>
-
-                                    <div className="team-prev-label">Previously</div>
-                                    <div className="team-companies">
-                                        {member.companies.map((company) => (
-                                            <span key={company} className="company-logo-text">
-                                                {company}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-                */}
+                <AboutTeamSection />
 
                 <ClosingCtaSection />
             </main>

@@ -5,21 +5,21 @@ import { MitableLogoMinimal } from "@/components/foundations/logo/mitable-logo";
 import { type MockupColors, type MockupVariant, getMockupColors } from "./colors";
 import { MacWindow } from "./mac-window";
 
-const SCENES = [{ id: "slack" }, { id: "perplexity" }, { id: "terminal" }, { id: "docs" }] as const;
+const SCENES = [{ id: "slack" }, { id: "chatgpt" }, { id: "terminal" }, { id: "docs" }] as const;
 
 const SCENE_DURATION = 4500;
 const FADE_DURATION = 600;
 
-/* ─── Scene 1: Slack ─── */
+/* ─── Scene 1: Slack — customer channel (SE / FDE work) ─── */
 const SlackScene = ({ charCount, C }: { charCount: number; C: MockupColors }) => {
     const isLight = C.bg === "#F5F1ED";
-    const channels = ["# general", "# eng-standup", "# design", "# random"];
+    const channels = ["# general", "# acme-corp", "# customer-updates", "# team-internal"];
     const messages = [
-        { user: "SK", name: "Sarah Kim", time: "10:23 AM", text: "Just shipped the auth refactor — PR is up for review" },
-        { user: "JL", name: "James Lee", time: "10:25 AM", text: "Nice! I'll take a look after standup" },
-        { user: "MR", name: "Maya Rivera", time: "10:31 AM", text: "Can someone point me to the API docs for the new endpoints?" },
+        { user: "SK", name: "Sarah Kim", time: "2:14 PM", text: "Any updates on the SSO integration for Acme?" },
+        { user: "TB", name: "Tunde Bakare", time: "2:18 PM", text: "Just finished configuring their IdP — tested all auth flows and they\u2019re passing \u2713" },
+        { user: "JL", name: "James Lee", time: "2:19 PM", text: "Amazing, they\u2019ll be thrilled. Can you send handoff notes?" },
     ];
-    const composing = "Looking into it now, should have an update by".slice(0, charCount);
+    const composing = "Sending the handoff doc with the config details now".slice(0, charCount);
 
     const slackSidebar = isLight ? "#F0EAF4" : "#1D1520";
     const slackSidebarBorder = isLight ? "rgba(74,21,75,0.08)" : "rgba(255,255,255,0.06)";
@@ -50,7 +50,7 @@ const SlackScene = ({ charCount, C }: { charCount: number; C: MockupColors }) =>
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", background: C.bg }}>
                 <div style={{ padding: "10px 16px", borderBottom: `1px solid rgba(${C.uiRgb}, 0.06)`, fontSize: 13, fontWeight: 600, color: C.text }}>
-                    # eng-standup
+                    # acme-corp
                 </div>
                 <div style={{ flex: 1, padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
                     {messages.map((m) => (
@@ -113,10 +113,12 @@ const SlackScene = ({ charCount, C }: { charCount: number; C: MockupColors }) =>
     );
 };
 
-/* ─── Scene 2: Perplexity ─── */
-const PerplexityScene = ({ charCount, C }: { charCount: number; C: MockupColors }) => {
-    const query = "best practices for database migration in production".slice(0, charCount);
-    const showResults = charCount >= 42;
+/* ─── Scene 2: ChatGPT — Excel formula query (ops / sales work) ─── */
+const ChatGPTScene = ({ charCount, C }: { charCount: number; C: MockupColors }) => {
+    const fullQuery = "give me an excel formula to do some analysis on the forecasting numbers";
+    const query = fullQuery.slice(0, charCount);
+    const showResponse = charCount >= 55;
+    const gptGreen = "#10A37F";
 
     return (
         <div style={{ fontFamily: C.sans, background: C.bg, height: "100%", display: "flex", flexDirection: "column" }}>
@@ -139,93 +141,135 @@ const PerplexityScene = ({ charCount, C }: { charCount: number; C: MockupColors 
                     </svg>
                 </div>
                 <div style={{ flex: 1, background: `rgba(${C.uiRgb}, 0.04)`, borderRadius: 6, padding: "5px 10px", fontSize: 11, color: C.textTer }}>
-                    perplexity.ai
+                    chatgpt.com
                 </div>
             </div>
-            <div style={{ flex: 1, padding: "32px 24px 16px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 600, color: C.text, marginBottom: 20 }}>Ask anything</div>
-                <div
-                    style={{
-                        width: "100%",
-                        maxWidth: 420,
-                        background: `rgba(${C.uiRgb}, 0.04)`,
-                        border: `1px solid rgba(${C.uiRgb}, 0.08)`,
-                        borderRadius: 10,
-                        padding: "12px 14px",
-                        fontSize: 13,
-                        color: C.text,
-                    }}
-                >
-                    {query}
-                    <span
-                        style={{
-                            display: "inline-block",
-                            width: 1,
-                            height: 14,
-                            background: C.accent,
-                            marginLeft: 1,
-                            verticalAlign: "text-bottom",
-                            animation: "montage-blink 1s step-end infinite",
-                        }}
-                    />
-                </div>
-                {showResults && (
-                    <div
-                        style={{
-                            width: "100%",
-                            maxWidth: 420,
-                            marginTop: 16,
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 10,
-                            opacity: showResults ? 1 : 0,
-                            transition: "opacity 0.4s",
-                        }}
-                    >
-                        {[
-                            "Use versioned migrations with rollback support",
-                            "Always run migrations in a transaction",
-                            "Test against a staging replica first",
-                        ].map((r, i) => (
+
+            <div style={{ flex: 1, padding: "16px 24px 12px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                {!showResponse ? (
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
                             <div
-                                key={i}
                                 style={{
-                                    background: `rgba(${C.uiRgb}, 0.03)`,
-                                    border: `1px solid rgba(${C.uiRgb}, 0.06)`,
-                                    borderRadius: 8,
-                                    padding: "10px 12px",
-                                    fontSize: 12,
-                                    color: C.textSec,
-                                    lineHeight: 1.5,
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 999,
+                                    background: gptGreen,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
                                 }}
                             >
-                                <span style={{ color: C.accent, marginRight: 6 }}>{i + 1}.</span>
-                                {r}
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                                </svg>
                             </div>
-                        ))}
+                            <span style={{ fontSize: 18, fontWeight: 600, color: C.text }}>ChatGPT</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+                        <div
+                            style={{
+                                alignSelf: "flex-end",
+                                maxWidth: "82%",
+                                background: `rgba(${C.uiRgb}, 0.06)`,
+                                borderRadius: 14,
+                                padding: "10px 14px",
+                                fontSize: 12,
+                                color: C.text,
+                                lineHeight: 1.5,
+                            }}
+                        >
+                            {fullQuery}
+                        </div>
+                        <div style={{ display: "flex", gap: 10, maxWidth: "88%" }}>
+                            <div
+                                style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 999,
+                                    background: gptGreen,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                    marginTop: 2,
+                                }}
+                            >
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            </div>
+                            <div style={{ fontSize: 12, color: C.textSec, lineHeight: 1.65 }}>
+                                Try this:{" "}
+                                <code
+                                    style={{
+                                        background: `rgba(${C.uiRgb}, 0.06)`,
+                                        padding: "2px 6px",
+                                        borderRadius: 4,
+                                        fontSize: 11,
+                                        fontFamily: C.mono,
+                                    }}
+                                >
+                                    =FORECAST.ETS(target, values, timeline)
+                                </code>
+                                <br />
+                                It uses exponential smoothing to project values from your historical data.
+                            </div>
+                        </div>
                     </div>
                 )}
+
+                <div style={{ marginTop: 12 }}>
+                    <div
+                        style={{
+                            background: `rgba(${C.uiRgb}, 0.04)`,
+                            border: `1px solid rgba(${C.uiRgb}, 0.08)`,
+                            borderRadius: 12,
+                            padding: "12px 14px",
+                            fontSize: 13,
+                            color: showResponse ? C.textTer : C.text,
+                            minHeight: 18,
+                        }}
+                    >
+                        {showResponse ? (
+                            "Ask a follow-up\u2026"
+                        ) : (
+                            <>
+                                {query}
+                                <span
+                                    style={{
+                                        display: "inline-block",
+                                        width: 1,
+                                        height: 14,
+                                        background: C.accent,
+                                        marginLeft: 1,
+                                        verticalAlign: "text-bottom",
+                                        animation: "montage-blink 1s step-end infinite",
+                                    }}
+                                />
+                            </>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
 };
 
-/* ─── Scene 3: Terminal ─── */
-const TerminalScene = ({ lineCount, C }: { lineCount: number; C: MockupColors }) => {
+/* ─── Scene 3: Terminal — Claude Code startup (eng work) ─── */
+const TerminalScene = ({ charCount, lineCount, C }: { charCount: number; lineCount: number; C: MockupColors }) => {
     const isLight = C.bg === "#F5F1ED";
     const termBg = isLight ? "#F8F5F2" : "#0D0D0D";
+    const claudeOrange = "#CC785C";
+    const boxBorder = isLight ? "rgba(28,43,51,0.15)" : "rgba(255,255,255,0.1)";
 
-    const lines = [
-        { prompt: true, text: "git status" },
-        { prompt: false, text: "On branch feat/auth-refactor" },
-        { prompt: false, text: "Changes staged for commit:" },
-        { prompt: false, text: "  modified:   src/auth/middleware.ts", color: C.green },
-        { prompt: false, text: "  modified:   src/auth/session.ts", color: C.green },
-        { prompt: false, text: "" },
-        { prompt: true, text: "npm run build" },
-        { prompt: false, text: "> mitable@1.0.0 build" },
-        { prompt: false, text: "✓ Compiled successfully in 4.2s", color: C.green },
-    ];
+    const typedCmd = "claude".slice(0, charCount);
+    const showBox = charCount >= 6 && lineCount >= 2;
+    const showTips = lineCount >= 3;
+    const showCwd = lineCount >= 4;
+    const showPrompt = lineCount >= 5;
 
     return (
         <div
@@ -241,33 +285,77 @@ const TerminalScene = ({ lineCount, C }: { lineCount: number; C: MockupColors })
                 boxSizing: "border-box",
             }}
         >
-            {lines.slice(0, lineCount).map((l, i) => (
-                <div key={i} style={{ color: l.color || C.textSec, whiteSpace: "pre" }}>
-                    {l.prompt && <span style={{ color: C.accent }}>~/mitable $&nbsp;</span>}
-                    {l.text}
-                    {i === lineCount - 1 && l.prompt && (
-                        <span
-                            style={{
-                                display: "inline-block",
-                                width: 7,
-                                height: 14,
-                                background: C.textSec,
-                                marginLeft: 2,
-                                verticalAlign: "text-bottom",
-                                animation: "montage-blink 1s step-end infinite",
-                            }}
-                        />
+            <div style={{ whiteSpace: "pre" }}>
+                <span style={{ color: C.accent }}>~/project $&nbsp;</span>
+                {typedCmd}
+                {charCount < 6 && (
+                    <span
+                        style={{
+                            display: "inline-block",
+                            width: 7,
+                            height: 14,
+                            background: C.textSec,
+                            marginLeft: 2,
+                            verticalAlign: "text-bottom",
+                            animation: "montage-blink 1s step-end infinite",
+                        }}
+                    />
+                )}
+            </div>
+
+            {showBox && (
+                <div
+                    style={{
+                        border: `1px solid ${boxBorder}`,
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                        margin: "10px 0 0",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ color: claudeOrange, fontSize: 16, lineHeight: 1 }}>{"\u2733"}</span>
+                        <span style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>Welcome to Claude Code!</span>
+                        <span style={{ color: C.textFaint, fontSize: 10 }}>v1.0.14</span>
+                    </div>
+                    {showTips && (
+                        <div style={{ fontSize: 11, color: C.textTer, marginTop: 8 }}>
+                            <span style={{ color: C.accent }}>/help</span> for help &nbsp;\u00B7&nbsp;{" "}
+                            <span style={{ color: C.accent }}>/status</span> for setup
+                        </div>
                     )}
                 </div>
-            ))}
+            )}
+
+            {showCwd && (
+                <div style={{ fontSize: 11, color: C.textTer, marginTop: 8 }}>
+                    cwd: <span style={{ color: C.textSec }}>~/project</span>
+                </div>
+            )}
+
+            {showPrompt && (
+                <div style={{ marginTop: 8, whiteSpace: "pre" }}>
+                    <span style={{ color: claudeOrange, fontSize: 14 }}>{"\u276F"}</span>
+                    <span
+                        style={{
+                            display: "inline-block",
+                            width: 7,
+                            height: 14,
+                            background: C.textSec,
+                            marginLeft: 6,
+                            verticalAlign: "text-bottom",
+                            animation: "montage-blink 1s step-end infinite",
+                        }}
+                    />
+                </div>
+            )}
         </div>
     );
 };
 
-/* ─── Scene 4: Document Editor ─── */
+/* ─── Scene 4: Document Editor — Product strategy (product work) ─── */
 const DocsScene = ({ charCount, C }: { charCount: number; C: MockupColors }) => {
     const bodyText =
-        "The new authentication flow uses short-lived JWTs with refresh token rotation. This ensures that compromised tokens expire quickly while maintaining a seamless user experience. Key changes include...".slice(
+        "Smart Alerts will enable teams to set threshold-based notifications on pipeline coverage, forecast variance, and deal velocity. By surfacing anomalies early we cut the gap between signal and action. Phase 1 targets sales leads and CSMs with configurable triggers across...".slice(
             0,
             charCount,
         );
@@ -311,7 +399,7 @@ const DocsScene = ({ charCount, C }: { charCount: number; C: MockupColors }) => 
                 </div>
             </div>
             <div style={{ flex: 1, padding: "24px 32px", overflowY: "auto" }}>
-                <div style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 16 }}>Auth System Technical Spec</div>
+                <div style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 16 }}>Q3 Product Strategy — Smart Alerts</div>
                 <div style={{ fontSize: 13, color: C.textSec, lineHeight: 1.75 }}>
                     {bodyText}
                     <span
@@ -425,13 +513,17 @@ export const WorkMontageMockup = ({ variant = "dark" }: { variant?: MockupVarian
             const scene = SCENES[activeScene];
 
             if (scene.id === "slack") {
-                setCharCount((c) => Math.min(c + 1, 44));
-            } else if (scene.id === "perplexity") {
-                setCharCount((c) => Math.min(c + 1, 50));
+                setCharCount((c) => Math.min(c + 1, 51));
+            } else if (scene.id === "chatgpt") {
+                setCharCount((c) => Math.min(c + 2, 71));
             } else if (scene.id === "terminal") {
-                if (frame % 4 === 0) setLineCount((c) => Math.min(c + 1, 9));
+                if (frame <= 6) {
+                    setCharCount(frame);
+                } else if ((frame - 6) % 4 === 0) {
+                    setLineCount((c) => Math.min(c + 1, 5));
+                }
             } else if (scene.id === "docs") {
-                setCharCount((c) => Math.min(c + 1, 190));
+                setCharCount((c) => Math.min(c + 1, 270));
             }
         }, 80);
 
@@ -456,17 +548,17 @@ export const WorkMontageMockup = ({ variant = "dark" }: { variant?: MockupVarian
         switch (SCENES[activeScene].id) {
             case "slack":
                 return <SlackScene charCount={charCount} C={C} />;
-            case "perplexity":
-                return <PerplexityScene charCount={charCount} C={C} />;
+            case "chatgpt":
+                return <ChatGPTScene charCount={charCount} C={C} />;
             case "terminal":
-                return <TerminalScene lineCount={lineCount} C={C} />;
+                return <TerminalScene charCount={charCount} lineCount={lineCount} C={C} />;
             case "docs":
                 return <DocsScene charCount={charCount} C={C} />;
         }
     };
 
     return (
-        <div style={{ position: "relative" }}>
+        <div className="l-work-montage-wrap" style={{ position: "relative" }}>
             <div style={{ opacity, transition: `opacity ${FADE_DURATION}ms ease` }}>
                 <MacWindow variant={variant}>{renderScene()}</MacWindow>
             </div>
@@ -487,7 +579,7 @@ export const WorkMontageMockup = ({ variant = "dark" }: { variant?: MockupVarian
                         right: auto !important;
                         left: 8px !important;
                         top: auto !important;
-                        bottom: 16px !important;
+                        bottom: 44px !important;
                     }
                 }
             `}</style>
