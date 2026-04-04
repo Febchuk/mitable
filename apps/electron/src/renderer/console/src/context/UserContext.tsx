@@ -42,20 +42,19 @@ function getAvailableViewModes(user: User | null): ViewMode[] {
 }
 
 function getInitialViewMode(user: User | null): ViewMode {
+  const available = getAvailableViewModes(user);
+
+  // Check saved preference (with old key migration)
   const saved = localStorage.getItem("mitable:viewMode") as ViewMode | null;
-  // Migrate old key
-  if (!saved) {
-    const oldMode = localStorage.getItem("mitable:lastMode");
-    if (oldMode === "admin") return "admin";
-    if (oldMode === "employee") return "employee";
-  }
-  if (saved) {
-    const available = getAvailableViewModes(user);
-    if (available.includes(saved)) return saved;
-  }
-  // Default: admin goes to admin, manager to manager, else employee
-  if (user?.role === "admin" || user?.originalRole === "admin") return "admin";
-  if (user?.isManager) return "manager";
+  const oldMode = !saved ? (localStorage.getItem("mitable:lastMode") as ViewMode | null) : null;
+  const preferred = saved || oldMode;
+
+  // Only use saved mode if this user is actually allowed to use it
+  if (preferred && available.includes(preferred)) return preferred;
+
+  // Default to highest available mode
+  if (available.includes("admin")) return "admin";
+  if (available.includes("manager")) return "manager";
   return "employee";
 }
 
