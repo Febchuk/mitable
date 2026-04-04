@@ -1,4 +1,4 @@
-import { Calendar, Download, LayoutGrid, User, Users, BarChart2, FileText, Target, Award, Network, FolderKanban } from "lucide-react";
+import { Calendar, Download, LayoutGrid, User, Users, BarChart2, FileText, Target, Award, Network } from "lucide-react";
 import NavItem from "./NavItem";
 import NavGroup from "./NavGroup";
 import MitableIcon from "../icons/MitableIcon";
@@ -17,7 +17,6 @@ export default function Nav({ viewMode }: NavProps) {
         <NavItem to="/benchmarks" icon={Target} label="Benchmarks" />
         <NavItem to="/reports" icon={BarChart2} label="Reports" />
         <NavItem to="/org-chart" icon={Network} label="Org Chart" />
-        <NavItem to="/teams" icon={FolderKanban} label="Teams" />
         <NavItem to="/agent" icon={MitableIcon} label="Agent" />
       </>
     );
