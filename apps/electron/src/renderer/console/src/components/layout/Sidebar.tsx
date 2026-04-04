@@ -9,9 +9,9 @@ import type { ViewMode } from "../../types";
 const isMac = navigator.platform.toLowerCase().includes("mac");
 
 const VIEW_MODE_LABELS: Record<ViewMode, string> = {
-  employee: "My View",
-  manager: "Team View",
-  admin: "Org View",
+  employee: "Me",
+  manager: "Team",
+  admin: "Org",
 };
 
 export default function Sidebar() {
