@@ -25,8 +25,8 @@ export default function Nav({ viewMode }: NavProps) {
   if (viewMode === "manager") {
     return (
       <>
-        <NavItem to="/dashboard" icon={LayoutGrid} label="Team Dashboard" />
-        <NavItem to="/people" icon={Users} label="My Reports" />
+        <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
+        <NavItem to="/people" icon={Users} label="People" />
         <NavItem to="/benchmarks" icon={Target} label="Benchmarks" />
         <NavItem to="/reports" icon={BarChart2} label="Reports" />
         <NavItem to="/agent" icon={MitableIcon} label="Agent" />
