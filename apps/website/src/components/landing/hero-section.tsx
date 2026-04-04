@@ -22,16 +22,20 @@ export const HeroSection = () => {
 
         els.forEach((el, i) => {
             const htmlEl = el as HTMLElement;
-            setTimeout(() => {
-                htmlEl.style.opacity = "1";
-                htmlEl.style.transform = "translateY(0)";
-            }, 100 + i * 120);
+            setTimeout(
+                () => {
+                    htmlEl.style.opacity = "1";
+                    htmlEl.style.transform = "translateY(0)";
+                },
+                100 + i * 120,
+            );
         });
     }, []);
 
     return (
         <section
             ref={heroRef}
+            className="l-hero-section"
             style={{
                 fontFamily: C.sans,
                 padding: "200px 48px 60px",
@@ -55,11 +59,12 @@ export const HeroSection = () => {
                     transition: "opacity 0.7s ease, transform 0.7s ease",
                 }}
             >
-                Knowing if your team is spending their time on the right things is the{" "}
-                <strong style={{ fontWeight: 600 }}>hardest</strong>{" "}
-                part of management.
+                Knowing if your team is spending their time on the right things is the <strong style={{ fontWeight: 600 }}>hardest</strong> part of management.
                 <br />
-                <em style={{ fontStyle: "italic", color: C.accent }}> Mitable makes it <strong style={{ fontWeight: 600 }}>simple</strong>.</em>
+                <em style={{ fontStyle: "italic", color: C.accent }}>
+                    {" "}
+                    Mitable makes it <strong style={{ fontWeight: 600 }}>simple</strong>.
+                </em>
             </h1>
             <p
                 className="hero-reveal"
@@ -79,7 +84,7 @@ export const HeroSection = () => {
             </p>
             <a
                 href="/download"
-                className="hero-reveal"
+                className="hero-reveal hero-download-cta"
                 style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -96,8 +101,12 @@ export const HeroSection = () => {
                     transform: "translateY(28px)",
                     transitionDelay: "0.16s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
             >
                 {os.label}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">

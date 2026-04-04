@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { getPricingTier } from "@mitable/shared";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -34,12 +34,7 @@ const FREE_BULLETS = [
     "Direct access to the founders",
 ];
 
-const PRO_BULLETS = [
-    "Unlimited recording",
-    "AI agent",
-    "MCP integrations",
-    "Shareable Bragbook highlights",
-];
+const PRO_BULLETS = ["Unlimited recording", "AI agent", "MCP integrations", "Shareable Bragbook highlights"];
 
 const TEAMS_BULLETS = [
     "Real-time visibility into your team's work",
@@ -49,13 +44,7 @@ const TEAMS_BULLETS = [
     "Manager privacy controls",
 ];
 
-const ENTERPRISE_BULLETS = [
-    "Internal expert routing",
-    "Dedicated onboarding",
-    "Priority support",
-    "SSO",
-    "Audit logs",
-];
+const ENTERPRISE_BULLETS = ["Internal expert routing", "Dedicated onboarding", "Priority support", "SSO", "Audit logs"];
 
 function CheckBullet({ children, accent }: { children: ReactNode; accent?: boolean }) {
     return (
@@ -73,7 +62,16 @@ function CheckBullet({ children, accent }: { children: ReactNode; accent?: boole
                     marginTop: 2,
                 }}
             >
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={accent ? C.accent : C.textTer} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={accent ? C.accent : C.textTer}
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                >
                     <path d="M20 6L9 17l-5-5" />
                 </svg>
             </div>
@@ -99,8 +97,13 @@ export default function PricingPage() {
         if (!stripePriceId) return;
         setLoading(loadingKey);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) { window.location.href = "/login?redirect=/pricing"; return; }
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = "/login?redirect=/pricing";
+                return;
+            }
             const res = await fetch(`${API_URL}/api/stripe/create-checkout-session`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
@@ -110,7 +113,11 @@ export default function PricingPage() {
                     cancelUrl: `${window.location.origin}/checkout/cancel`,
                 }),
             });
-            if (res.status === 401) { await supabase.auth.signOut(); window.location.href = "/login?redirect=/pricing"; return; }
+            if (res.status === 401) {
+                await supabase.auth.signOut();
+                window.location.href = "/login?redirect=/pricing";
+                return;
+            }
             const data = await res.json();
             if (data.url) window.location.href = data.url;
         } catch (error) {
@@ -129,15 +136,10 @@ export default function PricingPage() {
     const TEAMS_MONTHLY = "$40";
     const TEAMS_YEARLY = "$32";
 
-    const proDisplay =
-        billing === "yearly"
-            ? { amount: PRO_YEARLY, strikethrough: PRO_MONTHLY, period: "/month" }
-            : { amount: PRO_MONTHLY, period: "/month" };
+    const proDisplay = billing === "yearly" ? { amount: PRO_YEARLY, strikethrough: PRO_MONTHLY, period: "/month" } : { amount: PRO_MONTHLY, period: "/month" };
 
     const teamsDisplay =
-        billing === "yearly"
-            ? { amount: TEAMS_YEARLY, strikethrough: TEAMS_MONTHLY, period: "/user/month" }
-            : { amount: TEAMS_MONTHLY, period: "/user/month" };
+        billing === "yearly" ? { amount: TEAMS_YEARLY, strikethrough: TEAMS_MONTHLY, period: "/user/month" } : { amount: TEAMS_MONTHLY, period: "/user/month" };
 
     /** Cursor-like: muted track, lighter inner pill when selected, bright label on active. */
     const toggleSegment = (active: boolean) => ({
@@ -254,6 +256,16 @@ export default function PricingPage() {
                     }
                     .pricing-compact-header {
                         margin-bottom: 12px !important;
+                    }
+                }
+                @media (max-width: 768px) {
+                    .pricing-page-main {
+                        padding-left: 20px !important;
+                        padding-right: 20px !important;
+                    }
+                    .pricing-plan-grid {
+                        grid-template-columns: 1fr !important;
+                        gap: 12px !important;
                     }
                 }
             `}</style>
@@ -433,9 +445,7 @@ export default function PricingPage() {
                             {loading === "pro" ? "Redirecting..." : "Get Pro"}
                         </button>
                         <div style={{ height: 1, background: "rgba(var(--l-ui-rgb, 236,232,224), 0.04)", marginBottom: 8 }} />
-                        <p style={{ fontSize: 12, fontWeight: 600, color: C.textSec, margin: "0 0 6px", lineHeight: 1.35 }}>
-                            Everything in Free, plus:
-                        </p>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: C.textSec, margin: "0 0 6px", lineHeight: 1.35 }}>Everything in Free, plus:</p>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
                             {PRO_BULLETS.map((t) => (
                                 <CheckBullet key={t} accent>
@@ -522,9 +532,7 @@ export default function PricingPage() {
                             </a>
                         )}
                         <div style={{ height: 1, background: "rgba(var(--l-ui-rgb, 236,232,224), 0.04)", marginBottom: 8 }} />
-                        <p style={{ fontSize: 12, fontWeight: 600, color: C.textSec, margin: "0 0 6px", lineHeight: 1.35 }}>
-                            Everything in Pro, plus:
-                        </p>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: C.textSec, margin: "0 0 6px", lineHeight: 1.35 }}>Everything in Pro, plus:</p>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
                             {TEAMS_BULLETS.map((t) => (
                                 <CheckBullet key={t}>{t}</CheckBullet>
@@ -561,9 +569,7 @@ export default function PricingPage() {
                             Contact Sales
                         </a>
                         <div style={{ height: 1, background: "rgba(var(--l-ui-rgb, 236,232,224), 0.04)", marginBottom: 8 }} />
-                        <p style={{ fontSize: 12, fontWeight: 600, color: C.textSec, margin: "0 0 6px", lineHeight: 1.35 }}>
-                            Everything in Teams, plus:
-                        </p>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: C.textSec, margin: "0 0 6px", lineHeight: 1.35 }}>Everything in Teams, plus:</p>
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
                             {ENTERPRISE_BULLETS.map((t) => (
                                 <CheckBullet key={t}>{t}</CheckBullet>

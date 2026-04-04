@@ -34,6 +34,7 @@ export const ClosingCtaSection = () => {
     return (
         <section
             ref={ref}
+            className="l-closing-cta"
             style={{
                 padding: "140px 48px",
                 textAlign: "center",
@@ -68,11 +69,11 @@ export const ClosingCtaSection = () => {
                     color: C.textSec,
                 }}
             >
-                The teams that win will be the ones where everyone knows exactly what good looks like
-                and can see whether they&apos;re hitting it.
+                The teams that win will be the ones where everyone knows exactly what good looks like and can see whether they&apos;re hitting it.
             </p>
             <a
                 href="/download"
+                className="closing-download-cta"
                 style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -87,8 +88,12 @@ export const ClosingCtaSection = () => {
                     fontFamily: C.sans,
                     transition: "opacity 0.2s",
                 }}
-                onMouseEnter={(e) => { (e.currentTarget).style.opacity = "0.85"; }}
-                onMouseLeave={(e) => { (e.currentTarget).style.opacity = "1"; }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
             >
                 {os.label}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">

@@ -1,7 +1,7 @@
 "use client";
 
+import { ClosingCtaSection, LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
-import { LandingFooter, ClosingCtaSection } from "@/components/landing";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
@@ -172,10 +172,35 @@ export default function AboutPage() {
                 }
 
                 @media (max-width: 768px) {
-                    .about-hero { padding: 140px 24px 60px; }
-                    .about-hero h1 { font-size: 44px; }
-                    .about-section h2, .about-team h2 { font-size: 32px; }
-                    .about-closing p { font-size: 20px; }
+                    .about-hero {
+                        padding: 100px 20px 24px;
+                        text-align: left;
+                    }
+                    .about-hero h1 {
+                        font-size: 32px;
+                        max-width: none;
+                    }
+                    .about-hero p {
+                        font-size: 15px;
+                        max-width: none;
+                    }
+                    .about-section {
+                        padding: 24px 20px;
+                        text-align: left;
+                    }
+                    .about-section h2, .about-team h2 {
+                        font-size: 26px;
+                    }
+                    .about-section p {
+                        font-size: 15px;
+                    }
+                    .about-closing {
+                        padding: 24px 20px;
+                        text-align: left;
+                    }
+                    .about-closing p {
+                        font-size: 17px;
+                    }
                 }
             `}</style>
             <LandingNav />
@@ -186,10 +211,15 @@ export default function AboutPage() {
                     <h1>
                         Managing people is one of the <strong style={{ fontWeight: 600 }}>hardest</strong> jobs in a company.
                         <br />
-                        <em style={{ fontStyle: "italic", color: C.accent }}> We think it should be <strong style={{ fontWeight: 600 }}>easier</strong>.</em>
+                        <em style={{ fontStyle: "italic", color: C.accent }}>
+                            {" "}
+                            We think it should be <strong style={{ fontWeight: 600 }}>easier</strong>.
+                        </em>
                     </h1>
                     <p>
-                        AI has transformed how engineers, PMs, and ops teams work. Managers are still doing their work manually — gathering context from their team, chasing updates, trying to form a complete picture, and then translating all of it upward to leadership. We built Mitable to fix that.
+                        AI has transformed how engineers, PMs, and ops teams work. Managers are still doing their work manually — gathering context from their
+                        team, chasing updates, trying to form a complete picture, and then translating all of it upward to leadership. We built Mitable to fix
+                        that.
                     </p>
                 </section>
 
@@ -197,7 +227,9 @@ export default function AboutPage() {
                 <section className="about-section">
                     <h2>Great teams don't happen by accident. They need clarity.</h2>
                     <p>
-                        When managers know what their team is actually working on — and can measure it against clear benchmarks — misalignment gets caught early, strong work gets recognised, and people understand what good looks like. That's not micromanagement. That's just good leadership, with the right information to back it up.
+                        When managers know what their team is actually working on — and can measure it against clear benchmarks — misalignment gets caught
+                        early, strong work gets recognised, and people understand what good looks like. That's not micromanagement. That's just good leadership,
+                        with the right information to back it up.
                     </p>
                 </section>
 
@@ -205,15 +237,15 @@ export default function AboutPage() {
                 <section className="about-section">
                     <h2>We didn't want to build something that only worked for one side of the table.</h2>
                     <p>
-                        Employees deserve to know how they're being evaluated and to get credit for the work they're putting in. Mitable gives every employee a score against the benchmarks their manager has set, and a Bragbook that captures their contributions automatically. When both sides are working from the same picture, performance stops being something that happens to you and starts being something you're part of.
+                        Employees deserve to know how they're being evaluated and to get credit for the work they're putting in. Mitable gives every employee a
+                        score against the benchmarks their manager has set, and a Bragbook that captures their contributions automatically. When both sides are
+                        working from the same picture, performance stops being something that happens to you and starts being something you're part of.
                     </p>
                 </section>
 
                 {/* Section 4 */}
                 <section className="about-closing">
-                    <p>
-                        We've been managers. We've been managed. We started Mitable because both sides deserve better than the way things work today.
-                    </p>
+                    <p>We've been managers. We've been managed. We started Mitable because both sides deserve better than the way things work today.</p>
                 </section>
 
                 {/* Leadership Team — uncomment TEAM_MEMBERS + this block in a later commit.

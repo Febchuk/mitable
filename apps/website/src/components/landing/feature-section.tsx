@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useRef, type ReactNode } from "react";
+import React, { type ReactNode, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { MacWindow } from "./mockups/mac-window";
 import type { MockupVariant } from "./mockups/colors";
+import { MacWindow } from "./mockups/mac-window";
+import { MobileMockupClip } from "./mockups/mobile-mockup-clip";
 
 const C = {
     text: "var(--l-text, #ECE8E0)",
@@ -63,7 +64,7 @@ export const FeatureSection = ({
     }, []);
 
     const textBlock = (
-        <div style={{ fontFamily: C.sans }}>
+        <div className="l-feature-text" style={{ fontFamily: C.sans }}>
             {stepNumber != null && (
                 <div
                     style={{
@@ -114,16 +115,20 @@ export const FeatureSection = ({
                     fontWeight: 500,
                     transition: "opacity 0.2s",
                 }}
-                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.opacity = "0.75"; }}
-                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => { e.currentTarget.style.opacity = "1"; }}
+                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    e.currentTarget.style.opacity = "0.75";
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
             >
                 {linkText}
             </Link>
         </div>
     );
 
-    const visualBlock = (
-        <div style={{ overflow: "visible" }}>
+    const desktopVisual = (
+        <div className="l-feature-visual-desktop" style={{ overflow: "visible" }}>
             {screenshot ? (
                 <div
                     style={{
@@ -151,10 +156,22 @@ export const FeatureSection = ({
                     />
                 </div>
             ) : mockup ? (
-                rawMockup ? mockup : <MacWindow variant={variant}>{mockup}</MacWindow>
+                rawMockup ? (
+                    mockup
+                ) : (
+                    <MacWindow variant={variant}>{mockup}</MacWindow>
+                )
             ) : null}
         </div>
     );
+
+    const mobileVisual = mockup ? (
+        <div className="l-feature-visual-mobile">
+            <MobileMockupClip variant={variant} raw={rawMockup}>
+                {mockup}
+            </MobileMockupClip>
+        </div>
+    ) : null;
 
     return (
         <section
@@ -176,15 +193,16 @@ export const FeatureSection = ({
         >
             {reverse ? (
                 <>
-                    {visualBlock}
+                    {desktopVisual}
                     {textBlock}
                 </>
             ) : (
                 <>
                     {textBlock}
-                    {visualBlock}
+                    {desktopVisual}
                 </>
             )}
+            {mobileVisual}
         </section>
     );
 };

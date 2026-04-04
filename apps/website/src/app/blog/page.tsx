@@ -1,7 +1,7 @@
 "use client";
 
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { BLOG_AUTHOR, BLOG_POSTS, formatBlogPublished } from "@/content/blog-posts";
 
 const C = {
@@ -18,9 +18,7 @@ const C = {
 
 export default function BlogIndexPage() {
     /** Newest first; `publishedAt` still follows step order (step 1 oldest → step 4 newest). */
-    const sorted = [...BLOG_POSTS].sort(
-        (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-    );
+    const sorted = [...BLOG_POSTS].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
     return (
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
@@ -40,11 +38,30 @@ export default function BlogIndexPage() {
                     background: ${C.raised};
                     border-color: ${C.border};
                 }
+
+                @media (max-width: 768px) {
+                    .blog-main {
+                        padding: 100px 20px 48px !important;
+                    }
+                    .blog-main .blog-header h1 {
+                        font-size: 30px !important;
+                    }
+                    .blog-main .blog-header p {
+                        font-size: 14px !important;
+                    }
+                    .blog-main .blog-header {
+                        margin-bottom: 32px !important;
+                    }
+                    .blog-card {
+                        padding: 20px;
+                        margin-bottom: 10px;
+                    }
+                }
             `}</style>
             <LandingNav />
 
-            <main style={{ padding: "180px 48px 80px", maxWidth: 760, margin: "0 auto" }}>
-                <header style={{ marginBottom: 56 }}>
+            <main className="blog-main" style={{ padding: "180px 48px 80px", maxWidth: 760, margin: "0 auto" }}>
+                <header className="blog-header" style={{ marginBottom: 56 }}>
                     <h1
                         style={{
                             fontFamily: C.serif,
@@ -96,9 +113,7 @@ export default function BlogIndexPage() {
                                 >
                                     {post.title}
                                 </h2>
-                                <p style={{ fontSize: 14, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
-                                    {post.description}
-                                </p>
+                                <p style={{ fontSize: 14, color: C.textSec, lineHeight: 1.6, margin: 0 }}>{post.description}</p>
                             </a>
                         );
                     })}

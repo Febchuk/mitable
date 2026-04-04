@@ -1,16 +1,11 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { MitableLogoMinimal } from "@/components/foundations/logo/mitable-logo";
+import { type MockupColors, type MockupVariant, getMockupColors } from "./colors";
 import { MacWindow } from "./mac-window";
-import { getMockupColors, type MockupVariant, type MockupColors } from "./colors";
 
-const SCENES = [
-    { id: "slack" },
-    { id: "perplexity" },
-    { id: "terminal" },
-    { id: "docs" },
-] as const;
+const SCENES = [{ id: "slack" }, { id: "perplexity" }, { id: "terminal" }, { id: "docs" }] as const;
 
 const SCENE_DURATION = 4500;
 const FADE_DURATION = 600;
@@ -60,7 +55,21 @@ const SlackScene = ({ charCount, C }: { charCount: number; C: MockupColors }) =>
                 <div style={{ flex: 1, padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
                     {messages.map((m) => (
                         <div key={m.time} style={{ display: "flex", gap: 10 }}>
-                            <div style={{ width: 28, height: 28, borderRadius: 6, background: `rgba(${C.uiRgb}, 0.08)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: C.textSec, flexShrink: 0 }}>
+                            <div
+                                style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 6,
+                                    background: `rgba(${C.uiRgb}, 0.08)`,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    color: C.textSec,
+                                    flexShrink: 0,
+                                }}
+                            >
                                 {m.user}
                             </div>
                             <div>
@@ -74,9 +83,29 @@ const SlackScene = ({ charCount, C }: { charCount: number; C: MockupColors }) =>
                     ))}
                 </div>
                 <div style={{ padding: "10px 16px", borderTop: `1px solid rgba(${C.uiRgb}, 0.06)` }}>
-                    <div style={{ background: `rgba(${C.uiRgb}, 0.04)`, border: `1px solid rgba(${C.uiRgb}, 0.08)`, borderRadius: 8, padding: "10px 12px", fontSize: 12, color: C.text, minHeight: 18 }}>
+                    <div
+                        style={{
+                            background: `rgba(${C.uiRgb}, 0.04)`,
+                            border: `1px solid rgba(${C.uiRgb}, 0.08)`,
+                            borderRadius: 8,
+                            padding: "10px 12px",
+                            fontSize: 12,
+                            color: C.text,
+                            minHeight: 18,
+                        }}
+                    >
                         {composing}
-                        <span style={{ display: "inline-block", width: 1, height: 14, background: C.accent, marginLeft: 1, verticalAlign: "text-bottom", animation: "montage-blink 1s step-end infinite" }} />
+                        <span
+                            style={{
+                                display: "inline-block",
+                                width: 1,
+                                height: 14,
+                                background: C.accent,
+                                marginLeft: 1,
+                                verticalAlign: "text-bottom",
+                                animation: "montage-blink 1s step-end infinite",
+                            }}
+                        />
                     </div>
                 </div>
             </div>
@@ -91,10 +120,23 @@ const PerplexityScene = ({ charCount, C }: { charCount: number; C: MockupColors 
 
     return (
         <div style={{ fontFamily: C.sans, background: C.bg, height: "100%", display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: C.raised, borderBottom: `1px solid rgba(${C.uiRgb}, 0.06)` }}>
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 14px",
+                    background: C.raised,
+                    borderBottom: `1px solid rgba(${C.uiRgb}, 0.06)`,
+                }}
+            >
                 <div style={{ display: "flex", gap: 6 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textFaint} strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textFaint} strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textFaint} strokeWidth="2">
+                        <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.textFaint} strokeWidth="2">
+                        <path d="M9 18l6-6-6-6" />
+                    </svg>
                 </div>
                 <div style={{ flex: 1, background: `rgba(${C.uiRgb}, 0.04)`, borderRadius: 6, padding: "5px 10px", fontSize: 11, color: C.textTer }}>
                     perplexity.ai
@@ -102,15 +144,63 @@ const PerplexityScene = ({ charCount, C }: { charCount: number; C: MockupColors 
             </div>
             <div style={{ flex: 1, padding: "32px 24px 16px", display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: C.text, marginBottom: 20 }}>Ask anything</div>
-                <div style={{ width: "100%", maxWidth: 420, background: `rgba(${C.uiRgb}, 0.04)`, border: `1px solid rgba(${C.uiRgb}, 0.08)`, borderRadius: 10, padding: "12px 14px", fontSize: 13, color: C.text }}>
+                <div
+                    style={{
+                        width: "100%",
+                        maxWidth: 420,
+                        background: `rgba(${C.uiRgb}, 0.04)`,
+                        border: `1px solid rgba(${C.uiRgb}, 0.08)`,
+                        borderRadius: 10,
+                        padding: "12px 14px",
+                        fontSize: 13,
+                        color: C.text,
+                    }}
+                >
                     {query}
-                    <span style={{ display: "inline-block", width: 1, height: 14, background: C.accent, marginLeft: 1, verticalAlign: "text-bottom", animation: "montage-blink 1s step-end infinite" }} />
+                    <span
+                        style={{
+                            display: "inline-block",
+                            width: 1,
+                            height: 14,
+                            background: C.accent,
+                            marginLeft: 1,
+                            verticalAlign: "text-bottom",
+                            animation: "montage-blink 1s step-end infinite",
+                        }}
+                    />
                 </div>
                 {showResults && (
-                    <div style={{ width: "100%", maxWidth: 420, marginTop: 16, display: "flex", flexDirection: "column", gap: 10, opacity: showResults ? 1 : 0, transition: "opacity 0.4s" }}>
-                        {["Use versioned migrations with rollback support", "Always run migrations in a transaction", "Test against a staging replica first"].map((r, i) => (
-                            <div key={i} style={{ background: `rgba(${C.uiRgb}, 0.03)`, border: `1px solid rgba(${C.uiRgb}, 0.06)`, borderRadius: 8, padding: "10px 12px", fontSize: 12, color: C.textSec, lineHeight: 1.5 }}>
-                                <span style={{ color: C.accent, marginRight: 6 }}>{i + 1}.</span>{r}
+                    <div
+                        style={{
+                            width: "100%",
+                            maxWidth: 420,
+                            marginTop: 16,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
+                            opacity: showResults ? 1 : 0,
+                            transition: "opacity 0.4s",
+                        }}
+                    >
+                        {[
+                            "Use versioned migrations with rollback support",
+                            "Always run migrations in a transaction",
+                            "Test against a staging replica first",
+                        ].map((r, i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    background: `rgba(${C.uiRgb}, 0.03)`,
+                                    border: `1px solid rgba(${C.uiRgb}, 0.06)`,
+                                    borderRadius: 8,
+                                    padding: "10px 12px",
+                                    fontSize: 12,
+                                    color: C.textSec,
+                                    lineHeight: 1.5,
+                                }}
+                            >
+                                <span style={{ color: C.accent, marginRight: 6 }}>{i + 1}.</span>
+                                {r}
                             </div>
                         ))}
                     </div>
@@ -138,13 +228,35 @@ const TerminalScene = ({ lineCount, C }: { lineCount: number; C: MockupColors })
     ];
 
     return (
-        <div style={{ fontFamily: C.mono, fontSize: 12, lineHeight: 1.7, background: termBg, color: C.textSec, padding: "14px 16px", height: "100%", overflowY: "auto", boxSizing: "border-box" }}>
+        <div
+            style={{
+                fontFamily: C.mono,
+                fontSize: 12,
+                lineHeight: 1.7,
+                background: termBg,
+                color: C.textSec,
+                padding: "14px 16px",
+                height: "100%",
+                overflowY: "auto",
+                boxSizing: "border-box",
+            }}
+        >
             {lines.slice(0, lineCount).map((l, i) => (
                 <div key={i} style={{ color: l.color || C.textSec, whiteSpace: "pre" }}>
                     {l.prompt && <span style={{ color: C.accent }}>~/mitable $&nbsp;</span>}
                     {l.text}
                     {i === lineCount - 1 && l.prompt && (
-                        <span style={{ display: "inline-block", width: 7, height: 14, background: C.textSec, marginLeft: 2, verticalAlign: "text-bottom", animation: "montage-blink 1s step-end infinite" }} />
+                        <span
+                            style={{
+                                display: "inline-block",
+                                width: 7,
+                                height: 14,
+                                background: C.textSec,
+                                marginLeft: 2,
+                                verticalAlign: "text-bottom",
+                                animation: "montage-blink 1s step-end infinite",
+                            }}
+                        />
                     )}
                 </div>
             ))}
@@ -154,25 +266,65 @@ const TerminalScene = ({ lineCount, C }: { lineCount: number; C: MockupColors })
 
 /* ─── Scene 4: Document Editor ─── */
 const DocsScene = ({ charCount, C }: { charCount: number; C: MockupColors }) => {
-    const bodyText = "The new authentication flow uses short-lived JWTs with refresh token rotation. This ensures that compromised tokens expire quickly while maintaining a seamless user experience. Key changes include...".slice(0, charCount);
+    const bodyText =
+        "The new authentication flow uses short-lived JWTs with refresh token rotation. This ensures that compromised tokens expire quickly while maintaining a seamless user experience. Key changes include...".slice(
+            0,
+            charCount,
+        );
     const toolbarItems = ["B", "I", "U", "S"];
 
     return (
         <div style={{ fontFamily: C.sans, background: C.bg, height: "100%", display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "6px 14px", borderBottom: `1px solid rgba(${C.uiRgb}, 0.06)`, background: C.raised }}>
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    padding: "6px 14px",
+                    borderBottom: `1px solid rgba(${C.uiRgb}, 0.06)`,
+                    background: C.raised,
+                }}
+            >
                 {toolbarItems.map((t) => (
-                    <div key={t} style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: t === "B" ? 700 : 400, fontStyle: t === "I" ? "italic" : "normal", textDecoration: t === "U" ? "underline" : t === "S" ? "line-through" : "none", color: C.textSec, borderRadius: 4 }}>
+                    <div
+                        key={t}
+                        style={{
+                            width: 26,
+                            height: 26,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: t === "B" ? 700 : 400,
+                            fontStyle: t === "I" ? "italic" : "normal",
+                            textDecoration: t === "U" ? "underline" : t === "S" ? "line-through" : "none",
+                            color: C.textSec,
+                            borderRadius: 4,
+                        }}
+                    >
                         {t}
                     </div>
                 ))}
                 <div style={{ width: 1, height: 16, background: `rgba(${C.uiRgb}, 0.08)`, margin: "0 6px" }} />
-                <div style={{ fontSize: 11, color: C.textTer, padding: "2px 8px", borderRadius: 4, border: `1px solid rgba(${C.uiRgb}, 0.08)` }}>Normal text</div>
+                <div style={{ fontSize: 11, color: C.textTer, padding: "2px 8px", borderRadius: 4, border: `1px solid rgba(${C.uiRgb}, 0.08)` }}>
+                    Normal text
+                </div>
             </div>
             <div style={{ flex: 1, padding: "24px 32px", overflowY: "auto" }}>
                 <div style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 16 }}>Auth System Technical Spec</div>
                 <div style={{ fontSize: 13, color: C.textSec, lineHeight: 1.75 }}>
                     {bodyText}
-                    <span style={{ display: "inline-block", width: 1, height: 15, background: C.text, marginLeft: 1, verticalAlign: "text-bottom", animation: "montage-blink 1s step-end infinite" }} />
+                    <span
+                        style={{
+                            display: "inline-block",
+                            width: 1,
+                            height: 15,
+                            background: C.text,
+                            marginLeft: 1,
+                            verticalAlign: "text-bottom",
+                            animation: "montage-blink 1s step-end infinite",
+                        }}
+                    />
                 </div>
             </div>
         </div>
@@ -207,6 +359,7 @@ const RecordingPill = ({ C }: { C: MockupColors }) => {
 
     return (
         <div
+            className="recording-pill"
             style={{
                 position: "absolute",
                 right: -24,
@@ -225,7 +378,19 @@ const RecordingPill = ({ C }: { C: MockupColors }) => {
         >
             <div style={{ ...btnStyle("logo"), position: "relative" }} onMouseEnter={() => setHovered("logo")} onMouseLeave={() => setHovered(null)}>
                 <MitableLogoMinimal style={{ width: 14, height: 16, color: C.text }} />
-                <span style={{ position: "absolute", top: 1, right: 2, width: 7, height: 7, borderRadius: "50%", background: C.red, boxShadow: "0 0 0 0 rgba(239,68,68,0.45)", animation: "montage-pulse 1.6s infinite" }} />
+                <span
+                    style={{
+                        position: "absolute",
+                        top: 1,
+                        right: 2,
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        background: C.red,
+                        boxShadow: "0 0 0 0 rgba(239,68,68,0.45)",
+                        animation: "montage-pulse 1.6s infinite",
+                    }}
+                />
             </div>
             <div style={{ width: 20, height: 1, background: dividerColor }} />
             <div style={btnStyle("mic")} onMouseEnter={() => setHovered("mic")} onMouseLeave={() => setHovered(null)}>
@@ -289,19 +454,21 @@ export const WorkMontageMockup = ({ variant = "dark" }: { variant?: MockupVarian
 
     const renderScene = () => {
         switch (SCENES[activeScene].id) {
-            case "slack": return <SlackScene charCount={charCount} C={C} />;
-            case "perplexity": return <PerplexityScene charCount={charCount} C={C} />;
-            case "terminal": return <TerminalScene lineCount={lineCount} C={C} />;
-            case "docs": return <DocsScene charCount={charCount} C={C} />;
+            case "slack":
+                return <SlackScene charCount={charCount} C={C} />;
+            case "perplexity":
+                return <PerplexityScene charCount={charCount} C={C} />;
+            case "terminal":
+                return <TerminalScene lineCount={lineCount} C={C} />;
+            case "docs":
+                return <DocsScene charCount={charCount} C={C} />;
         }
     };
 
     return (
         <div style={{ position: "relative" }}>
             <div style={{ opacity, transition: `opacity ${FADE_DURATION}ms ease` }}>
-                <MacWindow variant={variant}>
-                    {renderScene()}
-                </MacWindow>
+                <MacWindow variant={variant}>{renderScene()}</MacWindow>
             </div>
             <RecordingPill C={C} />
 
@@ -314,6 +481,14 @@ export const WorkMontageMockup = ({ variant = "dark" }: { variant?: MockupVarian
                     0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.45); }
                     70% { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
                     100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+                }
+                @media (max-width: 768px) {
+                    .recording-pill {
+                        right: auto !important;
+                        left: 8px !important;
+                        top: auto !important;
+                        bottom: 16px !important;
+                    }
                 }
             `}</style>
         </div>
