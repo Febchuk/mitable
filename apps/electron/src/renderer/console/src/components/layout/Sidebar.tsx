@@ -68,13 +68,13 @@ export default function Sidebar() {
 
       {/* View Mode Switcher */}
       {availableViewModes.length > 1 && (
-        <div style={{ padding: "0 8px 6px" }}>
+        <div style={{ padding: "0 8px 4px" }}>
           <div
             style={{
               display: "flex",
               gap: 2,
               padding: 2,
-              borderRadius: 8,
+              borderRadius: 6,
               background: "rgba(var(--ui-rgb), 0.06)",
             }}
           >
@@ -84,9 +84,9 @@ export default function Sidebar() {
                 onClick={() => handleViewModeChange(mode)}
                 style={{
                   flex: 1,
-                  padding: "5px 6px",
-                  borderRadius: 6,
-                  fontSize: 11,
+                  padding: "3px 6px",
+                  borderRadius: 4,
+                  fontSize: 10,
                   fontWeight: 500,
                   border: "none",
                   cursor: "pointer",
