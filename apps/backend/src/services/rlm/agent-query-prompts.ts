@@ -13,12 +13,14 @@ export function getAgentQuerySystemPrompt(
   timezone?: string,
   isAdmin = false
 ): string {
-  const toolDescriptions = getAgentQueryTools(isAdmin).map((tool) => {
-    const params = tool.parameters
-      .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
-      .join(", ");
-    return `- ${tool.name}(${params || "no parameters"}): ${tool.description}`;
-  }).join("\n");
+  const toolDescriptions = getAgentQueryTools(isAdmin)
+    .map((tool) => {
+      const params = tool.parameters
+        .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
+        .join(", ");
+      return `- ${tool.name}(${params || "no parameters"}): ${tool.description}`;
+    })
+    .join("\n");
 
   const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dateCtx = buildDateContext(tz);

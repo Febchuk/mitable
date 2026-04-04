@@ -134,6 +134,9 @@ export function getAgentQueryTools(isAdmin: boolean): AgentQueryTool[] {
 /** @deprecated Use getAgentQueryTools(false) */
 export const AGENT_QUERY_TOOLS: AgentQueryTool[] = BASE_AGENT_QUERY_TOOLS;
 
-export function getAgentQueryToolByName(name: string, isAdmin: boolean): AgentQueryTool | undefined {
+export function getAgentQueryToolByName(
+  name: string,
+  isAdmin: boolean
+): AgentQueryTool | undefined {
   return getAgentQueryTools(isAdmin).find((t) => t.name === name);
 }
