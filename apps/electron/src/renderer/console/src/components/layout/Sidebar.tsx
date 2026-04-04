@@ -72,10 +72,10 @@ export default function Sidebar() {
           <div
             style={{
               display: "flex",
-              gap: 2,
+              gap: 1,
               padding: 2,
               borderRadius: 6,
-              background: "rgba(var(--ui-rgb), 0.06)",
+              background: "rgba(0, 0, 0, 0.06)",
             }}
           >
             {availableViewModes.map((mode) => (
@@ -91,9 +91,9 @@ export default function Sidebar() {
                   border: "none",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
-                  background: viewMode === mode ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
-                  color: viewMode === mode ? "var(--text-primary)" : "var(--text-tertiary)",
-                  boxShadow: viewMode === mode ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                  background: viewMode === mode ? "rgba(var(--ui-rgb), 0.08)" : "transparent",
+                  color: viewMode === mode ? "var(--text-secondary)" : "var(--text-tertiary)",
+                  boxShadow: "none",
                 }}
               >
                 {VIEW_MODE_LABELS[mode]}
