@@ -73,9 +73,9 @@ export default function Sidebar() {
             style={{
               display: "flex",
               gap: 1,
-              padding: 2,
-              borderRadius: 6,
-              background: "rgba(0, 0, 0, 0.06)",
+              background: "rgba(var(--ui-rgb), 0.05)",
+              borderRadius: 7,
+              padding: 3,
             }}
           >
             {availableViewModes.map((mode) => (
@@ -84,16 +84,16 @@ export default function Sidebar() {
                 onClick={() => handleViewModeChange(mode)}
                 style={{
                   flex: 1,
-                  padding: "3px 6px",
-                  borderRadius: 4,
-                  fontSize: 10,
-                  fontWeight: 500,
+                  padding: "4px 12px",
+                  borderRadius: 5,
+                  fontSize: 11,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 400,
                   border: "none",
                   cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  background: viewMode === mode ? "rgba(var(--ui-rgb), 0.08)" : "transparent",
-                  color: viewMode === mode ? "var(--text-secondary)" : "var(--text-tertiary)",
-                  boxShadow: "none",
+                  transition: "background 0.1s, color 0.1s",
+                  background: viewMode === mode ? "var(--bg-overlay)" : "transparent",
+                  color: viewMode === mode ? "var(--text-primary)" : "var(--text-secondary)",
                 }}
               >
                 {VIEW_MODE_LABELS[mode]}
