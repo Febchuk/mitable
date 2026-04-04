@@ -4,8 +4,6 @@ import {
   ChevronDown,
   ChevronRight,
   Users,
-  List,
-  GitBranch,
   AlertCircle,
   X,
 } from "lucide-react";
@@ -36,7 +34,7 @@ interface OrgTreeResponse {
   totalUsers: number;
 }
 
-type ViewMode = "tree" | "list";
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -887,146 +885,6 @@ function TreeNode({
 }
 
 // ---------------------------------------------------------------------------
-// List view row
-// ---------------------------------------------------------------------------
-
-function ListRow({
-  node,
-  flatNodes,
-  onManagerChanged,
-}: {
-  node: UserNode;
-  flatNodes: UserNode[];
-  onManagerChanged: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "2fr 1.5fr 1.5fr 1fr 80px",
-        alignItems: "center",
-        gap: 12,
-        padding: "10px 0",
-        borderBottom: "var(--border-hairline)",
-        background: hovered ? "rgba(var(--ui-rgb), 0.025)" : "transparent",
-        transition: "background 0.12s ease",
-      }}
-    >
-      {/* Name */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-        <Avatar node={node} size={28} />
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {getFullName(node)}
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--text-tertiary)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {node.email}
-          </div>
-        </div>
-      </div>
-
-      {/* Job title */}
-      <div
-        style={{
-          fontSize: 12,
-          color: "var(--text-secondary)",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {node.jobTitle ?? "—"}
-      </div>
-
-      {/* Manager — inline dropdown */}
-      <div style={{ minWidth: 0 }}>
-        <ManagerDropdown node={node} flatNodes={flatNodes} onManagerChanged={onManagerChanged} />
-      </div>
-
-      {/* Department */}
-      <div
-        style={{
-          fontSize: 12,
-          color: "var(--text-secondary)",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {node.department ?? "—"}
-      </div>
-
-      {/* Reports count */}
-      <div
-        style={{
-          fontSize: 12,
-          color: "var(--text-tertiary)",
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-        }}
-      >
-        {node.directReports.length > 0 && <Users size={11} style={{ opacity: 0.6 }} />}
-        {node.directReports.length > 0 ? node.directReports.length : "—"}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// List view header
-// ---------------------------------------------------------------------------
-
-function ListHeader() {
-  const cellStyle: React.CSSProperties = {
-    fontSize: 10,
-    fontWeight: 500,
-    textTransform: "uppercase",
-    letterSpacing: "0.07em",
-    color: "var(--text-tertiary)",
-  };
-
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "2fr 1.5fr 1.5fr 1fr 80px",
-        gap: 12,
-        padding: "8px 0",
-        borderBottom: "var(--border-hairline)",
-      }}
-    >
-      <div style={cellStyle}>Name</div>
-      <div style={cellStyle}>Job Title</div>
-      <div style={cellStyle}>Manager</div>
-      <div style={cellStyle}>Department</div>
-      <div style={cellStyle}>Reports</div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Loading spinner
 // ---------------------------------------------------------------------------
 
@@ -1070,7 +928,6 @@ export default function OrgChartView() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("tree");
   const [searchQuery, setSearchQuery] = useState("");
   const [refetchKey, setRefetchKey] = useState(0);
 
@@ -1130,18 +987,7 @@ export default function OrgChartView() {
     return { flatNodes: flat, managerMap: map };
   }, [tree]);
 
-  // Filter flat nodes for list view
-  const filteredFlatNodes = useMemo(() => {
-    if (!searchQuery) return flatNodes;
-    const q = searchQuery.toLowerCase();
-    return flatNodes.filter(
-      (n) =>
-        getFullName(n).toLowerCase().includes(q) ||
-        n.email.toLowerCase().includes(q) ||
-        (n.jobTitle ?? "").toLowerCase().includes(q) ||
-        (n.department ?? "").toLowerCase().includes(q)
-    );
-  }, [flatNodes, searchQuery]);
+
 
   const countLabel = loading
     ? "Loading..."
@@ -1227,59 +1073,6 @@ export default function OrgChartView() {
             />
           </div>
 
-          {/* View mode toggle */}
-          <div
-            style={{
-              display: "flex",
-              gap: 1,
-              background: "rgba(var(--ui-rgb), 0.05)",
-              borderRadius: 7,
-              padding: 3,
-            }}
-          >
-            <button
-              onClick={() => setViewMode("tree")}
-              title="Tree view"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "4px 11px",
-                borderRadius: 5,
-                fontSize: 12,
-                fontFamily: "var(--font-sans)",
-                color: viewMode === "tree" ? "var(--text-primary)" : "var(--text-secondary)",
-                background: viewMode === "tree" ? "var(--bg-overlay)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                transition: "background 0.1s, color 0.1s",
-              }}
-            >
-              <GitBranch size={13} />
-              Tree
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              title="List view"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "4px 11px",
-                borderRadius: 5,
-                fontSize: 12,
-                fontFamily: "var(--font-sans)",
-                color: viewMode === "list" ? "var(--text-primary)" : "var(--text-secondary)",
-                background: viewMode === "list" ? "var(--bg-overlay)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                transition: "background 0.1s, color 0.1s",
-              }}
-            >
-              <List size={13} />
-              List
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1329,19 +1122,12 @@ export default function OrgChartView() {
           >
             No org structure found.
           </div>
-        ) : viewMode === "tree" ? (
+        ) : (
           <TreeViewBody
             tree={tree}
             searchQuery={searchQuery}
             flatNodes={flatNodes}
             managerMap={managerMap}
-            onManagerChanged={handleManagerChanged}
-          />
-        ) : (
-          <ListViewBody
-            nodes={filteredFlatNodes}
-            flatNodes={flatNodes}
-            searchQuery={searchQuery}
             onManagerChanged={handleManagerChanged}
           />
         )}
@@ -1403,47 +1189,3 @@ function TreeViewBody({
   );
 }
 
-// ---------------------------------------------------------------------------
-// List view body
-// ---------------------------------------------------------------------------
-
-function ListViewBody({
-  nodes,
-  flatNodes,
-  searchQuery,
-  onManagerChanged,
-}: {
-  nodes: UserNode[];
-  flatNodes: UserNode[];
-  searchQuery: string;
-  onManagerChanged: () => void;
-}) {
-  if (nodes.length === 0) {
-    return (
-      <div
-        style={{
-          padding: "48px 0",
-          textAlign: "center",
-          fontSize: 13,
-          color: "var(--text-secondary)",
-        }}
-      >
-        No people found matching &ldquo;{searchQuery}&rdquo;
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <ListHeader />
-      {nodes.map((node) => (
-        <ListRow
-          key={node.id}
-          node={node}
-          flatNodes={flatNodes}
-          onManagerChanged={onManagerChanged}
-        />
-      ))}
-    </div>
-  );
-}
