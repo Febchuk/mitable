@@ -114,7 +114,7 @@ interface FirefliesStatus {
 function formatPlanDisplay(
   data: { subscription: { tier: string }; isInternal: boolean } | undefined,
   isPending: boolean,
-  isError: boolean,
+  isError: boolean
 ): string {
   if (isPending) return "Loading…";
   if (isError || !data?.subscription) return "Not available";
@@ -134,7 +134,7 @@ export default function UserProfilePage() {
 
   const planLabel = useMemo(
     () => formatPlanDisplay(subscriptionData, isPlanPending, isPlanError),
-    [subscriptionData, isPlanPending, isPlanError],
+    [subscriptionData, isPlanPending, isPlanError]
   );
   const { theme: currentTheme, setTheme } = useTheme();
 
@@ -1867,20 +1867,27 @@ export default function UserProfilePage() {
                     gap: 20,
                   }}
                 >
-                  {[
-                    { label: "Name", value: user?.name || "Not set" },
-                    { label: "Email", value: user?.email || "Not available" },
-                    {
-                      label: "Role",
-                      value: user?.role || "Employee",
-                      capitalize: true,
-                    },
-                    {
-                      label: "Organization",
-                      value: organization?.name || "Not available",
-                    },
-                    { label: "Plan", value: planLabel },
-                  ].map((field) => (
+                  {(
+                    [
+                      { label: "Name", value: user?.name || "Not set" },
+                      { label: "Email", value: user?.email || "Not available" },
+                      {
+                        label: "Role",
+                        value: user?.role || "Employee",
+                        capitalize: true,
+                      },
+                      {
+                        label: "Organization",
+                        value: organization?.name || "Not available",
+                      },
+                      { label: "Plan", value: planLabel },
+                    ] as Array<{
+                      label: string;
+                      value: string;
+                      capitalize?: boolean;
+                      mono?: boolean;
+                    }>
+                  ).map((field) => (
                     <div key={field.label}>
                       <div
                         style={{
@@ -3001,7 +3008,6 @@ export default function UserProfilePage() {
                   )}
                 </div>
               </div>
-
             </div>
           )}
 
