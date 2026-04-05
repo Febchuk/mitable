@@ -47,8 +47,12 @@ export const LandingFooter = () => (
                         fontSize: 13,
                         transition: "color 0.2s",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--l-text-secondary, #A09A8E)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--l-text-muted, #706B60)"; }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "var(--l-text-secondary, #A09A8E)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.color = "var(--l-text-muted, #706B60)";
+                    }}
                 >
                     {link.label}
                 </Link>

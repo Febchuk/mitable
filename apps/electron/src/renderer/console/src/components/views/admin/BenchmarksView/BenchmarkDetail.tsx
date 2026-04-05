@@ -35,11 +35,45 @@ function MiniScoreRing({ progress }: { progress: number }) {
   return (
     <div style={{ position: "relative", width: MINI_RING, height: MINI_RING, flexShrink: 0 }}>
       <svg width={MINI_RING} height={MINI_RING} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={MINI_RING / 2} cy={MINI_RING / 2} r={MINI_R} fill="none" stroke="rgba(var(--ui-rgb), 0.06)" strokeWidth={MINI_STROKE} />
-        <circle cx={MINI_RING / 2} cy={MINI_RING / 2} r={MINI_R} fill="none" stroke={strokeColor} strokeWidth={MINI_STROKE} strokeLinecap="round" strokeDasharray={MINI_C} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+        <circle
+          cx={MINI_RING / 2}
+          cy={MINI_RING / 2}
+          r={MINI_R}
+          fill="none"
+          stroke="rgba(var(--ui-rgb), 0.06)"
+          strokeWidth={MINI_STROKE}
+        />
+        <circle
+          cx={MINI_RING / 2}
+          cy={MINI_RING / 2}
+          r={MINI_R}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={MINI_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={MINI_C}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.6s ease" }}
+        />
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontFamily: "var(--font-serif)", fontSize: 13, fontWeight: 400, color: "var(--text-primary)", lineHeight: 1 }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 13,
+            fontWeight: 400,
+            color: "var(--text-primary)",
+            lineHeight: 1,
+          }}
+        >
           {Math.round(clamped)}
         </span>
       </div>
@@ -178,7 +212,10 @@ function PersonRow({
 
       {removeMode ? (
         <button
-          onClick={(e) => { e.stopPropagation(); onRemove?.(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove?.();
+          }}
           title="Remove"
           style={{
             width: 24,
@@ -261,9 +298,7 @@ export function BenchmarkDetail() {
             borderTopColor: SPINNER_COLOR,
           }}
         />
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-          Loading benchmark...
-        </span>
+        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading benchmark...</span>
       </div>
     );
   }
@@ -326,7 +361,6 @@ export function BenchmarkDetail() {
           >
             {benchmark.name}
           </h1>
-
         </div>
         {benchmark.description ? (
           <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, lineHeight: 1.6 }}>
@@ -402,7 +436,14 @@ export function BenchmarkDetail() {
       {/* People list */}
       {benchmark.assignments.length > 0 ? (
         <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
             <span
               style={{
                 fontSize: 10,
@@ -429,8 +470,10 @@ export function BenchmarkDetail() {
                       fontWeight: 500,
                       border: "var(--border-hairline)",
                       cursor: markedForRemoval.size === 0 ? "not-allowed" : "pointer",
-                      background: markedForRemoval.size > 0 ? "rgba(232, 116, 116, 0.12)" : "transparent",
-                      color: markedForRemoval.size > 0 ? "var(--status-error)" : "var(--text-faint)",
+                      background:
+                        markedForRemoval.size > 0 ? "rgba(232, 116, 116, 0.12)" : "transparent",
+                      color:
+                        markedForRemoval.size > 0 ? "var(--status-error)" : "var(--text-faint)",
                       transition: "all 0.15s",
                     }}
                   >

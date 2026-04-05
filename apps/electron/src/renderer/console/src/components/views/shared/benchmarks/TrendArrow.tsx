@@ -32,8 +32,7 @@ export function TrendArrow({ trend, delta }: TrendArrowProps) {
         className="inline-flex items-center gap-1 text-[12px] font-medium"
         style={{ color: "#3A9B6B" }}
       >
-        <TrendingUp size={14} strokeWidth={2} />
-        +{Math.abs(delta).toFixed(1)}%
+        <TrendingUp size={14} strokeWidth={2} />+{Math.abs(delta).toFixed(1)}%
       </span>
     );
   }
@@ -44,8 +43,7 @@ export function TrendArrow({ trend, delta }: TrendArrowProps) {
       className="inline-flex items-center gap-1 text-[12px] font-medium"
       style={{ color: "#D4A27A" }}
     >
-      <TrendingDown size={14} strokeWidth={2} />
-      -{Math.abs(delta).toFixed(1)}%
+      <TrendingDown size={14} strokeWidth={2} />-{Math.abs(delta).toFixed(1)}%
     </span>
   );
 }

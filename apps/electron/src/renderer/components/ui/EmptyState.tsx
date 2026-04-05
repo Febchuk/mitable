@@ -87,11 +87,7 @@ export function EmptyState({
           </span>
         )}
       </div>
-      {actions && (
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {actions}
-        </div>
-      )}
+      {actions && <div style={{ display: "flex", gap: 10, alignItems: "center" }}>{actions}</div>}
     </div>
   );
 }

@@ -24,13 +24,7 @@ const FREQUENCIES: { key: BenchmarkFrequency; label: string }[] = [
   { key: "quarterly", label: "Quarterly" },
 ];
 
-function ImportanceDots({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-}) {
+function ImportanceDots({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
       {[1, 2, 3, 4, 5].map((level) => (
@@ -43,10 +37,7 @@ function ImportanceDots({
             borderRadius: "50%",
             border: "none",
             cursor: "pointer",
-            background:
-              level <= value
-                ? "var(--text-primary)"
-                : "rgba(var(--ui-rgb), 0.12)",
+            background: level <= value ? "var(--text-primary)" : "rgba(var(--ui-rgb), 0.12)",
             transition: "background 0.15s, transform 0.1s",
             padding: 0,
           }}
@@ -142,7 +133,9 @@ function ParameterRow({
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                onUpdate({ description: (e.target as HTMLInputElement).value || param.description });
+                onUpdate({
+                  description: (e.target as HTMLInputElement).value || param.description,
+                });
                 setEditingDesc(false);
               }
             }}
@@ -176,10 +169,7 @@ function ParameterRow({
       </div>
 
       {/* Importance dots */}
-      <ImportanceDots
-        value={param.importance}
-        onChange={(v) => onUpdate({ importance: v })}
-      />
+      <ImportanceDots value={param.importance} onChange={(v) => onUpdate({ importance: v })} />
 
       {/* Remove button in remove mode */}
       {removeMode && (
@@ -321,9 +311,7 @@ export default function BenchmarkEditor() {
   };
 
   const handleUpdateParam = (paramId: string, updates: Partial<BenchmarkParameter>) => {
-    setParams((prev) =>
-      prev.map((a) => (a.id === paramId ? { ...a, ...updates } : a))
-    );
+    setParams((prev) => prev.map((a) => (a.id === paramId ? { ...a, ...updates } : a)));
   };
 
   const handleSave = async () => {
@@ -509,14 +497,8 @@ export default function BenchmarkEditor() {
                   borderRadius: 5,
                   fontSize: 11,
                   fontFamily: "var(--font-sans)",
-                  color:
-                    frequency === f.key
-                      ? "var(--text-primary)"
-                      : "var(--text-tertiary)",
-                  background:
-                    frequency === f.key
-                      ? "rgba(255,255,255,0.08)"
-                      : "transparent",
+                  color: frequency === f.key ? "var(--text-primary)" : "var(--text-tertiary)",
+                  background: frequency === f.key ? "rgba(255,255,255,0.08)" : "transparent",
                   border: "none",
                   cursor: "pointer",
                   transition: "background 0.1s, color 0.1s",
@@ -575,10 +557,7 @@ export default function BenchmarkEditor() {
                   <IconButton onClick={handleAddParam} title="Add parameter">
                     <Plus size={14} />
                   </IconButton>
-                  <IconButton
-                    onClick={() => setRemoveMode(true)}
-                    title="Remove parameters"
-                  >
+                  <IconButton onClick={() => setRemoveMode(true)} title="Remove parameters">
                     <Minus size={14} />
                   </IconButton>
                 </>
@@ -624,7 +603,8 @@ export default function BenchmarkEditor() {
                     fontWeight: 500,
                     border: "none",
                     cursor: !description.trim() || isGenerating ? "not-allowed" : "pointer",
-                    background: description.trim() && !isGenerating ? "#82C0CC" : "rgba(var(--ui-rgb), 0.08)",
+                    background:
+                      description.trim() && !isGenerating ? "#82C0CC" : "rgba(var(--ui-rgb), 0.08)",
                     color: description.trim() && !isGenerating ? "#1A1916" : "var(--text-faint)",
                     transition: "all 0.15s",
                     display: "flex",
@@ -676,12 +656,7 @@ export default function BenchmarkEditor() {
             gap: 8,
           }}
         >
-          {isSaving && (
-            <Loader2
-              size={13}
-              className="animate-spin"
-            />
-          )}
+          {isSaving && <Loader2 size={13} className="animate-spin" />}
           {isSaving ? "Saving..." : "Save"}
         </button>
       </div>

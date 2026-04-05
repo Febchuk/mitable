@@ -9,7 +9,11 @@ import {
   deleteBenchmark,
   updateBenchmarkParameters,
 } from "../../../services/benchmarkService";
-import type { BenchmarkFrequency, BenchmarkParameter, CreateBenchmarkPayload } from "../../../services/benchmarkService";
+import type {
+  BenchmarkFrequency,
+  BenchmarkParameter,
+  CreateBenchmarkPayload,
+} from "../../../services/benchmarkService";
 
 export function useAssignBenchmark() {
   const queryClient = useQueryClient();
@@ -53,7 +57,13 @@ export function useUpdateBenchmark() {
       payload,
     }: {
       id: string;
-      payload: { name?: string; description?: string; targetValue?: number; frequency?: BenchmarkFrequency; isActive?: boolean };
+      payload: {
+        name?: string;
+        description?: string;
+        targetValue?: number;
+        frequency?: BenchmarkFrequency;
+        isActive?: boolean;
+      };
     }) => updateBenchmark(id, payload),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "benchmarks", variables.id] });
@@ -119,8 +129,13 @@ export function useUpdateBenchmarkParameters() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ benchmarkId, parameters }: { benchmarkId: string; parameters: BenchmarkParameter[] }) =>
-      updateBenchmarkParameters(benchmarkId, parameters),
+    mutationFn: ({
+      benchmarkId,
+      parameters,
+    }: {
+      benchmarkId: string;
+      parameters: BenchmarkParameter[];
+    }) => updateBenchmarkParameters(benchmarkId, parameters),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "benchmarks", variables.benchmarkId] });
       queryClient.invalidateQueries({ queryKey: ["admin", "benchmarks"] });

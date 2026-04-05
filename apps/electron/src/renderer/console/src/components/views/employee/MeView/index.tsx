@@ -98,11 +98,46 @@ function BenchmarkMiniRing({ progress }: { progress: number }) {
   return (
     <div style={{ position: "relative", width: BMR_SIZE, height: BMR_SIZE, flexShrink: 0 }}>
       <svg width={BMR_SIZE} height={BMR_SIZE} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={BMR_SIZE / 2} cy={BMR_SIZE / 2} r={BMR_R} fill="none" stroke="rgba(236,232,224,0.06)" strokeWidth={BMR_STROKE} />
-        <circle cx={BMR_SIZE / 2} cy={BMR_SIZE / 2} r={BMR_R} fill="none" stroke={strokeColor} strokeWidth={BMR_STROKE} strokeLinecap="round" strokeDasharray={BMR_C} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+        <circle
+          cx={BMR_SIZE / 2}
+          cy={BMR_SIZE / 2}
+          r={BMR_R}
+          fill="none"
+          stroke="rgba(236,232,224,0.06)"
+          strokeWidth={BMR_STROKE}
+        />
+        <circle
+          cx={BMR_SIZE / 2}
+          cy={BMR_SIZE / 2}
+          r={BMR_R}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={BMR_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={BMR_C}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.6s ease" }}
+        />
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontFamily: "var(--font-serif)", fontSize: 11, color: "var(--text-primary)", lineHeight: 1 }}>{Math.round(clamped)}</span>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 11,
+            color: "var(--text-primary)",
+            lineHeight: 1,
+          }}
+        >
+          {Math.round(clamped)}
+        </span>
       </div>
     </div>
   );
@@ -1201,11 +1236,17 @@ export default function MeView() {
                     borderBottom: "var(--border-hairline)",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <BenchmarkMiniRing progress={s.progress} />
-                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>{s.name}</span>
+                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>
+                    {s.name}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1248,11 +1289,17 @@ export default function MeView() {
                     borderBottom: "var(--border-hairline)",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <BenchmarkMiniRing progress={s.progress} />
-                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>{s.name}</span>
+                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>
+                    {s.name}
+                  </span>
                 </div>
               ))}
             </div>

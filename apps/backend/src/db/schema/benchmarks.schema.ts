@@ -266,19 +266,16 @@ export const benchmarkAccomplishmentsRelations = relations(benchmarkAccomplishme
   }),
 }));
 
-export const benchmarkParameterScoresRelations = relations(
-  benchmarkParameterScores,
-  ({ one }) => ({
-    assignment: one(benchmarkAssignments, {
-      fields: [benchmarkParameterScores.assignmentId],
-      references: [benchmarkAssignments.id],
-    }),
-    parameter: one(benchmarkParameters, {
-      fields: [benchmarkParameterScores.parameterId],
-      references: [benchmarkParameters.id],
-    }),
-  })
-);
+export const benchmarkParameterScoresRelations = relations(benchmarkParameterScores, ({ one }) => ({
+  assignment: one(benchmarkAssignments, {
+    fields: [benchmarkParameterScores.assignmentId],
+    references: [benchmarkAssignments.id],
+  }),
+  parameter: one(benchmarkParameters, {
+    fields: [benchmarkParameterScores.parameterId],
+    references: [benchmarkParameters.id],
+  }),
+}));
 
 // Export types
 

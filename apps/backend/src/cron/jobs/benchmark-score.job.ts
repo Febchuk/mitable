@@ -79,10 +79,7 @@ export async function runBenchmarkScoreJob(frequencies?: string[]): Promise<{
   }
 
   const totalTimeMs = Date.now() - startTime;
-  logger.info(
-    { processed, failed, totalTimeMs },
-    "Benchmark score job completed"
-  );
+  logger.info({ processed, failed, totalTimeMs }, "Benchmark score job completed");
 
   return { benchmarksProcessed: processed, benchmarksFailed: failed, totalTimeMs };
 }

@@ -48,8 +48,6 @@ import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEd
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
 import OnboardingPage from "./pages/OnboardingPage";
-import TeamsView from "./components/views/admin/TeamsView";
-import OrgSetupView from "./components/views/admin/OrgSetupView";
 
 // Applies stored theme class to <html> on mount and syncs across windows
 function ThemeInitializer() {
@@ -218,7 +216,7 @@ function DefaultRoute() {
   }
 
   if (needsOnboarding) return <Navigate to="/onboarding" replace />;
-  if (user?.role === "admin" || user?.isManager) return <Navigate to="/dashboard" replace />;
+  if (user?.role === "admin") return <Navigate to="/dashboard" replace />;
   return <Navigate to="/calendar" replace />;
 }
 
@@ -244,15 +242,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RoleGate({ requireAdmin, requireManager, children }: {
-  requireAdmin?: boolean;
-  requireManager?: boolean;
-  children: React.ReactNode;
-}) {
+function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
-  const isAdmin = user?.role === "admin" || user?.originalRole === "admin";
-  if (requireAdmin && !isAdmin) return <Navigate to="/calendar" replace />;
-  if (requireManager && !isAdmin && !user?.isManager) return <Navigate to="/calendar" replace />;
+  if (user?.role !== "admin") return <Navigate to="/benchmarks" replace />;
   return <>{children}</>;
 }
 
@@ -323,18 +315,33 @@ function App() {
                         <Route path="reports" element={<ReportsView />} />
                         <Route path="reports/:docId" element={<DocDetail />} />
                         <Route path="benchmarks" element={<BenchmarksRouter />} />
-                        <Route path="benchmarks/new" element={<RoleGate requireManager><BenchmarkEditor /></RoleGate>} />
-                        <Route path="benchmarks/:id/edit" element={<RoleGate requireManager><BenchmarkEditor /></RoleGate>} />
+                        <Route
+                          path="benchmarks/new"
+                          element={
+                            <AdminOnlyRoute>
+                              <BenchmarkEditor />
+                            </AdminOnlyRoute>
+                          }
+                        />
+                        <Route
+                          path="benchmarks/:id/edit"
+                          element={
+                            <AdminOnlyRoute>
+                              <BenchmarkEditor />
+                            </AdminOnlyRoute>
+                          }
+                        />
                         <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
-                        <Route path="benchmarks/:id/person/:userId" element={<RoleGate requireManager><PersonBenchmarkView /></RoleGate>} />
+                        <Route
+                          path="benchmarks/:id/person/:userId"
+                          element={
+                            <AdminOnlyRoute>
+                              <PersonBenchmarkView />
+                            </AdminOnlyRoute>
+                          }
+                        />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
-                        {/* Admin: Org Setup (contains Org Chart, Permissions, General settings) */}
-                        <Route path="org-setup" element={<RoleGate requireAdmin><OrgSetupView /></RoleGate>} />
-                        {/* Legacy redirects */}
-                        <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
-                        <Route path="setup" element={<Navigate to="/org-setup" replace />} />
-                        <Route path="teams" element={<RoleGate requireAdmin><TeamsView /></RoleGate>} />
                         {/* Employee Routes */}
                         <Route path="me" element={<MeView />} />
                         <Route path="bragbook" element={<BragbookView />} />

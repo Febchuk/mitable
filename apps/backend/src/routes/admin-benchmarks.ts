@@ -53,7 +53,9 @@ router.post("/generate-parameters", async (req, res) => {
     res.status(200).json({ parameters });
   } catch (error) {
     logger.error({ err: error }, "Error generating benchmark parameters");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to generate benchmark parameters" });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to generate benchmark parameters" });
   }
 });
 
@@ -140,7 +142,10 @@ router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    logger.info({ organizationId: req.organizationId, benchmarkId: id }, "Getting benchmark detail");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId: id },
+      "Getting benchmark detail"
+    );
 
     const benchmark = await benchmarkService.getDetail(id, req.organizationId);
 
@@ -152,7 +157,9 @@ router.get("/:id", async (req, res) => {
     res.status(200).json({ benchmark });
   } catch (error) {
     logger.error({ err: error }, "Error getting benchmark detail");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to get benchmark detail" });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to get benchmark detail" });
   }
 });
 
@@ -205,14 +212,19 @@ router.post("/:id/compute", async (req, res) => {
   try {
     const { id } = req.params;
 
-    logger.info({ organizationId: req.organizationId, benchmarkId: id }, "Triggering benchmark score computation");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId: id },
+      "Triggering benchmark score computation"
+    );
 
     await benchmarkComputeService.computeScores(id, req.organizationId);
 
     res.status(200).json({ message: "Computation triggered" });
   } catch (error) {
     logger.error({ err: error }, "Error triggering benchmark computation");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to trigger computation" });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to trigger computation" });
   }
 });
 
@@ -238,7 +250,10 @@ router.post("/:id/assign", async (req, res) => {
       return;
     }
 
-    logger.info({ organizationId: req.organizationId, benchmarkId: id, userCount: userIds.length }, "Assigning users to benchmark");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId: id, userCount: userIds.length },
+      "Assigning users to benchmark"
+    );
 
     await benchmarkService.assign(id, req.organizationId, userIds, targetOverride);
 
@@ -268,7 +283,10 @@ router.post("/:id/unassign", async (req, res) => {
       return;
     }
 
-    logger.info({ organizationId: req.organizationId, benchmarkId: id, userId }, "Unassigning user from benchmark");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId: id, userId },
+      "Unassigning user from benchmark"
+    );
 
     await benchmarkService.unassign(id, userId);
 
@@ -293,14 +311,19 @@ router.patch("/:id/assignments/:userId", async (req, res) => {
     const { id, userId } = req.params;
     const payload = req.body as { targetValue?: number };
 
-    logger.info({ organizationId: req.organizationId, benchmarkId: id, userId }, "Updating benchmark assignment");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId: id, userId },
+      "Updating benchmark assignment"
+    );
 
     await benchmarkService.updateAssignment(id, userId, payload);
 
     res.status(200).json({ message: "Assignment updated" });
   } catch (error) {
     logger.error({ err: error }, "Error updating benchmark assignment");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to update assignment" });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to update assignment" });
   }
 });
 
@@ -317,7 +340,10 @@ router.get("/:benchmarkId/person/:userId", async (req, res) => {
   try {
     const { benchmarkId, userId } = req.params;
 
-    logger.info({ organizationId: req.organizationId, benchmarkId, userId }, "Getting person benchmark detail");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId, userId },
+      "Getting person benchmark detail"
+    );
 
     const detail = await benchmarkService.getPersonDetail(benchmarkId, userId, req.organizationId);
 
@@ -329,7 +355,9 @@ router.get("/:benchmarkId/person/:userId", async (req, res) => {
     res.status(200).json({ detail });
   } catch (error) {
     logger.error({ err: error }, "Error getting person benchmark detail");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to get person benchmark detail" });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to get person benchmark detail" });
   }
 });
 
@@ -346,14 +374,19 @@ router.get("/:id/parameters", async (req, res) => {
   try {
     const { id } = req.params;
 
-    logger.info({ organizationId: req.organizationId, benchmarkId: id }, "Getting benchmark parameters");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId: id },
+      "Getting benchmark parameters"
+    );
 
     const parameters = await benchmarkService.getParameters(id);
 
     res.status(200).json({ parameters });
   } catch (error) {
     logger.error({ err: error }, "Error getting benchmark parameters");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to get benchmark parameters" });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to get benchmark parameters" });
   }
 });
 
@@ -378,14 +411,19 @@ router.put("/:id/parameters", async (req, res) => {
       return;
     }
 
-    logger.info({ organizationId: req.organizationId, benchmarkId: id, count: parameters.length }, "Updating benchmark parameters");
+    logger.info(
+      { organizationId: req.organizationId, benchmarkId: id, count: parameters.length },
+      "Updating benchmark parameters"
+    );
 
     await benchmarkService.updateParameters(id, req.organizationId, parameters);
 
     res.status(200).json({ message: "Parameters updated" });
   } catch (error) {
     logger.error({ err: error }, "Error updating benchmark parameters");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to update benchmark parameters" });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to update benchmark parameters" });
   }
 });
 

@@ -190,7 +190,10 @@ export function initCronJobs(): void {
   // ──────────────────────────────────────────────
   let isBragbookGenerateRunning = false;
 
-  const runBragbook = async (periodTypes: Array<"weekly" | "monthly" | "quarterly">, label: string) => {
+  const runBragbook = async (
+    periodTypes: Array<"weekly" | "monthly" | "quarterly">,
+    label: string
+  ) => {
     if (isBragbookGenerateRunning) {
       logger.warn({ label }, "Bragbook generate job still running — skipping");
       return;

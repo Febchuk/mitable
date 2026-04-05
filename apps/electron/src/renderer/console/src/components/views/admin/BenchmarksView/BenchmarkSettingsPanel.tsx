@@ -1,10 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUpdateBenchmark } from "@/console/src/hooks/queries/benchmarks";
 import type { Benchmark, BenchmarkFrequency } from "@/console/src/services/benchmarkService";
 

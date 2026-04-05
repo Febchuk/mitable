@@ -187,11 +187,29 @@ export function BenchmarkCard({ benchmark, onDelete }: BenchmarkCardProps) {
           </div>
 
           {/* Bottom row: frequency + trend with icon */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "capitalize" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginTop: 2,
+            }}
+          >
+            <span
+              style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "capitalize" }}
+            >
               {benchmark.frequency}
             </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: trendColor }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                fontWeight: 500,
+                color: trendColor,
+              }}
+            >
               {benchmark.trend === "improving" ? (
                 <TrendingUp size={14} />
               ) : benchmark.trend === "declining" ? (
@@ -272,11 +290,7 @@ function ContextMenuItem({
         borderRadius: 6,
         border: "none",
         background: hovered ? "rgba(255,255,255,0.06)" : "transparent",
-        color: danger
-          ? hovered
-            ? "#e06060"
-            : "#c07070"
-          : "var(--text-secondary)",
+        color: danger ? (hovered ? "#e06060" : "#c07070") : "var(--text-secondary)",
         fontSize: 13,
         cursor: "pointer",
         transition: "background 0.1s, color 0.1s",

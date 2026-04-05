@@ -1,10 +1,24 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { ChevronDown, Mic, Pause } from "lucide-react";
 import { MitableLogoMinimal } from "@/components/foundations/logo/mitable-logo";
 import { MacWindow } from "./mockups/mac-window";
-import { getMockupColors, type MockupVariant, type MockupColors } from "./mockups/colors";
+
+const C = {
+    bg: "var(--l-bg, #1A1916)",
+    raised: "var(--l-bg-raised, #211F1B)",
+    overlay: "var(--l-bg-overlay, #2A2824)",
+    muted: "var(--l-bg-muted, #33312B)",
+    accent: "var(--l-accent, #82C0CC)",
+    accentMuted: "rgba(130, 192, 204, 0.12)",
+    text: "var(--l-text, #ECE8E0)",
+    textSec: "var(--l-text-secondary, #A09A8E)",
+    textMuted: "var(--l-text-muted, #706B60)",
+    border: "var(--l-border, #33312B)",
+    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+};
 
 type Frame = {
     company: string;
@@ -15,11 +29,8 @@ type Frame = {
     durationMs: number;
 };
 
-/** Row the demo animates — keep in sync with spreadsheet data below */
-const DEMO_FOCUS_NAME = "Chiamaka Obi";
-
 const FINAL_SUMMARY =
-    "Processed updates for Chiamaka Obi (Google). Transitioned lead status from New Lead to In Progress and identified role as Forward Deployed Engineer.";
+    "Processed updates for Alex Rivera (Google). Transitioned lead status from New Lead to In Progress and identified role as Forward Deployed Engineer.";
 
 const DROPDOWN_OPTIONS = ["New Lead", "In Progress", "Closed Won", "Lost"];
 
@@ -46,15 +57,8 @@ const cursorMap: Record<Frame["activeCell"], { left: number; top: number }> = {
     role: { left: COL.name + COL.company + COL.status + COL.role / 2, top: 128 },
 };
 
-function DemoWatchingPill({ C }: { C: MockupColors }) {
+function DemoWatchingPill() {
     const [hovered, setHovered] = useState<string | null>(null);
-    const isLight = C.bg === "#F5F1ED";
-
-    const pillBg = isLight ? "rgba(245,241,237,0.96)" : "rgba(26,26,26,0.96)";
-    const pillShadow = isLight ? "0 20px 40px rgba(0,0,0,0.1)" : "0 20px 40px rgba(0,0,0,0.35)";
-    const btnHoverBg = isLight ? "rgba(28,43,51,0.08)" : "rgba(255,255,255,0.1)";
-    const btnColor = isLight ? "rgba(28,43,51,0.74)" : "rgba(255,255,255,0.74)";
-    const dividerColor = isLight ? "rgba(28,43,51,0.1)" : "rgba(255,255,255,0.1)";
 
     const buttonStyle = (id: string): CSSProperties => ({
         width: 28,
@@ -63,8 +67,8 @@ function DemoWatchingPill({ C }: { C: MockupColors }) {
         alignItems: "center",
         justifyContent: "center",
         borderRadius: 999,
-        background: hovered === id ? btnHoverBg : "transparent",
-        color: btnColor,
+        background: hovered === id ? "rgba(255,255,255,0.1)" : "transparent",
+        color: "rgba(255,255,255,0.74)",
         border: "none",
         cursor: "pointer",
         transition: "background 0.15s ease, color 0.15s ease, transform 0.15s ease",
@@ -84,9 +88,9 @@ function DemoWatchingPill({ C }: { C: MockupColors }) {
                 gap: 6,
                 padding: 8,
                 borderRadius: 999,
-                background: pillBg,
+                background: "rgba(26,26,26,0.96)",
                 backdropFilter: "blur(16px)",
-                boxShadow: pillShadow,
+                boxShadow: "0 20px 40px rgba(0,0,0,0.35)",
             }}
         >
             <button
@@ -110,22 +114,12 @@ function DemoWatchingPill({ C }: { C: MockupColors }) {
                     }}
                 />
             </button>
-            <div style={{ width: 20, height: 1, background: dividerColor }} />
-            <button
-                style={buttonStyle("mic")}
-                onMouseEnter={() => setHovered("mic")}
-                onMouseLeave={() => setHovered(null)}
-                aria-label="Microphone"
-            >
+            <div style={{ width: 20, height: 1, background: "rgba(255,255,255,0.1)" }} />
+            <button style={buttonStyle("mic")} onMouseEnter={() => setHovered("mic")} onMouseLeave={() => setHovered(null)} aria-label="Microphone">
                 <Mic size={13} />
             </button>
-            <div style={{ width: 20, height: 1, background: dividerColor }} />
-            <button
-                style={buttonStyle("pause")}
-                onMouseEnter={() => setHovered("pause")}
-                onMouseLeave={() => setHovered(null)}
-                aria-label="Pause"
-            >
+            <div style={{ width: 20, height: 1, background: "rgba(255,255,255,0.1)" }} />
+            <button style={buttonStyle("pause")} onMouseEnter={() => setHovered("pause")} onMouseLeave={() => setHovered(null)} aria-label="Pause">
                 <Pause size={13} />
             </button>
         </div>
@@ -138,18 +132,14 @@ function SpreadsheetCell({
     active = false,
     align = "left",
     color,
-    C,
 }: {
     children: ReactNode;
     width: number;
     active?: boolean;
     align?: "left" | "center";
     color?: string;
-    C: MockupColors;
 }) {
     const [hovered, setHovered] = useState(false);
-    const isLight = C.bg === "#F5F1ED";
-    const hoverBg = isLight ? "rgba(28,43,51,0.03)" : "rgba(255,255,255,0.03)";
 
     return (
         <div
@@ -163,12 +153,8 @@ function SpreadsheetCell({
                 color: color ?? C.textSec,
                 borderRight: `1px solid ${C.border}`,
                 borderBottom: `1px solid ${C.border}`,
-                background: active
-                    ? `rgba(${C.accentRgb}, 0.08)`
-                    : hovered
-                      ? hoverBg
-                      : "transparent",
-                boxShadow: active ? `inset 0 0 0 1px rgba(${C.accentRgb}, 0.2)` : "none",
+                background: active ? "rgba(130,192,204,0.08)" : hovered ? "rgba(255,255,255,0.03)" : "transparent",
+                boxShadow: active ? "inset 0 0 0 1px rgba(130,192,204,0.2)" : "none",
                 transition: "background 0.15s ease, box-shadow 0.15s ease",
                 textAlign: align,
                 position: "relative",
@@ -184,17 +170,8 @@ function SpreadsheetCell({
     );
 }
 
-function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
+function InputSpreadsheet({ frame }: { frame: Frame }) {
     const cursorPos = cursorMap[frame.activeCell];
-    const isLight = C.bg === "#F5F1ED";
-
-    const sheetBg = isLight ? "#F0EBE6" : "#171612";
-    const headerBg = isLight ? "#ECE7E2" : "#1D1B17";
-    const tabBg = isLight ? "rgba(28,43,51,0.04)" : "rgba(255,255,255,0.04)";
-    const gradientBg = isLight
-        ? "linear-gradient(180deg, rgba(28,43,51,0.015), transparent 24%)"
-        : "linear-gradient(180deg, rgba(255,255,255,0.015), transparent 24%)";
-    const dropdownHover = isLight ? "rgba(28,43,51,0.06)" : "rgba(255,255,255,0.06)";
 
     const rows: [string, string, string, string][] = [
         ["Mina Patel", "Stripe", "Closed Won", "AE"],
@@ -205,7 +182,7 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
     ];
 
     return (
-        <div style={{ position: "relative", display: "flex", flexDirection: "column", background: sheetBg }}>
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", background: "#171612" }}>
             <div
                 style={{
                     padding: "10px 12px",
@@ -218,19 +195,19 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                     fontFamily: C.sans,
                 }}
             >
-                <div style={{ padding: "4px 8px", borderRadius: 6, background: tabBg }}>CRM Leads</div>
-                <div style={{ padding: "4px 8px", borderRadius: 6, background: tabBg }}>March Pipeline</div>
+                <div style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)" }}>CRM Leads</div>
+                <div style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)" }}>March Pipeline</div>
             </div>
 
             <div
                 style={{
                     position: "relative",
                     overflow: "hidden",
-                    background: gradientBg,
+                    background: "linear-gradient(180deg, rgba(255,255,255,0.015), transparent 24%)",
                 }}
             >
                 <div>
-                    <div style={{ display: "flex", position: "sticky", top: 0, zIndex: 1, background: headerBg }}>
+                    <div style={{ display: "flex", position: "sticky", top: 0, zIndex: 1, background: "#1D1B17" }}>
                         {(["Name", "Company", "Status", "Role"] as const).map((label) => {
                             const w = COL[label.toLowerCase() as keyof typeof COL];
                             return (
@@ -256,19 +233,19 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                     </div>
 
                     {rows.map(([name, company, status, role], index) => {
-                        const isFocusRow = name === DEMO_FOCUS_NAME;
+                        const isAlex = name === "Alex Rivera";
 
                         return (
                             <div key={`${name}-${index}`} style={{ display: "flex" }}>
-                                <SpreadsheetCell width={COL.name} color={isFocusRow ? C.text : undefined} C={C}>
+                                <SpreadsheetCell width={COL.name} color={isAlex ? C.text : undefined}>
                                     {name}
                                 </SpreadsheetCell>
-                                <SpreadsheetCell width={COL.company} active={isFocusRow && frame.activeCell === "company"} C={C}>
+                                <SpreadsheetCell width={COL.company} active={isAlex && frame.activeCell === "company"}>
                                     {company}
                                 </SpreadsheetCell>
-                                <SpreadsheetCell width={COL.status} active={isFocusRow && frame.activeCell === "status"} C={C}>
+                                <SpreadsheetCell width={COL.status} active={isAlex && frame.activeCell === "status"}>
                                     {status}
-                                    {isFocusRow && frame.dropdownOpen ? (
+                                    {isAlex && frame.dropdownOpen ? (
                                         <div
                                             style={{
                                                 position: "absolute",
@@ -278,7 +255,7 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                                                 background: C.raised,
                                                 border: `1px solid ${C.border}`,
                                                 borderRadius: 6,
-                                                boxShadow: isLight ? "0 12px 32px rgba(0,0,0,0.1)" : "0 12px 32px rgba(0,0,0,0.35)",
+                                                boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
                                                 overflow: "hidden",
                                                 zIndex: 3,
                                             }}
@@ -290,10 +267,7 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                                                         padding: "6px 10px",
                                                         fontSize: 11,
                                                         color: option === frame.status ? C.text : C.textSec,
-                                                        background:
-                                                            option === frame.status
-                                                                ? dropdownHover
-                                                                : "transparent",
+                                                        background: option === frame.status ? "rgba(255,255,255,0.06)" : "transparent",
                                                         cursor: "pointer",
                                                     }}
                                                 >
@@ -303,7 +277,7 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                                         </div>
                                     ) : null}
                                 </SpreadsheetCell>
-                                <SpreadsheetCell width={COL.role} active={isFocusRow && frame.activeCell === "role"} C={C}>
+                                <SpreadsheetCell width={COL.role} active={isAlex && frame.activeCell === "role"}>
                                     {role}
                                 </SpreadsheetCell>
                             </div>
@@ -321,17 +295,11 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
                         zIndex: 4,
                     }}
                 >
-                    <svg
-                        width="22"
-                        height="28"
-                        viewBox="0 0 22 28"
-                        fill="none"
-                        style={{ filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.2))" }}
-                    >
+                    <svg width="22" height="28" viewBox="0 0 22 28" fill="none" style={{ filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.2))" }}>
                         <path
                             d="M3 2L3.2 21.5L8.2 16.8L11.4 25.2L15.1 23.7L12 15.9L20 15.9L3 2Z"
-                            fill={isLight ? "#1C2B33" : "#FFFFFF"}
-                            stroke={isLight ? "#F5F1ED" : "#141414"}
+                            fill="#FFFFFF"
+                            stroke="#141414"
                             strokeWidth="1.2"
                             strokeLinejoin="round"
                         />
@@ -344,21 +312,9 @@ function InputSpreadsheet({ frame, C }: { frame: Frame; C: MockupColors }) {
 
 type BarVariant = "default" | "hero" | "appHero";
 
-const BarRow = ({
-    label,
-    pct,
-    time,
-    barVariant = "default",
-    C,
-}: {
-    label: string;
-    pct: number;
-    time: string;
-    barVariant?: BarVariant;
-    C: MockupColors;
-}) => {
+const BarRow = ({ label, pct, time, variant = "default" }: { label: string; pct: number; time: string; variant?: BarVariant }) => {
     const v =
-        barVariant === "hero"
+        variant === "hero"
             ? {
                   gap: 12,
                   labelSize: 15,
@@ -371,7 +327,7 @@ const BarRow = ({
                   metaW: 44,
                   pctW: 36,
               }
-            : barVariant === "appHero"
+            : variant === "appHero"
               ? {
                     gap: 10,
                     labelSize: 12,
@@ -397,9 +353,7 @@ const BarRow = ({
                     pctW: 22,
                 };
 
-    const labelStyle = v.labelFlex
-        ? { flex: 1 as const, minWidth: 0 as const }
-        : { width: v.labelW, flexShrink: 0 as const };
+    const labelStyle = v.labelFlex ? { flex: 1 as const, minWidth: 0 as const } : { width: v.labelW, flexShrink: 0 as const };
 
     return (
         <div
@@ -429,7 +383,7 @@ const BarRow = ({
                     background: C.muted,
                     borderRadius: 3,
                     overflow: "hidden",
-                    minWidth: barVariant === "hero" ? 80 : 24,
+                    minWidth: variant === "hero" ? 80 : 24,
                 }}
             >
                 <div style={{ height: "100%", width: `${pct}%`, background: C.accent, borderRadius: 3 }} />
@@ -460,7 +414,7 @@ const BarRow = ({
     );
 };
 
-function OutputActivityBlock({ C }: { C: MockupColors }) {
+function OutputActivityBlock() {
     const sectionLabel = (label: string, prominent?: boolean) => (
         <div
             style={{
@@ -512,7 +466,7 @@ function OutputActivityBlock({ C }: { C: MockupColors }) {
                         style={{
                             fontSize: 10,
                             padding: "3px 9px",
-                            background: `rgba(${C.uiRgb}, 0.06)`,
+                            background: "rgba(236,232,224,0.06)",
                             color: C.textMuted,
                             borderRadius: 4,
                             textTransform: "uppercase",
@@ -528,7 +482,7 @@ function OutputActivityBlock({ C }: { C: MockupColors }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <ChevronDown size={16} style={{ color: C.accent, flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <BarRow label="Lead pipeline updates" pct={100} time="1h 25m" barVariant="hero" C={C} />
+                            <BarRow label="Lead pipeline updates" pct={100} time="1h 25m" variant="hero" />
                         </div>
                     </div>
                     <div
@@ -546,18 +500,17 @@ function OutputActivityBlock({ C }: { C: MockupColors }) {
 
                 {sectionLabel("⊞ App Breakdown", true)}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 4 }}>
-                    <BarRow label="Chrome" pct={42} time="36m" barVariant="appHero" C={C} />
-                    <BarRow label="Claude" pct={28} time="24m" barVariant="appHero" C={C} />
-                    <BarRow label="Slack" pct={18} time="15m" barVariant="appHero" C={C} />
-                    <BarRow label="Cursor" pct={12} time="10m" barVariant="appHero" C={C} />
+                    <BarRow label="Chrome" pct={42} time="36m" variant="appHero" />
+                    <BarRow label="Claude" pct={28} time="24m" variant="appHero" />
+                    <BarRow label="Slack" pct={18} time="15m" variant="appHero" />
+                    <BarRow label="Cursor" pct={12} time="10m" variant="appHero" />
                 </div>
             </div>
         </div>
     );
 }
 
-export const ProductDemoSection = ({ variant = "dark" }: { variant?: MockupVariant }) => {
-    const C = getMockupColors(variant);
+export const ProductDemoSection = () => {
     const [frameIndex, setFrameIndex] = useState(0);
 
     useEffect(() => {
@@ -572,10 +525,7 @@ export const ProductDemoSection = ({ variant = "dark" }: { variant?: MockupVaria
 
     return (
         <div style={{ maxWidth: 1240, margin: "0 auto", padding: "0 48px 100px" }}>
-            <div
-                className="l-product-demo-row"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-            >
+            <div className="l-product-demo-row" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ width: 360, flexShrink: 0, position: "relative" }}>
                     <div
                         className="l-product-demo-label"
@@ -590,10 +540,10 @@ export const ProductDemoSection = ({ variant = "dark" }: { variant?: MockupVaria
                     >
                         Your team&apos;s work
                     </div>
-                    <MacWindow title="Google Sheets" variant={variant}>
-                        <InputSpreadsheet frame={frame} C={C} />
+                    <MacWindow title="Google Sheets">
+                        <InputSpreadsheet frame={frame} />
                     </MacWindow>
-                    <DemoWatchingPill C={C} />
+                    <DemoWatchingPill />
                 </div>
 
                 <div
@@ -626,8 +576,8 @@ export const ProductDemoSection = ({ variant = "dark" }: { variant?: MockupVaria
                     >
                         Automatically summarised
                     </div>
-                    <MacWindow title="Mitable" variant={variant}>
-                        <OutputActivityBlock C={C} />
+                    <MacWindow title="Mitable">
+                        <OutputActivityBlock />
                     </MacWindow>
                 </div>
             </div>

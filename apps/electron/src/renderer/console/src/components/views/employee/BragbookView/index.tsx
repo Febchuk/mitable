@@ -7,7 +7,11 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Loader2, AlertCircle, Plus, X } from "lucide-react";
-import { useBragbook, useSaveBragbookPeriod, useGenerateBragbookPeriod } from "@/console/src/hooks/queries/bragbook";
+import {
+  useBragbook,
+  useSaveBragbookPeriod,
+  useGenerateBragbookPeriod,
+} from "@/console/src/hooks/queries/bragbook";
 import type { BragbookView as BragbookViewType } from "@/console/src/services/bragbookService";
 import type { BragbookPeriod } from "@/console/src/services/bragbookService";
 
@@ -135,7 +139,10 @@ export default function BragbookView() {
   if (isLoading) {
     return (
       <div style={styles.centerContainer}>
-        <Loader2 size={24} style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }} />
+        <Loader2
+          size={24}
+          style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
+        />
         <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
           Loading bragbook...
         </p>
@@ -200,22 +207,22 @@ export default function BragbookView() {
                   if (!isActive) e.currentTarget.style.background = "transparent";
                 }}
               >
-                <span style={{
-                  ...styles.tocDot,
-                  background: hasContent
-                    ? "var(--mi-accent)"
-                    : "rgba(var(--ui-rgb), 0.15)",
-                }} />
-                <span style={{
-                  color: isActive ? "var(--mi-accent)" : "var(--text-secondary)",
-                  fontSize: 13,
-                  fontFamily: "var(--font-sans)",
-                }}>
+                <span
+                  style={{
+                    ...styles.tocDot,
+                    background: hasContent ? "var(--mi-accent)" : "rgba(var(--ui-rgb), 0.15)",
+                  }}
+                />
+                <span
+                  style={{
+                    color: isActive ? "var(--mi-accent)" : "var(--text-secondary)",
+                    fontSize: 13,
+                    fontFamily: "var(--font-sans)",
+                  }}
+                >
                   {period.periodLabel}
                 </span>
-                {hasContent && (
-                  <span style={styles.tocCount}>{period.accomplishments.length}</span>
-                )}
+                {hasContent && <span style={styles.tocCount}>{period.accomplishments.length}</span>}
               </button>
             );
           })}
@@ -227,9 +234,7 @@ export default function BragbookView() {
         <div style={styles.documentContent}>
           {periods.length === 0 ? (
             <div style={styles.centerContainer}>
-              <p style={{ color: "var(--text-tertiary)", fontSize: 14 }}>
-                No periods to display
-              </p>
+              <p style={{ color: "var(--text-tertiary)", fontSize: 14 }}>No periods to display</p>
             </div>
           ) : (
             <>
@@ -257,13 +262,18 @@ export default function BragbookView() {
 
 import { forwardRef } from "react";
 
-const PeriodSection = forwardRef<HTMLDivElement, {
-  period: BragbookPeriod;
-  activeView: BragbookViewType;
-}>(function PeriodSection({ period, activeView }, ref) {
+const PeriodSection = forwardRef<
+  HTMLDivElement,
+  {
+    period: BragbookPeriod;
+    activeView: BragbookViewType;
+  }
+>(function PeriodSection({ period, activeView }, ref) {
   const saveMutation = useSaveBragbookPeriod();
   const generateMutation = useGenerateBragbookPeriod();
-  const [localAccomplishments, setLocalAccomplishments] = useState<string[]>(period.accomplishments);
+  const [localAccomplishments, setLocalAccomplishments] = useState<string[]>(
+    period.accomplishments
+  );
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -342,15 +352,25 @@ const PeriodSection = forwardRef<HTMLDivElement, {
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Period heading (not editable) + Generate button */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
         <h2 style={{ ...styles.periodHeading, margin: 0 }}>{period.periodLabel}</h2>
         {!period.isEdited && (isHovered || generateMutation.isPending) && (
           <button
-            onClick={() => generateMutation.mutate({ periodType: activeView, periodStart: period.periodStart })}
+            onClick={() =>
+              generateMutation.mutate({ periodType: activeView, periodStart: period.periodStart })
+            }
             disabled={generateMutation.isPending}
             style={styles.generateButton}
             onMouseEnter={(e) => {
-              if (!generateMutation.isPending) e.currentTarget.style.background = "rgba(var(--mi-accent-rgb), 0.13)";
+              if (!generateMutation.isPending)
+                e.currentTarget.style.background = "rgba(var(--mi-accent-rgb), 0.13)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "transparent";
@@ -385,7 +405,10 @@ const PeriodSection = forwardRef<HTMLDivElement, {
                   onBlur={commitEdit}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") commitEdit();
-                    if (e.key === "Escape") { setEditingIndex(null); setEditValue(""); }
+                    if (e.key === "Escape") {
+                      setEditingIndex(null);
+                      setEditValue("");
+                    }
                   }}
                   autoFocus
                   style={styles.editInput}
@@ -393,10 +416,7 @@ const PeriodSection = forwardRef<HTMLDivElement, {
               ) : (
                 <>
                   <span style={styles.bulletMarker}>&#x2022;</span>
-                  <span
-                    onClick={() => startEdit(index)}
-                    style={styles.bulletText}
-                  >
+                  <span onClick={() => startEdit(index)} style={styles.bulletText}>
                     {item}
                   </span>
                   <button
@@ -424,7 +444,10 @@ const PeriodSection = forwardRef<HTMLDivElement, {
             onChange={(e) => setNewValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") addAccomplishment();
-              if (e.key === "Escape") { setIsAdding(false); setNewValue(""); }
+              if (e.key === "Escape") {
+                setIsAdding(false);
+                setNewValue("");
+              }
             }}
             autoFocus
             placeholder="What did you accomplish?"

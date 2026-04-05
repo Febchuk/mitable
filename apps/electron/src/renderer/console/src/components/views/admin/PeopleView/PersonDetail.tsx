@@ -1487,11 +1487,17 @@ export default function PersonDetail() {
                       borderBottom: "var(--border-hairline)",
                       transition: "background 0.15s",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
                   >
                     <BenchmarkMiniRing progress={s.progress} />
-                    <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>
+                      {s.name}
+                    </span>
                   </div>
                 ))}
               </div>

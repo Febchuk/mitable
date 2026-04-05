@@ -1,12 +1,4 @@
-import {
-  pgTable,
-  uuid,
-  varchar,
-  jsonb,
-  timestamp,
-  date,
-  unique,
-} from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, jsonb, timestamp, date, unique } from "drizzle-orm/pg-core";
 import { users } from "./users.schema";
 import { organizations } from "./organizations.schema";
 
@@ -40,18 +32,10 @@ export const bragbookEntries = pgTable(
     // "auto-generated" (from cron/LLM) or "user-edited" (manual edits)
     source: varchar("source", { length: 20 }).notNull().default("auto-generated"),
 
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    unique("bragbook_user_period_unique").on(
-      table.userId,
-      table.periodType,
-      table.periodStart
-    ),
+    unique("bragbook_user_period_unique").on(table.userId, table.periodType, table.periodStart),
   ]
 );

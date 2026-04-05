@@ -61,9 +61,7 @@ function getLastCompletedPeriod(periodType: PeriodType): { start: string; end: s
   }
 }
 
-export async function runBragbookGenerateJob(
-  periodTypes: PeriodType[]
-): Promise<{
+export async function runBragbookGenerateJob(periodTypes: PeriodType[]): Promise<{
   usersProcessed: number;
   usersSkipped: number;
   usersFailed: number;
@@ -85,10 +83,7 @@ export async function runBragbookGenerateJob(
       totalSkipped += result.usersSkipped;
       totalFailed += result.usersFailed;
 
-      logger.info(
-        { periodType, ...result },
-        "Bragbook generation completed for period"
-      );
+      logger.info({ periodType, ...result }, "Bragbook generation completed for period");
     } catch (error) {
       logger.error({ error: String(error), periodType }, "Bragbook generation failed for period");
       totalFailed++;

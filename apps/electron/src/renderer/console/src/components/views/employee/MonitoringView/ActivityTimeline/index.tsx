@@ -94,7 +94,11 @@ export default function ActivityTimeline({
           {timeline && timeline.groups.length === 0 && !isLoading && (
             <EmptyState
               variant="inline"
-              title={isSessionActive ? "Waiting for activity to be recorded..." : "No recorded activity yet."}
+              title={
+                isSessionActive
+                  ? "Waiting for activity to be recorded..."
+                  : "No recorded activity yet."
+              }
             />
           )}
         </div>
