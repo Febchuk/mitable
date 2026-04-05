@@ -1,5 +1,5 @@
 import pino from "pino";
-import pretty from "pino-pretty";
+import { createRequire } from "node:module";
 import { Writable } from "node:stream";
 import { appendDevLogLine } from "./dev-log-buffer.js";
 
@@ -41,7 +41,11 @@ function buildLogger(): pino.Logger {
     return pino(basePinoOptions);
   }
 
-  // development: tee raw JSON to an in-memory buffer (feedback) and pretty-print to stdout
+  // development: tee raw JSON to an in-memory buffer (feedback) and pretty-print to stdout.
+  // pino-pretty is devDependency + CJS/tty — never static-import (breaks ESM bundle / prod install).
+  const require = createRequire(import.meta.url);
+  const pretty = require("pino-pretty") as typeof import("pino-pretty");
+
   const level = getLogLevel() as pino.Level;
   const captureStream = new Writable({
     write(chunk, _encoding, callback) {
