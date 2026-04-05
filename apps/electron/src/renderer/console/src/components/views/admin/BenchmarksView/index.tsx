@@ -84,21 +84,19 @@ export default function BenchmarksView() {
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <h1
-            style={{
-              fontFamily: "var(--font-serif)",
-              fontSize: 26,
-              color: "var(--text-primary)",
-              fontWeight: 400,
-              letterSpacing: "-0.3px",
-              margin: 0,
-            }}
-          >
-            Benchmarks
-          </h1>
-          <DataScopeFilter />
-        </div>
+        <h1
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 26,
+            color: "var(--text-primary)",
+            fontWeight: 400,
+            letterSpacing: "-0.3px",
+            margin: 0,
+          }}
+        >
+          Benchmarks
+        </h1>
+        <DataScopeFilter />
 
         {/* Frequency filters — hidden for now
         <div

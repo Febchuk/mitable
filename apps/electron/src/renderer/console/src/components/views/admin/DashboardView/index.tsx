@@ -385,23 +385,23 @@ export default function DashboardView() {
     >
       {/* Page header row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <h1
-            style={{
-              fontFamily: "var(--font-serif)",
-              fontSize: 26,
-              color: "var(--text-primary)",
-              fontWeight: 400,
-              letterSpacing: "-0.3px",
-              margin: 0,
-            }}
-          >
-            Dashboard
-          </h1>
-          <DataScopeFilter />
-        </div>
+        <h1
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 26,
+            color: "var(--text-primary)",
+            fontWeight: 400,
+            letterSpacing: "-0.3px",
+            margin: 0,
+          }}
+        >
+          Dashboard
+        </h1>
 
-        {/* Time filter bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <DataScopeFilter />
+
+          {/* Time filter bar */}
         <div
           style={{
             display: "flex",
@@ -430,6 +430,7 @@ export default function DashboardView() {
               {f.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 

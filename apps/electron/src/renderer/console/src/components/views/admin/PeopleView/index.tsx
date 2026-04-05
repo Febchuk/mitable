@@ -205,21 +205,18 @@ export default function PeopleView() {
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <h1
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: 26,
-                color: "var(--text-primary)",
-                fontWeight: 400,
-                letterSpacing: "-0.3px",
-                margin: 0,
-              }}
-            >
-              People
-            </h1>
-            <DataScopeFilter />
-          </div>
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 26,
+              color: "var(--text-primary)",
+              fontWeight: 400,
+              letterSpacing: "-0.3px",
+              margin: 0,
+            }}
+          >
+            People
+          </h1>
           <div
             style={{
               fontSize: 12,
@@ -232,8 +229,9 @@ export default function PeopleView() {
         </div>
 
         <div
-          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 396 }}
+          style={{ display: "flex", alignItems: "center", gap: 12 }}
         >
+          <DataScopeFilter />
           <div style={{ position: "relative", flex: 1 }}>
             <Search
               size={15}
