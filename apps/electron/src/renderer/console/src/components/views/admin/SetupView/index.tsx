@@ -38,7 +38,7 @@ function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onCha
         cursor: disabled ? "not-allowed" : "pointer",
         position: "relative",
         transition: "background 0.2s",
-        background: checked ? "var(--mi-accent)" : "rgba(var(--ui-rgb), 0.1)",
+        background: checked ? "rgba(var(--ui-rgb), 0.3)" : "rgba(var(--ui-rgb), 0.1)",
         opacity: disabled ? 0.5 : 1,
         flexShrink: 0,
       }}
