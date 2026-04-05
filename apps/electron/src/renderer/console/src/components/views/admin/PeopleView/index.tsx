@@ -229,7 +229,7 @@ export default function PeopleView() {
         </div>
 
         <div
-          style={{ display: "flex", alignItems: "center", gap: 12 }}
+          style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: "auto" }}
         >
           <DataScopeFilter />
           <div style={{ position: "relative", flex: 1 }}>
