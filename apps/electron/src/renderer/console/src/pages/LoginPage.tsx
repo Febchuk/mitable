@@ -42,15 +42,21 @@ export default function LoginPage() {
       // Save tokens
       authService.saveTokens(response.session.access_token, response.session.refresh_token);
 
-      // Update user context
+      // Update user context (include hierarchy fields for view mode detection)
+      const profile = response.profile as Record<string, any>;
       updateUser({
-        id: response.profile.id,
-        name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
-        firstName: response.profile.firstName || "",
-        avatarUrl: response.profile.avatarUrl || undefined,
-        currentWeek: response.profile.currentWeek || 1,
-        role: response.profile.role,
-        organizationId: response.profile.organizationId || "",
+        id: profile.id,
+        name: `${profile.firstName || ""} ${profile.lastName || ""}`.trim(),
+        firstName: profile.firstName || "",
+        avatarUrl: profile.avatarUrl || undefined,
+        currentWeek: profile.currentWeek || 1,
+        role: profile.role,
+        organizationId: profile.organizationId || "",
+        isManager: profile.isManager ?? false,
+        managerId: profile.managerId ?? null,
+        teamId: profile.teamId ?? null,
+        department: profile.department ?? null,
+        directReportCount: profile.directReportCount ?? 0,
       });
 
       // Redirect to default route (handles onboarding check)

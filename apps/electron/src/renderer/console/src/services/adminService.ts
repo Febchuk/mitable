@@ -635,10 +635,13 @@ export interface DashboardPersonDetail {
  * Fetch org-wide dashboard metrics (admin only)
  */
 export async function fetchDashboardMetrics(
-  period: DashboardPeriod = "yesterday"
+  period: DashboardPeriod = "yesterday",
+  scope?: string
 ): Promise<DashboardMetrics> {
   try {
-    const response = await apiRequest<DashboardMetrics>(`/admin/dashboard?period=${period}`);
+    const params = new URLSearchParams({ period });
+    if (scope) params.set("scope", scope);
+    const response = await apiRequest<DashboardMetrics>(`/admin/dashboard?${params}`);
     return response;
   } catch (error) {
     logger.error("Error fetching dashboard metrics:", error);
@@ -650,9 +653,10 @@ export async function fetchDashboardMetrics(
  * Fetch all org users with lifetime activity summaries for People tab (admin only).
  * No date filtering — the backend returns ALL users with aggregated lifetime stats.
  */
-export async function fetchDashboardPeople(): Promise<DashboardPerson[]> {
+export async function fetchDashboardPeople(scope?: string): Promise<DashboardPerson[]> {
   try {
-    const response = await apiRequest<{ people: DashboardPerson[] }>(`/admin/dashboard/people`);
+    const params = scope ? `?scope=${scope}` : "";
+    const response = await apiRequest<{ people: DashboardPerson[] }>(`/admin/dashboard/people${params}`);
     return response.people;
   } catch (error) {
     logger.error("Error fetching dashboard people:", error);

@@ -22,6 +22,7 @@ import { summaryRefinementService } from "../services/summary-refinement.service
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../lib/sessionLogger";
 import { closeAudioConnection } from "./audio.js";
+import { canEditSession } from "../services/permissions.service.js";
 import { logger } from "../lib/logger";
 import { runBlockAnalyzer } from "../services/block-analyzer-orchestrator.service";
 import { classifySession } from "../services/session-classification.service";
@@ -48,8 +49,9 @@ function formatDuration(ms: number): string {
 }
 
 /**
- * Check if the requesting user owns the session OR is an admin in the same org.
- * Used for summary editing endpoints where admins can edit employee summaries.
+ * Check if the requesting user can edit the session.
+ * True if: actor owns the session, is an admin in the same org, or manages the session owner (direct or transitive).
+ * Delegates to the centralized permissions service.
  */
 async function isOwnerOrOrgAdmin(
   userId: string,
@@ -57,13 +59,15 @@ async function isOwnerOrOrgAdmin(
 ): Promise<boolean> {
   if (session.userId === userId) return true;
 
-  const [user] = await db
+  const [actor] = await db
     .select({ role: schema.users.role, organizationId: schema.users.organizationId })
     .from(schema.users)
     .where(eq(schema.users.id, userId))
     .limit(1);
 
-  return user?.role === "admin" && user.organizationId === session.organizationId;
+  if (!actor) return false;
+
+  return canEditSession(userId, session.userId, actor.role, actor.organizationId);
 }
 
 /**

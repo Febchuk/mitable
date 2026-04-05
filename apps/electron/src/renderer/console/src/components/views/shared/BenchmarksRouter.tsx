@@ -5,7 +5,8 @@ import EmployeeBenchmarksView from "../employee/BenchmarksView";
 export default function BenchmarksRouter() {
   const { user } = useUser();
 
-  if (user?.role === "admin") {
+  // Admins and managers get the full benchmarks management view
+  if (user?.role === "admin" || user?.isManager) {
     return <BenchmarksView />;
   }
 

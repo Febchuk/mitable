@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, ChevronRight, Zap } from "lucide-react";
+import { Search, ChevronRight, Zap } from "lucide-react";
 import { useUsers, useDashboardPeople } from "@/console/src/hooks/queries/admin";
 import type { User, DashboardPerson } from "@/console/src/services/adminService";
+import DataScopeFilter from "@/console/src/components/shared/DataScopeFilter";
 
 interface UserActivityMeta {
   lastActive: string;
@@ -194,13 +195,12 @@ export default function PeopleView() {
         gap: 24,
       }}
     >
+      {/* Title row: name + scope filter inline */}
       <div
         style={{
           display: "flex",
-          alignItems: "flex-end",
+          alignItems: "center",
           justifyContent: "space-between",
-          gap: 20,
-          flexWrap: "wrap",
         }}
       >
         <div>
@@ -226,61 +226,38 @@ export default function PeopleView() {
             {countLabel}
           </div>
         </div>
+        <DataScopeFilter />
+      </div>
 
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 396 }}
-        >
-          <div style={{ position: "relative", flex: 1 }}>
-            <Search
-              size={15}
-              style={{
-                position: "absolute",
-                left: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--text-tertiary)",
-                pointerEvents: "none",
-              }}
-            />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search people"
-              style={{
-                width: "100%",
-                height: 34,
-                padding: "0 12px 0 36px",
-                borderRadius: 8,
-                border: "var(--border-subtle)",
-                background: "var(--bg-raised)",
-                color: "var(--text-primary)",
-                fontSize: 13,
-                outline: "none",
-              }}
-            />
-          </div>
-
-          <button
-            onClick={() => navigate("/people/new")}
-            style={{
-              height: 34,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "0 12px",
-              borderRadius: 8,
-              border: "var(--border-subtle)",
-              background: "var(--bg-overlay)",
-              color: "var(--text-primary)",
-              fontSize: 13,
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <Plus size={14} />
-            Add user
-          </button>
-        </div>
+      {/* Search bar */}
+      <div style={{ position: "relative", maxWidth: 320 }}>
+        <Search
+          size={15}
+          style={{
+            position: "absolute",
+            left: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-tertiary)",
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search people"
+          style={{
+            width: "100%",
+            height: 34,
+            padding: "0 12px 0 36px",
+            borderRadius: 8,
+            border: "var(--border-subtle)",
+            background: "var(--bg-raised)",
+            color: "var(--text-primary)",
+            fontSize: 13,
+            outline: "none",
+          }}
+        />
       </div>
 
       <div style={{ borderTop: "var(--border-hairline)" }}>

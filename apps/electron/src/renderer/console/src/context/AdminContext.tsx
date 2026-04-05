@@ -74,7 +74,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   // Fetch admin data from APIs
   const fetchAdminData = async () => {
-    if (!user || user.role !== "admin") return;
+    if (!user || (user.role !== "admin" && !user.isManager)) return;
 
     setLoading(true);
     setError(null);
@@ -98,9 +98,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Fetch data when user logs in (only for admin users)
+  // Fetch data when user logs in (for admin or manager users)
   useEffect(() => {
-    if (user && user.role === "admin") {
+    if (user && (user.role === "admin" || user.isManager)) {
       fetchAdminData();
     }
   }, [user]);

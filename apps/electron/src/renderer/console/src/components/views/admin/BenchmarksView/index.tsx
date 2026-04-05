@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useBenchmarks, useDeleteBenchmark } from "@/console/src/hooks/queries/benchmarks";
 import type { Benchmark } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
+import DataScopeFilter from "@/console/src/components/shared/DataScopeFilter";
 
 // Frequency filters — commented out in UI for now
 // type FrequencyFilter = "all" | BenchmarkFrequency;
@@ -95,6 +96,7 @@ export default function BenchmarksView() {
         >
           Benchmarks
         </h1>
+        <DataScopeFilter />
 
         {/* Frequency filters — hidden for now
         <div

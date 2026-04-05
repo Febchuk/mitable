@@ -13,6 +13,6 @@ export function useSubscriberActivities(
   return useQuery({
     queryKey: ["admin", "dashboard", "people", userId, "subscriber-activities", subscriber, period],
     queryFn: () => fetchSubscriberActivities(userId, subscriber!, period),
-    enabled: !!user && user.role === "admin" && !!userId && !!subscriber,
+    enabled: !!user && (user.role === "admin" || !!user.isManager) && !!userId && !!subscriber,
   });
 }

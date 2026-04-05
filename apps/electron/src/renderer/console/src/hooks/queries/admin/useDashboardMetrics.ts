@@ -4,12 +4,12 @@ import type { DashboardPeriod } from "../../../services/adminService";
 import { useUser } from "../../../context/UserContext";
 
 export function useDashboardMetrics(period: DashboardPeriod = "today") {
-  const { user } = useUser();
+  const { user, dataScope } = useUser();
 
   return useQuery({
-    queryKey: ["admin", "dashboard", "metrics", period],
-    queryFn: () => fetchDashboardMetrics(period),
-    enabled: !!user && user.role === "admin",
+    queryKey: ["admin", "dashboard", "metrics", period, dataScope],
+    queryFn: () => fetchDashboardMetrics(period, dataScope),
+    enabled: !!user && (user.role === "admin" || !!user.isManager),
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
   });
 }

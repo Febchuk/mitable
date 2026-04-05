@@ -13,6 +13,6 @@ export function useUserDrillDown(
   return useQuery({
     queryKey: ["admin", "dashboard", "people", userId, "drill-down", metric, period],
     queryFn: () => fetchUserDrillDown(userId, metric!, period),
-    enabled: !!user && user.role === "admin" && !!userId && !!metric,
+    enabled: !!user && (user.role === "admin" || !!user.isManager) && !!userId && !!metric,
   });
 }

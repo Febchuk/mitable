@@ -1,25 +1,27 @@
-import { Calendar, Download, LayoutGrid, User, BarChart2, FileText, Target, Award } from "lucide-react";
+import { Calendar, Download, LayoutGrid, User, Users, BarChart2, FileText, Target, Award } from "lucide-react";
 import NavItem from "./NavItem";
 import NavGroup from "./NavGroup";
 import MitableIcon from "../icons/MitableIcon";
+import type { ViewMode } from "../../types";
 
 interface NavProps {
-  isAdminView?: boolean;
+  viewMode: ViewMode;
 }
 
-export default function Nav({ isAdminView = false }: NavProps) {
-  if (isAdminView) {
+export default function Nav({ viewMode }: NavProps) {
+  if (viewMode === "manager") {
     return (
       <>
         <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
-        <NavItem to="/agent" icon={MitableIcon} label="Agent" />
-        <NavItem to="/reports" icon={BarChart2} label="Reports" />
+        <NavItem to="/people" icon={Users} label="People" />
         <NavItem to="/benchmarks" icon={Target} label="Benchmarks" />
-        <NavItem to="/people" icon={User} label="People" />
+        {/* <NavItem to="/reports" icon={BarChart2} label="Reports" /> */}
+        {/* <NavItem to="/agent" icon={MitableIcon} label="Agent" /> */}
       </>
     );
   }
 
+  // Employee (My View)
   return (
     <>
       <NavItem to="/calendar" icon={Calendar} label="Calendar" />
@@ -29,7 +31,7 @@ export default function Nav({ isAdminView = false }: NavProps) {
       </NavGroup>
       <NavItem to="/agent" icon={MitableIcon} label="Agent" />
       <NavItem to="/docs" icon={FileText} label="Docs" />
-      <NavItem to="/uploads" icon={Download} label="Uploads" />
+      {/* <NavItem to="/uploads" icon={Download} label="Uploads" /> */}
     </>
   );
 }

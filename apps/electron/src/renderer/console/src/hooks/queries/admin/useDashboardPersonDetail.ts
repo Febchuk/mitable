@@ -9,6 +9,6 @@ export function useDashboardPersonDetail(userId: string, period: DashboardPeriod
   return useQuery({
     queryKey: ["admin", "dashboard", "person", userId, period],
     queryFn: () => fetchDashboardPersonDetail(userId, period),
-    enabled: !!user && user.role === "admin" && !!userId,
+    enabled: !!user && (user.role === "admin" || !!user.isManager) && !!userId,
   });
 }

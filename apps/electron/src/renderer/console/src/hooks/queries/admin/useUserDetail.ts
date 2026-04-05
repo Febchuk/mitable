@@ -8,6 +8,6 @@ export function useUserDetail(userId: string) {
   return useQuery({
     queryKey: ["admin", "users", userId],
     queryFn: () => fetchUserDetail(userId),
-    enabled: !!user && user.role === "admin" && !!userId,
+    enabled: !!user && (user.role === "admin" || !!user.isManager) && !!userId,
   });
 }

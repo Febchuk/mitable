@@ -9,6 +9,6 @@ export function useDrillDown(metric: string | null, period: DashboardPeriod = "y
   return useQuery({
     queryKey: ["admin", "dashboard", "drill-down", metric, period],
     queryFn: () => fetchDrillDown(metric!, period),
-    enabled: !!user && user.role === "admin" && !!metric,
+    enabled: !!user && (user.role === "admin" || !!user.isManager) && !!metric,
   });
 }

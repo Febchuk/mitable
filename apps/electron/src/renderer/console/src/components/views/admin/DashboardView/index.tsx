@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useDashboardMetrics } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod, DashboardMetrics } from "@/console/src/services/adminService";
 import { formatTopLevelDuration } from "../shared/topLevelDuration";
+import DataScopeFilter from "@/console/src/components/shared/DataScopeFilter";
 
 type TimeFilter = "yesterday" | "week" | "month" | "ytd" | "all";
 
@@ -397,7 +398,10 @@ export default function DashboardView() {
           Dashboard
         </h1>
 
-        {/* Time filter bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <DataScopeFilter />
+
+          {/* Time filter bar */}
         <div
           style={{
             display: "flex",
@@ -426,6 +430,7 @@ export default function DashboardView() {
               {f.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 

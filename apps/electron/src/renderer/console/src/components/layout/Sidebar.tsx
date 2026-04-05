@@ -1,31 +1,27 @@
-import { ArrowLeftRight, Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
 import Nav from "../navigation/Nav";
 import { useState, useRef, useEffect } from "react";
+import type { ViewMode } from "../../types";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 
+const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+  employee: "Me",
+  manager: "Team",
+};
+
 export default function Sidebar() {
   const { open } = useSidebar();
-  const { user, updateUser, logout, organization } = useUser();
+  const { user, logout, organization, viewMode, availableViewModes, setViewMode } = useUser();
   const navigate = useNavigate();
-  const [inAdminView, setInAdminView] = useState(user?.role === "admin");
 
-  const canSwitchRoles = user?.role === "admin" || user?.originalRole === "admin";
-
-  const handleSwitchView = () => {
-    if (!user) return;
-    const newRole = inAdminView ? "employee" : "admin";
-    setInAdminView(!inAdminView);
-    updateUser({
-      ...user,
-      role: newRole as "admin" | "employee",
-      originalRole: user.originalRole ?? user.role,
-    });
-    localStorage.setItem("mitable:lastMode", newRole);
-    navigate(newRole === "admin" ? "/dashboard" : "/calendar");
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    if (mode === "employee") navigate("/calendar");
+    else navigate("/dashboard");
   };
 
   const firstInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
@@ -69,9 +65,45 @@ export default function Sidebar() {
         }}
       />
 
+      {/* View Mode Switcher */}
+      {availableViewModes.length > 1 && (
+        <div style={{ padding: "0 8px", marginBottom: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 1,
+              background: "rgba(var(--ui-rgb), 0.05)",
+              borderRadius: 6,
+              padding: 2,
+            }}
+          >
+            {availableViewModes.map((mode) => (
+              <button
+                key={mode}
+                onClick={() => handleViewModeChange(mode)}
+                style={{
+                  flex: 1,
+                  padding: "3px 6px",
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background 0.1s, color 0.1s",
+                  background: viewMode === mode ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
+                  color: viewMode === mode ? "var(--text-primary)" : "var(--text-secondary)",
+                }}
+              >
+                {VIEW_MODE_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
-        <Nav isAdminView={inAdminView} />
+        <Nav viewMode={viewMode} />
       </nav>
 
       {/* Bottom section */}
@@ -84,54 +116,12 @@ export default function Sidebar() {
           gap: 2,
         }}
       >
-        {/* Switch view button */}
-        {canSwitchRoles && (
-          <>
-            <div
-              style={{
-                height: 0.5,
-                background: "var(--divider)",
-                margin: "0 -8px 4px",
-              }}
-            />
-            <button
-              onClick={handleSwitchView}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 11,
-                padding: "8px 12px",
-                borderRadius: 6,
-                fontSize: 13,
-                color: "var(--text-secondary)",
-                background: "none",
-                border: "none",
-                textAlign: "left",
-                width: "100%",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
-                e.currentTarget.style.color = "var(--text-primary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-                e.currentTarget.style.color = "var(--text-secondary)";
-              }}
-            >
-              <ArrowLeftRight size={15} strokeWidth={1.5} />
-              <span>{inAdminView ? "Switch to IC View" : "Switch to Admin View"}</span>
-            </button>
-          </>
-        )}
-
         {/* Divider before user row */}
         <div
           style={{
             height: 0.5,
             background: "var(--divider)",
-            margin: canSwitchRoles ? "4px -8px" : "0 -8px",
+            margin: "0 -8px",
           }}
         />
 
@@ -190,7 +180,7 @@ export default function Sidebar() {
                   lineHeight: 1,
                 }}
               >
-                {inAdminView && organization?.name ? organization.name : "Free plan"}
+                {viewMode !== "employee" && organization?.name ? organization.name : "Free plan"}
               </div>
             </div>
           </div>
@@ -242,6 +232,40 @@ export default function Sidebar() {
                 <Settings size={14} strokeWidth={1.5} />
                 Settings
               </button>
+
+              {(user?.role === "admin" || user?.originalRole === "admin") && (
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    navigate("/org-setup");
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "100%",
+                    padding: "9px 12px",
+                    borderRadius: 6,
+                    border: "none",
+                    background: "none",
+                    color: "var(--text-secondary)",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+                    e.currentTarget.style.color = "var(--text-primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "none";
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                  }}
+                >
+                  <Building2 size={14} strokeWidth={1.5} />
+                  Org Setup
+                </button>
+              )}
 
               <div
                 style={{
