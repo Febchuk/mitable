@@ -1,9 +1,9 @@
 "use client";
 
-import { useOsDetection, DOWNLOAD_URLS, type OsPlatform } from "@/hooks/use-os-detection";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { MITABLE_VERSION } from "@/config/content/base";
+import { DOWNLOAD_URLS, type OsPlatform, useOsDetection } from "@/hooks/use-os-detection";
 
 const BUILDS: { id: OsPlatform; platform: string; description: string; icon: "apple" | "windows" }[] = [
     { id: "mac-arm", platform: "macOS (Apple Silicon)", description: "For M1, M2, M3, and M4 Macs", icon: "apple" },
@@ -70,9 +70,7 @@ export const DownloadScreen = () => {
                     >
                         Download Mitable
                     </h1>
-                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
-                        Choose the right version for your platform.
-                    </p>
+                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>Choose the right version for your platform.</p>
                 </div>
 
                 {/* Recommended build */}
@@ -103,16 +101,21 @@ export const DownloadScreen = () => {
                                 textDecoration: "none",
                                 transition: "border-color 0.2s",
                             }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(130, 192, 204, 0.3)"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(130, 192, 204, 0.15)"; }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = "rgba(130, 192, 204, 0.3)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = "rgba(130, 192, 204, 0.15)";
+                            }}
                         >
                             <div style={{ color: C.text, flexShrink: 0 }}>
-                                {(() => { const Icon = iconMap[recommended.icon]; return <Icon />; })()}
+                                {(() => {
+                                    const Icon = iconMap[recommended.icon];
+                                    return <Icon />;
+                                })()}
                             </div>
                             <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 16, fontWeight: 500, color: C.text, marginBottom: 4 }}>
-                                    {recommended.platform}
-                                </div>
+                                <div style={{ fontSize: 16, fontWeight: 500, color: C.text, marginBottom: 4 }}>{recommended.platform}</div>
                                 <div style={{ fontSize: 13, color: C.textSec }}>{recommended.description}</div>
                             </div>
                             <div
@@ -172,14 +175,18 @@ export const DownloadScreen = () => {
                                         textDecoration: "none",
                                         transition: "border-color 0.2s",
                                     }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--l-border, #33312B)"; }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.borderColor = "var(--l-border, #33312B)";
+                                    }}
                                 >
-                                    <div style={{ color: C.textSec }}><Icon /></div>
+                                    <div style={{ color: C.textSec }}>
+                                        <Icon />
+                                    </div>
                                     <div>
-                                        <div style={{ fontSize: 15, fontWeight: 500, color: C.text, marginBottom: 3 }}>
-                                            {build.platform}
-                                        </div>
+                                        <div style={{ fontSize: 15, fontWeight: 500, color: C.text, marginBottom: 3 }}>{build.platform}</div>
                                         <div style={{ fontSize: 12, color: C.textTer }}>{build.description}</div>
                                     </div>
                                     <div
@@ -207,9 +214,7 @@ export const DownloadScreen = () => {
                 </div>
 
                 {/* Version */}
-                <p style={{ textAlign: "center", fontSize: 12, color: C.textTer, marginTop: 48 }}>
-                    Version {MITABLE_VERSION}
-                </p>
+                <p style={{ textAlign: "center", fontSize: 12, color: C.textTer, marginTop: 48 }}>Version {MITABLE_VERSION}</p>
             </main>
 
             <LandingFooter />

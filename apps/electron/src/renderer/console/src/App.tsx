@@ -36,7 +36,6 @@ import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import ReportsView from "./components/views/admin/ReportsView";
-import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
 import MeView from "./components/views/employee/MeView";
@@ -328,12 +327,9 @@ function App() {
                         <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
                         <Route path="benchmarks/:id/person/:userId" element={<RoleGate requireManager><PersonBenchmarkView /></RoleGate>} />
                         <Route path="integrations" element={<IntegrationsView />} />
-                        <Route path="setup" element={<SetupView />} />
-                        {/* Admin: Org Setup (contains Org Chart, Permissions, General settings) */}
                         <Route path="org-setup" element={<RoleGate requireAdmin><OrgSetupView /></RoleGate>} />
-                        {/* Legacy redirects */}
-                        <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
                         <Route path="setup" element={<Navigate to="/org-setup" replace />} />
+                        <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
                         <Route path="teams" element={<RoleGate requireAdmin><TeamsView /></RoleGate>} />
                         {/* Employee Routes */}
                         <Route path="me" element={<MeView />} />

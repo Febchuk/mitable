@@ -18,7 +18,7 @@ function getCssColor(name: string, fallback: string): string {
 function drawBarChart(
   canvas: HTMLCanvasElement,
   snapshots: BenchmarkSnapshot[],
-  targetValue: number,
+  targetValue: number
 ): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -327,10 +327,7 @@ export function BenchmarkDetailView() {
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {detail.accomplishments.map((a) => (
-              <div
-                key={a.id}
-                style={{ display: "flex", alignItems: "flex-start", gap: 10 }}
-              >
+              <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <span
                   style={{
                     fontSize: 13,
@@ -391,10 +388,7 @@ export function BenchmarkDetailView() {
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {detail.suggestions.map((s) => (
-              <div
-                key={s.id}
-                style={{ display: "flex", alignItems: "flex-start", gap: 10 }}
-              >
+              <div key={s.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <span
                   style={{
                     fontSize: 13,

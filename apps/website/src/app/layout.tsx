@@ -42,16 +42,12 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
     title: "Mitable — Performance, measured.",
-    description:
-        "Knowing if your team is spending their time on the right things is the hardest part of management. Mitable makes it simple.",
+    description: "Knowing if your team is spending their time on the right things is the hardest part of management. Mitable makes it simple.",
 };
 
 export const viewport: Viewport = {
-    themeColor: [
-        { media: "(prefers-color-scheme: dark)", color: "#1A1916" },
-        { media: "(prefers-color-scheme: light)", color: "#F5F1ED" },
-    ],
-    colorScheme: "dark light",
+    themeColor: "#1A1916",
+    colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -61,17 +57,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body
-                className={cx(
-                    inter.variable,
-                    manrope.variable,
-                    jetbrainsMono.variable,
-                    newsreader.variable,
-                    dmSans.variable,
-                    "antialiased",
-                )}
-                style={{ background: "var(--l-bg, #1A1916)" }}
-            >
+            <body className={cx(inter.variable, manrope.variable, jetbrainsMono.variable, newsreader.variable, dmSans.variable, "bg-primary antialiased")}>
                 <RouteProvider>
                     <Theme>{children}</Theme>
                 </RouteProvider>

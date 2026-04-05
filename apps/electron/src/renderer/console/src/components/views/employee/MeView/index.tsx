@@ -19,6 +19,7 @@ import {
   useMyCategoryActivities,
   useMySubscriberActivities,
 } from "@/console/src/hooks/queries/my-activity";
+import { useMyBenchmarks } from "@/console/src/hooks/queries/benchmarks/useMyBenchmarks";
 import type {
   DashboardPeriod,
   DashboardPersonDetail as PersonDetailData,
@@ -98,26 +99,51 @@ function BenchmarkMiniRing({ progress }: { progress: number }) {
   return (
     <div style={{ position: "relative", width: BMR_SIZE, height: BMR_SIZE, flexShrink: 0 }}>
       <svg width={BMR_SIZE} height={BMR_SIZE} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={BMR_SIZE / 2} cy={BMR_SIZE / 2} r={BMR_R} fill="none" stroke="rgba(236,232,224,0.06)" strokeWidth={BMR_STROKE} />
-        <circle cx={BMR_SIZE / 2} cy={BMR_SIZE / 2} r={BMR_R} fill="none" stroke={strokeColor} strokeWidth={BMR_STROKE} strokeLinecap="round" strokeDasharray={BMR_C} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+        <circle
+          cx={BMR_SIZE / 2}
+          cy={BMR_SIZE / 2}
+          r={BMR_R}
+          fill="none"
+          stroke="rgba(236,232,224,0.06)"
+          strokeWidth={BMR_STROKE}
+        />
+        <circle
+          cx={BMR_SIZE / 2}
+          cy={BMR_SIZE / 2}
+          r={BMR_R}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={BMR_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={BMR_C}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.6s ease" }}
+        />
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontFamily: "var(--font-serif)", fontSize: 11, color: "var(--text-primary)", lineHeight: 1 }}>{Math.round(clamped)}</span>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 11,
+            color: "var(--text-primary)",
+            lineHeight: 1,
+          }}
+        >
+          {Math.round(clamped)}
+        </span>
       </div>
     </div>
   );
 }
 
-const MY_STRENGTHS = [
-  { name: "Deep Focus Work", progress: 92, benchmarkId: "bm-deep-focus" },
-  { name: "Consistent Engagement", progress: 88, benchmarkId: "bm-engagement" },
-  { name: "Meeting Efficiency", progress: 85, benchmarkId: "bm-meeting-eff" },
-];
-const MY_OPPORTUNITIES = [
-  { name: "Cross-functional Collaboration", progress: 52, benchmarkId: "bm-cross-collab" },
-  { name: "AI Adoption & Tool Usage", progress: 58, benchmarkId: "bm-ai-adoption" },
-  { name: "Mentorship & Development", progress: 62, benchmarkId: "bm-mentorship" },
-];
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -504,6 +530,28 @@ export default function MeView() {
   }, [workFilter, workSearchQuery]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const { data: myBenchmarks } = useMyBenchmarks();
+
+  // Split benchmarks into strengths (≥ 70 progress) and opportunities (< 70),
+  // sorted by progress descending / ascending respectively, capped at 3 each.
+  const myStrengths = useMemo(() => {
+    if (!myBenchmarks?.length) return [];
+    return [...myBenchmarks]
+      .filter((b) => b.progress >= 70)
+      .sort((a, b) => b.progress - a.progress)
+      .slice(0, 3)
+      .map((b) => ({ name: b.name, progress: b.progress, benchmarkId: b.benchmarkId }));
+  }, [myBenchmarks]);
+
+  const myOpportunities = useMemo(() => {
+    if (!myBenchmarks?.length) return [];
+    return [...myBenchmarks]
+      .filter((b) => b.progress < 70)
+      .sort((a, b) => a.progress - b.progress)
+      .slice(0, 3)
+      .map((b) => ({ name: b.name, progress: b.progress, benchmarkId: b.benchmarkId }));
+  }, [myBenchmarks]);
 
   const { data: apiDetail } = useMyActivity(FILTER_TO_PERIOD[timeRange]);
   const { data: drillDownData } = useMyDrillDown(drillDownMetric, FILTER_TO_PERIOD[timeRange]);
@@ -1188,7 +1236,12 @@ export default function MeView() {
               Strengths
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {MY_STRENGTHS.map((s) => (
+              {myStrengths.length === 0 && (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "10px 0" }}>
+                  No benchmarks assigned yet
+                </div>
+              )}
+              {myStrengths.map((s) => (
                 <div
                   key={s.benchmarkId}
                   onClick={() => navigate(`/benchmarks/${s.benchmarkId}`)}
@@ -1201,11 +1254,17 @@ export default function MeView() {
                     borderBottom: "var(--border-hairline)",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <BenchmarkMiniRing progress={s.progress} />
-                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>{s.name}</span>
+                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>
+                    {s.name}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1235,7 +1294,12 @@ export default function MeView() {
               Opportunities
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {MY_OPPORTUNITIES.map((s) => (
+              {myOpportunities.length === 0 && (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "10px 0" }}>
+                  No opportunities to show
+                </div>
+              )}
+              {myOpportunities.map((s) => (
                 <div
                   key={s.benchmarkId}
                   onClick={() => navigate(`/benchmarks/${s.benchmarkId}`)}
@@ -1248,11 +1312,17 @@ export default function MeView() {
                     borderBottom: "var(--border-hairline)",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <BenchmarkMiniRing progress={s.progress} />
-                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>{s.name}</span>
+                  <span style={{ fontSize: 13, color: "var(--text-primary)", flex: 1 }}>
+                    {s.name}
+                  </span>
                 </div>
               ))}
             </div>

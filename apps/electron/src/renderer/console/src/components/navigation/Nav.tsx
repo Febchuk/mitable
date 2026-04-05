@@ -1,4 +1,4 @@
-import { Calendar, Download, LayoutGrid, User, Users, BarChart2, FileText, Target, Award } from "lucide-react";
+import { Calendar, LayoutGrid, User, Users, FileText, Target, Award } from "lucide-react";
 import NavItem from "./NavItem";
 import NavGroup from "./NavGroup";
 import MitableIcon from "../icons/MitableIcon";

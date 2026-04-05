@@ -15,9 +15,7 @@ export interface BragbookResponse {
   periods: BragbookPeriod[];
 }
 
-export async function fetchBragbook(
-  view: BragbookView = "weekly"
-): Promise<BragbookResponse> {
+export async function fetchBragbook(view: BragbookView = "weekly"): Promise<BragbookResponse> {
   return apiRequest<BragbookResponse>(`/my-bragbook?view=${view}`);
 }
 

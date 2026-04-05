@@ -189,13 +189,20 @@ Each parameter should have a clear name and description of what it measures.
 
 Return JSON only: { "parameters": [{ "name": "...", "description": "..." }] }`;
 
-      logger.info({ descriptionLength: description.length }, "Generating benchmark parameters via LLM");
+      logger.info(
+        { descriptionLength: description.length },
+        "Generating benchmark parameters via LLM"
+      );
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       const parsed = parseLLMJson<{ parameters: { name: string; description: string }[] }>(text);
 
-      if (!parsed.parameters || !Array.isArray(parsed.parameters) || parsed.parameters.length === 0) {
+      if (
+        !parsed.parameters ||
+        !Array.isArray(parsed.parameters) ||
+        parsed.parameters.length === 0
+      ) {
         throw new Error("LLM returned empty or invalid parameters array");
       }
 
@@ -218,7 +225,7 @@ Return JSON only: { "parameters": [{ "name": "...", "description": "..." }] }`;
    */
   async scoreParameters(
     parameters: BenchmarkParameter[],
-    periodSummary: PeriodActivitySummary,
+    periodSummary: PeriodActivitySummary
   ): Promise<ParameterScore[]> {
     try {
       const model = getModel();
@@ -236,7 +243,7 @@ Return JSON only: { "scores": [{ "parameterId": "...", "score": N, "reasoning": 
 
       logger.info(
         { parameterCount: parameters.length, daysActive: periodSummary.daysActive },
-        "Scoring benchmark parameters via LLM",
+        "Scoring benchmark parameters via LLM"
       );
 
       const result = await model.generateContent(prompt);
@@ -266,7 +273,7 @@ Return JSON only: { "scores": [{ "parameterId": "...", "score": N, "reasoning": 
   async generateSuggestions(
     priorities: PriorityParam[],
     periodSummary: PeriodActivitySummary,
-    userName: string,
+    userName: string
   ): Promise<Suggestion[]> {
     try {
       const model = getModel();
@@ -284,14 +291,18 @@ Return JSON only: { "suggestions": [{ "text": "...", "category": "scheduling|hab
 
       logger.info(
         { userName, priorityCount: priorities.length },
-        "Generating improvement suggestions via LLM",
+        "Generating improvement suggestions via LLM"
       );
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       const parsed = parseLLMJson<{ suggestions: Suggestion[] }>(text);
 
-      if (!parsed.suggestions || !Array.isArray(parsed.suggestions) || parsed.suggestions.length === 0) {
+      if (
+        !parsed.suggestions ||
+        !Array.isArray(parsed.suggestions) ||
+        parsed.suggestions.length === 0
+      ) {
         throw new Error("LLM returned empty or invalid suggestions array");
       }
 
@@ -308,7 +319,7 @@ Return JSON only: { "suggestions": [{ "text": "...", "category": "scheduling|hab
    */
   async detectAccomplishments(
     periodSummary: PeriodActivitySummary,
-    userName: string,
+    userName: string
   ): Promise<Accomplishment[]> {
     try {
       const model = getModel();
@@ -357,7 +368,11 @@ function generateParametersFallback(description: string): BenchmarkParameter[] {
 
   if (lower.includes("code") || lower.includes("engineer") || lower.includes("development")) {
     templates = MOCK_PARAM_TEMPLATES.code;
-  } else if (lower.includes("communicat") || lower.includes("writing") || lower.includes("update")) {
+  } else if (
+    lower.includes("communicat") ||
+    lower.includes("writing") ||
+    lower.includes("update")
+  ) {
     templates = MOCK_PARAM_TEMPLATES.communication;
   } else if (lower.includes("lead") || lower.includes("manag") || lower.includes("senior")) {
     templates = MOCK_PARAM_TEMPLATES.leadership;
@@ -373,18 +388,21 @@ function generateParametersFallback(description: string): BenchmarkParameter[] {
 
 function scoreParametersFallback(
   parameters: BenchmarkParameter[],
-  periodSummary: PeriodActivitySummary,
+  periodSummary: PeriodActivitySummary
 ): ParameterScore[] {
   return parameters.map((parameter) => {
     let score = 3.0;
     const name = parameter.name.toLowerCase();
 
     if (name.includes("focus") || name.includes("deep work")) {
-      score = Math.min(5, Math.max(1, (periodSummary.deepFocusMinutes / (periodSummary.daysActive * 60)) * 5));
+      score = Math.min(
+        5,
+        Math.max(1, (periodSummary.deepFocusMinutes / (periodSummary.daysActive * 60)) * 5)
+      );
     } else if (name.includes("communication") || name.includes("collaboration")) {
       score = Math.min(
         5,
-        Math.max(1, (periodSummary.collaborationMinutes / (periodSummary.daysActive * 30)) * 5),
+        Math.max(1, (periodSummary.collaborationMinutes / (periodSummary.daysActive * 30)) * 5)
       );
     } else if (name.includes("quality") || name.includes("reliability")) {
       score = Math.min(5, Math.max(1, periodSummary.onTaskRate * 5));

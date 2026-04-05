@@ -96,12 +96,32 @@ function formatDateStr(d: Date): string {
 
 function formatPeriodLabel(periodStart: Date, periodEnd: Date, periodType: PeriodType): string {
   const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
   const monthsShort = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
   ];
 
   switch (periodType) {
@@ -288,7 +308,10 @@ router.put("/:periodType/:periodStart", requireAuth, async (req: Request, res: R
     }
 
     const { accomplishments } = req.body;
-    if (!Array.isArray(accomplishments) || !accomplishments.every((a: unknown) => typeof a === "string")) {
+    if (
+      !Array.isArray(accomplishments) ||
+      !accomplishments.every((a: unknown) => typeof a === "string")
+    ) {
       return res.status(400).json({ error: "accomplishments must be a string array" });
     }
 

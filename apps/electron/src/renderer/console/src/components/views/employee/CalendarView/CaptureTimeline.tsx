@@ -11,7 +11,6 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Clock,
   ArrowRight,
   Code,
   Globe,
@@ -393,9 +392,7 @@ export default function CaptureTimeline({ captures, maxVisible = 100 }: CaptureT
   };
 
   if (captures.length === 0) {
-    return (
-      <EmptyState variant="inline" title="No captures in this block" />
-    );
+    return <EmptyState variant="inline" title="No captures in this block" />;
   }
 
   return (
