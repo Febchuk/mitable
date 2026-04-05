@@ -1,7 +1,23 @@
 import pino from "pino";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import { Writable } from "node:stream";
 import { appendDevLogLine } from "./dev-log-buffer.js";
+
+/** Anchor createRequire without import.meta (Jest/ts-jest runs this file as CJS). */
+function createRequireFromPackage(): NodeJS.Require {
+  const candidates = [
+    join(process.cwd(), "package.json"),
+    join(process.cwd(), "apps", "backend", "package.json"),
+  ];
+  for (const pkgJson of candidates) {
+    if (existsSync(pkgJson)) {
+      return createRequire(pkgJson);
+    }
+  }
+  throw new Error("Could not resolve package.json for pino-pretty (createRequire)");
+}
 
 const getLogLevel = (): pino.Level | string => {
   if (process.env.NODE_ENV === "production") return "info";
@@ -43,8 +59,8 @@ function buildLogger(): pino.Logger {
 
   // development: tee raw JSON to an in-memory buffer (feedback) and pretty-print to stdout.
   // pino-pretty is devDependency + CJS/tty — never static-import (breaks ESM bundle / prod install).
-  const require = createRequire(import.meta.url);
-  const pretty = require("pino-pretty") as typeof import("pino-pretty");
+  const requireFromPkg = createRequireFromPackage();
+  const pretty = requireFromPkg("pino-pretty") as typeof import("pino-pretty");
 
   const level = getLogLevel() as pino.Level;
   const captureStream = new Writable({
