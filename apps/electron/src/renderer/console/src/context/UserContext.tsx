@@ -1,4 +1,12 @@
-import { createContext, ReactNode, useContext, useEffect, useState, useMemo, useCallback } from "react";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import { authService } from "../services/authService";
 import type { User, ViewMode, DataScope } from "../types";
 import { createLogger } from "../../../lib/logger";
@@ -67,7 +75,11 @@ function getInitialViewMode(user: User | null): ViewMode {
 
 function canSeeOrgWide(user: User | null): boolean {
   if (!user) return false;
-  return user.role === "admin" || user.originalRole === "admin" || (user.permissions?.includes("canSeeOrgWide") ?? false);
+  return (
+    user.role === "admin" ||
+    user.originalRole === "admin" ||
+    (user.permissions?.includes("canSeeOrgWide") ?? false)
+  );
 }
 
 function getAvailableDataScopes(user: User | null): DataScope[] {
@@ -82,7 +94,8 @@ function getInitialDataScope(user: User | null): DataScope {
   if (saved && available.includes(saved)) return saved;
 
   // Admins with no reports default to org-wide; managers default to all-reports
-  const isAdminNoReports = (user?.role === "admin" || user?.originalRole === "admin") && !user?.isManager;
+  const isAdminNoReports =
+    (user?.role === "admin" || user?.originalRole === "admin") && !user?.isManager;
   if (isAdminNoReports && available.includes("org-wide")) return "org-wide";
   return "all-reports";
 }
@@ -98,17 +111,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const availableViewModes = useMemo(() => getAvailableViewModes(user), [user]);
   const availableDataScopes = useMemo(() => getAvailableDataScopes(user), [user]);
 
-  const setViewMode = useCallback((mode: ViewMode) => {
-    if (!availableViewModes.includes(mode)) return;
-    setViewModeState(mode);
-    localStorage.setItem("mitable:viewMode", mode);
-  }, [availableViewModes]);
+  const setViewMode = useCallback(
+    (mode: ViewMode) => {
+      if (!availableViewModes.includes(mode)) return;
+      setViewModeState(mode);
+      localStorage.setItem("mitable:viewMode", mode);
+    },
+    [availableViewModes]
+  );
 
-  const setDataScope = useCallback((scope: DataScope) => {
-    if (!availableDataScopes.includes(scope)) return;
-    setDataScopeState(scope);
-    localStorage.setItem("mitable:dataScope", scope);
-  }, [availableDataScopes]);
+  const setDataScope = useCallback(
+    (scope: DataScope) => {
+      if (!availableDataScopes.includes(scope)) return;
+      setDataScopeState(scope);
+      localStorage.setItem("mitable:dataScope", scope);
+    },
+    [availableDataScopes]
+  );
 
   // Helper: given an access token, fetch user profile and populate state
   const hydrateUser = async (accessToken: string) => {

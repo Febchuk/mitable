@@ -17,7 +17,11 @@ import * as schema from "../db/schema/index";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { requireAccessToUser } from "../middleware/authorization.js";
-import { getDirectReports, getTransitiveReportIds, canViewUserData } from "../services/permissions.service.js";
+import {
+  getDirectReports,
+  getTransitiveReportIds,
+  canViewUserData,
+} from "../services/permissions.service.js";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger({ context: "my-activity-routes" });

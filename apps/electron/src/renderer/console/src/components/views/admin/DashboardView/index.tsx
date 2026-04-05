@@ -402,34 +402,34 @@ export default function DashboardView() {
           <DataScopeFilter />
 
           {/* Time filter bar */}
-        <div
-          style={{
-            display: "flex",
-            gap: 1,
-            background: "rgba(var(--ui-rgb), 0.05)",
-            borderRadius: 7,
-            padding: 3,
-          }}
-        >
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => handleFilterChange(f.key)}
-              style={{
-                padding: "4px 12px",
-                borderRadius: 5,
-                fontSize: 11,
-                fontFamily: "var(--font-sans)",
-                color: filter === f.key ? "var(--text-primary)" : "var(--text-secondary)",
-                background: filter === f.key ? "var(--bg-overlay)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                transition: "background 0.1s, color 0.1s",
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
+          <div
+            style={{
+              display: "flex",
+              gap: 1,
+              background: "rgba(var(--ui-rgb), 0.05)",
+              borderRadius: 7,
+              padding: 3,
+            }}
+          >
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => handleFilterChange(f.key)}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 5,
+                  fontSize: 11,
+                  fontFamily: "var(--font-sans)",
+                  color: filter === f.key ? "var(--text-primary)" : "var(--text-secondary)",
+                  background: filter === f.key ? "var(--bg-overlay)" : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background 0.1s, color 0.1s",
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>

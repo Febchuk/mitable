@@ -12,7 +12,11 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, desc, asc, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requireManagerOrAdmin, requireAccessToUser, getScopedVisibleUserIds } from "../middleware/authorization.js";
+import {
+  requireManagerOrAdmin,
+  requireAccessToUser,
+  getScopedVisibleUserIds,
+} from "../middleware/authorization.js";
 import { createLogger } from "../lib/logger";
 import { normalizeName } from "../services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -320,21 +324,109 @@ async function computeLiveOrgMetrics(
 //   - "today": computed on-the-fly from user_daily_activities (always fresh)
 //   - "week/month/ytd": historical days from org_daily_metrics + today on-the-fly
 // ============================================================================
-router.get("/dashboard", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Resolve scoped user IDs based on ?scope param (direct/all-reports/org-wide)
-    const scopedUserIds = await getScopedVisibleUserIds(req);
+router.get(
+  "/dashboard",
+  requireAuth,
+  requireManagerOrAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Resolve scoped user IDs based on ?scope param (direct/all-reports/org-wide)
+      const scopedUserIds = await getScopedVisibleUserIds(req);
 
-    const period = (req.query.period as string) || "yesterday";
-    const { startDate, endDate } = resolveDateRange(period);
-    const todayStr = new Date().toISOString().split("T")[0]!;
+      const period = (req.query.period as string) || "yesterday";
+      const { startDate, endDate } = resolveDateRange(period);
+      const todayStr = new Date().toISOString().split("T")[0]!;
 
-    // ── Single-day views (today/yesterday) — compute live from user_daily_activities ──
-    if (period === "today" || period === "yesterday") {
-      const targetDate = period === "today" ? todayStr : startDate;
-      const live = await computeLiveOrgMetrics(req.organizationId!, targetDate, scopedUserIds);
+      // ── Single-day views (today/yesterday) — compute live from user_daily_activities ──
+      if (period === "today" || period === "yesterday") {
+        const targetDate = period === "today" ? todayStr : startDate;
+        const live = await computeLiveOrgMetrics(req.organizationId!, targetDate, scopedUserIds);
 
-      if (!live) {
+        if (!live) {
+          res.json({
+            period,
+            hasData: false,
+            metrics: {
+              avgWorkMinutes: 0,
+              avgMeetingMinutes: 0,
+              avgActiveMinutes: 0,
+              avgWorkPercentage: 0,
+              avgMeetingPercentage: 0,
+              totalUsersTracked: 0,
+              totalTeamWorkMinutes: 0,
+              totalTeamMeetingMinutes: 0,
+              totalTeamSessionMinutes: 0,
+            },
+            activityDistribution: [],
+            topApps: [],
+            userSummaries: [],
+            subscriberDistribution: [],
+            dailyTrend: [],
+          });
+          return;
+        }
+
+        res.json({
+          period,
+          hasData: true,
+          metrics: {
+            avgWorkMinutes: live.avgWorkMinutes,
+            avgMeetingMinutes: live.avgMeetingMinutes,
+            avgActiveMinutes: live.avgActiveMinutes,
+            avgWorkPercentage: live.avgWorkPercentage,
+            avgMeetingPercentage: live.avgMeetingPercentage,
+            totalUsersTracked: live.totalUsersTracked,
+            totalTeamWorkMinutes: live.totalTeamWorkMinutes,
+            totalTeamMeetingMinutes: live.totalTeamMeetingMinutes,
+            totalTeamSessionMinutes: live.totalTeamSessionMinutes,
+          },
+          activityDistribution: live.activityDistribution,
+          topApps: live.topApps,
+          userSummaries: live.userSummaries,
+          subscriberDistribution: live.subscriberDistribution,
+          dailyTrend: [
+            {
+              date: todayStr,
+              avgActiveMinutes: live.avgActiveMinutes,
+              avgWorkMinutes: live.avgWorkMinutes,
+              avgMeetingMinutes: live.avgMeetingMinutes,
+              usersTracked: live.totalUsersTracked,
+            },
+          ],
+        });
+        return;
+      }
+
+      // ── Multi-day periods — compute everything from user_daily_activities ──
+
+      // Single query: fetch all user daily rows in the date range
+      const MAX_DASHBOARD_ROWS = 10000; // Safety limit for large orgs on wide date ranges
+      const allUserRows = await db
+        .select({
+          userId: schema.userDailyActivities.userId,
+          activityDate: schema.userDailyActivities.activityDate,
+          totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
+          totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
+          totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+          totalSessionMinutes: schema.userDailyActivities.totalSessionMinutes,
+          workPercentage: schema.userDailyActivities.workPercentage,
+          meetingPercentage: schema.userDailyActivities.meetingPercentage,
+          categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
+          appBreakdown: schema.userDailyActivities.appBreakdown,
+          subscriberBreakdown: schema.userDailyActivities.subscriberBreakdown,
+        })
+        .from(schema.userDailyActivities)
+        .where(
+          and(
+            inArray(schema.userDailyActivities.userId, scopedUserIds),
+            eq(schema.userDailyActivities.periodType, "daily"),
+            gte(schema.userDailyActivities.activityDate, startDate),
+            lte(schema.userDailyActivities.activityDate, endDate)
+          )
+        )
+        .limit(MAX_DASHBOARD_ROWS);
+
+      if (allUserRows.length === 0) {
         res.json({
           period,
           hasData: false,
@@ -358,516 +450,447 @@ router.get("/dashboard", requireAuth, requireManagerOrAdmin, async (req: Request
         return;
       }
 
+      // ── Group by date for daily trend + per-day averages ──
+      const byDate = new Map<string, typeof allUserRows>();
+      for (const row of allUserRows) {
+        const existing = byDate.get(row.activityDate) || [];
+        existing.push(row);
+        byDate.set(row.activityDate, existing);
+      }
+
+      // Build daily trend: per-day averages across users
+      const dailyTrend: {
+        date: string;
+        avgActiveMinutes: number;
+        avgWorkMinutes: number;
+        avgMeetingMinutes: number;
+        usersTracked: number;
+      }[] = [];
+      let totalTeamWorkMinutes = 0;
+      let totalTeamMeetingMinutes = 0;
+      let totalTeamSessionMinutes = 0;
+      let maxUsers = 0;
+      let sumAvgWork = 0;
+      let sumAvgMeeting = 0;
+      let sumAvgActive = 0;
+
+      for (const [date, rows] of byDate.entries()) {
+        const userCount = rows.length;
+        const dayWork = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
+        const dayMeeting = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
+        const dayActive = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
+
+        const avgDayWork = dayWork / userCount;
+        const avgDayMeeting = dayMeeting / userCount;
+        const avgDayActive = dayActive / userCount;
+
+        dailyTrend.push({
+          date,
+          avgWorkMinutes: Math.round(avgDayWork * 10) / 10,
+          avgMeetingMinutes: Math.round(avgDayMeeting * 10) / 10,
+          avgActiveMinutes: Math.round(avgDayActive * 10) / 10,
+          usersTracked: userCount,
+        });
+
+        totalTeamWorkMinutes += dayWork;
+        totalTeamMeetingMinutes += dayMeeting;
+        totalTeamSessionMinutes += rows.reduce((s, r) => s + r.totalSessionMinutes, 0);
+        sumAvgWork += avgDayWork;
+        sumAvgMeeting += avgDayMeeting;
+        sumAvgActive += avgDayActive;
+        if (userCount > maxUsers) maxUsers = userCount;
+      }
+
+      dailyTrend.sort((a, b) => a.date.localeCompare(b.date));
+
+      // Period-level averages: average of per-day averages
+      const dayCount = byDate.size;
+      const avgWork = sumAvgWork / dayCount;
+      const avgMeeting = sumAvgMeeting / dayCount;
+      const avgActive = sumAvgActive / dayCount;
+
+      // ── Activity distribution (category totals across all days) ──
+      const catTotals = new Map<string, number>();
+      let totalTeamActive = 0;
+      for (const row of allUserRows) {
+        totalTeamActive += row.totalActiveMinutes;
+        for (const entry of (row.categoryBreakdown || []) as {
+          category: string;
+          minutes: number;
+        }[]) {
+          catTotals.set(entry.category, (catTotals.get(entry.category) || 0) + entry.minutes);
+        }
+      }
+      const activityDistribution = [...catTotals.entries()]
+        .map(([category, totalMinutes]) => ({
+          category,
+          totalMinutes,
+          percentage: totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+        }))
+        .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+      // ── Top apps across all days ──
+      const appTotals = new Map<string, { totalMinutes: number; users: Set<string> }>();
+      for (const row of allUserRows) {
+        for (const entry of (row.appBreakdown || []) as { app: string; minutes: number }[]) {
+          const existing = appTotals.get(entry.app) || {
+            totalMinutes: 0,
+            users: new Set<string>(),
+          };
+          existing.totalMinutes += entry.minutes;
+          existing.users.add(row.userId);
+          appTotals.set(entry.app, existing);
+        }
+      }
+      const topApps = [...appTotals.entries()]
+        .map(([app, data]) => ({
+          app,
+          totalMinutes: data.totalMinutes,
+          userCount: data.users.size,
+        }))
+        .sort((a, b) => b.totalMinutes - a.totalMinutes)
+        .slice(0, 10);
+
+      // ── User summaries (aggregate per user across all days) ──
+      const userTotals = new Map<string, { work: number; meeting: number; active: number }>();
+      for (const row of allUserRows) {
+        const existing = userTotals.get(row.userId) || { work: 0, meeting: 0, active: 0 };
+        existing.work += row.totalWorkMinutes;
+        existing.meeting += row.totalMeetingMinutes;
+        existing.active += row.totalActiveMinutes;
+        userTotals.set(row.userId, existing);
+      }
+      const userIds = [...userTotals.keys()];
+      const userProfiles =
+        userIds.length > 0
+          ? await db
+              .select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+              })
+              .from(schema.users)
+              .where(inArray(schema.users.id, userIds))
+          : [];
+      const nameMap = new Map(
+        userProfiles.map((u) => [
+          u.id,
+          [u.firstName, u.lastName].filter(Boolean).join(" ") || "Unknown",
+        ])
+      );
+
+      const userSummaries = [...userTotals.entries()].map(([userId, totals]) => ({
+        userId,
+        name: nameMap.get(userId) || "Unknown",
+        activeMinutes: totals.active,
+        workPct: totals.active > 0 ? Math.round((totals.work / totals.active) * 100) : 0,
+        meetingPct: totals.active > 0 ? Math.round((totals.meeting / totals.active) * 100) : 0,
+      }));
+
       res.json({
         period,
         hasData: true,
         metrics: {
-          avgWorkMinutes: live.avgWorkMinutes,
-          avgMeetingMinutes: live.avgMeetingMinutes,
-          avgActiveMinutes: live.avgActiveMinutes,
-          avgWorkPercentage: live.avgWorkPercentage,
-          avgMeetingPercentage: live.avgMeetingPercentage,
-          totalUsersTracked: live.totalUsersTracked,
-          totalTeamWorkMinutes: live.totalTeamWorkMinutes,
-          totalTeamMeetingMinutes: live.totalTeamMeetingMinutes,
-          totalTeamSessionMinutes: live.totalTeamSessionMinutes,
+          avgWorkMinutes: Math.round(avgWork * 10) / 10,
+          avgMeetingMinutes: Math.round(avgMeeting * 10) / 10,
+          avgActiveMinutes: Math.round(avgActive * 10) / 10,
+          avgWorkPercentage: avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0,
+          avgMeetingPercentage: avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0,
+          totalUsersTracked: maxUsers,
+          totalTeamWorkMinutes: totalTeamWorkMinutes,
+          totalTeamMeetingMinutes: totalTeamMeetingMinutes,
+          totalTeamSessionMinutes: totalTeamSessionMinutes,
         },
-        activityDistribution: live.activityDistribution,
-        topApps: live.topApps,
-        userSummaries: live.userSummaries,
-        subscriberDistribution: live.subscriberDistribution,
-        dailyTrend: [
-          {
-            date: todayStr,
-            avgActiveMinutes: live.avgActiveMinutes,
-            avgWorkMinutes: live.avgWorkMinutes,
-            avgMeetingMinutes: live.avgMeetingMinutes,
-            usersTracked: live.totalUsersTracked,
-          },
-        ],
-      });
-      return;
-    }
-
-    // ── Multi-day periods — compute everything from user_daily_activities ──
-
-    // Single query: fetch all user daily rows in the date range
-    const MAX_DASHBOARD_ROWS = 10000; // Safety limit for large orgs on wide date ranges
-    const allUserRows = await db
-      .select({
-        userId: schema.userDailyActivities.userId,
-        activityDate: schema.userDailyActivities.activityDate,
-        totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
-        totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
-        totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
-        totalSessionMinutes: schema.userDailyActivities.totalSessionMinutes,
-        workPercentage: schema.userDailyActivities.workPercentage,
-        meetingPercentage: schema.userDailyActivities.meetingPercentage,
-        categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
-        appBreakdown: schema.userDailyActivities.appBreakdown,
-        subscriberBreakdown: schema.userDailyActivities.subscriberBreakdown,
-      })
-      .from(schema.userDailyActivities)
-      .where(
-        and(
-          inArray(schema.userDailyActivities.userId, scopedUserIds),
-          eq(schema.userDailyActivities.periodType, "daily"),
-          gte(schema.userDailyActivities.activityDate, startDate),
-          lte(schema.userDailyActivities.activityDate, endDate)
-        )
-      )
-      .limit(MAX_DASHBOARD_ROWS);
-
-    if (allUserRows.length === 0) {
-      res.json({
-        period,
-        hasData: false,
-        metrics: {
-          avgWorkMinutes: 0,
-          avgMeetingMinutes: 0,
-          avgActiveMinutes: 0,
-          avgWorkPercentage: 0,
-          avgMeetingPercentage: 0,
-          totalUsersTracked: 0,
-          totalTeamWorkMinutes: 0,
-          totalTeamMeetingMinutes: 0,
-          totalTeamSessionMinutes: 0,
-        },
-        activityDistribution: [],
-        topApps: [],
-        userSummaries: [],
-        subscriberDistribution: [],
-        dailyTrend: [],
-      });
-      return;
-    }
-
-    // ── Group by date for daily trend + per-day averages ──
-    const byDate = new Map<string, typeof allUserRows>();
-    for (const row of allUserRows) {
-      const existing = byDate.get(row.activityDate) || [];
-      existing.push(row);
-      byDate.set(row.activityDate, existing);
-    }
-
-    // Build daily trend: per-day averages across users
-    const dailyTrend: {
-      date: string;
-      avgActiveMinutes: number;
-      avgWorkMinutes: number;
-      avgMeetingMinutes: number;
-      usersTracked: number;
-    }[] = [];
-    let totalTeamWorkMinutes = 0;
-    let totalTeamMeetingMinutes = 0;
-    let totalTeamSessionMinutes = 0;
-    let maxUsers = 0;
-    let sumAvgWork = 0;
-    let sumAvgMeeting = 0;
-    let sumAvgActive = 0;
-
-    for (const [date, rows] of byDate.entries()) {
-      const userCount = rows.length;
-      const dayWork = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
-      const dayMeeting = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
-      const dayActive = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
-
-      const avgDayWork = dayWork / userCount;
-      const avgDayMeeting = dayMeeting / userCount;
-      const avgDayActive = dayActive / userCount;
-
-      dailyTrend.push({
-        date,
-        avgWorkMinutes: Math.round(avgDayWork * 10) / 10,
-        avgMeetingMinutes: Math.round(avgDayMeeting * 10) / 10,
-        avgActiveMinutes: Math.round(avgDayActive * 10) / 10,
-        usersTracked: userCount,
-      });
-
-      totalTeamWorkMinutes += dayWork;
-      totalTeamMeetingMinutes += dayMeeting;
-      totalTeamSessionMinutes += rows.reduce((s, r) => s + r.totalSessionMinutes, 0);
-      sumAvgWork += avgDayWork;
-      sumAvgMeeting += avgDayMeeting;
-      sumAvgActive += avgDayActive;
-      if (userCount > maxUsers) maxUsers = userCount;
-    }
-
-    dailyTrend.sort((a, b) => a.date.localeCompare(b.date));
-
-    // Period-level averages: average of per-day averages
-    const dayCount = byDate.size;
-    const avgWork = sumAvgWork / dayCount;
-    const avgMeeting = sumAvgMeeting / dayCount;
-    const avgActive = sumAvgActive / dayCount;
-
-    // ── Activity distribution (category totals across all days) ──
-    const catTotals = new Map<string, number>();
-    let totalTeamActive = 0;
-    for (const row of allUserRows) {
-      totalTeamActive += row.totalActiveMinutes;
-      for (const entry of (row.categoryBreakdown || []) as {
-        category: string;
-        minutes: number;
-      }[]) {
-        catTotals.set(entry.category, (catTotals.get(entry.category) || 0) + entry.minutes);
-      }
-    }
-    const activityDistribution = [...catTotals.entries()]
-      .map(([category, totalMinutes]) => ({
-        category,
-        totalMinutes,
-        percentage: totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
-      }))
-      .sort((a, b) => b.totalMinutes - a.totalMinutes);
-
-    // ── Top apps across all days ──
-    const appTotals = new Map<string, { totalMinutes: number; users: Set<string> }>();
-    for (const row of allUserRows) {
-      for (const entry of (row.appBreakdown || []) as { app: string; minutes: number }[]) {
-        const existing = appTotals.get(entry.app) || { totalMinutes: 0, users: new Set<string>() };
-        existing.totalMinutes += entry.minutes;
-        existing.users.add(row.userId);
-        appTotals.set(entry.app, existing);
-      }
-    }
-    const topApps = [...appTotals.entries()]
-      .map(([app, data]) => ({ app, totalMinutes: data.totalMinutes, userCount: data.users.size }))
-      .sort((a, b) => b.totalMinutes - a.totalMinutes)
-      .slice(0, 10);
-
-    // ── User summaries (aggregate per user across all days) ──
-    const userTotals = new Map<string, { work: number; meeting: number; active: number }>();
-    for (const row of allUserRows) {
-      const existing = userTotals.get(row.userId) || { work: 0, meeting: 0, active: 0 };
-      existing.work += row.totalWorkMinutes;
-      existing.meeting += row.totalMeetingMinutes;
-      existing.active += row.totalActiveMinutes;
-      userTotals.set(row.userId, existing);
-    }
-    const userIds = [...userTotals.keys()];
-    const userProfiles =
-      userIds.length > 0
-        ? await db
-            .select({
-              id: schema.users.id,
-              firstName: schema.users.firstName,
-              lastName: schema.users.lastName,
-            })
-            .from(schema.users)
-            .where(inArray(schema.users.id, userIds))
-        : [];
-    const nameMap = new Map(
-      userProfiles.map((u) => [
-        u.id,
-        [u.firstName, u.lastName].filter(Boolean).join(" ") || "Unknown",
-      ])
-    );
-
-    const userSummaries = [...userTotals.entries()].map(([userId, totals]) => ({
-      userId,
-      name: nameMap.get(userId) || "Unknown",
-      activeMinutes: totals.active,
-      workPct: totals.active > 0 ? Math.round((totals.work / totals.active) * 100) : 0,
-      meetingPct: totals.active > 0 ? Math.round((totals.meeting / totals.active) * 100) : 0,
-    }));
-
-    res.json({
-      period,
-      hasData: true,
-      metrics: {
-        avgWorkMinutes: Math.round(avgWork * 10) / 10,
-        avgMeetingMinutes: Math.round(avgMeeting * 10) / 10,
-        avgActiveMinutes: Math.round(avgActive * 10) / 10,
-        avgWorkPercentage: avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0,
-        avgMeetingPercentage: avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0,
-        totalUsersTracked: maxUsers,
-        totalTeamWorkMinutes: totalTeamWorkMinutes,
-        totalTeamMeetingMinutes: totalTeamMeetingMinutes,
-        totalTeamSessionMinutes: totalTeamSessionMinutes,
-      },
-      activityDistribution,
-      topApps,
-      userSummaries,
-      subscriberDistribution: (() => {
-        const subscriberTotals = new Map<string, number>();
-        const subscriberNames = new Map<string, string>();
-        for (const row of allUserRows) {
-          const breakdown = (row.subscriberBreakdown || []) as {
-            subscriberName: string;
-            minutes: number;
-          }[];
-          for (const entry of breakdown) {
-            if (isExcludedSubscriber(entry.subscriberName)) continue;
-            const key = normalizeName(entry.subscriberName);
-            subscriberTotals.set(key, (subscriberTotals.get(key) || 0) + entry.minutes);
-            const prev = subscriberNames.get(key);
-            if (!prev || entry.subscriberName.length > prev.length)
-              subscriberNames.set(key, entry.subscriberName);
+        activityDistribution,
+        topApps,
+        userSummaries,
+        subscriberDistribution: (() => {
+          const subscriberTotals = new Map<string, number>();
+          const subscriberNames = new Map<string, string>();
+          for (const row of allUserRows) {
+            const breakdown = (row.subscriberBreakdown || []) as {
+              subscriberName: string;
+              minutes: number;
+            }[];
+            for (const entry of breakdown) {
+              if (isExcludedSubscriber(entry.subscriberName)) continue;
+              const key = normalizeName(entry.subscriberName);
+              subscriberTotals.set(key, (subscriberTotals.get(key) || 0) + entry.minutes);
+              const prev = subscriberNames.get(key);
+              if (!prev || entry.subscriberName.length > prev.length)
+                subscriberNames.set(key, entry.subscriberName);
+            }
           }
-        }
-        return [...subscriberTotals.entries()]
-          .map(([key, totalMinutes]) => ({
-            subscriberName: subscriberNames.get(key) || key,
-            totalMinutes,
-            percentage:
-              totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
-          }))
-          .sort((a, b) => b.totalMinutes - a.totalMinutes);
-      })(),
-      dailyTrend,
-    });
-  } catch (error) {
-    logger.error({ error: String(error) }, "Error fetching dashboard metrics");
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", message: "Failed to fetch dashboard metrics" });
+          return [...subscriberTotals.entries()]
+            .map(([key, totalMinutes]) => ({
+              subscriberName: subscriberNames.get(key) || key,
+              totalMinutes,
+              percentage:
+                totalTeamActive > 0 ? Math.round((totalMinutes / totalTeamActive) * 100) : 0,
+            }))
+            .sort((a, b) => b.totalMinutes - a.totalMinutes);
+        })(),
+        dailyTrend,
+      });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching dashboard metrics");
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch dashboard metrics" });
+    }
   }
-});
+);
 
 // ============================================================================
 // GET /admin/dashboard/people
 // Returns ALL org users with lifetime activity summaries for the People tab.
 // Date filtering is NOT applied here — it belongs in the per-user drill-down.
 // ============================================================================
-router.get("/dashboard/people", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Resolve scoped user IDs based on ?scope param
-    const scopedUserIds = await getScopedVisibleUserIds(req);
+router.get(
+  "/dashboard/people",
+  requireAuth,
+  requireManagerOrAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Resolve scoped user IDs based on ?scope param
+      const scopedUserIds = await getScopedVisibleUserIds(req);
 
-    // Step 1: Fetch users scoped to visible set
-    const orgUsers = scopedUserIds.length > 0
-      ? await db
-          .select({
-            id: schema.users.id,
-            firstName: schema.users.firstName,
-            lastName: schema.users.lastName,
-            email: schema.users.email,
-            role: schema.users.role,
-            jobTitle: schema.users.jobTitle,
-            avatarUrl: schema.users.avatarUrl,
-            status: schema.users.status,
-            createdAt: schema.users.createdAt,
-          })
-          .from(schema.users)
-          .where(inArray(schema.users.id, scopedUserIds))
-          .orderBy(asc(schema.users.firstName))
-      : [];
+      // Step 1: Fetch users scoped to visible set
+      const orgUsers =
+        scopedUserIds.length > 0
+          ? await db
+              .select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+                email: schema.users.email,
+                role: schema.users.role,
+                jobTitle: schema.users.jobTitle,
+                avatarUrl: schema.users.avatarUrl,
+                status: schema.users.status,
+                createdAt: schema.users.createdAt,
+              })
+              .from(schema.users)
+              .where(inArray(schema.users.id, scopedUserIds))
+              .orderBy(asc(schema.users.firstName))
+          : [];
 
-    // Step 2a: Fetch daily activities for scoped users (last 90 days)
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const activitiesCutoff = ninetyDaysAgo.toISOString().slice(0, 10);
+      // Step 2a: Fetch daily activities for scoped users (last 90 days)
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const activitiesCutoff = ninetyDaysAgo.toISOString().slice(0, 10);
 
-    const activities = scopedUserIds.length > 0
-      ? await db
-          .select({
-            userId: schema.userDailyActivities.userId,
-            activityDate: schema.userDailyActivities.activityDate,
-            totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
-            totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
-            totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
-            appBreakdown: schema.userDailyActivities.appBreakdown,
-            categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
-          })
-          .from(schema.userDailyActivities)
-          .where(
-            and(
-              inArray(schema.userDailyActivities.userId, scopedUserIds),
-              eq(schema.userDailyActivities.periodType, "daily"),
-              gte(schema.userDailyActivities.activityDate, activitiesCutoff)
-            )
-          )
-          .orderBy(desc(schema.userDailyActivities.activityDate))
-      : [];
-
-    // Step 2b: Fetch latest session per user for "Recent Highlight"
-    const userIds = orgUsers.map((u) => u.id);
-    const latestSessions =
-      userIds.length > 0
-        ? await db
-            .select({
-              userId: schema.monitoringSessions.userId,
-              name: schema.monitoringSessions.name,
-              finalSummary: schema.monitoringSessions.finalSummary,
-              rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
-              endedAt: schema.monitoringSessions.endedAt,
-            })
-            .from(schema.monitoringSessions)
-            .where(
-              and(
-                inArray(schema.monitoringSessions.userId, userIds),
-                isNotNull(schema.monitoringSessions.endedAt)
+      const activities =
+        scopedUserIds.length > 0
+          ? await db
+              .select({
+                userId: schema.userDailyActivities.userId,
+                activityDate: schema.userDailyActivities.activityDate,
+                totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
+                totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
+                totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+                appBreakdown: schema.userDailyActivities.appBreakdown,
+                categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
+              })
+              .from(schema.userDailyActivities)
+              .where(
+                and(
+                  inArray(schema.userDailyActivities.userId, scopedUserIds),
+                  eq(schema.userDailyActivities.periodType, "daily"),
+                  gte(schema.userDailyActivities.activityDate, activitiesCutoff)
+                )
               )
-            )
-            .orderBy(desc(schema.monitoringSessions.endedAt))
-        : [];
+              .orderBy(desc(schema.userDailyActivities.activityDate))
+          : [];
 
-    // Build map: userId → most recent session
-    const latestSessionMap = new Map<
-      string,
-      { name: string | null; summary: string | null; endedAt: Date | null }
-    >();
-    for (const s of latestSessions) {
-      if (!latestSessionMap.has(s.userId)) {
-        latestSessionMap.set(s.userId, {
-          name: s.name,
-          summary: s.finalSummary || s.rawActivitySummary || null,
-          endedAt: s.endedAt,
-        });
-      }
-    }
-
-    // Step 2c: Fetch latest document created per user
-    const latestDocs =
-      userIds.length > 0
-        ? await db
-            .select({
-              userId: schema.documents.createdBy,
-              createdAt: schema.documents.createdAt,
-            })
-            .from(schema.documents)
-            .where(
-              and(
-                inArray(schema.documents.createdBy, userIds),
-                isNotNull(schema.documents.createdBy)
+      // Step 2b: Fetch latest session per user for "Recent Highlight"
+      const userIds = orgUsers.map((u) => u.id);
+      const latestSessions =
+        userIds.length > 0
+          ? await db
+              .select({
+                userId: schema.monitoringSessions.userId,
+                name: schema.monitoringSessions.name,
+                finalSummary: schema.monitoringSessions.finalSummary,
+                rawActivitySummary: schema.monitoringSessions.rawActivitySummary,
+                endedAt: schema.monitoringSessions.endedAt,
+              })
+              .from(schema.monitoringSessions)
+              .where(
+                and(
+                  inArray(schema.monitoringSessions.userId, userIds),
+                  isNotNull(schema.monitoringSessions.endedAt)
+                )
               )
-            )
-            .orderBy(desc(schema.documents.createdAt))
-        : [];
+              .orderBy(desc(schema.monitoringSessions.endedAt))
+          : [];
 
-    const latestDocMap = new Map<string, Date>();
-    for (const d of latestDocs) {
-      if (d.userId && !latestDocMap.has(d.userId)) {
-        latestDocMap.set(d.userId, d.createdAt);
-      }
-    }
-
-    // Step 2d: Fetch latest agent conversation activity per user
-    const latestAgentChats =
-      userIds.length > 0
-        ? await db
-            .select({
-              userId: schema.agentConversations.userId,
-              updatedAt: schema.agentConversations.updatedAt,
-            })
-            .from(schema.agentConversations)
-            .where(inArray(schema.agentConversations.userId, userIds))
-            .orderBy(desc(schema.agentConversations.updatedAt))
-        : [];
-
-    const latestAgentChatMap = new Map<string, Date>();
-    for (const c of latestAgentChats) {
-      if (!latestAgentChatMap.has(c.userId)) {
-        latestAgentChatMap.set(c.userId, c.updatedAt);
-      }
-    }
-
-    // Step 3: Group activities by user
-    const activityMap = new Map<string, typeof activities>();
-    for (const act of activities) {
-      const existing = activityMap.get(act.userId) || [];
-      existing.push(act);
-      activityMap.set(act.userId, existing);
-    }
-
-    // Step 4: Build response — every user appears, activity data is optional
-    const people = orgUsers.map((user) => {
-      const rows = activityMap.get(user.id) || [];
-      const hasActivity = rows.length > 0;
-
-      const totalWork = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
-      const totalMeeting = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
-      const totalActive = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
-      const daysTracked = rows.length;
-
-      // Aggregate categoryBreakdown across all days
-      const catMap = new Map<string, { minutes: number }>();
-      for (const row of rows) {
-        for (const entry of (row.categoryBreakdown || []) as {
-          category: string;
-          minutes: number;
-        }[]) {
-          const existing = catMap.get(entry.category) || { minutes: 0 };
-          existing.minutes += entry.minutes;
-          catMap.set(entry.category, existing);
+      // Build map: userId → most recent session
+      const latestSessionMap = new Map<
+        string,
+        { name: string | null; summary: string | null; endedAt: Date | null }
+      >();
+      for (const s of latestSessions) {
+        if (!latestSessionMap.has(s.userId)) {
+          latestSessionMap.set(s.userId, {
+            name: s.name,
+            summary: s.finalSummary || s.rawActivitySummary || null,
+            endedAt: s.endedAt,
+          });
         }
       }
-      const aggregatedCategories = [...catMap.entries()]
-        .map(([category, data]) => ({
-          category,
-          minutes: data.minutes,
-          percentage: totalActive > 0 ? Math.round((data.minutes / totalActive) * 100) : 0,
-        }))
-        .sort((a, b) => b.minutes - a.minutes);
 
-      // Aggregate appBreakdown across all days
-      const appMap = new Map<string, number>();
-      for (const row of rows) {
-        for (const entry of (row.appBreakdown || []) as { app: string; minutes: number }[]) {
-          appMap.set(entry.app, (appMap.get(entry.app) || 0) + entry.minutes);
+      // Step 2c: Fetch latest document created per user
+      const latestDocs =
+        userIds.length > 0
+          ? await db
+              .select({
+                userId: schema.documents.createdBy,
+                createdAt: schema.documents.createdAt,
+              })
+              .from(schema.documents)
+              .where(
+                and(
+                  inArray(schema.documents.createdBy, userIds),
+                  isNotNull(schema.documents.createdBy)
+                )
+              )
+              .orderBy(desc(schema.documents.createdAt))
+          : [];
+
+      const latestDocMap = new Map<string, Date>();
+      for (const d of latestDocs) {
+        if (d.userId && !latestDocMap.has(d.userId)) {
+          latestDocMap.set(d.userId, d.createdAt);
         }
       }
-      const aggregatedApps = [...appMap.entries()]
-        .map(([app, minutes]) => ({ app, minutes }))
-        .sort((a, b) => b.minutes - a.minutes);
 
-      // Use latest session summary for "Recent Highlight"
-      const latestSession = latestSessionMap.get(user.id);
+      // Step 2d: Fetch latest agent conversation activity per user
+      const latestAgentChats =
+        userIds.length > 0
+          ? await db
+              .select({
+                userId: schema.agentConversations.userId,
+                updatedAt: schema.agentConversations.updatedAt,
+              })
+              .from(schema.agentConversations)
+              .where(inArray(schema.agentConversations.userId, userIds))
+              .orderBy(desc(schema.agentConversations.updatedAt))
+          : [];
 
-      // lastActiveAt = most recent of: session end, doc creation, agent chat
-      const candidates: Date[] = [];
-      if (latestSession?.endedAt) candidates.push(new Date(latestSession.endedAt));
-      const latestDoc = latestDocMap.get(user.id);
-      if (latestDoc) candidates.push(new Date(latestDoc));
-      const latestChat = latestAgentChatMap.get(user.id);
-      if (latestChat) candidates.push(new Date(latestChat));
+      const latestAgentChatMap = new Map<string, Date>();
+      for (const c of latestAgentChats) {
+        if (!latestAgentChatMap.has(c.userId)) {
+          latestAgentChatMap.set(c.userId, c.updatedAt);
+        }
+      }
 
-      const lastActiveAt =
-        candidates.length > 0
-          ? new Date(Math.max(...candidates.map((d) => d.getTime()))).toISOString()
-          : null;
+      // Step 3: Group activities by user
+      const activityMap = new Map<string, typeof activities>();
+      for (const act of activities) {
+        const existing = activityMap.get(act.userId) || [];
+        existing.push(act);
+        activityMap.set(act.userId, existing);
+      }
 
-      return {
-        userId: user.id,
-        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
-        email: user.email,
-        role: user.role,
-        jobTitle: user.jobTitle,
-        avatarUrl: user.avatarUrl,
-        userStatus: user.status,
-        createdAt: user.createdAt,
-        totalWorkMinutes: totalWork,
-        totalMeetingMinutes: totalMeeting,
-        totalActiveMinutes: totalActive,
-        avgActiveMinutesPerDay: daysTracked > 0 ? Math.round(totalActive / daysTracked) : 0,
-        workPercentage: totalActive > 0 ? Math.round((totalWork / totalActive) * 100) : 0,
-        meetingPercentage: totalActive > 0 ? Math.round((totalMeeting / totalActive) * 100) : 0,
-        recentHighlight: latestSession?.summary || latestSession?.name || null,
-        lastActiveAt,
-        categoryBreakdown: aggregatedCategories,
-        appBreakdown: aggregatedApps,
-        daysTracked,
-        hasActivity,
-      };
-    });
+      // Step 4: Build response — every user appears, activity data is optional
+      const people = orgUsers.map((user) => {
+        const rows = activityMap.get(user.id) || [];
+        const hasActivity = rows.length > 0;
 
-    // Sort: users with activity first (by active minutes desc), then inactive users alphabetically
-    people.sort((a, b) => {
-      if (a.hasActivity && !b.hasActivity) return -1;
-      if (!a.hasActivity && b.hasActivity) return 1;
-      if (a.hasActivity && b.hasActivity) return b.totalActiveMinutes - a.totalActiveMinutes;
-      return a.name.localeCompare(b.name);
-    });
+        const totalWork = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
+        const totalMeeting = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
+        const totalActive = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
+        const daysTracked = rows.length;
 
-    res.json({ people });
-  } catch (error) {
-    logger.error({ error: String(error) }, "Error fetching people data");
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", message: "Failed to fetch people data" });
+        // Aggregate categoryBreakdown across all days
+        const catMap = new Map<string, { minutes: number }>();
+        for (const row of rows) {
+          for (const entry of (row.categoryBreakdown || []) as {
+            category: string;
+            minutes: number;
+          }[]) {
+            const existing = catMap.get(entry.category) || { minutes: 0 };
+            existing.minutes += entry.minutes;
+            catMap.set(entry.category, existing);
+          }
+        }
+        const aggregatedCategories = [...catMap.entries()]
+          .map(([category, data]) => ({
+            category,
+            minutes: data.minutes,
+            percentage: totalActive > 0 ? Math.round((data.minutes / totalActive) * 100) : 0,
+          }))
+          .sort((a, b) => b.minutes - a.minutes);
+
+        // Aggregate appBreakdown across all days
+        const appMap = new Map<string, number>();
+        for (const row of rows) {
+          for (const entry of (row.appBreakdown || []) as { app: string; minutes: number }[]) {
+            appMap.set(entry.app, (appMap.get(entry.app) || 0) + entry.minutes);
+          }
+        }
+        const aggregatedApps = [...appMap.entries()]
+          .map(([app, minutes]) => ({ app, minutes }))
+          .sort((a, b) => b.minutes - a.minutes);
+
+        // Use latest session summary for "Recent Highlight"
+        const latestSession = latestSessionMap.get(user.id);
+
+        // lastActiveAt = most recent of: session end, doc creation, agent chat
+        const candidates: Date[] = [];
+        if (latestSession?.endedAt) candidates.push(new Date(latestSession.endedAt));
+        const latestDoc = latestDocMap.get(user.id);
+        if (latestDoc) candidates.push(new Date(latestDoc));
+        const latestChat = latestAgentChatMap.get(user.id);
+        if (latestChat) candidates.push(new Date(latestChat));
+
+        const lastActiveAt =
+          candidates.length > 0
+            ? new Date(Math.max(...candidates.map((d) => d.getTime()))).toISOString()
+            : null;
+
+        return {
+          userId: user.id,
+          name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
+          email: user.email,
+          role: user.role,
+          jobTitle: user.jobTitle,
+          avatarUrl: user.avatarUrl,
+          userStatus: user.status,
+          createdAt: user.createdAt,
+          totalWorkMinutes: totalWork,
+          totalMeetingMinutes: totalMeeting,
+          totalActiveMinutes: totalActive,
+          avgActiveMinutesPerDay: daysTracked > 0 ? Math.round(totalActive / daysTracked) : 0,
+          workPercentage: totalActive > 0 ? Math.round((totalWork / totalActive) * 100) : 0,
+          meetingPercentage: totalActive > 0 ? Math.round((totalMeeting / totalActive) * 100) : 0,
+          recentHighlight: latestSession?.summary || latestSession?.name || null,
+          lastActiveAt,
+          categoryBreakdown: aggregatedCategories,
+          appBreakdown: aggregatedApps,
+          daysTracked,
+          hasActivity,
+        };
+      });
+
+      // Sort: users with activity first (by active minutes desc), then inactive users alphabetically
+      people.sort((a, b) => {
+        if (a.hasActivity && !b.hasActivity) return -1;
+        if (!a.hasActivity && b.hasActivity) return 1;
+        if (a.hasActivity && b.hasActivity) return b.totalActiveMinutes - a.totalActiveMinutes;
+        return a.name.localeCompare(b.name);
+      });
+
+      res.json({ people });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error fetching people data");
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to fetch people data" });
+    }
   }
-});
+);
 
 // ============================================================================
 // GET /admin/dashboard/people/:id?period=today|week|month|ytd
@@ -2208,145 +2231,150 @@ async function callAskLLM(
   throw new Error("No LLM available — all providers exhausted");
 }
 
-router.post("/dashboard/chat", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+router.post(
+  "/dashboard/chat",
+  requireAuth,
+  requireManagerOrAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
 
-    const { messages, period = "month" } = req.body as {
-      messages: Array<{ role: "user" | "assistant"; content: string }>;
-      period?: string;
-    };
-
-    if (!messages || messages.length === 0) {
-      res.status(400).json({ error: "Bad Request", message: "messages array is required" });
-      return;
-    }
-
-    // Fetch dashboard data from user_daily_activities (same source as GET /dashboard)
-    const { startDate, endDate } = resolveDateRange(period);
-
-    const userActivities = await db
-      .select({
-        userId: schema.userDailyActivities.userId,
-        firstName: schema.users.firstName,
-        lastName: schema.users.lastName,
-        totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
-        totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
-        totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
-        workPercentage: schema.userDailyActivities.workPercentage,
-        meetingPercentage: schema.userDailyActivities.meetingPercentage,
-        daySummary: schema.userDailyActivities.daySummary,
-        activityDate: schema.userDailyActivities.activityDate,
-        categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
-      })
-      .from(schema.userDailyActivities)
-      .innerJoin(schema.users, eq(schema.userDailyActivities.userId, schema.users.id))
-      .where(
-        and(
-          eq(schema.userDailyActivities.organizationId, admin.organizationId),
-          eq(schema.userDailyActivities.periodType, "daily"),
-          gte(schema.userDailyActivities.activityDate, startDate),
-          lte(schema.userDailyActivities.activityDate, endDate)
-        )
-      )
-      .orderBy(desc(schema.userDailyActivities.totalActiveMinutes));
-
-    // Build aggregated dashboard data from user_daily_activities
-    let dashboardData: any = { period, hasData: false, metrics: {} };
-    if (userActivities.length > 0) {
-      // Group by date for per-day averages
-      const byDate = new Map<string, typeof userActivities>();
-      for (const row of userActivities) {
-        const existing = byDate.get(row.activityDate) || [];
-        existing.push(row);
-        byDate.set(row.activityDate, existing);
-      }
-
-      let sumAvgWork = 0,
-        sumAvgMeeting = 0,
-        sumAvgActive = 0;
-      let totalWork = 0,
-        totalMeeting = 0,
-        maxUsers = 0;
-      const dailyTrend: any[] = [];
-
-      for (const [date, rows] of byDate.entries()) {
-        const n = rows.length;
-        const dw = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
-        const dm = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
-        const da = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
-        sumAvgWork += dw / n;
-        sumAvgMeeting += dm / n;
-        sumAvgActive += da / n;
-        totalWork += dw;
-        totalMeeting += dm;
-        if (n > maxUsers) maxUsers = n;
-        dailyTrend.push({
-          date,
-          avgWorkMinutes: dw / n,
-          avgMeetingMinutes: dm / n,
-          usersTracked: n,
-        });
-      }
-
-      const dayCount = byDate.size;
-      const avgWork = sumAvgWork / dayCount;
-      const avgMeeting = sumAvgMeeting / dayCount;
-      const avgActive = sumAvgActive / dayCount;
-
-      // Category distribution
-      const catTotals = new Map<string, number>();
-      let totalActive = 0;
-      for (const row of userActivities) {
-        totalActive += row.totalActiveMinutes;
-        for (const entry of (row.categoryBreakdown || []) as {
-          category: string;
-          minutes: number;
-        }[]) {
-          catTotals.set(entry.category, (catTotals.get(entry.category) || 0) + entry.minutes);
-        }
-      }
-
-      dashboardData = {
-        period,
-        hasData: true,
-        metrics: {
-          avgWorkMinutes: avgWork,
-          avgMeetingMinutes: avgMeeting,
-          avgActiveMinutes: avgActive,
-          avgWorkPercentage: avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0,
-          avgMeetingPercentage: avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0,
-          totalUsersTracked: maxUsers,
-          totalTeamWorkMinutes: totalWork,
-          totalTeamMeetingMinutes: totalMeeting,
-        },
-        activityDistribution: [...catTotals.entries()]
-          .map(([category, totalMinutes]) => ({
-            category,
-            totalMinutes,
-            percentage: totalActive > 0 ? Math.round((totalMinutes / totalActive) * 100) : 0,
-          }))
-          .sort((a, b) => b.totalMinutes - a.totalMinutes),
-        dailyTrend: dailyTrend.sort((a, b) => a.date.localeCompare(b.date)),
+      const { messages, period = "month" } = req.body as {
+        messages: Array<{ role: "user" | "assistant"; content: string }>;
+        period?: string;
       };
+
+      if (!messages || messages.length === 0) {
+        res.status(400).json({ error: "Bad Request", message: "messages array is required" });
+        return;
+      }
+
+      // Fetch dashboard data from user_daily_activities (same source as GET /dashboard)
+      const { startDate, endDate } = resolveDateRange(period);
+
+      const userActivities = await db
+        .select({
+          userId: schema.userDailyActivities.userId,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+          totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
+          totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
+          workPercentage: schema.userDailyActivities.workPercentage,
+          meetingPercentage: schema.userDailyActivities.meetingPercentage,
+          daySummary: schema.userDailyActivities.daySummary,
+          activityDate: schema.userDailyActivities.activityDate,
+          categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
+        })
+        .from(schema.userDailyActivities)
+        .innerJoin(schema.users, eq(schema.userDailyActivities.userId, schema.users.id))
+        .where(
+          and(
+            eq(schema.userDailyActivities.organizationId, admin.organizationId),
+            eq(schema.userDailyActivities.periodType, "daily"),
+            gte(schema.userDailyActivities.activityDate, startDate),
+            lte(schema.userDailyActivities.activityDate, endDate)
+          )
+        )
+        .orderBy(desc(schema.userDailyActivities.totalActiveMinutes));
+
+      // Build aggregated dashboard data from user_daily_activities
+      let dashboardData: any = { period, hasData: false, metrics: {} };
+      if (userActivities.length > 0) {
+        // Group by date for per-day averages
+        const byDate = new Map<string, typeof userActivities>();
+        for (const row of userActivities) {
+          const existing = byDate.get(row.activityDate) || [];
+          existing.push(row);
+          byDate.set(row.activityDate, existing);
+        }
+
+        let sumAvgWork = 0,
+          sumAvgMeeting = 0,
+          sumAvgActive = 0;
+        let totalWork = 0,
+          totalMeeting = 0,
+          maxUsers = 0;
+        const dailyTrend: any[] = [];
+
+        for (const [date, rows] of byDate.entries()) {
+          const n = rows.length;
+          const dw = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
+          const dm = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
+          const da = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
+          sumAvgWork += dw / n;
+          sumAvgMeeting += dm / n;
+          sumAvgActive += da / n;
+          totalWork += dw;
+          totalMeeting += dm;
+          if (n > maxUsers) maxUsers = n;
+          dailyTrend.push({
+            date,
+            avgWorkMinutes: dw / n,
+            avgMeetingMinutes: dm / n,
+            usersTracked: n,
+          });
+        }
+
+        const dayCount = byDate.size;
+        const avgWork = sumAvgWork / dayCount;
+        const avgMeeting = sumAvgMeeting / dayCount;
+        const avgActive = sumAvgActive / dayCount;
+
+        // Category distribution
+        const catTotals = new Map<string, number>();
+        let totalActive = 0;
+        for (const row of userActivities) {
+          totalActive += row.totalActiveMinutes;
+          for (const entry of (row.categoryBreakdown || []) as {
+            category: string;
+            minutes: number;
+          }[]) {
+            catTotals.set(entry.category, (catTotals.get(entry.category) || 0) + entry.minutes);
+          }
+        }
+
+        dashboardData = {
+          period,
+          hasData: true,
+          metrics: {
+            avgWorkMinutes: avgWork,
+            avgMeetingMinutes: avgMeeting,
+            avgActiveMinutes: avgActive,
+            avgWorkPercentage: avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0,
+            avgMeetingPercentage: avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0,
+            totalUsersTracked: maxUsers,
+            totalTeamWorkMinutes: totalWork,
+            totalTeamMeetingMinutes: totalMeeting,
+          },
+          activityDistribution: [...catTotals.entries()]
+            .map(([category, totalMinutes]) => ({
+              category,
+              totalMinutes,
+              percentage: totalActive > 0 ? Math.round((totalMinutes / totalActive) * 100) : 0,
+            }))
+            .sort((a, b) => b.totalMinutes - a.totalMinutes),
+          dailyTrend: dailyTrend.sort((a, b) => a.date.localeCompare(b.date)),
+        };
+      }
+
+      // Build system prompt with data context
+      const systemPrompt =
+        DASHBOARD_CHAT_SYSTEM + "\n\n" + buildDashboardContext(dashboardData, userActivities);
+
+      // Call LLM
+      const aiResponse = await callDashboardLLM(systemPrompt, messages);
+
+      res.json({ message: aiResponse });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error in dashboard chat");
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to process chat request" });
     }
-
-    // Build system prompt with data context
-    const systemPrompt =
-      DASHBOARD_CHAT_SYSTEM + "\n\n" + buildDashboardContext(dashboardData, userActivities);
-
-    // Call LLM
-    const aiResponse = await callDashboardLLM(systemPrompt, messages);
-
-    res.json({ message: aiResponse });
-  } catch (error) {
-    logger.error({ error: String(error) }, "Error in dashboard chat");
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", message: "Failed to process chat request" });
   }
-});
+);
 
 // ── Ask RLM (deprecated): response parsing for /admin/ask/chat ──────────────
 
@@ -2382,28 +2410,33 @@ function parseAskResponse(raw: string): {
 // ── DEPRECATED: /admin/ask/* — Ask RLM HTTP API (slated for deletion) ────────
 
 // ── GET /admin/ask/threads — list all threads for this admin ──
-router.get("/ask/threads", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+router.get(
+  "/ask/threads",
+  requireAuth,
+  requireManagerOrAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
 
-    const threads = await db
-      .select()
-      .from(schema.askThreads)
-      .where(
-        and(
-          eq(schema.askThreads.userId, admin.userId),
-          eq(schema.askThreads.organizationId, admin.organizationId)
+      const threads = await db
+        .select()
+        .from(schema.askThreads)
+        .where(
+          and(
+            eq(schema.askThreads.userId, admin.userId),
+            eq(schema.askThreads.organizationId, admin.organizationId)
+          )
         )
-      )
-      .orderBy(desc(schema.askThreads.updatedAt));
+        .orderBy(desc(schema.askThreads.updatedAt));
 
-    res.json(threads);
-  } catch (error) {
-    logger.error({ error: String(error) }, "Error listing ask threads");
-    res.status(500).json({ error: "Internal Server Error" });
+      res.json(threads);
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error listing ask threads");
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   }
-});
+);
 
 // ── GET /admin/ask/threads/:id/messages — get messages for a thread ──
 router.get(
@@ -2535,171 +2568,182 @@ router.patch(
 // instead of receiving everything in a single context dump.
 const ASK_MAX_ITERATIONS = 10;
 
-router.post("/ask/chat", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+router.post(
+  "/ask/chat",
+  requireAuth,
+  requireManagerOrAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
 
-    const { threadId, message } = req.body as {
-      threadId?: string;
-      message: string;
-    };
+      const { threadId, message } = req.body as {
+        threadId?: string;
+        message: string;
+      };
 
-    if (!message || !message.trim()) {
-      res.status(400).json({ error: "Bad Request", message: "message is required" });
-      return;
-    }
-
-    // Create or verify thread
-    let activeThreadId = threadId;
-    if (!activeThreadId) {
-      const title = message.length > 40 ? message.slice(0, 40) + "…" : message;
-      const [newThread] = await db
-        .insert(schema.askThreads)
-        .values({
-          userId: admin.userId,
-          organizationId: admin.organizationId,
-          title,
-        })
-        .returning();
-      activeThreadId = newThread.id;
-    } else {
-      const [thread] = await db
-        .select()
-        .from(schema.askThreads)
-        .where(
-          and(eq(schema.askThreads.id, activeThreadId), eq(schema.askThreads.userId, admin.userId))
-        )
-        .limit(1);
-
-      if (!thread) {
-        res.status(404).json({ error: "Thread not found" });
+      if (!message || !message.trim()) {
+        res.status(400).json({ error: "Bad Request", message: "message is required" });
         return;
       }
-    }
 
-    // Save user message
-    await db.insert(schema.askMessages).values({
-      threadId: activeThreadId,
-      role: "user",
-      content: message.trim(),
-    });
+      // Create or verify thread
+      let activeThreadId = threadId;
+      if (!activeThreadId) {
+        const title = message.length > 40 ? message.slice(0, 40) + "…" : message;
+        const [newThread] = await db
+          .insert(schema.askThreads)
+          .values({
+            userId: admin.userId,
+            organizationId: admin.organizationId,
+            title,
+          })
+          .returning();
+        activeThreadId = newThread.id;
+      } else {
+        const [thread] = await db
+          .select()
+          .from(schema.askThreads)
+          .where(
+            and(
+              eq(schema.askThreads.id, activeThreadId),
+              eq(schema.askThreads.userId, admin.userId)
+            )
+          )
+          .limit(1);
 
-    // Load conversation history (only final messages, not tool calls)
-    const dbMessages = await db
-      .select()
-      .from(schema.askMessages)
-      .where(eq(schema.askMessages.threadId, activeThreadId))
-      .orderBy(asc(schema.askMessages.createdAt));
-
-    const conversationHistory = dbMessages.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
-
-    // Initialize RLM environment + system prompt
-    const environment = new AskEnvironment(admin.organizationId);
-    const adminName = admin.firstName || "there";
-    const systemPrompt = getAskSystemPrompt(adminName);
-
-    // RLM conversation: conversation history + tool calls for this turn
-    const rlmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
-      ...conversationHistory,
-    ];
-
-    // RLM tool-calling loop
-    let iterations = 0;
-    let toolCalls = 0;
-    let finalResponse = "";
-
-    while (iterations < ASK_MAX_ITERATIONS) {
-      iterations++;
-
-      // Get LLM decision (Claude → OpenAI → DeepSeek fallback)
-      const llmRaw = await callAskLLM(systemPrompt, rlmMessages);
-
-      let llmDecision: {
-        tool?: string;
-        parameters?: any;
-        reasoning?: string;
-        done?: boolean;
-        response?: string;
-      };
-      try {
-        llmDecision = parseJsonResponse(llmRaw);
-      } catch {
-        // LLM returned plain text instead of JSON — treat as final response
-        finalResponse = llmRaw;
-        break;
+        if (!thread) {
+          res.status(404).json({ error: "Thread not found" });
+          return;
+        }
       }
 
-      // Append assistant response to RLM conversation
-      rlmMessages.push({ role: "assistant", content: JSON.stringify(llmDecision) });
+      // Save user message
+      await db.insert(schema.askMessages).values({
+        threadId: activeThreadId,
+        role: "user",
+        content: message.trim(),
+      });
 
-      // Check if LLM is done
-      if (llmDecision.done && llmDecision.response) {
-        finalResponse = llmDecision.response;
-        break;
-      }
+      // Load conversation history (only final messages, not tool calls)
+      const dbMessages = await db
+        .select()
+        .from(schema.askMessages)
+        .where(eq(schema.askMessages.threadId, activeThreadId))
+        .orderBy(asc(schema.askMessages.createdAt));
 
-      // Execute the tool
-      if (llmDecision.tool && llmDecision.parameters !== undefined) {
-        const tool = getAskToolByName(llmDecision.tool);
-        if (!tool) {
-          rlmMessages.push({
-            role: "user",
-            content: `Error: Unknown tool "${llmDecision.tool}". Available tools: list_team_members, query_org_metrics, query_user_metrics, query_session_summaries.`,
-          });
-          continue;
+      const conversationHistory = dbMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      // Initialize RLM environment + system prompt
+      const environment = new AskEnvironment(admin.organizationId);
+      const adminName = admin.firstName || "there";
+      const systemPrompt = getAskSystemPrompt(adminName);
+
+      // RLM conversation: conversation history + tool calls for this turn
+      const rlmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+        ...conversationHistory,
+      ];
+
+      // RLM tool-calling loop
+      let iterations = 0;
+      let toolCalls = 0;
+      let finalResponse = "";
+
+      while (iterations < ASK_MAX_ITERATIONS) {
+        iterations++;
+
+        // Get LLM decision (Claude → OpenAI → DeepSeek fallback)
+        const llmRaw = await callAskLLM(systemPrompt, rlmMessages);
+
+        let llmDecision: {
+          tool?: string;
+          parameters?: any;
+          reasoning?: string;
+          done?: boolean;
+          response?: string;
+        };
+        try {
+          llmDecision = parseJsonResponse(llmRaw);
+        } catch {
+          // LLM returned plain text instead of JSON — treat as final response
+          finalResponse = llmRaw;
+          break;
         }
 
-        const toolResult = await tool.execute(llmDecision.parameters, environment);
-        toolCalls++;
+        // Append assistant response to RLM conversation
+        rlmMessages.push({ role: "assistant", content: JSON.stringify(llmDecision) });
 
-        rlmMessages.push({
-          role: "user",
-          content: `Tool "${llmDecision.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step.`,
-        });
-      } else {
-        // No tool call and not done — break to avoid infinite loop
-        if (llmDecision.response) finalResponse = llmDecision.response;
-        break;
+        // Check if LLM is done
+        if (llmDecision.done && llmDecision.response) {
+          finalResponse = llmDecision.response;
+          break;
+        }
+
+        // Execute the tool
+        if (llmDecision.tool && llmDecision.parameters !== undefined) {
+          const tool = getAskToolByName(llmDecision.tool);
+          if (!tool) {
+            rlmMessages.push({
+              role: "user",
+              content: `Error: Unknown tool "${llmDecision.tool}". Available tools: list_team_members, query_org_metrics, query_user_metrics, query_session_summaries.`,
+            });
+            continue;
+          }
+
+          const toolResult = await tool.execute(llmDecision.parameters, environment);
+          toolCalls++;
+
+          rlmMessages.push({
+            role: "user",
+            content: `Tool "${llmDecision.tool}" returned:\n${JSON.stringify(toolResult, null, 2)}\n\nContinue with the next step.`,
+          });
+        } else {
+          // No tool call and not done — break to avoid infinite loop
+          if (llmDecision.response) finalResponse = llmDecision.response;
+          break;
+        }
       }
+
+      if (!finalResponse) {
+        finalResponse =
+          "I wasn't able to generate a response. Please try rephrasing your question.";
+      }
+
+      logger.info({ threadId: activeThreadId, iterations, toolCalls }, "Ask RLM completed");
+
+      const parsed = parseAskResponse(finalResponse);
+
+      // Save assistant message (with report data if present)
+      const [savedMsg] = await db
+        .insert(schema.askMessages)
+        .values({
+          threadId: activeThreadId,
+          role: "assistant",
+          content: parsed.message,
+          reportTitle: parsed.report?.title || null,
+          reportSubtitle: parsed.report?.subtitle || null,
+          reportHtml: parsed.report?.html || null,
+        })
+        .returning({ id: schema.askMessages.id });
+
+      // Update thread timestamp
+      await db
+        .update(schema.askThreads)
+        .set({ updatedAt: new Date() })
+        .where(eq(schema.askThreads.id, activeThreadId));
+
+      res.json({ ...parsed, threadId: activeThreadId, messageId: savedMsg.id });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error in ask chat");
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: "Failed to process request" });
     }
-
-    if (!finalResponse) {
-      finalResponse = "I wasn't able to generate a response. Please try rephrasing your question.";
-    }
-
-    logger.info({ threadId: activeThreadId, iterations, toolCalls }, "Ask RLM completed");
-
-    const parsed = parseAskResponse(finalResponse);
-
-    // Save assistant message (with report data if present)
-    const [savedMsg] = await db
-      .insert(schema.askMessages)
-      .values({
-        threadId: activeThreadId,
-        role: "assistant",
-        content: parsed.message,
-        reportTitle: parsed.report?.title || null,
-        reportSubtitle: parsed.report?.subtitle || null,
-        reportHtml: parsed.report?.html || null,
-      })
-      .returning({ id: schema.askMessages.id });
-
-    // Update thread timestamp
-    await db
-      .update(schema.askThreads)
-      .set({ updatedAt: new Date() })
-      .where(eq(schema.askThreads.id, activeThreadId));
-
-    res.json({ ...parsed, threadId: activeThreadId, messageId: savedMsg.id });
-  } catch (error) {
-    logger.error({ error: String(error) }, "Error in ask chat");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to process request" });
   }
-});
+);
 
 /**
  * GET /admin/graph/users/:userId/work-insights?window=7d|30d|90d
@@ -3032,32 +3076,37 @@ router.get(
  * POST /admin/graph/sync
  * Triggers a manual graph sync run for admin troubleshooting and refresh.
  */
-router.post("/graph/sync", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+router.post(
+  "/graph/sync",
+  requireAuth,
+  requireManagerOrAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const admin = await verifyAdmin(req, res);
+      if (!admin) return;
 
-    if (!config.graph.enabled) {
-      res.status(503).json({ error: "GraphDisabled", message: "Graph features are disabled" });
-      return;
+      if (!config.graph.enabled) {
+        res.status(503).json({ error: "GraphDisabled", message: "Graph features are disabled" });
+        return;
+      }
+
+      const result = await graphSyncService.runNightlySync();
+      if (!result.success) {
+        res.status(500).json({
+          error: "GraphSyncFailed",
+          message: result.error || "Graph sync failed",
+          result,
+        });
+        return;
+      }
+
+      res.json({ ok: true, result });
+    } catch (error) {
+      logger.error({ error: String(error) }, "Error triggering manual graph sync");
+      res.status(500).json({ error: "Internal Server Error", message: "Failed to run graph sync" });
     }
-
-    const result = await graphSyncService.runNightlySync();
-    if (!result.success) {
-      res.status(500).json({
-        error: "GraphSyncFailed",
-        message: result.error || "Graph sync failed",
-        result,
-      });
-      return;
-    }
-
-    res.json({ ok: true, result });
-  } catch (error) {
-    logger.error({ error: String(error) }, "Error triggering manual graph sync");
-    res.status(500).json({ error: "Internal Server Error", message: "Failed to run graph sync" });
   }
-});
+);
 
 /**
  * GET /admin/graph/users/:userId/workflow-patterns?limit=20

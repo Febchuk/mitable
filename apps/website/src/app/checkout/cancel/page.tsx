@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
@@ -55,7 +55,15 @@ export default function CheckoutCancelPage() {
 
             <main
                 className="l-account-page-main l-account-page-main--checkout"
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "180px 48px 80px", width: "100%", boxSizing: "border-box" as const }}
+                style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "180px 48px 80px",
+                    width: "100%",
+                    boxSizing: "border-box" as const,
+                }}
             >
                 <motion.div
                     className="l-account-checkout-card"
@@ -72,7 +80,17 @@ export default function CheckoutCancelPage() {
                         border: `1px solid ${C.border}`,
                     }}
                 >
-                    <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
+                    <h1
+                        style={{
+                            fontFamily: C.serif,
+                            fontSize: 44,
+                            fontWeight: 400,
+                            color: C.text,
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.2,
+                            margin: "0 0 14px",
+                        }}
+                    >
                         Checkout cancelled
                     </h1>
                     <p className="l-account-page-subtitle" style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: "0 0 32px" }}>
@@ -83,16 +101,24 @@ export default function CheckoutCancelPage() {
                         <a
                             href="/pricing"
                             style={buttonPrimary}
-                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = "0.85";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = "1";
+                            }}
                         >
                             View Plans
                         </a>
                         <a
                             href="/"
                             style={buttonSecondary}
-                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = "0.85";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = "1";
+                            }}
                         >
                             Back to Home
                         </a>

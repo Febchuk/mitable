@@ -35,7 +35,6 @@ import {
   Monitor,
 } from "lucide-react";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
-import { BillingSection } from "@/console/src/components/billing";
 import { API_BASE_URL } from "@/console/src/lib/config";
 
 interface LinearStatus {
@@ -613,12 +612,6 @@ export default function SettingsView() {
         <p className="text-text-secondary mt-2">Manage your account and integrations</p>
       </div>
 
-      {/* Subscription Section */}
-      <div className="space-y-4 max-w-2xl">
-        <h2 className="text-2xl font-semibold text-text-primary">Subscription</h2>
-        <BillingSection />
-      </div>
-
       {/* Appearance Section */}
       <div className="space-y-4 max-w-2xl">
         <h2 className="text-2xl font-semibold text-text-primary">Appearance</h2>
@@ -714,6 +707,8 @@ export default function SettingsView() {
                 ) : (
                   <Switch
                     id="show-pill-toggle"
+                    size="sm"
+                    className="shrink-0"
                     checked={showPillOnSessionStart}
                     onCheckedChange={async (checked) => {
                       const result = await updatePreference("showPillOnSessionStart", checked);
@@ -755,6 +750,8 @@ export default function SettingsView() {
                 ) : (
                   <Switch
                     id="hide-pill-toggle"
+                    size="sm"
+                    className="shrink-0"
                     checked={hidePillOnSessionEnd}
                     onCheckedChange={async (checked) => {
                       const result = await updatePreference("hidePillOnSessionEnd", checked);
@@ -807,6 +804,8 @@ export default function SettingsView() {
                 ) : (
                   <Switch
                     id="always-ask-toggle"
+                    size="sm"
+                    className="shrink-0"
                     checked={alwaysAskOnSessionEnd}
                     onCheckedChange={async (checked) => {
                       const result = await setAlwaysAsk(checked);
@@ -945,6 +944,8 @@ export default function SettingsView() {
                     ) : (
                       <Switch
                         id="include-screenshots-toggle"
+                        size="sm"
+                        className="shrink-0"
                         checked={includeScreenshots}
                         onCheckedChange={async (checked) => {
                           const result = await updateDefaults({ includeScreenshots: checked });

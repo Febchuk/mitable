@@ -284,16 +284,18 @@ PUT    /admin/teams/:id/parent — Set parent team (for nested teams)
 ```
 
 **Create team request:**
+
 ```json
 {
   "name": "Engineering",
   "description": "Product engineering team",
-  "leaderId": "user-uuid",          // optional
-  "parentTeamId": "team-uuid"       // optional, for nesting
+  "leaderId": "user-uuid", // optional
+  "parentTeamId": "team-uuid" // optional, for nesting
 }
 ```
 
 **Validation:**
+
 - Team name unique within organization
 - Leader must be in same organization
 - Parent team must be in same organization
@@ -313,6 +315,7 @@ POST /admin/hierarchy/bulk-assign — Assign managers to multiple users at once
 ```
 
 Request:
+
 ```json
 {
   "assignments": [
@@ -361,6 +364,7 @@ Admin-only page accessible from "Org View" navigation.
 ### 2.3 View mode
 
 **Tree view (only view):** Visual hierarchy. Each node shows:
+
 - Avatar + name
 - Job title
 - Team name (if assigned)
@@ -398,14 +402,15 @@ function OrgNode({ user, depth, onAssignManager }: OrgNodeProps) {
           </button>
         )}
       </div>
-      {expanded && user.directReports.map((report) => (
-        <OrgNode
-          key={report.id}
-          user={report}
-          depth={depth + 1}
-          onAssignManager={onAssignManager}
-        />
-      ))}
+      {expanded &&
+        user.directReports.map((report) => (
+          <OrgNode
+            key={report.id}
+            user={report}
+            depth={depth + 1}
+            onAssignManager={onAssignManager}
+          />
+        ))}
     </div>
   );
 }
@@ -491,6 +496,7 @@ Admin-only page showing all teams in the organization.
 ### 4.2 Team detail panel
 
 Clicking a team opens a detail panel:
+
 - Edit team name, description
 - Assign/change team leader (UserSelect)
 - Set parent team (for nesting)
@@ -499,6 +505,7 @@ Clicking a team opens a detail panel:
 ### 4.3 Create team dialog
 
 Simple modal form:
+
 - Team name (required)
 - Description (optional)
 - Team leader (optional, UserSelect)
@@ -535,6 +542,7 @@ Combobox that shows existing department names in the org as suggestions, but all
 **File:** People list page component
 
 Add columns to the existing people table:
+
 - **Manager**: shows manager name, click to navigate to manager's profile
 - **Team**: shows team name with colored badge
 - **Department**: text field
@@ -542,12 +550,14 @@ Add columns to the existing people table:
 ### 6.2 Filter/group by
 
 Add grouping options to the people list:
+
 - Group by: Manager | Team | Department | None
 - Filter by: Team dropdown, Department dropdown
 
 ### 6.3 Bulk actions
 
 Select multiple users and:
+
 - Assign to same manager
 - Assign to same team
 - Set same department
@@ -563,6 +573,7 @@ Uses the `POST /admin/hierarchy/bulk-assign` endpoint.
 **File:** `Nav.tsx`
 
 Add to admin routes:
+
 ```typescript
 { path: "/org-chart", label: "Org Chart", icon: NetworkIcon }
 ```
@@ -640,11 +651,21 @@ export function useAssignManager() {
   });
 }
 
-export function useCreateTeam() { /* ... */ }
-export function useUpdateTeam() { /* ... */ }
-export function useDeleteTeam() { /* ... */ }
-export function useAssignTeam() { /* ... */ }
-export function useBulkAssignManagers() { /* ... */ }
+export function useCreateTeam() {
+  /* ... */
+}
+export function useUpdateTeam() {
+  /* ... */
+}
+export function useDeleteTeam() {
+  /* ... */
+}
+export function useAssignTeam() {
+  /* ... */
+}
+export function useBulkAssignManagers() {
+  /* ... */
+}
 ```
 
 ---
@@ -672,16 +693,16 @@ export function useBulkAssignManagers() { /* ... */ }
 
 ## Files Modified/Created
 
-| Action | File |
-|--------|------|
-| MODIFY | `apps/backend/src/routes/admin.ts` (team endpoints) |
-| CREATE | `apps/electron/.../pages/OrgChartPage.tsx` |
-| CREATE | `apps/electron/.../pages/TeamsPage.tsx` |
-| CREATE | `apps/electron/.../components/UserSelect.tsx` |
-| CREATE | `apps/electron/.../components/DepartmentInput.tsx` |
-| CREATE | `apps/electron/.../hooks/queries/admin/useOrgTree.ts` |
-| CREATE | `apps/electron/.../hooks/queries/admin/useTeams.ts` |
-| MODIFY | `apps/electron/.../components/navigation/Nav.tsx` (add routes) |
-| MODIFY | `apps/electron/.../App.tsx` (add route definitions) |
-| MODIFY | People page component (add columns, filters, bulk actions) |
+| Action | File                                                            |
+| ------ | --------------------------------------------------------------- |
+| MODIFY | `apps/backend/src/routes/admin.ts` (team endpoints)             |
+| CREATE | `apps/electron/.../pages/OrgChartPage.tsx`                      |
+| CREATE | `apps/electron/.../pages/TeamsPage.tsx`                         |
+| CREATE | `apps/electron/.../components/UserSelect.tsx`                   |
+| CREATE | `apps/electron/.../components/DepartmentInput.tsx`              |
+| CREATE | `apps/electron/.../hooks/queries/admin/useOrgTree.ts`           |
+| CREATE | `apps/electron/.../hooks/queries/admin/useTeams.ts`             |
+| MODIFY | `apps/electron/.../components/navigation/Nav.tsx` (add routes)  |
+| MODIFY | `apps/electron/.../App.tsx` (add route definitions)             |
+| MODIFY | People page component (add columns, filters, bulk actions)      |
 | MODIFY | User edit form component (add manager, team, department fields) |

@@ -2,17 +2,7 @@
 
 import type { ReactNode } from "react";
 
-export type PrevCompanyId =
-    | "salesforce"
-    | "lorikeet"
-    | "meta"
-    | "apple"
-    | "leidos"
-    | "ey"
-    | "kpmg"
-    | "macquarie"
-    | "oracle"
-    | "ripplematch";
+export type PrevCompanyId = "salesforce" | "lorikeet" | "meta" | "apple" | "leidos" | "ey" | "kpmg" | "macquarie" | "oracle" | "ripplematch";
 
 const MetaIcon = () => (
     <svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>

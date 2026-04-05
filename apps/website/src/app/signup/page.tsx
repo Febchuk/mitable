@@ -2,8 +2,8 @@
 
 import { type FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -112,23 +112,38 @@ function SignupForm() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 400, margin: "0 auto" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div>
-                    <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>First Name *</label>
+                    <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>
+                        First Name *
+                    </label>
                     <input required placeholder="Jane" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
                 </div>
                 <div>
-                    <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Last Name *</label>
+                    <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>
+                        Last Name *
+                    </label>
                     <input required placeholder="Smith" value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} />
                 </div>
             </div>
 
             <div>
-                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Email *</label>
+                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>
+                    Email *
+                </label>
                 <input required type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
             </div>
 
             <div>
-                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Password *</label>
-                <input required type="password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
+                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>
+                    Password *
+                </label>
+                <input
+                    required
+                    type="password"
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={inputStyle}
+                />
             </div>
 
             {error && <p style={{ fontSize: 13, color: "var(--status-error, #E87474)", margin: 0 }}>{error}</p>}
@@ -177,7 +192,17 @@ export default function SignupPage() {
                 style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}
             >
                 <div className="l-account-page-header" style={{ textAlign: "center", marginBottom: 48 }}>
-                    <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
+                    <h1
+                        style={{
+                            fontFamily: C.serif,
+                            fontSize: 44,
+                            fontWeight: 400,
+                            color: C.text,
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.2,
+                            margin: "0 0 14px",
+                        }}
+                    >
                         Create Account
                     </h1>
                     <p className="l-account-page-subtitle" style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>

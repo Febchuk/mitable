@@ -12,7 +12,9 @@ export const teams = pgTable("teams", {
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   leaderId: uuid("leader_id"), // FK to users.id — defined at DB level, not in Drizzle refs to avoid circular import
-  parentTeamId: uuid("parent_team_id").references((): AnyPgColumn => teams.id, { onDelete: "set null" }),
+  parentTeamId: uuid("parent_team_id").references((): AnyPgColumn => teams.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

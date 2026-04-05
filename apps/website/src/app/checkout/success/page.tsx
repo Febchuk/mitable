@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
@@ -55,7 +55,15 @@ export default function CheckoutSuccessPage() {
 
             <main
                 className="l-account-page-main l-account-page-main--checkout"
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "180px 48px 80px", width: "100%", boxSizing: "border-box" as const }}
+                style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "180px 48px 80px",
+                    width: "100%",
+                    boxSizing: "border-box" as const,
+                }}
             >
                 <motion.div
                     className="l-account-checkout-card"
@@ -84,12 +92,31 @@ export default function CheckoutSuccessPage() {
                             margin: "0 auto 24px",
                         }}
                     >
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-success, #3A9B6B)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                            width="32"
+                            height="32"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="var(--status-success, #3A9B6B)"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
                     </div>
 
-                    <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
+                    <h1
+                        style={{
+                            fontFamily: C.serif,
+                            fontSize: 44,
+                            fontWeight: 400,
+                            color: C.text,
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.2,
+                            margin: "0 0 14px",
+                        }}
+                    >
                         You&apos;re all set!
                     </h1>
                     <p className="l-account-page-subtitle" style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: "0 0 32px" }}>
@@ -100,16 +127,24 @@ export default function CheckoutSuccessPage() {
                         <a
                             href="/download"
                             style={buttonPrimary}
-                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = "0.85";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = "1";
+                            }}
                         >
                             Download Mitable
                         </a>
                         <a
                             href="/billing"
                             style={buttonSecondary}
-                            onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = "0.85";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = "1";
+                            }}
                         >
                             View Billing
                         </a>

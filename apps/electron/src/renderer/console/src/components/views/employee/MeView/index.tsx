@@ -19,6 +19,7 @@ import {
   useMyCategoryActivities,
   useMySubscriberActivities,
 } from "@/console/src/hooks/queries/my-activity";
+import { useMyBenchmarks } from "@/console/src/hooks/queries/benchmarks/useMyBenchmarks";
 import type {
   DashboardPeriod,
   DashboardPersonDetail as PersonDetailData,
@@ -142,17 +143,6 @@ function BenchmarkMiniRing({ progress }: { progress: number }) {
     </div>
   );
 }
-
-const MY_STRENGTHS = [
-  { name: "Deep Focus Work", progress: 92, benchmarkId: "bm-deep-focus" },
-  { name: "Consistent Engagement", progress: 88, benchmarkId: "bm-engagement" },
-  { name: "Meeting Efficiency", progress: 85, benchmarkId: "bm-meeting-eff" },
-];
-const MY_OPPORTUNITIES = [
-  { name: "Cross-functional Collaboration", progress: 52, benchmarkId: "bm-cross-collab" },
-  { name: "AI Adoption & Tool Usage", progress: 58, benchmarkId: "bm-ai-adoption" },
-  { name: "Mentorship & Development", progress: 62, benchmarkId: "bm-mentorship" },
-];
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -539,6 +529,28 @@ export default function MeView() {
   }, [workFilter, workSearchQuery]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const { data: myBenchmarks } = useMyBenchmarks();
+
+  // Split benchmarks into strengths (≥ 70 progress) and opportunities (< 70),
+  // sorted by progress descending / ascending respectively, capped at 3 each.
+  const myStrengths = useMemo(() => {
+    if (!myBenchmarks?.length) return [];
+    return [...myBenchmarks]
+      .filter((b) => b.progress >= 70)
+      .sort((a, b) => b.progress - a.progress)
+      .slice(0, 3)
+      .map((b) => ({ name: b.name, progress: b.progress, benchmarkId: b.benchmarkId }));
+  }, [myBenchmarks]);
+
+  const myOpportunities = useMemo(() => {
+    if (!myBenchmarks?.length) return [];
+    return [...myBenchmarks]
+      .filter((b) => b.progress < 70)
+      .sort((a, b) => a.progress - b.progress)
+      .slice(0, 3)
+      .map((b) => ({ name: b.name, progress: b.progress, benchmarkId: b.benchmarkId }));
+  }, [myBenchmarks]);
 
   const { data: apiDetail } = useMyActivity(FILTER_TO_PERIOD[timeRange]);
   const { data: drillDownData } = useMyDrillDown(drillDownMetric, FILTER_TO_PERIOD[timeRange]);
@@ -1223,7 +1235,12 @@ export default function MeView() {
               Strengths
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {MY_STRENGTHS.map((s) => (
+              {myStrengths.length === 0 && (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "10px 0" }}>
+                  No benchmarks assigned yet
+                </div>
+              )}
+              {myStrengths.map((s) => (
                 <div
                   key={s.benchmarkId}
                   onClick={() => navigate(`/benchmarks/${s.benchmarkId}`)}
@@ -1276,7 +1293,12 @@ export default function MeView() {
               Opportunities
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {MY_OPPORTUNITIES.map((s) => (
+              {myOpportunities.length === 0 && (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "10px 0" }}>
+                  No opportunities to show
+                </div>
+              )}
+              {myOpportunities.map((s) => (
                 <div
                   key={s.benchmarkId}
                   onClick={() => navigate(`/benchmarks/${s.benchmarkId}`)}

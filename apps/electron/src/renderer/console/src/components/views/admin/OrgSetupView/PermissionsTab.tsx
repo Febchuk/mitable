@@ -22,10 +22,7 @@ export default function PermissionsTab() {
   const filteredUsers = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return (users as UserWithPermissions[]).filter(
-      (u) =>
-        !q ||
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q)
+      (u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
     );
   }, [users, searchQuery]);
 
@@ -67,7 +64,16 @@ export default function PermissionsTab() {
   return (
     <div style={{ padding: "24px 32px" }}>
       {/* Section header */}
-      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "0 0 6px", letterSpacing: "-0.2px" }}>
+      <h2
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: 20,
+          fontWeight: 400,
+          color: "var(--text-primary)",
+          margin: "0 0 6px",
+          letterSpacing: "-0.2px",
+        }}
+      >
         User Permissions
       </h2>
       <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>

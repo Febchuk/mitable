@@ -168,7 +168,14 @@ function TeamCard({
       }}
     >
       {/* Card header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
           <div
             style={{
@@ -763,9 +770,7 @@ function DeleteConfirmModal({
                 size={14}
                 style={{ color: "var(--status-error)", flexShrink: 0, marginTop: 1 }}
               />
-              <p
-                style={{ fontSize: 12, color: "var(--status-error)", margin: 0, lineHeight: 1.5 }}
-              >
+              <p style={{ fontSize: 12, color: "var(--status-error)", margin: 0, lineHeight: 1.5 }}>
                 {deleteError}
               </p>
             </div>
@@ -1094,7 +1099,12 @@ export default function TeamsView() {
               No teams yet
             </div>
             <div
-              style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 280, lineHeight: 1.5 }}
+              style={{
+                fontSize: 13,
+                color: "var(--text-secondary)",
+                maxWidth: 280,
+                lineHeight: 1.5,
+              }}
             >
               Create your first team to start organizing people across the organization.
             </div>

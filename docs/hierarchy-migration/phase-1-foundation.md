@@ -101,6 +101,7 @@ export type NewTeam = typeof teams.$inferInsert;
 **File:** `apps/backend/src/db/schema/index.ts`
 
 Add:
+
 ```typescript
 export * from "./teams.schema.js";
 ```
@@ -194,10 +195,7 @@ export async function getTransitiveReportIds(managerId: string): Promise<string[
  * Get direct reports only (not transitive).
  */
 export async function getDirectReports(managerId: string) {
-  return db
-    .select()
-    .from(users)
-    .where(eq(users.managerId, managerId));
+  return db.select().from(users).where(eq(users.managerId, managerId));
 }
 
 /**
@@ -278,11 +276,7 @@ declare global {
 
 export async function getCachedVisibleUserIds(req: Request): Promise<string[]> {
   if (!req._visibleUserIds) {
-    req._visibleUserIds = await getVisibleUserIds(
-      req.userId!,
-      req.organizationId!,
-      req.userRole!
-    );
+    req._visibleUserIds = await getVisibleUserIds(req.userId!, req.organizationId!, req.userRole!);
   }
   return req._visibleUserIds;
 }
@@ -301,8 +295,8 @@ After the existing org lookup (line 44-52), add:
 ```typescript
 if (userRecord[0]) {
   req.organizationId = userRecord[0].organizationId;
-  req.userRole = userRecord[0].role;        // NEW
-  req.isManager = userRecord[0].isManager;  // NEW (computed, see below)
+  req.userRole = userRecord[0].role; // NEW
+  req.isManager = userRecord[0].isManager; // NEW (computed, see below)
 }
 ```
 
@@ -379,6 +373,7 @@ Body: { managerId: string | null }
 ```
 
 **Validation rules:**
+
 - Only admins can assign managers
 - Manager and target must be in the same organization
 - Cannot set someone as their own manager
@@ -416,6 +411,7 @@ Response: nested tree of users with their reports
 ```
 
 Returns:
+
 ```json
 [
   {
@@ -481,14 +477,14 @@ export const UserSchema = z.object({
 
 ## Files Modified/Created
 
-| Action | File |
-|--------|------|
-| MODIFY | `apps/backend/src/db/schema/users.schema.ts` |
-| CREATE | `apps/backend/src/db/schema/teams.schema.ts` |
-| MODIFY | `apps/backend/src/db/schema/index.ts` |
+| Action | File                                               |
+| ------ | -------------------------------------------------- |
+| MODIFY | `apps/backend/src/db/schema/users.schema.ts`       |
+| CREATE | `apps/backend/src/db/schema/teams.schema.ts`       |
+| MODIFY | `apps/backend/src/db/schema/index.ts`              |
 | CREATE | `apps/backend/src/services/permissions.service.ts` |
-| MODIFY | `apps/backend/src/middleware/auth.ts` |
-| MODIFY | `apps/backend/src/types.d.ts` |
-| MODIFY | `apps/backend/src/routes/auth.ts` |
-| MODIFY | `apps/backend/src/routes/admin.ts` |
-| MODIFY | `packages/shared/src/types.ts` |
+| MODIFY | `apps/backend/src/middleware/auth.ts`              |
+| MODIFY | `apps/backend/src/types.d.ts`                      |
+| MODIFY | `apps/backend/src/routes/auth.ts`                  |
+| MODIFY | `apps/backend/src/routes/admin.ts`                 |
+| MODIFY | `packages/shared/src/types.ts`                     |

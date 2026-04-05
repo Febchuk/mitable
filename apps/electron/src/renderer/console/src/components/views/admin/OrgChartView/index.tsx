@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Search,
-  ChevronDown,
-  ChevronRight,
-  Users,
-  AlertCircle,
-  X,
-} from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Users, AlertCircle, X } from "lucide-react";
 import { API_BASE_URL } from "@/console/src/lib/config";
 import { authService } from "@/console/src/services/authService";
 
@@ -33,8 +26,6 @@ interface OrgTreeResponse {
   tree: UserNode[];
   totalUsers: number;
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -229,9 +220,9 @@ function ManagerDropdown({
           }}
         >
           {currentManagerId
-            ? (flatNodes.find((n) => n.id === currentManagerId)
-                ? getFullName(flatNodes.find((n) => n.id === currentManagerId)!)
-                : "Unknown")
+            ? flatNodes.find((n) => n.id === currentManagerId)
+              ? getFullName(flatNodes.find((n) => n.id === currentManagerId)!)
+              : "Unknown"
             : "None"}
         </span>
       </button>
@@ -666,9 +657,7 @@ function NodeDetailPanel({
             {node.directReports.length === 0 && (
               <DetailRow
                 label="Direct reports"
-                value={
-                  manager ? `Reports to ${getFullName(manager)}, no direct reports` : "None"
-                }
+                value={manager ? `Reports to ${getFullName(manager)}, no direct reports` : "None"}
               />
             )}
           </div>
@@ -776,13 +765,7 @@ function TreeNode({
             borderRadius: 3,
           }}
         >
-          {hasReports ? (
-            expanded ? (
-              <ChevronDown size={13} />
-            ) : (
-              <ChevronRight size={13} />
-            )
-          ) : null}
+          {hasReports ? expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : null}
         </div>
 
         {/* Name / avatar area — clicking opens detail panel */}
@@ -987,8 +970,6 @@ export default function OrgChartView() {
     return { flatNodes: flat, managerMap: map };
   }, [tree]);
 
-
-
   const countLabel = loading
     ? "Loading..."
     : `${totalUsers} ${totalUsers === 1 ? "person" : "people"}`;
@@ -1072,7 +1053,6 @@ export default function OrgChartView() {
               }}
             />
           </div>
-
         </div>
       </div>
 
@@ -1188,4 +1168,3 @@ function TreeViewBody({
     </div>
   );
 }
-
