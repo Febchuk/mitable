@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
@@ -57,7 +57,17 @@ export default function NotFound() {
 
             <main style={{ padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto" }}>
                 <p style={{ fontSize: 14, fontWeight: 600, color: C.accent, marginBottom: 14 }}>404 error</p>
-                <h1 style={{ fontFamily: C.serif, fontSize: 52, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.15, margin: "0 0 18px" }}>
+                <h1
+                    style={{
+                        fontFamily: C.serif,
+                        fontSize: 52,
+                        fontWeight: 400,
+                        color: C.text,
+                        letterSpacing: "-0.02em",
+                        lineHeight: 1.15,
+                        margin: "0 0 18px",
+                    }}
+                >
                     We can&apos;t find that page
                 </h1>
                 <p style={{ fontSize: 18, color: C.textSec, lineHeight: 1.6, margin: "0 0 40px" }}>
@@ -68,16 +78,24 @@ export default function NotFound() {
                     <button
                         onClick={() => router.back()}
                         style={buttonSecondary}
-                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = "0.85";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                        }}
                     >
                         Go back
                     </button>
                     <a
                         href="/"
                         style={buttonPrimary}
-                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = "0.85";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                        }}
                     >
                         Take me home
                     </a>

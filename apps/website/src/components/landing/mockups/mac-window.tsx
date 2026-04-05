@@ -1,6 +1,6 @@
 "use client";
 
-import { getMockupColors, type MockupVariant } from "./colors";
+import { type MockupVariant, getMockupColors } from "./colors";
 
 /** Single source of truth for all landing page screen mockup proportions */
 export const SCREEN_ASPECT_RATIO = "16 / 10";
@@ -24,9 +24,7 @@ export const MacWindow = ({ children, className = "", title, variant = "dark" }:
                 borderRadius: 12,
                 border: `1px solid ${C.border}`,
                 overflow: "hidden",
-                boxShadow: isLight
-                    ? "0 24px 80px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)"
-                    : "0 24px 80px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2)",
+                boxShadow: isLight ? "0 24px 80px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)" : "0 24px 80px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2)",
             }}
         >
             <div
@@ -57,7 +55,9 @@ export const MacWindow = ({ children, className = "", title, variant = "dark" }:
                     </span>
                 ) : null}
             </div>
-            <div className="l-mac-window-body" style={{ overflow: "hidden", aspectRatio: SCREEN_ASPECT_RATIO }}>{children}</div>
+            <div className="l-mac-window-body" style={{ overflow: "hidden", aspectRatio: SCREEN_ASPECT_RATIO }}>
+                {children}
+            </div>
         </div>
     );
 };

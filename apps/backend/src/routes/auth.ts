@@ -706,13 +706,15 @@ authRouter.post("/login", async (req: Request, res: Response) => {
       .where(eq(schema.users.managerId, data.user.id))
       .limit(1);
 
-    const directReportCount = reportCheck.length > 0
-      ? (await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(schema.users)
-          .where(eq(schema.users.managerId, data.user.id))
-        )[0]?.count ?? 0
-      : 0;
+    const directReportCount =
+      reportCheck.length > 0
+        ? ((
+            await db
+              .select({ count: sql<number>`count(*)::int` })
+              .from(schema.users)
+              .where(eq(schema.users.managerId, data.user.id))
+          )[0]?.count ?? 0)
+        : 0;
 
     // Load user permissions
     const permRows = await db
@@ -883,13 +885,15 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
       .where(eq(schema.users.managerId, req.userId!))
       .limit(1);
 
-    const directReportCount = reportCheck.length > 0
-      ? (await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(schema.users)
-          .where(eq(schema.users.managerId, req.userId!))
-        )[0]?.count ?? 0
-      : 0;
+    const directReportCount =
+      reportCheck.length > 0
+        ? ((
+            await db
+              .select({ count: sql<number>`count(*)::int` })
+              .from(schema.users)
+              .where(eq(schema.users.managerId, req.userId!))
+          )[0]?.count ?? 0)
+        : 0;
 
     res.json({
       user: req.user,

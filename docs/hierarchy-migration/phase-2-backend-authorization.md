@@ -67,7 +67,9 @@ export function requireAccessToUser(paramName: string = "id") {
     );
 
     if (!hasAccess) {
-      res.status(403).json({ error: "Forbidden", message: "You do not have access to this user's data" });
+      res
+        .status(403)
+        .json({ error: "Forbidden", message: "You do not have access to this user's data" });
       return;
     }
 
@@ -83,19 +85,20 @@ export function requireAccessToUser(paramName: string = "id") {
 ### Principle: Replace inline checks, don't rewrite routes
 
 Each route file migration follows this pattern:
+
 1. Remove the `verifyAdmin()` call or inline `role !== "admin"` check
 2. Add the appropriate middleware to the route definition
 3. Add visible-user-ID scoping to data queries
 
 ### Migration order (by impact)
 
-| Priority | File | Inline checks | Middleware to use |
-|----------|------|--------------|-------------------|
-| 1 | `admin-dashboard.ts` | ~22 | `requireManagerOrAdmin` + query scoping |
-| 2 | `admin.ts` | ~16 | Mixed: `requireAdmin` for CRUD, `requireManagerOrAdmin` for viewing |
-| 3 | `monitoring.ts` | 1 (`isOwnerOrOrgAdmin`) | Replace with `canEditSession` from permissions service |
-| 4 | `admin-benchmarks.ts` | several | `requireManagerOrAdmin` for assignment, `requireAdmin` for CRUD |
-| 5 | Other route files | scattered | `requireAdmin` or `requireManagerOrAdmin` as appropriate |
+| Priority | File                  | Inline checks           | Middleware to use                                                   |
+| -------- | --------------------- | ----------------------- | ------------------------------------------------------------------- |
+| 1        | `admin-dashboard.ts`  | ~22                     | `requireManagerOrAdmin` + query scoping                             |
+| 2        | `admin.ts`            | ~16                     | Mixed: `requireAdmin` for CRUD, `requireManagerOrAdmin` for viewing |
+| 3        | `monitoring.ts`       | 1 (`isOwnerOrOrgAdmin`) | Replace with `canEditSession` from permissions service              |
+| 4        | `admin-benchmarks.ts` | several                 | `requireManagerOrAdmin` for assignment, `requireAdmin` for CRUD     |
+| 5        | Other route files     | scattered               | `requireAdmin` or `requireManagerOrAdmin` as appropriate            |
 
 ---
 
@@ -108,6 +111,7 @@ This file has the most `verifyAdmin()` calls and is the primary data-viewing sur
 The existing helper (line ~53) fetches user, checks admin role, returns org context. Replace with middleware chain:
 
 **Before:**
+
 ```typescript
 router.get("/admin/dashboard", requireAuth, async (req, res) => {
   const admin = await verifyAdmin(req, res);
@@ -117,6 +121,7 @@ router.get("/admin/dashboard", requireAuth, async (req, res) => {
 ```
 
 **After:**
+
 ```typescript
 router.get("/admin/dashboard", requireAuth, requireManagerOrAdmin, async (req, res) => {
   const visibleUserIds = await getCachedVisibleUserIds(req);
@@ -166,7 +171,9 @@ router.get(
   requireAuth,
   requireManagerOrAdmin,
   requireAccessToUser("id"),
-  async (req, res) => { /* ... */ }
+  async (req, res) => {
+    /* ... */
+  }
 );
 ```
 
@@ -178,9 +185,9 @@ Filter `user_daily_activities` and `activity_blocks` queries by visible user IDs
 const visibleUserIds = await getCachedVisibleUserIds(req);
 // Add to existing WHERE clause:
 and(
-  inArray(userDailyActivities.userId, visibleUserIds),
+  inArray(userDailyActivities.userId, visibleUserIds)
   // ... existing date/period filters
-)
+);
 ```
 
 ### 3.3 Helper: `aggregateUserMetrics`
@@ -188,10 +195,7 @@ and(
 New function to compute dashboard metrics from individual user activities (for manager view):
 
 ```typescript
-async function aggregateUserMetrics(
-  userIds: string[],
-  period: "today" | "week" | "month" | "ytd"
-) {
+async function aggregateUserMetrics(userIds: string[], period: "today" | "week" | "month" | "ytd") {
   const { startDate, endDate } = getPeriodDates(period);
 
   const result = await db
@@ -222,6 +226,7 @@ async function aggregateUserMetrics(
 Split existing admin routes into two categories:
 
 **Admin-only (keep `requireAdmin`):**
+
 - `POST /admin/users` — create/invite user
 - `POST /admin/users/:id/make-admin` — promote to admin
 - `GET /admin/integrations` — org integration management
@@ -230,6 +235,7 @@ Split existing admin routes into two categories:
 - `GET /admin/templates`, `POST /admin/templates` — template management
 
 **Manager-accessible (change to `requireManagerOrAdmin`):**
+
 - `GET /admin/users` — list users (scoped to visible users)
 - `GET /admin/users/:id` — user detail (with `requireAccessToUser`)
 
@@ -240,10 +246,7 @@ Split existing admin routes into two categories:
 ```typescript
 router.get("/admin/users", requireAuth, requireManagerOrAdmin, async (req, res) => {
   const visibleUserIds = await getCachedVisibleUserIds(req);
-  const userList = await db
-    .select(/* ... */)
-    .from(users)
-    .where(inArray(users.id, visibleUserIds));
+  const userList = await db.select(/* ... */).from(users).where(inArray(users.id, visibleUserIds));
   // ...
 });
 ```
@@ -258,7 +261,9 @@ router.get(
   requireAuth,
   requireManagerOrAdmin,
   requireAccessToUser("id"),
-  async (req, res) => { /* ... existing logic ... */ }
+  async (req, res) => {
+    /* ... existing logic ... */
+  }
 );
 ```
 
@@ -269,15 +274,17 @@ router.get(
 ### 5.1 Replace `isOwnerOrOrgAdmin`
 
 **Current** (line ~54):
+
 ```typescript
 async function isOwnerOrOrgAdmin(userId, session) {
   if (session.userId === userId) return true;
-  const [user] = await db.select({role, organizationId}).from(users).where(eq(users.id, userId));
+  const [user] = await db.select({ role, organizationId }).from(users).where(eq(users.id, userId));
   return user?.role === "admin" && user.organizationId === session.organizationId;
 }
 ```
 
 **Replace with:**
+
 ```typescript
 import { canEditSession } from "../services/permissions.service.js";
 
@@ -303,6 +310,7 @@ This now allows managers to edit their reports' session summaries (same as admin
 ### 6.1 Route classification
 
 **All benchmark routes open to managers (scoped to their reports):**
+
 - `POST /admin/benchmarks` — create benchmark (managers can create for their reports)
 - `PUT /admin/benchmarks/:id` — update benchmark (if created by them or assigned to their reports)
 - `DELETE /admin/benchmarks/:id` — delete benchmark (if created by them)
@@ -318,7 +326,12 @@ When a manager assigns a benchmark, validate the target user is their report:
 
 ```typescript
 if (req.userRole !== "admin") {
-  const hasAccess = await canViewUserData(req.userId!, targetUserId, req.userRole!, req.organizationId!);
+  const hasAccess = await canViewUserData(
+    req.userId!,
+    targetUserId,
+    req.userRole!,
+    req.organizationId!
+  );
   if (!hasAccess) {
     res.status(403).json({ error: "Can only assign benchmarks to your reports" });
     return;
@@ -348,7 +361,12 @@ Manager-scoped equivalent of the admin person-detail endpoint. Validates access 
 ```typescript
 router.get("/me/reports/:id/activity", requireAuth, async (req, res) => {
   const targetId = req.params.id;
-  const hasAccess = await canViewUserData(req.userId!, targetId, req.userRole!, req.organizationId!);
+  const hasAccess = await canViewUserData(
+    req.userId!,
+    targetId,
+    req.userRole!,
+    req.organizationId!
+  );
   if (!hasAccess) {
     res.status(403).json({ error: "Forbidden" });
     return;
@@ -393,11 +411,11 @@ Each manager dashboard load adds 1 extra query (the recursive CTE) compared to a
 
 ## Files Modified/Created
 
-| Action | File |
-|--------|------|
-| CREATE | `apps/backend/src/middleware/authorization.ts` |
-| MODIFY | `apps/backend/src/routes/admin-dashboard.ts` (22 changes) |
-| MODIFY | `apps/backend/src/routes/admin.ts` (16 changes) |
-| MODIFY | `apps/backend/src/routes/monitoring.ts` (1 change) |
-| MODIFY | `apps/backend/src/routes/admin-benchmarks.ts` (several changes) |
+| Action | File                                                                 |
+| ------ | -------------------------------------------------------------------- |
+| CREATE | `apps/backend/src/middleware/authorization.ts`                       |
+| MODIFY | `apps/backend/src/routes/admin-dashboard.ts` (22 changes)            |
+| MODIFY | `apps/backend/src/routes/admin.ts` (16 changes)                      |
+| MODIFY | `apps/backend/src/routes/monitoring.ts` (1 change)                   |
+| MODIFY | `apps/backend/src/routes/admin-benchmarks.ts` (several changes)      |
 | MODIFY | `apps/backend/src/routes/my-activity.ts` (add /me/reports endpoints) |

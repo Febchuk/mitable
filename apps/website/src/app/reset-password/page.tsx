@@ -1,8 +1,8 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { supabase } from "@/lib/supabase";
 
 const C = {
@@ -129,7 +129,17 @@ export default function ResetPasswordPage() {
                 style={{ flex: 1, padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto", width: "100%", boxSizing: "border-box" as const }}
             >
                 <div className="l-account-page-header" style={{ textAlign: "center", marginBottom: 48 }}>
-                    <h1 style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}>
+                    <h1
+                        style={{
+                            fontFamily: C.serif,
+                            fontSize: 44,
+                            fontWeight: 400,
+                            color: C.text,
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.2,
+                            margin: "0 0 14px",
+                        }}
+                    >
                         {status === "success" ? "Password Updated" : "Set New Password"}
                     </h1>
                     <p className="l-account-page-subtitle" style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
@@ -159,7 +169,18 @@ export default function ResetPasswordPage() {
                     {status === "ready" && (
                         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                             <div>
-                                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>New Password *</label>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: 10,
+                                        color: C.textTer,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.09em",
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    New Password *
+                                </label>
                                 <div style={{ position: "relative" }}>
                                     <input
                                         required
@@ -169,14 +190,30 @@ export default function ResetPasswordPage() {
                                         onChange={(e) => setPassword(e.target.value)}
                                         style={inputStyle}
                                     />
-                                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={eyeButtonStyle} aria-label={showPassword ? "Hide password" : "Show password"}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        style={eyeButtonStyle}
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                    >
                                         {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                                     </button>
                                 </div>
                             </div>
 
                             <div>
-                                <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Confirm Password *</label>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: 10,
+                                        color: C.textTer,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.09em",
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    Confirm Password *
+                                </label>
                                 <div style={{ position: "relative" }}>
                                     <input
                                         required
@@ -186,7 +223,12 @@ export default function ResetPasswordPage() {
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         style={inputStyle}
                                     />
-                                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={eyeButtonStyle} aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        style={eyeButtonStyle}
+                                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                    >
                                         {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
                                     </button>
                                 </div>
@@ -213,8 +255,12 @@ export default function ResetPasswordPage() {
                                     width: "100%",
                                     marginTop: 4,
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.opacity = "0.85";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.opacity = "1";
+                                }}
                             >
                                 Update Password
                             </button>
@@ -243,7 +289,16 @@ export default function ResetPasswordPage() {
                                     margin: "0 auto 16px",
                                 }}
                             >
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-success, #3A9B6B)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="var(--status-success, #3A9B6B)"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
                             </div>
@@ -262,8 +317,12 @@ export default function ResetPasswordPage() {
                                     fontFamily: C.sans,
                                     transition: "opacity 0.15s",
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.opacity = "0.85";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.opacity = "1";
+                                }}
                             >
                                 Sign in
                             </a>
@@ -292,7 +351,16 @@ export default function ResetPasswordPage() {
                                     margin: "0 auto 16px",
                                 }}
                             >
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-error, #E87474)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="var(--status-error, #E87474)"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
                                     <circle cx="12" cy="12" r="10" />
                                     <line x1="15" y1="9" x2="9" y2="15" />
                                     <line x1="9" y1="9" x2="15" y2="15" />
@@ -314,8 +382,12 @@ export default function ResetPasswordPage() {
                                         fontFamily: C.sans,
                                         transition: "opacity 0.15s",
                                     }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.opacity = "0.85";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.opacity = "1";
+                                    }}
                                 >
                                     Sign in
                                 </a>
@@ -334,8 +406,12 @@ export default function ResetPasswordPage() {
                                         transition: "opacity 0.15s",
                                         border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
                                     }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.opacity = "0.85";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.opacity = "1";
+                                    }}
                                 >
                                     Home
                                 </a>

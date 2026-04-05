@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { PRICING_TIERS, type QuotaStatus, type SubscriptionResponse } from "@mitable/shared";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -124,7 +124,9 @@ export default function BillingPage() {
     }
 
     async function getAccessToken(): Promise<string | null> {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+            data: { session },
+        } = await supabase.auth.getSession();
         if (!session) {
             window.location.href = "/login?redirect=/billing";
             return null;
@@ -203,7 +205,15 @@ export default function BillingPage() {
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
-                        style={{ fontFamily: C.serif, fontSize: 44, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.2, margin: "0 0 14px" }}
+                        style={{
+                            fontFamily: C.serif,
+                            fontSize: 44,
+                            fontWeight: 400,
+                            color: C.text,
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.2,
+                            margin: "0 0 14px",
+                        }}
                     >
                         Billing
                     </motion.h1>
@@ -243,8 +253,22 @@ export default function BillingPage() {
                         >
                             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
                                 <div>
-                                    <p style={{ fontFamily: C.sans, fontSize: 10, fontWeight: 600, letterSpacing: "0.09em", textTransform: "uppercase", color: C.textTer, marginBottom: 6 }}>Current Plan</p>
-                                    <h2 style={{ fontFamily: C.serif, fontSize: 24, fontWeight: 400, color: C.text, margin: 0 }}>{tierConfig?.name || "Free"}</h2>
+                                    <p
+                                        style={{
+                                            fontFamily: C.sans,
+                                            fontSize: 10,
+                                            fontWeight: 600,
+                                            letterSpacing: "0.09em",
+                                            textTransform: "uppercase",
+                                            color: C.textTer,
+                                            marginBottom: 6,
+                                        }}
+                                    >
+                                        Current Plan
+                                    </p>
+                                    <h2 style={{ fontFamily: C.serif, fontSize: 24, fontWeight: 400, color: C.text, margin: 0 }}>
+                                        {tierConfig?.name || "Free"}
+                                    </h2>
                                 </div>
                                 <span style={statusBadgeStyle(status)}>{status.replace("_", " ")}</span>
                             </div>
@@ -252,7 +276,11 @@ export default function BillingPage() {
                             {data.subscription?.subscription?.currentPeriodEnd && (
                                 <p style={{ fontSize: 13, color: C.textTer, marginBottom: 20 }}>
                                     {data.subscription.subscription.cancelAtPeriodEnd ? "Cancels" : "Renews"} on{" "}
-                                    {new Date(data.subscription.subscription.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                                    {new Date(data.subscription.subscription.currentPeriodEnd).toLocaleDateString("en-US", {
+                                        month: "long",
+                                        day: "numeric",
+                                        year: "numeric",
+                                    })}
                                 </p>
                             )}
 
@@ -261,8 +289,12 @@ export default function BillingPage() {
                                     <a
                                         href="/pricing"
                                         style={buttonPrimary}
-                                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.opacity = "0.85";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.opacity = "1";
+                                        }}
                                     >
                                         Upgrade
                                     </a>
@@ -271,8 +303,12 @@ export default function BillingPage() {
                                         onClick={handleManageBilling}
                                         disabled={portalLoading}
                                         style={{ ...buttonSecondary, opacity: portalLoading ? 0.7 : 1, cursor: portalLoading ? "wait" : "pointer" }}
-                                        onMouseEnter={(e) => { if (!portalLoading) e.currentTarget.style.opacity = "0.85"; }}
-                                        onMouseLeave={(e) => { if (!portalLoading) e.currentTarget.style.opacity = "1"; }}
+                                        onMouseEnter={(e) => {
+                                            if (!portalLoading) e.currentTarget.style.opacity = "0.85";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!portalLoading) e.currentTarget.style.opacity = "1";
+                                        }}
                                     >
                                         {portalLoading ? "Loading..." : "Manage Billing"}
                                     </button>
@@ -289,11 +325,23 @@ export default function BillingPage() {
                                 transition={{ duration: 0.5, delay: 0.25 }}
                                 style={cardStyle}
                             >
-                                <h2 style={{ fontFamily: C.serif, fontSize: 22, fontWeight: 400, color: C.text, margin: "0 0 20px", letterSpacing: "-0.02em" }}>Usage This Period</h2>
+                                <h2 style={{ fontFamily: C.serif, fontSize: 22, fontWeight: 400, color: C.text, margin: "0 0 20px", letterSpacing: "-0.02em" }}>
+                                    Usage This Period
+                                </h2>
 
                                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                                    <UsageBar label="AI Queries" used={data.quota.aiQueries.used} limit={data.quota.aiQueries.limit} percent={data.quota.aiQueries.percentUsed} />
-                                    <UsageBar label="Documents" used={data.quota.documents.used} limit={data.quota.documents.limit} percent={data.quota.documents.percentUsed} />
+                                    <UsageBar
+                                        label="AI Queries"
+                                        used={data.quota.aiQueries.used}
+                                        limit={data.quota.aiQueries.limit}
+                                        percent={data.quota.aiQueries.percentUsed}
+                                    />
+                                    <UsageBar
+                                        label="Documents"
+                                        used={data.quota.documents.used}
+                                        limit={data.quota.documents.limit}
+                                        percent={data.quota.documents.percentUsed}
+                                    />
                                     <UsageBar
                                         label="Storage"
                                         used={Math.round((data.quota.storage.usedBytes || 0) / 1024 / 1024)}
@@ -318,16 +366,24 @@ export default function BillingPage() {
                             <a
                                 href="/download"
                                 style={buttonPrimary}
-                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.opacity = "0.85";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.opacity = "1";
+                                }}
                             >
                                 Download App
                             </a>
                             <button
                                 onClick={handleSignOut}
                                 style={buttonSecondary}
-                                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.opacity = "0.85";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.opacity = "1";
+                                }}
                             >
                                 Sign Out
                             </button>

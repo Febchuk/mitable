@@ -1,8 +1,8 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
@@ -64,10 +64,23 @@ export default function ContactPage() {
                         marginBottom: 20,
                         transition: "color 0.15s",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--l-text)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--l-text-tertiary, #6B665C)"; }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "var(--l-text)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.color = "var(--l-text-tertiary, #6B665C)";
+                    }}
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
                         <line x1="19" y1="12" x2="5" y2="12" />
                         <polyline points="12 19 5 12 12 5" />
                     </svg>
@@ -88,25 +101,25 @@ export default function ContactPage() {
                     >
                         Contact Sales
                     </h1>
-                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
-                        Tell us about your team and we&apos;ll get back to you.
-                    </p>
+                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>Tell us about your team and we&apos;ll get back to you.</p>
                 </div>
 
                 <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                     <div>
-                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Name *</label>
-                        <input
-                            required
-                            placeholder="Your full name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            style={inputStyle}
-                        />
+                        <label
+                            style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}
+                        >
+                            Name *
+                        </label>
+                        <input required placeholder="Your full name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
                     </div>
 
                     <div>
-                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Email *</label>
+                        <label
+                            style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}
+                        >
+                            Email *
+                        </label>
                         <input
                             required
                             type="email"
@@ -118,17 +131,20 @@ export default function ContactPage() {
                     </div>
 
                     <div>
-                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Company</label>
-                        <input
-                            placeholder="Company name (optional)"
-                            value={company}
-                            onChange={(e) => setCompany(e.target.value)}
-                            style={inputStyle}
-                        />
+                        <label
+                            style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}
+                        >
+                            Company
+                        </label>
+                        <input placeholder="Company name (optional)" value={company} onChange={(e) => setCompany(e.target.value)} style={inputStyle} />
                     </div>
 
                     <div>
-                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Message *</label>
+                        <label
+                            style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}
+                        >
+                            Message *
+                        </label>
                         <textarea
                             required
                             rows={5}
@@ -158,8 +174,12 @@ export default function ContactPage() {
                             width: "100%",
                             marginTop: 4,
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = "0.85";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                        }}
                     >
                         Send Message
                     </button>

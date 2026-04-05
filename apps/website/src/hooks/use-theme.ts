@@ -1,7 +1,7 @@
 "use client";
 
-import { useTheme as useNextTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
+import { useTheme as useNextTheme } from "next-themes";
 
 type Theme = "dark" | "light";
 
