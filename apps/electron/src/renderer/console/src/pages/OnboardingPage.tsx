@@ -93,6 +93,7 @@ export function PermissionRow({
   granted,
   buttonLabel,
   onAction,
+  variant = "onboarding",
 }: {
   icon: React.ElementType;
   label: string;
@@ -100,7 +101,102 @@ export function PermissionRow({
   granted: boolean;
   buttonLabel: string;
   onAction: () => void;
+  /** `settings` — same row rhythm as Integrations / Update (icon tile, title, subtitle, right action). */
+  variant?: "onboarding" | "settings";
 }) {
+  if (variant === "settings") {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          padding: "14px 0",
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            background: "var(--bg-overlay)",
+            border: "var(--border-subtle)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Icon size={18} style={{ color: "var(--text-secondary)" }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 500,
+              color: "var(--text-primary)",
+              lineHeight: 1,
+            }}
+          >
+            {label}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--text-tertiary)",
+              marginTop: 4,
+              lineHeight: 1,
+            }}
+          >
+            {description}
+          </div>
+        </div>
+        {granted ? (
+          <div
+            role="status"
+            style={{
+              padding: "6px 14px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 500,
+              flexShrink: 0,
+              background: "rgba(var(--status-success-rgb), 0.14)",
+              color: "var(--status-success)",
+              border: "0.5px solid rgba(var(--status-success-rgb), 0.28)",
+            }}
+          >
+            Granted
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onAction}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "var(--text-primary)",
+              background: "rgba(var(--ui-rgb), 0.06)",
+              border: "var(--border-subtle)",
+              cursor: "pointer",
+              flexShrink: 0,
+              transition: "background 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+            }}
+          >
+            {buttonLabel}
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex items-center justify-between p-4 rounded-lg"

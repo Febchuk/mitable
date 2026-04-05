@@ -1,4 +1,12 @@
-import { useState, FormEvent, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  FormEvent,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Eye,
@@ -16,7 +24,6 @@ import {
   Settings,
   Plus,
   Search,
-  Globe,
   Sun,
   Moon,
   Monitor,
@@ -24,6 +31,7 @@ import {
   Trash2,
   Shield,
   MousePointerClick,
+  ChevronRight,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
@@ -32,29 +40,47 @@ import { Button as ShadcnButton } from "@/components/ui/button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
 import { useToast } from "@/hooks/use-toast";
-import { BillingSection } from "@/console/src/components/billing";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { usePermissions } from "../hooks/usePermissions";
 import { PermissionRow } from "./OnboardingPage";
-import {
-  useOrganizationSettings,
-  useUpdateOrganizationSettings,
-} from "@/console/src/hooks/queries/admin";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { OrgVariant } from "@mitable/shared";
+import { useSubscription } from "@/console/src/hooks/queries/billing";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
 import { apiRequest } from "../services/api";
 
 const logger = createLogger("UserProfilePage");
+
+/** Logo mark uses theme text color for contrast on both light and dark surfaces */
+function MitableLogoMark({ size = 20 }: { size?: number }) {
+  const h = Math.round((size * 100) / 92);
+  return (
+    <svg
+      width={size}
+      height={h}
+      viewBox="0 0 92 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+      style={{ display: "block", color: "var(--text-primary)" }}
+    >
+      <g clipPath="url(#mitable-logo-clip-settings)">
+        <path
+          d="M2 18H13.5C20.6797 18 26.5 23.8203 26.5 31V69C26.5 76.1797 20.6797 82 13.5 82C6.3203 82 0.5 76.1797 0.5 69V19.5C0.5 18.6716 1.17157 18 2 18Z"
+          fill="currentColor"
+        />
+        <rect x="33.5" y="0.5" width="25" height="99" rx="12.5" fill="currentColor" />
+        <rect x="65.5" y="18" width="26" height="64" rx="13" fill="currentColor" />
+      </g>
+      <defs>
+        <clipPath id="mitable-logo-clip-settings">
+          <rect width="92" height="100" fill="white" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
 
 interface LinearStatus {
   connected: boolean;
@@ -85,9 +111,31 @@ interface FirefliesStatus {
   lastSyncedAt: string | null;
 }
 
+function formatPlanDisplay(
+  data: { subscription: { tier: string }; isInternal: boolean } | undefined,
+  isPending: boolean,
+  isError: boolean,
+): string {
+  if (isPending) return "Loading…";
+  if (isError || !data?.subscription) return "Not available";
+  const { tier } = data.subscription;
+  const name = tier.length ? tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase() : "—";
+  return data.isInternal ? `${name} (Internal)` : name;
+}
+
 export default function UserProfilePage() {
-  const { user } = useUser();
+  const { user, organization } = useUser();
   const { toast } = useToast();
+  const {
+    data: subscriptionData,
+    isPending: isPlanPending,
+    isError: isPlanError,
+  } = useSubscription();
+
+  const planLabel = useMemo(
+    () => formatPlanDisplay(subscriptionData, isPlanPending, isPlanError),
+    [subscriptionData, isPlanPending, isPlanError],
+  );
   const { theme: currentTheme, setTheme } = useTheme();
 
   // Password change state
@@ -175,26 +223,6 @@ export default function UserProfilePage() {
   } = usePermissions();
 
   const navigate = useNavigate();
-
-  // Organization settings hooks (admin only)
-  const isAdmin = user?.role === "admin";
-  const { data: orgSettings, isLoading: isOrgSettingsLoading } = useOrganizationSettings();
-  const { mutate: updateOrgSettings, isPending: isUpdatingOrgSettings } =
-    useUpdateOrganizationSettings();
-  const currentVariant = orgSettings?.settings?.variant || "global";
-
-  const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }[] = [
-    {
-      value: "global",
-      label: "Global (Default)",
-      description: "Standard terminology: Docs, Artefacts",
-    },
-    {
-      value: "nigeria",
-      label: "Nigeria",
-      description: "Regional terminology: Reports, Uploads",
-    },
-  ];
 
   // Block list state
   const [blockedApps, setBlockedApps] = useState<string[]>([]);
@@ -1845,42 +1873,50 @@ export default function UserProfilePage() {
                     {
                       label: "Role",
                       value: user?.role || "Employee",
-                      accent: true,
+                      capitalize: true,
                     },
                     {
-                      label: "Organization ID",
-                      value: user?.organizationId || "Not available",
-                      mono: true,
+                      label: "Organization",
+                      value: organization?.name || "Not available",
                     },
+                    { label: "Plan", value: planLabel },
                   ].map((field) => (
                     <div key={field.label}>
                       <div
                         style={{
-                          fontSize: 12,
-                          fontWeight: 500,
+                          fontSize: 10,
+                          fontWeight: 600,
                           color: "var(--text-tertiary)",
-                          marginBottom: 6,
+                          marginBottom: 8,
                           textTransform: "uppercase",
-                          letterSpacing: "0.5px",
+                          letterSpacing: "0.07em",
                         }}
                       >
                         {field.label}
                       </div>
                       <div
+                        title={field.value}
                         style={{
+                          display: "flex",
+                          alignItems: "center",
+                          minHeight: 52,
+                          boxSizing: "border-box",
+                          padding: "14px 16px",
+                          borderRadius: 10,
+                          border: "0.5px solid rgba(var(--ui-rgb), 0.08)",
+                          background: "var(--bg-raised)",
                           fontSize: 13,
-                          color: field.accent
-                            ? "var(--mi-accent)"
-                            : field.mono
-                              ? "var(--text-tertiary)"
-                              : "var(--text-primary)",
-                          fontFamily: field.mono ? "monospace" : "inherit",
-                          padding: "9px 12px",
-                          borderRadius: 6,
-                          border: "var(--border-hairline)",
-                          background: "rgba(var(--ui-rgb), 0.03)",
-                          textTransform: field.accent ? "capitalize" : undefined,
-                          fontWeight: field.accent ? 500 : 400,
+                          lineHeight: "20px",
+                          color: "var(--text-primary)",
+                          fontFamily: field.mono
+                            ? "var(--font-mono), ui-monospace, monospace"
+                            : "var(--font-sans)",
+                          textTransform: field.capitalize ? "capitalize" : undefined,
+                          fontWeight: 400,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          fontVariantNumeric: field.mono ? "tabular-nums" : undefined,
                         }}
                       >
                         {field.value}
@@ -1888,21 +1924,6 @@ export default function UserProfilePage() {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Subscription Section */}
-              <div>
-                <h3
-                  style={{
-                    fontSize: 16,
-                    fontWeight: 500,
-                    color: "var(--text-primary)",
-                    margin: "0 0 16px",
-                  }}
-                >
-                  Subscription
-                </h3>
-                <BillingSection />
               </div>
             </div>
           )}
@@ -1918,7 +1939,7 @@ export default function UserProfilePage() {
                     borderBottom: "var(--border-hairline)",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 12,
+                    gap: 16,
                   }}
                 >
                   <h3
@@ -1942,7 +1963,7 @@ export default function UserProfilePage() {
                   ) : (
                     <>
                       {/* Currently Blocked Apps */}
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Label className="text-sm font-medium text-text-primary">
                           Blocked Apps
                         </Label>
@@ -1980,8 +2001,8 @@ export default function UserProfilePage() {
                       </div>
 
                       {/* Available Apps to Block */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
+                      <div className="space-y-4 pt-1">
+                        <div className="flex items-center justify-between gap-3">
                           <Label className="text-sm font-medium text-text-primary">
                             Add App to Block List
                           </Label>
@@ -2012,16 +2033,16 @@ export default function UserProfilePage() {
                             No apps found. Click Refresh to scan for installed apps on your system.
                           </p>
                         ) : (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {/* Search input */}
                             <div className="relative">
-                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
                               <input
                                 type="text"
                                 placeholder="Search apps..."
                                 value={appSearchQuery}
                                 onChange={(e) => setAppSearchQuery(e.target.value)}
-                                className="w-full pl-8 pr-3 py-2 text-sm bg-background-secondary border border-border-subtle rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
+                                className="w-full pl-9 pr-9 py-2.5 text-sm bg-background-secondary border border-border-subtle rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-blue"
                               />
                               {appSearchQuery && (
                                 <button
@@ -2033,7 +2054,7 @@ export default function UserProfilePage() {
                               )}
                             </div>
                             {/* App list */}
-                            <div className="max-h-48 overflow-y-auto border border-border-subtle rounded-lg">
+                            <div className="max-h-48 overflow-y-auto border border-border-subtle rounded-lg py-2">
                               {(() => {
                                 const filteredApps = detectedApps
                                   .filter((app) => !blockedApps.includes(app.normalizedName))
@@ -2048,7 +2069,7 @@ export default function UserProfilePage() {
 
                                 if (filteredApps.length === 0) {
                                   return (
-                                    <div className="px-3 py-2 text-xs text-text-tertiary italic">
+                                    <div className="px-4 py-4 text-xs text-text-tertiary italic">
                                       {appSearchQuery
                                         ? "No apps match your search"
                                         : "All apps are already blocked"}
@@ -2063,14 +2084,14 @@ export default function UserProfilePage() {
                                     <button
                                       key={app.normalizedName}
                                       onClick={() => handleAddBlockedApp(app.normalizedName)}
-                                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-background-secondary transition-colors text-left"
+                                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-background-secondary transition-colors text-left min-h-[44px]"
                                     >
-                                      <Plus size={14} className="text-text-tertiary" />
-                                      <span className="text-sm text-text-primary flex-1">
+                                      <Plus size={14} className="text-text-tertiary shrink-0" />
+                                      <span className="text-sm text-text-primary flex-1 min-w-0 truncate">
                                         {displayName}
                                       </span>
                                       {isInstalledOnly && (
-                                        <span className="text-[10px] text-text-tertiary bg-background-secondary px-1.5 py-0.5 rounded">
+                                        <span className="text-[10px] text-text-tertiary bg-background-secondary px-2 py-0.5 rounded shrink-0 mr-0.5">
                                           not opened
                                         </span>
                                       )}
@@ -2080,7 +2101,7 @@ export default function UserProfilePage() {
                               })()}
                             </div>
                             {/* App count */}
-                            <p className="text-[10px] text-text-tertiary">
+                            <p className="text-[10px] text-text-tertiary pt-0.5">
                               {
                                 detectedApps.filter(
                                   (app) => !blockedApps.includes(app.normalizedName)
@@ -2380,18 +2401,7 @@ export default function UserProfilePage() {
                     <button
                       type="submit"
                       disabled={isChangingPassword}
-                      style={{
-                        padding: "8px 20px",
-                        borderRadius: 6,
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: "var(--bg-base)",
-                        background: "var(--mi-accent)",
-                        border: "none",
-                        cursor: isChangingPassword ? "not-allowed" : "pointer",
-                        opacity: isChangingPassword ? 0.6 : 1,
-                        transition: "opacity 0.15s ease",
-                      }}
+                      className="inline-flex items-center justify-center rounded-md border border-border bg-muted px-5 py-2 text-sm font-medium text-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isChangingPassword ? "Changing Password..." : "Change Password"}
                     </button>
@@ -2401,80 +2411,90 @@ export default function UserProfilePage() {
             </div>
           )}
 
-          {/* Permissions Tab */}
+          {/* Permissions Tab — header + rows aligned with Integrations / Update */}
           {activeTab === "permissions" && (
-            <div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div>
-                    <h2
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 500,
-                        color: "var(--text-primary)",
-                        margin: 0,
-                      }}
-                    >
-                      macOS Permissions
-                    </h2>
-                    <p
-                      style={{
-                        fontSize: 13,
-                        color: "var(--text-tertiary)",
-                        margin: "4px 0 0",
-                      }}
-                    >
-                      Mitable needs these permissions to capture your work
-                    </p>
-                  </div>
-                  <div className="space-y-2.5">
-                    <PermissionRow
-                      icon={Monitor}
-                      label="Screen Recording"
-                      description="Required to capture screenshots"
-                      granted={screenPermission === "granted"}
-                      buttonLabel="Open Settings"
-                      onAction={openScreenRecording}
-                    />
-                    <PermissionRow
-                      icon={MousePointerClick}
-                      label="Accessibility"
-                      description="Required to track keyboard & mouse activity"
-                      granted={accessibilityPermission}
-                      buttonLabel="Grant Access"
-                      onAction={requestAccessibility}
-                    />
-                  </div>
-                </div>
-
-                {/* Re-run setup link */}
-                <div
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div
+                style={{
+                  paddingBottom: 16,
+                  borderBottom: "var(--border-hairline)",
+                }}
+              >
+                <h2
                   style={{
-                    borderTop: "0.5px solid rgba(var(--ui-rgb), 0.10)",
-                    paddingTop: 16,
+                    fontSize: 16,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    margin: 0,
                   }}
                 >
-                  <button
-                    onClick={async () => {
-                      if (user?.id) {
-                        await window.consoleAPI?.resetOnboarding(user.id);
-                        navigate("/onboarding");
-                      }
-                    }}
-                    style={{
-                      fontSize: 13,
-                      color: "var(--mi-accent)",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--mi-accent-light)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--mi-accent)")}
-                  >
-                    Re-run setup &rarr;
-                  </button>
-                </div>
+                  macOS Permissions
+                </h2>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
+                  Mitable needs these permissions to capture your work
+                </p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <PermissionRow
+                  variant="settings"
+                  icon={Monitor}
+                  label="Screen Recording"
+                  description="Required to capture screenshots"
+                  granted={screenPermission === "granted"}
+                  buttonLabel="Open Settings"
+                  onAction={openScreenRecording}
+                />
+                <div style={{ height: 0.5, background: "var(--divider)" }} />
+                <PermissionRow
+                  variant="settings"
+                  icon={MousePointerClick}
+                  label="Accessibility"
+                  description="Required to track keyboard & mouse activity"
+                  granted={accessibilityPermission}
+                  buttonLabel="Grant Access"
+                  onAction={requestAccessibility}
+                />
+              </div>
+
+              {/* Re-run setup link */}
+              <div
+                style={{
+                  borderTop: "var(--border-hairline)",
+                  paddingTop: 14,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (user?.id) {
+                      await window.consoleAPI?.resetOnboarding(user.id);
+                      navigate("/onboarding");
+                    }
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    textDecoration: "none",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                    fontFamily: "inherit",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "var(--text-primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                  }}
+                >
+                  Re-run setup
+                  <ChevronRight size={12} strokeWidth={1.5} />
+                </button>
               </div>
             </div>
           )}
@@ -2595,6 +2615,7 @@ export default function UserProfilePage() {
                   ) : (
                     <Switch
                       id="show-pill-toggle-profile"
+                      size="sm"
                       checked={showPillOnSessionStart}
                       onCheckedChange={async (checked) => {
                         const result = await updatePreference("showPillOnSessionStart", checked);
@@ -2636,6 +2657,7 @@ export default function UserProfilePage() {
                   ) : (
                     <Switch
                       id="hide-pill-toggle-profile"
+                      size="sm"
                       checked={hidePillOnSessionEnd}
                       onCheckedChange={async (checked) => {
                         const result = await updatePreference("hidePillOnSessionEnd", checked);
@@ -2678,6 +2700,7 @@ export default function UserProfilePage() {
                   ) : (
                     <Switch
                       id="pill-display-mode"
+                      size="sm"
                       checked={pillDisplayMode === "expanded"}
                       onCheckedChange={(checked) =>
                         handlePillDisplayModeChange(checked ? "expanded" : "compact")
@@ -2743,6 +2766,7 @@ export default function UserProfilePage() {
                   ) : (
                     <Switch
                       id="passive-monitoring-toggle"
+                      size="sm"
                       checked={passiveMonitoring}
                       onCheckedChange={handlePassiveMonitoringChange}
                       className="flex-shrink-0"
@@ -2769,6 +2793,7 @@ export default function UserProfilePage() {
                   ) : (
                     <Switch
                       id="auto-recap-toggle-profile"
+                      size="sm"
                       checked={autoRecap}
                       onCheckedChange={handleAutoRecapChange}
                       className="flex-shrink-0"
@@ -2854,21 +2879,22 @@ export default function UserProfilePage() {
                         </p>
                       </div>
 
-                      {/* System Audio Toggle */}
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5 flex-1 pr-4">
+                      {/* System Audio Toggle — extra vertical rhythm vs dropdown block above / source below */}
+                      <div className="flex items-center justify-between pt-6 border-t border-border-subtle">
+                        <div className="space-y-1 flex-1 pr-4">
                           <Label
                             htmlFor="system-audio-toggle"
                             className="text-sm font-medium text-text-primary cursor-pointer"
                           >
                             Capture System Audio
                           </Label>
-                          <p className="text-xs text-text-tertiary">
+                          <p className="text-xs text-text-tertiary leading-relaxed">
                             Record audio from apps (Zoom, Slack, browser audio, etc.)
                           </p>
                         </div>
                         <Switch
                           id="system-audio-toggle"
+                          size="sm"
                           checked={systemAudioEnabled}
                           onCheckedChange={handleSystemAudioToggle}
                           className="flex-shrink-0"
@@ -2877,7 +2903,7 @@ export default function UserProfilePage() {
 
                       {/* System Audio Output Device Selection - only show when enabled */}
                       {systemAudioEnabled && (
-                        <div className="space-y-2">
+                        <div className="space-y-2 mt-6">
                           <Label className="text-sm font-medium text-text-primary">
                             System Audio Source
                           </Label>
@@ -2976,105 +3002,6 @@ export default function UserProfilePage() {
                 </div>
               </div>
 
-              {/* Organization Settings Section (Admin Only) */}
-              {isAdmin && (
-                <div style={{ marginTop: 32 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                    <div
-                      style={{
-                        paddingBottom: 16,
-                        borderBottom: "var(--border-hairline)",
-                      }}
-                    >
-                      <h2
-                        style={{
-                          fontSize: 16,
-                          fontWeight: 500,
-                          color: "var(--text-primary)",
-                          margin: 0,
-                        }}
-                      >
-                        Organization Settings
-                      </h2>
-                      <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
-                        Configure settings that apply to all users in your organization
-                      </p>
-                    </div>
-
-                    {/* Region Variant Selector */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
-                          <Globe size={18} className="text-emerald-400" />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-medium text-text-primary">
-                            Region Variant
-                          </Label>
-                          <p className="text-xs text-text-tertiary">
-                            Customize UI labels based on your region. Changes terminology for
-                            Documents and Artifacts across the application.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0">
-                        {isOrgSettingsLoading ? (
-                          <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
-                        ) : (
-                          <Select
-                            value={currentVariant}
-                            onValueChange={(v) => {
-                              updateOrgSettings(
-                                { variant: v as OrgVariant },
-                                {
-                                  onSuccess: () => {
-                                    toast({
-                                      title: "Region updated",
-                                      description: `UI labels changed to ${v === "nigeria" ? "Nigeria" : "Global"} variant`,
-                                    });
-                                  },
-                                  onError: () => {
-                                    toast({
-                                      title: "Error",
-                                      description: "Failed to update region setting",
-                                      variant: "destructive",
-                                    });
-                                  },
-                                }
-                              );
-                            }}
-                            disabled={isUpdatingOrgSettings}
-                          >
-                            <SelectTrigger className="w-[200px] h-10 text-sm bg-background-elevated border-border-subtle">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {VARIANT_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  <div>
-                                    <span className="font-medium">{option.label}</span>
-                                    <p className="text-xs text-text-tertiary">
-                                      {option.description}
-                                    </p>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Info note */}
-                    <p className="text-xs text-text-tertiary bg-background-elevated rounded-lg p-3 border border-border-subtle">
-                      <span className="font-medium text-text-secondary">Note:</span> Changing the
-                      region variant will update UI labels for all users in your organization.
-                      Underlying data and functionality remain the same.
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -3768,111 +3695,218 @@ export default function UserProfilePage() {
             </div>
           )}
 
-          {/* Update Tab */}
+          {/* Update Tab — same row pattern as Integrations */}
           {activeTab === "update" && (
-            <div
-              style={{
-                padding: 20,
-                borderRadius: 8,
-                border: "var(--border-hairline)",
-                background: "rgba(var(--ui-rgb), 0.02)",
-              }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <RefreshCw className="w-6 h-6 text-primary" />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-text-primary">Mitable</h3>
-                  <p className="text-sm text-text-tertiary">Version {appVersion || "..."}</p>
-                </div>
-
-                <ShadcnButton
-                  onClick={
-                    updateStatus === "available"
-                      ? handleDownloadUpdate
-                      : updateStatus === "downloaded"
-                        ? handleInstallUpdate
-                        : handleCheckForUpdates
-                  }
-                  disabled={isCheckingForUpdates || updateStatus === "downloading"}
-                  variant={updateStatus === "downloaded" ? "default" : "outline"}
-                  className={
-                    updateStatus === "downloaded"
-                      ? "gap-2 bg-primary hover:bg-primary/90 text-white"
-                      : "gap-2 border-border-subtle bg-background-elevated text-text-primary hover:bg-background-tertiary hover:text-white"
-                  }
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div
+                style={{
+                  paddingBottom: 16,
+                  borderBottom: "var(--border-hairline)",
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    margin: 0,
+                  }}
                 >
-                  {isCheckingForUpdates ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Checking...
-                    </>
-                  ) : updateStatus === "up-to-date" ? (
-                    <>
-                      <Check className="w-4 h-4 text-green-400" />
-                      Up to date
-                    </>
-                  ) : updateStatus === "available" ? (
-                    <>
-                      <Download className="w-4 h-4" />
-                      Download v{availableVersion}
-                    </>
-                  ) : updateStatus === "downloading" ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Downloading...
-                    </>
-                  ) : updateStatus === "downloaded" ? (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      Install & Restart
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      Check for Updates
-                    </>
-                  )}
-                </ShadcnButton>
+                  Update
+                </h2>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
+                  Check for new releases and install updates when available
+                </p>
               </div>
 
-              {/* Download Progress Bar */}
-              {updateStatus === "downloading" && downloadProgress && (
-                <div className="mt-4 space-y-2">
-                  <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-300 ease-out"
-                      style={{ width: `${downloadProgress.percent}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-text-tertiary">
-                    {downloadProgress.percent.toFixed(0)}% —{" "}
-                    {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
-                    {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
-                  </p>
-                </div>
-              )}
-
-              {/* Error State */}
-              {updateStatus === "error" && updateError && (
-                <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <p className="text-sm text-red-400">{updateError}</p>
-                </div>
-              )}
-
-              {/* Release Notes Link */}
-              <div className="mt-4 pt-4 border-t border-border-subtle">
-                <a
-                  href="https://github.com/Febchuk/mitable/releases"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "14px 0",
+                  }}
                 >
-                  View release notes
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 8,
+                      background: "var(--bg-overlay)",
+                      border: "var(--border-subtle)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <MitableLogoMark size={20} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        lineHeight: 1,
+                      }}
+                    >
+                      Mitable
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-tertiary)",
+                        marginTop: 4,
+                        lineHeight: 1,
+                      }}
+                    >
+                      Version {appVersion || "…"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={
+                      updateStatus === "available"
+                        ? handleDownloadUpdate
+                        : updateStatus === "downloaded"
+                          ? handleInstallUpdate
+                          : handleCheckForUpdates
+                    }
+                    disabled={isCheckingForUpdates || updateStatus === "downloading"}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      background: "rgba(var(--ui-rgb), 0.06)",
+                      border: "var(--border-subtle)",
+                      cursor:
+                        isCheckingForUpdates || updateStatus === "downloading"
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity: isCheckingForUpdates || updateStatus === "downloading" ? 0.6 : 1,
+                      transition: "background 0.15s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isCheckingForUpdates && updateStatus !== "downloading") {
+                        e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.1)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+                    }}
+                  >
+                    {isCheckingForUpdates ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Checking…
+                      </>
+                    ) : updateStatus === "up-to-date" ? (
+                      "Up to date"
+                    ) : updateStatus === "available" ? (
+                      <>
+                        <Download size={12} strokeWidth={2} />
+                        Download v{availableVersion}
+                      </>
+                    ) : updateStatus === "downloading" ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Downloading…
+                      </>
+                    ) : updateStatus === "downloaded" ? (
+                      <>
+                        <RefreshCw size={12} strokeWidth={2} />
+                        Install and restart
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={12} strokeWidth={2} />
+                        Search for new updates
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {(updateStatus === "downloading" && downloadProgress) ||
+                (updateStatus === "error" && updateError) ? (
+                  <>
+                    <div style={{ height: 0.5, background: "var(--divider)" }} />
+                    <div style={{ padding: "14px 0" }}>
+                      {updateStatus === "downloading" && downloadProgress && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div
+                            style={{
+                              height: 3,
+                              borderRadius: 2,
+                              overflow: "hidden",
+                              background: "rgba(var(--ui-rgb), 0.06)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                borderRadius: 2,
+                                width: `${downloadProgress.percent}%`,
+                                background: "rgba(var(--ui-rgb), 0.2)",
+                                transition: "width 0.3s ease-out",
+                              }}
+                            />
+                          </div>
+                          <p style={{ margin: 0, fontSize: 11, color: "var(--text-tertiary)" }}>
+                            {downloadProgress.percent.toFixed(0)}% —{" "}
+                            {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
+                            {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
+                          </p>
+                        </div>
+                      )}
+                      {updateStatus === "error" && updateError && (
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 12,
+                            color: "var(--status-error)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {updateError}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+
+                <div style={{ height: 0.5, background: "var(--divider)" }} />
+                <div style={{ paddingTop: 14 }}>
+                  <a
+                    href="https://github.com/Febchuk/mitable/releases"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
+                      textDecoration: "none",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "var(--text-primary)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "var(--text-secondary)";
+                    }}
+                  >
+                    View release notes
+                    <ExternalLink size={12} strokeWidth={1.5} />
+                  </a>
+                </div>
               </div>
             </div>
           )}
