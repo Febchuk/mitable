@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Shield } from "lucide-react";
+import { Search } from "lucide-react";
 import { useUsers } from "@/console/src/hooks/queries/admin";
 import { apiRequest } from "@/console/src/services/api";
 import { useQueryClient } from "@tanstack/react-query";
@@ -67,12 +67,9 @@ export default function PermissionsTab() {
   return (
     <div style={{ padding: "24px 32px" }}>
       {/* Section header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <Shield size={16} style={{ color: "var(--text-secondary)" }} />
-        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-          User Permissions
-        </h2>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "0 0 6px", letterSpacing: "-0.2px" }}>
+        User Permissions
+      </h2>
       <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>
         Control which users can see org-wide data in the Team view.
       </p>

@@ -1,4 +1,3 @@
-import { Globe, BarChart3 } from "lucide-react";
 import {
   useOrganizationSettings,
   useUpdateOrganizationSettings,
@@ -105,12 +104,9 @@ export default function SetupView() {
   return (
     <div style={{ padding: "24px 32px" }}>
       {/* Region Variant section */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <Globe size={16} style={{ color: "var(--text-secondary)" }} />
-        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-          Region Variant
-        </h2>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "0 0 6px", letterSpacing: "-0.2px" }}>
+        Region Variant
+      </h2>
       <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>
         Customize UI labels based on your region. Changes the terminology for features like
         Documents and Artifacts.
@@ -164,20 +160,9 @@ export default function SetupView() {
       </div>
 
       {/* Dashboard Panels section */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          marginTop: 32,
-          marginBottom: 6,
-        }}
-      >
-        <BarChart3 size={16} style={{ color: "var(--text-secondary)" }} />
-        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-          Dashboard Panels
-        </h2>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "32px 0 6px", letterSpacing: "-0.2px" }}>
+        Dashboard Panels
+      </h2>
       <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>
         Choose which breakdowns appear on the dashboard.
       </p>
