@@ -90,7 +90,11 @@ export default function OrgSetupView() {
       <div style={{ flex: 1, overflowY: "auto" }}>
         {activeSection === "general" && <SetupView />}
         {activeSection === "permissions" && <PermissionsTab />}
-        {activeSection === "org-chart" && <OrgChartView />}
+        {activeSection === "org-chart" && (
+          <div style={{ padding: "24px 32px" }}>
+            <OrgChartView />
+          </div>
+        )}
       </div>
     </div>
   );
