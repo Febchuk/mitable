@@ -15,8 +15,8 @@ export default function Nav({ viewMode }: NavProps) {
         <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
         <NavItem to="/people" icon={Users} label="People" />
         <NavItem to="/benchmarks" icon={Target} label="Benchmarks" />
-        <NavItem to="/reports" icon={BarChart2} label="Reports" />
-        <NavItem to="/agent" icon={MitableIcon} label="Agent" />
+        {/* <NavItem to="/reports" icon={BarChart2} label="Reports" /> */}
+        {/* <NavItem to="/agent" icon={MitableIcon} label="Agent" /> */}
       </>
     );
   }
@@ -31,7 +31,7 @@ export default function Nav({ viewMode }: NavProps) {
       </NavGroup>
       <NavItem to="/agent" icon={MitableIcon} label="Agent" />
       <NavItem to="/docs" icon={FileText} label="Docs" />
-      <NavItem to="/uploads" icon={Download} label="Uploads" />
+      {/* <NavItem to="/uploads" icon={Download} label="Uploads" /> */}
     </>
   );
 }
