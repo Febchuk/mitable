@@ -1,8 +1,11 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef } from "react";
+import React, { type ReactNode, useEffect, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import type { MockupVariant } from "./mockups/colors";
 import { MacWindow } from "./mockups/mac-window";
+import { MobileMockupClip } from "./mockups/mobile-mockup-clip";
 
 const C = {
     text: "var(--l-text, #ECE8E0)",
@@ -14,6 +17,7 @@ const C = {
 
 interface FeatureSectionProps {
     id?: string;
+    stepNumber?: number;
     title: string;
     description: string;
     linkText: string;
@@ -24,10 +28,12 @@ interface FeatureSectionProps {
     mockup?: ReactNode;
     /** Render mockup without MacWindow wrapper */
     rawMockup?: boolean;
+    variant?: MockupVariant;
 }
 
 export const FeatureSection = ({
     id,
+    stepNumber,
     title,
     description,
     linkText,
@@ -37,6 +43,7 @@ export const FeatureSection = ({
     screenshotAlt = "Feature screenshot",
     mockup,
     rawMockup = false,
+    variant = "dark",
 }: FeatureSectionProps) => {
     const ref = useRef<HTMLElement>(null);
 
@@ -57,7 +64,22 @@ export const FeatureSection = ({
     }, []);
 
     const textBlock = (
-        <div style={{ fontFamily: C.sans }}>
+        <div className="l-feature-text" style={{ fontFamily: C.sans }}>
+            {stepNumber != null && (
+                <div
+                    style={{
+                        fontFamily: C.sans,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase" as const,
+                        color: C.accent,
+                        marginBottom: 10,
+                    }}
+                >
+                    Step {stepNumber}
+                </div>
+            )}
             <h2
                 style={{
                     fontFamily: C.serif,
@@ -84,7 +106,7 @@ export const FeatureSection = ({
             >
                 {description}
             </p>
-            <a
+            <Link
                 href={linkHref}
                 style={{
                     color: C.accent,
@@ -93,20 +115,20 @@ export const FeatureSection = ({
                     fontWeight: 500,
                     transition: "opacity 0.2s",
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
                     e.currentTarget.style.opacity = "0.75";
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
                     e.currentTarget.style.opacity = "1";
                 }}
             >
                 {linkText}
-            </a>
+            </Link>
         </div>
     );
 
-    const visualBlock = (
-        <div style={{ overflow: "visible" }}>
+    const desktopVisual = (
+        <div className="l-feature-visual-desktop" style={{ overflow: "visible" }}>
             {screenshot ? (
                 <div
                     style={{
@@ -137,11 +159,19 @@ export const FeatureSection = ({
                 rawMockup ? (
                     mockup
                 ) : (
-                    <MacWindow>{mockup}</MacWindow>
+                    <MacWindow variant={variant}>{mockup}</MacWindow>
                 )
             ) : null}
         </div>
     );
+
+    const mobileVisual = mockup ? (
+        <div className="l-feature-visual-mobile">
+            <MobileMockupClip variant={variant} raw={rawMockup}>
+                {mockup}
+            </MobileMockupClip>
+        </div>
+    ) : null;
 
     return (
         <section
@@ -163,15 +193,16 @@ export const FeatureSection = ({
         >
             {reverse ? (
                 <>
-                    {visualBlock}
+                    {desktopVisual}
                     {textBlock}
                 </>
             ) : (
                 <>
                     {textBlock}
-                    {visualBlock}
+                    {desktopVisual}
                 </>
             )}
+            {mobileVisual}
         </section>
     );
 };
