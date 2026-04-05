@@ -218,6 +218,21 @@ export const config = {
     fromAddress: (process.env.RESEND_FROM_ADDRESS || "Mitable AI <noreply@mitable.ai>").trim(),
   },
 
+  // In-app feedback emails (Resend `to` / `cc`); defaults match prior hardcoded recipients
+  feedback: {
+    emailTo: (process.env.FEEDBACK_EMAIL_TO || "mikun@mitable.ai").trim(),
+    /** Comma-separated CC list; empty env uses febe + aurel */
+    emailCcList: ((): string[] => {
+      const raw = process.env.FEEDBACK_EMAIL_CC;
+      if (!raw?.trim()) return ["febe@mitable.ai", "aurel@mitable.ai"];
+      const parts = raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return parts.length > 0 ? parts : ["febe@mitable.ai", "aurel@mitable.ai"];
+    })(),
+  },
+
   // Railway Public API (GraphQL) — feedback: pull recent backend logs for the reporting user
   railway: {
     /** Account or workspace token — Authorization: Bearer (RAILWAY_TOKEN is what Railway UI often suggests) */

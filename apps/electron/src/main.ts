@@ -16,14 +16,6 @@ import {
   shell,
   systemPreferences,
 } from "electron";
-import {
-  appendFileSync,
-  existsSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
 import { dirname, join } from "path";
 import electronLogMain from "electron-log/main";
 import { initActiveWindowBridge } from "./main/activeWindowBridge";
@@ -2977,6 +2969,7 @@ app.whenReady().then(async () => {
   // Feedback: main.log tail + renderer.log (DevTools/console stream persisted on disk next to main.log)
   const FEEDBACK_MAIN_LOG_TAIL_LINES = 10_000;
   const FEEDBACK_RENDERER_LOG_TAIL_LINES = 10_000;
+  const MAIN_LOG_READ_MAX_BYTES = 4 * 1024 * 1024;
   const RENDERER_LOG_MAX_BYTES = 12 * 1024 * 1024;
   const RENDERER_LOG_READ_MAX_BYTES = 6 * 1024 * 1024;
 
@@ -2989,24 +2982,31 @@ app.whenReady().then(async () => {
   ipcMain.on(IPC_CHANNELS.FEEDBACK_APPEND_RENDERER_LOG, (_event, chunk: unknown) => {
     if (typeof chunk !== "string" || chunk.length === 0) return;
     if (chunk.length > 1_500_000) return;
-    try {
-      const rPath = getRendererLogPath();
-      if (!rPath) return;
-      appendFileSync(rPath, chunk, "utf8");
-      const st = statSync(rPath);
-      if (st.size > RENDERER_LOG_MAX_BYTES) {
-        const bak = `${rPath}.1`;
-        if (existsSync(bak)) unlinkSync(bak);
-        renameSync(rPath, bak);
-        writeFileSync(
-          rPath,
-          `${new Date().toISOString()} [console.log] [renderer] Older lines rotated to renderer.log.1 (size cap)\n`,
-          "utf8"
-        );
+    void (async () => {
+      try {
+        const fsp = await import("fs/promises");
+        const rPath = getRendererLogPath();
+        if (!rPath) return;
+        await fsp.appendFile(rPath, chunk, "utf8");
+        const st = await fsp.stat(rPath);
+        if (st.size > RENDERER_LOG_MAX_BYTES) {
+          const bak = `${rPath}.1`;
+          try {
+            await fsp.unlink(bak);
+          } catch {
+            /* no prior backup */
+          }
+          await fsp.rename(rPath, bak);
+          await fsp.writeFile(
+            rPath,
+            `${new Date().toISOString()} [console.log] [renderer] Older lines rotated to renderer.log.1 (size cap)\n`,
+            "utf8"
+          );
+        }
+      } catch {
+        /* avoid breaking renderer */
       }
-    } catch {
-      /* avoid breaking renderer */
-    }
+    })();
   });
 
   ipcMain.handle(IPC_CHANNELS.FEEDBACK_GET_LOGS, async () => {
@@ -3017,9 +3017,31 @@ app.whenReady().then(async () => {
       }
 
       const fsp = await import("fs/promises");
-      const content = await fsp.readFile(mainPath, "utf-8");
-      const lines = content.split("\n");
-      const mainTail = lines.slice(-FEEDBACK_MAIN_LOG_TAIL_LINES).join("\n");
+
+      let mainContent = "";
+      const stMain = await fsp.stat(mainPath).catch(() => null);
+      if (stMain && stMain.size > 0) {
+        if (stMain.size <= MAIN_LOG_READ_MAX_BYTES) {
+          mainContent = await fsp.readFile(mainPath, "utf-8");
+        } else {
+          const fh = await fsp.open(mainPath, "r");
+          try {
+            const start = Number(stMain.size) - MAIN_LOG_READ_MAX_BYTES;
+            const buf = Buffer.alloc(MAIN_LOG_READ_MAX_BYTES);
+            await fh.read(buf, 0, MAIN_LOG_READ_MAX_BYTES, start);
+            let s = buf.toString("utf8");
+            const nl = s.indexOf("\n");
+            if (nl !== -1) s = s.slice(nl + 1);
+            mainContent =
+              `...[main.log: last ~${Math.round(MAIN_LOG_READ_MAX_BYTES / 1024)}KB of file]\n\n` +
+              s;
+          } finally {
+            await fh.close();
+          }
+        }
+      }
+      const mainLines = mainContent.split("\n");
+      const mainTail = mainLines.slice(-FEEDBACK_MAIN_LOG_TAIL_LINES).join("\n");
 
       let rendererLogs = "";
       const rPath = getRendererLogPath();

@@ -2,8 +2,10 @@ import { Router, Request, Response } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { Resend } from "resend";
 import { requireAuth } from "../middleware/auth.js";
+import { feedbackLimiter } from "../middleware/rateLimiter.js";
 import { config } from "../config.js";
 import { createLogger } from "../lib/logger.js";
+import { sanitizeFeedbackLogs } from "../lib/feedback-log-sanitize.js";
 import { fetchBackendLogsForFeedbackUser } from "../services/railway-logs.service.js";
 
 const logger = createLogger({ context: "feedback" });
@@ -13,9 +15,6 @@ const resend = config.resend.apiKey ? new Resend(config.resend.apiKey) : null;
 const anthropic = config.anthropic.apiKey
   ? new Anthropic({ apiKey: config.anthropic.apiKey })
   : null;
-
-const FEEDBACK_TO_PRIMARY = "mikun@mitable.ai";
-const FEEDBACK_CC = ["febe@mitable.ai", "aurel@mitable.ai"] as const;
 
 const MAX_AGENT_TURNS = 8;
 
@@ -254,7 +253,7 @@ function tailLogLines(text: string, maxLines: number): string {
   return lines.slice(-maxLines).join("\n");
 }
 
-router.post("/", requireAuth, async (req: Request, res: Response) => {
+router.post("/", requireAuth, feedbackLimiter, async (req: Request, res: Response) => {
   try {
     const { message, mainLogs, rendererLogs, logs, userEmail, userName } = req.body;
 
@@ -287,9 +286,13 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         ? tailLogLines(rendererLogs, FEEDBACK_CLIENT_LOG_MAX_LINES)
         : "";
 
+    const mainSanitized = sanitizeFeedbackLogs(mainRaw);
+    const rendererSanitized = sanitizeFeedbackLogs(rendererRaw);
+
     const clientBundleForAgent = [
-      mainRaw.trim() && `=== Main process (main.log) ===\n${mainRaw.trim()}`,
-      rendererRaw.trim() && `=== Renderer (renderer.log / DevTools) ===\n${rendererRaw.trim()}`,
+      mainSanitized.trim() && `=== Main process (main.log) ===\n${mainSanitized.trim()}`,
+      rendererSanitized.trim() &&
+        `=== Renderer (renderer.log / DevTools) ===\n${rendererSanitized.trim()}`,
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -302,10 +305,15 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         logger.warn({ error: String(err), userId: req.userId }, "Server log fetch failed");
       }
     }
+    const serverSanitized = sanitizeFeedbackLogs(serverLogsRaw);
 
     let logAnalysis = "";
-    if (clientBundleForAgent.length > 0 || serverLogsRaw.length > 0) {
-      logAnalysis = await analyzeFeedbackLogs(message.trim(), clientBundleForAgent, serverLogsRaw);
+    if (clientBundleForAgent.length > 0 || serverSanitized.length > 0) {
+      logAnalysis = await analyzeFeedbackLogs(
+        message.trim(),
+        clientBundleForAgent,
+        serverSanitized
+      );
     }
 
     const isProdFeedback = config.nodeEnv === "production";
@@ -373,11 +381,11 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
             }
 
             ${
-              mainRaw.trim() || rendererRaw.trim()
-                ? '<p style="margin:16px 0 0;font-size:12px;color:#64748b;line-height:1.5;">Attachments when present: <strong>main process</strong> (main.log, up to 10k lines) and <strong>renderer</strong> (renderer.log / DevTools, up to 10k lines), separate files.</p>'
+              mainSanitized.trim() || rendererSanitized.trim()
+                ? '<p style="margin:16px 0 0;font-size:12px;color:#64748b;line-height:1.5;">Attachments when present: <strong>main process</strong> (main.log, up to 10k lines) and <strong>renderer</strong> (renderer.log / DevTools, up to 10k lines), separate files. Sensitive patterns redacted.</p>'
                 : ""
             }
-            ${serverLogsRaw ? '<p style="margin:8px 0 0;font-size:12px;color:#64748b;line-height:1.5;">Server log excerpt (local dev capture or Railway in prod, user-scoped) attached when present.</p>' : ""}
+            ${serverSanitized ? '<p style="margin:8px 0 0;font-size:12px;color:#64748b;line-height:1.5;">Server log excerpt (local dev capture or Railway in prod, user-scoped) attached when present.</p>' : ""}
             ${emailSignature}
           </td>
         </tr>
@@ -388,29 +396,32 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     `;
 
     const attachments: { filename: string; content: Buffer }[] = [];
-    if (mainRaw.trim()) {
+    if (mainSanitized.trim()) {
       attachments.push({
         filename: `mitable-main-process-${Date.now()}.txt`,
-        content: Buffer.from(mainRaw, "utf-8"),
+        content: Buffer.from(mainSanitized, "utf-8"),
       });
     }
-    if (rendererRaw.trim()) {
+    if (rendererSanitized.trim()) {
       attachments.push({
         filename: `mitable-renderer-${Date.now()}.txt`,
-        content: Buffer.from(rendererRaw, "utf-8"),
+        content: Buffer.from(rendererSanitized, "utf-8"),
       });
     }
-    if (serverLogsRaw) {
+    if (serverSanitized) {
       attachments.push({
         filename: `mitable-server-logs-${Date.now()}.txt`,
-        content: Buffer.from(serverLogsRaw, "utf-8"),
+        content: Buffer.from(serverSanitized, "utf-8"),
       });
     }
 
+    const feedbackTo = config.feedback.emailTo || "mikun@mitable.ai";
+    const feedbackCc = config.feedback.emailCcList;
+
     const { error } = await resend.emails.send({
       from: config.resend.fromAddress,
-      to: FEEDBACK_TO_PRIMARY,
-      cc: [...FEEDBACK_CC],
+      to: feedbackTo,
+      ...(feedbackCc.length > 0 ? { cc: feedbackCc } : {}),
       subject,
       html: htmlBody,
       attachments,
