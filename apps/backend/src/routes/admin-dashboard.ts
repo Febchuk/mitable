@@ -12,7 +12,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, desc, asc, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requireManagerOrAdmin, requireAccessToUser } from "../middleware/authorization.js";
+import { requireManagerOrAdmin, requireAccessToUser, getScopedVisibleUserIds } from "../middleware/authorization.js";
 import { createLogger } from "../lib/logger";
 import { normalizeName } from "../services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -162,9 +162,10 @@ interface LiveOrgMetrics {
 
 async function computeLiveOrgMetrics(
   organizationId: string,
-  dateStr: string
+  dateStr: string,
+  scopedUserIds?: string[]
 ): Promise<LiveOrgMetrics | null> {
-  // Fetch all user daily activities for this org on this date
+  // Fetch user daily activities — scoped to specific users if provided, else org-wide
   const userRows = await db
     .select({
       userId: schema.userDailyActivities.userId,
@@ -181,7 +182,9 @@ async function computeLiveOrgMetrics(
     .from(schema.userDailyActivities)
     .where(
       and(
-        eq(schema.userDailyActivities.organizationId, organizationId),
+        scopedUserIds
+          ? inArray(schema.userDailyActivities.userId, scopedUserIds)
+          : eq(schema.userDailyActivities.organizationId, organizationId),
         eq(schema.userDailyActivities.activityDate, dateStr),
         eq(schema.userDailyActivities.periodType, "daily")
       )
@@ -318,8 +321,8 @@ async function computeLiveOrgMetrics(
 // ============================================================================
 router.get("/dashboard", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+    // Resolve scoped user IDs based on ?scope param (direct/all-reports/org-wide)
+    const scopedUserIds = await getScopedVisibleUserIds(req);
 
     const period = (req.query.period as string) || "yesterday";
     const { startDate, endDate } = resolveDateRange(period);
@@ -328,7 +331,7 @@ router.get("/dashboard", requireAuth, requireManagerOrAdmin, async (req: Request
     // ── Single-day views (today/yesterday) — compute live from user_daily_activities ──
     if (period === "today" || period === "yesterday") {
       const targetDate = period === "today" ? todayStr : startDate;
-      const live = await computeLiveOrgMetrics(admin.organizationId, targetDate);
+      const live = await computeLiveOrgMetrics(req.organizationId!, targetDate, scopedUserIds);
 
       if (!live) {
         res.json({
@@ -406,7 +409,7 @@ router.get("/dashboard", requireAuth, requireManagerOrAdmin, async (req: Request
       .from(schema.userDailyActivities)
       .where(
         and(
-          eq(schema.userDailyActivities.organizationId, admin.organizationId),
+          inArray(schema.userDailyActivities.userId, scopedUserIds),
           eq(schema.userDailyActivities.periodType, "daily"),
           gte(schema.userDailyActivities.activityDate, startDate),
           lte(schema.userDailyActivities.activityDate, endDate)
@@ -628,50 +631,54 @@ router.get("/dashboard", requireAuth, requireManagerOrAdmin, async (req: Request
 // ============================================================================
 router.get("/dashboard/people", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const admin = await verifyAdmin(req, res);
-    if (!admin) return;
+    // Resolve scoped user IDs based on ?scope param
+    const scopedUserIds = await getScopedVisibleUserIds(req);
 
-    // Step 1: Fetch ALL users in the org (regardless of activity)
-    const orgUsers = await db
-      .select({
-        id: schema.users.id,
-        firstName: schema.users.firstName,
-        lastName: schema.users.lastName,
-        email: schema.users.email,
-        role: schema.users.role,
-        jobTitle: schema.users.jobTitle,
-        avatarUrl: schema.users.avatarUrl,
-        status: schema.users.status,
-        createdAt: schema.users.createdAt,
-      })
-      .from(schema.users)
-      .where(eq(schema.users.organizationId, admin.organizationId))
-      .orderBy(asc(schema.users.firstName));
+    // Step 1: Fetch users scoped to visible set
+    const orgUsers = scopedUserIds.length > 0
+      ? await db
+          .select({
+            id: schema.users.id,
+            firstName: schema.users.firstName,
+            lastName: schema.users.lastName,
+            email: schema.users.email,
+            role: schema.users.role,
+            jobTitle: schema.users.jobTitle,
+            avatarUrl: schema.users.avatarUrl,
+            status: schema.users.status,
+            createdAt: schema.users.createdAt,
+          })
+          .from(schema.users)
+          .where(inArray(schema.users.id, scopedUserIds))
+          .orderBy(asc(schema.users.firstName))
+      : [];
 
-    // Step 2a: Fetch daily activities for this org (last 90 days)
+    // Step 2a: Fetch daily activities for scoped users (last 90 days)
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const activitiesCutoff = ninetyDaysAgo.toISOString().slice(0, 10);
 
-    const activities = await db
-      .select({
-        userId: schema.userDailyActivities.userId,
-        activityDate: schema.userDailyActivities.activityDate,
-        totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
-        totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
-        totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
-        appBreakdown: schema.userDailyActivities.appBreakdown,
-        categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
-      })
-      .from(schema.userDailyActivities)
-      .where(
-        and(
-          eq(schema.userDailyActivities.organizationId, admin.organizationId),
-          eq(schema.userDailyActivities.periodType, "daily"),
-          gte(schema.userDailyActivities.activityDate, activitiesCutoff)
-        )
-      )
-      .orderBy(desc(schema.userDailyActivities.activityDate));
+    const activities = scopedUserIds.length > 0
+      ? await db
+          .select({
+            userId: schema.userDailyActivities.userId,
+            activityDate: schema.userDailyActivities.activityDate,
+            totalWorkMinutes: schema.userDailyActivities.totalWorkMinutes,
+            totalMeetingMinutes: schema.userDailyActivities.totalMeetingMinutes,
+            totalActiveMinutes: schema.userDailyActivities.totalActiveMinutes,
+            appBreakdown: schema.userDailyActivities.appBreakdown,
+            categoryBreakdown: schema.userDailyActivities.categoryBreakdown,
+          })
+          .from(schema.userDailyActivities)
+          .where(
+            and(
+              inArray(schema.userDailyActivities.userId, scopedUserIds),
+              eq(schema.userDailyActivities.periodType, "daily"),
+              gte(schema.userDailyActivities.activityDate, activitiesCutoff)
+            )
+          )
+          .orderBy(desc(schema.userDailyActivities.activityDate))
+      : [];
 
     // Step 2b: Fetch latest session per user for "Recent Highlight"
     const userIds = orgUsers.map((u) => u.id);
@@ -688,7 +695,7 @@ router.get("/dashboard/people", requireAuth, requireManagerOrAdmin, async (req: 
             .from(schema.monitoringSessions)
             .where(
               and(
-                eq(schema.monitoringSessions.organizationId, admin.organizationId),
+                inArray(schema.monitoringSessions.userId, userIds),
                 isNotNull(schema.monitoringSessions.endedAt)
               )
             )
@@ -721,7 +728,7 @@ router.get("/dashboard/people", requireAuth, requireManagerOrAdmin, async (req: 
             .from(schema.documents)
             .where(
               and(
-                eq(schema.documents.organizationId, admin.organizationId),
+                inArray(schema.documents.createdBy, userIds),
                 isNotNull(schema.documents.createdBy)
               )
             )
@@ -744,7 +751,7 @@ router.get("/dashboard/people", requireAuth, requireManagerOrAdmin, async (req: 
               updatedAt: schema.agentConversations.updatedAt,
             })
             .from(schema.agentConversations)
-            .where(eq(schema.agentConversations.organizationId, admin.organizationId))
+            .where(inArray(schema.agentConversations.userId, userIds))
             .orderBy(desc(schema.agentConversations.updatedAt))
         : [];
 
