@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import type { OrgVariant } from "@mitable/shared";
 
 const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }[] = [
@@ -25,6 +24,41 @@ const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }
     description: "Regional terminology: Reports, Uploads",
   },
 ];
+
+function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 36,
+        height: 20,
+        borderRadius: 10,
+        border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        position: "relative",
+        transition: "background 0.2s",
+        background: checked ? "var(--mi-accent)" : "rgba(var(--ui-rgb), 0.1)",
+        opacity: disabled ? 0.5 : 1,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: "white",
+          position: "absolute",
+          top: 2,
+          left: checked ? 18 : 2,
+          transition: "left 0.2s",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        }}
+      />
+    </button>
+  );
+}
 
 export default function SetupView() {
   const { data: orgSettings, isLoading, error } = useOrganizationSettings();
@@ -167,9 +201,9 @@ export default function SetupView() {
               Show time allocation by customer
             </div>
           </div>
-          <Switch
+          <ToggleSwitch
             checked={orgSettings?.settings?.showCustomerBreakdown !== false}
-            onCheckedChange={(checked) => updateSettings({ showCustomerBreakdown: checked })}
+            onChange={(checked) => updateSettings({ showCustomerBreakdown: checked })}
             disabled={isUpdating}
           />
         </div>
@@ -192,9 +226,9 @@ export default function SetupView() {
               Show time allocation by project
             </div>
           </div>
-          <Switch
+          <ToggleSwitch
             checked={orgSettings?.settings?.showTopicBreakdown !== false}
-            onCheckedChange={(checked) => updateSettings({ showTopicBreakdown: checked })}
+            onChange={(checked) => updateSettings({ showTopicBreakdown: checked })}
             disabled={isUpdating}
           />
         </div>
