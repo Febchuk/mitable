@@ -1017,18 +1017,18 @@ export default function OrgChartView() {
         }}
       >
         <div>
-          <h1
+          <h2
             style={{
               fontFamily: "var(--font-serif)",
-              fontSize: 26,
+              fontSize: 20,
               color: "var(--text-primary)",
               fontWeight: 400,
-              letterSpacing: "-0.3px",
+              letterSpacing: "-0.2px",
               margin: 0,
             }}
           >
             Org Chart
-          </h1>
+          </h2>
           <div
             style={{
               fontSize: 12,
