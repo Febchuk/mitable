@@ -1,4 +1,3 @@
-import { Settings, Globe, Check, BarChart3 } from "lucide-react";
 import {
   useOrganizationSettings,
   useUpdateOrganizationSettings,
@@ -10,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import type { OrgVariant } from "@mitable/shared";
 
 const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }[] = [
@@ -26,6 +24,41 @@ const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }
   },
 ];
 
+function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 36,
+        height: 20,
+        borderRadius: 10,
+        border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        position: "relative",
+        transition: "background 0.2s",
+        background: checked ? "rgba(var(--ui-rgb), 0.3)" : "rgba(var(--ui-rgb), 0.1)",
+        opacity: disabled ? 0.5 : 1,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: "white",
+          position: "absolute",
+          top: 2,
+          left: checked ? 18 : 2,
+          transition: "left 0.2s",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        }}
+      />
+    </button>
+  );
+}
+
 export default function SetupView() {
   const { data: orgSettings, isLoading, error } = useOrganizationSettings();
   const { mutate: updateSettings, isPending: isUpdating } = useUpdateOrganizationSettings();
@@ -38,167 +71,151 @@ export default function SetupView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[500px] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
-          </div>
-          <span className="text-ink-tertiary text-sm font-medium">Loading settings...</span>
-        </div>
+      <div style={{ padding: "64px 0", textAlign: "center" }}>
+        <div
+          className="animate-spin"
+          style={{
+            width: 24,
+            height: 24,
+            margin: "0 auto 12px",
+            borderRadius: "50%",
+            border: "2px solid rgba(var(--ui-rgb), 0.1)",
+            borderTopColor: "var(--text-secondary)",
+          }}
+        />
+        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading settings...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-[500px] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="text-red-400 text-sm">Failed to load organization settings</div>
-          <p className="text-ink-tertiary text-xs max-w-xs">
-            {error instanceof Error ? error.message : "Please try again later"}
-          </p>
+      <div style={{ padding: "64px 0", textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6 }}>
+          Failed to load organization settings
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+          {error instanceof Error ? error.message : "Please try again later"}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto app-no-drag">
-      <div className="px-8 pt-8 pb-6">
-        <div className="stagger-1">
-          {/* Header */}
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <h1 className="font-display text-3xl font-semibold text-ink-primary tracking-tight">
-                Setup
-              </h1>
-              <p className="text-ink-tertiary mt-1 text-sm">Configure your organization settings</p>
+    <div style={{ padding: "24px 32px" }}>
+      {/* Region Variant section */}
+      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "0 0 6px", letterSpacing: "-0.2px" }}>
+        Region Variant
+      </h2>
+      <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>
+        Customize UI labels based on your region. Changes the terminology for features like
+        Documents and Artifacts.
+      </p>
+
+      <div style={{ borderTop: "var(--border-hairline)" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 0",
+            borderBottom: "var(--border-hairline)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+              {orgSettings?.name || "Your organization"}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 3 }}>
+              Applies to all users in the organization
             </div>
           </div>
-
-          {/* Organization Settings Card */}
-          <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay p-6 mb-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo/10 border border-indigo/20">
-                <Settings size={20} className="text-indigo" />
-              </div>
-              <div>
-                <h2 className="font-display text-lg font-semibold text-ink-primary tracking-tight">
-                  Organization Settings
-                </h2>
-                <p className="text-ink-tertiary text-sm">
-                  {orgSettings?.name || "Your organization"}
-                </p>
-              </div>
-            </div>
-
-            {/* Variant Selector */}
-            <div className="space-y-4">
-              <div className="flex items-start gap-4 p-4 rounded-lg bg-canvas-muted/50 border border-stroke-subtle">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
-                  <Globe size={18} className="text-emerald-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-4 mb-2">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <Select
+              value={currentVariant}
+              onValueChange={(v) => handleVariantChange(v as OrgVariant)}
+              disabled={isUpdating}
+            >
+              <SelectTrigger style={{ width: 200, height: 32, fontSize: 13 }}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VARIANT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
                     <div>
-                      <h3 className="font-medium text-ink-primary">Region Variant</h3>
-                      <p className="text-ink-tertiary text-sm mt-0.5">
-                        Customize UI labels based on your region. Changes the terminology for
-                        features like Documents and Artifacts.
-                      </p>
+                      <div style={{ fontWeight: 500 }}>{option.label}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                        {option.description}
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-3">
-                    <Select
-                      value={currentVariant}
-                      onValueChange={(v) => handleVariantChange(v as OrgVariant)}
-                      disabled={isUpdating}
-                    >
-                      <SelectTrigger className="w-[280px] h-10 text-sm bg-canvas-overlay border-stroke">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VARIANT_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{option.label}</span>
-                              {option.value === currentVariant && (
-                                <Check size={14} className="text-emerald-400" />
-                              )}
-                            </div>
-                            <p className="text-xs text-ink-tertiary mt-0.5">{option.description}</p>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {isUpdating && <p className="text-xs text-ink-tertiary mt-2">Saving...</p>}
-                  </div>
-                </div>
-              </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {isUpdating && (
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Saving...</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Dashboard Panels section */}
+      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "32px 0 6px", letterSpacing: "-0.2px" }}>
+        Dashboard Panels
+      </h2>
+      <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>
+        Choose which breakdowns appear on the dashboard.
+      </p>
+
+      <div style={{ borderTop: "var(--border-hairline)" }}>
+        {/* Customer / Client toggle */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 0",
+            borderBottom: "var(--border-hairline)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+              Customer / Client Breakdown
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 3 }}>
+              Show time allocation by customer
             </div>
           </div>
+          <ToggleSwitch
+            checked={orgSettings?.settings?.showCustomerBreakdown !== false}
+            onChange={(checked) => updateSettings({ showCustomerBreakdown: checked })}
+            disabled={isUpdating}
+          />
+        </div>
 
-          {/* Dashboard Panels Card */}
-          <div className="rounded-xl border border-stroke-subtle bg-canvas-overlay p-6 mb-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo/10 border border-indigo/20">
-                <BarChart3 size={20} className="text-indigo" />
-              </div>
-              <div>
-                <h2 className="font-display text-lg font-semibold text-ink-primary tracking-tight">
-                  Dashboard Panels
-                </h2>
-                <p className="text-ink-tertiary text-sm">
-                  Choose which breakdowns appear on the dashboard
-                </p>
-              </div>
+        {/* Project / Topic toggle */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 0",
+            borderBottom: "var(--border-hairline)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+              Project / Topic Breakdown
             </div>
-
-            <div className="space-y-4">
-              {/* Customer / Client toggle */}
-              <div className="flex items-center justify-between p-4 rounded-lg bg-canvas-muted/50 border border-stroke-subtle">
-                <div>
-                  <h3 className="font-medium text-ink-primary">Customer / Client Breakdown</h3>
-                  <p className="text-ink-tertiary text-sm mt-0.5">
-                    Show time allocation by customer
-                  </p>
-                </div>
-                <Switch
-                  size="sm"
-                  className="shrink-0"
-                  checked={orgSettings?.settings?.showCustomerBreakdown !== false}
-                  onCheckedChange={(checked) => updateSettings({ showCustomerBreakdown: checked })}
-                  disabled={isUpdating}
-                />
-              </div>
-
-              {/* Project / Topic toggle */}
-              <div className="flex items-center justify-between p-4 rounded-lg bg-canvas-muted/50 border border-stroke-subtle">
-                <div>
-                  <h3 className="font-medium text-ink-primary">Project / Topic Breakdown</h3>
-                  <p className="text-ink-tertiary text-sm mt-0.5">
-                    Show time allocation by project
-                  </p>
-                </div>
-                <Switch
-                  size="sm"
-                  className="shrink-0"
-                  checked={orgSettings?.settings?.showTopicBreakdown !== false}
-                  onCheckedChange={(checked) => updateSettings({ showTopicBreakdown: checked })}
-                  disabled={isUpdating}
-                />
-              </div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 3 }}>
+              Show time allocation by project
             </div>
           </div>
-
-          {/* Info Box */}
-          <div className="rounded-lg border border-stroke-subtle bg-canvas-muted/30 p-4">
-            <p className="text-sm text-ink-secondary">
-              <span className="font-medium text-ink-primary">Note:</span> Changing the region
-              variant will update UI labels across the application for all users in your
-              organization. The underlying data and functionality remain the same.
-            </p>
-          </div>
+          <ToggleSwitch
+            checked={orgSettings?.settings?.showTopicBreakdown !== false}
+            onChange={(checked) => updateSettings({ showTopicBreakdown: checked })}
+            disabled={isUpdating}
+          />
         </div>
       </div>
     </div>

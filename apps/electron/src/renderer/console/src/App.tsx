@@ -36,7 +36,6 @@ import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
 import ReportsView from "./components/views/admin/ReportsView";
-import SetupView from "./components/views/admin/SetupView";
 import AgentView from "./components/views/employee/AgentView";
 import UploadsView from "./components/views/employee/UploadsView";
 import MeView from "./components/views/employee/MeView";
@@ -48,6 +47,8 @@ import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEd
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
 import OnboardingPage from "./pages/OnboardingPage";
+import TeamsView from "./components/views/admin/TeamsView";
+import OrgSetupView from "./components/views/admin/OrgSetupView";
 
 // Applies stored theme class to <html> on mount and syncs across windows
 function ThemeInitializer() {
@@ -248,6 +249,18 @@ function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RoleGate({ requireAdmin, requireManager, children }: {
+  requireAdmin?: boolean;
+  requireManager?: boolean;
+  children: React.ReactNode;
+}) {
+  const { user } = useUser();
+  const isAdmin = user?.role === "admin" || user?.originalRole === "admin";
+  if (requireAdmin && !isAdmin) return <Navigate to="/calendar" replace />;
+  if (requireManager && !isAdmin && !user?.isManager) return <Navigate to="/calendar" replace />;
+  return <>{children}</>;
+}
+
 // Variant wrapper - provides organization variant context from user's org settings
 function VariantWrapper({ children }: { children: React.ReactNode }) {
   const { organization } = useUser();
@@ -341,7 +354,10 @@ function App() {
                           }
                         />
                         <Route path="integrations" element={<IntegrationsView />} />
-                        <Route path="setup" element={<SetupView />} />
+                        <Route path="org-setup" element={<RoleGate requireAdmin><OrgSetupView /></RoleGate>} />
+                        <Route path="setup" element={<Navigate to="/org-setup" replace />} />
+                        <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
+                        <Route path="teams" element={<RoleGate requireAdmin><TeamsView /></RoleGate>} />
                         {/* Employee Routes */}
                         <Route path="me" element={<MeView />} />
                         <Route path="bragbook" element={<BragbookView />} />
