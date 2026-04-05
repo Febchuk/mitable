@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
-import { eq, sql, count, desc, and, asc } from "drizzle-orm";
+import { eq, sql, count, desc, and, asc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requireAdmin, requireManagerOrAdmin, requireAccessToUser } from "../middleware/authorization.js";
+import { requireAdmin, requireManagerOrAdmin, requireAccessToUser, getScopedVisibleUserIds } from "../middleware/authorization.js";
 import { wouldCreateCycle } from "../services/permissions.service.js";
 import { grantPermission, revokePermission, getUserPermissions } from "../services/userPermissions.service.js";
 import { supabaseAdmin } from "../lib/supabase";
@@ -382,24 +382,28 @@ router.get("/users/:id", requireAuth, requireManagerOrAdmin, requireAccessToUser
  *     security:
  *       - BearerAuth: []
  */
-router.get("/users", requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get("/users", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Admin-only: fetch all users in the org
-    const orgUsers = await db
-      .select({
-        id: schema.users.id,
-        firstName: schema.users.firstName,
-        lastName: schema.users.lastName,
-        email: schema.users.email,
-        role: schema.users.role,
-        jobTitle: schema.users.jobTitle,
-        status: schema.users.status,
-        avatarUrl: schema.users.avatarUrl,
-        createdAt: schema.users.createdAt,
-      })
-      .from(schema.users)
-      .where(eq(schema.users.organizationId, req.organizationId!))
-      .orderBy(schema.users.firstName, schema.users.lastName);
+    // Scope users by ?scope param (direct/all-reports/org-wide)
+    const scopedUserIds = await getScopedVisibleUserIds(req);
+
+    const orgUsers = scopedUserIds.length > 0
+      ? await db
+          .select({
+            id: schema.users.id,
+            firstName: schema.users.firstName,
+            lastName: schema.users.lastName,
+            email: schema.users.email,
+            role: schema.users.role,
+            jobTitle: schema.users.jobTitle,
+            status: schema.users.status,
+            avatarUrl: schema.users.avatarUrl,
+            createdAt: schema.users.createdAt,
+          })
+          .from(schema.users)
+          .where(inArray(schema.users.id, scopedUserIds))
+          .orderBy(schema.users.firstName, schema.users.lastName)
+      : [];
 
     // Batch-fetch permissions for all org users
     const userIds = orgUsers.map((u) => u.id);

@@ -15,11 +15,6 @@ interface UserListItem {
   permissions?: string[];
 }
 
-async function fetchMyReports(scope: DataScope): Promise<UserListItem[]> {
-  const response = await apiRequest<{ reports: UserListItem[] }>(`/my-activity/reports?transitive=true&scope=${scope}`);
-  return response.reports;
-}
-
 async function fetchScopedUsers(scope: DataScope): Promise<UserListItem[]> {
   const response = await apiRequest<{ users: UserListItem[] }>(`/admin/users?scope=${scope}`);
   return response.users;
@@ -33,7 +28,7 @@ export function useUsers() {
 
   return useQuery({
     queryKey: ["users", viewMode, dataScope],
-    queryFn: () => isAdmin ? fetchScopedUsers(dataScope) : fetchMyReports(dataScope),
+    queryFn: () => fetchScopedUsers(dataScope),
     enabled: !!user && viewMode === "manager" && (isAdmin || isManager),
   });
 }
