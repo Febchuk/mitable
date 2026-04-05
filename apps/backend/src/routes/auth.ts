@@ -714,6 +714,13 @@ authRouter.post("/login", async (req: Request, res: Response) => {
         )[0]?.count ?? 0
       : 0;
 
+    // Load user permissions
+    const permRows = await db
+      .select({ permission: schema.userPermissions.permission })
+      .from(schema.userPermissions)
+      .where(eq(schema.userPermissions.userId, data.user.id));
+    const permissions = permRows.map((r) => r.permission);
+
     res.json({
       user: data.user,
       session: data.session,
@@ -721,6 +728,7 @@ authRouter.post("/login", async (req: Request, res: Response) => {
         ...userProfile,
         isManager: reportCheck.length > 0,
         directReportCount,
+        permissions,
       },
     });
   } catch (error) {
@@ -889,6 +897,7 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
         ...userProfile,
         isManager: reportCheck.length > 0,
         directReportCount,
+        permissions: req.userPermissions || [],
       },
       organization: organization
         ? {

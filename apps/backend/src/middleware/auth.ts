@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { eq } from "drizzle-orm";
 import { supabase } from "../lib/supabase";
 import { db } from "../db/client.js";
-import { users } from "../db/schema/index.js";
+import { users, userPermissions } from "../db/schema/index.js";
 
 /**
  * Middleware to require authentication
@@ -58,6 +58,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         .where(eq(users.managerId, user.id))
         .limit(1);
       req.isManager = reportCheck.length > 0;
+
+      // Load user permissions
+      const permRows = await db
+        .select({ permission: userPermissions.permission })
+        .from(userPermissions)
+        .where(eq(userPermissions.userId, user.id));
+      req.userPermissions = permRows.map((r) => r.permission);
     }
 
     next();

@@ -16,6 +16,7 @@ export default function ConsoleLayout() {
     location.pathname === "/me" ||
     location.pathname === "/dashboard" ||
     location.pathname === "/bragbook" ||
+    location.pathname === "/org-setup" ||
     location.pathname.startsWith("/people/") ||
     location.pathname.startsWith("/agent");
 

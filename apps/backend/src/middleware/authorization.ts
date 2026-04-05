@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { canViewUserData, getVisibleUserIds } from "../services/permissions.service.js";
+import { canViewUserData, getVisibleUserIds, getScopedUserIds } from "../services/permissions.service.js";
 
 /**
  * Requires the authenticated user to be an org admin.
@@ -69,4 +69,25 @@ export async function getCachedVisibleUserIds(req: Request): Promise<string[]> {
     );
   }
   return req._visibleUserIds;
+}
+
+/**
+ * Scope-aware visible user IDs.
+ * Reads ?scope=direct|all-reports|org-wide from query params.
+ * Falls back to "all-reports" if no scope provided.
+ */
+export async function getScopedVisibleUserIds(req: Request): Promise<string[]> {
+  const validScopes = ["direct", "all-reports", "org-wide"] as const;
+  const rawScope = req.query.scope as string | undefined;
+  const scope = rawScope && validScopes.includes(rawScope as any)
+    ? (rawScope as "direct" | "all-reports" | "org-wide")
+    : "all-reports";
+
+  return getScopedUserIds(
+    req.userId!,
+    req.organizationId!,
+    req.userRole!,
+    req.userPermissions || [],
+    scope
+  );
 }

@@ -5,6 +5,7 @@ import { eq, sql, count, desc, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { requireAdmin, requireManagerOrAdmin, requireAccessToUser } from "../middleware/authorization.js";
 import { wouldCreateCycle } from "../services/permissions.service.js";
+import { grantPermission, revokePermission, getUserPermissions } from "../services/userPermissions.service.js";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
 import { notionService } from "../services/notion.service.js";
@@ -400,6 +401,21 @@ router.get("/users", requireAuth, requireAdmin, async (req: Request, res: Respon
       .where(eq(schema.users.organizationId, req.organizationId!))
       .orderBy(schema.users.firstName, schema.users.lastName);
 
+    // Batch-fetch permissions for all org users
+    const userIds = orgUsers.map((u) => u.id);
+    const allPerms = userIds.length > 0
+      ? await db
+          .select({ userId: schema.userPermissions.userId, permission: schema.userPermissions.permission })
+          .from(schema.userPermissions)
+      : [];
+    const permsByUser = new Map<string, string[]>();
+    for (const p of allPerms) {
+      if (!userIds.includes(p.userId)) continue;
+      const arr = permsByUser.get(p.userId) || [];
+      arr.push(p.permission);
+      permsByUser.set(p.userId, arr);
+    }
+
     const usersFormatted = orgUsers.map((user) => ({
       id: user.id,
       name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
@@ -409,6 +425,7 @@ router.get("/users", requireAuth, requireAdmin, async (req: Request, res: Respon
       status: user.status || "active",
       avatarUrl: user.avatarUrl,
       createdAt: user.createdAt,
+      permissions: permsByUser.get(user.id) || [],
     }));
 
     res.json({ users: usersFormatted });
@@ -3011,6 +3028,90 @@ router.delete(
     } catch (error) {
       console.error("Error deleting team:", error);
       res.status(500).json({ error: "Internal Server Error", message: "Failed to delete team" });
+    }
+  }
+);
+
+// ============================================
+// ── USER PERMISSIONS ENDPOINTS ──────────────
+// ============================================
+
+const VALID_PERMISSIONS = ["canSeeOrgWide"] as const;
+
+/**
+ * GET /admin/users/:id/permissions — List a user's permissions
+ */
+router.get(
+  "/users/:id/permissions",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const permissions = await getUserPermissions(req.params.id);
+      res.json({ permissions });
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * PUT /admin/users/:id/permissions/:permission — Grant a permission
+ */
+router.put(
+  "/users/:id/permissions/:permission",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { permission } = req.params;
+      if (!VALID_PERMISSIONS.includes(permission as any)) {
+        res.status(400).json({ error: "Bad Request", message: `Invalid permission: ${permission}` });
+        return;
+      }
+
+      // Verify target user is in same org
+      const [target] = await db
+        .select({ organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, req.params.id))
+        .limit(1);
+
+      if (!target || target.organizationId !== req.organizationId) {
+        res.status(404).json({ error: "Not Found", message: "User not found in your organization" });
+        return;
+      }
+
+      await grantPermission(req.params.id, permission, req.userId!);
+      res.json({ success: true, message: `Permission '${permission}' granted` });
+    } catch (error) {
+      console.error("Error granting permission:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  }
+);
+
+/**
+ * DELETE /admin/users/:id/permissions/:permission — Revoke a permission
+ */
+router.delete(
+  "/users/:id/permissions/:permission",
+  requireAuth,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { permission } = req.params;
+      if (!VALID_PERMISSIONS.includes(permission as any)) {
+        res.status(400).json({ error: "Bad Request", message: `Invalid permission: ${permission}` });
+        return;
+      }
+
+      await revokePermission(req.params.id, permission);
+      res.json({ success: true, message: `Permission '${permission}' revoked` });
+    } catch (error) {
+      console.error("Error revoking permission:", error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   }
 );

@@ -128,6 +128,45 @@ export async function isManagerOf(actorId: string, targetUserId: string): Promis
 }
 
 /**
+ * Get user IDs scoped by the requested data scope.
+ * - "direct": self + direct reports only
+ * - "all-reports": self + transitive reports
+ * - "org-wide": all org users (only if admin or has canSeeOrgWide permission)
+ */
+export async function getScopedUserIds(
+  actorId: string,
+  organizationId: string,
+  role: string,
+  permissions: string[],
+  scope: "direct" | "all-reports" | "org-wide"
+): Promise<string[]> {
+  // Validate org-wide access — silently downgrade if not authorized
+  if (scope === "org-wide" && role !== "admin" && !permissions.includes("canSeeOrgWide")) {
+    scope = "all-reports";
+  }
+
+  if (scope === "org-wide") {
+    const orgUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.organizationId, organizationId));
+    return orgUsers.map((u) => u.id);
+  }
+
+  if (scope === "direct") {
+    const directs = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.managerId, actorId));
+    return [actorId, ...directs.map((u) => u.id)];
+  }
+
+  // "all-reports" — self + transitive
+  const reports = await getTransitiveReportIds(actorId);
+  return [actorId, ...reports];
+}
+
+/**
  * Check if setting proposedManagerId as manager of targetUserId would create a cycle.
  * Walks up the chain from proposedManager; if we reach targetUser, it's a cycle.
  */

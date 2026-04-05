@@ -1,4 +1,4 @@
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
@@ -11,7 +11,6 @@ const isMac = navigator.platform.toLowerCase().includes("mac");
 const VIEW_MODE_LABELS: Record<ViewMode, string> = {
   employee: "Me",
   manager: "Team",
-  admin: "Org",
 };
 
 export default function Sidebar() {
@@ -233,6 +232,40 @@ export default function Sidebar() {
                 <Settings size={14} strokeWidth={1.5} />
                 Settings
               </button>
+
+              {(user?.role === "admin" || user?.originalRole === "admin") && (
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    navigate("/org-setup");
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "100%",
+                    padding: "9px 12px",
+                    borderRadius: 6,
+                    border: "none",
+                    background: "none",
+                    color: "var(--text-secondary)",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+                    e.currentTarget.style.color = "var(--text-primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "none";
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                  }}
+                >
+                  <Building2 size={14} strokeWidth={1.5} />
+                  Org Setup
+                </button>
+              )}
 
               <div
                 style={{

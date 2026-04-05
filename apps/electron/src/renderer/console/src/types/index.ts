@@ -70,7 +70,8 @@ export interface Chat {
 
 // User types
 export type UserRole = "admin" | "employee";
-export type ViewMode = "employee" | "manager" | "admin";
+export type ViewMode = "employee" | "manager";
+export type DataScope = "direct" | "all-reports" | "org-wide";
 
 export interface User {
   id: string;
@@ -87,6 +88,7 @@ export interface User {
   teamId?: string | null;
   department?: string | null;
   directReportCount?: number;
+  permissions?: string[];
 }
 
 // ============================================

@@ -1,6 +1,6 @@
-import { createContext, ReactNode, useContext, useEffect, useState, useMemo } from "react";
+import { createContext, ReactNode, useContext, useEffect, useState, useMemo, useCallback } from "react";
 import { authService } from "../services/authService";
-import type { User, ViewMode } from "../types";
+import type { User, ViewMode, DataScope } from "../types";
 import { createLogger } from "../../../lib/logger";
 import type { OrgSettings } from "@mitable/shared";
 
@@ -25,6 +25,9 @@ interface UserContextType {
   viewMode: ViewMode;
   availableViewModes: ViewMode[];
   setViewMode: (mode: ViewMode) => void;
+  dataScope: DataScope;
+  availableDataScopes: DataScope[];
+  setDataScope: (scope: DataScope) => void;
   updateUser: (user: User) => void;
   updateOrganization: (org: Organization) => void;
   logout: () => Promise<void>;
@@ -36,8 +39,10 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 function getAvailableViewModes(user: User | null): ViewMode[] {
   if (!user) return ["employee"];
   const modes: ViewMode[] = ["employee"];
-  if (user.isManager) modes.push("manager");
-  if (user.role === "admin" || user.originalRole === "admin") modes.push("admin");
+  // Admins always get Team view, even without direct reports
+  if (user.isManager || user.role === "admin" || user.originalRole === "admin") {
+    modes.push("manager");
+  }
   return modes;
 }
 
@@ -45,17 +50,41 @@ function getInitialViewMode(user: User | null): ViewMode {
   const available = getAvailableViewModes(user);
 
   // Check saved preference (with old key migration)
-  const saved = localStorage.getItem("mitable:viewMode") as ViewMode | null;
-  const oldMode = !saved ? (localStorage.getItem("mitable:lastMode") as ViewMode | null) : null;
-  const preferred = saved || oldMode;
+  const saved = localStorage.getItem("mitable:viewMode") as string | null;
+  const oldMode = !saved ? (localStorage.getItem("mitable:lastMode") as string | null) : null;
+  let preferred = saved || oldMode;
+
+  // Migration: treat old "admin" as "manager"
+  if (preferred === "admin") preferred = "manager";
 
   // Only use saved mode if this user is actually allowed to use it
-  if (preferred && available.includes(preferred)) return preferred;
+  if (preferred && available.includes(preferred as ViewMode)) return preferred as ViewMode;
 
   // Default to highest available mode
-  if (available.includes("admin")) return "admin";
   if (available.includes("manager")) return "manager";
   return "employee";
+}
+
+function canSeeOrgWide(user: User | null): boolean {
+  if (!user) return false;
+  return user.role === "admin" || user.originalRole === "admin" || (user.permissions?.includes("canSeeOrgWide") ?? false);
+}
+
+function getAvailableDataScopes(user: User | null): DataScope[] {
+  const scopes: DataScope[] = ["direct", "all-reports"];
+  if (canSeeOrgWide(user)) scopes.push("org-wide");
+  return scopes;
+}
+
+function getInitialDataScope(user: User | null): DataScope {
+  const available = getAvailableDataScopes(user);
+  const saved = localStorage.getItem("mitable:dataScope") as DataScope | null;
+  if (saved && available.includes(saved)) return saved;
+
+  // Admins with no reports default to org-wide; managers default to all-reports
+  const isAdminNoReports = (user?.role === "admin" || user?.originalRole === "admin") && !user?.isManager;
+  if (isAdminNoReports && available.includes("org-wide")) return "org-wide";
+  return "all-reports";
 }
 
 export function UserProvider({ children }: { children: ReactNode }) {
@@ -64,27 +93,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [viewMode, setViewModeState] = useState<ViewMode>("employee");
+  const [dataScope, setDataScopeState] = useState<DataScope>("all-reports");
 
   const availableViewModes = useMemo(() => getAvailableViewModes(user), [user]);
+  const availableDataScopes = useMemo(() => getAvailableDataScopes(user), [user]);
 
-  const setViewMode = (mode: ViewMode) => {
+  const setViewMode = useCallback((mode: ViewMode) => {
     if (!availableViewModes.includes(mode)) return;
     setViewModeState(mode);
     localStorage.setItem("mitable:viewMode", mode);
-    // Also update the legacy role field for backward compat with components that read user.role
-    if (user) {
-      const newRole = mode === "admin" ? "admin" : (user.originalRole === "admin" ? "employee" : user.role);
-      setUser({ ...user, role: newRole as "admin" | "employee", originalRole: user.originalRole ?? user.role });
-    }
-  };
+  }, [availableViewModes]);
+
+  const setDataScope = useCallback((scope: DataScope) => {
+    if (!availableDataScopes.includes(scope)) return;
+    setDataScopeState(scope);
+    localStorage.setItem("mitable:dataScope", scope);
+  }, [availableDataScopes]);
 
   // Helper: given an access token, fetch user profile and populate state
   const hydrateUser = async (accessToken: string) => {
     const response = await authService.getMe(accessToken);
-    // Restore last-used mode if the user is an admin who previously switched
     const dbRole = response.profile.role;
-    const savedMode = localStorage.getItem("mitable:lastMode") as "admin" | "employee" | null;
-    const effectiveRole = dbRole === "admin" && savedMode ? savedMode : dbRole;
 
     // The profile may include hierarchy fields added in the hierarchy migration
     const profile = response.profile as Record<string, any>;
@@ -95,7 +124,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       email: profile.email || undefined,
       avatarUrl: profile.avatarUrl || undefined,
       currentWeek: profile.currentWeek || 1,
-      role: effectiveRole,
+      role: dbRole,
       originalRole: dbRole,
       organizationId: profile.organizationId || "",
       isManager: profile.isManager ?? false,
@@ -103,9 +132,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
       teamId: profile.teamId ?? null,
       department: profile.department ?? null,
       directReportCount: profile.directReportCount ?? 0,
+      permissions: profile.permissions ?? [],
     };
     setUser(newUser);
     setViewModeState(getInitialViewMode(newUser));
+    setDataScopeState(getInitialDataScope(newUser));
 
     // Set organization if returned from API
     if (response.organization) {
@@ -303,6 +334,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         viewMode,
         availableViewModes,
         setViewMode,
+        dataScope,
+        availableDataScopes,
+        setDataScope,
         updateUser,
         updateOrganization,
         logout,

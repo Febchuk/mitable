@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchUsers } from "../../../services/adminService";
 import { apiRequest } from "../../../services/api";
 import { useUser } from "../../../context/UserContext";
+import type { DataScope } from "../../../types";
 
 interface UserListItem {
   id: string;
@@ -12,22 +12,28 @@ interface UserListItem {
   status: string;
   avatarUrl: string | null;
   createdAt: string;
+  permissions?: string[];
 }
 
-async function fetchMyReports(): Promise<UserListItem[]> {
-  const response = await apiRequest<{ reports: UserListItem[] }>("/my-activity/reports?transitive=true");
+async function fetchMyReports(scope: DataScope): Promise<UserListItem[]> {
+  const response = await apiRequest<{ reports: UserListItem[] }>(`/my-activity/reports?transitive=true&scope=${scope}`);
   return response.reports;
 }
 
-export function useUsers() {
-  const { user, viewMode } = useUser();
+async function fetchScopedUsers(scope: DataScope): Promise<UserListItem[]> {
+  const response = await apiRequest<{ users: UserListItem[] }>(`/admin/users?scope=${scope}`);
+  return response.users;
+}
 
-  const isAdmin = user?.role === "admin";
+export function useUsers() {
+  const { user, viewMode, dataScope } = useUser();
+
+  const isAdmin = user?.role === "admin" || user?.originalRole === "admin";
   const isManager = !!user?.isManager;
 
   return useQuery({
-    queryKey: ["users", viewMode],
-    queryFn: viewMode === "admin" ? fetchUsers : fetchMyReports,
-    enabled: !!user && (viewMode === "admin" ? isAdmin : isManager),
+    queryKey: ["users", viewMode, dataScope],
+    queryFn: () => isAdmin ? fetchScopedUsers(dataScope) : fetchMyReports(dataScope),
+    enabled: !!user && viewMode === "manager" && (isAdmin || isManager),
   });
 }

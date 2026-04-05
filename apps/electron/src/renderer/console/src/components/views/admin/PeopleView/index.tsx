@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Search, Plus, ChevronRight, Zap } from "lucide-react";
 import { useUsers, useDashboardPeople } from "@/console/src/hooks/queries/admin";
 import type { User, DashboardPerson } from "@/console/src/services/adminService";
+import DataScopeFilter from "@/console/src/components/shared/DataScopeFilter";
 
 interface UserActivityMeta {
   lastActive: string;
@@ -204,18 +205,21 @@ export default function PeopleView() {
         }}
       >
         <div>
-          <h1
-            style={{
-              fontFamily: "var(--font-serif)",
-              fontSize: 26,
-              color: "var(--text-primary)",
-              fontWeight: 400,
-              letterSpacing: "-0.3px",
-              margin: 0,
-            }}
-          >
-            People
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <h1
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 26,
+                color: "var(--text-primary)",
+                fontWeight: 400,
+                letterSpacing: "-0.3px",
+                margin: 0,
+              }}
+            >
+              People
+            </h1>
+            <DataScopeFilter />
+          </div>
           <div
             style={{
               fontSize: 12,

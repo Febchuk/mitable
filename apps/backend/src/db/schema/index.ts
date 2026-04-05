@@ -35,3 +35,4 @@ export * from "./github/github-issues.schema";
 export * from "./benchmarks.schema";
 export * from "./bragbook.schema";
 export * from "./teams.schema";
+export * from "./user-permissions.schema";

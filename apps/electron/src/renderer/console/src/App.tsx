@@ -48,8 +48,8 @@ import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEd
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "./hooks/useTheme";
 import OnboardingPage from "./pages/OnboardingPage";
-import OrgChartView from "./components/views/admin/OrgChartView";
 import TeamsView from "./components/views/admin/TeamsView";
+import OrgSetupView from "./components/views/admin/OrgSetupView";
 
 // Applies stored theme class to <html> on mount and syncs across windows
 function ThemeInitializer() {
@@ -218,7 +218,7 @@ function DefaultRoute() {
   }
 
   if (needsOnboarding) return <Navigate to="/onboarding" replace />;
-  if (user?.role === "admin") return <Navigate to="/dashboard" replace />;
+  if (user?.role === "admin" || user?.isManager) return <Navigate to="/dashboard" replace />;
   return <Navigate to="/calendar" replace />;
 }
 
@@ -250,8 +250,9 @@ function RoleGate({ requireAdmin, requireManager, children }: {
   children: React.ReactNode;
 }) {
   const { user } = useUser();
-  if (requireAdmin && user?.role !== "admin") return <Navigate to="/calendar" replace />;
-  if (requireManager && user?.role !== "admin" && !user?.isManager) return <Navigate to="/calendar" replace />;
+  const isAdmin = user?.role === "admin" || user?.originalRole === "admin";
+  if (requireAdmin && !isAdmin) return <Navigate to="/calendar" replace />;
+  if (requireManager && !isAdmin && !user?.isManager) return <Navigate to="/calendar" replace />;
   return <>{children}</>;
 }
 
@@ -328,8 +329,11 @@ function App() {
                         <Route path="benchmarks/:id/person/:userId" element={<RoleGate requireManager><PersonBenchmarkView /></RoleGate>} />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="setup" element={<SetupView />} />
-                        {/* Hierarchy Management Routes (admin only) */}
-                        <Route path="org-chart" element={<RoleGate requireAdmin><OrgChartView /></RoleGate>} />
+                        {/* Admin: Org Setup (contains Org Chart, Permissions, General settings) */}
+                        <Route path="org-setup" element={<RoleGate requireAdmin><OrgSetupView /></RoleGate>} />
+                        {/* Legacy redirects */}
+                        <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
+                        <Route path="setup" element={<Navigate to="/org-setup" replace />} />
                         <Route path="teams" element={<RoleGate requireAdmin><TeamsView /></RoleGate>} />
                         {/* Employee Routes */}
                         <Route path="me" element={<MeView />} />

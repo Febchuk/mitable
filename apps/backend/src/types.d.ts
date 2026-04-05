@@ -9,6 +9,7 @@ declare global {
       correlationId?: string;
       userRole?: string;
       isManager?: boolean;
+      userPermissions?: string[];
       _visibleUserIds?: string[];
     }
   }

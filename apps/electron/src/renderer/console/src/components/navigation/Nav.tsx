@@ -1,4 +1,4 @@
-import { Calendar, Download, LayoutGrid, User, Users, BarChart2, FileText, Target, Award, Network } from "lucide-react";
+import { Calendar, Download, LayoutGrid, User, Users, BarChart2, FileText, Target, Award } from "lucide-react";
 import NavItem from "./NavItem";
 import NavGroup from "./NavGroup";
 import MitableIcon from "../icons/MitableIcon";
@@ -9,19 +9,6 @@ interface NavProps {
 }
 
 export default function Nav({ viewMode }: NavProps) {
-  if (viewMode === "admin") {
-    return (
-      <>
-        <NavItem to="/dashboard" icon={LayoutGrid} label="Dashboard" />
-        <NavItem to="/people" icon={Users} label="People" />
-        <NavItem to="/benchmarks" icon={Target} label="Benchmarks" />
-        <NavItem to="/reports" icon={BarChart2} label="Reports" />
-        <NavItem to="/org-chart" icon={Network} label="Org Chart" />
-        <NavItem to="/agent" icon={MitableIcon} label="Agent" />
-      </>
-    );
-  }
-
   if (viewMode === "manager") {
     return (
       <>
