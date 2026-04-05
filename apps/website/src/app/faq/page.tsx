@@ -56,11 +56,13 @@ const FaqItem = ({ q, a }: { q: string; a: string }) => {
 
     return (
         <div
+            className="l-faq-item"
             style={{
                 borderBottom: `1px solid ${C.border}`,
             }}
         >
             <button
+                type="button"
                 onClick={() => setOpen(!open)}
                 style={{
                     display: "flex",
@@ -112,6 +114,7 @@ const FaqItem = ({ q, a }: { q: string; a: string }) => {
                 }}
             >
                 <p
+                    className="l-faq-answer"
                     style={{
                         fontSize: 14,
                         color: C.textSec,
@@ -133,9 +136,9 @@ export default function FaqPage() {
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
             <LandingNav />
 
-            <main style={{ padding: "180px 48px 80px", maxWidth: 760, margin: "0 auto" }}>
+            <main className="l-account-page-main l-faq-page" style={{ padding: "180px 48px 80px", maxWidth: 760, margin: "0 auto" }}>
                 {/* Header */}
-                <div style={{ marginBottom: 56 }}>
+                <div className="l-account-page-header l-faq-page-header" style={{ marginBottom: 56 }}>
                     <h1
                         style={{
                             fontFamily: C.serif,
@@ -149,7 +152,7 @@ export default function FaqPage() {
                     >
                         Frequently asked questions
                     </h1>
-                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
+                    <p className="l-account-page-subtitle" style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
                         Everything you need to know about how Mitable works.
                     </p>
                 </div>
@@ -163,6 +166,7 @@ export default function FaqPage() {
 
                 {/* CTA */}
                 <div
+                    className="l-faq-bottom-cta"
                     style={{
                         textAlign: "center",
                         marginTop: 64,

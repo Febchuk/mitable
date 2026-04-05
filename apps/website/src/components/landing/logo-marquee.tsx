@@ -84,36 +84,51 @@ interface LogoMarqueeProps {
 }
 
 export const LogoMarquee = ({ className }: LogoMarqueeProps) => {
+    const logoItemStyle: React.CSSProperties = {
+        display: "flex",
+        flexShrink: 0,
+        alignItems: "center",
+        justifyContent: "center",
+    };
+
     return (
         <section className={cx("bg-surface overflow-hidden py-10 md:py-14", className)}>
             <div className="mx-auto max-w-container px-4 md:px-8">
-                <p className="mb-8 text-center font-mono text-[10px] tracking-widest text-gray-600 uppercase md:mb-10">{siteContent.logoMarquee.heading}</p>
+                <p
+                    className="mb-8 text-center font-mono text-[10px] tracking-widest uppercase md:mb-10"
+                    style={{ color: "var(--l-text-faint)" }}
+                >
+                    {siteContent.logoMarquee.heading}
+                </p>
             </div>
 
-            {/* Marquee container */}
             <div className="relative">
-                {/* Gradient masks */}
-                <div className="pointer-events-none absolute top-0 left-0 z-10 h-full w-20 bg-gradient-to-r from-[#151515] to-transparent md:w-32" />
-                <div className="pointer-events-none absolute top-0 right-0 z-10 h-full w-20 bg-gradient-to-l from-[#151515] to-transparent md:w-32" />
+                <div
+                    className="pointer-events-none absolute top-0 left-0 z-10 h-full w-20 md:w-32"
+                    style={{ background: "linear-gradient(to right, var(--l-bg, #151515), transparent)" }}
+                />
+                <div
+                    className="pointer-events-none absolute top-0 right-0 z-10 h-full w-20 md:w-32"
+                    style={{ background: "linear-gradient(to left, var(--l-bg, #151515), transparent)" }}
+                />
 
-                {/* Scrolling logos */}
                 <div className="flex animate-marquee gap-14 md:gap-20">
-                    {/* First set */}
                     {logos.map((logo) => (
                         <div
                             key={logo.name}
-                            className="flex shrink-0 items-center justify-center opacity-30 grayscale transition-all duration-300 hover:opacity-70 hover:grayscale-0"
+                            className="logo-marquee-item"
+                            style={logoItemStyle}
                         >
-                            <logo.component className="h-5 w-auto text-gray-500 md:h-7" />
+                            <logo.component className="h-5 w-auto md:h-7" />
                         </div>
                     ))}
-                    {/* Duplicate set for seamless loop */}
                     {logos.map((logo) => (
                         <div
                             key={`${logo.name}-dup`}
-                            className="flex shrink-0 items-center justify-center opacity-30 grayscale transition-all duration-300 hover:opacity-70 hover:grayscale-0"
+                            className="logo-marquee-item"
+                            style={logoItemStyle}
                         >
-                            <logo.component className="h-5 w-auto text-gray-500 md:h-7" />
+                            <logo.component className="h-5 w-auto md:h-7" />
                         </div>
                     ))}
                 </div>

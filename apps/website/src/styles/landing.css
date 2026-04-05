@@ -5,31 +5,36 @@
    ═══════════════════════════════════════════ */
 
 :root {
-    --l-bg: #1A1916;
-    --l-bg-raised: #211F1B;
-    --l-bg-overlay: #2A2824;
-    --l-bg-muted: #33312B;
+    --l-bg: #1a1916;
+    --l-bg-raised: #211f1b;
+    --l-bg-overlay: #2a2824;
+    --l-bg-muted: #33312b;
 
-    --l-accent: #82C0CC;
-    --l-accent-dark: #3A7A87;
+    --l-accent: #82c0cc;
+    --l-accent-rgb: 130, 192, 204;
+    --l-accent-dark: #3a7a87;
     --l-accent-muted: rgba(130, 192, 204, 0.12);
     --l-accent-dim: rgba(130, 192, 204, 0.06);
 
-    --l-text: #ECE8E0;
-    --l-text-secondary: #A09A8E;
-    --l-text-tertiary: #6B665C;
-    --l-text-muted: #706B60;
-    --l-text-faint: #4A4640;
+    --l-text: #ece8e0;
+    --l-text-secondary: #a09a8e;
+    --l-text-tertiary: #6b665c;
+    --l-text-muted: #706b60;
+    --l-text-faint: #4a4640;
 
-    --l-border: #33312B;
-    --l-border-subtle: #2A2824;
+    --l-border: #33312b;
+    --l-border-subtle: #2a2824;
     --l-ui-rgb: 236, 232, 224;
 
     --l-nav-bg: rgba(26, 25, 22, 0.82);
     --l-nav-border: rgba(236, 232, 224, 0.06);
-    --l-nav-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15);
+    --l-nav-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.15);
     --l-nav-divider: rgba(236, 232, 224, 0.1);
     --l-nav-hover-bg: rgba(236, 232, 224, 0.06);
+
+    --l-logo-color: #ece8e0;
+    --l-logo-opacity: 0.55;
+    --l-logo-hover-opacity: 0.8;
 
     --l-serif: var(--font-newsreader, "Newsreader"), Georgia, serif;
     --l-sans: var(--font-dm-sans, "DM Sans"), system-ui, sans-serif;
@@ -45,10 +50,10 @@
     --text-faint: var(--l-text-faint);
     --mi-accent: var(--l-accent);
     --mi-accent-rgb: 130, 192, 204;
-    --mi-accent-dark: #3A7A87;
-    --status-success: #3A9B6B;
+    --mi-accent-dark: #3a7a87;
+    --status-success: #3a9b6b;
     --status-success-rgb: 58, 155, 107;
-    --status-error: #E87474;
+    --status-error: #e87474;
     --status-error-rgb: 232, 116, 116;
     --ui-rgb: var(--l-ui-rgb);
     --border-hairline: 0.5px solid rgba(var(--ui-rgb), 0.08);
@@ -60,38 +65,43 @@
 
 /* Light mode overrides (from Electron .light class) */
 .landing-light {
-    --l-bg: #F5F1ED;
-    --l-bg-raised: #FAF8F6;
-    --l-bg-overlay: #FDFCFB;
-    --l-bg-muted: #E8E2DC;
+    --l-bg: #f5f1ed;
+    --l-bg-raised: #faf8f6;
+    --l-bg-overlay: #fdfcfb;
+    --l-bg-muted: #e8e2dc;
 
-    --l-accent: #2A7F8E;
-    --l-accent-dark: #16697A;
+    --l-accent: #2a7f8e;
+    --l-accent-rgb: 42, 127, 142;
+    --l-accent-dark: #16697a;
     --l-accent-muted: rgba(42, 127, 142, 0.08);
     --l-accent-dim: rgba(42, 127, 142, 0.04);
 
-    --l-text: #1C2B33;
-    --l-text-secondary: #5C6B73;
-    --l-text-tertiary: #8A9199;
-    --l-text-muted: #8A9199;
-    --l-text-faint: #B0B7BC;
+    --l-text: #1c2b33;
+    --l-text-secondary: #5c6b73;
+    --l-text-tertiary: #8a9199;
+    --l-text-muted: #8a9199;
+    --l-text-faint: #b0b7bc;
 
-    --l-border: #E0D9D1;
-    --l-border-subtle: #E8E2DC;
+    --l-border: #e0d9d1;
+    --l-border-subtle: #e8e2dc;
     --l-ui-rgb: 28, 43, 51;
 
     --l-nav-bg: rgba(245, 241, 237, 0.82);
     --l-nav-border: rgba(28, 43, 51, 0.08);
-    --l-nav-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+    --l-nav-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
     --l-nav-divider: rgba(28, 43, 51, 0.1);
     --l-nav-hover-bg: rgba(28, 43, 51, 0.06);
 
-    --mi-accent: #2A7F8E;
+    --l-logo-color: #1c2b33;
+    --l-logo-opacity: 0.6;
+    --l-logo-hover-opacity: 0.9;
+
+    --mi-accent: #2a7f8e;
     --mi-accent-rgb: 42, 127, 142;
-    --mi-accent-dark: #16697A;
-    --status-success: #2D8659;
+    --mi-accent-dark: #16697a;
+    --status-success: #2d8659;
     --status-success-rgb: 45, 134, 89;
-    --status-error: #D45555;
+    --status-error: #d45555;
     --status-error-rgb: 212, 85, 85;
 }
 
@@ -101,6 +111,107 @@
     background: var(--l-bg);
     color: var(--l-text);
     -webkit-font-smoothing: antialiased;
+    max-width: 100vw;
+    overflow-x: clip;
+}
+
+/* ── Light-mode overrides for hardcoded Tailwind dark classes ──
+   Many landing section components use fixed dark Tailwind utilities
+   (bg-ink, text-white, text-gray-*, bg-gray-*). These overrides remap
+   them to --l-* tokens when .landing-light is active so every section
+   responds to the theme toggle without per-file rewrites. */
+.landing-light .bg-ink {
+    background-color: var(--l-bg) !important;
+}
+.landing-light .bg-surface {
+    background-color: var(--l-bg) !important;
+}
+
+.landing-light .text-white {
+    color: var(--l-text) !important;
+}
+.landing-light .text-gray-300 {
+    color: var(--l-text) !important;
+}
+.landing-light .text-gray-400 {
+    color: var(--l-text-secondary) !important;
+}
+.landing-light .text-gray-500 {
+    color: var(--l-text-tertiary) !important;
+}
+.landing-light .text-gray-600 {
+    color: var(--l-text-faint) !important;
+}
+.landing-light .text-gray-700 {
+    color: var(--l-text-faint) !important;
+}
+
+.landing-light .bg-gray-700 {
+    background-color: rgba(var(--l-ui-rgb), 0.18) !important;
+}
+.landing-light .bg-gray-800 {
+    background-color: rgba(var(--l-ui-rgb), 0.08) !important;
+}
+.landing-light .bg-gray-800\/50 {
+    background-color: rgba(var(--l-ui-rgb), 0.06) !important;
+}
+.landing-light .bg-gray-800\/60 {
+    background-color: rgba(var(--l-ui-rgb), 0.06) !important;
+}
+.landing-light .bg-gray-900\/30 {
+    background-color: rgba(var(--l-ui-rgb), 0.03) !important;
+}
+.landing-light .bg-gray-900\/40 {
+    background-color: rgba(var(--l-ui-rgb), 0.04) !important;
+}
+.landing-light .bg-gray-900\/50 {
+    background-color: rgba(var(--l-ui-rgb), 0.04) !important;
+}
+.landing-light .bg-gray-950\/50 {
+    background-color: rgba(var(--l-ui-rgb), 0.03) !important;
+}
+
+.landing-light .border-gray-700\/60 {
+    border-color: rgba(var(--l-ui-rgb), 0.1) !important;
+}
+.landing-light .border-gray-800\/40 {
+    border-color: rgba(var(--l-ui-rgb), 0.08) !important;
+}
+.landing-light .border-gray-800\/60 {
+    border-color: rgba(var(--l-ui-rgb), 0.1) !important;
+}
+.landing-light .border-gray-800 {
+    border-color: rgba(var(--l-ui-rgb), 0.1) !important;
+}
+
+.landing-light .bg-gray-700\/50 {
+    background-color: rgba(var(--l-ui-rgb), 0.12) !important;
+}
+.landing-light .bg-gray-800\/40 {
+    background-color: rgba(var(--l-ui-rgb), 0.06) !important;
+}
+.landing-light .bg-gray-900 {
+    background-color: rgba(var(--l-ui-rgb), 0.04) !important;
+}
+
+.landing-light .border-gray-700 {
+    border-color: rgba(var(--l-ui-rgb), 0.1) !important;
+}
+.landing-light .border-red-900\/20 {
+    border-color: rgba(212, 85, 85, 0.12) !important;
+}
+
+.landing-light .hover\:border-gray-700\/60:hover {
+    border-color: rgba(var(--l-ui-rgb), 0.15) !important;
+}
+.landing-light .hover\:bg-gray-800\/60:hover {
+    background-color: rgba(var(--l-ui-rgb), 0.08) !important;
+}
+.landing-light .hover\:text-white:hover {
+    color: var(--l-text) !important;
+}
+.landing-light .hover\:text-gray-300:hover {
+    color: var(--l-text) !important;
 }
 
 .landing * {
@@ -116,21 +227,29 @@
 .l-reveal {
     opacity: 0;
     transform: translateY(28px);
-    transition: opacity 0.7s ease, transform 0.7s ease;
+    transition:
+        opacity 0.7s ease,
+        transform 0.7s ease;
 }
 .l-reveal.visible {
     opacity: 1;
     transform: translateY(0);
 }
-.l-reveal-d1 { transition-delay: 0.08s; }
-.l-reveal-d2 { transition-delay: 0.16s; }
-.l-reveal-d3 { transition-delay: 0.24s; }
+.l-reveal-d1 {
+    transition-delay: 0.08s;
+}
+.l-reveal-d2 {
+    transition-delay: 0.16s;
+}
+.l-reveal-d3 {
+    transition-delay: 0.24s;
+}
 
 /* ── macOS window shell (always dark, simulates the app) ── */
 .mac-window {
-    background: #1A1916;
+    background: #1a1916;
     border-radius: 12px;
-    border: 1px solid #33312B;
+    border: 1px solid #33312b;
     overflow: hidden;
     box-shadow:
         0 24px 80px rgba(0, 0, 0, 0.45),
@@ -148,8 +267,8 @@
     align-items: center;
     padding: 11px 14px;
     gap: 7px;
-    background: #211F1B;
-    border-bottom: 1px solid #33312B;
+    background: #211f1b;
+    border-bottom: 1px solid #33312b;
 }
 
 .mac-dot {
@@ -157,15 +276,21 @@
     height: 12px;
     border-radius: 50%;
 }
-.mac-dot-r { background: #ff5f57; }
-.mac-dot-y { background: #febc2e; }
-.mac-dot-g { background: #28c840; }
+.mac-dot-r {
+    background: #ff5f57;
+}
+.mac-dot-y {
+    background: #febc2e;
+}
+.mac-dot-g {
+    background: #28c840;
+}
 
 /* ── Mock sidebar ── */
 .mock-sidebar {
     width: 154px;
-    background: #211F1B;
-    border-right: 1px solid #33312B;
+    background: #211f1b;
+    border-right: 1px solid #33312b;
     padding: 14px 0;
     flex-shrink: 0;
     position: relative;
@@ -177,12 +302,12 @@
     gap: 8px;
     padding: 6px 14px;
     font-size: 12px;
-    color: #A09A8E;
+    color: #a09a8e;
     cursor: default;
 }
 .mock-sidebar-item.active {
     background: rgba(130, 192, 204, 0.12);
-    color: #82C0CC;
+    color: #82c0cc;
 }
 
 /* ── Screenshot frame with accent padding ── */
@@ -224,13 +349,30 @@
     opacity: 0.7;
 }
 
+/* ── Logo marquee ── */
+.logo-marquee-item {
+    color: var(--l-logo-color);
+    opacity: var(--l-logo-opacity);
+    transition: opacity 0.3s;
+}
+.logo-marquee-item:hover {
+    opacity: var(--l-logo-hover-opacity);
+}
+
 .landing-light .logo-strip img {
     filter: brightness(0);
 }
 
 /* ── Spinner ── */
 @keyframes l-spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 .l-spinner {
     width: 14px;
@@ -242,8 +384,20 @@
 }
 
 /* ── Responsive ── */
+
+/* Mobile visual hidden on desktop, desktop visual hidden on mobile */
+.l-feature-visual-mobile {
+    display: none;
+}
+.l-feature-visual-desktop {
+    display: block;
+    overflow: visible;
+}
+
 @media (max-width: 960px) {
-    .mock-sidebar { width: 120px; }
+    .mock-sidebar {
+        width: 120px;
+    }
 
     .l-feature-section {
         grid-template-columns: 1fr !important;
@@ -256,8 +410,222 @@
     }
 }
 
+/* Mobile-only “Get Started” CTAs (desktop uses download buttons) */
+.hero-get-started-cta,
+.closing-get-started-cta {
+    display: none !important;
+}
+
 @media (max-width: 768px) {
     .l-hero-grid {
         grid-template-columns: 1fr !important;
+    }
+
+    .l-hero-section {
+        padding: 100px 20px 36px !important;
+        text-align: left !important;
+    }
+
+    .l-hero-section h1 {
+        font-size: 28px !important;
+        margin-bottom: 14px !important;
+    }
+
+    .l-hero-section p {
+        font-size: 15px !important;
+        margin-bottom: 28px !important;
+        max-width: none !important;
+    }
+
+    .hero-download-cta,
+    .closing-download-cta {
+        display: none !important;
+    }
+
+    .hero-get-started-cta,
+    .closing-get-started-cta {
+        display: inline-flex !important;
+    }
+
+    /* Shorter mockup chrome on mobile — less vertical scroll between feature sections */
+    .l-feature-visual-mobile .l-mac-window-body {
+        aspect-ratio: 16 / 7.5 !important;
+    }
+
+    /*
+     * Person detail mockup: keep profile + headline stats readable; clip lower donut / activity rows.
+     * Removes flex stretch that created empty space; :has() scopes only this mockup.
+     */
+    .l-feature-visual-mobile .l-mac-window:has(.l-person-detail-mockup) .l-mac-window-body {
+        aspect-ratio: unset !important;
+        /* Taller than before so padding/gaps can breathe; bottom of charts still clips */
+        max-height: min(304px, 84vw);
+        overflow: hidden;
+    }
+
+    .l-person-detail-mockup {
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 18px 20px !important;
+        gap: 16px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-header {
+        gap: 16px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-stats {
+        gap: 36px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-grid {
+        flex: none !important;
+        min-height: 0 !important;
+        gap: 12px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-grid > div {
+        padding: 16px 15px !important;
+        border-radius: 14px !important;
+    }
+
+    .l-person-detail-mockup .l-pd-grid > div > span:first-child {
+        margin-bottom: 16px !important;
+        display: block;
+    }
+
+    .l-person-detail-mockup .l-pd-card-body {
+        flex: none !important;
+        min-height: 0 !important;
+        gap: 12px !important;
+    }
+
+    /* Global mobile padding: reduce 48px horizontal to 20px on all pages */
+    .landing > main {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+    }
+
+    .l-feature-section {
+        grid-template-columns: 1fr !important;
+        gap: 28px !important;
+        padding: 60px 0 !important;
+    }
+
+    .l-feature-text {
+        order: 1 !important;
+    }
+
+    .l-feature-visual-desktop {
+        display: none !important;
+    }
+
+    .l-feature-visual-mobile {
+        display: block !important;
+        order: 2 !important;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+
+    .l-closing-cta {
+        padding: 60px 0 !important;
+    }
+
+    .l-closing-cta h2 {
+        font-size: 32px !important;
+    }
+
+    .l-closing-cta p {
+        font-size: 16px !important;
+    }
+
+    .l-cards-section {
+        padding: 60px 0 !important;
+    }
+
+    .l-cards-section h2 {
+        font-size: 26px !important;
+    }
+
+    .l-cards-grid {
+        gap: 12px !important;
+    }
+
+    .l-card {
+        padding: 22px !important;
+    }
+
+    /* Auth, billing, FAQ, checkout — align with blog / about mobile rhythm */
+    .l-account-page-main {
+        padding-top: 100px !important;
+        padding-bottom: 80px !important;
+    }
+
+    .l-account-page-main--checkout {
+        padding-top: 96px !important;
+        align-items: flex-start !important;
+    }
+
+    .l-account-checkout-card {
+        padding: 24px 20px !important;
+    }
+
+    .l-account-page-main--checkout h1 {
+        font-size: 28px !important;
+    }
+
+    .l-account-page-header {
+        text-align: left !important;
+        margin-bottom: 28px !important;
+    }
+
+    .l-account-page-main h1 {
+        font-size: 30px !important;
+    }
+
+    .l-account-page-subtitle {
+        font-size: 15px !important;
+    }
+
+    .l-faq-page-header {
+        margin-bottom: 28px !important;
+    }
+
+    .l-faq-item button {
+        padding: 16px 0 !important;
+        gap: 16px !important;
+    }
+
+    .l-faq-item button span:first-of-type {
+        font-size: 15px !important;
+    }
+
+    .l-faq-item .l-faq-answer {
+        font-size: 14px !important;
+        padding-bottom: 16px !important;
+        padding-right: 0 !important;
+    }
+
+    .l-faq-bottom-cta {
+        margin-top: 40px !important;
+        padding: 24px 20px !important;
+        text-align: left !important;
+    }
+
+    .l-faq-bottom-cta h2 {
+        font-size: 22px !important;
+    }
+
+    .l-billing-card {
+        padding: 20px 18px !important;
+    }
+
+    .l-account-page-main .l-billing-card h2 {
+        font-size: 20px !important;
+    }
+
+    .l-landing-footer {
+        padding: 36px 20px !important;
     }
 }

@@ -15,13 +15,11 @@ const C = {
 const cards = [
     {
         title: "Replace the management cycle",
-        description:
-            "When you already know what's going on, meetings can be about strategy and decisions — not status updates.",
+        description: "When you already know what's going on, meetings can be about strategy and decisions — not status updates.",
     },
     {
         title: "Merit-based recognition",
-        description:
-            "Mitable makes every person's work visible, so the best work always gets recognised — not just the work of those who speak up loudest.",
+        description: "Mitable makes every person's work visible, so the best work always gets recognised — not just the work of those who speak up loudest.",
     },
     {
         title: "Scale without the overhead",
@@ -52,6 +50,7 @@ const Card = ({ title, description, delay }: { title: string; description: strin
     return (
         <div
             ref={ref}
+            className="l-card"
             style={{
                 background: C.bgRaised,
                 border: `1px solid ${C.borderSubtle}`,
@@ -103,6 +102,7 @@ const Card = ({ title, description, delay }: { title: string; description: strin
 
 export const CardsSection = () => (
     <section
+        className="l-cards-section"
         style={{
             padding: "120px 48px",
             maxWidth: 1240,

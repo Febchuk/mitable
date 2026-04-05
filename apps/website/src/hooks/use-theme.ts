@@ -1,45 +1,21 @@
 "use client";
 
+import { useTheme as useNextTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
 
 type Theme = "dark" | "light";
 
-const STORAGE_KEY = "mitable-theme";
-
-function getStoredTheme(): Theme | null {
-    if (typeof window === "undefined") return null;
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === "light" || stored === "dark" ? stored : null;
-}
-
-function applyTheme(theme: Theme) {
-    const root = document.documentElement;
-    if (theme === "light") {
-        root.classList.add("landing-light");
-    } else {
-        root.classList.remove("landing-light");
-    }
-}
-
 export function useTheme() {
-    const [theme, setTheme] = useState<Theme>("dark");
+    const { resolvedTheme, setTheme } = useNextTheme();
+    const [mounted, setMounted] = useState(false);
 
-    useEffect(() => {
-        const stored = getStoredTheme();
-        if (stored) {
-            setTheme(stored);
-            applyTheme(stored);
-        }
-    }, []);
+    useEffect(() => setMounted(true), []);
+
+    const theme: Theme = mounted && resolvedTheme === "light" ? "light" : "dark";
 
     const toggle = useCallback(() => {
-        setTheme((prev) => {
-            const next: Theme = prev === "dark" ? "light" : "dark";
-            localStorage.setItem(STORAGE_KEY, next);
-            applyTheme(next);
-            return next;
-        });
-    }, []);
+        setTheme(theme === "dark" ? "light" : "dark");
+    }, [theme, setTheme]);
 
     return { theme, toggle };
 }

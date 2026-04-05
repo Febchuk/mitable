@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 const C = {
     text: "var(--l-text, #ECE8E0)",
     textSec: "var(--l-text-secondary, #A09A8E)",
@@ -8,16 +10,19 @@ const C = {
     sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
 
+/** Same order as `navLinks` in landing-nav.tsx, then Contact (not in nav). */
 const links = [
-    { label: "About Us", href: "#" },
-    { label: "How it works", href: "#" },
+    { label: "How it works", href: "/#how-it-works" },
     { label: "Pricing", href: "/pricing" },
-    { label: "FAQs", href: "#" },
+    { label: "Blog", href: "/blog" },
+    { label: "About", href: "/about" },
+    { label: "FAQs", href: "/faq" },
     { label: "Contact", href: "/contact" },
 ];
 
 export const LandingFooter = () => (
     <footer
+        className="l-landing-footer"
         style={{
             borderTop: `1px solid ${C.borderSubtle}`,
             padding: "40px 48px",
@@ -31,9 +36,9 @@ export const LandingFooter = () => (
             gap: 20,
         }}
     >
-        <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+        <div className="l-landing-footer-links" style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             {links.map((link) => (
-                <a
+                <Link
                     key={link.label}
                     href={link.href}
                     style={{
@@ -46,7 +51,7 @@ export const LandingFooter = () => (
                     onMouseLeave={(e) => { e.currentTarget.style.color = "var(--l-text-muted, #706B60)"; }}
                 >
                     {link.label}
-                </a>
+                </Link>
             ))}
         </div>
         <div style={{ fontSize: 12, color: C.textMuted }}>© 2026 Mitable</div>

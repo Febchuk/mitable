@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { useOsDetection } from "@/hooks/use-os-detection";
 
 const C = {
@@ -22,19 +23,23 @@ export const HeroSection = () => {
 
         els.forEach((el, i) => {
             const htmlEl = el as HTMLElement;
-            setTimeout(() => {
-                htmlEl.style.opacity = "1";
-                htmlEl.style.transform = "translateY(0)";
-            }, 100 + i * 120);
+            setTimeout(
+                () => {
+                    htmlEl.style.opacity = "1";
+                    htmlEl.style.transform = "translateY(0)";
+                },
+                100 + i * 120,
+            );
         });
     }, []);
 
     return (
         <section
             ref={heroRef}
+            className="l-hero-section"
             style={{
                 fontFamily: C.sans,
-                padding: "200px 48px 120px",
+                padding: "200px 48px 60px",
                 maxWidth: 1100,
                 margin: "0 auto",
                 textAlign: "center",
@@ -55,11 +60,12 @@ export const HeroSection = () => {
                     transition: "opacity 0.7s ease, transform 0.7s ease",
                 }}
             >
-                Knowing if your team is spending their time on the right things is the{" "}
-                <strong style={{ fontWeight: 600 }}>hardest</strong>{" "}
-                part of management.
+                Knowing if your team is spending their time on the right things is the <strong style={{ fontWeight: 600 }}>hardest</strong> part of management.
                 <br />
-                <em style={{ fontStyle: "italic", color: C.accent }}> Mitable makes it <strong style={{ fontWeight: 600 }}>simple</strong>.</em>
+                <em style={{ fontStyle: "italic", color: C.accent }}>
+                    {" "}
+                    Mitable makes it <strong style={{ fontWeight: 600 }}>simple</strong>.
+                </em>
             </h1>
             <p
                 className="hero-reveal"
@@ -79,7 +85,7 @@ export const HeroSection = () => {
             </p>
             <a
                 href="/download"
-                className="hero-reveal"
+                className="hero-reveal hero-download-cta"
                 style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -96,14 +102,47 @@ export const HeroSection = () => {
                     transform: "translateY(28px)",
                     transitionDelay: "0.16s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
             >
                 {os.label}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M8 3v10M8 13l-3-3M8 13l3-3" />
                 </svg>
             </a>
+            <Link
+                href="/login"
+                className="hero-reveal hero-get-started-cta"
+                style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    background: C.text,
+                    color: C.bg,
+                    padding: "14px 28px",
+                    borderRadius: 10,
+                    textDecoration: "none",
+                    fontWeight: 500,
+                    fontSize: 15,
+                    transition: "opacity 0.2s, all 0.7s ease",
+                    opacity: 0,
+                    transform: "translateY(28px)",
+                    transitionDelay: "0.16s",
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
+            >
+                Get Started
+            </Link>
         </section>
     );
 };

@@ -82,8 +82,8 @@ const DownloadsFolderIllustration = () => (
             style={{
                 width: 100,
                 height: 72,
-                background: "rgba(130, 192, 204, 0.12)",
-                border: "1px solid rgba(130, 192, 204, 0.2)",
+                background: "rgba(var(--l-accent-rgb, 130,192,204), 0.12)",
+                border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                 borderRadius: 10,
                 display: "flex",
                 flexDirection: "column",
@@ -99,28 +99,30 @@ const DownloadsFolderIllustration = () => (
                     left: 8,
                     width: 36,
                     height: 14,
-                    background: "rgba(130, 192, 204, 0.18)",
+                    background: "rgba(var(--l-accent-rgb, 130,192,204), 0.18)",
                     borderRadius: "6px 6px 0 0",
-                    border: "1px solid rgba(130, 192, 204, 0.2)",
+                    border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                     borderBottom: "none",
                 }}
             />
             <div
                 style={{
-                    width: 42,
-                    height: 48,
-                    background: C.overlay,
-                    borderRadius: 6,
-                    border: `1px solid ${C.border}`,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "rgba(var(--l-accent-rgb, 130,192,204), 0.12)",
+                    border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 4,
+                    color: C.accent,
                 }}
             >
-                <MitableLogo />
-                <span style={{ fontSize: 7, color: C.textTer, fontFamily: C.sans }}>.dmg</span>
+                <svg width="22" height="22" viewBox="0 0 91 102" fill="currentColor">
+                    <path d="M2 20H13.5C20.6797 20 26.5 25.8203 26.5 33V71C26.5 78.1797 20.6797 84 13.5 84C6.3203 84 0.5 78.1797 0.5 71V21.5L0.507812 21.3467C0.58461 20.5903 1.22334 20 2 20Z" />
+                    <rect x="33.5" y="2.5" width="25" height="99" rx="12.5" />
+                    <rect x="65.5" y="20" width="26" height="64" rx="13" />
+                </svg>
             </div>
         </div>
         <span style={{ fontSize: 10, color: C.textTer, fontFamily: C.sans, textTransform: "uppercase", letterSpacing: "0.06em" }}>Downloads</span>
@@ -135,8 +137,8 @@ const DragToAppsIllustration = () => (
                 width: 56,
                 height: 56,
                 borderRadius: 14,
-                background: "rgba(130, 192, 204, 0.12)",
-                border: "1px solid rgba(130, 192, 204, 0.2)",
+                background: "rgba(var(--l-accent-rgb, 130,192,204), 0.12)",
+                border: "1px solid rgba(var(--l-accent-rgb, 130,192,204), 0.2)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -197,8 +199,8 @@ const OpenFromAppsIllustration = () => (
                     alignItems: "center",
                     gap: 10,
                     padding: "8px 14px",
-                    background: app.active ? "rgba(130, 192, 204, 0.12)" : C.raised,
-                    border: `1px solid ${app.active ? "rgba(130, 192, 204, 0.2)" : C.border}`,
+                    background: app.active ? "rgba(var(--l-accent-rgb, 130,192,204), 0.12)" : C.raised,
+                    border: `1px solid ${app.active ? "rgba(var(--l-accent-rgb, 130,192,204), 0.2)" : C.border}`,
                     borderTop: "none",
                     fontSize: 12,
                     color: app.active ? C.accent : C.textSec,
@@ -210,7 +212,7 @@ const OpenFromAppsIllustration = () => (
                         width: 20,
                         height: 20,
                         borderRadius: 5,
-                        background: app.active ? "rgba(130, 192, 204, 0.15)" : "rgba(236, 232, 224, 0.04)",
+                        background: app.active ? "rgba(var(--l-accent-rgb, 130,192,204), 0.15)" : "rgba(var(--l-ui-rgb, 236,232,224), 0.04)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",

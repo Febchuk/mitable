@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { useOsDetection } from "@/hooks/use-os-detection";
 
 const C = {
@@ -34,6 +35,7 @@ export const ClosingCtaSection = () => {
     return (
         <section
             ref={ref}
+            className="l-closing-cta"
             style={{
                 padding: "140px 48px",
                 textAlign: "center",
@@ -68,11 +70,11 @@ export const ClosingCtaSection = () => {
                     color: C.textSec,
                 }}
             >
-                The teams that win will be the ones where everyone knows exactly what good looks like
-                and can see whether they&apos;re hitting it.
+                The teams that win will be the ones where everyone knows exactly what good looks like and can see whether they&apos;re hitting it.
             </p>
             <a
                 href="/download"
+                className="closing-download-cta"
                 style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -87,14 +89,45 @@ export const ClosingCtaSection = () => {
                     fontFamily: C.sans,
                     transition: "opacity 0.2s",
                 }}
-                onMouseEnter={(e) => { (e.currentTarget).style.opacity = "0.85"; }}
-                onMouseLeave={(e) => { (e.currentTarget).style.opacity = "1"; }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
             >
                 {os.label}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M8 3v10M8 13l-3-3M8 13l3-3" />
                 </svg>
             </a>
+            <Link
+                href="/login"
+                className="closing-get-started-cta"
+                style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    background: C.text,
+                    color: C.bg,
+                    padding: "16px 32px",
+                    borderRadius: 10,
+                    textDecoration: "none",
+                    fontWeight: 500,
+                    fontSize: 16,
+                    fontFamily: C.sans,
+                    transition: "opacity 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                }}
+            >
+                Get Started
+            </Link>
         </section>
     );
 };

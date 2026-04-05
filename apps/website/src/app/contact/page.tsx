@@ -1,17 +1,33 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { Button } from "@/components/base/buttons/button";
-import { Input } from "@/components/base/input/input";
-import { TextArea } from "@/components/base/textarea/textarea";
-import { MitableHeader } from "@/components/marketing/header-navigation/mitable-header";
+import { LandingNav } from "@/components/landing/landing-nav";
+import { LandingFooter } from "@/components/landing";
 
-const darkInput = {
-    wrapperClassName: "!bg-gray-900/50 !ring-gray-800/60 focus-within:!ring-brand",
-    inputClassName: "!text-white !placeholder-gray-500",
+const C = {
+    bg: "var(--l-bg, #1A1916)",
+    raised: "var(--l-bg-raised, #211F1B)",
+    text: "var(--l-text, #ECE8E0)",
+    textSec: "var(--l-text-secondary, #A09A8E)",
+    textTer: "var(--l-text-tertiary, #6B665C)",
+    accent: "var(--l-accent, #82C0CC)",
+    border: "var(--l-border, #33312B)",
+    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
 };
 
-const darkTextArea = "!bg-gray-900/50 !ring-gray-800/60 !text-white !placeholder-gray-500 focus:!ring-brand";
+const inputStyle = {
+    width: "100%",
+    padding: "10px 14px",
+    fontSize: 14,
+    color: "var(--l-text, #ECE8E0)",
+    background: "rgba(var(--l-ui-rgb, 236, 232, 224), 0.04)",
+    border: "1px solid rgba(var(--l-ui-rgb, 236, 232, 224), 0.08)",
+    borderRadius: 10,
+    outline: "none",
+    fontFamily: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+    transition: "border-color 0.15s",
+};
 
 export default function ContactPage() {
     const [name, setName] = useState("");
@@ -32,94 +48,125 @@ export default function ContactPage() {
     };
 
     return (
-        <div className="flex min-h-dvh flex-col bg-ink">
-            <MitableHeader />
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+            <LandingNav />
 
-            <main className="flex-1 pt-18 md:pt-20">
-                <section className="relative overflow-hidden">
-                    {/* Background glow */}
-                    <div
-                        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            <main style={{ padding: "140px 48px 64px", maxWidth: 640, margin: "0 auto" }}>
+                <a
+                    href="/"
+                    style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 13,
+                        color: C.textTer,
+                        textDecoration: "none",
+                        marginBottom: 20,
+                        transition: "color 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--l-text)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--l-text-tertiary, #6B665C)"; }}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12" />
+                        <polyline points="12 19 5 12 12 5" />
+                    </svg>
+                    Back to home
+                </a>
+
+                <div style={{ textAlign: "center", marginBottom: 32 }}>
+                    <h1
                         style={{
-                            width: "800px",
-                            height: "600px",
-                            background: "radial-gradient(50% 50% at 50% 50%, rgba(138,97,247,0.06) 0%, transparent 100%)",
+                            fontFamily: C.serif,
+                            fontSize: 44,
+                            fontWeight: 400,
+                            color: C.text,
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.2,
+                            margin: "0 0 14px",
                         }}
-                    />
+                    >
+                        Contact Sales
+                    </h1>
+                    <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
+                        Tell us about your team and we&apos;ll get back to you.
+                    </p>
+                </div>
 
-                    <div className="relative mx-auto max-w-container px-4 py-20 md:px-8 md:py-28 lg:py-36">
-                        {/* Back link */}
-                        <a href="/" className="mb-12 inline-flex items-center gap-2 font-mono text-sm text-gray-400 transition-colors hover:text-white">
-                            <svg
-                                className="size-4"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <line x1="19" y1="12" x2="5" y2="12" />
-                                <polyline points="12 19 5 12 12 5" />
-                            </svg>
-                            Back to home
-                        </a>
-
-                        {/* Headline */}
-                        <div className="mb-12 text-center">
-                            <h1 className="font-display text-4xl font-extrabold tracking-tight text-white uppercase md:text-5xl lg:text-6xl">Contact Sales</h1>
-                            <p className="mt-4 text-lg text-gray-400 md:text-xl">Tell us about your team and we&apos;ll get back to you.</p>
-                        </div>
-
-                        {/* Form */}
-                        <form onSubmit={handleSubmit} className="mx-auto flex max-w-lg flex-col gap-5">
-                            <Input
-                                label="Name"
-                                placeholder="Your full name"
-                                isRequired
-                                value={name}
-                                onChange={setName}
-                                wrapperClassName={darkInput.wrapperClassName}
-                                inputClassName={darkInput.inputClassName}
-                            />
-
-                            <Input
-                                label="Email"
-                                placeholder="you@company.com"
-                                type="email"
-                                isRequired
-                                value={email}
-                                onChange={setEmail}
-                                wrapperClassName={darkInput.wrapperClassName}
-                                inputClassName={darkInput.inputClassName}
-                            />
-
-                            <Input
-                                label="Company"
-                                placeholder="Company name (optional)"
-                                value={company}
-                                onChange={setCompany}
-                                wrapperClassName={darkInput.wrapperClassName}
-                                inputClassName={darkInput.inputClassName}
-                            />
-
-                            <TextArea
-                                label="Message"
-                                placeholder="How can we help?"
-                                isRequired
-                                rows={5}
-                                value={message}
-                                onChange={setMessage}
-                                textAreaClassName={darkTextArea}
-                            />
-
-                            <Button type="submit" color="primary" size="lg" className="btn-pill mt-2 w-full">
-                                Send Message
-                            </Button>
-                        </form>
+                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                    <div>
+                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Name *</label>
+                        <input
+                            required
+                            placeholder="Your full name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            style={inputStyle}
+                        />
                     </div>
-                </section>
+
+                    <div>
+                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Email *</label>
+                        <input
+                            required
+                            type="email"
+                            placeholder="you@company.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            style={inputStyle}
+                        />
+                    </div>
+
+                    <div>
+                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Company</label>
+                        <input
+                            placeholder="Company name (optional)"
+                            value={company}
+                            onChange={(e) => setCompany(e.target.value)}
+                            style={inputStyle}
+                        />
+                    </div>
+
+                    <div>
+                        <label style={{ display: "block", fontSize: 10, color: C.textTer, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 8 }}>Message *</label>
+                        <textarea
+                            required
+                            rows={5}
+                            placeholder="How can we help?"
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            style={{ ...inputStyle, resize: "vertical", minHeight: 120 }}
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: "13px 0",
+                            borderRadius: 10,
+                            fontSize: 14,
+                            fontWeight: 500,
+                            background: C.text,
+                            color: C.bg,
+                            border: "none",
+                            cursor: "pointer",
+                            fontFamily: C.sans,
+                            transition: "opacity 0.15s",
+                            width: "100%",
+                            marginTop: 4,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                    >
+                        Send Message
+                    </button>
+                </form>
             </main>
+
+            <LandingFooter />
         </div>
     );
 }

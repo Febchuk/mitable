@@ -1,33 +1,90 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/base/buttons/button";
+import { LandingNav } from "@/components/landing/landing-nav";
+import { LandingFooter } from "@/components/landing";
+
+const C = {
+    bg: "var(--l-bg, #1A1916)",
+    text: "var(--l-text, #ECE8E0)",
+    textSec: "var(--l-text-secondary, #A09A8E)",
+    textTer: "var(--l-text-tertiary, #6B665C)",
+    accent: "var(--l-accent, #82C0CC)",
+    serif: 'var(--font-newsreader, "Newsreader"), Georgia, serif',
+    sans: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+};
+
+const buttonPrimary: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "13px 28px",
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 500,
+    background: "var(--l-text, #ECE8E0)",
+    color: "var(--l-bg, #1A1916)",
+    border: "none",
+    textDecoration: "none",
+    fontFamily: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+    transition: "opacity 0.15s",
+    cursor: "pointer",
+};
+
+const buttonSecondary: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "13px 28px",
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 500,
+    background: "rgba(var(--l-ui-rgb, 236,232,224), 0.06)",
+    color: "var(--l-text, #ECE8E0)",
+    border: "1px solid rgba(var(--l-ui-rgb, 236,232,224), 0.08)",
+    textDecoration: "none",
+    fontFamily: 'var(--font-dm-sans, "DM Sans"), system-ui, sans-serif',
+    transition: "opacity 0.15s",
+    cursor: "pointer",
+};
 
 export default function NotFound() {
     const router = useRouter();
 
     return (
-        <section className="flex min-h-screen items-start bg-primary py-16 md:items-center md:py-24">
-            <div className="mx-auto max-w-container grow px-4 md:px-8">
-                <div className="flex w-full max-w-3xl flex-col gap-8 md:gap-12">
-                    <div className="flex flex-col gap-4 md:gap-6">
-                        <div className="flex flex-col gap-3">
-                            <span className="text-md font-semibold text-brand-secondary">404 error</span>
-                            <h1 className="text-display-md font-semibold text-primary md:text-display-lg lg:text-display-xl">We can’t find that page</h1>
-                        </div>
-                        <p className="text-lg text-tertiary md:text-xl">Sorry, the page you are looking for doesn&apos;t exist or has been moved.</p>
-                    </div>
+        <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
+            <LandingNav />
 
-                    <div className="flex flex-col-reverse gap-3 sm:flex-row">
-                        <Button color="secondary" size="xl" onClick={() => router.back()}>
-                            Go back
-                        </Button>
-                        <Button size="xl" onClick={() => router.back()}>
-                            Take me home
-                        </Button>
-                    </div>
+            <main style={{ padding: "180px 48px 80px", maxWidth: 640, margin: "0 auto" }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: C.accent, marginBottom: 14 }}>404 error</p>
+                <h1 style={{ fontFamily: C.serif, fontSize: 52, fontWeight: 400, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.15, margin: "0 0 18px" }}>
+                    We can&apos;t find that page
+                </h1>
+                <p style={{ fontSize: 18, color: C.textSec, lineHeight: 1.6, margin: "0 0 40px" }}>
+                    Sorry, the page you are looking for doesn&apos;t exist or has been moved.
+                </p>
+
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    <button
+                        onClick={() => router.back()}
+                        style={buttonSecondary}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                    >
+                        Go back
+                    </button>
+                    <a
+                        href="/"
+                        style={buttonPrimary}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                    >
+                        Take me home
+                    </a>
                 </div>
-            </div>
-        </section>
+            </main>
+
+            <LandingFooter />
+        </div>
     );
 }
