@@ -217,7 +217,7 @@ function DefaultRoute() {
   }
 
   if (needsOnboarding) return <Navigate to="/onboarding" replace />;
-  if (user?.role === "admin") return <Navigate to="/dashboard" replace />;
+  if (user?.role === "admin" || user?.isManager) return <Navigate to="/dashboard" replace />;
   return <Navigate to="/calendar" replace />;
 }
 
@@ -240,12 +240,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
-}
-
-function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useUser();
-  if (user?.role !== "admin") return <Navigate to="/benchmarks" replace />;
   return <>{children}</>;
 }
 
@@ -328,31 +322,10 @@ function App() {
                         <Route path="reports" element={<ReportsView />} />
                         <Route path="reports/:docId" element={<DocDetail />} />
                         <Route path="benchmarks" element={<BenchmarksRouter />} />
-                        <Route
-                          path="benchmarks/new"
-                          element={
-                            <AdminOnlyRoute>
-                              <BenchmarkEditor />
-                            </AdminOnlyRoute>
-                          }
-                        />
-                        <Route
-                          path="benchmarks/:id/edit"
-                          element={
-                            <AdminOnlyRoute>
-                              <BenchmarkEditor />
-                            </AdminOnlyRoute>
-                          }
-                        />
+                        <Route path="benchmarks/new" element={<RoleGate requireManager><BenchmarkEditor /></RoleGate>} />
+                        <Route path="benchmarks/:id/edit" element={<RoleGate requireManager><BenchmarkEditor /></RoleGate>} />
                         <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
-                        <Route
-                          path="benchmarks/:id/person/:userId"
-                          element={
-                            <AdminOnlyRoute>
-                              <PersonBenchmarkView />
-                            </AdminOnlyRoute>
-                          }
-                        />
+                        <Route path="benchmarks/:id/person/:userId" element={<RoleGate requireManager><PersonBenchmarkView /></RoleGate>} />
                         <Route path="integrations" element={<IntegrationsView />} />
                         <Route path="org-setup" element={<RoleGate requireAdmin><OrgSetupView /></RoleGate>} />
                         <Route path="setup" element={<Navigate to="/org-setup" replace />} />
