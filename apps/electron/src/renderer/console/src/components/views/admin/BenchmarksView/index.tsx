@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useBenchmarks, useDeleteBenchmark } from "@/console/src/hooks/queries/benchmarks";
 import type { Benchmark } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
+import DataScopeFilter from "@/console/src/components/shared/DataScopeFilter";
 
 // Frequency filters — commented out in UI for now
 // type FrequencyFilter = "all" | BenchmarkFrequency;
@@ -83,18 +84,21 @@ export default function BenchmarksView() {
           flexWrap: "wrap",
         }}
       >
-        <h1
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: 26,
-            color: "var(--text-primary)",
-            fontWeight: 400,
-            letterSpacing: "-0.3px",
-            margin: 0,
-          }}
-        >
-          Benchmarks
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <h1
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 26,
+              color: "var(--text-primary)",
+              fontWeight: 400,
+              letterSpacing: "-0.3px",
+              margin: 0,
+            }}
+          >
+            Benchmarks
+          </h1>
+          <DataScopeFilter />
+        </div>
 
         {/* Frequency filters — hidden for now
         <div

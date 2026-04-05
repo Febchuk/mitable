@@ -94,9 +94,10 @@ export interface MyBenchmarkDetail extends MyBenchmark {
 
 // ── Admin API ──────────────────────────────────────────────
 
-export async function fetchBenchmarks(): Promise<Benchmark[]> {
+export async function fetchBenchmarks(scope?: string): Promise<Benchmark[]> {
   try {
-    const response = await apiRequest<{ benchmarks: Benchmark[] }>("/admin/benchmarks");
+    const params = scope ? `?scope=${scope}` : "";
+    const response = await apiRequest<{ benchmarks: Benchmark[] }>(`/admin/benchmarks${params}`);
     return response.benchmarks;
   } catch (error) {
     logger.error("Error fetching benchmarks:", error);

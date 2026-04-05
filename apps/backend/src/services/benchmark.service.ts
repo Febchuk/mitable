@@ -1,4 +1,4 @@
-import { eq, and, avg, count, asc, desc } from "drizzle-orm";
+import { eq, and, avg, count, asc, desc, inArray } from "drizzle-orm";
 import { db } from "../db/client.js";
 import {
   benchmarks,
@@ -144,7 +144,11 @@ function formatTimestamp(ts: Date | null): string {
 /**
  * Compute aggregate fields for a single benchmark from its assignments.
  */
-async function computeAggregates(benchmarkId: string) {
+async function computeAggregates(benchmarkId: string, scopedUserIds?: string[]) {
+  const whereClause = scopedUserIds
+    ? and(eq(benchmarkAssignments.benchmarkId, benchmarkId), inArray(benchmarkAssignments.userId, scopedUserIds))
+    : eq(benchmarkAssignments.benchmarkId, benchmarkId);
+
   const rows = await db
     .select({
       assignedCount: count(benchmarkAssignments.id),
@@ -152,7 +156,7 @@ async function computeAggregates(benchmarkId: string) {
       avgTrendDelta: avg(benchmarkAssignments.trendDelta),
     })
     .from(benchmarkAssignments)
-    .where(eq(benchmarkAssignments.benchmarkId, benchmarkId));
+    .where(whereClause);
 
   const row = rows[0];
   const assignedCount = Number(row?.assignedCount ?? 0);
@@ -168,7 +172,7 @@ async function computeAggregates(benchmarkId: string) {
         cnt: count(benchmarkAssignments.id),
       })
       .from(benchmarkAssignments)
-      .where(eq(benchmarkAssignments.benchmarkId, benchmarkId))
+      .where(whereClause)
       .groupBy(benchmarkAssignments.trend)
       .orderBy(desc(count(benchmarkAssignments.id)))
       .limit(1);
@@ -253,8 +257,8 @@ export const benchmarkService = {
   /**
    * List all benchmarks for an organization with aggregate assignment stats.
    */
-  async listByOrg(organizationId: string): Promise<BenchmarkWithAggregates[]> {
-    logger.info({ organizationId }, "listing benchmarks for organization");
+  async listByOrg(organizationId: string, scopedUserIds?: string[]): Promise<BenchmarkWithAggregates[]> {
+    logger.info({ organizationId, scopedUsers: scopedUserIds?.length }, "listing benchmarks for organization");
 
     const rows = await db
       .select()
@@ -263,7 +267,9 @@ export const benchmarkService = {
 
     const results: BenchmarkWithAggregates[] = [];
     for (const bm of rows) {
-      const agg = await computeAggregates(bm.id);
+      const agg = await computeAggregates(bm.id, scopedUserIds);
+      // When scoping, only include benchmarks that have at least one scoped assignment
+      if (scopedUserIds && agg.assignedCount === 0) continue;
       results.push(toBenchmarkWithAggregates(bm, agg));
     }
 

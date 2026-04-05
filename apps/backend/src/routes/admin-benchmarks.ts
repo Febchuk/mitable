@@ -16,6 +16,7 @@
 
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
+import { getScopedVisibleUserIds } from "../middleware/authorization.js";
 import { createLogger } from "../lib/logger.js";
 import { benchmarkService } from "../services/benchmark.service.js";
 import { benchmarkComputeService } from "../services/benchmark-compute.service.js";
@@ -112,9 +113,12 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    logger.info({ organizationId: req.organizationId }, "Listing benchmarks");
+    // Get scoped user IDs for filtering benchmark assignments
+    const scopedUserIds = await getScopedVisibleUserIds(req);
 
-    const benchmarks = await benchmarkService.listByOrg(req.organizationId);
+    logger.info({ organizationId: req.organizationId, scope: req.query.scope, scopedUsers: scopedUserIds.length }, "Listing benchmarks");
+
+    const benchmarks = await benchmarkService.listByOrg(req.organizationId, scopedUserIds);
 
     res.status(200).json({ benchmarks });
   } catch (error) {
