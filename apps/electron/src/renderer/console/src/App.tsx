@@ -243,7 +243,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RoleGate({ requireAdmin, requireManager, children }: {
+function RoleGate({
+  requireAdmin,
+  requireManager,
+  children,
+}: {
   requireAdmin?: boolean;
   requireManager?: boolean;
   children: React.ReactNode;
@@ -322,15 +326,50 @@ function App() {
                         <Route path="reports" element={<ReportsView />} />
                         <Route path="reports/:docId" element={<DocDetail />} />
                         <Route path="benchmarks" element={<BenchmarksRouter />} />
-                        <Route path="benchmarks/new" element={<RoleGate requireManager><BenchmarkEditor /></RoleGate>} />
-                        <Route path="benchmarks/:id/edit" element={<RoleGate requireManager><BenchmarkEditor /></RoleGate>} />
+                        <Route
+                          path="benchmarks/new"
+                          element={
+                            <RoleGate requireManager>
+                              <BenchmarkEditor />
+                            </RoleGate>
+                          }
+                        />
+                        <Route
+                          path="benchmarks/:id/edit"
+                          element={
+                            <RoleGate requireManager>
+                              <BenchmarkEditor />
+                            </RoleGate>
+                          }
+                        />
                         <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
-                        <Route path="benchmarks/:id/person/:userId" element={<RoleGate requireManager><PersonBenchmarkView /></RoleGate>} />
+                        <Route
+                          path="benchmarks/:id/person/:userId"
+                          element={
+                            <RoleGate requireManager>
+                              <PersonBenchmarkView />
+                            </RoleGate>
+                          }
+                        />
                         <Route path="integrations" element={<IntegrationsView />} />
-                        <Route path="org-setup" element={<RoleGate requireAdmin><OrgSetupView /></RoleGate>} />
+                        <Route
+                          path="org-setup"
+                          element={
+                            <RoleGate requireAdmin>
+                              <OrgSetupView />
+                            </RoleGate>
+                          }
+                        />
                         <Route path="setup" element={<Navigate to="/org-setup" replace />} />
                         <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
-                        <Route path="teams" element={<RoleGate requireAdmin><TeamsView /></RoleGate>} />
+                        <Route
+                          path="teams"
+                          element={
+                            <RoleGate requireAdmin>
+                              <TeamsView />
+                            </RoleGate>
+                          }
+                        />
                         {/* Employee Routes */}
                         <Route path="me" element={<MeView />} />
                         <Route path="bragbook" element={<BragbookView />} />

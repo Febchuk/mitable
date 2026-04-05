@@ -146,7 +146,10 @@ function formatTimestamp(ts: Date | null): string {
  */
 async function computeAggregates(benchmarkId: string, scopedUserIds?: string[]) {
   const whereClause = scopedUserIds
-    ? and(eq(benchmarkAssignments.benchmarkId, benchmarkId), inArray(benchmarkAssignments.userId, scopedUserIds))
+    ? and(
+        eq(benchmarkAssignments.benchmarkId, benchmarkId),
+        inArray(benchmarkAssignments.userId, scopedUserIds)
+      )
     : eq(benchmarkAssignments.benchmarkId, benchmarkId);
 
   const rows = await db
@@ -257,8 +260,14 @@ export const benchmarkService = {
   /**
    * List all benchmarks for an organization with aggregate assignment stats.
    */
-  async listByOrg(organizationId: string, scopedUserIds?: string[]): Promise<BenchmarkWithAggregates[]> {
-    logger.info({ organizationId, scopedUsers: scopedUserIds?.length }, "listing benchmarks for organization");
+  async listByOrg(
+    organizationId: string,
+    scopedUserIds?: string[]
+  ): Promise<BenchmarkWithAggregates[]> {
+    logger.info(
+      { organizationId, scopedUsers: scopedUserIds?.length },
+      "listing benchmarks for organization"
+    );
 
     const rows = await db
       .select()

@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { canViewUserData, getVisibleUserIds, getScopedUserIds } from "../services/permissions.service.js";
+import {
+  canViewUserData,
+  getVisibleUserIds,
+  getScopedUserIds,
+} from "../services/permissions.service.js";
 
 /**
  * Requires the authenticated user to be an org admin.
@@ -62,11 +66,7 @@ export function requireAccessToUser(paramName: string = "id") {
  */
 export async function getCachedVisibleUserIds(req: Request): Promise<string[]> {
   if (!req._visibleUserIds) {
-    req._visibleUserIds = await getVisibleUserIds(
-      req.userId!,
-      req.organizationId!,
-      req.userRole!
-    );
+    req._visibleUserIds = await getVisibleUserIds(req.userId!, req.organizationId!, req.userRole!);
   }
   return req._visibleUserIds;
 }
@@ -79,9 +79,10 @@ export async function getCachedVisibleUserIds(req: Request): Promise<string[]> {
 export async function getScopedVisibleUserIds(req: Request): Promise<string[]> {
   const validScopes = ["direct", "all-reports", "org-wide"] as const;
   const rawScope = req.query.scope as string | undefined;
-  const scope = rawScope && validScopes.includes(rawScope as any)
-    ? (rawScope as "direct" | "all-reports" | "org-wide")
-    : "all-reports";
+  const scope =
+    rawScope && validScopes.includes(rawScope as any)
+      ? (rawScope as "direct" | "all-reports" | "org-wide")
+      : "all-reports";
 
   return getScopedUserIds(
     req.userId!,

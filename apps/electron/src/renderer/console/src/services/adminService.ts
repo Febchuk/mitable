@@ -656,7 +656,9 @@ export async function fetchDashboardMetrics(
 export async function fetchDashboardPeople(scope?: string): Promise<DashboardPerson[]> {
   try {
     const params = scope ? `?scope=${scope}` : "";
-    const response = await apiRequest<{ people: DashboardPerson[] }>(`/admin/dashboard/people${params}`);
+    const response = await apiRequest<{ people: DashboardPerson[] }>(
+      `/admin/dashboard/people${params}`
+    );
     return response.people;
   } catch (error) {
     logger.error("Error fetching dashboard people:", error);

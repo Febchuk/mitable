@@ -1,8 +1,8 @@
 "use client";
 
 import { ReactNode } from "react";
-import { LandingNav } from "@/components/landing/landing-nav";
 import { LandingFooter } from "@/components/landing";
+import { LandingNav } from "@/components/landing/landing-nav";
 import { BLOG_AUTHOR, formatBlogPublished } from "@/content/blog-posts";
 
 const C = {
@@ -105,7 +105,18 @@ export const BlogPostLayout = ({ title, description, publishedAt, author = BLOG_
             <main className="blog-post-main">
                 {/* Header */}
                 <header style={{ marginBottom: 56, paddingBottom: 32, borderBottom: `1px solid ${C.border}` }}>
-                    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16, fontFamily: C.sans, fontSize: 13, color: C.textTer }}>
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: 12,
+                            marginBottom: 16,
+                            fontFamily: C.sans,
+                            fontSize: 13,
+                            color: C.textTer,
+                        }}
+                    >
                         {published && (
                             <time dateTime={published.dateTime} style={{ color: C.textTer }}>
                                 {published.label}
@@ -127,17 +138,11 @@ export const BlogPostLayout = ({ title, description, publishedAt, author = BLOG_
                     >
                         {title}
                     </h1>
-                    {description && (
-                        <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>
-                            {description}
-                        </p>
-                    )}
+                    {description && <p style={{ fontSize: 16, color: C.textSec, lineHeight: 1.6, margin: 0 }}>{description}</p>}
                 </header>
 
                 {/* Content Body */}
-                <article className="blog-content">
-                    {children}
-                </article>
+                <article className="blog-content">{children}</article>
             </main>
 
             <LandingFooter />

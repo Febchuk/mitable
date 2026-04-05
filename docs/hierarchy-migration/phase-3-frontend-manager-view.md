@@ -157,7 +157,7 @@ Configuration and org-wide analytics. No personal features (calendar, me) — sw
 **File:** `apps/electron/src/renderer/console/src/types/index.ts`
 
 ```typescript
-export type UserRole = "admin" | "employee";  // UNCHANGED — manager is NOT a role
+export type UserRole = "admin" | "employee"; // UNCHANGED — manager is NOT a role
 
 export interface User {
   id: string;
@@ -205,9 +205,9 @@ Replace the binary `role` / `originalRole` switching with a `viewMode` state:
 ```typescript
 interface UserContextValue {
   user: User | null;
-  viewMode: ViewMode;           // NEW: current active view
+  viewMode: ViewMode; // NEW: current active view
   availableViewModes: ViewMode[]; // NEW: what views this user can access
-  setViewMode: (mode: ViewMode) => void;  // NEW
+  setViewMode: (mode: ViewMode) => void; // NEW
   // ... existing methods
 }
 ```
@@ -290,6 +290,7 @@ function ViewModeSwitcher() {
 ```
 
 **Labels:**
+
 - `employee` → "Me" (personal data)
 - `manager` → "Team" (reports' data)
 - `admin` → "Org" (org-wide data)
@@ -302,23 +303,24 @@ function ViewModeSwitcher() {
 
 ### 4.1 Three-tier navigation
 
-| Route | Employee (Me) | Manager (Team) | Admin (Org) |
-|-------|-------------------|--------------------|--------------------|
-| `/calendar` | yes | — | — |
-| `/me` | yes | — | — |
-| `/agent` | yes | yes | yes |
-| `/docs` | yes | — | — |
-| `/uploads` | yes | — | — |
-| `/dashboard` | — | yes (scoped) | yes (org-wide) |
-| `/people` | — | yes (reports only) | yes (all) |
-| `/benchmarks` | yes (view only) | yes (full CRUD, scoped) | yes (full CRUD, org-wide) |
-| `/benchmarks/new` | — | yes | yes |
-| `/benchmarks/:id/edit` | — | yes | yes |
-| `/reports` | — | yes (scoped to reports) | yes (org-wide) |
-| `/org-chart` | — | — | yes |
-| `/teams` | — | — | yes |
+| Route                  | Employee (Me)   | Manager (Team)          | Admin (Org)               |
+| ---------------------- | --------------- | ----------------------- | ------------------------- |
+| `/calendar`            | yes             | —                       | —                         |
+| `/me`                  | yes             | —                       | —                         |
+| `/agent`               | yes             | yes                     | yes                       |
+| `/docs`                | yes             | —                       | —                         |
+| `/uploads`             | yes             | —                       | —                         |
+| `/dashboard`           | —               | yes (scoped)            | yes (org-wide)            |
+| `/people`              | —               | yes (reports only)      | yes (all)                 |
+| `/benchmarks`          | yes (view only) | yes (full CRUD, scoped) | yes (full CRUD, org-wide) |
+| `/benchmarks/new`      | —               | yes                     | yes                       |
+| `/benchmarks/:id/edit` | —               | yes                     | yes                       |
+| `/reports`             | —               | yes (scoped to reports) | yes (org-wide)            |
+| `/org-chart`           | —               | —                       | yes                       |
+| `/teams`               | —               | —                       | yes                       |
 
 **Design rationale:**
+
 - **Admin (Org)** is configuration-focused — no `/calendar`, `/me`. Admins switch to Me view for personal features.
 - **Manager (Team)** gets full benchmark CRUD and reports, scoped to their reports. No `/calendar` or `/me` — managers switch to Me view for personal features.
 - **Employee (Me)** is personal productivity only.
@@ -380,6 +382,7 @@ function Nav({ viewMode }: NavProps) {
 ### 5.1 Replace `AdminOnlyRoute` with `RoleGate`
 
 **Current** (line 245):
+
 ```typescript
 function AdminOnlyRoute({ children }) {
   const { user } = useUser();
@@ -389,6 +392,7 @@ function AdminOnlyRoute({ children }) {
 ```
 
 **Replace with:**
+
 ```typescript
 interface RoleGateProps {
   requireAdmin?: boolean;
@@ -450,10 +454,12 @@ function RoleGate({ requireAdmin, requireManager, children }: RoleGateProps) {
 **Current:** Admin → `/dashboard`, non-admin → `/benchmarks`
 
 **New:**
+
 ```typescript
 if (user.role === "admin") navigate("/dashboard");
-else if (user.isManager) navigate("/dashboard");  // managers go to team dashboard
-else navigate("/calendar");  // employees land on calendar
+else if (user.isManager)
+  navigate("/dashboard"); // managers go to team dashboard
+else navigate("/calendar"); // employees land on calendar
 ```
 
 ---
@@ -469,11 +475,13 @@ Rename file to `ManagementContext.tsx`. Update all imports across the app.
 ### 6.2 Activate for managers
 
 **Current activation condition:**
+
 ```typescript
 const isEnabled = user?.role === "admin";
 ```
 
 **New:**
+
 ```typescript
 const isEnabled = user?.role === "admin" || user?.isManager;
 ```
@@ -487,9 +495,9 @@ Add `viewMode` to the context so dashboard components know whether to show "Org"
 ```typescript
 interface ManagementContextValue {
   viewMode: ViewMode;
-  users: User[];         // visible users (all org for admin, reports for manager)
-  integrations: Integration[];  // admin only
-  templates: Template[];        // admin only
+  users: User[]; // visible users (all org for admin, reports for manager)
+  integrations: Integration[]; // admin only
+  templates: Template[]; // admin only
   // ...
 }
 ```
@@ -500,7 +508,7 @@ Conditionally fetch integration and template data only for admins:
 const { data: integrations } = useQuery({
   queryKey: ["integrations"],
   queryFn: fetchIntegrations,
-  enabled: user?.role === "admin",  // managers don't need this
+  enabled: user?.role === "admin", // managers don't need this
 });
 ```
 
@@ -565,10 +573,10 @@ Update query keys to include `viewMode` so data refetches when switching views:
 
 ```typescript
 // Before
-queryKey: ["dashboard", "people"]
+queryKey: ["dashboard", "people"];
 
 // After
-queryKey: ["dashboard", "people", viewMode]
+queryKey: ["dashboard", "people", viewMode];
 ```
 
 This ensures an admin switching between "Team" and "Org" sees correctly scoped data without stale cache.
@@ -593,14 +601,14 @@ This ensures an admin switching between "Team" and "Org" sees correctly scoped d
 
 ## Files Modified/Created
 
-| Action | File |
-|--------|------|
-| MODIFY | `apps/electron/src/renderer/console/src/types/index.ts` |
-| MODIFY | `apps/electron/src/renderer/console/src/context/UserContext.tsx` |
+| Action | File                                                                   |
+| ------ | ---------------------------------------------------------------------- |
+| MODIFY | `apps/electron/src/renderer/console/src/types/index.ts`                |
+| MODIFY | `apps/electron/src/renderer/console/src/context/UserContext.tsx`       |
 | MODIFY | `apps/electron/src/renderer/console/src/components/layout/Sidebar.tsx` |
 | MODIFY | `apps/electron/src/renderer/console/src/components/navigation/Nav.tsx` |
-| MODIFY | `apps/electron/src/renderer/console/src/App.tsx` |
-| RENAME | `AdminContext.tsx` → `ManagementContext.tsx` |
-| MODIFY | All files importing AdminContext (update imports) |
-| MODIFY | Dashboard page components (labels, headers) |
-| MODIFY | People list components (scoping labels) |
+| MODIFY | `apps/electron/src/renderer/console/src/App.tsx`                       |
+| RENAME | `AdminContext.tsx` → `ManagementContext.tsx`                           |
+| MODIFY | All files importing AdminContext (update imports)                      |
+| MODIFY | Dashboard page components (labels, headers)                            |
+| MODIFY | People list components (scoping labels)                                |

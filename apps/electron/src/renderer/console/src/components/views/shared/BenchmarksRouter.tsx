@@ -3,12 +3,13 @@ import BenchmarksView from "../admin/BenchmarksView";
 import EmployeeBenchmarksView from "../employee/BenchmarksView";
 
 export default function BenchmarksRouter() {
-  const { user } = useUser();
+  const { user, viewMode } = useUser();
 
-  // Admins and managers get the full benchmarks management view
-  if (user?.role === "admin" || user?.isManager) {
+  // Admins and managers in Team view get the full benchmarks management view
+  if ((user?.role === "admin" || user?.isManager) && viewMode === "manager") {
     return <BenchmarksView />;
   }
 
+  // Me view always shows read-only "My Benchmarks"
   return <EmployeeBenchmarksView />;
 }

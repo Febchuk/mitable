@@ -24,7 +24,15 @@ const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }
   },
 ];
 
-function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function ToggleSwitch({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       disabled={disabled}
@@ -104,7 +112,16 @@ export default function SetupView() {
   return (
     <div style={{ padding: "24px 32px" }}>
       {/* Region Variant section */}
-      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "0 0 6px", letterSpacing: "-0.2px" }}>
+      <h2
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: 20,
+          fontWeight: 400,
+          color: "var(--text-primary)",
+          margin: "0 0 6px",
+          letterSpacing: "-0.2px",
+        }}
+      >
         Region Variant
       </h2>
       <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>
@@ -160,7 +177,16 @@ export default function SetupView() {
       </div>
 
       {/* Dashboard Panels section */}
-      <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 400, color: "var(--text-primary)", margin: "32px 0 6px", letterSpacing: "-0.2px" }}>
+      <h2
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: 20,
+          fontWeight: 400,
+          color: "var(--text-primary)",
+          margin: "32px 0 6px",
+          letterSpacing: "-0.2px",
+        }}
+      >
         Dashboard Panels
       </h2>
       <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 20 }}>

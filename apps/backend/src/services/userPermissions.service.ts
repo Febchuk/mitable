@@ -34,10 +34,7 @@ export async function grantPermission(
   permission: string,
   grantedBy: string
 ): Promise<void> {
-  await db
-    .insert(userPermissions)
-    .values({ userId, permission, grantedBy })
-    .onConflictDoNothing();
+  await db.insert(userPermissions).values({ userId, permission, grantedBy }).onConflictDoNothing();
 }
 
 /**

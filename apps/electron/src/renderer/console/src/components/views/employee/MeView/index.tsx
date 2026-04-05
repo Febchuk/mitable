@@ -144,7 +144,6 @@ function BenchmarkMiniRing({ progress }: { progress: number }) {
   );
 }
 
-
 // ── Types ────────────────────────────────────────────────────
 
 type RecentWorkFilter = "all" | "block" | "meeting" | "doc";

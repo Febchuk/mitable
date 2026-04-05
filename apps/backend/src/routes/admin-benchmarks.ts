@@ -118,7 +118,14 @@ router.get("/", async (req, res) => {
     // Get scoped user IDs for filtering benchmark assignments
     const scopedUserIds = await getScopedVisibleUserIds(req);
 
-    logger.info({ organizationId: req.organizationId, scope: req.query.scope, scopedUsers: scopedUserIds.length }, "Listing benchmarks");
+    logger.info(
+      {
+        organizationId: req.organizationId,
+        scope: req.query.scope,
+        scopedUsers: scopedUserIds.length,
+      },
+      "Listing benchmarks"
+    );
 
     const benchmarks = await benchmarkService.listByOrg(req.organizationId, scopedUserIds);
 

@@ -94,10 +94,7 @@ export const LogoMarquee = ({ className }: LogoMarqueeProps) => {
     return (
         <section className={cx("bg-surface overflow-hidden py-10 md:py-14", className)}>
             <div className="mx-auto max-w-container px-4 md:px-8">
-                <p
-                    className="mb-8 text-center font-mono text-[10px] tracking-widest uppercase md:mb-10"
-                    style={{ color: "var(--l-text-faint)" }}
-                >
+                <p className="mb-8 text-center font-mono text-[10px] tracking-widest uppercase md:mb-10" style={{ color: "var(--l-text-faint)" }}>
                     {siteContent.logoMarquee.heading}
                 </p>
             </div>
@@ -114,20 +111,12 @@ export const LogoMarquee = ({ className }: LogoMarqueeProps) => {
 
                 <div className="flex animate-marquee gap-14 md:gap-20">
                     {logos.map((logo) => (
-                        <div
-                            key={logo.name}
-                            className="logo-marquee-item"
-                            style={logoItemStyle}
-                        >
+                        <div key={logo.name} className="logo-marquee-item" style={logoItemStyle}>
                             <logo.component className="h-5 w-auto md:h-7" />
                         </div>
                     ))}
                     {logos.map((logo) => (
-                        <div
-                            key={`${logo.name}-dup`}
-                            className="logo-marquee-item"
-                            style={logoItemStyle}
-                        >
+                        <div key={`${logo.name}-dup`} className="logo-marquee-item" style={logoItemStyle}>
                             <logo.component className="h-5 w-auto md:h-7" />
                         </div>
                     ))}

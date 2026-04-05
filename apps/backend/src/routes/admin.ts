@@ -3,9 +3,18 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, sql, count, desc, and, asc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
-import { requireAdmin, requireManagerOrAdmin, requireAccessToUser, getScopedVisibleUserIds } from "../middleware/authorization.js";
+import {
+  requireAdmin,
+  requireManagerOrAdmin,
+  requireAccessToUser,
+  getScopedVisibleUserIds,
+} from "../middleware/authorization.js";
 import { wouldCreateCycle } from "../services/permissions.service.js";
-import { grantPermission, revokePermission, getUserPermissions } from "../services/userPermissions.service.js";
+import {
+  grantPermission,
+  revokePermission,
+  getUserPermissions,
+} from "../services/userPermissions.service.js";
 import { supabaseAdmin } from "../lib/supabase";
 import { extractNotionPageId } from "../utils/notion-url-parser.js";
 import { notionService } from "../services/notion.service.js";
@@ -157,177 +166,183 @@ function formatTimestamp(date: Date): string {
  *     security:
  *       - BearerAuth: []
  */
-router.get("/users/:id", requireAuth, requireManagerOrAdmin, requireAccessToUser("id"), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const targetUserId = req.params.id;
+router.get(
+  "/users/:id",
+  requireAuth,
+  requireManagerOrAdmin,
+  requireAccessToUser("id"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.userId!;
+      const targetUserId = req.params.id;
 
-    // Verify user is admin
-    const [currentUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, userId))
-      .limit(1);
+      // Verify user is admin
+      const [currentUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
 
-    if (!currentUser || currentUser.role !== "admin") {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "Admin access required",
+      if (!currentUser || currentUser.role !== "admin") {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "Admin access required",
+        });
+        return;
+      }
+
+      // Fetch target user
+      const [user] = await db
+        .select({
+          id: schema.users.id,
+          organizationId: schema.users.organizationId,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          email: schema.users.email,
+          role: schema.users.role,
+          startDate: schema.users.startDate,
+          status: schema.users.status,
+          avatarUrl: schema.users.avatarUrl,
+          currentWeek: schema.users.currentWeek,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, targetUserId))
+        .limit(1);
+
+      if (!user) {
+        res.status(404).json({
+          error: "Not Found",
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Verify user belongs to the same organization as the admin
+      if (user.organizationId !== currentUser.organizationId) {
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have permission to view this user",
+        });
+        return;
+      }
+
+      // Get assigned roadmap templates with completion stats
+      const assignedRoadmaps = await db
+        .select({
+          templateId: schema.userTemplateAssignments.templateId,
+          templateTitle: schema.roadmapTemplates.title,
+          templateDescription: schema.roadmapTemplates.description,
+          assignedAt: schema.userTemplateAssignments.assignedAt,
+        })
+        .from(schema.userTemplateAssignments)
+        .innerJoin(
+          schema.roadmapTemplates,
+          eq(schema.userTemplateAssignments.templateId, schema.roadmapTemplates.id)
+        )
+        .where(eq(schema.userTemplateAssignments.userId, targetUserId));
+
+      // For each roadmap, calculate completion
+      const roadmapsWithStats = await Promise.all(
+        assignedRoadmaps.map(async (roadmap) => {
+          const [taskStats] = await db
+            .select({
+              total: count(),
+              completed: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
+            })
+            .from(schema.userRoadmapTasks)
+            .where(
+              and(
+                eq(schema.userRoadmapTasks.userId, targetUserId),
+                eq(schema.userRoadmapTasks.templateId, roadmap.templateId)
+              )
+            );
+
+          const totalTasks = Number(taskStats?.total || 0);
+          const completedTasks = Number(taskStats?.completed || 0);
+          const completion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+          return {
+            id: roadmap.templateId,
+            title: roadmap.templateTitle,
+            description: roadmap.templateDescription || "",
+            tasks: totalTasks,
+            completion,
+          };
+        })
+      );
+
+      // Get recent conversations (last 5)
+      const recentConversations = await db
+        .select({
+          id: schema.conversations.id,
+          title: schema.conversations.title,
+          contextType: schema.conversations.contextType,
+          createdAt: schema.conversations.createdAt,
+        })
+        .from(schema.conversations)
+        .where(eq(schema.conversations.userId, targetUserId))
+        .orderBy(desc(schema.conversations.createdAt))
+        .limit(5);
+
+      // Map conversations to status format
+      const conversationsWithStatus = recentConversations.map((conv) => ({
+        id: conv.id,
+        timestamp: formatTimestamp(conv.createdAt),
+        question: conv.title || "Untitled conversation",
+        status: "resolved" as const,
+      }));
+
+      // Calculate task metrics
+      const [taskMetrics] = await db
+        .select({
+          totalTasks: count(),
+          completedTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
+          overdueTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = false)`,
+        })
+        .from(schema.userRoadmapTasks)
+        .where(eq(schema.userRoadmapTasks.userId, targetUserId));
+
+      const totalTasks = Number(taskMetrics?.totalTasks || 0);
+      const completedTasks = Number(taskMetrics?.completedTasks || 0);
+      const overdueTasks = Number(taskMetrics?.overdueTasks || 0);
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      // Activity data (simplified - can be enhanced with actual analytics later)
+      const activityData = [
+        { date: "Oct 13", hours: 0 },
+        { date: "Yesterday", hours: 0 },
+        { date: "Today", hours: 0 },
+      ];
+
+      // Format response
+      const userDetail = {
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        role: user.role,
+        startDate: user.startDate || "N/A",
+        status: progress === 100 ? "Active" : "Onboarding",
+        progress,
+        manager: null, // TODO: Add manager relationship to schema
+        metrics: {
+          totalTasks,
+          completedTasks,
+          overdueTasks,
+        },
+        assignedRoadmaps: roadmapsWithStats,
+        conversations: conversationsWithStatus,
+        activityData,
+      };
+
+      res.json({ user: userDetail });
+    } catch (error) {
+      console.error("Error fetching user detail:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to fetch user details",
       });
-      return;
     }
-
-    // Fetch target user
-    const [user] = await db
-      .select({
-        id: schema.users.id,
-        organizationId: schema.users.organizationId,
-        firstName: schema.users.firstName,
-        lastName: schema.users.lastName,
-        email: schema.users.email,
-        role: schema.users.role,
-        startDate: schema.users.startDate,
-        status: schema.users.status,
-        avatarUrl: schema.users.avatarUrl,
-        currentWeek: schema.users.currentWeek,
-      })
-      .from(schema.users)
-      .where(eq(schema.users.id, targetUserId))
-      .limit(1);
-
-    if (!user) {
-      res.status(404).json({
-        error: "Not Found",
-        message: "User not found",
-      });
-      return;
-    }
-
-    // Verify user belongs to the same organization as the admin
-    if (user.organizationId !== currentUser.organizationId) {
-      res.status(403).json({
-        error: "Forbidden",
-        message: "You do not have permission to view this user",
-      });
-      return;
-    }
-
-    // Get assigned roadmap templates with completion stats
-    const assignedRoadmaps = await db
-      .select({
-        templateId: schema.userTemplateAssignments.templateId,
-        templateTitle: schema.roadmapTemplates.title,
-        templateDescription: schema.roadmapTemplates.description,
-        assignedAt: schema.userTemplateAssignments.assignedAt,
-      })
-      .from(schema.userTemplateAssignments)
-      .innerJoin(
-        schema.roadmapTemplates,
-        eq(schema.userTemplateAssignments.templateId, schema.roadmapTemplates.id)
-      )
-      .where(eq(schema.userTemplateAssignments.userId, targetUserId));
-
-    // For each roadmap, calculate completion
-    const roadmapsWithStats = await Promise.all(
-      assignedRoadmaps.map(async (roadmap) => {
-        const [taskStats] = await db
-          .select({
-            total: count(),
-            completed: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
-          })
-          .from(schema.userRoadmapTasks)
-          .where(
-            and(
-              eq(schema.userRoadmapTasks.userId, targetUserId),
-              eq(schema.userRoadmapTasks.templateId, roadmap.templateId)
-            )
-          );
-
-        const totalTasks = Number(taskStats?.total || 0);
-        const completedTasks = Number(taskStats?.completed || 0);
-        const completion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-        return {
-          id: roadmap.templateId,
-          title: roadmap.templateTitle,
-          description: roadmap.templateDescription || "",
-          tasks: totalTasks,
-          completion,
-        };
-      })
-    );
-
-    // Get recent conversations (last 5)
-    const recentConversations = await db
-      .select({
-        id: schema.conversations.id,
-        title: schema.conversations.title,
-        contextType: schema.conversations.contextType,
-        createdAt: schema.conversations.createdAt,
-      })
-      .from(schema.conversations)
-      .where(eq(schema.conversations.userId, targetUserId))
-      .orderBy(desc(schema.conversations.createdAt))
-      .limit(5);
-
-    // Map conversations to status format
-    const conversationsWithStatus = recentConversations.map((conv) => ({
-      id: conv.id,
-      timestamp: formatTimestamp(conv.createdAt),
-      question: conv.title || "Untitled conversation",
-      status: "resolved" as const,
-    }));
-
-    // Calculate task metrics
-    const [taskMetrics] = await db
-      .select({
-        totalTasks: count(),
-        completedTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = true)`,
-        overdueTasks: sql<number>`count(*) filter (where ${schema.userRoadmapTasks.completed} = false)`,
-      })
-      .from(schema.userRoadmapTasks)
-      .where(eq(schema.userRoadmapTasks.userId, targetUserId));
-
-    const totalTasks = Number(taskMetrics?.totalTasks || 0);
-    const completedTasks = Number(taskMetrics?.completedTasks || 0);
-    const overdueTasks = Number(taskMetrics?.overdueTasks || 0);
-    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-    // Activity data (simplified - can be enhanced with actual analytics later)
-    const activityData = [
-      { date: "Oct 13", hours: 0 },
-      { date: "Yesterday", hours: 0 },
-      { date: "Today", hours: 0 },
-    ];
-
-    // Format response
-    const userDetail = {
-      id: user.id,
-      name: `${user.firstName} ${user.lastName}`,
-      role: user.role,
-      startDate: user.startDate || "N/A",
-      status: progress === 100 ? "Active" : "Onboarding",
-      progress,
-      manager: null, // TODO: Add manager relationship to schema
-      metrics: {
-        totalTasks,
-        completedTasks,
-        overdueTasks,
-      },
-      assignedRoadmaps: roadmapsWithStats,
-      conversations: conversationsWithStatus,
-      activityData,
-    };
-
-    res.json({ user: userDetail });
-  } catch (error) {
-    console.error("Error fetching user detail:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to fetch user details",
-    });
   }
-});
+);
 
 /**
  * @openapi
@@ -382,65 +397,75 @@ router.get("/users/:id", requireAuth, requireManagerOrAdmin, requireAccessToUser
  *     security:
  *       - BearerAuth: []
  */
-router.get("/users", requireAuth, requireManagerOrAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Scope users by ?scope param (direct/all-reports/org-wide)
-    const scopedUserIds = await getScopedVisibleUserIds(req);
+router.get(
+  "/users",
+  requireAuth,
+  requireManagerOrAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Scope users by ?scope param (direct/all-reports/org-wide)
+      const scopedUserIds = await getScopedVisibleUserIds(req);
 
-    const orgUsers = scopedUserIds.length > 0
-      ? await db
-          .select({
-            id: schema.users.id,
-            firstName: schema.users.firstName,
-            lastName: schema.users.lastName,
-            email: schema.users.email,
-            role: schema.users.role,
-            jobTitle: schema.users.jobTitle,
-            status: schema.users.status,
-            avatarUrl: schema.users.avatarUrl,
-            createdAt: schema.users.createdAt,
-          })
-          .from(schema.users)
-          .where(inArray(schema.users.id, scopedUserIds))
-          .orderBy(schema.users.firstName, schema.users.lastName)
-      : [];
+      const orgUsers =
+        scopedUserIds.length > 0
+          ? await db
+              .select({
+                id: schema.users.id,
+                firstName: schema.users.firstName,
+                lastName: schema.users.lastName,
+                email: schema.users.email,
+                role: schema.users.role,
+                jobTitle: schema.users.jobTitle,
+                status: schema.users.status,
+                avatarUrl: schema.users.avatarUrl,
+                createdAt: schema.users.createdAt,
+              })
+              .from(schema.users)
+              .where(inArray(schema.users.id, scopedUserIds))
+              .orderBy(schema.users.firstName, schema.users.lastName)
+          : [];
 
-    // Batch-fetch permissions for all org users
-    const userIds = orgUsers.map((u) => u.id);
-    const allPerms = userIds.length > 0
-      ? await db
-          .select({ userId: schema.userPermissions.userId, permission: schema.userPermissions.permission })
-          .from(schema.userPermissions)
-      : [];
-    const permsByUser = new Map<string, string[]>();
-    for (const p of allPerms) {
-      if (!userIds.includes(p.userId)) continue;
-      const arr = permsByUser.get(p.userId) || [];
-      arr.push(p.permission);
-      permsByUser.set(p.userId, arr);
+      // Batch-fetch permissions for all org users
+      const userIds = orgUsers.map((u) => u.id);
+      const allPerms =
+        userIds.length > 0
+          ? await db
+              .select({
+                userId: schema.userPermissions.userId,
+                permission: schema.userPermissions.permission,
+              })
+              .from(schema.userPermissions)
+          : [];
+      const permsByUser = new Map<string, string[]>();
+      for (const p of allPerms) {
+        if (!userIds.includes(p.userId)) continue;
+        const arr = permsByUser.get(p.userId) || [];
+        arr.push(p.permission);
+        permsByUser.set(p.userId, arr);
+      }
+
+      const usersFormatted = orgUsers.map((user) => ({
+        id: user.id,
+        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
+        email: user.email,
+        role: user.role,
+        jobTitle: user.jobTitle,
+        status: user.status || "active",
+        avatarUrl: user.avatarUrl,
+        createdAt: user.createdAt,
+        permissions: permsByUser.get(user.id) || [],
+      }));
+
+      res.json({ users: usersFormatted });
+    } catch (error) {
+      console.error("Error fetching admin users:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "Failed to fetch users",
+      });
     }
-
-    const usersFormatted = orgUsers.map((user) => ({
-      id: user.id,
-      name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
-      email: user.email,
-      role: user.role,
-      jobTitle: user.jobTitle,
-      status: user.status || "active",
-      avatarUrl: user.avatarUrl,
-      createdAt: user.createdAt,
-      permissions: permsByUser.get(user.id) || [],
-    }));
-
-    res.json({ users: usersFormatted });
-  } catch (error) {
-    console.error("Error fetching admin users:", error);
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Failed to fetch users",
-    });
   }
-});
+);
 
 /**
  * @openapi
@@ -2639,152 +2664,142 @@ router.patch(
  * PUT /admin/users/:id/manager — Set or clear a user's manager
  * Admin-only. Validates same org, no self-reference, no cycles.
  */
-router.put(
-  "/users/:id/manager",
-  requireAuth,
-  requireAdmin,
-  async (req: Request, res: Response) => {
-    try {
-      const targetUserId = req.params.id;
-      const { managerId } = req.body as { managerId: string | null };
+router.put("/users/:id/manager", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const targetUserId = req.params.id;
+    const { managerId } = req.body as { managerId: string | null };
 
-      // Verify target user exists and is in the same org
-      const [targetUser] = await db
-        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
-        .from(schema.users)
-        .where(eq(schema.users.id, targetUserId));
+    // Verify target user exists and is in the same org
+    const [targetUser] = await db
+      .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+      .from(schema.users)
+      .where(eq(schema.users.id, targetUserId));
 
-      if (!targetUser) {
-        res.status(404).json({ error: "Not Found", message: "User not found" });
-        return;
-      }
+    if (!targetUser) {
+      res.status(404).json({ error: "Not Found", message: "User not found" });
+      return;
+    }
 
-      if (targetUser.organizationId !== req.organizationId) {
-        res.status(403).json({ error: "Forbidden", message: "User is not in your organization" });
-        return;
-      }
+    if (targetUser.organizationId !== req.organizationId) {
+      res.status(403).json({ error: "Forbidden", message: "User is not in your organization" });
+      return;
+    }
 
-      // Clear manager if null
-      if (managerId === null || managerId === undefined) {
-        await db
-          .update(schema.users)
-          .set({ managerId: null, updatedAt: new Date() })
-          .where(eq(schema.users.id, targetUserId));
-
-        res.json({ success: true, message: "Manager cleared" });
-        return;
-      }
-
-      // Validate manager exists and is in same org
-      const [managerUser] = await db
-        .select({ id: schema.users.id, organizationId: schema.users.organizationId })
-        .from(schema.users)
-        .where(eq(schema.users.id, managerId));
-
-      if (!managerUser) {
-        res.status(404).json({ error: "Not Found", message: "Manager not found" });
-        return;
-      }
-
-      if (managerUser.organizationId !== req.organizationId) {
-        res.status(400).json({
-          error: "Bad Request",
-          message: "Manager must be in the same organization",
-        });
-        return;
-      }
-
-      // Check for self-reference
-      if (targetUserId === managerId) {
-        res.status(400).json({
-          error: "Bad Request",
-          message: "A user cannot be their own manager",
-        });
-        return;
-      }
-
-      // Check for circular reference
-      const isCycle = await wouldCreateCycle(targetUserId, managerId);
-      if (isCycle) {
-        res.status(400).json({
-          error: "Bad Request",
-          message: "This assignment would create a circular reporting chain",
-        });
-        return;
-      }
-
-      // Assign manager
+    // Clear manager if null
+    if (managerId === null || managerId === undefined) {
       await db
         .update(schema.users)
-        .set({ managerId, updatedAt: new Date() })
+        .set({ managerId: null, updatedAt: new Date() })
         .where(eq(schema.users.id, targetUserId));
 
-      res.json({ success: true, message: "Manager assigned" });
-    } catch (error) {
-      console.error("Error assigning manager:", error);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: "Failed to assign manager",
-      });
+      res.json({ success: true, message: "Manager cleared" });
+      return;
     }
+
+    // Validate manager exists and is in same org
+    const [managerUser] = await db
+      .select({ id: schema.users.id, organizationId: schema.users.organizationId })
+      .from(schema.users)
+      .where(eq(schema.users.id, managerId));
+
+    if (!managerUser) {
+      res.status(404).json({ error: "Not Found", message: "Manager not found" });
+      return;
+    }
+
+    if (managerUser.organizationId !== req.organizationId) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "Manager must be in the same organization",
+      });
+      return;
+    }
+
+    // Check for self-reference
+    if (targetUserId === managerId) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "A user cannot be their own manager",
+      });
+      return;
+    }
+
+    // Check for circular reference
+    const isCycle = await wouldCreateCycle(targetUserId, managerId);
+    if (isCycle) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "This assignment would create a circular reporting chain",
+      });
+      return;
+    }
+
+    // Assign manager
+    await db
+      .update(schema.users)
+      .set({ managerId, updatedAt: new Date() })
+      .where(eq(schema.users.id, targetUserId));
+
+    res.json({ success: true, message: "Manager assigned" });
+  } catch (error) {
+    console.error("Error assigning manager:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to assign manager",
+    });
   }
-);
+});
 
 /**
  * GET /admin/org-tree — Get the full organizational hierarchy as a nested tree
  * Admin-only.
  */
-router.get(
-  "/org-tree",
-  requireAuth,
-  requireAdmin,
-  async (req: Request, res: Response) => {
-    try {
-      // Fetch all users in org
-      const orgUsers = await db
-        .select({
-          id: schema.users.id,
-          firstName: schema.users.firstName,
-          lastName: schema.users.lastName,
-          email: schema.users.email,
-          role: schema.users.role,
-          jobTitle: schema.users.jobTitle,
-          avatarUrl: schema.users.avatarUrl,
-          managerId: schema.users.managerId,
-          teamId: schema.users.teamId,
-          department: schema.users.department,
-          status: schema.users.status,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.organizationId, req.organizationId!))
-        .orderBy(asc(schema.users.firstName));
+router.get("/org-tree", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    // Fetch all users in org
+    const orgUsers = await db
+      .select({
+        id: schema.users.id,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        role: schema.users.role,
+        jobTitle: schema.users.jobTitle,
+        avatarUrl: schema.users.avatarUrl,
+        managerId: schema.users.managerId,
+        teamId: schema.users.teamId,
+        department: schema.users.department,
+        status: schema.users.status,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.organizationId, req.organizationId!))
+      .orderBy(asc(schema.users.firstName));
 
-      // Build tree in-memory
-      const userMap = new Map<string, any>();
-      for (const user of orgUsers) {
-        userMap.set(user.id, { ...user, directReports: [] });
-      }
-
-      const roots: any[] = [];
-      for (const user of orgUsers) {
-        const node = userMap.get(user.id)!;
-        if (user.managerId && userMap.has(user.managerId)) {
-          userMap.get(user.managerId)!.directReports.push(node);
-        } else {
-          roots.push(node);
-        }
-      }
-
-      res.json({ tree: roots, totalUsers: orgUsers.length });
-    } catch (error) {
-      console.error("Error fetching org tree:", error);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: "Failed to fetch organization tree",
-      });
+    // Build tree in-memory
+    const userMap = new Map<string, any>();
+    for (const user of orgUsers) {
+      userMap.set(user.id, { ...user, directReports: [] });
     }
+
+    const roots: any[] = [];
+    for (const user of orgUsers) {
+      const node = userMap.get(user.id)!;
+      if (user.managerId && userMap.has(user.managerId)) {
+        userMap.get(user.managerId)!.directReports.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    res.json({ tree: roots, totalUsers: orgUsers.length });
+  } catch (error) {
+    console.error("Error fetching org tree:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to fetch organization tree",
+    });
   }
-);
+});
 
 // ============================================
 // Teams CRUD Endpoints
@@ -2793,248 +2808,216 @@ router.get(
 /**
  * GET /admin/teams — List all teams in the organization
  */
-router.get(
-  "/teams",
-  requireAuth,
-  requireAdmin,
-  async (req: Request, res: Response) => {
-    try {
-      const orgTeams = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.organizationId, req.organizationId!))
-        .orderBy(asc(schema.teams.name));
+router.get("/teams", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const orgTeams = await db
+      .select()
+      .from(schema.teams)
+      .where(eq(schema.teams.organizationId, req.organizationId!))
+      .orderBy(asc(schema.teams.name));
 
-      // Enrich with member count and leader name
-      const enriched = await Promise.all(
-        orgTeams.map(async (team) => {
-          const [memberCount] = await db
-            .select({ count: sql<number>`count(*)::int` })
+    // Enrich with member count and leader name
+    const enriched = await Promise.all(
+      orgTeams.map(async (team) => {
+        const [memberCount] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(schema.users)
+          .where(eq(schema.users.teamId, team.id));
+
+        let leaderName = null;
+        if (team.leaderId) {
+          const [leader] = await db
+            .select({ firstName: schema.users.firstName, lastName: schema.users.lastName })
             .from(schema.users)
-            .where(eq(schema.users.teamId, team.id));
-
-          let leaderName = null;
-          if (team.leaderId) {
-            const [leader] = await db
-              .select({ firstName: schema.users.firstName, lastName: schema.users.lastName })
-              .from(schema.users)
-              .where(eq(schema.users.id, team.leaderId));
-            if (leader) {
-              leaderName = `${leader.firstName || ""} ${leader.lastName || ""}`.trim();
-            }
+            .where(eq(schema.users.id, team.leaderId));
+          if (leader) {
+            leaderName = `${leader.firstName || ""} ${leader.lastName || ""}`.trim();
           }
+        }
 
-          // Find sub-teams
-          const subTeams = orgTeams
-            .filter((t) => t.parentTeamId === team.id)
-            .map((t) => ({ id: t.id, name: t.name }));
+        // Find sub-teams
+        const subTeams = orgTeams
+          .filter((t) => t.parentTeamId === team.id)
+          .map((t) => ({ id: t.id, name: t.name }));
 
-          return {
-            ...team,
-            memberCount: memberCount?.count ?? 0,
-            leaderName,
-            subTeams,
-          };
-        })
-      );
+        return {
+          ...team,
+          memberCount: memberCount?.count ?? 0,
+          leaderName,
+          subTeams,
+        };
+      })
+    );
 
-      res.json({ teams: enriched });
-    } catch (error) {
-      console.error("Error fetching teams:", error);
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch teams" });
-    }
+    res.json({ teams: enriched });
+  } catch (error) {
+    console.error("Error fetching teams:", error);
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch teams" });
   }
-);
+});
 
 /**
  * POST /admin/teams — Create a new team
  */
-router.post(
-  "/teams",
-  requireAuth,
-  requireAdmin,
-  async (req: Request, res: Response) => {
-    try {
-      const { name, description, leaderId, parentTeamId } = req.body as {
-        name?: string;
-        description?: string;
-        leaderId?: string;
-        parentTeamId?: string;
-      };
+router.post("/teams", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { name, description, leaderId, parentTeamId } = req.body as {
+      name?: string;
+      description?: string;
+      leaderId?: string;
+      parentTeamId?: string;
+    };
 
-      if (!name || !name.trim()) {
-        res.status(400).json({ error: "Bad Request", message: "Team name is required" });
+    if (!name || !name.trim()) {
+      res.status(400).json({ error: "Bad Request", message: "Team name is required" });
+      return;
+    }
+
+    // Validate leader is in same org
+    if (leaderId) {
+      const [leader] = await db
+        .select({ organizationId: schema.users.organizationId })
+        .from(schema.users)
+        .where(eq(schema.users.id, leaderId));
+      if (!leader || leader.organizationId !== req.organizationId) {
+        res
+          .status(400)
+          .json({ error: "Bad Request", message: "Leader must be in your organization" });
         return;
       }
-
-      // Validate leader is in same org
-      if (leaderId) {
-        const [leader] = await db
-          .select({ organizationId: schema.users.organizationId })
-          .from(schema.users)
-          .where(eq(schema.users.id, leaderId));
-        if (!leader || leader.organizationId !== req.organizationId) {
-          res.status(400).json({ error: "Bad Request", message: "Leader must be in your organization" });
-          return;
-        }
-      }
-
-      // Validate parent team is in same org
-      if (parentTeamId) {
-        const [parent] = await db
-          .select({ organizationId: schema.teams.organizationId })
-          .from(schema.teams)
-          .where(eq(schema.teams.id, parentTeamId));
-        if (!parent || parent.organizationId !== req.organizationId) {
-          res.status(400).json({ error: "Bad Request", message: "Parent team must be in your organization" });
-          return;
-        }
-      }
-
-      const [created] = await db
-        .insert(schema.teams)
-        .values({
-          organizationId: req.organizationId!,
-          name: name.trim(),
-          description: description?.trim() || null,
-          leaderId: leaderId || null,
-          parentTeamId: parentTeamId || null,
-        })
-        .returning();
-
-      res.status(201).json({ team: created });
-    } catch (error) {
-      console.error("Error creating team:", error);
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to create team" });
     }
+
+    // Validate parent team is in same org
+    if (parentTeamId) {
+      const [parent] = await db
+        .select({ organizationId: schema.teams.organizationId })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, parentTeamId));
+      if (!parent || parent.organizationId !== req.organizationId) {
+        res
+          .status(400)
+          .json({ error: "Bad Request", message: "Parent team must be in your organization" });
+        return;
+      }
+    }
+
+    const [created] = await db
+      .insert(schema.teams)
+      .values({
+        organizationId: req.organizationId!,
+        name: name.trim(),
+        description: description?.trim() || null,
+        leaderId: leaderId || null,
+        parentTeamId: parentTeamId || null,
+      })
+      .returning();
+
+    res.status(201).json({ team: created });
+  } catch (error) {
+    console.error("Error creating team:", error);
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to create team" });
   }
-);
+});
 
 /**
  * GET /admin/teams/:id — Get team detail with members
  */
-router.get(
-  "/teams/:id",
-  requireAuth,
-  requireAdmin,
-  async (req: Request, res: Response) => {
-    try {
-      const [team] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.id, req.params.id));
+router.get("/teams/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, req.params.id));
 
-      if (!team || team.organizationId !== req.organizationId) {
-        res.status(404).json({ error: "Not Found", message: "Team not found" });
-        return;
-      }
-
-      const members = await db
-        .select({
-          id: schema.users.id,
-          firstName: schema.users.firstName,
-          lastName: schema.users.lastName,
-          email: schema.users.email,
-          role: schema.users.role,
-          jobTitle: schema.users.jobTitle,
-          avatarUrl: schema.users.avatarUrl,
-          status: schema.users.status,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.teamId, team.id))
-        .orderBy(asc(schema.users.firstName));
-
-      res.json({ team, members });
-    } catch (error) {
-      console.error("Error fetching team detail:", error);
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch team" });
+    if (!team || team.organizationId !== req.organizationId) {
+      res.status(404).json({ error: "Not Found", message: "Team not found" });
+      return;
     }
+
+    const members = await db
+      .select({
+        id: schema.users.id,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        email: schema.users.email,
+        role: schema.users.role,
+        jobTitle: schema.users.jobTitle,
+        avatarUrl: schema.users.avatarUrl,
+        status: schema.users.status,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.teamId, team.id))
+      .orderBy(asc(schema.users.firstName));
+
+    res.json({ team, members });
+  } catch (error) {
+    console.error("Error fetching team detail:", error);
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to fetch team" });
   }
-);
+});
 
 /**
  * PATCH /admin/teams/:id — Update a team
  */
-router.patch(
-  "/teams/:id",
-  requireAuth,
-  requireAdmin,
-  async (req: Request, res: Response) => {
-    try {
-      const [team] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.id, req.params.id));
+router.patch("/teams/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, req.params.id));
 
-      if (!team || team.organizationId !== req.organizationId) {
-        res.status(404).json({ error: "Not Found", message: "Team not found" });
-        return;
-      }
-
-      const { name, description, leaderId, parentTeamId } = req.body as {
-        name?: string;
-        description?: string;
-        leaderId?: string | null;
-        parentTeamId?: string | null;
-      };
-
-      const updates: Record<string, any> = { updatedAt: new Date() };
-      if (name !== undefined) updates.name = name.trim();
-      if (description !== undefined) updates.description = description?.trim() || null;
-      if (leaderId !== undefined) updates.leaderId = leaderId;
-      if (parentTeamId !== undefined) updates.parentTeamId = parentTeamId;
-
-      const [updated] = await db
-        .update(schema.teams)
-        .set(updates)
-        .where(eq(schema.teams.id, req.params.id))
-        .returning();
-
-      res.json({ team: updated });
-    } catch (error) {
-      console.error("Error updating team:", error);
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to update team" });
+    if (!team || team.organizationId !== req.organizationId) {
+      res.status(404).json({ error: "Not Found", message: "Team not found" });
+      return;
     }
+
+    const { name, description, leaderId, parentTeamId } = req.body as {
+      name?: string;
+      description?: string;
+      leaderId?: string | null;
+      parentTeamId?: string | null;
+    };
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name.trim();
+    if (description !== undefined) updates.description = description?.trim() || null;
+    if (leaderId !== undefined) updates.leaderId = leaderId;
+    if (parentTeamId !== undefined) updates.parentTeamId = parentTeamId;
+
+    const [updated] = await db
+      .update(schema.teams)
+      .set(updates)
+      .where(eq(schema.teams.id, req.params.id))
+      .returning();
+
+    res.json({ team: updated });
+  } catch (error) {
+    console.error("Error updating team:", error);
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to update team" });
   }
-);
+});
 
 /**
  * DELETE /admin/teams/:id — Delete a team
  */
-router.delete(
-  "/teams/:id",
-  requireAuth,
-  requireAdmin,
-  async (req: Request, res: Response) => {
-    try {
-      const [team] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.id, req.params.id));
+router.delete("/teams/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, req.params.id));
 
-      if (!team || team.organizationId !== req.organizationId) {
-        res.status(404).json({ error: "Not Found", message: "Team not found" });
-        return;
-      }
-
-      // Unassign all members from this team
-      await db
-        .update(schema.users)
-        .set({ teamId: null, updatedAt: new Date() })
-        .where(eq(schema.users.teamId, team.id));
-
-      // Delete the team
-      await db
-        .delete(schema.teams)
-        .where(eq(schema.teams.id, req.params.id));
-
-      res.json({ success: true, message: "Team deleted" });
-    } catch (error) {
-      console.error("Error deleting team:", error);
-      res.status(500).json({ error: "Internal Server Error", message: "Failed to delete team" });
+    if (!team || team.organizationId !== req.organizationId) {
+      res.status(404).json({ error: "Not Found", message: "Team not found" });
+      return;
     }
+
+    // Unassign all members from this team
+    await db
+      .update(schema.users)
+      .set({ teamId: null, updatedAt: new Date() })
+      .where(eq(schema.users.teamId, team.id));
+
+    // Delete the team
+    await db.delete(schema.teams).where(eq(schema.teams.id, req.params.id));
+
+    res.json({ success: true, message: "Team deleted" });
+  } catch (error) {
+    console.error("Error deleting team:", error);
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to delete team" });
   }
-);
+});
 
 // ============================================
 // ── USER PERMISSIONS ENDPOINTS ──────────────
@@ -3071,7 +3054,9 @@ router.put(
     try {
       const { permission } = req.params;
       if (!VALID_PERMISSIONS.includes(permission as any)) {
-        res.status(400).json({ error: "Bad Request", message: `Invalid permission: ${permission}` });
+        res
+          .status(400)
+          .json({ error: "Bad Request", message: `Invalid permission: ${permission}` });
         return;
       }
 
@@ -3083,7 +3068,9 @@ router.put(
         .limit(1);
 
       if (!target || target.organizationId !== req.organizationId) {
-        res.status(404).json({ error: "Not Found", message: "User not found in your organization" });
+        res
+          .status(404)
+          .json({ error: "Not Found", message: "User not found in your organization" });
         return;
       }
 
@@ -3107,7 +3094,9 @@ router.delete(
     try {
       const { permission } = req.params;
       if (!VALID_PERMISSIONS.includes(permission as any)) {
-        res.status(400).json({ error: "Bad Request", message: `Invalid permission: ${permission}` });
+        res
+          .status(400)
+          .json({ error: "Bad Request", message: `Invalid permission: ${permission}` });
         return;
       }
 
