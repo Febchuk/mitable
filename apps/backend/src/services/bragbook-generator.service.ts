@@ -8,7 +8,7 @@
 import Groq from "groq-sdk";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import { config } from "../config.js";
 import { createLogger } from "../lib/logger.js";
 
@@ -58,7 +58,7 @@ export async function generateBragbookEntry(
     .where(
       and(
         eq(schema.monitoringSessions.userId, userId),
-        eq(schema.monitoringSessions.status, "ended"),
+        inArray(schema.monitoringSessions.status, ["ended", "ready"]),
         gte(schema.monitoringSessions.startedAt, new Date(periodStart + "T00:00:00Z")),
         lte(schema.monitoringSessions.startedAt, new Date(periodEnd + "T23:59:59Z"))
       )
@@ -216,7 +216,7 @@ export async function generateForAllUsers(
     .from(schema.monitoringSessions)
     .where(
       and(
-        eq(schema.monitoringSessions.status, "ended"),
+        inArray(schema.monitoringSessions.status, ["ended", "ready"]),
         gte(schema.monitoringSessions.startedAt, new Date(periodStart + "T00:00:00Z")),
         lte(schema.monitoringSessions.startedAt, new Date(periodEnd + "T23:59:59Z"))
       )

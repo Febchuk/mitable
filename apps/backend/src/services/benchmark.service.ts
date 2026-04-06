@@ -277,8 +277,6 @@ export const benchmarkService = {
     const results: BenchmarkWithAggregates[] = [];
     for (const bm of rows) {
       const agg = await computeAggregates(bm.id, scopedUserIds);
-      // When scoping, only include benchmarks that have at least one scoped assignment
-      if (scopedUserIds && agg.assignedCount === 0) continue;
       results.push(toBenchmarkWithAggregates(bm, agg));
     }
 

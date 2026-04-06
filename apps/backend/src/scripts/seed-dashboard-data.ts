@@ -130,6 +130,7 @@ const ROLE_PROFILES: Record<string, RoleProfile> = {
 
 // Map user first names to role profiles
 const USER_ROLE_MAP: Record<string, string> = {
+  // Lorikeet users
   Emily: "engineer",
   Alex: "engineer",
   Jordan: "engineer",
@@ -144,6 +145,19 @@ const USER_ROLE_MAP: Record<string, string> = {
   Olivia: "sales",
   Ethan: "design",
   Maya: "devops",
+  // Mitable users
+  Febe: "pm",
+  Aurel: "pm",
+  Mikun: "pm",
+  Amara: "engineer",
+  Chisom: "engineer",
+  Ella: "design",
+  Jide: "engineer",
+  Kamsi: "engineer",
+  Nneka: "customer_success",
+  Tunde: "devops",
+  Yemi: "engineer",
+  Test: "engineer",
 };
 
 // ── Helpers ──────────────────────────────────────────
@@ -176,17 +190,21 @@ function distributeMinutes(
 // ── Main ──────────────────────────────────────────
 
 async function main() {
-  console.log("🌱 Seeding dashboard data for Lorikeet org...\n");
+  // Support --org=domain CLI arg, default to mitable.ai
+  const orgDomainArg = process.argv.find((a) => a.startsWith("--org="));
+  const orgDomain = orgDomainArg ? orgDomainArg.split("=")[1]! : "mitable.ai";
 
-  // 1. Find the Lorikeet org
+  console.log(`🌱 Seeding dashboard data for ${orgDomain} org...\n`);
+
+  // 1. Find the org
   const [org] = await db
     .select()
     .from(schema.organizations)
-    .where(eq(schema.organizations.domain, "lorikeet.ai"))
+    .where(eq(schema.organizations.domain, orgDomain))
     .limit(1);
 
   if (!org) {
-    console.error("❌ Lorikeet org not found. Run the main seed first.");
+    console.error(`❌ Org with domain "${orgDomain}" not found.`);
     process.exit(1);
   }
   console.log(`✅ Found org: ${org.name} (${org.id})`);
@@ -203,7 +221,7 @@ async function main() {
     .where(eq(schema.users.organizationId, org.id));
 
   if (users.length === 0) {
-    console.error("❌ No users found in Lorikeet org.");
+    console.error("❌ No users found in org.");
     process.exit(1);
   }
   console.log(`✅ Found ${users.length} users\n`);
