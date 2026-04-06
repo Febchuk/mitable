@@ -1,11 +1,11 @@
 /**
  * Bragbook Generator Service
  *
- * Synthesizes polished, brag-worthy accomplishments from session data using Groq.
+ * Synthesizes polished, brag-worthy accomplishments from session data using Gemini.
  * Used by both the cron job (batch generation) and the "Generate Now" endpoint.
  */
 
-import Groq from "groq-sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
@@ -14,7 +14,21 @@ import { createLogger } from "../lib/logger.js";
 
 const logger = createLogger({ context: "bragbook-generator" });
 
-const TEXT_MODEL = config.groq.chatModel || "openai/gpt-oss-120b";
+let _genAI: GoogleGenerativeAI | null = null;
+function getGenAI(): GoogleGenerativeAI {
+  if (!_genAI) {
+    _genAI = new GoogleGenerativeAI(config.gemini.apiKey);
+  }
+  return _genAI;
+}
+
+function parseLLMJson<T>(text: string): T {
+  const cleaned = text
+    .replace(/```(?:json)?\n?/g, "")
+    .replace(/```$/g, "")
+    .trim();
+  return JSON.parse(cleaned);
+}
 
 interface SessionContext {
   name: string | null;
@@ -127,22 +141,20 @@ Respond with valid JSON only:
 { "accomplishments": ["Accomplishment 1", "Accomplishment 2"] }`;
 
   try {
-    const groq = new Groq({ apiKey: config.groq.apiKey });
-    const completion = await groq.chat.completions.create({
-      model: TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 800,
-      response_format: { type: "json_object" },
+    const model = getGenAI().getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      logger.warn({ userId, periodStart }, "Empty Groq response");
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    if (!text) {
+      logger.warn({ userId, periodStart }, "Empty Gemini response");
       return { accomplishments: [], sessionsUsed: sessions.length };
     }
 
-    const parsed = JSON.parse(content) as { accomplishments?: string[] };
+    const parsed = parseLLMJson<{ accomplishments?: string[] }>(text);
     const accomplishments = Array.isArray(parsed.accomplishments)
       ? parsed.accomplishments.filter(
           (a): a is string => typeof a === "string" && a.trim().length > 0
