@@ -2,6 +2,7 @@
  * Bragbook Generator Service
  *
  * Synthesizes polished, brag-worthy accomplishments from session data using Gemini.
+ * Uses hierarchical generation: weekly from sessions, monthly from weeks, quarterly from months.
  * Used by both the cron job (batch generation) and the "Generate Now" endpoint.
  */
 
@@ -22,6 +23,13 @@ function getGenAI(): GoogleGenerativeAI {
   return _genAI;
 }
 
+function getModel() {
+  return getGenAI().getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+  });
+}
+
 function parseLLMJson<T>(text: string): T {
   const cleaned = text
     .replace(/```(?:json)?\n?/g, "")
@@ -29,6 +37,74 @@ function parseLLMJson<T>(text: string): T {
     .trim();
   return JSON.parse(cleaned);
 }
+
+function formatDateStr(d: Date): string {
+  return d.toISOString().split("T")[0]!;
+}
+
+// ---------------------------------------------------------------------------
+// Period helpers (mirrored from my-bragbook route)
+// ---------------------------------------------------------------------------
+
+function getWeekStart(d: Date): Date {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function getPeriodEnd(periodStart: Date, periodType: string): Date {
+  const end = new Date(periodStart);
+  switch (periodType) {
+    case "weekly":
+      end.setDate(end.getDate() + 6);
+      break;
+    case "monthly":
+      end.setMonth(end.getMonth() + 1);
+      end.setDate(end.getDate() - 1);
+      break;
+    case "quarterly":
+      end.setMonth(end.getMonth() + 3);
+      end.setDate(end.getDate() - 1);
+      break;
+  }
+  return end;
+}
+
+/**
+ * Get all weekly period starts within a month (periodStart = 1st of month).
+ */
+function getWeeksInMonth(monthStart: string): string[] {
+  const start = new Date(monthStart + "T00:00:00");
+  const endOfMonth = getPeriodEnd(start, "monthly");
+  const weeks: string[] = [];
+  let cursor = getWeekStart(start);
+  // If the week starts before the month, still include it
+  while (cursor <= endOfMonth) {
+    weeks.push(formatDateStr(cursor));
+    cursor = new Date(cursor);
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return weeks;
+}
+
+/**
+ * Get all monthly period starts within a quarter (periodStart = 1st of quarter).
+ */
+function getMonthsInQuarter(quarterStart: string): string[] {
+  const start = new Date(quarterStart + "T00:00:00");
+  return [0, 1, 2].map((offset) => {
+    const d = new Date(start);
+    d.setMonth(d.getMonth() + offset);
+    return formatDateStr(d);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface SessionContext {
   name: string | null;
@@ -44,18 +120,82 @@ interface GenerationResult {
   sessionsUsed: number;
 }
 
-/**
- * Generate a bragbook entry for a single user and period.
- * Pulls session data, runs through Groq, and upserts into bragbook_entries.
- */
-export async function generateBragbookEntry(
+// ---------------------------------------------------------------------------
+// Upsert helper
+// ---------------------------------------------------------------------------
+
+async function upsertBragbookEntry(
   userId: string,
   organizationId: string,
   periodType: string,
   periodStart: string,
+  accomplishments: string[]
+): Promise<void> {
+  const existing = await db
+    .select({ id: schema.bragbookEntries.id, source: schema.bragbookEntries.source })
+    .from(schema.bragbookEntries)
+    .where(
+      and(
+        eq(schema.bragbookEntries.userId, userId),
+        eq(schema.bragbookEntries.periodType, periodType),
+        eq(schema.bragbookEntries.periodStart, periodStart)
+      )
+    )
+    .limit(1);
+
+  if (existing[0]) {
+    if (existing[0].source === "user-edited") {
+      logger.info(
+        { userId, periodStart, periodType },
+        "Skipping upsert — user-edited entry exists"
+      );
+      return;
+    }
+    await db
+      .update(schema.bragbookEntries)
+      .set({ accomplishments, source: "auto-generated", updatedAt: new Date() })
+      .where(eq(schema.bragbookEntries.id, existing[0].id));
+  } else {
+    await db.insert(schema.bragbookEntries).values({
+      userId,
+      organizationId,
+      periodType,
+      periodStart,
+      accomplishments,
+      source: "auto-generated",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LLM call helper
+// ---------------------------------------------------------------------------
+
+async function callGemini(prompt: string): Promise<string[]> {
+  const model = getModel();
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  if (!text) return [];
+
+  const parsed = parseLLMJson<{ accomplishments?: string[] }>(text);
+  return Array.isArray(parsed.accomplishments)
+    ? parsed.accomplishments.filter(
+        (a): a is string => typeof a === "string" && a.trim().length > 0
+      )
+    : [];
+}
+
+// ---------------------------------------------------------------------------
+// Weekly: generate from raw sessions
+// ---------------------------------------------------------------------------
+
+async function generateWeekly(
+  userId: string,
+  organizationId: string,
+  periodStart: string,
   periodEnd: string
 ): Promise<GenerationResult> {
-  // Fetch completed sessions in the date range
   const sessions = await db
     .select({
       id: schema.monitoringSessions.id,
@@ -79,11 +219,9 @@ export async function generateBragbookEntry(
     );
 
   if (sessions.length === 0) {
-    logger.info({ userId, periodType, periodStart }, "No sessions found for period");
     return { accomplishments: [], sessionsUsed: 0 };
   }
 
-  // Build session context for the prompt
   const sessionContexts: SessionContext[] = sessions.map((s) => ({
     name: s.name,
     masterStory: s.finalSummary || s.rawActivitySummary,
@@ -100,67 +238,26 @@ export async function generateBragbookEntry(
         : 0,
   }));
 
-  // For large session counts (monthly/quarterly), pre-aggregate to keep prompt manageable.
-  // Collect all accomplishments and summaries, then send a condensed version.
-  const MAX_DETAILED_SESSIONS = 20;
-  let sessionsBlock: string;
+  const sessionsBlock = sessionContexts
+    .map((s, i) => {
+      const parts: string[] = [];
+      if (s.name) parts.push(`Session: ${s.name}`);
+      if (s.durationMinutes > 0) parts.push(`Duration: ${s.durationMinutes}m`);
+      if (s.masterStory) parts.push(`Summary: ${s.masterStory}`);
+      if (s.taskBreakdown.length > 0) {
+        const tasks = s.taskBreakdown
+          .map((t) => `  - ${t.shortTitle} (${t.minutes}m): ${t.description}`)
+          .join("\n");
+        parts.push(`Tasks:\n${tasks}`);
+      }
+      if (s.accomplishments.length > 0) {
+        parts.push(`Raw accomplishments: ${s.accomplishments.join("; ")}`);
+      }
+      return `<session_${i + 1}>\n${parts.join("\n")}\n</session_${i + 1}>`;
+    })
+    .join("\n\n");
 
-  if (sessionContexts.length <= MAX_DETAILED_SESSIONS) {
-    // Small enough — send full detail per session
-    sessionsBlock = sessionContexts
-      .map((s, i) => {
-        const parts: string[] = [];
-        if (s.name) parts.push(`Session: ${s.name}`);
-        if (s.durationMinutes > 0) parts.push(`Duration: ${s.durationMinutes}m`);
-        if (s.masterStory) parts.push(`Summary: ${s.masterStory}`);
-        if (s.taskBreakdown.length > 0) {
-          const tasks = s.taskBreakdown
-            .map((t) => `  - ${t.shortTitle} (${t.minutes}m): ${t.description}`)
-            .join("\n");
-          parts.push(`Tasks:\n${tasks}`);
-        }
-        if (s.accomplishments.length > 0) {
-          parts.push(`Raw accomplishments: ${s.accomplishments.join("; ")}`);
-        }
-        return `<session_${i + 1}>\n${parts.join("\n")}\n</session_${i + 1}>`;
-      })
-      .join("\n\n");
-  } else {
-    // Too many sessions — aggregate into a condensed summary
-    const allAccomplishments = sessionContexts.flatMap((s) => s.accomplishments).filter(Boolean);
-    const allTasks = sessionContexts.flatMap((s) => s.taskBreakdown);
-    const totalMinutes = sessionContexts.reduce((sum, s) => sum + s.durationMinutes, 0);
-    const sessionNames = sessionContexts.map((s) => s.name).filter(Boolean);
-    const summaries = sessionContexts
-      .map((s) => s.masterStory)
-      .filter(Boolean)
-      .slice(0, 15); // Cap summaries to keep prompt reasonable
-
-    const parts: string[] = [];
-    parts.push(`Total sessions: ${sessionContexts.length}`);
-    parts.push(`Total work time: ${Math.round(totalMinutes / 60)}h ${totalMinutes % 60}m`);
-    if (sessionNames.length > 0) {
-      parts.push(`Session topics: ${[...new Set(sessionNames)].join(", ")}`);
-    }
-    if (summaries.length > 0) {
-      parts.push(`\nKey session summaries:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join("\n")}`);
-    }
-    if (allAccomplishments.length > 0) {
-      const unique = [...new Set(allAccomplishments)];
-      parts.push(`\nAll raw accomplishments:\n${unique.map((a) => `- ${a}`).join("\n")}`);
-    }
-    if (allTasks.length > 0) {
-      const topTasks = allTasks
-        .sort((a, b) => b.minutes - a.minutes)
-        .slice(0, 20);
-      parts.push(
-        `\nTop tasks by time:\n${topTasks.map((t) => `- ${t.shortTitle} (${t.minutes}m): ${t.description}`).join("\n")}`
-      );
-    }
-    sessionsBlock = `<aggregated_data>\n${parts.join("\n")}\n</aggregated_data>`;
-  }
-
-  const prompt = `You are writing a bragbook entry — a curated list of accomplishments worth celebrating from a work period.
+  const prompt = `You are writing a bragbook entry — a curated list of accomplishments worth celebrating from a work week.
 
 <sessions>
 ${sessionsBlock}
@@ -180,71 +277,253 @@ ${sessionsBlock}
 Respond with valid JSON only:
 { "accomplishments": ["Accomplishment 1", "Accomplishment 2"] }`;
 
-  try {
-    const model = getGenAI().getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
-    });
+  const accomplishments = await callGemini(prompt);
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+  await upsertBragbookEntry(userId, organizationId, "weekly", periodStart, accomplishments);
 
-    if (!text) {
-      logger.warn({ userId, periodStart }, "Empty Gemini response");
-      return { accomplishments: [], sessionsUsed: sessions.length };
-    }
+  logger.info(
+    { userId, periodStart, count: accomplishments.length, sessions: sessions.length },
+    "Weekly bragbook entry generated"
+  );
+  return { accomplishments, sessionsUsed: sessions.length };
+}
 
-    const parsed = parseLLMJson<{ accomplishments?: string[] }>(text);
-    const accomplishments = Array.isArray(parsed.accomplishments)
-      ? parsed.accomplishments.filter(
-          (a): a is string => typeof a === "string" && a.trim().length > 0
-        )
-      : [];
+// ---------------------------------------------------------------------------
+// Monthly: synthesize from weekly entries
+// ---------------------------------------------------------------------------
 
-    // Upsert into bragbook_entries
+async function generateMonthly(
+  userId: string,
+  organizationId: string,
+  periodStart: string,
+  _periodEnd: string
+): Promise<GenerationResult> {
+  const weekStarts = getWeeksInMonth(periodStart);
+
+  // Ensure weekly entries exist for each week
+  let totalSessions = 0;
+  for (const weekStart of weekStarts) {
+    const weekEnd = formatDateStr(getPeriodEnd(new Date(weekStart + "T00:00:00"), "weekly"));
+
+    // Check if weekly entry already exists
     const existing = await db
-      .select({ id: schema.bragbookEntries.id, source: schema.bragbookEntries.source })
+      .select({ id: schema.bragbookEntries.id })
       .from(schema.bragbookEntries)
       .where(
         and(
           eq(schema.bragbookEntries.userId, userId),
-          eq(schema.bragbookEntries.periodType, periodType),
-          eq(schema.bragbookEntries.periodStart, periodStart)
+          eq(schema.bragbookEntries.periodType, "weekly"),
+          eq(schema.bragbookEntries.periodStart, weekStart)
         )
       )
       .limit(1);
 
-    if (existing[0]) {
-      // Only overwrite if not user-edited
-      if (existing[0].source === "user-edited") {
-        logger.info({ userId, periodStart }, "Skipping — user-edited entry exists");
-        return { accomplishments, sessionsUsed: sessions.length };
-      }
-      await db
-        .update(schema.bragbookEntries)
-        .set({ accomplishments, source: "auto-generated", updatedAt: new Date() })
-        .where(eq(schema.bragbookEntries.id, existing[0].id));
-    } else {
-      await db.insert(schema.bragbookEntries).values({
-        userId,
-        organizationId,
-        periodType,
-        periodStart,
-        accomplishments,
-        source: "auto-generated",
-      });
+    if (!existing[0]) {
+      const result = await generateWeekly(userId, organizationId, weekStart, weekEnd);
+      totalSessions += result.sessionsUsed;
     }
+  }
 
-    logger.info(
-      { userId, periodStart, count: accomplishments.length, sessions: sessions.length },
-      "Bragbook entry generated"
+  // Fetch all weekly entries for this month
+  const weeklyEntries = await db
+    .select({
+      periodStart: schema.bragbookEntries.periodStart,
+      accomplishments: schema.bragbookEntries.accomplishments,
+    })
+    .from(schema.bragbookEntries)
+    .where(
+      and(
+        eq(schema.bragbookEntries.userId, userId),
+        eq(schema.bragbookEntries.periodType, "weekly"),
+        inArray(schema.bragbookEntries.periodStart, weekStarts)
+      )
     );
-    return { accomplishments, sessionsUsed: sessions.length };
+
+  const allAccomplishments = weeklyEntries.flatMap((e) => (e.accomplishments as string[]) || []);
+
+  if (allAccomplishments.length === 0) {
+    return { accomplishments: [], sessionsUsed: totalSessions };
+  }
+
+  const weeksBlock = weeklyEntries
+    .map((e) => {
+      const items = (e.accomplishments as string[]) || [];
+      return `Week of ${e.periodStart}:\n${items.map((a) => `- ${a}`).join("\n")}`;
+    })
+    .join("\n\n");
+
+  const prompt = `You are writing a monthly bragbook entry — a curated highlight reel of the month's top accomplishments.
+
+Below are the weekly accomplishment entries for this month:
+
+${weeksBlock}
+
+<rules>
+- Synthesize into 5-10 polished monthly highlights
+- Merge related weekly items into stronger, higher-level bullets
+- Prioritize impact: what shipped, what was completed, what moved the needle
+- Use strong action verbs and be specific with names, numbers, and outcomes
+- Each bullet should be 1 sentence, concise but impactful
+- Do NOT fabricate details not in the weekly entries
+</rules>
+
+Respond with valid JSON only:
+{ "accomplishments": ["Accomplishment 1", "Accomplishment 2"] }`;
+
+  const accomplishments = await callGemini(prompt);
+
+  await upsertBragbookEntry(userId, organizationId, "monthly", periodStart, accomplishments);
+
+  logger.info(
+    { userId, periodStart, count: accomplishments.length, weeks: weeklyEntries.length },
+    "Monthly bragbook entry generated"
+  );
+  return { accomplishments, sessionsUsed: totalSessions };
+}
+
+// ---------------------------------------------------------------------------
+// Quarterly: synthesize from monthly entries
+// ---------------------------------------------------------------------------
+
+async function generateQuarterly(
+  userId: string,
+  organizationId: string,
+  periodStart: string,
+  _periodEnd: string
+): Promise<GenerationResult> {
+  const monthStarts = getMonthsInQuarter(periodStart);
+
+  // Ensure monthly entries exist for each month
+  let totalSessions = 0;
+  for (const monthStart of monthStarts) {
+    const monthEnd = formatDateStr(getPeriodEnd(new Date(monthStart + "T00:00:00"), "monthly"));
+
+    const existing = await db
+      .select({ id: schema.bragbookEntries.id })
+      .from(schema.bragbookEntries)
+      .where(
+        and(
+          eq(schema.bragbookEntries.userId, userId),
+          eq(schema.bragbookEntries.periodType, "monthly"),
+          eq(schema.bragbookEntries.periodStart, monthStart)
+        )
+      )
+      .limit(1);
+
+    if (!existing[0]) {
+      const result = await generateMonthly(userId, organizationId, monthStart, monthEnd);
+      totalSessions += result.sessionsUsed;
+    }
+  }
+
+  // Fetch all monthly entries for this quarter
+  const monthlyEntries = await db
+    .select({
+      periodStart: schema.bragbookEntries.periodStart,
+      accomplishments: schema.bragbookEntries.accomplishments,
+    })
+    .from(schema.bragbookEntries)
+    .where(
+      and(
+        eq(schema.bragbookEntries.userId, userId),
+        eq(schema.bragbookEntries.periodType, "monthly"),
+        inArray(schema.bragbookEntries.periodStart, monthStarts)
+      )
+    );
+
+  const allAccomplishments = monthlyEntries.flatMap((e) => (e.accomplishments as string[]) || []);
+
+  if (allAccomplishments.length === 0) {
+    return { accomplishments: [], sessionsUsed: totalSessions };
+  }
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const monthsBlock = monthlyEntries
+    .map((e) => {
+      const d = new Date(e.periodStart + "T00:00:00");
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      const items = (e.accomplishments as string[]) || [];
+      return `${label}:\n${items.map((a) => `- ${a}`).join("\n")}`;
+    })
+    .join("\n\n");
+
+  const prompt = `You are writing a quarterly bragbook entry — a strategic summary of the quarter's most significant achievements.
+
+Below are the monthly accomplishment entries for this quarter:
+
+${monthsBlock}
+
+<rules>
+- Synthesize into 5-8 high-impact quarterly highlights
+- Focus on themes, outcomes, and measurable results across the quarter
+- Elevate from tactical (what was done) to strategic (what impact it had)
+- Merge related monthly items into comprehensive achievement statements
+- Use strong action verbs and include specific outcomes where available
+- Each bullet should be 1-2 sentences, emphasizing impact
+- Do NOT fabricate details not in the monthly entries
+</rules>
+
+Respond with valid JSON only:
+{ "accomplishments": ["Accomplishment 1", "Accomplishment 2"] }`;
+
+  const accomplishments = await callGemini(prompt);
+
+  await upsertBragbookEntry(userId, organizationId, "quarterly", periodStart, accomplishments);
+
+  logger.info(
+    { userId, periodStart, count: accomplishments.length, months: monthlyEntries.length },
+    "Quarterly bragbook entry generated"
+  );
+  return { accomplishments, sessionsUsed: totalSessions };
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a bragbook entry for a single user and period.
+ * Weekly: generated from raw sessions.
+ * Monthly: synthesized from weekly entries (auto-generates missing weeks).
+ * Quarterly: synthesized from monthly entries (auto-generates missing months).
+ */
+export async function generateBragbookEntry(
+  userId: string,
+  organizationId: string,
+  periodType: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<GenerationResult> {
+  try {
+    switch (periodType) {
+      case "weekly":
+        return await generateWeekly(userId, organizationId, periodStart, periodEnd);
+      case "monthly":
+        return await generateMonthly(userId, organizationId, periodStart, periodEnd);
+      case "quarterly":
+        return await generateQuarterly(userId, organizationId, periodStart, periodEnd);
+      default:
+        return await generateWeekly(userId, organizationId, periodStart, periodEnd);
+    }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
     logger.error(
-      { err: errMsg, errStack, userId, periodStart },
+      { err: errMsg, errStack, userId, periodType, periodStart },
       "Failed to generate bragbook entry"
     );
     throw error;
