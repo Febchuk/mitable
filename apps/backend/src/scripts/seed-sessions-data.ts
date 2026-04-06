@@ -67,10 +67,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Improved API error responses with structured error codes",
       ],
       taskBreakdown: [
-        { shortTitle: "Audit existing endpoints", description: "Mapped all user API routes and identified duplication", minutes: 20 },
-        { shortTitle: "Create shared middleware", description: "Built validation and error-handling middleware", minutes: 35 },
-        { shortTitle: "Migrate endpoints", description: "Updated all user routes to use new middleware", minutes: 25 },
-        { shortTitle: "Write tests", description: "Added integration tests for refactored endpoints", minutes: 15 },
+        {
+          shortTitle: "Audit existing endpoints",
+          description: "Mapped all user API routes and identified duplication",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Create shared middleware",
+          description: "Built validation and error-handling middleware",
+          minutes: 35,
+        },
+        {
+          shortTitle: "Migrate endpoints",
+          description: "Updated all user routes to use new middleware",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Write tests",
+          description: "Added integration tests for refactored endpoints",
+          minutes: 15,
+        },
       ],
       keyActivities: [
         "Reviewed existing API route handlers in VS Code",
@@ -90,9 +106,21 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Reduced auth-related 401 errors by 85% with proactive token refresh",
       ],
       taskBreakdown: [
-        { shortTitle: "Token rotation logic", description: "Implemented server-side refresh token rotation", minutes: 30 },
-        { shortTitle: "Cookie storage", description: "Switched refresh tokens to httpOnly cookies", minutes: 20 },
-        { shortTitle: "Client-side refresh", description: "Added automatic token refresh interceptor", minutes: 25 },
+        {
+          shortTitle: "Token rotation logic",
+          description: "Implemented server-side refresh token rotation",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Cookie storage",
+          description: "Switched refresh tokens to httpOnly cookies",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Client-side refresh",
+          description: "Added automatic token refresh interceptor",
+          minutes: 25,
+        },
       ],
       keyActivities: [
         "Designed token rotation flow on whiteboard",
@@ -112,10 +140,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Added Redis caching for team activity aggregations",
       ],
       taskBreakdown: [
-        { shortTitle: "Profile slow queries", description: "Used pg_stat_statements to identify bottlenecks", minutes: 15 },
-        { shortTitle: "Add indexes", description: "Created composite indexes for dashboard queries", minutes: 20 },
-        { shortTitle: "Rewrite N+1 queries", description: "Converted sequential queries to Drizzle joins", minutes: 30 },
-        { shortTitle: "Add caching layer", description: "Implemented Redis caching for team aggregations", minutes: 20 },
+        {
+          shortTitle: "Profile slow queries",
+          description: "Used pg_stat_statements to identify bottlenecks",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Add indexes",
+          description: "Created composite indexes for dashboard queries",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Rewrite N+1 queries",
+          description: "Converted sequential queries to Drizzle joins",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Add caching layer",
+          description: "Implemented Redis caching for team aggregations",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Analyzed query execution plans in pgAdmin",
@@ -135,9 +179,21 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Closed 3 low-priority bugs as duplicates with proper cross-references",
       ],
       taskBreakdown: [
-        { shortTitle: "Triage bug reports", description: "Reviewed and prioritized 5 incoming bug reports", minutes: 15 },
-        { shortTitle: "Fix race condition", description: "Added row-level locking to session cleanup", minutes: 30 },
-        { shortTitle: "Fix timezone bug", description: "Normalized all date comparisons to UTC", minutes: 25 },
+        {
+          shortTitle: "Triage bug reports",
+          description: "Reviewed and prioritized 5 incoming bug reports",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Fix race condition",
+          description: "Added row-level locking to session cleanup",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Fix timezone bug",
+          description: "Normalized all date comparisons to UTC",
+          minutes: 25,
+        },
       ],
       keyActivities: [
         "Reviewed error logs in production monitoring",
@@ -157,10 +213,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Reviewed and approved 3 PRs enabling team to ship on schedule",
       ],
       taskBreakdown: [
-        { shortTitle: "Review notification PR", description: "Deep review of notification system architecture", minutes: 25 },
-        { shortTitle: "Review search endpoint", description: "Found SQL injection, suggested parameterized queries", minutes: 20 },
-        { shortTitle: "Review component library", description: "Verified design system changes and accessibility", minutes: 15 },
-        { shortTitle: "Review minor fixes", description: "Quick review of 1 small bugfix PR", minutes: 10 },
+        {
+          shortTitle: "Review notification PR",
+          description: "Deep review of notification system architecture",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Review search endpoint",
+          description: "Found SQL injection, suggested parameterized queries",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Review component library",
+          description: "Verified design system changes and accessibility",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Review minor fixes",
+          description: "Quick review of 1 small bugfix PR",
+          minutes: 10,
+        },
       ],
       keyActivities: [
         "Read through notification system PR diff on GitHub",
@@ -180,10 +252,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Added WebSocket reconnection logic with exponential backoff",
       ],
       taskBreakdown: [
-        { shortTitle: "WebSocket server setup", description: "Created WS endpoint with authentication", minutes: 25 },
-        { shortTitle: "Event dispatching", description: "Built event system for session state changes", minutes: 20 },
-        { shortTitle: "Client integration", description: "Connected feed component to WS with React Query", minutes: 25 },
-        { shortTitle: "Virtual scrolling", description: "Implemented virtualized list for feed performance", minutes: 20 },
+        {
+          shortTitle: "WebSocket server setup",
+          description: "Created WS endpoint with authentication",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Event dispatching",
+          description: "Built event system for session state changes",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Client integration",
+          description: "Connected feed component to WS with React Query",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Virtual scrolling",
+          description: "Implemented virtualized list for feed performance",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Set up WebSocket server with ws library",
@@ -205,9 +293,21 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Achieved team consensus on sprint goals within 45-minute planning session",
       ],
       taskBreakdown: [
-        { shortTitle: "Backlog prioritization", description: "Scored and ranked items by impact and effort", minutes: 25 },
-        { shortTitle: "Epic decomposition", description: "Broke 3 epics into user stories", minutes: 30 },
-        { shortTitle: "Sprint commitment", description: "Facilitated team commitment and owner assignment", minutes: 20 },
+        {
+          shortTitle: "Backlog prioritization",
+          description: "Scored and ranked items by impact and effort",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Epic decomposition",
+          description: "Broke 3 epics into user stories",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Sprint commitment",
+          description: "Facilitated team commitment and owner assignment",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Reviewed customer feedback tickets in Linear",
@@ -227,10 +327,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Identified 2 technical constraints early saving estimated 1 week of rework",
       ],
       taskBreakdown: [
-        { shortTitle: "Stakeholder feedback", description: "Synthesized notes from 3 stakeholder interviews", minutes: 20 },
-        { shortTitle: "PRD updates", description: "Updated requirements, user flows, and edge cases", minutes: 30 },
-        { shortTitle: "Success metrics", description: "Defined measurable KPIs for the feature", minutes: 15 },
-        { shortTitle: "Eng alignment", description: "Reviewed technical feasibility with engineering lead", minutes: 20 },
+        {
+          shortTitle: "Stakeholder feedback",
+          description: "Synthesized notes from 3 stakeholder interviews",
+          minutes: 20,
+        },
+        {
+          shortTitle: "PRD updates",
+          description: "Updated requirements, user flows, and edge cases",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Success metrics",
+          description: "Defined measurable KPIs for the feature",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Eng alignment",
+          description: "Reviewed technical feasibility with engineering lead",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Reviewed stakeholder interview notes in Notion",
@@ -250,10 +366,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Drafted executive summary with recommendations for leadership review",
       ],
       taskBreakdown: [
-        { shortTitle: "Data collection", description: "Gathered feedback from support, NPS, and interviews", minutes: 20 },
-        { shortTitle: "Theme analysis", description: "Categorized and identified top 3 pain points", minutes: 25 },
-        { shortTitle: "Roadmap mapping", description: "Connected themes to existing product roadmap", minutes: 15 },
-        { shortTitle: "Recommendations", description: "Drafted executive summary with proposed actions", minutes: 20 },
+        {
+          shortTitle: "Data collection",
+          description: "Gathered feedback from support, NPS, and interviews",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Theme analysis",
+          description: "Categorized and identified top 3 pain points",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Roadmap mapping",
+          description: "Connected themes to existing product roadmap",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Recommendations",
+          description: "Drafted executive summary with proposed actions",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Exported support ticket data from Zendesk",
@@ -273,10 +405,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Documented clear ownership matrix for all Q2 initiatives",
       ],
       taskBreakdown: [
-        { shortTitle: "Q1 retrospective", description: "Presented Q1 metrics and learnings", minutes: 15 },
-        { shortTitle: "OKR alignment", description: "Facilitated discussion on Q2 objectives", minutes: 30 },
-        { shortTitle: "Conflict resolution", description: "Worked through 2 resource conflicts", minutes: 20 },
-        { shortTitle: "Documentation", description: "Created ownership matrix and action items", minutes: 15 },
+        {
+          shortTitle: "Q1 retrospective",
+          description: "Presented Q1 metrics and learnings",
+          minutes: 15,
+        },
+        {
+          shortTitle: "OKR alignment",
+          description: "Facilitated discussion on Q2 objectives",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Conflict resolution",
+          description: "Worked through 2 resource conflicts",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Documentation",
+          description: "Created ownership matrix and action items",
+          minutes: 15,
+        },
       ],
       keyActivities: [
         "Prepared Q1 retrospective slides",
@@ -298,9 +446,21 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Created customized training guide tailored to their engineering workflow",
       ],
       taskBreakdown: [
-        { shortTitle: "Platform walkthrough", description: "Live demo of core features for the team", minutes: 30 },
-        { shortTitle: "Integration setup", description: "Configured Slack and Notion integrations", minutes: 25 },
-        { shortTitle: "Custom documentation", description: "Created team-specific training guides", minutes: 20 },
+        {
+          shortTitle: "Platform walkthrough",
+          description: "Live demo of core features for the team",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Integration setup",
+          description: "Configured Slack and Notion integrations",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Custom documentation",
+          description: "Created team-specific training guides",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Led onboarding call with Acme Corp team on Zoom",
@@ -320,10 +480,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Created reusable QBR template reducing future prep time by 50%",
       ],
       taskBreakdown: [
-        { shortTitle: "Usage analytics", description: "Compiled platform usage data for 3 accounts", minutes: 20 },
-        { shortTitle: "ROI calculations", description: "Calculated productivity improvements and time savings", minutes: 20 },
-        { shortTitle: "Deck creation", description: "Built presentation slides with charts and metrics", minutes: 25 },
-        { shortTitle: "Template creation", description: "Standardized QBR template for future use", minutes: 15 },
+        {
+          shortTitle: "Usage analytics",
+          description: "Compiled platform usage data for 3 accounts",
+          minutes: 20,
+        },
+        {
+          shortTitle: "ROI calculations",
+          description: "Calculated productivity improvements and time savings",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Deck creation",
+          description: "Built presentation slides with charts and metrics",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Template creation",
+          description: "Standardized QBR template for future use",
+          minutes: 15,
+        },
       ],
       keyActivities: [
         "Exported usage analytics from admin dashboard",
@@ -343,10 +519,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Corrected Stripe billing discrepancy and issued credit memo",
       ],
       taskBreakdown: [
-        { shortTitle: "Investigate sync issue", description: "Diagnosed Nike's data synchronization problem", minutes: 25 },
-        { shortTitle: "Coordinate fix", description: "Worked with engineering to deploy hotfix", minutes: 20 },
-        { shortTitle: "Billing resolution", description: "Investigated and corrected Stripe billing error", minutes: 20 },
-        { shortTitle: "Follow-up", description: "Sent resolution summaries to affected accounts", minutes: 10 },
+        {
+          shortTitle: "Investigate sync issue",
+          description: "Diagnosed Nike's data synchronization problem",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Coordinate fix",
+          description: "Worked with engineering to deploy hotfix",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Billing resolution",
+          description: "Investigated and corrected Stripe billing error",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Follow-up",
+          description: "Sent resolution summaries to affected accounts",
+          minutes: 10,
+        },
       ],
       keyActivities: [
         "Investigated error logs for Nike's sync issue",
@@ -366,9 +558,21 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Prevented potential churn by scheduling executive sponsor meetings for 2 accounts",
       ],
       taskBreakdown: [
-        { shortTitle: "Pre-call research", description: "Reviewed usage data and support history for each account", minutes: 15 },
-        { shortTitle: "Health check calls", description: "Conducted 4 calls with account stakeholders", minutes: 40 },
-        { shortTitle: "Action plans", description: "Created 30-day improvement plans for each account", minutes: 20 },
+        {
+          shortTitle: "Pre-call research",
+          description: "Reviewed usage data and support history for each account",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Health check calls",
+          description: "Conducted 4 calls with account stakeholders",
+          minutes: 40,
+        },
+        {
+          shortTitle: "Action plans",
+          description: "Created 30-day improvement plans for each account",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Reviewed account health dashboards before calls",
@@ -390,10 +594,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Updated Q2 forecast with 15% increase based on pipeline momentum",
       ],
       taskBreakdown: [
-        { shortTitle: "Pipeline review", description: "Reviewed all active opportunities in CRM", minutes: 20 },
-        { shortTitle: "Lead qualification", description: "Qualified 3 new inbound leads", minutes: 25 },
-        { shortTitle: "Forecast update", description: "Revised Q2 revenue forecast and probabilities", minutes: 15 },
-        { shortTitle: "Follow-ups", description: "Sent next-step emails to 5 prospects", minutes: 15 },
+        {
+          shortTitle: "Pipeline review",
+          description: "Reviewed all active opportunities in CRM",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Lead qualification",
+          description: "Qualified 3 new inbound leads",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Forecast update",
+          description: "Revised Q2 revenue forecast and probabilities",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Follow-ups",
+          description: "Sent next-step emails to 5 prospects",
+          minutes: 15,
+        },
       ],
       keyActivities: [
         "Reviewed pipeline dashboard in CRM",
@@ -413,10 +633,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Proposed 4-week implementation timeline accepted by procurement team",
       ],
       taskBreakdown: [
-        { shortTitle: "Demo customization", description: "Tailored demo environment for Nike's workflow", minutes: 25 },
-        { shortTitle: "Security prep", description: "Prepared security documentation and compliance answers", minutes: 15 },
-        { shortTitle: "Demo delivery", description: "Presented to Nike's 6-person procurement team", minutes: 30 },
-        { shortTitle: "Proposal outline", description: "Created implementation timeline and pricing proposal", minutes: 20 },
+        {
+          shortTitle: "Demo customization",
+          description: "Tailored demo environment for Nike's workflow",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Security prep",
+          description: "Prepared security documentation and compliance answers",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Demo delivery",
+          description: "Presented to Nike's 6-person procurement team",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Proposal outline",
+          description: "Created implementation timeline and pricing proposal",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Customized demo instance with Nike branding",
@@ -436,9 +672,21 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Built prospect research database with key decision-maker contacts",
       ],
       taskBreakdown: [
-        { shortTitle: "Account research", description: "Researched 8 target fintech accounts", minutes: 25 },
-        { shortTitle: "Outreach drafting", description: "Wrote personalized email sequences", minutes: 20 },
-        { shortTitle: "LinkedIn outreach", description: "Connected with decision-makers on LinkedIn", minutes: 15 },
+        {
+          shortTitle: "Account research",
+          description: "Researched 8 target fintech accounts",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Outreach drafting",
+          description: "Wrote personalized email sequences",
+          minutes: 20,
+        },
+        {
+          shortTitle: "LinkedIn outreach",
+          description: "Connected with decision-makers on LinkedIn",
+          minutes: 15,
+        },
         { shortTitle: "Calendar booking", description: "Scheduled 2 discovery calls", minutes: 10 },
       ],
       keyActivities: [
@@ -461,10 +709,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Established reusable chart component patterns for the design system",
       ],
       taskBreakdown: [
-        { shortTitle: "Competitive analysis", description: "Reviewed 5 competitor dashboard designs", minutes: 20 },
-        { shortTitle: "Wireframing", description: "Created 3 design direction wireframes in Figma", minutes: 30 },
-        { shortTitle: "Data viz exploration", description: "Tested chart types for activity data", minutes: 20 },
-        { shortTitle: "Team feedback", description: "Presented concepts and gathered input", minutes: 15 },
+        {
+          shortTitle: "Competitive analysis",
+          description: "Reviewed 5 competitor dashboard designs",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Wireframing",
+          description: "Created 3 design direction wireframes in Figma",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Data viz exploration",
+          description: "Tested chart types for activity data",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Team feedback",
+          description: "Presented concepts and gathered input",
+          minutes: 15,
+        },
       ],
       keyActivities: [
         "Reviewed competitor dashboards for inspiration",
@@ -484,10 +748,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Documented all component variants reducing designer onboarding time",
       ],
       taskBreakdown: [
-        { shortTitle: "Component audit", description: "Reviewed all components for consistency", minutes: 25 },
-        { shortTitle: "Spacing fixes", description: "Corrected spacing tokens across 8 components", minutes: 20 },
-        { shortTitle: "Dark mode tokens", description: "Added dark mode color variants", minutes: 20 },
-        { shortTitle: "Documentation", description: "Updated Figma component documentation", minutes: 15 },
+        {
+          shortTitle: "Component audit",
+          description: "Reviewed all components for consistency",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Spacing fixes",
+          description: "Corrected spacing tokens across 8 components",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Dark mode tokens",
+          description: "Added dark mode color variants",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Documentation",
+          description: "Updated Figma component documentation",
+          minutes: 15,
+        },
       ],
       keyActivities: [
         "Audited component library in Figma",
@@ -507,10 +787,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Identified critical usability issue in session start flow affecting 60% of users",
       ],
       taskBreakdown: [
-        { shortTitle: "Interview review", description: "Re-read transcripts and highlighted key quotes", minutes: 20 },
-        { shortTitle: "Affinity mapping", description: "Grouped findings into themes on FigJam", minutes: 25 },
-        { shortTitle: "Insight extraction", description: "Distilled themes into actionable insights", minutes: 15 },
-        { shortTitle: "Report writing", description: "Drafted research report with recommendations", minutes: 25 },
+        {
+          shortTitle: "Interview review",
+          description: "Re-read transcripts and highlighted key quotes",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Affinity mapping",
+          description: "Grouped findings into themes on FigJam",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Insight extraction",
+          description: "Distilled themes into actionable insights",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Report writing",
+          description: "Drafted research report with recommendations",
+          minutes: 25,
+        },
       ],
       keyActivities: [
         "Reviewed interview transcripts and recordings",
@@ -530,10 +826,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Received engineering sign-off on feasibility of all proposed interactions",
       ],
       taskBreakdown: [
-        { shortTitle: "Screen design", description: "Designed 12 settings page screens", minutes: 30 },
-        { shortTitle: "Micro-interactions", description: "Added toggle, slide, and fade animations", minutes: 20 },
-        { shortTitle: "Responsive layouts", description: "Created breakpoint variants for all screens", minutes: 15 },
-        { shortTitle: "Prototype linking", description: "Connected screens into interactive flow", minutes: 10 },
+        {
+          shortTitle: "Screen design",
+          description: "Designed 12 settings page screens",
+          minutes: 30,
+        },
+        {
+          shortTitle: "Micro-interactions",
+          description: "Added toggle, slide, and fade animations",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Responsive layouts",
+          description: "Created breakpoint variants for all screens",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Prototype linking",
+          description: "Connected screens into interactive flow",
+          minutes: 10,
+        },
       ],
       keyActivities: [
         "Designed settings page layouts in Figma",
@@ -555,10 +867,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Created incident response runbook reducing mean-time-to-acknowledge by 40%",
       ],
       taskBreakdown: [
-        { shortTitle: "Dashboard setup", description: "Created Datadog dashboards for key metrics", minutes: 25 },
-        { shortTitle: "Alert configuration", description: "Set up alerting rules for critical thresholds", minutes: 20 },
-        { shortTitle: "Runbook creation", description: "Documented incident response procedures", minutes: 20 },
-        { shortTitle: "Testing", description: "Triggered test alerts to verify routing", minutes: 10 },
+        {
+          shortTitle: "Dashboard setup",
+          description: "Created Datadog dashboards for key metrics",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Alert configuration",
+          description: "Set up alerting rules for critical thresholds",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Runbook creation",
+          description: "Documented incident response procedures",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Testing",
+          description: "Triggered test alerts to verify routing",
+          minutes: 10,
+        },
       ],
       keyActivities: [
         "Configured Datadog integration with production services",
@@ -578,10 +906,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Added Docker layer caching saving 4 minutes per build",
       ],
       taskBreakdown: [
-        { shortTitle: "Pipeline analysis", description: "Identified bottlenecks in current workflow", minutes: 15 },
-        { shortTitle: "Test parallelization", description: "Sharded tests across 3 GitHub runners", minutes: 25 },
-        { shortTitle: "Docker caching", description: "Implemented multi-stage build with layer caching", minutes: 20 },
-        { shortTitle: "Validation", description: "Ran 10 builds to verify consistency and speed", minutes: 15 },
+        {
+          shortTitle: "Pipeline analysis",
+          description: "Identified bottlenecks in current workflow",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Test parallelization",
+          description: "Sharded tests across 3 GitHub runners",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Docker caching",
+          description: "Implemented multi-stage build with layer caching",
+          minutes: 20,
+        },
+        {
+          shortTitle: "Validation",
+          description: "Ran 10 builds to verify consistency and speed",
+          minutes: 15,
+        },
       ],
       keyActivities: [
         "Analyzed GitHub Actions workflow timing breakdown",
@@ -601,10 +945,26 @@ const TEMPLATES: Record<string, SessionTemplate[]> = {
         "Completed full security audit of dependency tree with clean bill of health",
       ],
       taskBreakdown: [
-        { shortTitle: "CVE assessment", description: "Reviewed and prioritized 3 critical vulnerabilities", minutes: 15 },
-        { shortTitle: "Dependency updates", description: "Updated affected packages and resolved conflicts", minutes: 25 },
-        { shortTitle: "Secret rotation", description: "Rotated API keys and updated vault", minutes: 15 },
-        { shortTitle: "Deployment", description: "Staged rollout to staging then production", minutes: 20 },
+        {
+          shortTitle: "CVE assessment",
+          description: "Reviewed and prioritized 3 critical vulnerabilities",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Dependency updates",
+          description: "Updated affected packages and resolved conflicts",
+          minutes: 25,
+        },
+        {
+          shortTitle: "Secret rotation",
+          description: "Rotated API keys and updated vault",
+          minutes: 15,
+        },
+        {
+          shortTitle: "Deployment",
+          description: "Staged rollout to staging then production",
+          minutes: 20,
+        },
       ],
       keyActivities: [
         "Ran npm audit and reviewed CVE details",
@@ -697,7 +1057,9 @@ async function main() {
       .limit(1);
 
     if (existing.length > 0) {
-      console.log(`  ⏭️  ${firstName} ${user.lastName || ""} — already has seed sessions, skipping`);
+      console.log(
+        `  ⏭️  ${firstName} ${user.lastName || ""} — already has seed sessions, skipping`
+      );
       skippedUsers++;
       continue;
     }
@@ -707,7 +1069,9 @@ async function main() {
     const selectedTemplates = shuffle(templates).slice(0, numSessions);
     const sessionDates = shuffle(weekdays).slice(0, numSessions);
 
-    console.log(`  👤 ${firstName} ${user.lastName || ""} (${roleKey}) — inserting ${numSessions} sessions`);
+    console.log(
+      `  👤 ${firstName} ${user.lastName || ""} (${roleKey}) — inserting ${numSessions} sessions`
+    );
 
     for (let i = 0; i < numSessions; i++) {
       const template = selectedTemplates[i]!;
