@@ -9,7 +9,7 @@ type OrgSetupSection = "general" | "permissions" | "org-chart";
 const SECTIONS: { id: OrgSetupSection; label: string; icon: typeof Settings }[] = [
   { id: "general", label: "General", icon: Settings },
   { id: "permissions", label: "Permissions", icon: Shield },
-  { id: "org-chart", label: "Org Chart", icon: Network },
+  { id: "org-chart", label: "Organization", icon: Network },
 ];
 
 export default function OrgSetupView() {

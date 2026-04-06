@@ -439,10 +439,9 @@ export async function resumeMonitoringSession(): Promise<{ success: boolean; err
 }
 
 /**
- * End the active monitoring session via IPC
- * Returns captures data for upload to backend
+ * Stop local capture only (no backend finalize). Use before deleting a session from the API.
  */
-export async function endMonitoringSession(): Promise<{
+export async function stopLocalMonitoringSessionForDelete(): Promise<{
   success: boolean;
   sessionId?: string;
   captureCount?: number;
@@ -458,7 +457,7 @@ export async function endMonitoringSession(): Promise<{
   }>;
   error?: string;
 }> {
-  return window.consoleAPI.endMonitoringSession();
+  return window.consoleAPI.stopLocalMonitoringSessionForDelete();
 }
 
 /**

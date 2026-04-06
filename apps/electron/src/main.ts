@@ -64,7 +64,6 @@ const notificationLogger = createLogger("Notification");
 let consoleWindow: BrowserWindow | null = null;
 let watchingPillWindow: BrowserWindow | null = null;
 let watchingPillEyeDropdown: BrowserWindow | null = null;
-let watchingPillMenuDropdown: BrowserWindow | null = null;
 let notificationWindow: BrowserWindow | null = null;
 
 // System tray (Windows-first "keep alive on close" behavior)
@@ -73,15 +72,16 @@ let isExplicitQuit = false;
 
 // Notification timer for periodic prompts
 let notificationTimer: NodeJS.Timeout | null = null;
+
+/** Logo + expanded row (pause, mic, optional eye); 200px clipped bottom controls on some layouts */
+const WATCHING_PILL_WINDOW_HEIGHT = 280;
 let notificationAutoHideTimer: NodeJS.Timeout | null = null;
 
-// Track when dropdowns were last hidden (to prevent re-opening on button click)
+// Track when eye dropdown was last hidden (to prevent re-opening on button click)
 let eyeDropdownLastHidden = 0;
-let menuDropdownLastHidden = 0;
 
-// Track whether dropdown webContents have finished loading (first-open data send timing)
+// Track whether eye dropdown webContents have finished loading (first-open data send timing)
 let eyeDropdownReady = false;
-let menuDropdownReady = false;
 
 // Interval for checking if watched windows are still open
 let closedWindowCheckInterval: NodeJS.Timeout | null = null;
@@ -142,6 +142,11 @@ async function cleanupAudioRecording(sessionId?: string): Promise<void> {
   monitoringLogger.info(
     "🔇 Audio recording cleaned up" + (sessionId ? ` for session ${sessionId}` : "")
   );
+}
+
+/** Settings → Dev: optional eye dropdown on the pill for focus-tracker window list */
+function isPillFocusTrackerWindowPickerEnabled(): boolean {
+  return preferencesService.getShowFocusTrackerWindowPickerOnPill();
 }
 
 function isBoundsVisible(bounds: Electron.Rectangle): boolean {
@@ -410,15 +415,14 @@ function createWatchingPillWindow() {
   const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
 
   const windowWidth = 64; // Pill (~50px) + outer padding (12px) + 2px safety
-  const windowHeight = 200; // Pill expanded height + top padding
   const rightMargin = 5;
 
   watchingPillWindow = new BrowserWindow({
     title: "Mitable Guide",
     width: windowWidth,
-    height: windowHeight,
+    height: WATCHING_PILL_WINDOW_HEIGHT,
     x: screenWidth - windowWidth - rightMargin,
-    y: Math.floor((screenHeight - windowHeight) / 2),
+    y: Math.floor((screenHeight - WATCHING_PILL_WINDOW_HEIGHT) / 2),
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -451,11 +455,8 @@ function createWatchingPillWindow() {
   }
 
   watchingPillWindow.on("closed", () => {
-    // Close dropdowns explicitly (no longer auto-closed without parent)
     if (watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed())
       watchingPillEyeDropdown.close();
-    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed())
-      watchingPillMenuDropdown.close();
     watchingPillWindow = null;
     stopClosedWindowCheck();
     stopPillCursorTracking();
@@ -528,14 +529,13 @@ function movePillToDisplay(display: Electron.Display) {
 
   const { width: screenWidth, height: screenHeight, x: screenX, y: screenY } = display.bounds;
   const windowWidth = 64;
-  const windowHeight = 200;
   const rightMargin = 5;
 
   watchingPillWindow.setBounds({
     x: screenX + screenWidth - windowWidth - rightMargin,
-    y: screenY + Math.floor((screenHeight - windowHeight) / 2),
+    y: screenY + Math.floor((screenHeight - WATCHING_PILL_WINDOW_HEIGHT) / 2),
     width: windowWidth,
-    height: windowHeight,
+    height: WATCHING_PILL_WINDOW_HEIGHT,
   });
 
   // Reposition any open dropdown windows relative to new pill location
@@ -550,18 +550,6 @@ function movePillToDisplay(display: Electron.Display) {
       y: pillBounds.y + 40,
       width: 240,
       height: 280,
-    });
-  }
-  if (
-    watchingPillMenuDropdown &&
-    !watchingPillMenuDropdown.isDestroyed() &&
-    watchingPillMenuDropdown.isVisible()
-  ) {
-    watchingPillMenuDropdown.setBounds({
-      x: pillBounds.x - 170,
-      y: pillBounds.y + 90,
-      width: 160,
-      height: 100,
     });
   }
 }
@@ -671,72 +659,6 @@ function createWatchingPillEyeDropdown() {
     watchingPillEyeDropdown.loadURL("http://localhost:5173/watchingPillDropdown/eye.html");
   } else {
     watchingPillEyeDropdown.loadFile(join(__dirname, "../renderer/watchingPillDropdown/eye.html"));
-  }
-}
-
-function createWatchingPillMenuDropdown() {
-  if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
-
-  const pillBounds = watchingPillWindow.getBounds();
-
-  watchingPillMenuDropdown = new BrowserWindow({
-    title: "Mitable Nudge",
-    width: 160,
-    height: 100,
-    x: pillBounds.x - 170, // Left of pill
-    y: pillBounds.y + 90, // Below menu button position
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    fullscreenable: false,
-    maximizable: false,
-    show: false,
-    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
-    hasShadow: false,
-    webPreferences: {
-      preload: join(__dirname, "../preload/watchingPillDropdown.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // Platform-specific always-on-top
-  if (process.platform === "darwin") {
-    watchingPillMenuDropdown.setAlwaysOnTop(true, "floating");
-    watchingPillMenuDropdown.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } else {
-    watchingPillMenuDropdown.setAlwaysOnTop(true, "normal", 1);
-  }
-
-  // Dismiss on blur (click away)
-  watchingPillMenuDropdown.on("blur", () => {
-    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) {
-      watchingPillMenuDropdown.hide();
-      menuDropdownLastHidden = Date.now(); // Track when hidden for toggle logic
-      // Notify pill that dropdown closed
-      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-        watchingPillWindow.webContents.send("menu-dropdown-closed");
-      }
-    }
-  });
-
-  watchingPillMenuDropdown.on("closed", () => {
-    watchingPillMenuDropdown = null;
-    menuDropdownReady = false;
-  });
-
-  watchingPillMenuDropdown.webContents.once("did-finish-load", () => {
-    menuDropdownReady = true;
-  });
-
-  if (!app.isPackaged) {
-    watchingPillMenuDropdown.loadURL("http://localhost:5173/watchingPillDropdown/menu.html");
-  } else {
-    watchingPillMenuDropdown.loadFile(
-      join(__dirname, "../renderer/watchingPillDropdown/menu.html")
-    );
   }
 }
 
@@ -1084,9 +1006,10 @@ function setupIPC() {
     }
   });
 
-  // Toggle eye dropdown (window selector)
+  // Toggle eye dropdown (window selector) — when Settings → Dev enables it
   ipcMain.handle(IPC_CHANNELS.WATCHING_PILL_SHOW_EYE_DROPDOWN, async () => {
     if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+    if (!isPillFocusTrackerWindowPickerEnabled()) return;
 
     // If dropdown was just hidden by blur (within 200ms), don't re-open
     // This handles the case where clicking the button triggers blur before click
@@ -1172,80 +1095,35 @@ function setupIPC() {
     }
   });
 
-  // Toggle menu dropdown (session controls)
-  ipcMain.handle(IPC_CHANNELS.WATCHING_PILL_SHOW_MENU_DROPDOWN, async () => {
-    if (!watchingPillWindow || watchingPillWindow.isDestroyed()) return;
+  ipcMain.handle(IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_GET, () => {
+    return { enabled: preferencesService.getShowFocusTrackerWindowPickerOnPill() };
+  });
 
-    // If dropdown was just hidden by blur (within 200ms), don't re-open
-    // This handles the case where clicking the button triggers blur before click
-    if (Date.now() - menuDropdownLastHidden < 200) {
-      return;
-    }
-
-    // Toggle: if visible, hide it
-    if (
-      watchingPillMenuDropdown &&
-      !watchingPillMenuDropdown.isDestroyed() &&
-      watchingPillMenuDropdown.isVisible()
-    ) {
-      watchingPillMenuDropdown.hide();
-      return;
-    }
-
-    // Create dropdown if it doesn't exist
-    if (!watchingPillMenuDropdown || watchingPillMenuDropdown.isDestroyed()) {
-      createWatchingPillMenuDropdown();
-    }
-
-    // Reposition relative to current pill location
-    const pillBounds = watchingPillWindow.getBounds();
-    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) {
-      watchingPillMenuDropdown.setBounds({
-        x: pillBounds.x - 170,
-        y: pillBounds.y + 90,
-        width: 160,
-        height: 100,
-      });
-
-      // Helper: send session data to the menu dropdown
-      const sendMenuData = () => {
-        if (!watchingPillMenuDropdown || watchingPillMenuDropdown.isDestroyed()) return;
-        const sessionState = monitoringSessionService.getSessionState();
-        const selectedWindows = windowDetectionService.getSelectedWindows();
-        watchingPillMenuDropdown.webContents.send(IPC_CHANNELS.WATCHING_PILL_DROPDOWN_DATA, {
-          type: "menu",
-          sessionState,
-          selectedWindows,
-        });
-      };
-
-      // Show dropdown immediately
-      watchingPillMenuDropdown.show();
-      watchingPillMenuDropdown.focus();
-
-      // Defer data send until renderer is ready (first open) or send immediately (re-open)
-      if (menuDropdownReady) {
-        sendMenuData();
-      } else {
-        watchingPillMenuDropdown.webContents.once("did-finish-load", () => {
-          sendMenuData();
-        });
+  ipcMain.handle(IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_SET, (_event, enabled: boolean) => {
+    preferencesService.setShowFocusTrackerWindowPickerOnPill(Boolean(enabled));
+    if (!enabled && watchingPillEyeDropdown && !watchingPillEyeDropdown.isDestroyed()) {
+      watchingPillEyeDropdown.hide();
+      if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+        watchingPillWindow.webContents.send("eye-dropdown-closed");
       }
     }
-  });
-
-  // Hide menu dropdown
-  ipcMain.on(IPC_CHANNELS.WATCHING_PILL_HIDE_MENU_DROPDOWN, () => {
-    if (watchingPillMenuDropdown && !watchingPillMenuDropdown.isDestroyed()) {
-      watchingPillMenuDropdown.hide();
+    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.webContents.send(
+        IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_CHANGED,
+        Boolean(enabled)
+      );
     }
+    return { success: true };
   });
 
-  // Handle actions from dropdown windows
+  // Eye dropdown only: select/unselect watched windows (focus-tracker debug)
   ipcMain.handle(
     IPC_CHANNELS.WATCHING_PILL_DROPDOWN_ACTION,
     async (_event, action: { type: string; payload?: unknown }) => {
-      watchingPillLogger.info(" Dropdown action:", action);
+      if (!isPillFocusTrackerWindowPickerEnabled()) {
+        return { success: false, error: "Window picker disabled" };
+      }
+      watchingPillLogger.info(" Eye dropdown action:", action);
 
       switch (action.type) {
         case "select-window": {
@@ -1259,7 +1137,6 @@ function setupIPC() {
             appName: payload.appName,
             windowTitle: payload.windowTitle,
           });
-          // Notify pill and dropdown to update badge count / selected windows list
           const selectedWindows = windowDetectionService.getSelectedWindows();
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
             watchingPillWindow.webContents.send(
@@ -1278,7 +1155,6 @@ function setupIPC() {
         case "unselect-window": {
           const windowId = action.payload as string;
           windowDetectionService.removeWindow(windowId);
-          // Notify pill and dropdown to update badge count / selected windows list
           const selectedWindows = windowDetectionService.getSelectedWindows();
           if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
             watchingPillWindow.webContents.send(
@@ -1291,110 +1167,6 @@ function setupIPC() {
               IPC_CHANNELS.WATCH_WINDOWS_UPDATED,
               selectedWindows
             );
-          }
-          return { success: true };
-        }
-        case "start-session": {
-          // Use shared helper function for session start
-          return startSessionFromMain();
-        }
-        case "pause-session": {
-          return monitoringSessionService.pauseSession();
-        }
-        case "resume-session": {
-          return monitoringSessionService.resumeSession();
-        }
-        case "end-session": {
-          const sessionState = monitoringSessionService.getSessionState();
-          if (!sessionState?.id) {
-            monitoringLogger.warn(" No active session found for end-session action");
-            return { success: false, error: "No active session" };
-          }
-
-          // Always end directly from pill — no dialog navigation needed.
-          // The console calendar block updates reactively via session state changes.
-          monitoringLogger.info(" Ending session from pill with stored defaults");
-          const summaryDefaults = preferencesService.getSummaryDefaults();
-
-          const runEndSession = async () => {
-            // 0. Stop audio recording before ending session (prevents runaway AudioWorklet)
-            const preEndState = monitoringSessionService.getSessionState();
-            await cleanupAudioRecording(preEndState?.id);
-
-            // 1. End Electron-side capture loop and get captures
-            const result = await monitoringSessionService.endSession();
-
-            if (!result.success || !result.sessionId) {
-              return result;
-            }
-
-            // 2. Upload captures and end backend session with defaults
-            try {
-              // Upload captures if any exist
-              if (result.captures && result.captures.length > 0) {
-                monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
-                await authManager.authenticatedFetch(
-                  `/api/monitoring/sessions/${result.sessionId}/captures`,
-                  {
-                    method: "POST",
-                    body: JSON.stringify({ captures: result.captures }),
-                  }
-                );
-              }
-
-              // End backend session with stored preferences
-              monitoringLogger.info(` Triggering backend summarization with defaults`);
-              const autoRecapEnabled = currentUserContext?.userId
-                ? preferencesService.getUserAutoRecap(currentUserContext.userId)
-                : true;
-              await authManager.authenticatedFetch(
-                `/api/monitoring/sessions/${result.sessionId}/end`,
-                {
-                  method: "POST",
-                  body: JSON.stringify({
-                    preferences: {
-                      detailLevel: summaryDefaults.detailLevel,
-                      format: summaryDefaults.format,
-                      includeScreenshots: summaryDefaults.includeScreenshots,
-                    },
-                    autoRecap: autoRecapEnabled,
-                  }),
-                }
-              );
-            } catch (error) {
-              monitoringLogger.error(" Error:", error);
-            }
-
-            // Hide watching pill after successful end
-            if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-              watchingPillWindow.hide();
-            }
-
-            return result;
-          };
-
-          void runEndSession();
-          return { success: true, background: true };
-        }
-        case "show-console": {
-          if (!consoleWindow || consoleWindow.isDestroyed()) {
-            createConsoleWindow();
-          }
-          if (consoleWindow && !consoleWindow.isDestroyed()) {
-            if (consoleWindow.isMinimized()) {
-              consoleWindow.restore();
-            }
-            consoleWindow.show();
-            consoleWindow.focus();
-            if (process.platform === "darwin") {
-              app.focus({ steal: true });
-            }
-          }
-          return { success: true };
-        }
-        case "hide-pill": {
-          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-            watchingPillWindow.hide();
           }
           return { success: true };
         }
@@ -1536,11 +1308,12 @@ function setupIPC() {
 
   ipcLogger.info(" Screenshot capture and display metadata handlers registered successfully");
 
+  // Monitoring session + prefs IPC first so core session/notification channels exist even if
+  // watch-mode setup ever regresses; renderer depends on these for session start and Settings.
+  setupMonitoringSessionHandlers();
+
   // Watch Mode IPC Handlers
   setupWatchModeHandlers();
-
-  // Monitoring Session IPC Handlers
-  setupMonitoringSessionHandlers();
 
   // Update notification handlers
   setupUpdateHandlers();
@@ -1928,10 +1701,9 @@ function setupMonitoringSessionHandlers() {
     return result;
   });
 
-  // End the active session — returns immediately after stopping captures.
-  // Audio WS is disconnected synchronously; backend notification runs in background.
-  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_END, async () => {
-    monitoringLogger.info(" Ending session");
+  // Stop local capture only — no POST /captures or POST /end (e.g. before deleting session from server).
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_STOP_LOCAL_FOR_DELETE, async () => {
+    monitoringLogger.info(" Stop local session for delete");
     audioActiveBeforePause = false;
 
     // Grab state before ending so we can notify backend in background
@@ -1977,73 +1749,6 @@ function setupMonitoringSessionHandlers() {
 
     return result;
   });
-
-  // Finalize session: upload captures to backend + trigger summarization
-  ipcMain.handle(
-    IPC_CHANNELS.MONITORING_SESSION_FINALIZE,
-    async (
-      _event,
-      sessionId: string,
-      captures: Array<{
-        sequenceNumber: number;
-        captureTrigger: "periodic" | "focus_change" | "manual";
-        capturedAt: number;
-        windowId?: string;
-        appName?: string;
-        windowTitle?: string;
-        screenshotPath?: string;
-        screenshotHash?: string;
-      }>
-    ) => {
-      monitoringLogger.info("Finalizing session:", sessionId, "captures:", captures.length);
-
-      try {
-        // Step 1: Upload captures to backend
-        if (captures.length > 0) {
-          monitoringLogger.info(" Uploading", captures.length, "captures to backend");
-          const uploadResponse = await authManager.authenticatedFetch(
-            `/api/monitoring/sessions/${sessionId}/captures`,
-            {
-              method: "POST",
-              body: JSON.stringify({ captures }),
-            }
-          );
-
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text();
-            monitoringLogger.error(" Upload captures error:", errorText);
-            return { success: false, error: `Failed to upload captures: ${uploadResponse.status}` };
-          }
-          monitoringLogger.info(" Captures uploaded successfully");
-        }
-
-        // Step 2: Call /end endpoint to trigger summarization
-        monitoringLogger.info(" Triggering summarization");
-        const autoRecapForFinalize = currentUserContext?.userId
-          ? preferencesService.getUserAutoRecap(currentUserContext.userId)
-          : true;
-        const endResponse = await authManager.authenticatedFetch(
-          `/api/monitoring/sessions/${sessionId}/end`,
-          {
-            method: "POST",
-            body: JSON.stringify({ autoRecap: autoRecapForFinalize }),
-          }
-        );
-
-        if (!endResponse.ok) {
-          const errorText = await endResponse.text();
-          monitoringLogger.error(" End session error:", errorText);
-          return { success: false, error: `Failed to end session: ${endResponse.status}` };
-        }
-
-        monitoringLogger.info(" Session finalized successfully");
-        return { success: true };
-      } catch (error) {
-        monitoringLogger.error(" Finalize error:", error);
-        return { success: false, error: String(error) };
-      }
-    }
-  );
 
   // Reset/clear session state (used when session is deleted externally)
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESET, async () => {
@@ -2529,48 +2234,76 @@ function setupMonitoringSessionHandlers() {
     // End Electron-side capture loop — fast (no Top-K / base64)
     const result = await monitoringSessionService.endSession();
 
-    // Fire-and-forget: backend audio-stop notification
-    if (preEndState?.id) {
-      authManager
-        .authenticatedFetch(`/api/monitoring/sessions/${preEndState.id}/audio/stop`, {
-          method: "POST",
-        })
-        .catch((err) => monitoringLogger.error(" Background audio stop notification failed:", err));
+    // Match stop-local handler: hide pill as soon as local session stops (don’t wait for uploads).
+    // Otherwise the pill can sit in a confusing state for seconds while captures POST + /end run.
+    if (result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+      watchingPillWindow.hide();
     }
+
+    // Fire-and-forget: backend audio-stop notification + resume passive detection after focused session
+    (async () => {
+      if (preEndState?.id) {
+        try {
+          await authManager.authenticatedFetch(
+            `/api/monitoring/sessions/${preEndState.id}/audio/stop`,
+            { method: "POST" }
+          );
+        } catch (err) {
+          monitoringLogger.error(" Background audio stop notification failed:", err);
+        }
+      }
+      if (currentUserContext?.userId) {
+        const passiveEnabled = preferencesService.getUserPassiveMonitoringEnabled(
+          currentUserContext.userId
+        );
+        if (passiveEnabled) {
+          passiveMonitorService.onManualSessionEnd();
+        }
+      }
+    })();
 
     if (!result.success || !result.sessionId) {
       return result;
     }
 
-    // Upload captures and trigger backend summarization
-    try {
-      if (result.captures && result.captures.length > 0) {
-        monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
-        await authManager.authenticatedFetch(
-          `/api/monitoring/sessions/${result.sessionId}/captures`,
-          {
-            method: "POST",
-            body: JSON.stringify({ captures: result.captures }),
+    const endedSessionId = result.sessionId;
+    const capturesToUpload = result.captures;
+    const autoRecap = currentUserContext?.userId
+      ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+      : true;
+
+    // Upload + POST /end can take 1–2s+; return IPC immediately so the console can refresh UI.
+    // Local capture is already stopped; optimistic "summarizing" covers the gap until the API updates.
+    void (async () => {
+      try {
+        if (capturesToUpload && capturesToUpload.length > 0) {
+          monitoringLogger.info(` Uploading ${capturesToUpload.length} captures to backend`);
+          await authManager.authenticatedFetch(
+            `/api/monitoring/sessions/${endedSessionId}/captures`,
+            {
+              method: "POST",
+              body: JSON.stringify({ captures: capturesToUpload }),
+            }
+          );
+        }
+
+        monitoringLogger.info(` Triggering backend summarization`);
+        await authManager.authenticatedFetch(`/api/monitoring/sessions/${endedSessionId}/end`, {
+          method: "POST",
+          body: JSON.stringify({ autoRecap }),
+        });
+
+        BrowserWindow.getAllWindows().forEach((window) => {
+          if (!window.isDestroyed()) {
+            window.webContents.send(IPC_CHANNELS.MONITORING_SESSION_SERVER_SYNCED, {
+              sessionId: endedSessionId,
+            });
           }
-        );
+        });
+      } catch (error) {
+        monitoringLogger.error(" Error ending session (background upload/end):", error);
       }
-
-      monitoringLogger.info(` Triggering backend summarization`);
-      const autoRecap = currentUserContext?.userId
-        ? preferencesService.getUserAutoRecap(currentUserContext.userId)
-        : true;
-      await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
-        method: "POST",
-        body: JSON.stringify({ autoRecap }),
-      });
-    } catch (error) {
-      monitoringLogger.error(" Error ending session:", error);
-    }
-
-    // Hide watching pill after successful end
-    if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
-      watchingPillWindow.hide();
-    }
+    })();
 
     return result;
   });

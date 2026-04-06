@@ -29,10 +29,13 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_START: "monitoring-session-start",
   MONITORING_SESSION_PAUSE: "monitoring-session-pause",
   MONITORING_SESSION_RESUME: "monitoring-session-resume",
-  MONITORING_SESSION_END: "monitoring-session-end",
+  MONITORING_SESSION_STOP_LOCAL_FOR_DELETE: "monitoring-session-stop-local-for-delete",
+  PILL_FOCUS_TRACKER_WINDOW_PICKER_GET: "pill-focus-tracker-window-picker-get",
+  PILL_FOCUS_TRACKER_WINDOW_PICKER_SET: "pill-focus-tracker-window-picker-set",
   MONITORING_SESSION_RESET: "monitoring-session-reset",
   MONITORING_SESSION_STATUS: "monitoring-session-status",
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
+  MONITORING_SESSION_SERVER_SYNCED: "monitoring-session-server-synced",
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
   // Window detection
   WATCH_WINDOWS_GET_ALL: "watch-windows-get-all",
@@ -230,7 +233,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   resumeMonitoringSession: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESUME),
 
-  endMonitoringSession: (): Promise<{
+  stopLocalMonitoringSessionForDelete: (): Promise<{
     success: boolean;
     sessionId?: string;
     captureCount?: number;
@@ -246,7 +249,15 @@ contextBridge.exposeInMainWorld("consoleAPI", {
       imageData?: string;
     }>;
     error?: string;
-  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_END),
+  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STOP_LOCAL_FOR_DELETE),
+
+  getShowFocusTrackerWindowPickerOnPill: (): Promise<{ enabled: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_GET),
+
+  setShowFocusTrackerWindowPickerOnPill: (
+    enabled: boolean
+  ): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_SET, enabled),
 
   resetMonitoringSession: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESET),
@@ -263,6 +274,17 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     // Return unsubscribe function
     return () => {
       ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_SESSION_UPDATE, handler);
+    };
+  },
+
+  onMonitoringSessionServerSynced: (
+    callback: (payload: { sessionId: string }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, payload: { sessionId: string }) =>
+      callback(payload);
+    ipcRenderer.on(IPC_CHANNELS.MONITORING_SESSION_SERVER_SYNCED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_SESSION_SERVER_SYNCED, handler);
     };
   },
 

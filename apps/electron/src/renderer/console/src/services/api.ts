@@ -32,9 +32,12 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    // Avoid HTTP disk cache + conditional GET (304). Chromium treats 304 as !ok, so apiRequest
+    // would throw and React Query would keep stale session/calendar data.
     return fetch(`${API_BASE_URL}/api${endpoint}`, {
       ...options,
       headers,
+      cache: options.cache ?? "no-store",
     });
   };
 

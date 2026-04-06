@@ -6,11 +6,10 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_START: "monitoring-session-start",
   MONITORING_SESSION_PAUSE: "monitoring-session-pause",
   MONITORING_SESSION_RESUME: "monitoring-session-resume",
-  MONITORING_SESSION_END: "monitoring-session-end",
+  MONITORING_SESSION_STOP_LOCAL_FOR_DELETE: "monitoring-session-stop-local-for-delete",
   MONITORING_SESSION_STATUS: "monitoring-session-status",
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
-  MONITORING_SESSION_FINALIZE: "monitoring-session-finalize",
   MONITORING_AUDIO_START: "monitoring-audio-start",
   MONITORING_AUDIO_STOP: "monitoring-audio-stop",
   MONITORING_AUDIO_FORCE_STOP: "monitoring-audio-force-stop",
@@ -24,14 +23,14 @@ const IPC_CHANNELS = {
   WATCHING_PILL_HIDE: "watching-pill-hide",
   WATCHING_PILL_SHOW_EYE_DROPDOWN: "watching-pill-show-eye-dropdown",
   WATCHING_PILL_HIDE_EYE_DROPDOWN: "watching-pill-hide-eye-dropdown",
-  WATCHING_PILL_SHOW_MENU_DROPDOWN: "watching-pill-show-menu-dropdown",
-  WATCHING_PILL_HIDE_MENU_DROPDOWN: "watching-pill-hide-menu-dropdown",
   SHOW_CONSOLE: "show-console",
   USER_CONTEXT_GET: "user-context-get",
   CREATE_BACKEND_SESSION: "create-backend-session",
   PILL_DISPLAY_MODE_GET: "pill-display-mode-get",
   PILL_DISPLAY_MODE_SET: "pill-display-mode-set",
   PILL_DISPLAY_MODE_CHANGED: "pill-display-mode-changed",
+  PILL_FOCUS_TRACKER_WINDOW_PICKER_GET: "pill-focus-tracker-window-picker-get",
+  PILL_FOCUS_TRACKER_WINDOW_PICKER_CHANGED: "pill-focus-tracker-window-picker-changed",
 } as const;
 
 // Session start config type
@@ -45,42 +44,25 @@ interface SessionStartConfig {
 }
 
 contextBridge.exposeInMainWorld("watchingPillAPI", {
-  // ===========================
-  // Session Lifecycle
-  // ===========================
-
   startSession: (config: SessionStartConfig): Promise<{ sessionId: string; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_START, config),
 
+  // Same channels as console preload `pauseMonitoringSession` / `resumeMonitoringSession`
   pauseSession: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_PAUSE),
 
   resumeSession: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESUME),
 
-  endSession: (): Promise<{
+  stopLocalSessionForDelete: (): Promise<{
     success: boolean;
     sessionId?: string;
     captureCount?: number;
-    captures?: Array<{
-      sequenceNumber: number;
-      captureTrigger: "periodic" | "focus_change" | "manual";
-      capturedAt: number;
-      windowId?: string;
-      appName?: string;
-      windowTitle?: string;
-      screenshotPath?: string;
-      screenshotHash?: string;
-    }>;
     error?: string;
-  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_END),
+  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STOP_LOCAL_FOR_DELETE),
 
   getSessionState: (): Promise<MonitoringSessionState | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STATUS),
-
-  // ===========================
-  // Session Event Listeners
-  // ===========================
 
   onSessionUpdate: (callback: (state: MonitoringSessionState | null) => void): (() => void) => {
     const handler = (_event: IpcRendererEvent, state: MonitoringSessionState | null) =>
@@ -94,10 +76,6 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
     ipcRenderer.on(IPC_CHANNELS.MONITORING_CAPTURE_PROGRESS, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_CAPTURE_PROGRESS, handler);
   },
-
-  // ===========================
-  // Window Management
-  // ===========================
 
   getVisibleWindows: (): Promise<{
     success: boolean;
@@ -127,10 +105,6 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, handler);
   },
 
-  // ===========================
-  // UI Actions
-  // ===========================
-
   hide: (): void => {
     ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE);
   },
@@ -146,35 +120,24 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
     ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE_EYE_DROPDOWN);
   },
 
-  showMenuDropdown: (): Promise<void> =>
-    ipcRenderer.invoke(IPC_CHANNELS.WATCHING_PILL_SHOW_MENU_DROPDOWN),
-
-  hideMenuDropdown: (): void => {
-    ipcRenderer.send(IPC_CHANNELS.WATCHING_PILL_HIDE_MENU_DROPDOWN);
-  },
-
   onEyeDropdownClosed: (callback: () => void): (() => void) => {
     const handler = () => callback();
     ipcRenderer.on("eye-dropdown-closed", handler);
     return () => ipcRenderer.removeListener("eye-dropdown-closed", handler);
   },
 
-  onMenuDropdownClosed: (callback: () => void): (() => void) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-dropdown-closed", handler);
-    return () => ipcRenderer.removeListener("menu-dropdown-closed", handler);
-  },
+  getShowFocusTrackerWindowPickerOnPill: (): Promise<{ enabled: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_GET),
 
-  // ===========================
-  // User Context
-  // ===========================
+  onShowFocusTrackerWindowPickerOnPillChanged: (callback: (enabled: boolean) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, enabled: boolean) => callback(enabled);
+    ipcRenderer.on(IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_CHANGED, handler);
+    return () =>
+      ipcRenderer.removeListener(IPC_CHANNELS.PILL_FOCUS_TRACKER_WINDOW_PICKER_CHANGED, handler);
+  },
 
   getCurrentUser: (): Promise<{ userId: string; organizationId: string } | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.USER_CONTEXT_GET),
-
-  // ===========================
-  // Backend Session Creation
-  // ===========================
 
   createBackendSession: (config: {
     selectedWindows: Array<{ windowId: string; appName: string; windowTitle?: string }>;
@@ -183,55 +146,28 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
   }): Promise<{ session?: { id: string }; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.CREATE_BACKEND_SESSION, config),
 
-  // ===========================
-  // Session Finalization (upload captures + trigger summarization)
-  // ===========================
-
-  finalizeSession: (
-    sessionId: string,
-    captures: Array<{
-      sequenceNumber: number;
-      captureTrigger: "periodic" | "focus_change" | "manual";
-      capturedAt: number;
-      windowId?: string;
-      appName?: string;
-      windowTitle?: string;
-      screenshotPath?: string;
-      screenshotHash?: string;
-    }>
-  ): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_FINALIZE, sessionId, captures),
-
-  // ===========================
-  // Audio Recording
-  // ===========================
-
   startAudioRecording: (): Promise<{ success: boolean; hasSystemAudio: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_AUDIO_START),
 
   stopAudioRecording: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_AUDIO_STOP),
 
-  // Send audio chunk to main process
   sendAudioChunk: (audioBuffer: ArrayBuffer): void => {
     ipcRenderer.send("audio-chunk", audioBuffer);
   },
 
-  // Main → Renderer: force stop AudioWorklet when session ends/pauses
   onForceStopAudio: (callback: () => void): (() => void) => {
     const handler = () => callback();
     ipcRenderer.on(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP, handler);
   },
 
-  // Main → Renderer: auto-restart AudioWorklet when session resumes after pause
   onForceStartAudio: (callback: () => void): (() => void) => {
     const handler = () => callback();
     ipcRenderer.on(IPC_CHANNELS.MONITORING_AUDIO_FORCE_START, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.MONITORING_AUDIO_FORCE_START, handler);
   },
 
-  // Pill display mode
   getPillDisplayMode: (userId: string): Promise<"compact" | "expanded"> =>
     ipcRenderer.invoke(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, userId),
 
@@ -242,37 +178,21 @@ contextBridge.exposeInMainWorld("watchingPillAPI", {
   },
 });
 
-// Type declarations for renderer
 declare global {
   interface Window {
     watchingPillAPI: {
-      // Session lifecycle
       startSession: (config: SessionStartConfig) => Promise<{ sessionId: string; error?: string }>;
       pauseSession: () => Promise<{ success: boolean; error?: string }>;
       resumeSession: () => Promise<{ success: boolean; error?: string }>;
-      endSession: () => Promise<{
+      stopLocalSessionForDelete: () => Promise<{
         success: boolean;
         sessionId?: string;
         captureCount?: number;
-        captures?: Array<{
-          sequenceNumber: number;
-          captureTrigger: "periodic" | "focus_change" | "manual";
-          capturedAt: number;
-          windowId?: string;
-          appName?: string;
-          windowTitle?: string;
-          screenshotPath?: string;
-          screenshotHash?: string;
-        }>;
         error?: string;
       }>;
       getSessionState: () => Promise<MonitoringSessionState | null>;
-
-      // Session event listeners
       onSessionUpdate: (callback: (state: MonitoringSessionState | null) => void) => () => void;
       onCaptureProgress: (callback: (data: { captureCount: number }) => void) => () => void;
-
-      // Window management
       getVisibleWindows: () => Promise<{
         success: boolean;
         windows: WatchableWindow[];
@@ -287,43 +207,19 @@ declare global {
       toggleWatchMode: (enabled: boolean) => Promise<void>;
       unselectWindow: (windowId: string) => Promise<void>;
       onWindowsUpdated: (callback: (windows: SelectedWindowInfo[]) => void) => () => void;
-
-      // UI actions
       hide: () => void;
       showConsole: () => void;
       showEyeDropdown: () => Promise<void>;
       hideEyeDropdown: () => void;
-      showMenuDropdown: () => Promise<void>;
-      hideMenuDropdown: () => void;
       onEyeDropdownClosed: (callback: () => void) => () => void;
-      onMenuDropdownClosed: (callback: () => void) => () => void;
-
-      // User context
+      getShowFocusTrackerWindowPickerOnPill: () => Promise<{ enabled: boolean }>;
+      onShowFocusTrackerWindowPickerOnPillChanged: (callback: (enabled: boolean) => void) => () => void;
       getCurrentUser: () => Promise<{ userId: string; organizationId: string } | null>;
-
-      // Backend session creation
       createBackendSession: (config: {
         selectedWindows: Array<{ windowId: string; appName: string; windowTitle?: string }>;
         captureIntervalMs: number;
         name?: string;
       }) => Promise<{ session?: { id: string }; error?: string }>;
-
-      // Session finalization
-      finalizeSession: (
-        sessionId: string,
-        captures: Array<{
-          sequenceNumber: number;
-          captureTrigger: "periodic" | "focus_change" | "manual";
-          capturedAt: number;
-          windowId?: string;
-          appName?: string;
-          windowTitle?: string;
-          screenshotPath?: string;
-          screenshotHash?: string;
-        }>
-      ) => Promise<{ success: boolean; error?: string }>;
-
-      // Audio recording
       startAudioRecording: () => Promise<{
         success: boolean;
         hasSystemAudio: boolean;
@@ -333,10 +229,8 @@ declare global {
       sendAudioChunk: (audioBuffer: ArrayBuffer) => void;
       onForceStopAudio: (callback: () => void) => () => void;
       onForceStartAudio: (callback: () => void) => () => void;
-
-      // Pill display mode
       getPillDisplayMode: (userId: string) => Promise<"compact" | "expanded">;
       onPillDisplayModeChanged: (callback: (mode: "compact" | "expanded") => void) => () => void;
-    };
+    }
   }
 }

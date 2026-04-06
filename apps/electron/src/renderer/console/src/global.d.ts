@@ -71,7 +71,8 @@ interface ConsoleAPI {
   }) => Promise<{ sessionId: string; error?: string }>;
   pauseMonitoringSession: () => Promise<{ success: boolean; error?: string }>;
   resumeMonitoringSession: () => Promise<{ success: boolean; error?: string }>;
-  endMonitoringSession: () => Promise<{
+  /** Stop local Electron capture only (no backend /end). Use before deleting a session server-side. */
+  stopLocalMonitoringSessionForDelete: () => Promise<{
     success: boolean;
     sessionId?: string;
     captureCount?: number;
@@ -88,11 +89,16 @@ interface ConsoleAPI {
     }>;
     error?: string;
   }>;
+  getShowFocusTrackerWindowPickerOnPill: () => Promise<{ enabled: boolean }>;
+  setShowFocusTrackerWindowPickerOnPill: (
+    enabled: boolean
+  ) => Promise<{ success: boolean }>;
   resetMonitoringSession: () => Promise<{ success: boolean }>;
   getMonitoringSessionState: () => Promise<MonitoringSessionState | null>;
   onMonitoringSessionUpdate: (
     callback: (state: MonitoringSessionState | null) => void
   ) => () => void;
+  onMonitoringSessionServerSynced: (callback: (payload: { sessionId: string }) => void) => () => void;
   onMonitoringCaptureProgress: (
     callback: (progress: {
       sessionId: string;

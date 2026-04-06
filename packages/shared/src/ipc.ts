@@ -39,21 +39,27 @@ export const IPC_CHANNELS = {
   WATCHING_PILL_PAUSE: "watching-pill-pause",
   WATCHING_PILL_RESUME: "watching-pill-resume",
   WATCHING_PILL_SEND_UPDATE: "watching-pill-send-update",
+  /** Optional pill eye dropdown (focus-tracker window list). User toggle in Settings → Dev. */
   WATCHING_PILL_SHOW_EYE_DROPDOWN: "watching-pill-show-eye-dropdown",
   WATCHING_PILL_HIDE_EYE_DROPDOWN: "watching-pill-hide-eye-dropdown",
-  WATCHING_PILL_SHOW_MENU_DROPDOWN: "watching-pill-show-menu-dropdown",
-  WATCHING_PILL_HIDE_MENU_DROPDOWN: "watching-pill-hide-menu-dropdown",
-  WATCHING_PILL_DROPDOWN_DATA: "watching-pill-dropdown-data", // Send data to dropdown windows
-  WATCHING_PILL_DROPDOWN_ACTION: "watching-pill-dropdown-action", // Actions from dropdown to main
+  WATCHING_PILL_DROPDOWN_DATA: "watching-pill-dropdown-data",
+  WATCHING_PILL_DROPDOWN_ACTION: "watching-pill-dropdown-action",
+
+  /** Settings → Dev: show focus-tracker window picker (eye) on the pill */
+  PILL_FOCUS_TRACKER_WINDOW_PICKER_GET: "pill-focus-tracker-window-picker-get",
+  PILL_FOCUS_TRACKER_WINDOW_PICKER_SET: "pill-focus-tracker-window-picker-set",
+  PILL_FOCUS_TRACKER_WINDOW_PICKER_CHANGED: "pill-focus-tracker-window-picker-changed",
 
   // Monitoring Session system (Work Session Tracking)
   MONITORING_SESSION_START: "monitoring-session-start", // Start new monitoring session
   MONITORING_SESSION_PAUSE: "monitoring-session-pause", // Pause active session
   MONITORING_SESSION_RESUME: "monitoring-session-resume", // Resume paused session
-  MONITORING_SESSION_END: "monitoring-session-end", // End session and trigger summary
-  MONITORING_SESSION_FINALIZE: "monitoring-session-finalize", // Upload captures + trigger backend summarization
+  /** Stop local capture only — no POST /captures or POST /end. Use before deleting a session from the server. */
+  MONITORING_SESSION_STOP_LOCAL_FOR_DELETE: "monitoring-session-stop-local-for-delete",
   MONITORING_SESSION_STATUS: "monitoring-session-status", // Get current session status
   MONITORING_SESSION_UPDATE: "monitoring-session-update", // Broadcast session state changes
+  /** Main → renderers: POST /end (and optional capture upload) finished; refetch session list/detail from API */
+  MONITORING_SESSION_SERVER_SYNCED: "monitoring-session-server-synced",
   MONITORING_SESSION_RESET: "monitoring-session-reset", // Reset/clear session state (after external delete)
   MONITORING_CAPTURE_TAKEN: "monitoring-capture-taken", // Notify when capture is taken
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update

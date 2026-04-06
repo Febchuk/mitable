@@ -16,14 +16,14 @@ Proactively save a memory when any of these come up during work:
 - **Domain knowledge** — business logic, user-facing concepts, data models
 - **Team/project context** — who works on what, project goals, integrations
 - **Tech stack details** — versions, configurations, gotchas
-- **User preferences** — Aurel's coding style, UI opinions, workflow habits
+- **User preferences** — Mikun's coding style, UI opinions, workflow habits
 
 ## How to Save
 
 1. Create a new `.cursor/rules/<topic-slug>.mdc` file (one topic per file, under 50 lines)
 2. Use `alwaysApply: true` unless the memory only matters for specific file types
 3. Keep content concise and factual — no filler
-4. After saving, briefly tell Aurel what was stored (one sentence)
+4. After saving, briefly tell Mikun what was stored (one sentence)
 
 ## How to Update
 

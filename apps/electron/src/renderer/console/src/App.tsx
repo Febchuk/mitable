@@ -183,7 +183,20 @@ function MonitoringSessionHandler() {
       queryClient.invalidateQueries({ queryKey: ["calendar"] });
     });
 
-    return () => unsubscribe?.();
+    const unsubscribeServerSynced = window.consoleAPI.onMonitoringSessionServerSynced?.(
+      ({ sessionId }) => {
+        logger.info(" Server end complete, refetching session data:", sessionId);
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.summary(sessionId) });
+        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+        queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      }
+    );
+
+    return () => {
+      unsubscribe?.();
+      unsubscribeServerSynced?.();
+    };
   }, [queryClient]);
 
   return null;

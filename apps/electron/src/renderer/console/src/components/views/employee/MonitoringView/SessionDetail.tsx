@@ -5,7 +5,7 @@
  * Shows summary, allows editing, and provides delivery options.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createLogger } from "../../../../../../lib/logger";
 
@@ -108,7 +108,11 @@ export default function SessionDetail() {
   });
   const sessionStatus = optimisticStatus ?? session?.status;
   const summaryStatusForPolling = sessionStatus;
-  const { data: summaryData, isLoading: isLoadingSummary } = useSessionSummary(
+  const {
+    data: summaryData,
+    isLoading: isLoadingSummary,
+    isFetching: isFetchingSummary,
+  } = useSessionSummary(
     sessionId || "",
     summaryStatusForPolling // Polls every 2s when "summarizing" (including during regeneration)
   );
@@ -130,6 +134,11 @@ export default function SessionDetail() {
   }, [summary]);
   const uiStatus = hasSummary ? "ready" : sessionStatus;
   const isEndingState = sessionStatus === "summarizing" && !hasSummary;
+  /** Short-session /end finishes with status "ready" + summary row in one response; session refetch can beat summary refetch */
+  const showSummaryProgress =
+    !hasSummary &&
+    (uiStatus === "summarizing" ||
+      (session?.status === "ready" && (isLoadingSummary || isFetchingSummary)));
 
   // Fetch progressive story (polls while session is active/paused)
   const { data: storyData } = useSessionStory(sessionId || "", uiStatus);
@@ -159,6 +168,8 @@ export default function SessionDetail() {
   const [isCopied, setIsCopied] = useState(false);
 
   const [isExternallyTriggered, setIsExternallyTriggered] = useState(false);
+  /** Prevents double POST /end when React Strict Mode runs the effect twice before URL replace. */
+  const pillEndOnceRef = useRef(false);
 
   // Preferences for hide pill on session end
   const { hidePillOnSessionEnd, dontAskHidePillAgain, updatePreference } = usePreferences();
@@ -166,13 +177,17 @@ export default function SessionDetail() {
   // Check for URL param to open end dialog (triggered from pill via App.tsx navigation)
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    if (searchParams.get("openEndDialog") === "true") {
-      logger.info("End session triggered via URL param from pill");
-      setIsExternallyTriggered(true);
-      navigate(`/monitoring/${sessionId}`, { replace: true });
-      // Directly end — no dialog needed
-      handleEndSession();
+    if (searchParams.get("openEndDialog") !== "true") {
+      pillEndOnceRef.current = false;
+      return;
     }
+    if (pillEndOnceRef.current) return;
+    pillEndOnceRef.current = true;
+    logger.info("End session triggered via URL param from pill");
+    setIsExternallyTriggered(true);
+    navigate(`/monitoring/${sessionId}`, { replace: true });
+    // Directly end — no dialog needed
+    handleEndSession();
   }, [location.search, sessionId, navigate]);
 
   // Show summary toast when navigated from pill with silent end-session flow
@@ -506,30 +521,21 @@ export default function SessionDetail() {
     }
 
     try {
-      if (wasExternallyTriggered) {
-        logger.info("Ending session via pill trigger");
-        const result = await window.consoleAPI.endSessionFull();
+      logger.info(
+        wasExternallyTriggered ? "Ending session via pill trigger" : "Ending session via console"
+      );
+      const result = await window.consoleAPI.endSessionFull();
 
-        if (!result.success) {
-          throw new Error(result.error || "Failed to end session");
-        }
-
-        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
-        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-        queryClient.invalidateQueries({ queryKey: ["calendar"] });
-      } else {
-        // Triggered from Console — use the unified IPC path too
-        logger.info("Ending session via console");
-        const result = await window.consoleAPI.endSessionFull();
-
-        if (!result.success) {
-          throw new Error(result.error || "Failed to end session");
-        }
-
-        queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
-        queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-        queryClient.invalidateQueries({ queryKey: ["calendar"] });
+      if (!result.success) {
+        throw new Error(result.error || "Failed to end session");
       }
+
+      // Don't await: invalidateQueries waits for network refetches and adds seconds of perceived delay.
+      // POST /end now runs in the main process after IPC returns; MONITORING_SESSION_SERVER_SYNCED triggers a second refresh when the server is updated.
+      void queryClient.invalidateQueries({ queryKey: monitoringKeys.session(sessionId) });
+      void queryClient.invalidateQueries({ queryKey: monitoringKeys.summary(sessionId) });
+      void queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      void queryClient.invalidateQueries({ queryKey: ["calendar"] });
     } catch (error) {
       logger.error("Error ending session:", error);
       setOptimisticStatus(null);
@@ -1031,7 +1037,7 @@ export default function SessionDetail() {
           </div>
         ) : (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
-            {uiStatus === "summarizing" ? (
+            {showSummaryProgress ? (
               <SummarizationProgress progress={session.summarizationProgress ?? null} />
             ) : (
               <p className="text-sm text-ink-secondary">No summary available for this session.</p>

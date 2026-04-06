@@ -31,6 +31,7 @@ import {
   Shield,
   MousePointerClick,
   ChevronRight,
+  FlaskConical,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
@@ -207,6 +208,17 @@ export default function UserProfilePage() {
     isLoading: isPreferencesLoading,
     updatePreference,
   } = usePreferences();
+
+  const [showEyeDropdownOnPill, setShowEyeDropdownOnPill] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.consoleAPI?.getShowFocusTrackerWindowPickerOnPill !== "function") {
+      return;
+    }
+    void window.consoleAPI.getShowFocusTrackerWindowPickerOnPill().then((r) => {
+      setShowEyeDropdownOnPill(r.enabled);
+    });
+  }, []);
 
   // Permissions hook
   const {
@@ -1691,18 +1703,36 @@ export default function UserProfilePage() {
     "permissions",
     "preferences",
     "integrations",
+    "dev",
     "update",
   ] as const;
-  type TabId = (typeof validTabs)[number];
-  const initialTab = validTabs.includes(searchParams.get("tab") as TabId)
-    ? (searchParams.get("tab") as TabId)
-    : "account";
+  type TabId =
+    | "account"
+    | "security"
+    | "permissions"
+    | "preferences"
+    | "integrations"
+    | "update"
+    | "dev";
+  const tabFromUrl = searchParams.get("tab");
+  const normalizedTab: TabId | null =
+    tabFromUrl === "developer"
+      ? "dev"
+      : tabFromUrl && validTabs.includes(tabFromUrl as TabId)
+        ? (tabFromUrl as TabId)
+        : null;
+  const initialTab = normalizedTab ?? "account";
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
   useEffect(() => {
-    const tabParam = searchParams.get("tab") as TabId;
-    if (tabParam && validTabs.includes(tabParam)) {
-      setActiveTab(tabParam);
+    const tabParam = searchParams.get("tab");
+    if (!tabParam) return;
+    if (tabParam === "developer") {
+      setActiveTab("dev");
+      return;
+    }
+    if (validTabs.includes(tabParam as TabId)) {
+      setActiveTab(tabParam as TabId);
     }
   }, [searchParams]);
 
@@ -1712,6 +1742,7 @@ export default function UserProfilePage() {
     { id: "permissions" as const, label: "Permissions", icon: Shield },
     { id: "preferences" as const, label: "Preferences", icon: Settings },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
+    { id: "dev" as const, label: "Dev", icon: FlaskConical },
     { id: "update" as const, label: "Update", icon: RefreshCw },
   ];
 
@@ -3660,6 +3691,66 @@ export default function UserProfilePage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === "dev" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div>
+                <h2
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    margin: 0,
+                  }}
+                >
+                  Dev
+                </h2>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
+                  Optional tools and advanced pill controls.
+                </p>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  padding: "14px 16px",
+                  borderRadius: 10,
+                  border: "var(--border-subtle)",
+                  background: "rgba(var(--ui-rgb), 0.03)",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <Label
+                    htmlFor="pill-eye-dropdown"
+                    style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}
+                  >
+                    Show eye dropdown on pill
+                  </Label>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "4px 0 0" }}>
+                    When on, the pill includes the eye control that lists windows the focus tracker is
+                    watching. When off, only the logo, microphone, and pause/resume appear.
+                  </p>
+                </div>
+                <Switch
+                  id="pill-eye-dropdown"
+                  checked={showEyeDropdownOnPill}
+                  onCheckedChange={async (checked) => {
+                    setShowEyeDropdownOnPill(checked);
+                    const res = await window.consoleAPI?.setShowFocusTrackerWindowPickerOnPill?.(checked);
+                    if (res && !res.success) {
+                      toast({
+                        title: "Could not save",
+                        description: "Failed to update this preference.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                />
+              </div>
             </div>
           )}
 

@@ -31,6 +31,14 @@ import { cleanupStaleSessions } from "../services/stale-session-cleanup.service"
 
 const router = Router();
 
+// Dynamic session data must not be cached — Express ETag + browser conditional GETs yield 304
+// with no body; Electron fetch treats 304 as failure and the console can show stale sessions.
+router.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
+
 /**
  * Format milliseconds into a human-readable duration string
  */

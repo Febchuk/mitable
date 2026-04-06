@@ -12,7 +12,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { monitoringKeys } from "@/console/src/hooks/queries/monitoring";
 import { calendarKeys } from "@/console/src/hooks/queries/calendar";
-import { createSession, startMonitoringSession } from "@/console/src/services/monitoringService";
+import {
+  createSession,
+  deleteSession,
+  startMonitoringSession,
+} from "@/console/src/services/monitoringService";
 import { authService } from "@/console/src/services/authService";
 import { SESSION_DEFAULTS } from "@mitable/shared";
 import { createLogger } from "../../../../lib/logger";
@@ -84,6 +88,9 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
     setIsStarting(true);
     setError(null);
 
+    /** Set after backend session exists; cleared after Electron start succeeds — used to rollback on IPC failure */
+    let backendSessionIdForRollback: string | undefined;
+
     try {
       // 0. Ensure auth tokens are synced to main process BEFORE starting session
       // This is critical for frame analysis - the main process needs the token
@@ -109,6 +116,7 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
       });
 
       const sessionId = backendResult.session.id;
+      backendSessionIdForRollback = sessionId;
       logger.info("Backend session created:", sessionId);
       onSessionCreated?.(sessionId);
 
@@ -126,6 +134,7 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
         throw new Error(electronResult.error);
       }
 
+      backendSessionIdForRollback = undefined;
       logger.info("Session started successfully:", sessionId);
 
       // 3. Invalidate sessions + calendar so passive views converge with server
@@ -147,6 +156,21 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
       return sessionId;
     } catch (err) {
+      if (backendSessionIdForRollback) {
+        try {
+          await deleteSession(backendSessionIdForRollback);
+          logger.info(
+            "Removed orphan backend session after Electron failed to start:",
+            backendSessionIdForRollback
+          );
+        } catch (rollbackErr) {
+          logger.error(
+            "Failed to delete orphan session after Electron start failure:",
+            rollbackErr
+          );
+        }
+      }
+
       onStartFlowFailed?.();
       const errorMsg = err instanceof Error ? err.message : "Failed to start session";
       logger.error("Failed to start session:", err);

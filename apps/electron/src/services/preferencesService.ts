@@ -40,6 +40,8 @@ interface PreferencesSchema {
     hidePillOnSessionEnd: boolean;
     dontAskHidePillAgain: boolean;
     showPillOnSessionStart: boolean;
+    /** Eye dropdown on pill: list windows the focus tracker considers for capture */
+    showFocusTrackerWindowPickerOnPill: boolean;
   };
   summary: SummaryPreferences;
   audio: AudioPreferences;
@@ -62,6 +64,7 @@ const defaults: PreferencesSchema = {
     hidePillOnSessionEnd: false,
     dontAskHidePillAgain: false,
     showPillOnSessionStart: true,
+    showFocusTrackerWindowPickerOnPill: false,
   },
   summary: {
     detailLevel: "concise",
@@ -95,6 +98,7 @@ class PreferencesService {
             hidePillOnSessionEnd: { type: "boolean" },
             dontAskHidePillAgain: { type: "boolean" },
             showPillOnSessionStart: { type: "boolean" },
+            showFocusTrackerWindowPickerOnPill: { type: "boolean" },
           },
         },
         summary: {
@@ -408,6 +412,18 @@ class PreferencesService {
     this.store.set("audio", { ...current, ...prefs });
     logger.info("🎤 Audio preferences updated:", prefs);
     return { success: true };
+  }
+
+  getShowFocusTrackerWindowPickerOnPill(): boolean {
+    const v = this.store.get("session.showFocusTrackerWindowPickerOnPill") as boolean | undefined;
+    if (v !== undefined) return v;
+    const legacy = this.store.get("dev.focusTrackerWindowPickerEnabled") as boolean | undefined;
+    return legacy ?? false;
+  }
+
+  setShowFocusTrackerWindowPickerOnPill(enabled: boolean): void {
+    this.store.set("session.showFocusTrackerWindowPickerOnPill", enabled);
+    logger.info(" showFocusTrackerWindowPickerOnPill set to:", enabled);
   }
 }
 

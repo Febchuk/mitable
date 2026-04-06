@@ -24,6 +24,7 @@ import { monitoringKeys } from "../../../../hooks/queries/monitoring";
 import type { MonitoringSessionState } from "@mitable/shared";
 import { authService } from "../../../../services/authService";
 import { API_BASE_URL } from "../../../../lib/config";
+import { usePreferences } from "../../../../hooks/usePreferences";
 
 function getStartOfWeek(date: Date): Date {
   const d = new Date(date);
@@ -159,6 +160,7 @@ function filterPendingDeletesFromDays(days: ActivityDay[], pendingIds: Set<strin
 
 export default function CalendarView() {
   const queryClient = useQueryClient();
+  const { hidePillOnSessionEnd, dontAskHidePillAgain } = usePreferences();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
@@ -438,6 +440,10 @@ export default function CalendarView() {
     lastActiveSessionIdRef.current = null;
     setOptimisticActive(null);
 
+    if (hidePillOnSessionEnd || dontAskHidePillAgain) {
+      window.consoleAPI?.hidePill?.();
+    }
+
     queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
     queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
 
@@ -448,11 +454,21 @@ export default function CalendarView() {
       }
     } catch (err) {
       console.error("[CalendarView] endSessionFull failed:", err);
+    } finally {
+      const state = await window.consoleAPI?.getMonitoringSessionState();
+      const s = deriveStatus(state);
+      setSessionStatus(s);
+      prevSessionStatusRef.current = s;
+      if (state?.status === "active" || state?.status === "paused") {
+        lastActiveSessionIdRef.current = state.id ?? null;
+      } else {
+        lastActiveSessionIdRef.current = null;
+      }
     }
 
     queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
     queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
-  }, [queryClient]);
+  }, [queryClient, hidePillOnSessionEnd, dontAskHidePillAgain]);
 
   const handlePause = useCallback(async () => {
     try {
@@ -480,9 +496,9 @@ export default function CalendarView() {
           setSessionStatus("idle");
           prevSessionStatusRef.current = "idle";
           lastActiveSessionIdRef.current = null;
-          const endRes = await window.consoleAPI?.endMonitoringSession();
+          const endRes = await window.consoleAPI?.stopLocalMonitoringSessionForDelete();
           if (endRes?.error) {
-            console.error("[CalendarView] endMonitoringSession before delete:", endRes.error);
+            console.error("[CalendarView] stopLocalMonitoringSessionForDelete before delete:", endRes.error);
             return false;
           }
         }
