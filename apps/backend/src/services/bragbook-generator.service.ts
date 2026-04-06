@@ -100,25 +100,65 @@ export async function generateBragbookEntry(
         : 0,
   }));
 
-  // Build the LLM prompt
-  const sessionsBlock = sessionContexts
-    .map((s, i) => {
-      const parts: string[] = [];
-      if (s.name) parts.push(`Session: ${s.name}`);
-      if (s.durationMinutes > 0) parts.push(`Duration: ${s.durationMinutes}m`);
-      if (s.masterStory) parts.push(`Summary: ${s.masterStory}`);
-      if (s.taskBreakdown.length > 0) {
-        const tasks = s.taskBreakdown
-          .map((t) => `  - ${t.shortTitle} (${t.minutes}m): ${t.description}`)
-          .join("\n");
-        parts.push(`Tasks:\n${tasks}`);
-      }
-      if (s.accomplishments.length > 0) {
-        parts.push(`Raw accomplishments: ${s.accomplishments.join("; ")}`);
-      }
-      return `<session_${i + 1}>\n${parts.join("\n")}\n</session_${i + 1}>`;
-    })
-    .join("\n\n");
+  // For large session counts (monthly/quarterly), pre-aggregate to keep prompt manageable.
+  // Collect all accomplishments and summaries, then send a condensed version.
+  const MAX_DETAILED_SESSIONS = 20;
+  let sessionsBlock: string;
+
+  if (sessionContexts.length <= MAX_DETAILED_SESSIONS) {
+    // Small enough — send full detail per session
+    sessionsBlock = sessionContexts
+      .map((s, i) => {
+        const parts: string[] = [];
+        if (s.name) parts.push(`Session: ${s.name}`);
+        if (s.durationMinutes > 0) parts.push(`Duration: ${s.durationMinutes}m`);
+        if (s.masterStory) parts.push(`Summary: ${s.masterStory}`);
+        if (s.taskBreakdown.length > 0) {
+          const tasks = s.taskBreakdown
+            .map((t) => `  - ${t.shortTitle} (${t.minutes}m): ${t.description}`)
+            .join("\n");
+          parts.push(`Tasks:\n${tasks}`);
+        }
+        if (s.accomplishments.length > 0) {
+          parts.push(`Raw accomplishments: ${s.accomplishments.join("; ")}`);
+        }
+        return `<session_${i + 1}>\n${parts.join("\n")}\n</session_${i + 1}>`;
+      })
+      .join("\n\n");
+  } else {
+    // Too many sessions — aggregate into a condensed summary
+    const allAccomplishments = sessionContexts.flatMap((s) => s.accomplishments).filter(Boolean);
+    const allTasks = sessionContexts.flatMap((s) => s.taskBreakdown);
+    const totalMinutes = sessionContexts.reduce((sum, s) => sum + s.durationMinutes, 0);
+    const sessionNames = sessionContexts.map((s) => s.name).filter(Boolean);
+    const summaries = sessionContexts
+      .map((s) => s.masterStory)
+      .filter(Boolean)
+      .slice(0, 15); // Cap summaries to keep prompt reasonable
+
+    const parts: string[] = [];
+    parts.push(`Total sessions: ${sessionContexts.length}`);
+    parts.push(`Total work time: ${Math.round(totalMinutes / 60)}h ${totalMinutes % 60}m`);
+    if (sessionNames.length > 0) {
+      parts.push(`Session topics: ${[...new Set(sessionNames)].join(", ")}`);
+    }
+    if (summaries.length > 0) {
+      parts.push(`\nKey session summaries:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join("\n")}`);
+    }
+    if (allAccomplishments.length > 0) {
+      const unique = [...new Set(allAccomplishments)];
+      parts.push(`\nAll raw accomplishments:\n${unique.map((a) => `- ${a}`).join("\n")}`);
+    }
+    if (allTasks.length > 0) {
+      const topTasks = allTasks
+        .sort((a, b) => b.minutes - a.minutes)
+        .slice(0, 20);
+      parts.push(
+        `\nTop tasks by time:\n${topTasks.map((t) => `- ${t.shortTitle} (${t.minutes}m): ${t.description}`).join("\n")}`
+      );
+    }
+    sessionsBlock = `<aggregated_data>\n${parts.join("\n")}\n</aggregated_data>`;
+  }
 
   const prompt = `You are writing a bragbook entry — a curated list of accomplishments worth celebrating from a work period.
 
