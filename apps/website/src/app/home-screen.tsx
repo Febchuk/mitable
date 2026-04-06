@@ -4,14 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CardsSection, ClosingCtaSection, FeatureSection, HeroSection, LandingFooter, LandingNav, SocialProofSection } from "@/components/landing";
 import { BenchmarkMockup } from "@/components/landing/mockups/benchmark-mockup";
+import type { MockupVariant } from "@/components/landing/mockups/colors";
 import { EvaluationMockup } from "@/components/landing/mockups/evaluation-mockup";
 import { PersonDetailMockup } from "@/components/landing/mockups/person-detail-mockup";
 import { WorkMontageMockup } from "@/components/landing/mockups/work-montage-mockup";
+import { useTheme } from "@/hooks/use-theme";
 import { supabase } from "@/lib/supabase";
 
 export const HomeScreen = () => {
     const router = useRouter();
     const [checking, setChecking] = useState(true);
+    const { theme } = useTheme();
+    const variant: MockupVariant = theme === "light" ? "light" : "dark";
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -61,37 +65,49 @@ export const HomeScreen = () => {
                 {/* Feature 1: Benchmarks */}
                 <FeatureSection
                     id="how-it-works"
+                    stepNumber={1}
                     title="Set the standard."
                     description="Define what good looks like for every role. Mitable's AI generates scoring parameters from a simple description, so benchmarks take minutes to create."
                     linkText="Learn how benchmarks work →"
-                    mockup={<BenchmarkMockup />}
+                    linkHref="/blog/benchmarks"
+                    mockup={<BenchmarkMockup variant={variant} />}
+                    variant={variant}
                 />
 
                 {/* Feature 2: Multi-app work montage */}
                 <FeatureSection
+                    stepNumber={2}
                     title="Your team just works."
                     description="Slack, browsers, terminals, docs — Mitable captures work across every app on your team's computer. No manual time tracking. No status updates."
                     linkText="See how capture works →"
-                    mockup={<WorkMontageMockup />}
+                    linkHref="/blog/work-capture"
+                    mockup={<WorkMontageMockup variant={variant} />}
                     rawMockup
                     reverse
+                    variant={variant}
                 />
 
                 {/* Feature 3: Evaluation */}
                 <FeatureSection
+                    stepNumber={3}
                     title="Evaluate performance more accurately."
                     description="Get a live, AI-generated score for every person on your team — measured against the benchmarks you set. No more guessing who's on track and who needs support."
-                    linkText="See the employee view →"
-                    mockup={<EvaluationMockup />}
+                    linkText="See how we evaluate performance →"
+                    linkHref="/blog/evaluations"
+                    mockup={<EvaluationMockup variant={variant} />}
+                    variant={variant}
                 />
 
                 {/* Feature 4: Person Detail */}
                 <FeatureSection
+                    stepNumber={4}
                     title="More robust reporting."
                     description="See exactly how each person spends their time — which customers they serve, how their focus and meeting hours break down, and where they're most effective."
-                    linkText="See the full dashboard →"
-                    mockup={<PersonDetailMockup />}
+                    linkText="Read about our reporting →"
+                    linkHref="/blog/reporting"
+                    mockup={<PersonDetailMockup variant={variant} />}
                     reverse
+                    variant={variant}
                 />
 
                 <CardsSection />
