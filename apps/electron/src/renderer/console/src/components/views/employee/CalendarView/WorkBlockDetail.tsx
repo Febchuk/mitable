@@ -128,6 +128,7 @@ function getStatusColor(status: WorkBlock["status"]): { bg: string; text: string
     summarizing: { bg: "bg-indigo/20", text: "text-indigo" },
     ready: { bg: "bg-cyan/20", text: "text-cyan" },
     delivered: { bg: "bg-violet/20", text: "text-violet" },
+    error: { bg: "bg-red-500/20", text: "text-red-400" },
   };
   return colors[status] || colors.ended;
 }

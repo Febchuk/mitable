@@ -1,7 +1,16 @@
 import { useState, useMemo } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { ChevronRight, Clock, TrendingUp, LayoutList, Trash2, Users, User } from "lucide-react";
+import {
+  ChevronRight,
+  Clock,
+  TrendingUp,
+  LayoutList,
+  Trash2,
+  Users,
+  User,
+  RefreshCw,
+} from "lucide-react";
 import type { WorkBlock } from "./types";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
 
@@ -10,6 +19,8 @@ interface ActivityBlockProps {
   blockNumber: number;
   defaultExpanded?: boolean;
   onDelete?: (blockId: string) => void;
+  /** Re-run the failed operation (e.g. delete). */
+  onRetry?: () => void;
 }
 
 function formatTime(date: Date): string {
@@ -197,13 +208,15 @@ export default function ActivityBlock({
   blockNumber,
   defaultExpanded = false,
   onDelete,
+  onRetry,
 }: ActivityBlockProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const isGranola = block.source === "granola";
   const isFireflies = block.source === "fireflies";
   const isMeeting = isMeetingBlock(block.source);
-  const isActive = block.isActive || block.status === "active";
+  const isError = block.status === "error";
+  const isActive = !isError && (block.isActive || block.status === "active");
   const timeRange = `${formatTime(block.startTime)} - ${block.endTime ? formatTime(block.endTime) : "now"}`;
 
   const hasTasks = block.taskBreakdown && block.taskBreakdown.length > 0;
@@ -220,13 +233,15 @@ export default function ActivityBlock({
   const accentColor = isGranola ? GRANOLA_GREEN : isFireflies ? FIREFLIES_PINK : "var(--mi-accent)";
   const meetingBorder = isGranola ? GRANOLA_BORDER : FIREFLIES_BORDER;
 
-  const cardBorder = isActive
-    ? "rgba(var(--status-success-rgb), 0.2)"
-    : isExpanded
-      ? isMeeting
-        ? meetingBorder
-        : "rgba(var(--mi-accent-rgb), 0.18)"
-      : "rgba(var(--ui-rgb), 0.08)";
+  const cardBorder = isError
+    ? "rgba(var(--status-error-rgb), 0.28)"
+    : isActive
+      ? "rgba(var(--status-success-rgb), 0.2)"
+      : isExpanded
+        ? isMeeting
+          ? meetingBorder
+          : "rgba(var(--mi-accent-rgb), 0.18)"
+        : "rgba(var(--ui-rgb), 0.08)";
 
   return (
     <div
@@ -316,7 +331,68 @@ export default function ActivityBlock({
         )}
 
         {!isMeeting &&
-          (isActive ? (
+          (isError ? (
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexShrink: 0,
+              }}
+            >
+              <span
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  background: "rgba(var(--status-error-rgb), 0.14)",
+                  color: "var(--status-error)",
+                  border: "0.5px solid rgba(var(--status-error-rgb), 0.28)",
+                }}
+              >
+                Error
+              </span>
+              {onRetry && (
+                <button
+                  type="button"
+                  title="Retry"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetry();
+                  }}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 6,
+                    border: "0.5px solid rgba(var(--ui-rgb), 0.12)",
+                    background: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    color: "var(--text-secondary)",
+                    flexShrink: 0,
+                    transition: "color 0.15s ease, border-color 0.15s ease, background 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "var(--text-primary)";
+                    e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                    e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <RefreshCw size={12} strokeWidth={1.6} />
+                </button>
+              )}
+            </span>
+          ) : isActive ? (
             <span
               style={{
                 padding: "3px 8px",
@@ -384,7 +460,7 @@ export default function ActivityBlock({
           ))}
 
         {/* Delete */}
-        {onDelete && (
+        {onDelete && !isError && (
           <button
             onClick={(e) => {
               e.stopPropagation();

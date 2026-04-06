@@ -35,7 +35,15 @@ export interface Capture {
 /**
  * WorkBlock status - aligns with MonitoringSession status
  */
-export type WorkBlockStatus = "active" | "paused" | "ended" | "summarizing" | "ready" | "delivered";
+export type WorkBlockStatus =
+  | "active"
+  | "paused"
+  | "ended"
+  | "summarizing"
+  | "ready"
+  | "delivered"
+  /** Client-only: action failed after optimistic UI; use retry to re-run the last action. */
+  | "error";
 
 /**
  * Delivery channel for block summaries (via Recaps)

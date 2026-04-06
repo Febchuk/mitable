@@ -6,13 +6,13 @@
  * Record/Stop/Pause controls in the page header.
  */
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import WeekStrip from "./WeekStrip";
 import ActivityBlock from "./ActivityBlock";
-import type { ActivityDay } from "./types";
+import type { ActivityDay, WorkBlock } from "./types";
 import {
   useCalendarDays,
   calendarKeys,
@@ -85,6 +85,78 @@ function getInitialLoadedRange(): CalendarDateRange {
   };
 }
 
+function buildSyntheticActiveBlock(id: string, startTime: Date): WorkBlock {
+  return {
+    id,
+    startTime,
+    endTime: null,
+    duration: 0,
+    idleGapBefore: null,
+    summary: "Starting…",
+    captures: [],
+    appBreakdown: [],
+    taskBreakdown: [],
+    isActive: true,
+    status: "active",
+  };
+}
+
+/** Insert or replace a local “recording” block until the server list includes it. */
+function mergeOptimisticActiveIntoDays(
+  days: ActivityDay[],
+  optimistic: { id: string; startTime: Date } | null
+): ActivityDay[] {
+  if (!optimistic) return days;
+
+  const targetDate = optimistic.startTime;
+  const serverHasBlock = days.some((d) =>
+    d.workBlocks.some(
+      (b) =>
+        b.id === optimistic.id &&
+        (b.status === "active" || b.status === "paused" || b.isActive)
+    )
+  );
+  if (serverHasBlock) return days;
+
+  const synthetic = buildSyntheticActiveBlock(optimistic.id, optimistic.startTime);
+  const idx = days.findIndex((d) => isSameDay(d.date, targetDate));
+
+  if (idx >= 0) {
+    const day = days[idx];
+    const withoutDup = day.workBlocks.filter((b) => b.id !== optimistic.id);
+    return days.map((d, i) =>
+      i === idx
+        ? {
+            ...d,
+            workBlocks: [...withoutDup, synthetic].sort(
+              (a, b) => a.startTime.getTime() - b.startTime.getTime()
+            ),
+          }
+        : d
+    );
+  }
+
+  const dateKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`;
+  const newDay: ActivityDay = {
+    id: `day-${dateKey}`,
+    date: new Date(dateKey + "T00:00:00"),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    totalWorkTime: 0,
+    workBlocks: [synthetic],
+    summary: "",
+    topApps: [],
+  };
+  return [...days, newDay].sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+function filterPendingDeletesFromDays(days: ActivityDay[], pendingIds: Set<string>): ActivityDay[] {
+  if (pendingIds.size === 0) return days;
+  return days.map((d) => ({
+    ...d,
+    workBlocks: d.workBlocks.filter((b) => !pendingIds.has(b.id)),
+  }));
+}
+
 export default function CalendarView() {
   const queryClient = useQueryClient();
   const today = new Date();
@@ -93,10 +165,24 @@ export default function CalendarView() {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("idle");
   const [summarizingBlockIds, setSummarizingBlockIds] = useState<Set<string>>(new Set());
   const [loadedRange, setLoadedRange] = useState<CalendarDateRange>(getInitialLoadedRange);
+  const [optimisticActive, setOptimisticActive] = useState<{ id: string; startTime: Date } | null>(
+    null
+  );
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [optimisticDeleteIds, setOptimisticDeleteIds] = useState(() => new Set<string>());
+  const [deleteFailedIds, setDeleteFailedIds] = useState(() => new Set<string>());
+
+  const lastActiveSessionIdRef = useRef<string | null>(null);
+  const prevSessionStatusRef = useRef<SessionStatus>("idle");
 
   const { startSession, isStarting } = useStartSession({
     navigateOnSuccess: false,
     showToasts: true,
+    onSessionCreated: (sessionId) => {
+      setOptimisticActive((prev) => (prev ? { ...prev, id: sessionId } : null));
+      lastActiveSessionIdRef.current = sessionId;
+    },
+    onStartFlowFailed: () => setOptimisticActive(null),
   });
 
   // Integration sync state — only show button if connected
@@ -156,33 +242,66 @@ export default function CalendarView() {
   // Hydrate session state on mount
   useEffect(() => {
     window.consoleAPI?.getMonitoringSessionState().then((state) => {
-      setSessionStatus(deriveStatus(state));
+      const s = deriveStatus(state);
+      setSessionStatus(s);
+      prevSessionStatusRef.current = s;
+      if (state?.status === "active" || state?.status === "paused") {
+        lastActiveSessionIdRef.current = state.id ?? null;
+      }
     });
   }, []);
 
   // Listen for session updates — refresh data AND track state
-  // When session transitions from active→idle (ended), optimistically mark the block as summarizing
   useEffect(() => {
-    let prevStatus: SessionStatus = sessionStatus;
     const unsub = window.consoleAPI?.onMonitoringSessionUpdate?.((state) => {
       const newStatus = deriveStatus(state);
-      // Session just ended (was active/paused, now idle) — mark its block as optimistically summarizing
+      const prev = prevSessionStatusRef.current;
       if (
-        (prevStatus === "active" || prevStatus === "paused") &&
+        (prev === "active" || prev === "paused") &&
         newStatus === "idle" &&
         state?.id
       ) {
-        setSummarizingBlockIds((prev) => new Set(prev).add(state.id));
+        setSummarizingBlockIds((p) => new Set(p).add(state.id));
       }
-      prevStatus = newStatus;
+      prevSessionStatusRef.current = newStatus;
+      if (state?.status === "active" || state?.status === "paused") {
+        lastActiveSessionIdRef.current = state.id ?? null;
+      }
       setSessionStatus(newStatus);
       queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
     });
     return () => unsub?.();
-  }, [queryClient, sessionStatus]);
+  }, [queryClient]);
 
   const { data: realDays, isLoading, error } = useCalendarDays(loadedRange);
-  const allDays = realDays || [];
+  const allDays = useMemo(() => {
+    const merged = mergeOptimisticActiveIntoDays(realDays || [], optimisticActive);
+    return filterPendingDeletesFromDays(merged, optimisticDeleteIds);
+  }, [realDays, optimisticActive, optimisticDeleteIds]);
+
+  useEffect(() => {
+    if (optimisticDeleteIds.size === 0 || !realDays?.length) return;
+    setOptimisticDeleteIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const id of prev) {
+        const stillThere = realDays.some((d) => d.workBlocks.some((b) => b.id === id));
+        if (!stillThere) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [realDays, optimisticDeleteIds]);
+
+  useEffect(() => {
+    if (!optimisticActive || !realDays?.length) return;
+    const has = realDays.some((d) =>
+      d.workBlocks.some((b) => b.id === optimisticActive.id)
+    );
+    if (has) setOptimisticActive(null);
+  }, [realDays, optimisticActive]);
 
   const weekDays = useMemo(() => {
     const days: ActivityDay[] = [];
@@ -224,7 +343,12 @@ export default function CalendarView() {
   // 2. Optimistic flip: if user just ended a session, show "summarizing" instead of stale "active"
   const selectedDay = useMemo(() => {
     const clearedIds: string[] = [];
-    const blocks = selectedDayRaw.workBlocks.map((block) => {
+    const blocks = selectedDayRaw.workBlocks.map((original) => {
+      let block =
+        deleteFailedIds.has(original.id) && original.source !== "granola" && original.source !== "fireflies"
+          ? { ...original, status: "error" as const, isActive: false }
+          : original;
+
       const isMeeting = block.source === "granola" || block.source === "fireflies";
       const hasTasks = block.taskBreakdown && block.taskBreakdown.length > 0;
 
@@ -258,7 +382,7 @@ export default function CalendarView() {
     }
 
     return { ...selectedDayRaw, workBlocks: blocks };
-  }, [selectedDayRaw, summarizingBlockIds]);
+  }, [selectedDayRaw, summarizingBlockIds, deleteFailedIds]);
 
   const isCurrentWeek = isSameDay(weekStart, getStartOfWeek(today));
 
@@ -296,20 +420,27 @@ export default function CalendarView() {
 
   // ── Session controls ──────────────────────────────────────────
   const handleRecord = useCallback(async () => {
-    await startSession();
+    const startTime = new Date();
+    setOptimisticActive({ id: `pending-${startTime.getTime()}`, startTime });
+    const sessionId = await startSession();
+    if (!sessionId) {
+      setOptimisticActive(null);
+    }
   }, [startSession]);
 
   const handleStop = useCallback(async () => {
-    // 1. Optimistic UI: immediately show summarizing state
-    const currentState = await window.consoleAPI?.getMonitoringSessionState();
-    setSessionStatus("idle");
-    if (currentState?.id) {
-      setSummarizingBlockIds((prev) => new Set(prev).add(currentState.id));
+    const sid = lastActiveSessionIdRef.current;
+    if (sid) {
+      setSummarizingBlockIds((prev) => new Set(prev).add(sid));
     }
+    setSessionStatus("idle");
+    prevSessionStatusRef.current = "idle";
+    lastActiveSessionIdRef.current = null;
+    setOptimisticActive(null);
+
     queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
     queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
 
-    // 2. Full end flow: stop captures + upload + POST /end (same as pill/SessionDetail)
     try {
       const result = await window.consoleAPI?.endSessionFull();
       if (result?.error) {
@@ -319,7 +450,6 @@ export default function CalendarView() {
       console.error("[CalendarView] endSessionFull failed:", err);
     }
 
-    // 3. Refresh data now that backend has started summarization
     queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
     queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
   }, [queryClient]);
@@ -342,27 +472,76 @@ export default function CalendarView() {
     }
   }, []);
 
-  const handleDeleteBlock = useCallback(
-    async (blockId: string) => {
+  const executeDeleteBlock = useCallback(
+    async (blockId: string): Promise<boolean> => {
       try {
-        // If deleting the currently recording block, stop the capture loop first
         const currentState = await window.consoleAPI?.getMonitoringSessionState();
         if (currentState && currentState.id === blockId) {
           setSessionStatus("idle");
-          await window.consoleAPI?.endMonitoringSession();
+          prevSessionStatusRef.current = "idle";
+          lastActiveSessionIdRef.current = null;
+          const endRes = await window.consoleAPI?.endMonitoringSession();
+          if (endRes?.error) {
+            console.error("[CalendarView] endMonitoringSession before delete:", endRes.error);
+            return false;
+          }
         }
 
         await deleteSession(blockId);
         queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
         queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+        return true;
       } catch (err) {
         console.error("[CalendarView] deleteSession failed:", err);
+        return false;
       }
     },
     [queryClient]
   );
 
+  const retryDeleteBlock = useCallback(
+    async (blockId: string) => {
+      setDeleteFailedIds((prev) => {
+        const n = new Set(prev);
+        n.delete(blockId);
+        return n;
+      });
+      setOptimisticDeleteIds((prev) => new Set(prev).add(blockId));
+      const ok = await executeDeleteBlock(blockId);
+      if (!ok) {
+        setOptimisticDeleteIds((prev) => {
+          const n = new Set(prev);
+          n.delete(blockId);
+          return n;
+        });
+        setDeleteFailedIds((prev) => new Set(prev).add(blockId));
+      }
+    },
+    [executeDeleteBlock]
+  );
+
   const isRecording = sessionStatus === "active" || sessionStatus === "paused";
+
+  const confirmDeleteBlock = useCallback(async () => {
+    const id = deleteTargetId;
+    if (!id) return;
+    setDeleteTargetId(null);
+    setDeleteFailedIds((prev) => {
+      const n = new Set(prev);
+      n.delete(id);
+      return n;
+    });
+    setOptimisticDeleteIds((prev) => new Set(prev).add(id));
+    const ok = await executeDeleteBlock(id);
+    if (!ok) {
+      setOptimisticDeleteIds((prev) => {
+        const n = new Set(prev);
+        n.delete(id);
+        return n;
+      });
+      setDeleteFailedIds((prev) => new Set(prev).add(id));
+    }
+  }, [deleteTargetId, executeDeleteBlock]);
 
   return (
     <div className="app-no-drag" style={{ display: "flex", flexDirection: "column" }}>
@@ -714,7 +893,12 @@ export default function CalendarView() {
                           index === workBlocks.length - 1 &&
                           workBlocks.length <= 3
                         }
-                        onDelete={handleDeleteBlock}
+                        onDelete={(bid) => setDeleteTargetId(bid)}
+                        onRetry={
+                          block.status === "error"
+                            ? () => void retryDeleteBlock(block.id)
+                            : undefined
+                        }
                       />
                     ))}
                   </>
@@ -723,6 +907,136 @@ export default function CalendarView() {
             );
           })()}
       </div>
+
+      {deleteTargetId && (
+        <div
+          role="presentation"
+          onClick={() => setDeleteTargetId(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(0, 0, 0, 0.5)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-block-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              background: "var(--bg-overlay)",
+              border: "var(--border-hairline)",
+              borderRadius: 12,
+              padding: "22px 20px 18px",
+              boxShadow: "0 8px 28px rgba(0, 0, 0, 0.22)",
+            }}
+          >
+            <h2
+              id="delete-block-title"
+              style={{
+                margin: 0,
+                fontSize: 24,
+                fontWeight: 400,
+                fontFamily: "var(--font-serif)",
+                letterSpacing: "-0.35px",
+                lineHeight: 1.2,
+                color: "var(--text-primary)",
+              }}
+            >
+              Delete this activity block?
+            </h2>
+            <p
+              style={{
+                margin: "14px 0 0",
+                fontSize: 14,
+                lineHeight: 1.5,
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 400,
+              }}
+            >
+              This activity block will be permanently deleted. This cannot be undone.
+            </p>
+            <div
+              style={{
+                height: "0.5px",
+                background: "var(--divider)",
+                margin: "20px 0 16px",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 6,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setDeleteTargetId(null)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "var(--border-subtle)",
+                  background: "transparent",
+                  color: "var(--text-primary)",
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+                  e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDeleteBlock()}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "0.5px solid rgba(var(--status-error-rgb), 0.25)",
+                  background: "rgba(var(--status-error-rgb), 0.06)",
+                  color: "var(--status-error)",
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(var(--status-error-rgb), 0.12)";
+                  e.currentTarget.style.borderColor = "rgba(var(--status-error-rgb), 0.35)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(var(--status-error-rgb), 0.06)";
+                  e.currentTarget.style.borderColor = "rgba(var(--status-error-rgb), 0.25)";
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -749,6 +749,20 @@ interface NotificationConfig {
   timeout?: number;
 }
 
+/** Product: recurring "turn on tracking" toast was removed; block if anything still sends it (stale builds / old main). */
+function isDisabledPeriodicTrackingReminder(config: NotificationConfig): boolean {
+  const hasTurnOn = config.actions?.some((a) => a.id === "turn-on");
+  if (!hasTurnOn) return false;
+  const t = (config.title || "").toLowerCase();
+  const m = (config.message || "").toLowerCase();
+  return (
+    t.includes("ready to track") ||
+    t.includes("track your work") ||
+    m.includes("turn on mitable") ||
+    m.includes("log your activity")
+  );
+}
+
 function createNotificationWindow() {
   // Get screen dimensions for bottom-right positioning
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -807,6 +821,11 @@ function createNotificationWindow() {
 }
 
 function showNotification(config: NotificationConfig) {
+  if (isDisabledPeriodicTrackingReminder(config)) {
+    notificationLogger.info("Suppressed disabled periodic tracking reminder toast");
+    return;
+  }
+
   // Windows: use native toast notification for OS integration (Action Center)
   if (process.platform === "win32") {
     showNativeWindowsNotification(config);
@@ -935,58 +954,6 @@ function handleNotificationAction(actionId: string) {
       break;
     default:
       notificationLogger.warn("Unknown notification action:", actionId);
-  }
-}
-
-// Start periodic notification timer (prompts user to turn on monitoring)
-function startNotificationTimer() {
-  // Get user's preferred notification frequency (defaults to 30 minutes)
-  let notificationFrequencyMinutes = 30;
-  if (currentUserContext?.userId) {
-    notificationFrequencyMinutes = preferencesService.getUserNotificationFrequency(
-      currentUserContext.userId
-    );
-  }
-  const NOTIFICATION_INTERVAL = notificationFrequencyMinutes * 60 * 1000; // Convert minutes to milliseconds
-  // const NOTIFICATION_INTERVAL = 10 * 1000; // 10 seconds for testing
-
-  if (notificationTimer) {
-    clearInterval(notificationTimer);
-  }
-
-  notificationTimer = setInterval(() => {
-    // Only show if:
-    // 1. No active monitoring session
-    // 2. User is logged in (has auth token)
-    const sessionState = monitoringSessionService.getSessionState();
-    const isMonitoringActive =
-      sessionState?.status === "active" || sessionState?.status === "paused";
-    const isLoggedIn = authTokens.accessToken !== null;
-
-    if (!isMonitoringActive && isLoggedIn) {
-      notificationLogger.info(" Triggering periodic notification (monitoring is off)");
-      showNotification({
-        title: "Ready to track your work?",
-        message: "Turn on Mitable to log your activity and get better insights.",
-        actions: [
-          { id: "turn-on", label: "Turn On", primary: true },
-          { id: "dismiss", label: "Later" },
-        ],
-        timeout: 10000, // 10 seconds auto-dismiss
-      });
-    }
-  }, NOTIFICATION_INTERVAL);
-
-  notificationLogger.info(
-    ` Notification timer started (${notificationFrequencyMinutes} min interval)`
-  );
-}
-
-function stopNotificationTimer() {
-  if (notificationTimer) {
-    clearInterval(notificationTimer);
-    notificationTimer = null;
-    notificationLogger.info(" Notification timer stopped");
   }
 }
 
@@ -2220,8 +2187,6 @@ function setupMonitoringSessionHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET, (_, userId: string, minutes: number) => {
     preferencesService.setUserNotificationFrequency(userId, minutes);
-    // Restart the notification timer with the new frequency
-    startNotificationTimer();
     return { success: true };
   });
 
@@ -3305,9 +3270,6 @@ app.whenReady().then(async () => {
   // Start automatic update checks (every 4 hours)
   updateService.startPeriodicChecks(240);
 
-  // Start periodic notification timer (prompts user to turn on monitoring)
-  startNotificationTimer();
-
   // Clean up stale sessions on startup (laptop closed, crash, etc.)
   // Runs server-side for this user — auto-ends sessions with no recent captures
   try {
@@ -3586,7 +3548,6 @@ app.on("will-quit", () => {
 
 app.on("before-quit", () => {
   updateService.stopPeriodicChecks();
-  stopNotificationTimer();
   // Ensure focus window tracker is stopped even if session state is corrupted
   focusWindowTracker.stop();
   // Ensure passive polling stops on quit

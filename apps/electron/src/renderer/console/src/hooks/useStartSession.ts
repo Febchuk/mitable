@@ -11,6 +11,7 @@ import { useUser } from "@/console/src/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { monitoringKeys } from "@/console/src/hooks/queries/monitoring";
+import { calendarKeys } from "@/console/src/hooks/queries/calendar";
 import { createSession, startMonitoringSession } from "@/console/src/services/monitoringService";
 import { authService } from "@/console/src/services/authService";
 import { SESSION_DEFAULTS } from "@mitable/shared";
@@ -23,6 +24,10 @@ interface UseStartSessionOptions {
   navigateOnSuccess?: boolean;
   /** Show toast notifications (default: true) */
   showToasts?: boolean;
+  /** Fires after backend session exists, before Electron capture starts (for optimistic UI). */
+  onSessionCreated?: (sessionId: string) => void;
+  /** Fires on any failure after `setIsStarting(true)` (for rolling back optimistic UI). */
+  onStartFlowFailed?: () => void;
 }
 
 interface UseStartSessionReturn {
@@ -50,7 +55,8 @@ interface UseStartSessionReturn {
  * <Button onClick={startSession} disabled={isStarting}>Start</Button>
  */
 export function useStartSession(options: UseStartSessionOptions = {}): UseStartSessionReturn {
-  const { navigateOnSuccess = true, showToasts = true } = options;
+  const { navigateOnSuccess = true, showToasts = true, onSessionCreated, onStartFlowFailed } =
+    options;
 
   const { user } = useUser();
   const navigate = useNavigate();
@@ -104,6 +110,7 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
       const sessionId = backendResult.session.id;
       logger.info("Backend session created:", sessionId);
+      onSessionCreated?.(sessionId);
 
       // 2. Start Electron capture loop (focus tracker starts automatically)
       const electronResult = await startMonitoringSession({
@@ -121,8 +128,9 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
       logger.info("Session started successfully:", sessionId);
 
-      // 3. Invalidate sessions query to refresh list
+      // 3. Invalidate sessions + calendar so passive views converge with server
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
+      queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
 
       // 4. Show success toast
       if (showToasts) {
@@ -139,6 +147,7 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
       return sessionId;
     } catch (err) {
+      onStartFlowFailed?.();
       const errorMsg = err instanceof Error ? err.message : "Failed to start session";
       logger.error("Failed to start session:", err);
       setError(errorMsg);
@@ -155,7 +164,16 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
     } finally {
       setIsStarting(false);
     }
-  }, [user, navigate, toast, queryClient, navigateOnSuccess, showToasts]);
+  }, [
+    user,
+    navigate,
+    toast,
+    queryClient,
+    navigateOnSuccess,
+    showToasts,
+    onSessionCreated,
+    onStartFlowFailed,
+  ]);
 
   return {
     startSession,
