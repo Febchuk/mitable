@@ -120,9 +120,9 @@ export default function AboutPage() {
                 }
                 .team-card-img {
                     width: 100%;
-                    aspect-ratio: 3 / 4;
+                    aspect-ratio: 1 / 1;
                     object-fit: cover;
-                    object-position: center top;
+                    object-position: center center;
                     border-radius: 10px;
                     background: ${C.border};
                     display: block;
@@ -250,7 +250,7 @@ export default function AboutPage() {
                     }
                     .team-card-img {
                         aspect-ratio: 4 / 5;
-                        object-position: center center;
+                        object-position: center top;
                         border-radius: 14px;
                     }
                     .team-card-content {

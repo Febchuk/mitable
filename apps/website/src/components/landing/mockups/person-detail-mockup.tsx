@@ -116,7 +116,7 @@ export const PersonDetailMockup = ({ variant = "dark" }: { variant?: MockupVaria
                 <div>
                     <h1 style={{ fontFamily: C.serif, fontSize: 22, fontWeight: 400, color: C.text, letterSpacing: "-0.3px", margin: 0 }}>Kemi Adebayo</h1>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-                        <span style={{ fontSize: 12, color: C.textSec }}>Senior Engineer</span>
+                        <span style={{ fontSize: 12, color: C.textSec }}>Virtual Assistant</span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: C.textSec }}>
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#54705F" strokeWidth="2.5" strokeLinecap="round">
                                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
