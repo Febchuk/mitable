@@ -201,7 +201,9 @@ Respond with valid JSON only:
     );
     return { accomplishments, sessionsUsed: sessions.length };
   } catch (error) {
-    logger.error({ error, userId, periodStart }, "Failed to generate bragbook entry");
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    logger.error({ err: errMsg, errStack, userId, periodStart }, "Failed to generate bragbook entry");
     throw error;
   }
 }

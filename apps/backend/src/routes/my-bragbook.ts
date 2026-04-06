@@ -286,7 +286,8 @@ router.post("/generate", requireAuth, async (req: Request, res: Response) => {
       sessionsUsed: result.sessionsUsed,
     });
   } catch (error) {
-    logger.error({ error }, "Failed to generate bragbook entry");
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error({ err: errMsg, userId: req.userId }, "Failed to generate bragbook entry");
     return res.status(500).json({ error: "Failed to generate bragbook entry" });
   }
 });
