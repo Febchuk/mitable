@@ -128,15 +128,28 @@ Respond with valid JSON only:
 
   try {
     const groq = new Groq({ apiKey: config.groq.apiKey });
-    const completion = await groq.chat.completions.create({
-      model: TEXT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 800,
-      response_format: { type: "json_object" },
-    });
+    const FALLBACK_MODEL = "llama-3.3-70b-versatile";
+    const models = [TEXT_MODEL, FALLBACK_MODEL];
 
-    const content = completion.choices[0]?.message?.content;
+    let content: string | null = null;
+    for (const model of models) {
+      try {
+        const completion = await groq.chat.completions.create({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,
+          max_tokens: 800,
+          response_format: { type: "json_object" },
+        });
+        content = completion.choices[0]?.message?.content ?? null;
+        if (content) break;
+      } catch (modelError: unknown) {
+        const status = (modelError as { status?: number }).status;
+        logger.warn({ model, status, userId, periodStart }, "Groq model failed, trying fallback");
+        if (model === models[models.length - 1]) throw modelError;
+      }
+    }
+
     if (!content) {
       logger.warn({ userId, periodStart }, "Empty Groq response");
       return { accomplishments: [], sessionsUsed: sessions.length };
