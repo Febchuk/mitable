@@ -143,7 +143,7 @@ Respond with valid JSON only:
   try {
     const model = getGenAI().getGenerativeModel({
       model: "gemini-2.5-flash",
-      generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
     });
 
     const result = await model.generateContent(prompt);
