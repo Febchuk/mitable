@@ -203,7 +203,10 @@ Respond with valid JSON only:
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
-    logger.error({ err: errMsg, errStack, userId, periodStart }, "Failed to generate bragbook entry");
+    logger.error(
+      { err: errMsg, errStack, userId, periodStart },
+      "Failed to generate bragbook entry"
+    );
     throw error;
   }
 }

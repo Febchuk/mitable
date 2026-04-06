@@ -5,6 +5,7 @@
  * Preferences are stored locally on the user's machine.
  */
 
+import { app } from "electron";
 import Store from "electron-store";
 import { createLogger } from "../lib/logger";
 
@@ -83,8 +84,9 @@ class PreferencesService {
   private store: any;
 
   constructor() {
+    const storeName = app.isPackaged ? "mitable-preferences" : "mitable-dev-preferences";
     this.store = new Store({
-      name: "mitable-preferences",
+      name: storeName,
       defaults,
       schema: {
         session: {

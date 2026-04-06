@@ -191,7 +191,7 @@ function createConsoleWindow() {
   const isWindows = process.platform === "win32";
 
   consoleWindow = new BrowserWindow({
-    title: "Mitable Console",
+    title: app.isPackaged ? "Mitable Console" : "Mitable Console (Dev)",
     width: windowWidth,
     height: windowHeight,
     // Center the window within the chosen display's work area
@@ -2905,17 +2905,23 @@ function registerGlobalShortcuts() {
 }
 
 app.whenReady().then(async () => {
-  // Enforce Single Instance Lock - must be first to prevent duplicate initialization
-  const gotTheLock = app.requestSingleInstanceLock();
+  // Enforce Single Instance Lock - scoped by packaged vs dev so both can run simultaneously
+  const lockData = { mode: app.isPackaged ? "production" : "development" };
+  const gotTheLock = app.requestSingleInstanceLock(lockData);
   if (!gotTheLock) {
     consoleLogger.info(" Another instance is already running. Quitting...");
     app.quit();
     return;
   }
 
+  // Differentiate dev instance so it uses separate userData/logs paths
+  if (!app.isPackaged) {
+    app.setName("Mitable Dev");
+  }
+
   // Set App User Model ID for Windows notification center integration
   if (process.platform === "win32") {
-    app.setAppUserModelId("com.mitable.app");
+    app.setAppUserModelId(app.isPackaged ? "com.mitable.app" : "com.mitable.dev");
   }
 
   app.on("second-instance", (_event, commandLine) => {
