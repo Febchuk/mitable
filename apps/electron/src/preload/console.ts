@@ -117,6 +117,9 @@ const IPC_CHANNELS = {
   // Onboarding
   ONBOARDING_GET_VERSION: "onboarding:get-version",
   ONBOARDING_SET_VERSION: "onboarding:set-version",
+  // Feedback
+  FEEDBACK_GET_LOGS: "feedback:get-logs",
+  FEEDBACK_APPEND_RENDERER_LOG: "feedback:append-renderer-log",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -707,6 +710,17 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on(IPC_CHANNELS.BROWSER_BRIDGE_CONNECTION_UPDATE, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_BRIDGE_CONNECTION_UPDATE, handler);
   },
+
+  // Feedback — main.log tail + renderer.log (DevTools stream, written by main)
+  appendRendererLogChunk: (chunk: string): void => {
+    ipcRenderer.send(IPC_CHANNELS.FEEDBACK_APPEND_RENDERER_LOG, chunk);
+  },
+  getElectronLogs: (): Promise<{
+    success: boolean;
+    logs: string;
+    rendererLogs: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_GET_LOGS),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

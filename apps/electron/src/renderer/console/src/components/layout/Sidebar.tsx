@@ -1,8 +1,9 @@
-import { Settings, LogOut, Building2 } from "lucide-react";
+import { Settings, LogOut, Building2, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
 import Nav from "../navigation/Nav";
+import FeedbackDialog from "../views/shared/FeedbackDialog";
 import { useState, useRef, useEffect } from "react";
 import type { ViewMode } from "../../types";
 
@@ -26,6 +27,7 @@ export default function Sidebar() {
 
   const firstInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close menu on click outside
@@ -116,6 +118,37 @@ export default function Sidebar() {
           gap: 2,
         }}
       >
+        <button
+          type="button"
+          onClick={() => setFeedbackOpen(true)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 11,
+            padding: "8px 12px",
+            borderRadius: 6,
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            background: "none",
+            border: "none",
+            textAlign: "left",
+            width: "100%",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "none";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }}
+        >
+          <MessageSquare size={15} strokeWidth={1.5} />
+          <span>Send Feedback</span>
+        </button>
+
         {/* Divider before user row */}
         <div
           style={{
@@ -202,6 +235,7 @@ export default function Sidebar() {
               }}
             >
               <button
+                type="button"
                 onClick={() => {
                   setShowUserMenu(false);
                   navigate("/profile");
@@ -235,6 +269,7 @@ export default function Sidebar() {
 
               {(user?.role === "admin" || user?.originalRole === "admin") && (
                 <button
+                  type="button"
                   onClick={() => {
                     setShowUserMenu(false);
                     navigate("/org-setup");
@@ -276,6 +311,7 @@ export default function Sidebar() {
               />
 
               <button
+                type="button"
                 onClick={() => {
                   setShowUserMenu(false);
                   logout();
@@ -310,6 +346,7 @@ export default function Sidebar() {
           )}
         </div>
       </div>
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </aside>
   );
 }

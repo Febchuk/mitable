@@ -1,9 +1,14 @@
+/* =============================================================================
+ * DEPRECATED — Ask RLM persistence (ask_threads / ask_messages).
+ * Not in active product use. Scheduled for deletion with Ask RLM teardown.
+ * =============================================================================
+ */
 import { pgTable, uuid, varchar, text, timestamp } from "drizzle-orm/pg-core";
 // Note: organizationId uses uuid (not varchar) to match all other schemas
 import { relations } from "drizzle-orm";
 import { users } from "./users.schema";
 
-// Ask Threads — admin org-wide AI conversations
+// Ask Threads — legacy admin Ask RLM conversations
 export const askThreads = pgTable("ask_threads", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")

@@ -5,25 +5,43 @@
  * The LLM fetches user data on demand via tools, then synthesizes answers.
  */
 
-import { AGENT_QUERY_TOOLS } from "./agent-query-tools.js";
+import { getAgentQueryTools } from "./agent-query-tools.js";
 import { buildDateContext, formatDateContextForPrompt } from "@mitable/shared";
 
-export function getAgentQuerySystemPrompt(userName: string, timezone?: string): string {
-  const toolDescriptions = AGENT_QUERY_TOOLS.map((tool) => {
-    const params = tool.parameters
-      .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
-      .join(", ");
-    return `- ${tool.name}(${params || "no parameters"}): ${tool.description}`;
-  }).join("\n");
+export function getAgentQuerySystemPrompt(
+  userName: string,
+  timezone?: string,
+  isAdmin = false
+): string {
+  const toolDescriptions = getAgentQueryTools(isAdmin)
+    .map((tool) => {
+      const params = tool.parameters
+        .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
+        .join(", ");
+      return `- ${tool.name}(${params || "no parameters"}): ${tool.description}`;
+    })
+    .join("\n");
 
   const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dateCtx = buildDateContext(tz);
   const dateBlock = formatDateContextForPrompt(dateCtx);
   const today = dateCtx.today;
 
+  const adminBlock = isAdmin
+    ? `
+
+<admin_capabilities>
+The user is an **organization admin**. You also have tools to query **other team members** and **org-wide** metrics: list_team_members, query_org_metrics, query_user_metrics, query_session_summaries.
+- Questions about a **specific colleague**, "the team", "who's most active", or org patterns → use these admin tools (resolve names via list_team_members when unsure).
+- Questions about **this user's own** work, meetings, and sessions → still use get_my_activity / get_activity_detail (that is only their data).
+- **Never** answer "how is [person] doing?" using only get_my_activity — that returns the admin's activity, not theirs.
+</admin_capabilities>
+`
+    : "";
+
   return `You are Mitable Agent — a personal AI assistant that helps users understand their work activity, patterns, and history.
 
-You have tools to query the user's captured work data on demand. Each query is limited to 31 days max, but you can make multiple queries for different periods to build a complete picture.
+You have tools to query the user's captured work data on demand. Each query is limited to 31 days max, but you can make multiple queries for different periods to build a complete picture.${adminBlock}
 
 <available_tools>
 ${toolDescriptions}

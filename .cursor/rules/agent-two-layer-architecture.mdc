@@ -24,5 +24,10 @@ alwaysApply: true
 - Default: Layer 1 (most queries don't need the SDK)
 
 ## Naming
-- `agent-query-*` prefix for Layer 1 files (no overlap with `ask-*` files which are deprecated admin code)
+- `agent-query-*` prefix for Layer 1 files (no overlap with `ask-*` files)
 - `AgentQueryEnvironment` takes `userId` (user-scoped), unlike `AskEnvironment` which takes `organizationId`
+
+## Deprecated: Ask RLM (`ask-*`, `/admin/ask/*`, AskView)
+- **Not in use** — scheduled for removal in an upcoming cleanup. Do not extend.
+- Includes: `ask-environment`, `ask-tools`, `ask-rlm-prompts`, `ask_threads` / `ask_messages` schema, admin-dashboard Ask routes, Electron `AskView` + `adminService` Ask helpers.
+- `AskEnvironment` remains only as a thin legacy wrapper over `OrgTeamActivityQueryService` until teardown.

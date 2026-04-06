@@ -4,7 +4,7 @@ import { requireAuth, optionalAuth } from "./middleware/auth.js";
 import agentRouter from "./routes/agent.js";
 import roadmapsRouter from "./routes/roadmaps.js";
 // DEPRECATED: Old multi-agent chat system (OrchestratorService → KnowledgeAgent/Groq)
-// Admin Ask now uses /admin/ask/chat (Claude). Employees have no chat UI.
+// DEPRECATED: Admin Ask RLM — /admin/ask/* (unused; slated for deletion). Not extending.
 // import conversationsRouter from "./routes/conversations.js";
 import adminRouter from "./routes/admin.js";
 import adminDashboardRouter from "./routes/admin-dashboard.js";
@@ -20,6 +20,7 @@ import myActivityRouter from "./routes/my-activity.js";
 import myBenchmarksRouter from "./routes/my-benchmarks.js";
 import myBragbookRouter from "./routes/my-bragbook.js";
 import adminBenchmarksRouter from "./routes/admin-benchmarks.js";
+import feedbackRouter from "./routes/feedback.js";
 import { authLimiter } from "./middleware/rateLimiter.js";
 // DEPRECATED: Guide routes replaced by WorkflowOptions metadata system
 // import guidesRouter from "./routes/guides.routes.js";
@@ -48,6 +49,7 @@ router.use("/api-keys", apiKeysRouter);
 router.use("/my-activity", myActivityRouter);
 router.use("/my/benchmarks", myBenchmarksRouter);
 router.use("/my-bragbook", myBragbookRouter);
+router.use("/feedback", feedbackRouter);
 
 /**
  * DEPRECATED: /guides routes

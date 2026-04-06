@@ -218,6 +218,31 @@ export const config = {
     fromAddress: (process.env.RESEND_FROM_ADDRESS || "Mitable AI <noreply@mitable.ai>").trim(),
   },
 
+  // In-app feedback emails (Resend `to` / `cc`); defaults match prior hardcoded recipients
+  feedback: {
+    emailTo: (process.env.FEEDBACK_EMAIL_TO || "mikun@mitable.ai").trim(),
+    /** Comma-separated CC list; empty env uses febe + aurel */
+    emailCcList: ((): string[] => {
+      const raw = process.env.FEEDBACK_EMAIL_CC;
+      if (!raw?.trim()) return ["febe@mitable.ai", "aurel@mitable.ai"];
+      const parts = raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return parts.length > 0 ? parts : ["febe@mitable.ai", "aurel@mitable.ai"];
+    })(),
+  },
+
+  // Railway Public API (GraphQL) — feedback: pull recent backend logs for the reporting user
+  railway: {
+    /** Account or workspace token — Authorization: Bearer (RAILWAY_TOKEN is what Railway UI often suggests) */
+    apiToken: (process.env.RAILWAY_API_TOKEN || process.env.RAILWAY_TOKEN || "").trim(),
+    /** Project-scoped token — Project-Access-Token header (alternative to apiToken) */
+    projectAccessToken: (process.env.RAILWAY_PROJECT_ACCESS_TOKEN || "").trim(),
+    environmentId: (process.env.RAILWAY_ENVIRONMENT_ID || "").trim(),
+    backendServiceId: (process.env.RAILWAY_BACKEND_SERVICE_ID || "").trim(),
+  },
+
   // Backend URL (used for password reset redirects, etc.)
   backendUrl: (process.env.BACKEND_URL || `http://localhost:${PORT}`).trim(),
 

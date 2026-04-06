@@ -4,9 +4,9 @@
  * Centralized logging utility using electron-log for the main process.
  * Provides scoped loggers with consistent formatting and persistent file logging.
  *
- * Log file locations:
+ * Log file locations (see also renderer.log next to main.log for console-window DevTools capture):
  * - macOS: ~/Library/Logs/mitable/main.log
- * - Windows: %USERPROFILE%\AppData\Roaming\mitable\logs\main.log
+ * - Windows: %USERPROFILE%\AppData\Roaming\mitable\logs\main.log (or @mitable\electron\logs\ per app id)
  * - Linux: ~/.config/mitable/logs/main.log
  */
 

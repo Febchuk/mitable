@@ -64,3 +64,21 @@ export const screenshotLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+/**
+ * Feedback submissions — triggers Haiku log analysis (costly). Per authenticated user.
+ */
+export const feedbackLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 6,
+  message: {
+    error: "Too many feedback submissions. Please try again later.",
+    retryAfter: "1 hour",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const uid = req.userId;
+    return uid ? `feedback:user:${uid}` : `feedback:ip:${req.ip ?? "unknown"}`;
+  },
+});

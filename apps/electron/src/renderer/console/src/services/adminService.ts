@@ -826,7 +826,7 @@ export async function fetchSubscriberActivities(
   }
 }
 
-// ── Ask Threads CRUD ──────────────────────────────────────────
+// ── DEPRECATED — Ask RLM client (/admin/ask/*). Unused; slated for deletion. ─
 
 export interface AskThread {
   id: string;

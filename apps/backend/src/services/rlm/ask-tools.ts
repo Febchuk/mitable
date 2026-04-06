@@ -1,9 +1,10 @@
-/**
- * Ask RLM Tools
+/* =============================================================================
+ * DEPRECATED — Ask RLM tool definitions.
+ * Not in active use. Paired with ask-rlm-prompts + /admin/ask/chat; slated for removal.
+ * Do not extend. Org-wide queries: OrgTeamActivityQueryService + Layer 1 admin tools.
+ * =============================================================================
  *
- * Predefined tools for the Ask AI assistant.
- * The LLM calls these to fetch org/user data on demand,
- * keeping the context window lean (max 31 days per query).
+ * Predefined tools for the legacy Ask AI tool loop (max 31 days per query).
  */
 
 import { AskEnvironment } from "./ask-environment";

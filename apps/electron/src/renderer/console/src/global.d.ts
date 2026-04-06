@@ -312,6 +312,15 @@ interface ConsoleAPI {
   getBrowserBridgeStatus: () => Promise<boolean>;
   getBrowserBridgeInfo: () => Promise<{ port: number; token: string; connected: boolean }>;
   onBrowserBridgeConnectionUpdate: (callback: (connected: boolean) => void) => () => void;
+
+  // Feedback — main.log + renderer.log on disk
+  appendRendererLogChunk: (chunk: string) => void;
+  getElectronLogs: () => Promise<{
+    success: boolean;
+    logs: string;
+    rendererLogs: string;
+    error?: string;
+  }>;
 }
 
 declare global {
