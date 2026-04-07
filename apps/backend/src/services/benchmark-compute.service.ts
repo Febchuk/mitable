@@ -10,7 +10,7 @@
  * @module benchmark-compute
  */
 
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, lt, desc } from "drizzle-orm";
 import { db } from "../db/client.js";
 import {
   benchmarks,
@@ -428,14 +428,14 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
     for (const result of results) {
       const percentile = calculatePercentile(result.progress, allProgresses);
 
-      // Get previous snapshot for trend calculation
+      // Get previous snapshot for trend calculation (before today, not including today)
       const [previousSnapshot] = await db
         .select({ value: benchmarkSnapshots.value })
         .from(benchmarkSnapshots)
         .where(
           and(
             eq(benchmarkSnapshots.assignmentId, result.assignmentId),
-            lte(benchmarkSnapshots.date, today)
+            lt(benchmarkSnapshots.date, today)
           )
         )
         .orderBy(desc(benchmarkSnapshots.date))
@@ -482,7 +482,16 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
         );
       }
 
-      // 9. Insert snapshot (store progress 0-100 so charts are consistent)
+      // 9. Upsert snapshot (store progress 0-100 so charts are consistent)
+      // Delete any existing snapshot for today to avoid duplicates on re-run
+      await db
+        .delete(benchmarkSnapshots)
+        .where(
+          and(
+            eq(benchmarkSnapshots.assignmentId, result.assignmentId),
+            eq(benchmarkSnapshots.date, today)
+          )
+        );
       await db.insert(benchmarkSnapshots).values({
         assignmentId: result.assignmentId,
         date: today,

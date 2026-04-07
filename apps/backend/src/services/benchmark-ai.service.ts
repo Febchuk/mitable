@@ -254,12 +254,22 @@ Return JSON only: { "scores": [{ "parameterId": "...", "score": N, "reasoning": 
         throw new Error("LLM returned empty or invalid scores array");
       }
 
-      // Clamp scores to 1-5 range
-      return parsed.scores.map((s) => ({
-        parameterId: s.parameterId,
-        score: Math.round(Math.min(5, Math.max(1, s.score)) * 10) / 10,
-        reasoning: s.reasoning,
-      }));
+      // Map scores back to actual parameter IDs by matching name or index.
+      // LLMs sometimes corrupt UUIDs, so we don't trust parameterId from the response.
+      const paramByName = new Map(parameters.map((p) => [p.name.toLowerCase(), p.id]));
+      return parsed.scores.map((s, i) => {
+        // Try to match by parameterId first, then by name, then by index
+        const matchedId =
+          parameters.find((p) => p.id === s.parameterId)?.id ??
+          paramByName.get((s as { name?: string }).name?.toLowerCase() ?? "") ??
+          parameters[i]?.id ??
+          s.parameterId;
+        return {
+          parameterId: matchedId,
+          score: Math.round(Math.min(5, Math.max(1, s.score)) * 10) / 10,
+          reasoning: s.reasoning,
+        };
+      });
     } catch (error) {
       logger.warn({ error }, "LLM scoring failed, using rule-based fallback");
       return scoreParametersFallback(parameters, periodSummary);

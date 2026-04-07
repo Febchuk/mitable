@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Minus, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, Plus, Minus, ChevronRight, X, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useBenchmarkDetail } from "@/console/src/hooks/queries/benchmarks";
 import { useUnassignBenchmark } from "@/console/src/hooks/queries/benchmarks";
+import { useTriggerCompute } from "@/console/src/hooks/queries/benchmarks/useBenchmarkMutations";
 
 import { TrendArrow } from "../../shared/benchmarks/TrendArrow";
 import { AssignBenchmarkModal } from "./AssignBenchmarkModal";
@@ -250,6 +251,7 @@ export function BenchmarkDetail() {
   const [removeMode, setRemoveMode] = useState(false);
   const [markedForRemoval, setMarkedForRemoval] = useState<Set<string>>(new Set());
   const { mutate: unassign } = useUnassignBenchmark();
+  const { mutate: triggerCompute, isPending: isComputing } = useTriggerCompute();
 
   const toggleMarked = (userId: string) => {
     setMarkedForRemoval((prev) => {
@@ -499,6 +501,35 @@ export function BenchmarkDetail() {
                 </>
               ) : (
                 <>
+                  <button
+                    onClick={() => id && triggerCompute(id)}
+                    disabled={isComputing}
+                    title="Recalculate scores for all people"
+                    style={{
+                      height: 32,
+                      padding: "0 12px",
+                      borderRadius: 8,
+                      fontSize: 11,
+                      fontFamily: "var(--font-sans)",
+                      fontWeight: 500,
+                      border: "var(--border-hairline)",
+                      cursor: isComputing ? "not-allowed" : "pointer",
+                      background: isComputing ? "rgba(var(--ui-rgb), 0.04)" : "transparent",
+                      color: "var(--text-secondary)",
+                      transition: "all 0.15s",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <RefreshCw
+                      size={12}
+                      style={{
+                        animation: isComputing ? "spin 1s linear infinite" : "none",
+                      }}
+                    />
+                    {isComputing ? "Calculating..." : "Recalculate"}
+                  </button>
                   <IconButton onClick={() => setAssignModalOpen(true)} title="Add people">
                     <Plus size={14} />
                   </IconButton>
