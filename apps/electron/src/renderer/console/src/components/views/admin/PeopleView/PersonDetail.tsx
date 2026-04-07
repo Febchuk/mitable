@@ -29,6 +29,7 @@ import type {
 } from "@/console/src/services/adminService";
 import { DocEditor } from "@/console/src/components/editor";
 import { useDocument } from "@/console/src/hooks/queries/documents";
+import { useUserBenchmarks } from "@/console/src/hooks/queries/benchmarks";
 import { getLocale } from "@/console/src/lib/date";
 import DrillDownPanel from "../DashboardView/DrillDownPanel";
 import ActivityBlock from "../../employee/CalendarView/ActivityBlock";
@@ -540,6 +541,7 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
   });
 
   const latestActivityAt =
+    api.lastActiveAt ||
     [...api.blocks].sort(
       (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
     )[0]?.startTime ||
@@ -671,16 +673,25 @@ export default function PersonDetail() {
     enabled: !!id,
   });
 
-  const strengths = [
-    { name: "Deep Focus Work", progress: 92, benchmarkId: "bm-deep-focus" },
-    { name: "Consistent Engagement", progress: 88, benchmarkId: "bm-engagement" },
-    { name: "Meeting Efficiency", progress: 85, benchmarkId: "bm-meeting-eff" },
-  ];
-  const toImprove = [
-    { name: "Cross-functional Collaboration", progress: 52, benchmarkId: "bm-cross-collab" },
-    { name: "AI Adoption & Tool Usage", progress: 58, benchmarkId: "bm-ai-adoption" },
-    { name: "Mentorship & Development", progress: 62, benchmarkId: "bm-mentorship" },
-  ];
+  const { data: userBenchmarks } = useUserBenchmarks(id);
+
+  const strengths = useMemo(() => {
+    if (!userBenchmarks) return [];
+    return userBenchmarks
+      .filter((b) => b.progress >= 75)
+      .sort((a, b) => b.progress - a.progress)
+      .slice(0, 3)
+      .map((b) => ({ name: b.name, progress: b.progress, benchmarkId: b.benchmarkId }));
+  }, [userBenchmarks]);
+
+  const toImprove = useMemo(() => {
+    if (!userBenchmarks) return [];
+    return userBenchmarks
+      .filter((b) => b.progress < 75)
+      .sort((a, b) => a.progress - b.progress)
+      .slice(0, 3)
+      .map((b) => ({ name: b.name, progress: b.progress, benchmarkId: b.benchmarkId }));
+  }, [userBenchmarks]);
 
   const handleDrillDown = (label: string) => {
     const metricKey = LABEL_TO_METRIC[label] || label.toLowerCase();
@@ -1450,29 +1461,28 @@ export default function PersonDetail() {
           </div>
 
           {/* Strengths */}
-          {strengths.length > 0 && (
-            <div
+          <div
+            style={{
+              background: "var(--bg-raised)",
+              border: "var(--border-hairline)",
+              borderRadius: 12,
+              padding: "22px 24px",
+            }}
+          >
+            <span
               style={{
-                background: "var(--bg-raised)",
-                border: "var(--border-hairline)",
-                borderRadius: 12,
-                padding: "22px 24px",
-                alignSelf: "start",
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.09em",
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-sans)",
+                display: "block",
+                marginBottom: 14,
               }}
             >
-              <span
-                style={{
-                  fontSize: 10,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.09em",
-                  color: "var(--text-secondary)",
-                  fontFamily: "var(--font-sans)",
-                  display: "block",
-                  marginBottom: 14,
-                }}
-              >
-                Strengths
-              </span>
+              Strengths
+            </span>
+            {strengths.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {strengths.map((s) => (
                   <div
@@ -1501,33 +1511,36 @@ export default function PersonDetail() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                No strengths identified yet
+              </span>
+            )}
+          </div>
 
           {/* Opportunities */}
-          {toImprove.length > 0 && (
-            <div
+          <div
+            style={{
+              background: "var(--bg-raised)",
+              border: "var(--border-hairline)",
+              borderRadius: 12,
+              padding: "22px 24px",
+            }}
+          >
+            <span
               style={{
-                background: "var(--bg-raised)",
-                border: "var(--border-hairline)",
-                borderRadius: 12,
-                padding: "22px 24px",
-                alignSelf: "start",
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.09em",
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-sans)",
+                display: "block",
+                marginBottom: 14,
               }}
             >
-              <span
-                style={{
-                  fontSize: 10,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.09em",
-                  color: "var(--text-secondary)",
-                  fontFamily: "var(--font-sans)",
-                  display: "block",
-                  marginBottom: 14,
-                }}
-              >
-                Opportunities
-              </span>
+              Opportunities
+            </span>
+            {toImprove.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {toImprove.map((s) => (
                   <div
@@ -1556,8 +1569,12 @@ export default function PersonDetail() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                No opportunities identified yet
+              </span>
+            )}
+          </div>
         </div>
 
         <div

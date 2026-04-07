@@ -199,6 +199,18 @@ export async function updateAssignment(
   }
 }
 
+export async function fetchUserBenchmarks(userId: string): Promise<MyBenchmark[]> {
+  try {
+    const response = await apiRequest<{ benchmarks: MyBenchmark[] }>(
+      `/admin/benchmarks/user/${userId}`
+    );
+    return response.benchmarks;
+  } catch (error) {
+    logger.error("Error fetching user benchmarks:", error);
+    throw error;
+  }
+}
+
 export interface PersonBenchmarkDetail {
   benchmarkId: string;
   benchmarkName: string;

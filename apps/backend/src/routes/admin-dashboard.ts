@@ -1067,8 +1067,21 @@ router.get(
         blocksByDate.set(dateKey, existing);
       }
 
+      // Compute lastActiveAt from real-time sources (same logic as people list)
+      const lastActiveCandidates: Date[] = [];
+      if (sessionActivities[0]?.startedAt)
+        lastActiveCandidates.push(new Date(sessionActivities[0].startedAt));
+      if (sessionActivities[0]?.endedAt)
+        lastActiveCandidates.push(new Date(sessionActivities[0].endedAt));
+      if (userDocs[0]?.createdAt) lastActiveCandidates.push(new Date(userDocs[0].createdAt));
+      const lastActiveAt =
+        lastActiveCandidates.length > 0
+          ? new Date(Math.max(...lastActiveCandidates.map((d) => d.getTime()))).toISOString()
+          : null;
+
       res.json({
         period,
+        lastActiveAt,
         user: {
           id: targetUser.id,
           name: [targetUser.firstName, targetUser.lastName].filter(Boolean).join(" "),

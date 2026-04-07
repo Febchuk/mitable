@@ -13,3 +13,4 @@ export {
 export { useMyBenchmarks } from "./useMyBenchmarks";
 export { useMyBenchmarkDetail } from "./useMyBenchmarkDetail";
 export { usePersonBenchmarkDetail } from "./usePersonBenchmarkDetail";
+export { useUserBenchmarks } from "./useUserBenchmarks";

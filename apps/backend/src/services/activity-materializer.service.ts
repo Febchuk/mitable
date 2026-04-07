@@ -156,22 +156,28 @@ export async function materializeSession(sessionId: string): Promise<void> {
       const sessionDurationMs = sessionEnd.getTime() - sessionStart.getTime();
 
       for (const act of keyActivities) {
-        const minutes = Math.max(1, act.minutes || 1);
+        const classifiedMinutes = Math.max(1, act.minutes || 1);
         const fractionMs =
           totalClassifiedMinutes > 0
-            ? (minutes / totalClassifiedMinutes) * sessionDurationMs
+            ? (classifiedMinutes / totalClassifiedMinutes) * sessionDurationMs
             : sessionDurationMs / keyActivities.length;
 
         const blockStart = new Date(sessionStart.getTime() + offsetMs);
         const blockEnd = new Date(sessionStart.getTime() + offsetMs + fractionMs);
         const category = (act.category || "Other").toLowerCase();
+        // Use proportionally distributed session time so block durations
+        // sum to the actual session duration, not Claude's raw estimates.
+        const proportionalMinutes = Math.max(1, Math.round(fractionMs / 60000));
 
+        // Session-based blocks are always "work" — meetings should only come from
+        // authoritative sources (Granola, Fireflies) that confirm a meeting happened.
+        // Claude's screenshot classification seeing a Teams/Zoom window is unreliable.
         blocks.push({
           name: act.activity || "Activity",
-          blockType: category === "meeting" ? "meeting" : "work",
+          blockType: "work",
           startTime: blockStart,
           endTime: blockEnd,
-          durationMinutes: minutes,
+          durationMinutes: proportionalMinutes,
           description: act.description || act.activity || "",
           apps: [],
           category,
@@ -350,6 +356,8 @@ export async function recalculateDailyStats(
     .select({
       blockType: schema.activityBlocks.blockType,
       durationMinutes: schema.activityBlocks.durationMinutes,
+      startTime: schema.activityBlocks.startTime,
+      endTime: schema.activityBlocks.endTime,
       apps: schema.activityBlocks.apps,
       category: schema.activityBlocks.category,
       sessionId: schema.activityBlocks.sessionId,
@@ -358,6 +366,36 @@ export async function recalculateDailyStats(
     })
     .from(schema.activityBlocks)
     .where(eq(schema.activityBlocks.dailyActivityId, dailyActivityId));
+
+  // Deduplicate meeting blocks: when a session-classified "meeting" block overlaps
+  // with a Granola/Fireflies block (which has more accurate duration from the meeting tool),
+  // reduce the session block's effective duration by the overlap to avoid double-counting.
+  const authoritativeMeetingBlocks = blocks.filter(
+    (b: { blockType: string }) => b.blockType === "granola" || b.blockType === "fireflies"
+  );
+
+  // Map each block to its effective duration after dedup
+  const effectiveDuration = new Map<typeof blocks[number], number>();
+  for (const block of blocks) {
+    if (block.blockType === "meeting" && authoritativeMeetingBlocks.length > 0) {
+      const blockStartMs = new Date(block.startTime).getTime();
+      const blockEndMs = new Date(block.endTime).getTime();
+      let totalOverlapMs = 0;
+      for (const auth of authoritativeMeetingBlocks) {
+        const authStartMs = new Date(auth.startTime).getTime();
+        const authEndMs = new Date(auth.endTime).getTime();
+        const overlapMs = Math.max(
+          0,
+          Math.min(blockEndMs, authEndMs) - Math.max(blockStartMs, authStartMs)
+        );
+        totalOverlapMs += overlapMs;
+      }
+      const overlapMinutes = Math.round(totalOverlapMs / 60000);
+      effectiveDuration.set(block, Math.max(0, block.durationMinutes - overlapMinutes));
+    } else {
+      effectiveDuration.set(block, block.durationMinutes);
+    }
+  }
 
   let totalWorkMinutes = 0;
   let totalMeetingMinutes = 0;
@@ -370,34 +408,37 @@ export async function recalculateDailyStats(
   const sessionIds = new Set<string>();
 
   for (const block of blocks) {
+    const duration = effectiveDuration.get(block) ?? block.durationMinutes;
     if (
       block.blockType === "meeting" ||
       block.blockType === "granola" ||
       block.blockType === "fireflies"
     ) {
-      totalMeetingMinutes += block.durationMinutes;
+      totalMeetingMinutes += duration;
     } else {
-      totalWorkMinutes += block.durationMinutes;
+      totalWorkMinutes += duration;
     }
+
+    if (duration === 0) continue; // Fully overlapped, skip breakdowns
 
     if (block.sessionId) sessionIds.add(block.sessionId);
 
     // App breakdown (normalize so "Slack Huddle" → "Slack")
     const blockApps = ((block.apps as string[]) || []).map(normalizeAppDisplayName);
     const dedupedApps = [...new Set(blockApps)];
-    const perAppMinutes = dedupedApps.length > 0 ? block.durationMinutes / dedupedApps.length : 0;
+    const perAppMinutes = dedupedApps.length > 0 ? duration / dedupedApps.length : 0;
     for (const app of dedupedApps) {
       appMinutes[app] = (appMinutes[app] || 0) + perAppMinutes;
     }
 
     // Category breakdown — use the classified category from the block
     const cat = (block.category as string) || "other";
-    categoryMinutes[cat] = (categoryMinutes[cat] || 0) + block.durationMinutes;
+    categoryMinutes[cat] = (categoryMinutes[cat] || 0) + duration;
 
     // Topic breakdown (normalize key, keep longest display name)
     if (block.topicName) {
       const tKey = normalizeName(block.topicName);
-      topicMinutes[tKey] = (topicMinutes[tKey] || 0) + block.durationMinutes;
+      topicMinutes[tKey] = (topicMinutes[tKey] || 0) + duration;
       if (!topicDisplayNames[tKey] || block.topicName.length > topicDisplayNames[tKey].length) {
         topicDisplayNames[tKey] = block.topicName;
       }
@@ -414,7 +455,7 @@ export async function recalculateDailyStats(
 
     if (effectiveSubscriber) {
       const sKey = normalizeName(effectiveSubscriber);
-      subscriberMinutes[sKey] = (subscriberMinutes[sKey] || 0) + block.durationMinutes;
+      subscriberMinutes[sKey] = (subscriberMinutes[sKey] || 0) + duration;
       if (
         !subscriberDisplayNames[sKey] ||
         effectiveSubscriber.length > subscriberDisplayNames[sKey].length

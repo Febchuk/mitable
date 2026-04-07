@@ -335,6 +335,35 @@ router.patch("/:id/assignments/:userId", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /user/:userId — all benchmark assignments for a specific user
+// ---------------------------------------------------------------------------
+
+router.get("/user/:userId", async (req, res) => {
+  if (!req.organizationId) {
+    res.status(403).json({ error: "Forbidden", message: "Organization context required" });
+    return;
+  }
+
+  try {
+    const { userId } = req.params;
+
+    logger.info(
+      { organizationId: req.organizationId, userId },
+      "Getting all benchmarks for user"
+    );
+
+    const benchmarks = await benchmarkService.getMyBenchmarks(userId);
+
+    res.status(200).json({ benchmarks });
+  } catch (error) {
+    logger.error({ err: error }, "Error getting user benchmarks");
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: "Failed to get user benchmarks" });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /:benchmarkId/person/:userId — person-level benchmark detail
 // ---------------------------------------------------------------------------
 
