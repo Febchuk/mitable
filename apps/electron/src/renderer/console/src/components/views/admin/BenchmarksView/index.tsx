@@ -91,27 +91,31 @@ export default function BenchmarksView() {
         >
           Benchmarks
         </h1>
-        <DataScopeFilter onScopeChange={() => setShowUnassigned(false)} dimmed={showUnassigned}>
-          {hasUnassigned && (
-            <button
-              onClick={() => setShowUnassigned(!showUnassigned)}
-              style={{
-                padding: "4px 10px",
-                borderRadius: 4,
-                fontSize: 11,
-                fontWeight: 500,
-                border: "none",
-                cursor: "pointer",
-                transition: "background 0.1s, color 0.1s",
-                background: showUnassigned ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
-                color: showUnassigned ? "var(--text-primary)" : "var(--text-tertiary)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Unassigned
-            </button>
-          )}
-        </DataScopeFilter>
+        <DataScopeFilter
+          onScopeChange={() => setShowUnassigned(false)}
+          dimmed={showUnassigned}
+          leading={
+            hasUnassigned ? (
+              <button
+                onClick={() => setShowUnassigned(!showUnassigned)}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background 0.1s, color 0.1s",
+                  background: showUnassigned ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
+                  color: showUnassigned ? "var(--text-primary)" : "var(--text-tertiary)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Unassigned
+              </button>
+            ) : undefined
+          }
+        />
 
         {/* Frequency filters — hidden for now
         <div

@@ -10,12 +10,14 @@ const SCOPE_LABELS: Record<DataScope, string> = {
 interface DataScopeFilterProps {
   onScopeChange?: () => void;
   dimmed?: boolean;
+  leading?: React.ReactNode;
   children?: React.ReactNode;
 }
 
 export default function DataScopeFilter({
   onScopeChange,
   dimmed,
+  leading,
   children,
 }: DataScopeFilterProps = {}) {
   const { viewMode, dataScope, availableDataScopes, setDataScope } = useUser();
@@ -33,6 +35,7 @@ export default function DataScopeFilter({
         padding: 2,
       }}
     >
+      {leading}
       {availableDataScopes.map((scope) => {
         const isActive = dataScope === scope && !dimmed;
         return (
