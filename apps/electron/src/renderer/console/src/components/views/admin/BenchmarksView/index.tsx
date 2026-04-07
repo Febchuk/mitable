@@ -6,29 +6,23 @@ import { useBenchmarks, useDeleteBenchmark } from "@/console/src/hooks/queries/b
 import type { Benchmark } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
 import DataScopeFilter from "@/console/src/components/shared/DataScopeFilter";
-
-// Frequency filters — commented out in UI for now
-// type FrequencyFilter = "all" | BenchmarkFrequency;
-// const FREQUENCY_FILTERS = [
-//   { key: "all", label: "All" },
-//   { key: "daily", label: "Daily" },
-//   { key: "weekly", label: "Weekly" },
-//   { key: "monthly", label: "Monthly" },
-//   { key: "quarterly", label: "Quarterly" },
-// ];
-
 const SPINNER_COLOR = "#82C0CC";
 
 export default function BenchmarksView() {
   const navigate = useNavigate();
   const { data: benchmarks = [], isLoading } = useBenchmarks();
   const { mutate: deleteBenchmark } = useDeleteBenchmark();
-  // const [activeFrequency, setActiveFrequency] = useState<FrequencyFilter>("all");
+  const [showUnassigned, setShowUnassigned] = useState(false);
 
   // Delete confirmation state
   const [deletingBenchmark, setDeletingBenchmark] = useState<Benchmark | null>(null);
 
-  const filtered = benchmarks; // No frequency filtering for now
+  const hasUnassigned = useMemo(() => benchmarks.some((b) => b.assignedCount === 0), [benchmarks]);
+
+  const filtered = useMemo(() => {
+    if (showUnassigned) return benchmarks.filter((b) => b.assignedCount === 0);
+    return benchmarks.filter((b) => b.assignedCount > 0);
+  }, [benchmarks, showUnassigned]);
 
   // Score: avg completion across filtered benchmarks
   const score = useMemo(() => {
@@ -96,7 +90,28 @@ export default function BenchmarksView() {
         >
           Benchmarks
         </h1>
-        <DataScopeFilter />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <DataScopeFilter onScopeChange={() => setShowUnassigned(false)} dimmed={showUnassigned} />
+          {hasUnassigned && (
+            <button
+              onClick={() => setShowUnassigned(!showUnassigned)}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: 500,
+                border: "none",
+                cursor: "pointer",
+                transition: "background 0.1s, color 0.1s",
+                background: showUnassigned ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
+                color: showUnassigned ? "var(--text-primary)" : "var(--text-tertiary)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Unassigned
+            </button>
+          )}
+        </div>
 
         {/* Frequency filters — hidden for now
         <div

@@ -7,7 +7,12 @@ const SCOPE_LABELS: Record<DataScope, string> = {
   "org-wide": "Org-wide",
 };
 
-export default function DataScopeFilter() {
+interface DataScopeFilterProps {
+  onScopeChange?: () => void;
+  dimmed?: boolean;
+}
+
+export default function DataScopeFilter({ onScopeChange, dimmed }: DataScopeFilterProps = {}) {
   const { viewMode, dataScope, availableDataScopes, setDataScope } = useUser();
 
   // Only show in Team view with more than one option
@@ -23,26 +28,32 @@ export default function DataScopeFilter() {
         padding: 2,
       }}
     >
-      {availableDataScopes.map((scope) => (
-        <button
-          key={scope}
-          onClick={() => setDataScope(scope)}
-          style={{
-            padding: "4px 10px",
-            borderRadius: 4,
-            fontSize: 11,
-            fontWeight: 500,
-            border: "none",
-            cursor: "pointer",
-            transition: "background 0.1s, color 0.1s",
-            background: dataScope === scope ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
-            color: dataScope === scope ? "var(--text-primary)" : "var(--text-tertiary)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {SCOPE_LABELS[scope]}
-        </button>
-      ))}
+      {availableDataScopes.map((scope) => {
+        const isActive = dataScope === scope && !dimmed;
+        return (
+          <button
+            key={scope}
+            onClick={() => {
+              setDataScope(scope);
+              onScopeChange?.();
+            }}
+            style={{
+              padding: "4px 10px",
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 500,
+              border: "none",
+              cursor: "pointer",
+              transition: "background 0.1s, color 0.1s",
+              background: isActive ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
+              color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {SCOPE_LABELS[scope]}
+          </button>
+        );
+      })}
     </div>
   );
 }
