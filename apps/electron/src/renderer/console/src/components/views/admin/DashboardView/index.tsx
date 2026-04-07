@@ -325,7 +325,7 @@ export default function DashboardView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get("period") as TimeFilter | null;
   const [filter, setFilter] = useState<TimeFilter>(
-    initialFilter && VALID_FILTERS.has(initialFilter) ? initialFilter : "yesterday"
+    initialFilter && VALID_FILTERS.has(initialFilter) ? initialFilter : "week"
   );
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -342,7 +342,13 @@ export default function DashboardView() {
 
   const totalMinutes = useMemo(() => {
     if (!apiData?.hasData) return 0;
-    return apiData.metrics.totalTeamSessionMinutes ?? 0;
+    // Sum the per-user-average work+meeting from each day in the trend —
+    // this matches exactly what the chart bars display.
+    const trend = apiData.dailyTrend || [];
+    return trend.reduce(
+      (sum, d) => sum + (d.avgWorkMinutes ?? 0) + (d.avgMeetingMinutes ?? 0),
+      0
+    );
   }, [apiData]);
 
   const activeTimeDisplay = useMemo(() => formatTopLevelDuration(totalMinutes), [totalMinutes]);
@@ -421,7 +427,7 @@ export default function DashboardView() {
                   fontSize: 11,
                   fontFamily: "var(--font-sans)",
                   color: filter === f.key ? "var(--text-primary)" : "var(--text-secondary)",
-                  background: filter === f.key ? "var(--bg-overlay)" : "transparent",
+                  background: filter === f.key ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
                   border: "none",
                   cursor: "pointer",
                   transition: "background 0.1s, color 0.1s",

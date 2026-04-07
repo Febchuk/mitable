@@ -584,6 +584,7 @@ export interface SessionActivity {
 
 export interface DashboardPersonDetail {
   period: string;
+  lastActiveAt?: string | null;
   user: {
     id: string;
     name: string;
