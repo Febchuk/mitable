@@ -1,10 +1,11 @@
 import { useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, CircleHelp } from "lucide-react";
 import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
 import AuthLogo from "../components/ui/AuthLogo";
+import FeedbackDialog from "../components/views/shared/FeedbackDialog";
 
 const inputClassName =
   "flex h-10 w-full rounded-md px-3 py-2 text-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 outline-none";
@@ -28,6 +29,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const navigate = useNavigate();
   const { updateUser } = useUser();
 
@@ -210,6 +212,43 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* Unauthenticated feedback entry point (login issues, auth errors, etc.) */}
+      <button
+        type="button"
+        onClick={() => setFeedbackOpen(true)}
+        aria-label="Help and feedback"
+        title="Help and feedback"
+        style={{
+          position: "fixed",
+          left: 18,
+          bottom: 18,
+          width: 42,
+          height: 42,
+          borderRadius: "50%",
+          border: "var(--border-subtle)",
+          background: "rgba(var(--ui-rgb), 0.06)",
+          color: "var(--text-secondary)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          boxShadow: "0 10px 26px rgba(0,0,0,0.32)",
+          zIndex: 1000,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.10)";
+          e.currentTarget.style.color = "var(--text-primary)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+          e.currentTarget.style.color = "var(--text-secondary)";
+        }}
+      >
+        <CircleHelp size={18} strokeWidth={1.7} />
+      </button>
+
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} anonymousSource="login" />
     </div>
   );
 }

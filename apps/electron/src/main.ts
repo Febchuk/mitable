@@ -9,12 +9,15 @@ import {
   BrowserWindow,
   globalShortcut,
   ipcMain,
+  Menu,
   nativeTheme,
+  nativeImage,
   Notification,
   powerMonitor,
   screen,
   shell,
   systemPreferences,
+  Tray,
 } from "electron";
 import { dirname, join } from "path";
 import electronLogMain from "electron-log/main";
@@ -63,6 +66,10 @@ let watchingPillWindow: BrowserWindow | null = null;
 let watchingPillEyeDropdown: BrowserWindow | null = null;
 let watchingPillMenuDropdown: BrowserWindow | null = null;
 let notificationWindow: BrowserWindow | null = null;
+
+// System tray (Windows-first "keep alive on close" behavior)
+let tray: Tray | null = null;
+let isExplicitQuit = false;
 
 // Notification timer for periodic prompts
 let notificationTimer: NodeJS.Timeout | null = null;
@@ -301,8 +308,26 @@ function createConsoleWindow() {
     consoleWindow.loadFile(join(__dirname, "../renderer/console/index.html"));
   }
 
+  // Slack-style: closing the window hides it (keeps app running).
+  // On macOS, users can Cmd+Q to quit; on Windows, tray "Quit" exits fully.
+  consoleWindow.on("close", (event) => {
+    if (isExplicitQuit) return;
+
+    // Windows: hide-to-tray. macOS: close-to-hide (reopen via dock/activate).
+    // Linux: keep default close behavior (no tray UX here yet).
+    if (process.platform !== "win32" && process.platform !== "darwin") return;
+
+    event.preventDefault();
+    try {
+      consoleWindow?.hide();
+      if (process.platform === "win32") consoleWindow?.setSkipTaskbar(true);
+    } catch {
+      /* ignore */
+    }
+  });
+
   consoleWindow.on("closed", () => {
-    app.quit(); // Quit app when main console window is closed
+    consoleWindow = null;
   });
 
   // macOS: ensure traffic light buttons stay visible after fullscreen transitions
@@ -314,6 +339,69 @@ function createConsoleWindow() {
       consoleWindow?.setWindowButtonVisibility(true);
     });
   }
+}
+
+function buildTrayIcon(): Electron.NativeImage {
+  const candidates = app.isPackaged
+    ? [
+        join(process.resourcesPath, "resources", "tray-icon.png"),
+        join(process.resourcesPath, "tray-icon.png"),
+      ]
+    : [join(app.getAppPath(), "resources", "tray-icon.png")];
+
+  for (const p of candidates) {
+    const img = nativeImage.createFromPath(p);
+    if (!img.isEmpty()) return img.resize({ width: 16, height: 16 });
+  }
+
+  consoleLogger.warn("Tray icon not found, tried:", candidates);
+  return nativeImage.createEmpty();
+}
+
+function showConsoleWindow(): void {
+  if (!consoleWindow || consoleWindow.isDestroyed()) {
+    createConsoleWindow();
+    return;
+  }
+  if (consoleWindow.isMinimized()) consoleWindow.restore();
+  // If we hid it to tray on Windows, bring it back to taskbar too
+  if (process.platform === "win32") consoleWindow.setSkipTaskbar(false);
+  consoleWindow.show();
+  consoleWindow.focus();
+}
+
+function createTrayIfSupported(): void {
+  // Windows tray is the primary UX target for "close → keep alive".
+  if (process.platform !== "win32") return;
+  if (tray) return;
+
+  const icon = buildTrayIcon();
+  tray = new Tray(icon);
+  tray.setToolTip("Mitable");
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: "Open Mitable",
+      click: () => showConsoleWindow(),
+    },
+    { type: "separator" },
+    {
+      label: "Quit",
+      click: () => {
+        isExplicitQuit = true;
+        try {
+          // Ensure the main window actually closes (releasing resources)
+          consoleWindow?.close();
+        } catch {
+          /* ignore */
+        }
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+  tray.on("click", () => showConsoleWindow());
 }
 
 function createWatchingPillWindow() {
@@ -2537,17 +2625,6 @@ function setupUpdateHandlers() {
     return { success: true };
   });
 
-  ipcMain.handle("download-update", async () => {
-    updateLogger.info(" Download update requested");
-    try {
-      await updateService.downloadUpdate();
-      return { success: true };
-    } catch (error) {
-      updateLogger.error(" Download failed:", error);
-      return { success: false, error: String(error) };
-    }
-  });
-
   ipcMain.handle("install-update", () => {
     updateLogger.info(" Install update requested");
     updateService.quitAndInstall();
@@ -2949,6 +3026,8 @@ app.whenReady().then(async () => {
   createConsoleWindow();
   // WatchingPill is created on-demand when session starts
 
+  createTrayIfSupported();
+
   setupIPC();
   registerGlobalShortcuts();
 
@@ -3146,10 +3225,7 @@ app.whenReady().then(async () => {
     });
   });
 
-  // Wire update service → notification service (OS notifications on update events)
-  updateService.setOnUpdateAvailable((version) =>
-    notificationService.notifyUpdateAvailable(version)
-  );
+  // OS notification only when update is downloaded and ready to install
   updateService.setOnUpdateDownloaded((version) =>
     notificationService.notifyUpdateDownloaded(version)
   );
@@ -3278,9 +3354,13 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
+  // If user explicitly quits (tray "Quit"), allow shutdown.
+  // Otherwise, keep running so the app can be reopened quickly.
+  if (process.platform === "linux") {
     app.quit();
+    return;
   }
+  if (isExplicitQuit) app.quit();
 });
 
 // macOS: Re-create or focus window when clicking dock icon

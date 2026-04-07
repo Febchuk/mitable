@@ -2,19 +2,9 @@ import { useUpdate } from "../../context/UpdateContext";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function UpdateBanner() {
-  const {
-    updateState,
-    updateInfo,
-    downloadProgress,
-    isBannerDismissed,
-    dismissBanner,
-    downloadUpdate,
-    installUpdate,
-  } = useUpdate();
+  const { updateState, updateInfo, isBannerDismissed, dismissBanner, installUpdate } = useUpdate();
 
-  const isVisible =
-    !isBannerDismissed &&
-    (updateState === "available" || updateState === "downloading" || updateState === "downloaded");
+  const isVisible = !isBannerDismissed && updateState === "downloaded";
 
   return (
     <AnimatePresence>
@@ -29,46 +19,20 @@ export default function UpdateBanner() {
           <div className="flex items-center justify-between px-4 py-2 bg-indigo/10 border-b border-indigo/20 text-sm">
             <div className="flex items-center gap-2 min-w-0">
               <span className="shrink-0 text-indigo">
-                {updateState === "downloaded" ? (
-                  <CheckCircleIcon />
-                ) : updateState === "downloading" ? (
-                  <SpinnerIcon />
-                ) : (
-                  <ArrowDownIcon />
-                )}
+                <CheckCircleIcon />
               </span>
-
               <span className="text-text-primary truncate">
-                {updateState === "downloaded" && (
-                  <>v{updateInfo?.version} ready &mdash; restart to apply</>
-                )}
-                {updateState === "downloading" && (
-                  <>
-                    Downloading v{updateInfo?.version}
-                    {downloadProgress ? ` (${Math.round(downloadProgress.percent)}%)` : "..."}
-                  </>
-                )}
-                {updateState === "available" && <>v{updateInfo?.version} available</>}
+                v{updateInfo?.version} ready &mdash; restart to apply
               </span>
             </div>
 
             <div className="flex items-center gap-2 shrink-0 ml-3">
-              {updateState === "available" && (
-                <button
-                  onClick={downloadUpdate}
-                  className="px-3 py-1 rounded-md text-xs font-medium bg-indigo text-white hover:bg-indigo/90 transition-colors"
-                >
-                  Download
-                </button>
-              )}
-              {updateState === "downloaded" && (
-                <button
-                  onClick={installUpdate}
-                  className="px-3 py-1 rounded-md text-xs font-medium bg-indigo text-white hover:bg-indigo/90 transition-colors"
-                >
-                  Restart
-                </button>
-              )}
+              <button
+                onClick={installUpdate}
+                className="px-3 py-1 rounded-md text-xs font-medium bg-indigo text-white hover:bg-indigo/90 transition-colors"
+              >
+                Install &amp; Restart
+              </button>
               <button
                 onClick={dismissBanner}
                 className="p-1 rounded hover:bg-white/10 transition-colors text-text-secondary hover:text-text-primary"
@@ -81,41 +45,6 @@ export default function UpdateBanner() {
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-function ArrowDownIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 5v14M5 12l7 7 7-7" />
-    </svg>
-  );
-}
-
-function SpinnerIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="animate-spin"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }
 

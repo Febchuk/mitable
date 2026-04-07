@@ -345,10 +345,7 @@ export default function DashboardView() {
     // Sum the per-user-average work+meeting from each day in the trend —
     // this matches exactly what the chart bars display.
     const trend = apiData.dailyTrend || [];
-    return trend.reduce(
-      (sum, d) => sum + (d.avgWorkMinutes ?? 0) + (d.avgMeetingMinutes ?? 0),
-      0
-    );
+    return trend.reduce((sum, d) => sum + (d.avgWorkMinutes ?? 0) + (d.avgMeetingMinutes ?? 0), 0);
   }, [apiData]);
 
   const activeTimeDisplay = useMemo(() => formatTopLevelDuration(totalMinutes), [totalMinutes]);

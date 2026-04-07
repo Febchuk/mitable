@@ -26,7 +26,6 @@ import {
   RefreshCw,
   ExternalLink,
   Info,
-  Download,
   FileText,
   List,
   Sparkles,
@@ -78,15 +77,10 @@ export default function SettingsView() {
   const [appVersion, setAppVersion] = useState<string>("");
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<
-    "idle" | "checking" | "up-to-date" | "available" | "downloading" | "downloaded" | "error"
+    "idle" | "checking" | "up-to-date" | "downloaded" | "error"
   >("idle");
   const [updateError, setUpdateError] = useState<string | null>(null);
-  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState<{
-    percent: number;
-    transferred: number;
-    total: number;
-  } | null>(null);
+  const [downloadedVersion, setDownloadedVersion] = useState<string | null>(null);
 
   // Preferences
   const {
@@ -114,20 +108,12 @@ export default function SettingsView() {
     loadAppVersion();
   }, []);
 
-  // Listen for update events
+  // Listen for update events (download happens silently in background)
   useEffect(() => {
-    const unsubscribeAvailable = window.consoleAPI?.onUpdateAvailable((info) => {
-      logger.info("Update available:", info.version);
-      setIsCheckingForUpdates(false);
-      setUpdateStatus("available");
-      setAvailableVersion(info.version);
-    });
-
     const unsubscribeNotAvailable = window.consoleAPI?.onUpdateNotAvailable(() => {
       logger.info("No update available - app is up to date");
       setIsCheckingForUpdates(false);
       setUpdateStatus("up-to-date");
-      // Reset to idle after 5 seconds
       setTimeout(() => setUpdateStatus("idle"), 5000);
     });
 
@@ -136,29 +122,18 @@ export default function SettingsView() {
       setIsCheckingForUpdates(false);
       setUpdateStatus("error");
       setUpdateError(error.message);
-      setDownloadProgress(null);
     });
 
-    const unsubscribeProgress = window.consoleAPI?.onUpdateDownloadProgress((progress) => {
-      logger.info("Download progress:", progress.percent.toFixed(1) + "%");
-      setDownloadProgress({
-        percent: progress.percent,
-        transferred: progress.transferred,
-        total: progress.total,
-      });
-    });
-
-    const unsubscribeDownloaded = window.consoleAPI?.onUpdateDownloaded(() => {
-      logger.info("Update downloaded, ready to install");
+    const unsubscribeDownloaded = window.consoleAPI?.onUpdateDownloaded((info) => {
+      logger.info("Update downloaded, ready to install:", info.version);
+      setIsCheckingForUpdates(false);
       setUpdateStatus("downloaded");
-      setDownloadProgress(null);
+      setDownloadedVersion(info.version);
     });
 
     return () => {
-      unsubscribeAvailable?.();
       unsubscribeNotAvailable?.();
       unsubscribeError?.();
-      unsubscribeProgress?.();
       unsubscribeDownloaded?.();
     };
   }, []);
@@ -255,21 +230,6 @@ export default function SettingsView() {
       setIsCheckingForUpdates(false);
       setUpdateStatus("error");
       setUpdateError("Failed to check for updates");
-    }
-  };
-
-  const handleDownloadUpdate = async () => {
-    setUpdateStatus("downloading");
-    setUpdateError(null);
-    setDownloadProgress({ percent: 0, transferred: 0, total: 0 });
-    try {
-      await window.consoleAPI?.downloadUpdate();
-      // Progress updates come through event listeners
-    } catch (error) {
-      logger.error("Error downloading update:", error);
-      setUpdateStatus("error");
-      setUpdateError("Failed to download update");
-      setDownloadProgress(null);
     }
   };
 
@@ -1200,14 +1160,8 @@ export default function SettingsView() {
 
             {/* Update Button - changes based on state */}
             <Button
-              onClick={
-                updateStatus === "available"
-                  ? handleDownloadUpdate
-                  : updateStatus === "downloaded"
-                    ? handleInstallUpdate
-                    : handleCheckForUpdates
-              }
-              disabled={isCheckingForUpdates || updateStatus === "downloading"}
+              onClick={updateStatus === "downloaded" ? handleInstallUpdate : handleCheckForUpdates}
+              disabled={isCheckingForUpdates}
               variant={updateStatus === "downloaded" ? "default" : "outline"}
               className={
                 updateStatus === "downloaded"
@@ -1225,20 +1179,10 @@ export default function SettingsView() {
                   <Check className="w-4 h-4 text-status-success" />
                   Up to date
                 </>
-              ) : updateStatus === "available" ? (
-                <>
-                  <Download className="w-4 h-4" />
-                  Download v{availableVersion}
-                </>
-              ) : updateStatus === "downloading" ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Downloading...
-                </>
               ) : updateStatus === "downloaded" ? (
                 <>
                   <RefreshCw className="w-4 h-4" />
-                  Install & Restart
+                  Install v{downloadedVersion} &amp; Restart
                 </>
               ) : (
                 <>
@@ -1248,23 +1192,6 @@ export default function SettingsView() {
               )}
             </Button>
           </div>
-
-          {/* Download Progress Bar */}
-          {updateStatus === "downloading" && downloadProgress && (
-            <div className="mt-4 space-y-2">
-              <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300 ease-out"
-                  style={{ width: `${downloadProgress.percent}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {downloadProgress.percent.toFixed(0)}% —{" "}
-                {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
-                {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
-              </p>
-            </div>
-          )}
 
           {/* Error State */}
           {updateStatus === "error" && updateError && (
