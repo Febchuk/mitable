@@ -17,7 +17,8 @@ export default function BenchmarksView() {
   // Delete confirmation state
   const [deletingBenchmark, setDeletingBenchmark] = useState<Benchmark | null>(null);
 
-  const hasUnassigned = useMemo(() => benchmarks.some((b) => b.assignedCount === 0), [benchmarks]);
+  // Show "Unassigned" tab if currently selected OR if benchmarks data has unassigned ones
+  const hasUnassigned = showUnassigned || benchmarks.some((b) => b.assignedCount === 0);
 
   const filtered = useMemo(() => {
     if (showUnassigned) return benchmarks.filter((b) => b.assignedCount === 0);
@@ -90,8 +91,7 @@ export default function BenchmarksView() {
         >
           Benchmarks
         </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <DataScopeFilter onScopeChange={() => setShowUnassigned(false)} dimmed={showUnassigned} />
+        <DataScopeFilter onScopeChange={() => setShowUnassigned(false)} dimmed={showUnassigned}>
           {hasUnassigned && (
             <button
               onClick={() => setShowUnassigned(!showUnassigned)}
@@ -111,7 +111,7 @@ export default function BenchmarksView() {
               Unassigned
             </button>
           )}
-        </div>
+        </DataScopeFilter>
 
         {/* Frequency filters — hidden for now
         <div

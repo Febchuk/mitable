@@ -10,9 +10,14 @@ const SCOPE_LABELS: Record<DataScope, string> = {
 interface DataScopeFilterProps {
   onScopeChange?: () => void;
   dimmed?: boolean;
+  children?: React.ReactNode;
 }
 
-export default function DataScopeFilter({ onScopeChange, dimmed }: DataScopeFilterProps = {}) {
+export default function DataScopeFilter({
+  onScopeChange,
+  dimmed,
+  children,
+}: DataScopeFilterProps = {}) {
   const { viewMode, dataScope, availableDataScopes, setDataScope } = useUser();
 
   // Only show in Team view with more than one option
@@ -54,6 +59,7 @@ export default function DataScopeFilter({ onScopeChange, dimmed }: DataScopeFilt
           </button>
         );
       })}
+      {children}
     </div>
   );
 }
