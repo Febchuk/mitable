@@ -19,6 +19,11 @@ const DEDUPE_WINDOW_MS = 4 * 60 * 60 * 1000;
 
 type NotificationCategory = "update" | "session" | "nudge" | "recap" | "general";
 
+interface NotificationAction {
+  type: "button";
+  text: string;
+}
+
 interface NotificationOptions {
   title: string;
   body: string;
@@ -27,8 +32,12 @@ interface NotificationOptions {
   dedupeKey?: string;
   /** Category for preference check */
   category?: NotificationCategory;
-  /** Action ID passed to the click handler */
+  /** Action ID passed to the click handler when the notification body is clicked */
   clickAction?: string;
+  /** macOS action buttons shown on the notification (requires signed app + alert style) */
+  actions?: NotificationAction[];
+  /** Action ID passed to the click handler when an action button is clicked */
+  actionClickAction?: string;
 }
 
 type ClickHandler = (actionId: string) => void;
@@ -86,16 +95,37 @@ class NotificationService {
       title: options.title,
       body: options.body,
       silent: options.silent ?? false,
+      actions: options.actions,
     });
 
-    if (options.clickAction && this.clickHandler) {
+    if (this.clickHandler) {
       const handler = this.clickHandler;
-      const action = options.clickAction;
-      notification.on("click", () => handler(action));
+
+      if (options.clickAction) {
+        const clickAction = options.clickAction;
+        notification.on("click", () => handler(clickAction));
+      }
+
+      if (options.actionClickAction) {
+        const actionClickAction = options.actionClickAction;
+        notification.on("action", () => handler(actionClickAction));
+      }
     }
 
+    notification.on("show", () => {
+      logger.info("Notification displayed by OS:", options.title);
+    });
+
+    notification.on("failed", (_, error) => {
+      logger.error("Notification failed:", options.title, error);
+    });
+
+    notification.on("close", () => {
+      logger.info("Notification closed:", options.title);
+    });
+
     notification.show();
-    logger.info("Notification shown:", options.title);
+    logger.info("Notification.show() called:", options.title);
   }
 
   // --- Convenience methods ---

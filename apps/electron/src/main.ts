@@ -12,7 +12,6 @@ import {
   Menu,
   nativeTheme,
   nativeImage,
-  Notification,
   powerMonitor,
   screen,
   shell,
@@ -701,8 +700,53 @@ function handleNotificationAction(actionId: string) {
         consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
       }
       break;
+    case "start-session": {
+      // Optimistic: show pill immediately so the user gets instant feedback
+      const shouldShowPill = preferencesService.getShowPillOnSessionStart();
+      if (shouldShowPill) {
+        if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
+          createWatchingPillWindow();
+        }
+        if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+          showPillReliably(watchingPillWindow);
+          startPillCursorTracking();
+          watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_SESSION_UPDATE, {
+            id: "pending",
+            status: "active",
+            selectedWindows: [],
+            captureIntervalMs: 0,
+            startedAt: Date.now(),
+            totalPausedMs: 0,
+            captureCount: 0,
+            elapsedMs: 0,
+          } satisfies import("@mitable/shared").MonitoringSessionState);
+        }
+      }
+
+      startSessionFromMain("focused").then((result) => {
+        if (result.success) {
+          notificationService.notifySessionStarted("focused");
+        } else {
+          // Roll back: hide pill, show console with error
+          if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
+            stopPillCursorTracking();
+            watchingPillWindow.hide();
+          }
+          if (consoleWindow && !consoleWindow.isDestroyed()) {
+            consoleWindow.show();
+            consoleWindow.focus();
+          }
+          notificationService.show({
+            title: "Session failed to start",
+            body: result.error || "Something went wrong. Try again from the app.",
+            category: "session",
+            clickAction: "focus",
+          });
+        }
+      });
+      break;
+    }
     case "dismiss":
-      // No-op — notification already dismissed
       break;
     default:
       notificationLogger.warn("Unknown notification action:", actionId);
@@ -758,9 +802,11 @@ function startNotificationReminder(userId: string) {
 
     notificationService.show({
       title: "Ready to track?",
-      body: "You don't have an active session. Open Mitable to start tracking.",
+      body: "You don't have an active session.",
       category: "session",
       clickAction: "focus",
+      actions: [{ type: "button", text: "Start Session" }],
+      actionClickAction: "start-session",
     });
   }, minutes * 60 * 1000);
 }
