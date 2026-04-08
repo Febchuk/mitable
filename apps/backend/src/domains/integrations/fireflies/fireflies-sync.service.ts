@@ -406,7 +406,9 @@ Respond ONLY with JSON:
   ): Promise<{ created: boolean; dailyActivityId: string }> {
     const startTime = transcript.date ? new Date(transcript.date) : new Date();
     const durationSeconds = transcript.duration || 0;
-    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
+    // Use real duration when available, otherwise 0 — the materializer excludes
+    // fireflies blocks from totals so fabricating a duration would only inflate numbers.
+    const durationMinutes = durationSeconds > 0 ? Math.round(durationSeconds / 60) : 0;
     const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
 
     // Build participants from all available sources:

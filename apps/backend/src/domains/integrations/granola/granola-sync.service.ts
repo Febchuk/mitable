@@ -540,15 +540,16 @@ Respond ONLY with JSON:
     const startTime = meeting.start_time
       ? new Date(meeting.start_time)
       : new Date(meeting.created_at || Date.now());
-    const DEFAULT_MEETING_MINUTES = 60;
     let endTime: Date;
     let durationMinutes: number;
     if (meeting.end_time) {
       endTime = new Date(meeting.end_time);
       durationMinutes = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000));
     } else {
-      durationMinutes = DEFAULT_MEETING_MINUTES;
-      endTime = new Date(startTime.getTime() + DEFAULT_MEETING_MINUTES * 60000);
+      // No end_time available from Granola MCP — store 0 rather than fabricating
+      // a duration. The materializer already excludes granola blocks from totals.
+      durationMinutes = 0;
+      endTime = new Date(startTime.getTime() + 60 * 60000);
     }
 
     const attendees = (meeting.attendees || []).map((a) => ({
