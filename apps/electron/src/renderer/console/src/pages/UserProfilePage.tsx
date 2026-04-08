@@ -20,7 +20,6 @@ import {
   Unlink,
   RefreshCw,
   ExternalLink,
-  Download,
   Settings,
   Plus,
   Search,
@@ -196,15 +195,10 @@ export default function UserProfilePage() {
   const [appVersion, setAppVersion] = useState<string>("");
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<
-    "idle" | "checking" | "up-to-date" | "available" | "downloading" | "downloaded" | "error"
+    "idle" | "checking" | "up-to-date" | "downloaded" | "error"
   >("idle");
   const [updateError, setUpdateError] = useState<string | null>(null);
-  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState<{
-    percent: number;
-    transferred: number;
-    total: number;
-  } | null>(null);
+  const [downloadedVersion, setDownloadedVersion] = useState<string | null>(null);
 
   // Preferences hook
   const {
@@ -869,15 +863,8 @@ export default function UserProfilePage() {
     loadAudioPreferences,
   ]);
 
-  // Listen for update events
+  // Listen for update events (download happens silently in background)
   useEffect(() => {
-    const unsubscribeAvailable = window.consoleAPI?.onUpdateAvailable((info) => {
-      logger.info("Update available:", info.version);
-      setIsCheckingForUpdates(false);
-      setUpdateStatus("available");
-      setAvailableVersion(info.version);
-    });
-
     const unsubscribeNotAvailable = window.consoleAPI?.onUpdateNotAvailable(() => {
       logger.info("No update available - app is up to date");
       setIsCheckingForUpdates(false);
@@ -890,29 +877,18 @@ export default function UserProfilePage() {
       setIsCheckingForUpdates(false);
       setUpdateStatus("error");
       setUpdateError(error.message);
-      setDownloadProgress(null);
     });
 
-    const unsubscribeProgress = window.consoleAPI?.onUpdateDownloadProgress((progress) => {
-      logger.info("Download progress:", progress.percent.toFixed(1) + "%");
-      setDownloadProgress({
-        percent: progress.percent,
-        transferred: progress.transferred,
-        total: progress.total,
-      });
-    });
-
-    const unsubscribeDownloaded = window.consoleAPI?.onUpdateDownloaded(() => {
-      logger.info("Update downloaded, ready to install");
+    const unsubscribeDownloaded = window.consoleAPI?.onUpdateDownloaded((info) => {
+      logger.info("Update downloaded, ready to install:", info.version);
+      setIsCheckingForUpdates(false);
       setUpdateStatus("downloaded");
-      setDownloadProgress(null);
+      setDownloadedVersion(info.version);
     });
 
     return () => {
-      unsubscribeAvailable?.();
       unsubscribeNotAvailable?.();
       unsubscribeError?.();
-      unsubscribeProgress?.();
       unsubscribeDownloaded?.();
     };
   }, []);
@@ -1002,20 +978,6 @@ export default function UserProfilePage() {
       setIsCheckingForUpdates(false);
       setUpdateStatus("error");
       setUpdateError("Failed to check for updates");
-    }
-  };
-
-  const handleDownloadUpdate = async () => {
-    setUpdateStatus("downloading");
-    setUpdateError(null);
-    setDownloadProgress({ percent: 0, transferred: 0, total: 0 });
-    try {
-      await window.consoleAPI?.downloadUpdate();
-    } catch (error) {
-      logger.error("Error downloading update:", error);
-      setUpdateStatus("error");
-      setUpdateError("Failed to download update");
-      setDownloadProgress(null);
     }
   };
 
@@ -3774,13 +3736,9 @@ export default function UserProfilePage() {
                   <button
                     type="button"
                     onClick={
-                      updateStatus === "available"
-                        ? handleDownloadUpdate
-                        : updateStatus === "downloaded"
-                          ? handleInstallUpdate
-                          : handleCheckForUpdates
+                      updateStatus === "downloaded" ? handleInstallUpdate : handleCheckForUpdates
                     }
-                    disabled={isCheckingForUpdates || updateStatus === "downloading"}
+                    disabled={isCheckingForUpdates}
                     style={{
                       padding: "6px 14px",
                       borderRadius: 6,
@@ -3789,11 +3747,8 @@ export default function UserProfilePage() {
                       color: "var(--text-primary)",
                       background: "rgba(var(--ui-rgb), 0.06)",
                       border: "var(--border-subtle)",
-                      cursor:
-                        isCheckingForUpdates || updateStatus === "downloading"
-                          ? "not-allowed"
-                          : "pointer",
-                      opacity: isCheckingForUpdates || updateStatus === "downloading" ? 0.6 : 1,
+                      cursor: isCheckingForUpdates ? "not-allowed" : "pointer",
+                      opacity: isCheckingForUpdates ? 0.6 : 1,
                       transition: "background 0.15s ease",
                       display: "flex",
                       alignItems: "center",
@@ -3801,7 +3756,7 @@ export default function UserProfilePage() {
                       flexShrink: 0,
                     }}
                     onMouseEnter={(e) => {
-                      if (!isCheckingForUpdates && updateStatus !== "downloading") {
+                      if (!isCheckingForUpdates) {
                         e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.1)";
                       }
                     }}
@@ -3816,74 +3771,34 @@ export default function UserProfilePage() {
                       </>
                     ) : updateStatus === "up-to-date" ? (
                       "Up to date"
-                    ) : updateStatus === "available" ? (
-                      <>
-                        <Download size={12} strokeWidth={2} />
-                        Download v{availableVersion}
-                      </>
-                    ) : updateStatus === "downloading" ? (
-                      <>
-                        <Loader2 size={12} className="animate-spin" />
-                        Downloading…
-                      </>
                     ) : updateStatus === "downloaded" ? (
                       <>
                         <RefreshCw size={12} strokeWidth={2} />
-                        Install and restart
+                        Install v{downloadedVersion} &amp; restart
                       </>
                     ) : (
                       <>
                         <RefreshCw size={12} strokeWidth={2} />
-                        Search for new updates
+                        Check for updates
                       </>
                     )}
                   </button>
                 </div>
 
-                {(updateStatus === "downloading" && downloadProgress) ||
-                (updateStatus === "error" && updateError) ? (
+                {updateStatus === "error" && updateError ? (
                   <>
                     <div style={{ height: 0.5, background: "var(--divider)" }} />
                     <div style={{ padding: "14px 0" }}>
-                      {updateStatus === "downloading" && downloadProgress && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <div
-                            style={{
-                              height: 3,
-                              borderRadius: 2,
-                              overflow: "hidden",
-                              background: "rgba(var(--ui-rgb), 0.06)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                height: "100%",
-                                borderRadius: 2,
-                                width: `${downloadProgress.percent}%`,
-                                background: "rgba(var(--ui-rgb), 0.2)",
-                                transition: "width 0.3s ease-out",
-                              }}
-                            />
-                          </div>
-                          <p style={{ margin: 0, fontSize: 11, color: "var(--text-tertiary)" }}>
-                            {downloadProgress.percent.toFixed(0)}% —{" "}
-                            {(downloadProgress.transferred / 1024 / 1024).toFixed(1)} MB /{" "}
-                            {(downloadProgress.total / 1024 / 1024).toFixed(1)} MB
-                          </p>
-                        </div>
-                      )}
-                      {updateStatus === "error" && updateError && (
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: 12,
-                            color: "var(--status-error)",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {updateError}
-                        </p>
-                      )}
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: "var(--status-error)",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {updateError}
+                      </p>
                     </div>
                   </>
                 ) : null}

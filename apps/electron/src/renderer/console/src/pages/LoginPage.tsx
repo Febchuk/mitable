@@ -5,6 +5,7 @@ import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
 import AuthLogo from "../components/ui/AuthLogo";
+import HelpFeedbackButton from "../components/ui/HelpFeedbackButton";
 
 const inputClassName =
   "flex h-10 w-full rounded-md px-3 py-2 text-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 outline-none";
@@ -210,6 +211,8 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <HelpFeedbackButton anonymousSource="login" />
     </div>
   );
 }

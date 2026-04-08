@@ -5,6 +5,7 @@ import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
 import AuthLogo from "../components/ui/AuthLogo";
+import HelpFeedbackButton from "../components/ui/HelpFeedbackButton";
 import type { AccountType } from "@mitable/shared";
 
 const inputClassName =
@@ -368,6 +369,8 @@ export default function SignupOrganizationPage() {
           </div>
         </div>
       </div>
+
+      <HelpFeedbackButton anonymousSource="register" />
     </div>
   );
 }

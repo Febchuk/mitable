@@ -5,10 +5,7 @@ import log from "electron-log";
 class UpdateService {
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private isCheckingForUpdates = false;
-  private maxRetries = 3;
-  private currentRetry = 0;
   private usingGitHubFallback = false;
-  private onUpdateAvailableCb: ((version: string) => void) | null = null;
   private onUpdateDownloadedCb: ((version: string) => void) | null = null;
 
   constructor() {
@@ -16,11 +13,11 @@ class UpdateService {
     autoUpdater.logger = log;
     log.transports.file.level = "info";
 
-    // Disable auto-download - we want user to click first
-    autoUpdater.autoDownload = false;
+    // Download silently in background; banner appears only when ready to install
+    autoUpdater.autoDownload = true;
 
-    // Disable auto-install on app quit
-    autoUpdater.autoInstallOnAppQuit = false;
+    // Install staged update when user quits the app
+    autoUpdater.autoInstallOnAppQuit = true;
 
     // Set request headers for better cache handling
     autoUpdater.requestHeaders = {
@@ -40,14 +37,8 @@ class UpdateService {
     });
 
     autoUpdater.on("update-available", (info) => {
-      log.info("[UpdateService] Update available:", info.version);
+      log.info("[UpdateService] Update available:", info.version, "— downloading silently...");
       this.isCheckingForUpdates = false;
-      this.notifyRenderers("update-available", {
-        version: info.version,
-        releaseNotes: info.releaseNotes,
-        releaseDate: info.releaseDate,
-      });
-      this.onUpdateAvailableCb?.(info.version);
     });
 
     autoUpdater.on("update-not-available", (info) => {
@@ -87,11 +78,6 @@ class UpdateService {
       log.info(
         `[UpdateService] Download progress: ${progressObj.percent.toFixed(2)}% (${progressObj.transferred}/${progressObj.total})`
       );
-      this.notifyRenderers("update-download-progress", {
-        percent: progressObj.percent,
-        transferred: progressObj.transferred,
-        total: progressObj.total,
-      });
     });
 
     autoUpdater.on("update-downloaded", (info) => {
@@ -202,50 +188,6 @@ class UpdateService {
       this.updateCheckInterval = null;
       log.info("[UpdateService] Stopped periodic update checks");
     }
-  }
-
-  /**
-   * Download the available update with retry logic for slow connections
-   */
-  async downloadUpdate(): Promise<void> {
-    this.currentRetry = 0;
-    await this.attemptDownload();
-  }
-
-  /**
-   * Attempt to download update with exponential backoff retry
-   */
-  private async attemptDownload(): Promise<void> {
-    try {
-      log.info(`[UpdateService] Download attempt ${this.currentRetry + 1}/${this.maxRetries}...`);
-      await autoUpdater.downloadUpdate();
-    } catch (error) {
-      this.currentRetry++;
-      if (this.currentRetry < this.maxRetries) {
-        const delay = Math.pow(2, this.currentRetry) * 1000; // Exponential backoff: 2s, 4s, 8s
-        log.warn(`[UpdateService] Download failed, retrying in ${delay / 1000}s...`, error);
-
-        // Notify renderers about retry
-        this.notifyRenderers("update-download-retry", {
-          attempt: this.currentRetry + 1,
-          maxRetries: this.maxRetries,
-          delaySeconds: delay / 1000,
-        });
-
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        await this.attemptDownload();
-      } else {
-        log.error("[UpdateService] All download attempts failed after", this.maxRetries, "retries");
-        throw error;
-      }
-    }
-  }
-
-  /**
-   * Register a callback fired when an update is available.
-   */
-  setOnUpdateAvailable(cb: (version: string) => void): void {
-    this.onUpdateAvailableCb = cb;
   }
 
   /**

@@ -12,18 +12,18 @@
 
 .mitable-calendar {
   /* CSS custom properties for the calendar */
-  --cal-bg-base: #0C0C0E;
+  --cal-bg-base: #0c0c0e;
   --cal-bg-raised: #141418;
-  --cal-bg-overlay: #1C1C22;
-  --cal-bg-muted: #24242C;
+  --cal-bg-overlay: #1c1c22;
+  --cal-bg-muted: #24242c;
   --cal-stroke-subtle: rgba(255, 255, 255, 0.06);
   --cal-stroke-default: rgba(255, 255, 255, 0.12);
-  --cal-ink-primary: #F4F4F5;
-  --cal-ink-secondary: #A1A1AA;
-  --cal-ink-tertiary: #52525B;
+  --cal-ink-primary: #f4f4f5;
+  --cal-ink-secondary: #a1a1aa;
+  --cal-ink-tertiary: #52525b;
   --cal-indigo: var(--mi-accent);
   --cal-indigo-light: var(--mi-accent-light);
-  --cal-emerald: #34D399;
+  --cal-emerald: #34d399;
 }
 
 /* Calendar container */
@@ -123,10 +123,10 @@
 }
 .mitable-calendar .text-utility-gray-600,
 .mitable-calendar .text-utility-gray-700 {
-  color: #A1A1AA !important;
+  color: #a1a1aa !important;
 }
 .mitable-calendar .bg-utility-gray-500 {
-  background-color: #71717A !important;
+  background-color: #71717a !important;
 }
 
 /* Brand/Indigo events */
@@ -146,11 +146,11 @@
 .mitable-calendar .text-utility-brand-700,
 .mitable-calendar .text-utility-indigo-600,
 .mitable-calendar .text-utility-indigo-700 {
-  color: #818CF8 !important;
+  color: #818cf8 !important;
 }
 .mitable-calendar .bg-utility-brand-500,
 .mitable-calendar .bg-utility-indigo-500 {
-  background-color: #6366F1 !important;
+  background-color: #6366f1 !important;
 }
 
 /* Green/Success events */
@@ -165,10 +165,10 @@
 }
 .mitable-calendar .text-utility-green-600,
 .mitable-calendar .text-utility-green-700 {
-  color: #34D399 !important;
+  color: #34d399 !important;
 }
 .mitable-calendar .bg-utility-green-500 {
-  background-color: #34D399 !important;
+  background-color: #34d399 !important;
 }
 
 /* Blue events */
@@ -183,10 +183,10 @@
 }
 .mitable-calendar .text-utility-blue-600,
 .mitable-calendar .text-utility-blue-700 {
-  color: #60A5FA !important;
+  color: #60a5fa !important;
 }
 .mitable-calendar .bg-utility-blue-500 {
-  background-color: #3B82F6 !important;
+  background-color: #3b82f6 !important;
 }
 
 /* Purple events */
@@ -201,10 +201,10 @@
 }
 .mitable-calendar .text-utility-purple-600,
 .mitable-calendar .text-utility-purple-700 {
-  color: #C084FC !important;
+  color: #c084fc !important;
 }
 .mitable-calendar .bg-utility-purple-500 {
-  background-color: #A855F7 !important;
+  background-color: #a855f7 !important;
 }
 
 /* Pink events */
@@ -219,10 +219,10 @@
 }
 .mitable-calendar .text-utility-pink-600,
 .mitable-calendar .text-utility-pink-700 {
-  color: #F472B6 !important;
+  color: #f472b6 !important;
 }
 .mitable-calendar .bg-utility-pink-500 {
-  background-color: #EC4899 !important;
+  background-color: #ec4899 !important;
 }
 
 /* Orange events */
@@ -237,10 +237,10 @@
 }
 .mitable-calendar .text-utility-orange-600,
 .mitable-calendar .text-utility-orange-700 {
-  color: #FB923C !important;
+  color: #fb923c !important;
 }
 .mitable-calendar .bg-utility-orange-500 {
-  background-color: #F97316 !important;
+  background-color: #f97316 !important;
 }
 
 /* Yellow events */
@@ -255,10 +255,10 @@
 }
 .mitable-calendar .text-utility-yellow-600,
 .mitable-calendar .text-utility-yellow-700 {
-  color: #FDE047 !important;
+  color: #fde047 !important;
 }
 .mitable-calendar .bg-utility-yellow-500 {
-  background-color: #FACC15 !important;
+  background-color: #facc15 !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -271,7 +271,7 @@
 }
 
 .mitable-calendar button[class*="bg-primary"]:hover {
-  background-color: #4F46E5 !important;
+  background-color: #4f46e5 !important;
 }
 
 .mitable-calendar button[class*="color-tertiary"],

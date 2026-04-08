@@ -1,4 +1,4 @@
-import { Settings, LogOut, Building2, MessageSquare } from "lucide-react";
+import { Settings, LogOut, Building2, CircleHelp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
@@ -145,7 +145,7 @@ export default function Sidebar() {
             e.currentTarget.style.color = "var(--text-secondary)";
           }}
         >
-          <MessageSquare size={15} strokeWidth={1.5} />
+          <CircleHelp size={16} strokeWidth={1.6} />
           <span>Send Feedback</span>
         </button>
 

@@ -1,12 +1,15 @@
 import { Router, Request, Response } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { Resend } from "resend";
-import { requireAuth } from "../middleware/auth.js";
+import { optionalAuth, requireAuth } from "../middleware/auth.js";
 import { feedbackLimiter } from "../middleware/rateLimiter.js";
 import { config } from "../config.js";
 import { createLogger } from "../lib/logger.js";
 import { sanitizeFeedbackLogs } from "../lib/feedback-log-sanitize.js";
-import { fetchBackendLogsForFeedbackUser } from "../services/railway-logs.service.js";
+import {
+  fetchBackendLogsForFeedbackUnauth,
+  fetchBackendLogsForFeedbackUser,
+} from "../services/railway-logs.service.js";
 
 const logger = createLogger({ context: "feedback" });
 const router = Router();
@@ -61,7 +64,7 @@ function buildFeedbackLogTools(hasElectron: boolean, hasServer: boolean): Anthro
       {
         name: "search_server_logs",
         description:
-          "Search backend API logs for this user (JSON request logs with userId). In production these come from Railway; in local dev they come from this running server. Use for API errors, 5xx, auth, routes.",
+          "Search backend API log excerpt attached to this report. In production these come from Railway; in local dev they come from this running server. Use for API errors, 5xx, auth, routes.",
         input_schema: SEARCH_TOOL_SCHEMA,
       },
       {
@@ -253,7 +256,7 @@ function tailLogLines(text: string, maxLines: number): string {
   return lines.slice(-maxLines).join("\n");
 }
 
-router.post("/", requireAuth, feedbackLimiter, async (req: Request, res: Response) => {
+async function handleFeedback(req: Request, res: Response, options: { unauth: boolean }) {
   try {
     const { message, mainLogs, rendererLogs, logs, userEmail, userName } = req.body;
 
@@ -298,7 +301,13 @@ router.post("/", requireAuth, feedbackLimiter, async (req: Request, res: Respons
       .join("\n\n");
 
     let serverLogsRaw = "";
-    if (req.userId) {
+    if (options.unauth) {
+      try {
+        serverLogsRaw = await fetchBackendLogsForFeedbackUnauth();
+      } catch (err) {
+        logger.warn({ error: String(err) }, "Server log fetch failed (unauth)");
+      }
+    } else if (req.userId) {
       try {
         serverLogsRaw = await fetchBackendLogsForFeedbackUser({ userId: req.userId });
       } catch (err) {
@@ -438,6 +447,17 @@ router.post("/", requireAuth, feedbackLimiter, async (req: Request, res: Respons
       res.status(500).json({ error: "Internal server error" });
     }
   }
+}
+
+// Authenticated feedback: includes user-scoped server logs + permissions context.
+router.post("/", requireAuth, feedbackLimiter, async (req: Request, res: Response) => {
+  await handleFeedback(req, res, { unauth: false });
+});
+
+// Unauthenticated feedback (login / register): no JWT required.
+// Still attaches Electron logs; server logs are a generic Railway excerpt (no userId filter).
+router.post("/unauth", optionalAuth, feedbackLimiter, async (req: Request, res: Response) => {
+  await handleFeedback(req, res, { unauth: true });
 });
 
 function escapeHtml(text: string): string {

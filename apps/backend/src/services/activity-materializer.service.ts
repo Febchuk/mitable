@@ -375,7 +375,7 @@ export async function recalculateDailyStats(
   );
 
   // Map each block to its effective duration after dedup
-  const effectiveDuration = new Map<typeof blocks[number], number>();
+  const effectiveDuration = new Map<(typeof blocks)[number], number>();
   for (const block of blocks) {
     if (block.blockType === "meeting" && authoritativeMeetingBlocks.length > 0) {
       const blockStartMs = new Date(block.startTime).getTime();

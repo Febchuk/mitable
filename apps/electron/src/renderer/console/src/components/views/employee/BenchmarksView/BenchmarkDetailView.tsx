@@ -133,12 +133,14 @@ export function BenchmarkDetailView() {
         style={{
           height: "100vh",
           overflowY: "auto",
-          padding: "28px 0",
+          paddingTop: 120,
+          paddingRight: 0,
+          paddingBottom: 28,
+          paddingLeft: 0,
           color: "var(--text-tertiary)",
           fontSize: 13,
           fontFamily: "var(--font-sans)",
           textAlign: "center",
-          paddingTop: 120,
         }}
       >
         Loading...

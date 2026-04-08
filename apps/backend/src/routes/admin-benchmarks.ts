@@ -347,10 +347,7 @@ router.get("/user/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    logger.info(
-      { organizationId: req.organizationId, userId },
-      "Getting all benchmarks for user"
-    );
+    logger.info({ organizationId: req.organizationId, userId }, "Getting all benchmarks for user");
 
     const benchmarks = await benchmarkService.getMyBenchmarks(userId);
 

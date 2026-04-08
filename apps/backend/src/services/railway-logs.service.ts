@@ -206,3 +206,72 @@ export async function fetchBackendLogsForFeedbackUser(options: {
   }
   return fetchRecentBackendLogsForUser(options);
 }
+
+/**
+ * Feedback logs when we **don't** have a userId (login / register screens).
+ * In production, returns a recent excerpt for the backend service (no user filter).
+ * In development, returns empty (we only capture dev logs by userId today).
+ */
+export async function fetchBackendLogsForFeedbackUnauth(options?: {
+  hoursBack?: number;
+  maxLines?: number;
+}): Promise<string> {
+  if (config.nodeEnv !== "production") {
+    return "";
+  }
+
+  const hoursBack = options?.hoursBack ?? 1;
+  const maxLines = options?.maxLines ?? 2500;
+
+  // NOTE: We can't easily reuse the internal env resolver without exporting it.
+  // So we just call the GraphQL query path directly by re-implementing the small subset here.
+  const headers = railwayHeaders();
+  const actualEnvId = await (async () => {
+    if (config.railway.environmentId.trim()) return config.railway.environmentId.trim();
+    // If env id isn't configured and we have a project access token, resolve via projectToken query.
+    if (config.railway.projectAccessToken) {
+      try {
+        const res = await fetch(RAILWAY_GQL_URL, {
+          method: "POST",
+          headers: {
+            "Project-Access-Token": config.railway.projectAccessToken,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ query: "query { projectToken { environmentId } }" }),
+        });
+        if (!res.ok) return "";
+        const json = (await res.json()) as GqlProjectTokenResponse;
+        return json.data?.projectToken?.environmentId?.trim() ?? "";
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  })();
+
+  if (!actualEnvId || !headers) {
+    return "";
+  }
+
+  const afterDate = new Date(Date.now() - hoursBack * 3600 * 1000).toISOString();
+  const serviceId = config.railway.backendServiceId.trim();
+  const filter = serviceId ? `@service:${serviceId}` : null;
+
+  const json = await postGraphql({
+    query: ENVIRONMENT_LOGS_QUERY,
+    variables: {
+      environmentId: actualEnvId,
+      afterDate,
+      afterLimit: maxLines,
+      filter,
+    },
+  });
+
+  if (json.errors?.length) {
+    log.warn({ errors: json.errors.map((e) => e.message) }, "Railway GraphQL errors (unauth)");
+  }
+
+  const rows = json.data?.environmentLogs ?? [];
+  if (rows.length === 0) return "";
+  return rows.map((r) => `${r.timestamp} [${r.severity}] ${r.message}`).join("\n");
+}

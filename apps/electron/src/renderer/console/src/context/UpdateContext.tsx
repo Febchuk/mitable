@@ -1,27 +1,17 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 
-type UpdateState = "idle" | "available" | "downloading" | "downloaded" | "error";
+type UpdateState = "idle" | "downloaded" | "error";
 
 interface UpdateInfo {
   version: string;
-  releaseNotes?: string;
-  releaseDate?: string;
-}
-
-interface DownloadProgress {
-  percent: number;
-  transferred: number;
-  total: number;
 }
 
 interface UpdateContextValue {
   updateState: UpdateState;
   updateInfo: UpdateInfo | null;
-  downloadProgress: DownloadProgress | null;
   errorMessage: string | null;
   isBannerDismissed: boolean;
   dismissBanner: () => void;
-  downloadUpdate: () => void;
   installUpdate: () => void;
 }
 
@@ -30,7 +20,6 @@ const UpdateContext = createContext<UpdateContextValue | null>(null);
 export function UpdateProvider({ children }: { children: ReactNode }) {
   const [updateState, setUpdateState] = useState<UpdateState>("idle");
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
 
@@ -39,27 +28,10 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!window.consoleAPI) return;
 
-    const unsubAvailable = window.consoleAPI.onUpdateAvailable?.((info) => {
-      setUpdateInfo(info);
-      setUpdateState("available");
-      setDownloadProgress(null);
-      setErrorMessage(null);
-      // If a new version arrives that's different from dismissed, re-show banner
-      if (info.version !== dismissedVersion) {
-        setDismissedVersion(null);
-      }
-    });
-
-    const unsubProgress = window.consoleAPI.onUpdateDownloadProgress?.((progress) => {
-      setUpdateState("downloading");
-      setDownloadProgress(progress);
-    });
-
     const unsubDownloaded = window.consoleAPI.onUpdateDownloaded?.((info) => {
-      setUpdateInfo((prev) => (prev ? { ...prev, ...info } : { version: info.version }));
+      setUpdateInfo({ version: info.version });
       setUpdateState("downloaded");
-      setDownloadProgress(null);
-      // Re-show banner when download completes (even if previously dismissed)
+      setErrorMessage(null);
       setDismissedVersion(null);
     });
 
@@ -69,23 +41,16 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      unsubAvailable?.();
-      unsubProgress?.();
       unsubDownloaded?.();
       unsubError?.();
     };
-  }, [dismissedVersion]);
+  }, []);
 
   const dismissBanner = useCallback(() => {
     if (updateInfo) {
       setDismissedVersion(updateInfo.version);
     }
   }, [updateInfo]);
-
-  const downloadUpdate = useCallback(() => {
-    window.consoleAPI?.downloadUpdate?.();
-    setUpdateState("downloading");
-  }, []);
 
   const installUpdate = useCallback(() => {
     window.consoleAPI?.installUpdate?.();
@@ -96,11 +61,9 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
       value={{
         updateState,
         updateInfo,
-        downloadProgress,
         errorMessage,
         isBannerDismissed,
         dismissBanner,
-        downloadUpdate,
         installUpdate,
       }}
     >

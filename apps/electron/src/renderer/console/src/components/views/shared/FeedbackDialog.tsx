@@ -1,17 +1,30 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Check, Loader2, MessageSquare } from "lucide-react";
+import { Check, Loader2, CircleHelp } from "lucide-react";
 import { useUser } from "../../../context/UserContext";
 import { authService } from "../../../services/authService";
 import { API_BASE_URL } from "../../../lib/config";
 import { flushRendererLogsPending } from "../../../../../lib/feedback-log-buffer";
 
+export type FeedbackAnonymousSource = "login" | "register";
+
 interface FeedbackDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When set, email "From" uses this context instead of the signed-in user (login / register screens). */
+  anonymousSource?: FeedbackAnonymousSource;
 }
 
-export default function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
+const ANONYMOUS_SOURCE_LABEL: Record<FeedbackAnonymousSource, string> = {
+  login: "user at login page",
+  register: "user at register page",
+};
+
+export default function FeedbackDialog({
+  open,
+  onOpenChange,
+  anonymousSource,
+}: FeedbackDialogProps) {
   const { user } = useUser();
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -39,7 +52,15 @@ export default function FeedbackDialog({ open, onOpenChange }: FeedbackDialogPro
       }
 
       const token = authService.getAccessToken();
-      const res = await fetch(`${API_BASE_URL}/api/feedback`, {
+      const fromLoginOrRegister = anonymousSource ? ANONYMOUS_SOURCE_LABEL[anonymousSource] : null;
+      const resolvedUserName = fromLoginOrRegister
+        ? fromLoginOrRegister
+        : user?.name || user?.firstName || "Unknown";
+      const resolvedUserEmail = fromLoginOrRegister ? "unauthenticated" : user?.email || "unknown";
+      const endpoint = anonymousSource
+        ? `${API_BASE_URL}/api/feedback/unauth`
+        : `${API_BASE_URL}/api/feedback`;
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -49,8 +70,8 @@ export default function FeedbackDialog({ open, onOpenChange }: FeedbackDialogPro
           message: message.trim(),
           mainLogs,
           rendererLogs,
-          userName: user?.name || user?.firstName || "Unknown",
-          userEmail: user?.email || "unknown",
+          userName: resolvedUserName,
+          userEmail: resolvedUserEmail,
         }),
       });
 
@@ -102,7 +123,7 @@ export default function FeedbackDialog({ open, onOpenChange }: FeedbackDialogPro
               <>Thanks</>
             ) : (
               <>
-                <MessageSquare size={18} strokeWidth={1.5} />
+                <CircleHelp size={18} strokeWidth={1.6} />
                 Send Feedback
               </>
             )}
