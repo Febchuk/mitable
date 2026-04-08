@@ -60,11 +60,11 @@ export const HeroSection = () => {
                     transition: "opacity 0.7s ease, transform 0.7s ease",
                 }}
             >
-                Knowing if your team is spending their time on the right things is the <strong style={{ fontWeight: 600 }}>hardest</strong> part of management.
+                Is your team working on what <strong style={{ fontWeight: 600 }}>matters</strong>?
                 <br />
                 <em style={{ fontStyle: "italic", color: C.accent }}>
                     {" "}
-                    Mitable makes it <strong style={{ fontWeight: 600 }}>simple</strong>.
+                    Now you'll know.
                 </em>
             </h1>
             <p
@@ -81,7 +81,7 @@ export const HeroSection = () => {
                     transitionDelay: "0.08s",
                 }}
             >
-                Measuring what gets done against the goals you set, in real time.
+                Mitable measures what gets done against your goals, in real time.
             </p>
             <a
                 href="/download"

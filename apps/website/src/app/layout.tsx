@@ -42,7 +42,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
     title: "Mitable — Performance, measured.",
-    description: "Knowing if your team is spending their time on the right things is the hardest part of management. Mitable makes it simple.",
+    description: "Is your team working on what matters? Now you'll know. Mitable measures what gets done against your goals, in real time.",
 };
 
 export const viewport: Viewport = {
