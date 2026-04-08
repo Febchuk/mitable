@@ -126,11 +126,8 @@ export const IPC_CHANNELS = {
   SHOW_END_SESSION_DIALOG: "show-end-session-dialog", // Main → Console: trigger dialog
   END_SESSION_FULL: "end-session-full", // Console → Main: end captures + upload + summarize
 
-  // Custom Notifications (Granola-style prompts)
-  NOTIFICATION_SHOW: "notification-show", // Show notification with config
-  NOTIFICATION_HIDE: "notification-hide", // Hide/dismiss notification
-  NOTIFICATION_ACTION: "notification-action", // User clicked action button
-  NOTIFICATION_DATA: "notification-data", // Send notification config to renderer
+  // Notifications (native OS via centralized notificationService — custom toast renderer removed)
+  NOTIFICATION_SHOW: "notification-show", // Show native OS notification
 
   // Passive Monitoring (auto-detect activity for session start/end)
   PASSIVE_MONITORING_SET_ENABLED: "passive-monitoring-set-enabled",

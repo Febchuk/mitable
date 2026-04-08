@@ -64,18 +64,17 @@ const notificationLogger = createLogger("Notification");
 let consoleWindow: BrowserWindow | null = null;
 let watchingPillWindow: BrowserWindow | null = null;
 let watchingPillEyeDropdown: BrowserWindow | null = null;
-let notificationWindow: BrowserWindow | null = null;
+// NOTE: Custom notification toast renderer (notificationWindow, createNotificationWindow,
+// showCustomNotification, etc.) was intentionally removed. Notifications now use the
+// centralized notificationService which sends native OS notifications via Electron's
+// Notification API. Do not re-add a BrowserWindow-based toast — see notificationService.ts.
 
 // System tray (Windows-first "keep alive on close" behavior)
 let tray: Tray | null = null;
 let isExplicitQuit = false;
 
-// Notification timer for periodic prompts
-let notificationTimer: NodeJS.Timeout | null = null;
-
 /** Logo + expanded row (pause, mic, optional eye); 200px clipped bottom controls on some layouts */
 const WATCHING_PILL_WINDOW_HEIGHT = 280;
-let notificationAutoHideTimer: NodeJS.Timeout | null = null;
 
 // Track when eye dropdown was last hidden (to prevent re-opening on button click)
 let eyeDropdownLastHidden = 0;
@@ -662,175 +661,6 @@ function createWatchingPillEyeDropdown() {
   }
 }
 
-// Notification configuration type
-interface NotificationConfig {
-  title: string;
-  message: string;
-  icon?: string;
-  actions: Array<{ id: string; label: string; primary?: boolean }>;
-  timeout?: number;
-}
-
-/** Product: recurring "turn on tracking" toast was removed; block if anything still sends it (stale builds / old main). */
-function isDisabledPeriodicTrackingReminder(config: NotificationConfig): boolean {
-  const hasTurnOn = config.actions?.some((a) => a.id === "turn-on");
-  if (!hasTurnOn) return false;
-  const t = (config.title || "").toLowerCase();
-  const m = (config.message || "").toLowerCase();
-  return (
-    t.includes("ready to track") ||
-    t.includes("track your work") ||
-    m.includes("turn on mitable") ||
-    m.includes("log your activity")
-  );
-}
-
-function createNotificationWindow() {
-  // Get screen dimensions for bottom-right positioning
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
-
-  const windowWidth = 340;
-  const windowHeight = 150;
-  const padding = 20;
-  const dockHeight = 80; // Account for macOS dock
-
-  notificationWindow = new BrowserWindow({
-    title: "Mitable Notification",
-    width: windowWidth,
-    height: windowHeight,
-    x: screenWidth - windowWidth - padding,
-    y: screenHeight - windowHeight - padding - dockHeight,
-    frame: false,
-    transparent: true,
-    hasShadow: false, // Disable macOS window shadow for clean transparent look
-    alwaysOnTop: true,
-    resizable: false,
-    skipTaskbar: true,
-    focusable: false, // Don't steal focus when notification appears
-    show: false,
-    webPreferences: {
-      preload: join(__dirname, "../preload/notification.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // Platform-specific always-on-top (below modal-panel so it doesn't cover pill)
-  if (process.platform === "darwin") {
-    notificationWindow.setAlwaysOnTop(true, "floating");
-    notificationWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } else {
-    notificationWindow.setAlwaysOnTop(true, "normal", 1);
-  }
-
-  // Dismiss on blur (click away)
-  notificationWindow.on("blur", () => {
-    hideNotification();
-  });
-
-  notificationWindow.on("closed", () => {
-    notificationWindow = null;
-  });
-
-  if (!app.isPackaged) {
-    notificationWindow.loadURL("http://localhost:5173/notifications/index.html");
-  } else {
-    notificationWindow.loadFile(join(__dirname, "../renderer/notifications/index.html"));
-  }
-
-  notificationLogger.info(" Notification window created");
-}
-
-function showNotification(config: NotificationConfig) {
-  if (isDisabledPeriodicTrackingReminder(config)) {
-    notificationLogger.info("Suppressed disabled periodic tracking reminder toast");
-    return;
-  }
-
-  // Windows: use native toast notification for OS integration (Action Center)
-  if (process.platform === "win32") {
-    showNativeWindowsNotification(config);
-    return;
-  }
-
-  // macOS: use custom BrowserWindow notification
-  showCustomNotification(config);
-}
-
-function showNativeWindowsNotification(config: NotificationConfig) {
-  // Build action buttons XML
-  const actionsXml = config.actions
-    .map(
-      (action) =>
-        `<action content="${escapeXml(action.label)}" activationType="protocol" arguments="mitable://${action.id}" />`
-    )
-    .join("\n        ");
-
-  const toastXml = `
-<toast launch="mitable://focus" activationType="protocol">
-  <visual>
-    <binding template="ToastText02">
-      <text id="1">${escapeXml(config.title)}</text>
-      <text id="2">${escapeXml(config.message)}</text>
-    </binding>
-  </visual>
-  <actions>
-    ${actionsXml}
-  </actions>
-</toast>`.trim();
-
-  const notification = new Notification({ toastXml });
-  notification.show();
-  notificationLogger.info("Native Windows notification shown:", config.title);
-}
-
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function showCustomNotification(config: NotificationConfig) {
-  // Create window if it doesn't exist
-  if (!notificationWindow || notificationWindow.isDestroyed()) {
-    createNotificationWindow();
-  }
-
-  // Wait for window to be ready before sending data
-  if (notificationWindow && !notificationWindow.isDestroyed()) {
-    // Send config data to renderer
-    notificationWindow.webContents.send(IPC_CHANNELS.NOTIFICATION_DATA, config);
-    notificationWindow.showInactive(); // Don't steal focus or affect other windows
-
-    notificationLogger.info("Showing custom notification:", config.title);
-
-    // Set up auto-hide timer (as backup, renderer also handles this)
-    if (config.timeout && config.timeout > 0) {
-      if (notificationAutoHideTimer) {
-        clearTimeout(notificationAutoHideTimer);
-      }
-      notificationAutoHideTimer = setTimeout(() => {
-        hideNotification();
-      }, config.timeout + 500); // Slightly longer than renderer timeout
-    }
-  }
-}
-
-function hideNotification() {
-  if (notificationAutoHideTimer) {
-    clearTimeout(notificationAutoHideTimer);
-    notificationAutoHideTimer = null;
-  }
-
-  if (notificationWindow && !notificationWindow.isDestroyed()) {
-    notificationWindow.hide();
-    notificationLogger.info(" Notification hidden");
-  }
-}
 
 // Shared handler for notification actions (used by both Windows protocol and macOS IPC)
 function handleNotificationAction(actionId: string) {
@@ -906,6 +736,42 @@ function autoEnablePassiveMonitoring(userId: string) {
   });
 }
 
+// Periodic reminder timer — nudges user via native OS notification when no session is active
+let notificationReminderTimer: NodeJS.Timeout | null = null;
+
+function startNotificationReminder(userId: string) {
+  stopNotificationReminder();
+
+  const minutes = preferencesService.getUserNotificationFrequency(userId);
+  if (minutes <= 0) return;
+
+  notificationLogger.info(`Starting notification reminder every ${minutes}m`);
+
+  notificationReminderTimer = setInterval(() => {
+    const sessionState = monitoringSessionService.getSessionState();
+    const passiveState = passiveMonitorService.getState();
+    const hasActiveSession =
+      (sessionState && (sessionState.status === "active" || sessionState.status === "paused")) ||
+      passiveState.sessionId !== null;
+
+    if (hasActiveSession) return;
+
+    notificationService.show({
+      title: "Ready to track?",
+      body: "You don't have an active session. Open Mitable to start tracking.",
+      category: "session",
+      clickAction: "focus",
+    });
+  }, minutes * 60 * 1000);
+}
+
+function stopNotificationReminder() {
+  if (notificationReminderTimer) {
+    clearInterval(notificationReminderTimer);
+    notificationReminderTimer = null;
+  }
+}
+
 // IPC Handlers
 function setupIPC() {
   ipcLogger.info(" Setting up IPC handlers...");
@@ -971,6 +837,7 @@ function setupIPC() {
     authLogger.info(" Auth manager and keychain cleared");
 
     currentUserContext = null;
+    stopNotificationReminder();
 
     // Broadcast token clear to all windows
     const allWindows = [consoleWindow, watchingPillWindow];
@@ -1226,6 +1093,9 @@ function setupIPC() {
 
       // Auto-enable passive monitoring if preference is on (default: true)
       autoEnablePassiveMonitoring(user.userId);
+
+      // Start periodic "ready to track?" reminder at user's configured frequency
+      startNotificationReminder(user.userId);
     }
   );
 
@@ -1328,25 +1198,20 @@ function setupIPC() {
   setupAgentHandlers();
 }
 
-// Custom notification handlers (Granola-style prompts)
+// Notification handlers (toast renderer removed — routes through centralized notificationService for native OS notifications)
 function setupNotificationHandlers() {
-  // Show notification (from renderer or internal)
-  ipcMain.handle(IPC_CHANNELS.NOTIFICATION_SHOW, async (_, config: NotificationConfig) => {
-    showNotification(config);
-    return { success: true };
-  });
-
-  // Hide notification
-  ipcMain.on(IPC_CHANNELS.NOTIFICATION_HIDE, () => {
-    hideNotification();
-  });
-
-  // Handle notification action button clicks (from custom macOS notification)
-  ipcMain.on(IPC_CHANNELS.NOTIFICATION_ACTION, async (_, actionId: string) => {
-    notificationLogger.info("Notification action (IPC):", actionId);
-    hideNotification();
-    handleNotificationAction(actionId);
-  });
+  // Generic show notification — rewired from old toast renderer to native OS notifications
+  ipcMain.handle(
+    IPC_CHANNELS.NOTIFICATION_SHOW,
+    async (_, config: { title: string; message: string; actions?: Array<{ id: string; label: string; primary?: boolean }>; timeout?: number }) => {
+      notificationService.show({
+        title: config.title,
+        body: config.message,
+        clickAction: config.actions?.[0]?.id,
+      });
+      return { success: true };
+    }
+  );
 
   // Recap-ready notification — delegates to centralized NotificationService
   ipcMain.handle(
@@ -1892,6 +1757,7 @@ function setupMonitoringSessionHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET, (_, userId: string, minutes: number) => {
     preferencesService.setUserNotificationFrequency(userId, minutes);
+    startNotificationReminder(userId);
     return { success: true };
   });
 
@@ -2972,6 +2838,9 @@ app.whenReady().then(async () => {
 
       // Auto-enable passive monitoring if preference is on (default: true)
       autoEnablePassiveMonitoring(restored.userId);
+
+      // Start periodic "ready to track?" reminder at user's configured frequency
+      startNotificationReminder(restored.userId);
 
       // Push restored tokens to the console renderer once it's ready
       const pushTokensToConsole = () => {
