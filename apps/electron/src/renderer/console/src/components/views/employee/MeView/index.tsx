@@ -45,7 +45,6 @@ import { formatTopLevelDuration } from "../../admin/shared/topLevelDuration";
 const LABEL_TO_METRIC: Record<string, string> = {
   "Total Active Time": "active_time",
   "Avg Weekly Active Time": "active_time",
-  "Avg Monthly Active Time": "active_time",
 };
 
 const FILTER_TO_PERIOD: Record<TimeRange, DashboardPeriod> = {
@@ -451,10 +450,14 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     }
     metricMinutes = effectiveActiveMinutes / Math.max(1, weekCount);
   } else if (range === "ytd" || range === "all") {
-    metricLabel = "Avg Monthly Active Time";
-    const dates = api.dailyActivities.map((d) => d.date.slice(0, 7));
-    const months = new Set(dates);
-    metricMinutes = effectiveActiveMinutes / Math.max(1, months.size);
+    metricLabel = "Avg Weekly Active Time";
+    const sorted = api.dailyActivities.map((d) => d.date).sort();
+    if (sorted.length > 0) {
+      const firstDay = new Date(sorted[0]!);
+      const lastDay = new Date(sorted[sorted.length - 1]!);
+      const weekSpan = Math.max(1, Math.ceil((lastDay.getTime() - firstDay.getTime()) / (7 * 86400000)) + 1);
+      metricMinutes = effectiveActiveMinutes / Math.max(1, weekSpan);
+    }
   }
 
   return {

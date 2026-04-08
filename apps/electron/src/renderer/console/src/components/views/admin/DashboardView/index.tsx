@@ -171,25 +171,38 @@ function buildChartData(api: DashboardMetrics, filter: TimeFilter): ChartDataPoi
     return weekBuckets;
   }
 
-  // YTD and All — monthly buckets, avg per user per month
-  const buckets = new Map<string, { total: number; label: string }>();
-  for (const d of trend) {
-    const date = new Date(d.date);
-    const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, "0")}`;
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.total += getTrendTotal(d);
-    } else {
-      buckets.set(key, {
-        total: getTrendTotal(d),
-        label: date.toLocaleDateString("en", { month: "short" }),
-      });
+  // YTD and All — weekly buckets, avg per user per week
+  const weekBucketsYtd: ChartDataPoint[] = [];
+  const sorted = [...trend].sort((a, b) => a.date.localeCompare(b.date));
+  if (!sorted.length) return [];
+
+  let wkStart = getMonday(new Date(sorted[0]!.date));
+  const lastDate = new Date(sorted[sorted.length - 1]!.date);
+
+  while (wkStart <= lastDate) {
+    const wkEnd = new Date(wkStart);
+    wkEnd.setDate(wkEnd.getDate() + 6);
+
+    let weekTotal = 0;
+    const cursor = new Date(wkStart);
+    while (cursor <= wkEnd) {
+      const key = cursor.toISOString().split("T")[0]!;
+      const entry = lookup.get(key);
+      if (entry) weekTotal += getTrendTotal(entry);
+      cursor.setDate(cursor.getDate() + 1);
     }
+
+    const startLabel = `${wkStart.toLocaleDateString("en", { month: "short" })} ${wkStart.getDate()}`;
+    weekBucketsYtd.push({
+      label: startLabel,
+      value: Math.round(weekTotal / users),
+    });
+
+    wkStart = new Date(wkEnd);
+    wkStart.setDate(wkStart.getDate() + 1);
   }
-  return [...buckets.values()].map((b) => ({
-    label: b.label,
-    value: Math.round(b.total / users),
-  }));
+
+  return weekBucketsYtd;
 }
 
 /**
@@ -393,9 +406,13 @@ export default function DashboardView() {
       return raw / users / Math.max(1, weekCount);
     }
 
-    // YTD / All: avg per user per month
-    const months = new Set(trend.map((d) => d.date.slice(0, 7)));
-    return raw / users / Math.max(1, months.size);
+    // YTD / All: avg per user per week
+    const sorted = [...trend].sort((a, b) => a.date.localeCompare(b.date));
+    if (!sorted.length) return 0;
+    const firstDay = getMonday(new Date(sorted[0]!.date));
+    const lastDay = new Date(sorted[sorted.length - 1]!.date);
+    const weekSpan = Math.max(1, Math.ceil((lastDay.getTime() - firstDay.getTime()) / (7 * 86400000)) + 1);
+    return raw / users / weekSpan;
   }, [apiData, filter, isAvgMode]);
 
   const activeTimeDisplay = useMemo(
@@ -405,7 +422,7 @@ export default function DashboardView() {
 
   const headlineLabel = useMemo(() => {
     if (filter === "month") return "Avg weekly active time";
-    if (filter === "ytd" || filter === "all") return "Avg monthly active time";
+    if (filter === "ytd" || filter === "all") return "Avg weekly active time";
     return "Total active time";
   }, [filter]);
 

@@ -138,26 +138,38 @@ export function buildActivityChartData(
     return weekBuckets;
   }
 
-  // YTD and All — monthly buckets
-  const buckets = new Map<string, { total: number; label: string }>();
-  for (const d of trend) {
-    const date = new Date(d.date);
-    const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, "0")}`;
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.total += entryTotal(d);
-    } else {
-      buckets.set(key, {
-        total: entryTotal(d),
-        label: date.toLocaleDateString("en", { month: "short" }),
-      });
+  // YTD and All — weekly buckets
+  const sorted = [...trend].sort((a, b) => a.date.localeCompare(b.date));
+  if (!sorted.length) return [];
+
+  const weekBucketsYtd: ActivityChartDataPoint[] = [];
+  let wkStart = getMonday(new Date(sorted[0]!.date));
+  const lastDate = new Date(sorted[sorted.length - 1]!.date);
+
+  while (wkStart <= lastDate) {
+    const wkEnd = new Date(wkStart);
+    wkEnd.setDate(wkEnd.getDate() + 6);
+
+    let weekTotal = 0;
+    const cursor = new Date(wkStart);
+    while (cursor <= wkEnd) {
+      const key = cursor.toISOString().split("T")[0]!;
+      const entry = lookup.get(key);
+      if (entry) weekTotal += entryTotal(entry);
+      cursor.setDate(cursor.getDate() + 1);
     }
+
+    const startLabel = `${wkStart.toLocaleDateString("en", { month: "short" })} ${wkStart.getDate()}`;
+    weekBucketsYtd.push({
+      label: startLabel,
+      value: Math.round(weekTotal),
+    });
+
+    wkStart = new Date(wkEnd);
+    wkStart.setDate(wkStart.getDate() + 1);
   }
 
-  return [...buckets.values()].map((b) => ({
-    label: b.label,
-    value: Math.round(b.total),
-  }));
+  return weekBucketsYtd;
 }
 
 function sparseIndices(n: number, maxLabels = 8): Set<number> {
