@@ -109,14 +109,6 @@ async function processOrgDay(organizationId: string, todayStr: string): Promise<
 
   const count = userRollups.length;
 
-  // Averages
-  const avgWorkMinutes = userRollups.reduce((sum, r) => sum + r.totalWorkMinutes, 0) / count;
-  const avgMeetingMinutes = userRollups.reduce((sum, r) => sum + r.totalMeetingMinutes, 0) / count;
-  const avgActiveMinutes = userRollups.reduce((sum, r) => sum + r.totalActiveMinutes, 0) / count;
-  const avgWorkPercentage = userRollups.reduce((sum, r) => sum + r.workPercentage, 0) / count;
-  const avgMeetingPercentage = userRollups.reduce((sum, r) => sum + r.meetingPercentage, 0) / count;
-
-  // Totals
   const totalTeamWorkMinutes = userRollups.reduce((sum, r) => sum + r.totalWorkMinutes, 0);
   const totalTeamMeetingMinutes = userRollups.reduce((sum, r) => sum + r.totalMeetingMinutes, 0);
   const totalTeamActiveMinutes = totalTeamWorkMinutes + totalTeamMeetingMinutes;
@@ -181,11 +173,11 @@ async function processOrgDay(organizationId: string, todayStr: string): Promise<
     .limit(1);
 
   const metricsData = {
-    avgWorkMinutes: Math.round(avgWorkMinutes * 10) / 10,
-    avgMeetingMinutes: Math.round(avgMeetingMinutes * 10) / 10,
-    avgActiveMinutes: Math.round(avgActiveMinutes * 10) / 10,
-    avgWorkPercentage: Math.round(avgWorkPercentage * 10) / 10,
-    avgMeetingPercentage: Math.round(avgMeetingPercentage * 10) / 10,
+    avgWorkMinutes: 0,
+    avgMeetingMinutes: 0,
+    avgActiveMinutes: 0,
+    avgWorkPercentage: 0,
+    avgMeetingPercentage: 0,
     totalUsersTracked: count,
     totalTeamWorkMinutes,
     totalTeamMeetingMinutes,
@@ -215,7 +207,7 @@ async function processOrgDay(organizationId: string, todayStr: string): Promise<
       organizationId,
       date: todayStr,
       usersTracked: count,
-      avgActiveMinutes: Math.round(avgActiveMinutes),
+      totalActiveMinutes: totalTeamActiveMinutes,
       topCategories: activityDistribution.slice(0, 3).map((d) => d.category),
     },
     "Wrote org daily metrics"

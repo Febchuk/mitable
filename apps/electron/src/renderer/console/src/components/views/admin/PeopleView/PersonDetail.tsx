@@ -38,16 +38,16 @@ import {
   ACTIVITY_FILTERS,
   buildActivityChartData,
   drawActivityChart,
-  DEEP_WORK_COLOR,
-  MEETINGS_COLOR,
+  BAR_COLOR,
   type ActivityTimeFilter as TimeRange,
   type ActivityTrendEntry,
 } from "../shared/activityChart";
 import { formatTopLevelDuration } from "../shared/topLevelDuration";
 
 const LABEL_TO_METRIC: Record<string, string> = {
-  "Average Focus Time": "focus_time",
-  "Time In Meetings": "meeting_load",
+  "Total Active Time": "active_time",
+  "Avg Weekly Active Time": "active_time",
+  "Avg Monthly Active Time": "active_time",
 };
 
 const FILTER_TO_PERIOD: Record<TimeRange, DashboardPeriod> = {
@@ -244,15 +244,14 @@ function formatLastActive(input?: string | null): string {
   const date = new Date(input);
   if (Number.isNaN(date.getTime())) return "—";
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
+  const diffMs = Date.now() - date.getTime();
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(hours / 24);
 
-  if (diffDays <= 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (hours < 1) return "Just now";
+  if (hours < 24) return `${hours}h ago`;
+  if (days === 1) return "Yesterday";
+  return `${days}d ago`;
 }
 
 function matchesTimeRange(dateString: string, range: TimeRange): boolean {
@@ -276,45 +275,6 @@ function matchesTimeRange(dateString: string, range: TimeRange): boolean {
   }
 
   return date >= start && date <= end;
-}
-
-function buildAppBreakdown(apps: string[] | null | undefined, durationMinutes: number) {
-  const normalized = (apps || []).filter((app): app is string => Boolean(app));
-  if (!normalized.length || durationMinutes <= 0) return [];
-
-  const base = Math.floor(durationMinutes / normalized.length);
-  const remainder = durationMinutes - base * normalized.length;
-
-  return normalized.map((app, index) => {
-    const minutes = base + (index < remainder ? 1 : 0);
-    return {
-      app,
-      minutes,
-      percentage: Math.max(1, Math.round((minutes / durationMinutes) * 100)),
-    };
-  });
-}
-
-function createWorkBlockFromActivityBlock(block: PersonDetailData["blocks"][number]): {
-  block: WorkBlock;
-  blockNumber: number;
-} {
-  return {
-    block: {
-      id: block.id,
-      startTime: new Date(block.startTime),
-      endTime: block.endTime ? new Date(block.endTime) : null,
-      duration: block.durationMinutes,
-      idleGapBefore: null,
-      summary: block.description || "",
-      captures: [],
-      appBreakdown: buildAppBreakdown(block.apps, block.durationMinutes),
-      taskBreakdown: [],
-      name: block.name || `Block ${block.sequenceNumber}`,
-      status: "ready",
-    },
-    blockNumber: block.sequenceNumber || 1,
-  };
 }
 
 function createWorkBlockFromGranolaBlock(block: GranolaBlock): WorkBlock {
@@ -375,9 +335,6 @@ function buildTrendEntries(api: PersonDetailData): ActivityTrendEntry[] {
 }
 
 function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
-  const daysTracked = api.summary.daysTracked || 1;
-  const divisor = range === "yesterday" ? 1 : daysTracked;
-
   let effectiveWorkMinutes = api.summary.totalWorkMinutes;
   let effectiveMeetingMinutes = api.summary.totalMeetingMinutes;
   let effectiveActiveMinutes = api.summary.totalActiveMinutes;
@@ -496,28 +453,60 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
 
   const recentWork: RecentWorkItem[] = [];
 
-  for (const block of [...api.blocks].sort(
-    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-  )) {
-    if (block.type !== "work") continue;
-    if (block.description === "Unclassified session." && block.category === "other") continue;
+  // Build recent work directly from sessions (1 session = 1 block entry)
+  const sessions = [...api.sessionActivities].sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+  );
 
-    const adapted = createWorkBlockFromActivityBlock(block);
-    const previewSource =
-      block.description ||
-      (block.apps?.length ? `Worked across ${block.apps.join(", ")}` : block.name || "");
+  let blockCounter = sessions.length;
+  for (const session of sessions) {
+    const blockNum = blockCounter--;
+    const taskBreakdown = (session.taskBreakdown || []).map((t) => ({
+      shortTitle: t.shortTitle || "Activity",
+      description: t.description || "",
+      minutes: t.minutes || 0,
+    }));
+
+    let appBreakdown: { app: string; minutes: number; percentage: number }[] = [];
+    const tb = session.timeBreakdown;
+    if (tb && Object.keys(tb).length > 0) {
+      const totalMs = Object.values(tb).reduce((a, b) => a + b, 0);
+      appBreakdown = Object.entries(tb)
+        .map(([app, ms]) => ({
+          app,
+          minutes: Math.round(ms / 60000),
+          percentage: totalMs > 0 ? Math.round((ms / totalMs) * 100) : 0,
+        }))
+        .sort((a, b) => b.minutes - a.minutes)
+        .slice(0, 5);
+    }
+
+    const containerBlock: WorkBlock = {
+      id: session.sessionId,
+      startTime: new Date(session.startedAt),
+      endTime: session.endedAt ? new Date(session.endedAt) : null,
+      duration: session.durationMinutes,
+      idleGapBefore: null,
+      summary: session.summary || taskBreakdown.map((t) => t.shortTitle).join(". "),
+      captures: [],
+      appBreakdown,
+      taskBreakdown,
+      name: session.sessionName || `Block ${blockNum}`,
+      status: "ready",
+    };
+
+    const taskCount = taskBreakdown.length;
 
     recentWork.push({
       kind: "block",
-      id: block.id,
-      title: block.name || `Block ${block.sequenceNumber}`,
-      preview: toPlainText(previewSource),
-      date: formatDateLabel(block.startTime),
-      time: formatTimeLabel(block.startTime),
-      durationMinutes: block.durationMinutes,
-      category: block.category || undefined,
-      block: adapted.block,
-      blockNumber: adapted.blockNumber,
+      id: session.sessionId,
+      title: session.sessionName || `Block ${blockNum}`,
+      preview: `${taskCount} task${taskCount !== 1 ? "s" : ""} — ${formatHours(session.durationMinutes)}`,
+      date: formatDateLabel(session.startedAt),
+      time: formatTimeLabel(session.startedAt),
+      durationMinutes: session.durationMinutes,
+      block: containerBlock,
+      blockNumber: blockNum,
     });
   }
 
@@ -557,16 +546,31 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     lastActive: formatLastActive(latestActivityAt),
     mood: moodLabel,
     moodColor,
-    metrics: [
-      {
-        label: "Average Focus Time",
-        value: formatHours(effectiveWorkMinutes / divisor),
-      },
-      {
-        label: "Time In Meetings",
-        value: formatHours(effectiveMeetingMinutes / divisor),
-      },
-    ],
+    metrics: (() => {
+      let metricLabel = "Total Active Time";
+      let metricMinutes = effectiveActiveMinutes;
+
+      if (range === "month") {
+        metricLabel = "Avg Weekly Active Time";
+        const today = new Date();
+        const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        let weekCount = 0;
+        const ws = new Date(firstOfMonth);
+        while (ws <= lastOfMonth) {
+          weekCount++;
+          ws.setDate(ws.getDate() + 7);
+        }
+        metricMinutes = effectiveActiveMinutes / Math.max(1, weekCount);
+      } else if (range === "ytd" || range === "all") {
+        metricLabel = "Avg Monthly Active Time";
+        const dates = api.dailyActivities.map((d) => d.date.slice(0, 7));
+        const months = new Set(dates);
+        metricMinutes = effectiveActiveMinutes / Math.max(1, months.size);
+      }
+
+      return [{ label: metricLabel, value: formatHours(metricMinutes) }];
+    })(),
     activities,
     chartEntries: buildTrendEntries(api),
     customerBreakdown,
@@ -1104,8 +1108,6 @@ export default function PersonDetail() {
                 }}
               >
                 <span>{person.email}</span>
-                <span style={{ opacity: 0.5 }}>•</span>
-                <span>Started {person.startDate}</span>
               </div>
             </div>
           </div>
@@ -1607,29 +1609,16 @@ export default function PersonDetail() {
             >
               Active Time
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div
-                  style={{
-                    width: 20,
-                    height: 3,
-                    borderRadius: 1.5,
-                    background: DEEP_WORK_COLOR,
-                  }}
-                />
-                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Deep work</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div
-                  style={{
-                    width: 20,
-                    height: 3,
-                    borderRadius: 1.5,
-                    background: MEETINGS_COLOR,
-                  }}
-                />
-                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Meetings</span>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 20,
+                  height: 3,
+                  borderRadius: 1.5,
+                  background: BAR_COLOR,
+                }}
+              />
+              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Active time</span>
             </div>
           </div>
 

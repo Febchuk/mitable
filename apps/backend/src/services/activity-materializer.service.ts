@@ -367,35 +367,11 @@ export async function recalculateDailyStats(
     .from(schema.activityBlocks)
     .where(eq(schema.activityBlocks.dailyActivityId, dailyActivityId));
 
-  // Deduplicate meeting blocks: when a session-classified "meeting" block overlaps
-  // with a Granola/Fireflies block (which has more accurate duration from the meeting tool),
-  // reduce the session block's effective duration by the overlap to avoid double-counting.
-  const authoritativeMeetingBlocks = blocks.filter(
-    (b: { blockType: string }) => b.blockType === "granola" || b.blockType === "fireflies"
-  );
-
-  // Map each block to its effective duration after dedup
-  const effectiveDuration = new Map<(typeof blocks)[number], number>();
-  for (const block of blocks) {
-    if (block.blockType === "meeting" && authoritativeMeetingBlocks.length > 0) {
-      const blockStartMs = new Date(block.startTime).getTime();
-      const blockEndMs = new Date(block.endTime).getTime();
-      let totalOverlapMs = 0;
-      for (const auth of authoritativeMeetingBlocks) {
-        const authStartMs = new Date(auth.startTime).getTime();
-        const authEndMs = new Date(auth.endTime).getTime();
-        const overlapMs = Math.max(
-          0,
-          Math.min(blockEndMs, authEndMs) - Math.max(blockStartMs, authStartMs)
-        );
-        totalOverlapMs += overlapMs;
-      }
-      const overlapMinutes = Math.round(totalOverlapMs / 60000);
-      effectiveDuration.set(block, Math.max(0, block.durationMinutes - overlapMinutes));
-    } else {
-      effectiveDuration.set(block, block.durationMinutes);
-    }
-  }
+  // Granola and Fireflies blocks have unreliable durations (Granola defaults to
+  // 60 min via MCP, Fireflies often reports tiny durations). Exclude them from
+  // ALL time-based metrics. They still exist as activity_blocks for recent work
+  // display but contribute zero to totalWork/Meeting/ActiveMinutes and breakdowns.
+  const EXCLUDED_BLOCK_TYPES = new Set(["granola", "fireflies"]);
 
   let totalWorkMinutes = 0;
   let totalMeetingMinutes = 0;
@@ -408,22 +384,19 @@ export async function recalculateDailyStats(
   const sessionIds = new Set<string>();
 
   for (const block of blocks) {
-    const duration = effectiveDuration.get(block) ?? block.durationMinutes;
-    if (
-      block.blockType === "meeting" ||
-      block.blockType === "granola" ||
-      block.blockType === "fireflies"
-    ) {
+    if (EXCLUDED_BLOCK_TYPES.has(block.blockType)) continue;
+
+    const duration = block.durationMinutes;
+    if (block.blockType === "meeting") {
       totalMeetingMinutes += duration;
     } else {
       totalWorkMinutes += duration;
     }
 
-    if (duration === 0) continue; // Fully overlapped, skip breakdowns
+    if (duration === 0) continue;
 
     if (block.sessionId) sessionIds.add(block.sessionId);
 
-    // App breakdown (normalize so "Slack Huddle" → "Slack")
     const blockApps = ((block.apps as string[]) || []).map(normalizeAppDisplayName);
     const dedupedApps = [...new Set(blockApps)];
     const perAppMinutes = dedupedApps.length > 0 ? duration / dedupedApps.length : 0;
@@ -431,7 +404,6 @@ export async function recalculateDailyStats(
       appMinutes[app] = (appMinutes[app] || 0) + perAppMinutes;
     }
 
-    // Category breakdown — use the classified category from the block
     const cat = (block.category as string) || "other";
     categoryMinutes[cat] = (categoryMinutes[cat] || 0) + duration;
 

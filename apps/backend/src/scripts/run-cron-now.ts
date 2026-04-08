@@ -1,6 +1,11 @@
 /**
  * Manual Cron Trigger + Historical Backfill
  *
+ * WARNING: The L1 (User Rollup / Day Analyzer) step is DEPRECATED.
+ * It destructively replaces activity_blocks created by the Block Analyzer pipeline.
+ * Set ALLOW_DAY_ANALYZER_BACKFILL=true to enable it. Without that env var,
+ * runUserRollup() is a no-op and only L2 (Org Rollup) + L3 (Snapshots) will run.
+ *
  * Usage:
  *   npx tsx src/scripts/run-cron-now.ts                Run all layers for today
  *   npx tsx src/scripts/run-cron-now.ts --backfill     Discover ALL historical dates and process each

@@ -34,8 +34,7 @@ import {
   ACTIVITY_FILTERS,
   buildActivityChartData,
   drawActivityChart,
-  DEEP_WORK_COLOR,
-  MEETINGS_COLOR,
+  BAR_COLOR,
   type ActivityTimeFilter as TimeRange,
   type ActivityTrendEntry,
 } from "../../admin/shared/activityChart";
@@ -44,8 +43,9 @@ import { formatTopLevelDuration } from "../../admin/shared/topLevelDuration";
 // ── Constants ────────────────────────────────────────────────
 
 const LABEL_TO_METRIC: Record<string, string> = {
-  "Average Focus Time": "focus_time",
-  "Time In Meetings": "meeting_load",
+  "Total Active Time": "active_time",
+  "Avg Weekly Active Time": "active_time",
+  "Avg Monthly Active Time": "active_time",
 };
 
 const FILTER_TO_PERIOD: Record<TimeRange, DashboardPeriod> = {
@@ -223,45 +223,6 @@ function formatTimeLabel(input: string): string {
   return new Date(input).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-function buildAppBreakdown(apps: string[] | null | undefined, durationMinutes: number) {
-  const normalized = (apps || []).filter((app): app is string => Boolean(app));
-  if (!normalized.length || durationMinutes <= 0) return [];
-
-  const base = Math.floor(durationMinutes / normalized.length);
-  const remainder = durationMinutes - base * normalized.length;
-
-  return normalized.map((app, index) => {
-    const minutes = base + (index < remainder ? 1 : 0);
-    return {
-      app,
-      minutes,
-      percentage: Math.max(1, Math.round((minutes / durationMinutes) * 100)),
-    };
-  });
-}
-
-function createWorkBlockFromActivityBlock(block: PersonDetailData["blocks"][number]): {
-  block: WorkBlock;
-  blockNumber: number;
-} {
-  return {
-    block: {
-      id: block.id,
-      startTime: new Date(block.startTime),
-      endTime: block.endTime ? new Date(block.endTime) : null,
-      duration: block.durationMinutes,
-      idleGapBefore: null,
-      summary: block.description || "",
-      captures: [],
-      appBreakdown: buildAppBreakdown(block.apps, block.durationMinutes),
-      taskBreakdown: [],
-      name: block.name || `Block ${block.sequenceNumber}`,
-      status: "ready",
-    },
-    blockNumber: block.sequenceNumber || 1,
-  };
-}
-
 function buildTrendEntries(api: PersonDetailData): ActivityTrendEntry[] {
   const hasDailyTotals = api.dailyActivities.some(
     (day) => day.totalWorkMinutes > 0 || day.totalMeetingMinutes > 0
@@ -297,9 +258,6 @@ function buildTrendEntries(api: PersonDetailData): ActivityTrendEntry[] {
 }
 
 function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange): PersonViewModel {
-  const daysTracked = api.summary.daysTracked || 1;
-  const divisor = range === "yesterday" ? 1 : daysTracked;
-
   let effectiveWorkMinutes = api.summary.totalWorkMinutes;
   let effectiveMeetingMinutes = api.summary.totalMeetingMinutes;
   let effectiveActiveMinutes = api.summary.totalActiveMinutes;
@@ -401,28 +359,60 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
 
   const recentWork: RecentWorkItem[] = [];
 
-  for (const block of [...api.blocks].sort(
-    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-  )) {
-    if (block.type !== "work") continue;
-    if (block.description === "Unclassified session." && block.category === "other") continue;
+  // Build recent work directly from sessions (1 session = 1 block entry)
+  const sessions = [...api.sessionActivities].sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+  );
 
-    const adapted = createWorkBlockFromActivityBlock(block);
-    const previewSource =
-      block.description ||
-      (block.apps?.length ? `Worked across ${block.apps.join(", ")}` : block.name || "");
+  let blockCounter = sessions.length;
+  for (const session of sessions) {
+    const blockNum = blockCounter--;
+    const taskBreakdown = (session.taskBreakdown || []).map((t) => ({
+      shortTitle: t.shortTitle || "Activity",
+      description: t.description || "",
+      minutes: t.minutes || 0,
+    }));
+
+    let appBreakdown: { app: string; minutes: number; percentage: number }[] = [];
+    const tb = session.timeBreakdown;
+    if (tb && Object.keys(tb).length > 0) {
+      const totalMs = Object.values(tb).reduce((a, b) => a + b, 0);
+      appBreakdown = Object.entries(tb)
+        .map(([app, ms]) => ({
+          app,
+          minutes: Math.round(ms / 60000),
+          percentage: totalMs > 0 ? Math.round((ms / totalMs) * 100) : 0,
+        }))
+        .sort((a, b) => b.minutes - a.minutes)
+        .slice(0, 5);
+    }
+
+    const containerBlock: WorkBlock = {
+      id: session.sessionId,
+      startTime: new Date(session.startedAt),
+      endTime: session.endedAt ? new Date(session.endedAt) : null,
+      duration: session.durationMinutes,
+      idleGapBefore: null,
+      summary: session.summary || taskBreakdown.map((t) => t.shortTitle).join(". "),
+      captures: [],
+      appBreakdown,
+      taskBreakdown,
+      name: session.sessionName || `Block ${blockNum}`,
+      status: "ready",
+    };
+
+    const taskCount = taskBreakdown.length;
 
     recentWork.push({
       kind: "block",
-      id: block.id,
-      title: block.name || `Block ${block.sequenceNumber}`,
-      preview: toPlainText(previewSource),
-      date: formatDateLabel(block.startTime),
-      time: formatTimeLabel(block.startTime),
-      durationMinutes: block.durationMinutes,
-      category: block.category || undefined,
-      block: adapted.block,
-      blockNumber: adapted.blockNumber,
+      id: session.sessionId,
+      title: session.sessionName || `Block ${blockNum}`,
+      preview: `${taskCount} task${taskCount !== 1 ? "s" : ""} — ${formatHours(session.durationMinutes)}`,
+      date: formatDateLabel(session.startedAt),
+      time: formatTimeLabel(session.startedAt),
+      durationMinutes: session.durationMinutes,
+      block: containerBlock,
+      blockNumber: blockNum,
     });
   }
 
@@ -445,15 +435,33 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     return dateB - dateA;
   });
 
+  let metricLabel = "Total Active Time";
+  let metricMinutes = effectiveActiveMinutes;
+
+  if (range === "month") {
+    metricLabel = "Avg Weekly Active Time";
+    const today = new Date();
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    let weekCount = 0;
+    const ws = new Date(firstOfMonth);
+    while (ws <= lastOfMonth) {
+      weekCount++;
+      ws.setDate(ws.getDate() + 7);
+    }
+    metricMinutes = effectiveActiveMinutes / Math.max(1, weekCount);
+  } else if (range === "ytd" || range === "all") {
+    metricLabel = "Avg Monthly Active Time";
+    const dates = api.dailyActivities.map((d) => d.date.slice(0, 7));
+    const months = new Set(dates);
+    metricMinutes = effectiveActiveMinutes / Math.max(1, months.size);
+  }
+
   return {
     metrics: [
       {
-        label: "Average Focus Time",
-        value: formatHours(effectiveWorkMinutes / divisor),
-      },
-      {
-        label: "Time In Meetings",
-        value: formatHours(effectiveMeetingMinutes / divisor),
+        label: metricLabel,
+        value: formatHours(metricMinutes),
       },
     ],
     activities,
@@ -1359,29 +1367,16 @@ export default function MeView() {
             >
               Active Time
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div
-                  style={{
-                    width: 20,
-                    height: 3,
-                    borderRadius: 1.5,
-                    background: DEEP_WORK_COLOR,
-                  }}
-                />
-                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Deep work</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div
-                  style={{
-                    width: 20,
-                    height: 3,
-                    borderRadius: 1.5,
-                    background: MEETINGS_COLOR,
-                  }}
-                />
-                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Meetings</span>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 20,
+                  height: 3,
+                  borderRadius: 1.5,
+                  background: BAR_COLOR,
+                }}
+              />
+              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Active time</span>
             </div>
           </div>
 

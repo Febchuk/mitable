@@ -25,8 +25,7 @@ const FILTER_TO_PERIOD: Record<TimeFilter, DashboardPeriod> = {
 
 const VALID_FILTERS = new Set<TimeFilter>(["yesterday", "week", "month", "ytd", "all"]);
 
-const DEEP_WORK_COLOR = "var(--mi-accent)";
-const MEETINGS_COLOR = "var(--mi-accent-dark)";
+const BAR_COLOR = "var(--mi-accent)";
 
 function getCssVar(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -34,8 +33,7 @@ function getCssVar(name: string, fallback: string): string {
 
 interface ChartDataPoint {
   label: string;
-  deepWork: number; // minutes
-  meetings: number; // minutes
+  value: number; // minutes (total or avg depending on filter)
 }
 
 function formatHour(h: number): string {
@@ -43,10 +41,6 @@ function formatHour(h: number): string {
   if (h < 12) return `${h}am`;
   if (h === 12) return "12pm";
   return `${h - 12}pm`;
-}
-
-function shortDate(date: Date): string {
-  return `${date.toLocaleDateString("en", { month: "short" })} ${date.getDate()}`;
 }
 
 // Realistic 24h activity distribution — peaks 9am–5pm, quiet overnight
@@ -77,9 +71,36 @@ const HOUR_WEIGHTS = [
   0.01, // 6pm–11pm
 ];
 
+function getTrendWork(d: DashboardMetrics["dailyTrend"][number]): number {
+  return d.totalWorkMinutes ?? d.avgWorkMinutes ?? 0;
+}
+function getTrendMeeting(d: DashboardMetrics["dailyTrend"][number]): number {
+  return d.totalMeetingMinutes ?? d.avgMeetingMinutes ?? 0;
+}
+
+function getTrendTotal(d: DashboardMetrics["dailyTrend"][number]): number {
+  return getTrendWork(d) + getTrendMeeting(d);
+}
+
+function getMonday(d: Date): Date {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  const day = date.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  date.setDate(date.getDate() - diff);
+  return date;
+}
+
+function getDistinctUsers(api: DashboardMetrics): number {
+  return api.metrics.distinctUsersTracked ?? api.metrics.totalUsersTracked ?? 1;
+}
+
 function buildChartData(api: DashboardMetrics, filter: TimeFilter): ChartDataPoint[] {
   const trend = api.dailyTrend || [];
   if (!trend.length) return [];
+
+  const lookup = new Map(trend.map((d) => [d.date, d]));
+  const users = Math.max(1, getDistinctUsers(api));
 
   if (filter === "yesterday") {
     const entry = trend[0];
@@ -87,62 +108,87 @@ function buildChartData(api: DashboardMetrics, filter: TimeFilter): ChartDataPoi
     const totalW = HOUR_WEIGHTS.reduce((a, b) => a + b, 0);
     return HOUR_WEIGHTS.map((w, i) => ({
       label: formatHour(i),
-      deepWork: Math.max(0, Math.round((entry.avgWorkMinutes * w) / totalW)),
-      meetings: Math.max(0, Math.round((entry.avgMeetingMinutes * w) / totalW)),
+      value: Math.max(0, Math.round((getTrendTotal(entry) * w) / totalW)),
     }));
   }
 
   if (filter === "week") {
     const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const lookup = new Map(trend.map((d) => [d.date, d]));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const monday = getMonday(new Date());
 
     return Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(today);
-      date.setDate(date.getDate() - (6 - i));
+      const date = new Date(monday);
+      date.setDate(date.getDate() + i);
       const key = date.toISOString().split("T")[0]!;
       const entry = lookup.get(key);
       return {
-        label: dayNames[date.getDay() === 0 ? 6 : date.getDay() - 1] || "?",
-        deepWork: entry ? Math.round(entry.avgWorkMinutes) : 0,
-        meetings: entry ? Math.round(entry.avgMeetingMinutes) : 0,
+        label: dayNames[i]!,
+        value: entry ? Math.round(getTrendTotal(entry)) : 0,
       };
     });
   }
 
   if (filter === "month") {
-    return trend.map((d) => {
-      const date = new Date(d.date);
-      return {
-        label: shortDate(date),
-        deepWork: Math.round(d.avgWorkMinutes),
-        meetings: Math.round(d.avgMeetingMinutes),
-      };
-    });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const lastOfMonth = new Date(year, month + 1, 0);
+
+    const weekBuckets: ChartDataPoint[] = [];
+    let weekStart = new Date(firstOfMonth);
+
+    while (weekStart <= lastOfMonth) {
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const clampedEnd = weekEnd > lastOfMonth ? lastOfMonth : weekEnd;
+
+      let weekTotal = 0;
+      const cursor = new Date(weekStart);
+      while (cursor <= clampedEnd) {
+        const key = cursor.toISOString().split("T")[0]!;
+        const entry = lookup.get(key);
+        if (entry) weekTotal += getTrendTotal(entry);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      const startLabel = `${weekStart.toLocaleDateString("en", { month: "short" })} ${weekStart.getDate()}`;
+      const endLabel =
+        clampedEnd.getMonth() === weekStart.getMonth()
+          ? `${clampedEnd.getDate()}`
+          : `${clampedEnd.toLocaleDateString("en", { month: "short" })} ${clampedEnd.getDate()}`;
+
+      weekBuckets.push({
+        label: `${startLabel}–${endLabel}`,
+        value: Math.round(weekTotal / users),
+      });
+
+      weekStart = new Date(clampedEnd);
+      weekStart.setDate(weekStart.getDate() + 1);
+    }
+
+    return weekBuckets;
   }
 
-  // YTD and All — aggregate daily entries into monthly buckets
-  const buckets = new Map<string, { deepWork: number; meetings: number; label: string }>();
+  // YTD and All — monthly buckets, avg per user per month
+  const buckets = new Map<string, { total: number; label: string }>();
   for (const d of trend) {
     const date = new Date(d.date);
     const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, "0")}`;
     const existing = buckets.get(key);
     if (existing) {
-      existing.deepWork += d.avgWorkMinutes;
-      existing.meetings += d.avgMeetingMinutes;
+      existing.total += getTrendTotal(d);
     } else {
       buckets.set(key, {
-        deepWork: d.avgWorkMinutes,
-        meetings: d.avgMeetingMinutes,
+        total: getTrendTotal(d),
         label: date.toLocaleDateString("en", { month: "short" }),
       });
     }
   }
   return [...buckets.values()].map((b) => ({
     label: b.label,
-    deepWork: Math.round(b.deepWork),
-    meetings: Math.round(b.meetings),
+    value: Math.round(b.total / users),
   }));
 }
 
@@ -197,8 +243,7 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const deepWorkHex = getCssVar("--mi-accent", "#82C0CC");
-  const meetingsHex = getCssVar("--mi-accent-dark", "#3A7A87");
+  const barHex = getCssVar("--mi-accent", "#82C0CC");
   const uiRgb = getCssVar("--ui-rgb", "236, 232, 224");
   const axisHex = getCssVar("--text-secondary", "#9B9689");
 
@@ -230,13 +275,11 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
   const chartH = H - padTop - padBottom;
 
   const n = data.length;
-  const rawMax = Math.max(1, ...data.map((d) => Math.max(d.deepWork, d.meetings)));
+  const rawMax = Math.max(1, ...data.map((d) => d.value));
 
-  // Nice Y-axis: pick unit (h or m) and clean step
   const { step, unit, divisor } = niceAxis(rawMax);
   const maxVal = Math.ceil(rawMax / step) * step;
 
-  // Grid lines at each step interval
   ctx.strokeStyle = `rgba(${uiRgb}, 0.04)`;
   ctx.lineWidth = 1;
   for (let v = step; v <= maxVal; v += step) {
@@ -247,7 +290,6 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
     ctx.stroke();
   }
 
-  // Y-axis labels at each step
   ctx.fillStyle = axisHex;
   ctx.font = "10px Inter, system-ui, sans-serif";
   ctx.textAlign = "right";
@@ -256,10 +298,8 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
     ctx.fillText(`${Math.round(v / divisor)}${unit}`, padLeft - 8, y + 3);
   }
 
-  // Bar sizing per the brief
   const groupW = chartW / n;
-  const barW = Math.max(3, Math.min(groupW * 0.3, 28));
-  const gap = Math.max(1.5, barW * 0.15);
+  const barW = Math.max(3, Math.min(groupW * 0.5, 36));
   const radius = 3;
 
   const labelSet = sparseIndices(n);
@@ -269,25 +309,10 @@ function drawChart(canvas: HTMLCanvasElement, data: ChartDataPoint[]) {
     const groupX = padLeft + i * groupW;
     const centerX = groupX + groupW / 2;
 
-    const dwIsZero = d.deepWork < 1;
-    const mtIsZero = d.meetings < 1;
-
-    if (!dwIsZero && !mtIsZero) {
-      const dwH = (d.deepWork / maxVal) * chartH;
-      const dwX = centerX - barW - gap / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
-
-      const mtH = (d.meetings / maxVal) * chartH;
-      const mtX = centerX + gap / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
-    } else if (!dwIsZero) {
-      const dwH = (d.deepWork / maxVal) * chartH;
-      const dwX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
-    } else if (!mtIsZero) {
-      const mtH = (d.meetings / maxVal) * chartH;
-      const mtX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
+    if (d.value >= 1) {
+      const barH = (d.value / maxVal) * chartH;
+      const barX = centerX - barW / 2;
+      drawRoundedTopBar(ctx, barX, padTop + chartH - barH, barW, barH, radius, barHex);
     }
 
     if (labelSet.has(i)) {
@@ -340,15 +365,49 @@ export default function DashboardView() {
 
   const { data: apiData } = useDashboardMetrics(FILTER_TO_PERIOD[filter]);
 
-  const totalMinutes = useMemo(() => {
-    if (!apiData?.hasData) return 0;
-    // Sum the per-user-average work+meeting from each day in the trend —
-    // this matches exactly what the chart bars display.
-    const trend = apiData.dailyTrend || [];
-    return trend.reduce((sum, d) => sum + (d.avgWorkMinutes ?? 0) + (d.avgMeetingMinutes ?? 0), 0);
-  }, [apiData]);
+  const isAvgMode = filter === "month" || filter === "ytd" || filter === "all";
 
-  const activeTimeDisplay = useMemo(() => formatTopLevelDuration(totalMinutes), [totalMinutes]);
+  const headlineMinutes = useMemo(() => {
+    if (!apiData?.hasData) return 0;
+    const raw =
+      apiData.metrics.totalActiveMinutes ??
+      (apiData.dailyTrend || []).reduce((sum, d) => sum + getTrendTotal(d), 0);
+
+    if (!isAvgMode) return raw;
+
+    const users = Math.max(1, getDistinctUsers(apiData));
+    const trend = apiData.dailyTrend || [];
+    if (!trend.length) return 0;
+
+    if (filter === "month") {
+      // avg per user per week: total / users / weeks-with-data
+      const today = new Date();
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      let weekCount = 0;
+      const ws = new Date(firstOfMonth);
+      while (ws <= lastOfMonth) {
+        weekCount++;
+        ws.setDate(ws.getDate() + 7);
+      }
+      return raw / users / Math.max(1, weekCount);
+    }
+
+    // YTD / All: avg per user per month
+    const months = new Set(trend.map((d) => d.date.slice(0, 7)));
+    return raw / users / Math.max(1, months.size);
+  }, [apiData, filter, isAvgMode]);
+
+  const activeTimeDisplay = useMemo(
+    () => formatTopLevelDuration(headlineMinutes),
+    [headlineMinutes]
+  );
+
+  const headlineLabel = useMemo(() => {
+    if (filter === "month") return "Avg weekly active time";
+    if (filter === "ytd" || filter === "all") return "Avg monthly active time";
+    return "Total active time";
+  }, [filter]);
 
   const peopleActive = useMemo(() => {
     if (!apiData?.hasData) return "0";
@@ -449,7 +508,7 @@ export default function DashboardView() {
               fontFamily: "var(--font-sans)",
             }}
           >
-            Total active time
+            {headlineLabel}
           </span>
           <span
             style={{
@@ -522,49 +581,28 @@ export default function DashboardView() {
               fontFamily: "var(--font-sans)",
             }}
           >
-            Team active time
+            {isAvgMode ? "Avg active time" : "Active time"}
           </span>
 
           {/* Legend */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 20,
-                  height: 3,
-                  borderRadius: 1.5,
-                  background: DEEP_WORK_COLOR,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--text-secondary)",
-                  fontFamily: "var(--font-sans)",
-                }}
-              >
-                Deep work
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 20,
-                  height: 3,
-                  borderRadius: 1.5,
-                  background: MEETINGS_COLOR,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--text-secondary)",
-                  fontFamily: "var(--font-sans)",
-                }}
-              >
-                Meetings
-              </span>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 20,
+                height: 3,
+                borderRadius: 1.5,
+                background: BAR_COLOR,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              {isAvgMode ? "Avg per person" : "Active time"}
+            </span>
           </div>
         </div>
 

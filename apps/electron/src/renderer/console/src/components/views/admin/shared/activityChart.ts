@@ -8,8 +8,7 @@ export interface ActivityTrendEntry {
 
 export interface ActivityChartDataPoint {
   label: string;
-  deepWork: number;
-  meetings: number;
+  value: number;
 }
 
 export const ACTIVITY_FILTERS: { key: ActivityTimeFilter; label: string }[] = [
@@ -33,8 +32,7 @@ function getCssVar(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-export const DEEP_WORK_COLOR = "var(--mi-accent)";
-export const MEETINGS_COLOR = "var(--mi-accent-dark)";
+export const BAR_COLOR = "var(--mi-accent)";
 export const AXIS_COLOR = "var(--text-secondary)";
 
 function formatHour(h: number): string {
@@ -44,14 +42,23 @@ function formatHour(h: number): string {
   return `${h - 12}pm`;
 }
 
-function shortDate(date: Date): string {
-  return `${date.toLocaleDateString("en", { month: "short" })} ${date.getDate()}`;
-}
-
 const HOUR_WEIGHTS = [
   0.02, 0.01, 0.01, 0.01, 0.01, 0.02, 0.03, 0.05, 0.07, 0.1, 0.12, 0.13, 0.12, 0.08, 0.11, 0.1,
   0.09, 0.07, 0.04, 0.03, 0.02, 0.02, 0.01, 0.01,
 ];
+
+function getMonday(d: Date): Date {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  const day = date.getDay();
+  const diff = day === 0 ? 6 : day - 1;
+  date.setDate(date.getDate() - diff);
+  return date;
+}
+
+function entryTotal(e: ActivityTrendEntry): number {
+  return e.workMinutes + e.meetingMinutes;
+}
 
 export function buildActivityChartData(
   trend: ActivityTrendEntry[],
@@ -59,59 +66,89 @@ export function buildActivityChartData(
 ): ActivityChartDataPoint[] {
   if (!trend.length) return [];
 
+  const lookup = new Map(trend.map((d) => [d.date, d]));
+
   if (filter === "yesterday") {
     const entry = trend[0];
     if (!entry) return [];
     const totalW = HOUR_WEIGHTS.reduce((a, b) => a + b, 0);
+    const total = entryTotal(entry);
     return HOUR_WEIGHTS.map((w, i) => ({
       label: formatHour(i),
-      deepWork: Math.max(0, Math.round((entry.workMinutes * w) / totalW)),
-      meetings: Math.max(0, Math.round((entry.meetingMinutes * w) / totalW)),
+      value: Math.max(0, Math.round((total * w) / totalW)),
     }));
   }
 
   if (filter === "week") {
     const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const lookup = new Map(trend.map((d) => [d.date, d]));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const monday = getMonday(new Date());
 
     return Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(today);
-      date.setDate(date.getDate() - (6 - i));
+      const date = new Date(monday);
+      date.setDate(date.getDate() + i);
       const key = date.toISOString().split("T")[0]!;
       const entry = lookup.get(key);
       return {
-        label: dayNames[date.getDay() === 0 ? 6 : date.getDay() - 1] || "?",
-        deepWork: entry ? Math.round(entry.workMinutes) : 0,
-        meetings: entry ? Math.round(entry.meetingMinutes) : 0,
+        label: dayNames[i]!,
+        value: entry ? Math.round(entryTotal(entry)) : 0,
       };
     });
   }
 
   if (filter === "month") {
-    return trend.map((d) => {
-      const date = new Date(d.date);
-      return {
-        label: shortDate(date),
-        deepWork: Math.round(d.workMinutes),
-        meetings: Math.round(d.meetingMinutes),
-      };
-    });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const lastOfMonth = new Date(year, month + 1, 0);
+
+    const weekBuckets: ActivityChartDataPoint[] = [];
+    let weekStart = new Date(firstOfMonth);
+
+    while (weekStart <= lastOfMonth) {
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const clampedEnd = weekEnd > lastOfMonth ? lastOfMonth : weekEnd;
+
+      let weekTotal = 0;
+      const cursor = new Date(weekStart);
+      while (cursor <= clampedEnd) {
+        const key = cursor.toISOString().split("T")[0]!;
+        const entry = lookup.get(key);
+        if (entry) weekTotal += entryTotal(entry);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      const startLabel = `${weekStart.toLocaleDateString("en", { month: "short" })} ${weekStart.getDate()}`;
+      const endLabel =
+        clampedEnd.getMonth() === weekStart.getMonth()
+          ? `${clampedEnd.getDate()}`
+          : `${clampedEnd.toLocaleDateString("en", { month: "short" })} ${clampedEnd.getDate()}`;
+
+      weekBuckets.push({
+        label: `${startLabel}–${endLabel}`,
+        value: Math.round(weekTotal),
+      });
+
+      weekStart = new Date(clampedEnd);
+      weekStart.setDate(weekStart.getDate() + 1);
+    }
+
+    return weekBuckets;
   }
 
-  const buckets = new Map<string, { deepWork: number; meetings: number; label: string }>();
+  // YTD and All — monthly buckets
+  const buckets = new Map<string, { total: number; label: string }>();
   for (const d of trend) {
     const date = new Date(d.date);
     const key = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, "0")}`;
     const existing = buckets.get(key);
     if (existing) {
-      existing.deepWork += d.workMinutes;
-      existing.meetings += d.meetingMinutes;
+      existing.total += entryTotal(d);
     } else {
       buckets.set(key, {
-        deepWork: d.workMinutes,
-        meetings: d.meetingMinutes,
+        total: entryTotal(d),
         label: date.toLocaleDateString("en", { month: "short" }),
       });
     }
@@ -119,8 +156,7 @@ export function buildActivityChartData(
 
   return [...buckets.values()].map((b) => ({
     label: b.label,
-    deepWork: Math.round(b.deepWork),
-    meetings: Math.round(b.meetings),
+    value: Math.round(b.total),
   }));
 }
 
@@ -187,8 +223,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const deepWorkHex = getCssVar("--mi-accent", "#82C0CC");
-  const meetingsHex = getCssVar("--mi-accent-dark", "#3A7A87");
+  const barHex = getCssVar("--mi-accent", "#82C0CC");
   const uiRgb = getCssVar("--ui-rgb", "236, 232, 224");
   const axisHex = getCssVar("--text-secondary", "#9B9689");
 
@@ -219,7 +254,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
   const n = data.length;
-  const rawMax = Math.max(1, ...data.map((d) => Math.max(d.deepWork, d.meetings)));
+  const rawMax = Math.max(1, ...data.map((d) => d.value));
   const { step, unit, divisor } = niceAxis(rawMax);
   const maxVal = Math.ceil(rawMax / step) * step;
 
@@ -242,8 +277,7 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
   }
 
   const groupW = chartW / n;
-  const barW = Math.max(3, Math.min(groupW * 0.3, 28));
-  const gap = Math.max(1.5, barW * 0.15);
+  const barW = Math.max(3, Math.min(groupW * 0.5, 36));
   const radius = 3;
   const labelSet = sparseIndices(n);
 
@@ -252,25 +286,10 @@ export function drawActivityChart(canvas: HTMLCanvasElement, data: ActivityChart
     const groupX = padLeft + i * groupW;
     const centerX = groupX + groupW / 2;
 
-    const dwIsZero = d.deepWork < 1;
-    const mtIsZero = d.meetings < 1;
-
-    if (!dwIsZero && !mtIsZero) {
-      const dwH = (d.deepWork / maxVal) * chartH;
-      const dwX = centerX - barW - gap / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
-
-      const mtH = (d.meetings / maxVal) * chartH;
-      const mtX = centerX + gap / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
-    } else if (!dwIsZero) {
-      const dwH = (d.deepWork / maxVal) * chartH;
-      const dwX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, dwX, padTop + chartH - dwH, barW, dwH, radius, deepWorkHex);
-    } else if (!mtIsZero) {
-      const mtH = (d.meetings / maxVal) * chartH;
-      const mtX = centerX - barW / 2;
-      drawRoundedTopBar(ctx, mtX, padTop + chartH - mtH, barW, mtH, radius, meetingsHex);
+    if (d.value >= 1) {
+      const barH = (d.value / maxVal) * chartH;
+      const barX = centerX - barW / 2;
+      drawRoundedTopBar(ctx, barX, padTop + chartH - barH, barW, barH, radius, barHex);
     }
 
     if (labelSet.has(i)) {
