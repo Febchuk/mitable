@@ -6,7 +6,6 @@ class UpdateService {
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private isCheckingForUpdates = false;
   private usingGitHubFallback = false;
-  private onUpdateAvailableCb: ((version: string) => void) | null = null;
   private onUpdateDownloadedCb: ((version: string) => void) | null = null;
 
   constructor() {
@@ -40,7 +39,6 @@ class UpdateService {
     autoUpdater.on("update-available", (info) => {
       log.info("[UpdateService] Update available:", info.version, "— downloading silently...");
       this.isCheckingForUpdates = false;
-      this.onUpdateAvailableCb?.(info.version);
     });
 
     autoUpdater.on("update-not-available", (info) => {
@@ -190,13 +188,6 @@ class UpdateService {
       this.updateCheckInterval = null;
       log.info("[UpdateService] Stopped periodic update checks");
     }
-  }
-
-  /**
-   * Register a callback fired when an update is available.
-   */
-  setOnUpdateAvailable(cb: (version: string) => void): void {
-    this.onUpdateAvailableCb = cb;
   }
 
   /**
