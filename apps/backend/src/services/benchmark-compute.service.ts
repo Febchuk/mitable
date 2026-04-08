@@ -10,7 +10,7 @@
  * @module benchmark-compute
  */
 
-import { eq, and, gte, lte, lt, desc } from "drizzle-orm";
+import { eq, and, gte, lte, lt, desc, inArray } from "drizzle-orm";
 import { db } from "../db/client.js";
 import {
   benchmarks,
@@ -28,7 +28,9 @@ import {
   type AppBreakdownEntry,
   type CategoryBreakdownEntry,
 } from "../db/schema/daily-activities.schema.js";
+import { monitoringSessions } from "../db/schema/monitoring.schema.js";
 import { users } from "../db/schema/users.schema.js";
+import type { ActivityContext, SessionContext, DayContext } from "./benchmark-ai.service.js";
 import { createLogger } from "../lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-compute" });
@@ -239,6 +241,82 @@ async function gatherPeriodActivity(
 }
 
 // ---------------------------------------------------------------------------
+// gatherSessionContext — rich session-level data for accomplishment generation
+// ---------------------------------------------------------------------------
+
+async function gatherSessionContext(
+  userId: string,
+  frequency: string
+): Promise<ActivityContext> {
+  const startDate = periodStartDate(frequency);
+  const endDate = todayDateString();
+
+  // 1. Query monitoring sessions for the period (cap at 10 most recent)
+  const sessions = await db
+    .select({
+      name: monitoringSessions.name,
+      rawActivitySummary: monitoringSessions.rawActivitySummary,
+      finalSummary: monitoringSessions.finalSummary,
+      accomplishments: monitoringSessions.accomplishments,
+      keyActivities: monitoringSessions.keyActivities,
+      taskBreakdown: monitoringSessions.taskBreakdown,
+      startedAt: monitoringSessions.startedAt,
+    })
+    .from(monitoringSessions)
+    .where(
+      and(
+        eq(monitoringSessions.userId, userId),
+        inArray(monitoringSessions.status, ["ended", "ready"]),
+        gte(monitoringSessions.startedAt, new Date(startDate + "T00:00:00Z")),
+        lte(monitoringSessions.startedAt, new Date(endDate + "T23:59:59Z"))
+      )
+    )
+    .orderBy(desc(monitoringSessions.startedAt))
+    .limit(10);
+
+  const sessionContexts: SessionContext[] = sessions.map((s) => {
+    const summary = s.finalSummary || s.rawActivitySummary;
+    return {
+      sessionName: s.name,
+      summary: summary ? summary.slice(0, 500) : null,
+      accomplishments: (s.accomplishments ?? []) as string[],
+      keyActivities: (s.keyActivities ?? []) as string[],
+      taskBreakdown: (s.taskBreakdown ?? []) as Array<{
+        shortTitle: string;
+        description: string;
+        minutes: number;
+      }>,
+      date: s.startedAt ? new Date(s.startedAt).toISOString().split("T")[0] : "",
+    };
+  });
+
+  // 2. Query daily summaries and key accomplishments
+  const dailyRows = await db
+    .select({
+      activityDate: userDailyActivities.activityDate,
+      daySummary: userDailyActivities.daySummary,
+      keyAccomplishments: userDailyActivities.keyAccomplishments,
+    })
+    .from(userDailyActivities)
+    .where(
+      and(
+        eq(userDailyActivities.userId, userId),
+        eq(userDailyActivities.periodType, "daily"),
+        gte(userDailyActivities.activityDate, startDate),
+        lte(userDailyActivities.activityDate, endDate)
+      )
+    );
+
+  const dailySummaries: DayContext[] = dailyRows.map((row) => ({
+    date: row.activityDate,
+    daySummary: row.daySummary,
+    keyAccomplishments: (row.keyAccomplishments ?? []) as string[],
+  }));
+
+  return { sessions: sessionContexts, dailySummaries };
+}
+
+// ---------------------------------------------------------------------------
 // computeDirectMetric
 // ---------------------------------------------------------------------------
 
@@ -351,6 +429,7 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
       progress: number;
       parameterScores: Array<{ parameterId: string; score: number; reasoning: string }>;
       periodSummary: PeriodActivitySummary;
+      activityContext: ActivityContext;
     }> = [];
 
     // 4. Score each assignment
@@ -358,7 +437,10 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
       const userName =
         [assignment.firstName, assignment.lastName].filter(Boolean).join(" ") || "User";
 
-      const periodSummary = await gatherPeriodActivity(assignment.userId, benchmark.frequency);
+      const [periodSummary, activityContext] = await Promise.all([
+        gatherPeriodActivity(assignment.userId, benchmark.frequency),
+        gatherSessionContext(assignment.userId, benchmark.frequency),
+      ]);
 
       let currentValue: number;
       let parameterScores: Array<{
@@ -418,6 +500,7 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
         progress,
         parameterScores,
         periodSummary,
+        activityContext,
       });
     }
 
@@ -442,7 +525,7 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
         .limit(1);
 
       const { trend, trendDelta } = calculateTrend(
-        result.currentValue,
+        result.progress,
         previousSnapshot?.value ?? null
       );
 
@@ -521,7 +604,13 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
           Array<{ text: string }>,
         ] = await Promise.all([
           benchmarkAIService.generateSuggestions(priorities, result.periodSummary, result.userName),
-          benchmarkAIService.detectAccomplishments(result.periodSummary, result.userName),
+          benchmarkAIService.detectAccomplishments(
+            result.periodSummary,
+            result.userName,
+            result.activityContext,
+            priorities,
+            benchmark.name
+          ),
         ]);
 
         // Delete old suggestions and accomplishments for this assignment

@@ -65,6 +65,26 @@ export interface Accomplishment {
   date: string;
 }
 
+export interface SessionContext {
+  sessionName: string | null;
+  summary: string | null;
+  accomplishments: string[];
+  keyActivities: string[];
+  taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
+  date: string;
+}
+
+export interface DayContext {
+  date: string;
+  daySummary: string | null;
+  keyAccomplishments: string[];
+}
+
+export interface ActivityContext {
+  sessions: SessionContext[];
+  dailySummaries: DayContext[];
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -325,26 +345,96 @@ Return JSON only: { "suggestions": [{ "text": "...", "category": "scheduling|hab
 
   /**
    * Detect notable accomplishments from a period's activity data.
-   * Falls back to data-derived accomplishments.
+   * Accomplishments are grounded in specific observed activities from sessions
+   * and aligned to the benchmark's parameters.
+   * Falls back to extracting raw accomplishments from session data.
    */
   async detectAccomplishments(
     periodSummary: PeriodActivitySummary,
-    userName: string
+    userName: string,
+    activityContext: ActivityContext,
+    parameters: PriorityParam[],
+    benchmarkName?: string
   ): Promise<Accomplishment[]> {
     try {
       const model = getModel();
-      const prompt = `Based on ${userName}'s activity data for this period, identify 2-4 notable accomplishments:
 
-${JSON.stringify(periodSummary)}
+      // Build session context blocks (same format as bragbook generator)
+      const sessionsBlock = activityContext.sessions
+        .map((s, i) => {
+          const parts: string[] = [];
+          if (s.sessionName) parts.push(`Session: ${s.sessionName}`);
+          if (s.summary) parts.push(`Summary: ${s.summary}`);
+          if (s.taskBreakdown.length > 0) {
+            const tasks = s.taskBreakdown
+              .map((t) => `  - ${t.shortTitle}: ${t.description}`)
+              .join("\n");
+            parts.push(`Tasks:\n${tasks}`);
+          }
+          if (s.accomplishments.length > 0) {
+            parts.push(`Accomplishments: ${s.accomplishments.join("; ")}`);
+          }
+          if (s.keyActivities.length > 0) {
+            parts.push(`Key activities: ${s.keyActivities.join("; ")}`);
+          }
+          return `<session_${i + 1}>\n${parts.join("\n")}\n</session_${i + 1}>`;
+        })
+        .join("\n\n");
 
-Look for:
-- Long deep focus sessions (high longestFocusBlockMinutes)
-- High on-task rates
-- Significant collaboration time
-- High number of accomplishments logged
-- Diverse tool usage
+      const dailyBlock = activityContext.dailySummaries
+        .filter((d) => d.daySummary || d.keyAccomplishments.length > 0)
+        .map((d) => {
+          const parts: string[] = [`Date: ${d.date}`];
+          if (d.daySummary) parts.push(`Summary: ${d.daySummary}`);
+          if (d.keyAccomplishments.length > 0) {
+            parts.push(`Accomplishments: ${d.keyAccomplishments.join("; ")}`);
+          }
+          return parts.join("\n");
+        })
+        .join("\n\n");
 
-Return JSON only: { "accomplishments": [{ "text": "description of accomplishment", "date": "YYYY-MM-DD" }] }`;
+      const paramsBlock = parameters
+        .map((p) => `- ${p.name} (${p.score.toFixed(1)}/5): ${p.description}`)
+        .join("\n");
+
+      const prompt = `Identify 2-4 accomplishments from ${userName}'s recent work activity.${benchmarkName ? ` This is for the "${benchmarkName}" benchmark.` : ""}
+
+<benchmark_parameters>
+These are the areas being evaluated. Each accomplishment should be legible against at least one parameter:
+${paramsBlock}
+</benchmark_parameters>
+
+<sessions>
+${sessionsBlock || "No session data available."}
+</sessions>
+
+<daily_summaries>
+${dailyBlock || "No daily summaries available."}
+</daily_summaries>
+
+<rules>
+A good accomplishment describes a specific, observable activity and the quality of how it was executed. It is grounded in what actually happened.
+
+- Write in plain, active, past-tense prose
+- Each accomplishment should name a concrete action: what was done, to/with whom, and in what context
+- Align accomplishments to the benchmark parameters above — prefer activities that reflect those focus areas
+- Do NOT rephrase metrics ("dedicated X minutes", "maintained X% rate", "utilized N applications")
+- Do NOT use self-congratulatory language ("exceptional", "impressive", "showcased", "demonstrated")
+- Do NOT produce generic statements that could apply to anyone on any day
+- Do NOT fabricate details not present in the session data
+- If no meaningful specific accomplishments can be identified from the data, return an empty array
+</rules>
+
+<examples>
+Good: "Reviewed the mitable.ai website, identified an opportunity for improvement with the CTA, crafted a concise replacement, and shared it in the team channel."
+Good: "Responded to a team member's question about the Kestral meeting link in the session it was raised."
+Good: "Opened a same-day huddle when coordination with Febe was needed."
+Bad: "Demonstrated exceptional teamwork and collaboration, dedicating 1247 minutes to collaborative activities."
+Bad: "Exhibited broad technical versatility by utilizing 27 unique applications."
+Bad: "Maintained a high on-task rate throughout the period."
+</examples>
+
+Return JSON only: { "accomplishments": [{ "text": "...", "date": "YYYY-MM-DD" }] }`;
 
       logger.info({ userName }, "Detecting accomplishments via LLM");
 
@@ -363,7 +453,7 @@ Return JSON only: { "accomplishments": [{ "text": "description of accomplishment
       return parsed.accomplishments;
     } catch (error) {
       logger.warn({ error }, "LLM accomplishment detection failed, using fallback");
-      return detectAccomplishmentsFallback(periodSummary);
+      return detectAccomplishmentsFallback(periodSummary, activityContext);
     }
   },
 };
@@ -443,37 +533,40 @@ function generateSuggestionsFallback(priorities: PriorityParam[]): Suggestion[] 
   }));
 }
 
-function detectAccomplishmentsFallback(periodSummary: PeriodActivitySummary): Accomplishment[] {
-  const accomplishments: Accomplishment[] = [];
+function detectAccomplishmentsFallback(
+  _periodSummary: PeriodActivitySummary,
+  activityContext: ActivityContext
+): Accomplishment[] {
   const today = new Date().toISOString().split("T")[0];
+  const seen = new Set<string>();
+  const accomplishments: Accomplishment[] = [];
 
-  if (periodSummary.longestFocusBlockMinutes >= 90) {
-    accomplishments.push({
-      text: `Achieved a ${periodSummary.longestFocusBlockMinutes}-minute deep focus session`,
-      date: today,
-    });
+  // Patterns that indicate metric-rephrasing rather than real accomplishments
+  const metricPatterns = /\d+\s*minutes?|\d+\s*hours?|\d+%|\d+\s*apps?|\d+\s*tools?/i;
+
+  // 1. Extract raw accomplishments from sessions (most specific source)
+  for (const session of activityContext.sessions) {
+    for (const text of session.accomplishments) {
+      const key = text.toLowerCase().trim();
+      if (!seen.has(key) && !metricPatterns.test(text)) {
+        seen.add(key);
+        accomplishments.push({ text, date: session.date || today });
+      }
+    }
   }
 
-  if (periodSummary.onTaskRate >= 0.8) {
-    accomplishments.push({
-      text: `Maintained ${Math.round(periodSummary.onTaskRate * 100)}% on-task rate`,
-      date: today,
-    });
+  // 2. Extract from daily key accomplishments
+  for (const day of activityContext.dailySummaries) {
+    for (const text of day.keyAccomplishments) {
+      const key = text.toLowerCase().trim();
+      if (!seen.has(key) && !metricPatterns.test(text)) {
+        seen.add(key);
+        accomplishments.push({ text, date: day.date || today });
+      }
+    }
   }
 
-  if (periodSummary.accomplishmentCount >= 3) {
-    accomplishments.push({
-      text: `Completed ${periodSummary.accomplishmentCount} key accomplishments`,
-      date: today,
-    });
-  }
-
-  if (accomplishments.length === 0) {
-    accomplishments.push({
-      text: `Logged ${periodSummary.daysActive} active work days`,
-      date: today,
-    });
-  }
-
-  return accomplishments;
+  // Cap at 4, preferring most recent
+  accomplishments.sort((a, b) => b.date.localeCompare(a.date));
+  return accomplishments.slice(0, 4);
 }
