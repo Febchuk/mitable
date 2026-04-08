@@ -83,6 +83,9 @@ function canSeeOrgWide(user: User | null): boolean {
 }
 
 function getAvailableDataScopes(user: User | null): DataScope[] {
+  if (!user?.isManager) {
+    return canSeeOrgWide(user) ? ["org-wide"] : [];
+  }
   const scopes: DataScope[] = ["direct", "all-reports"];
   if (canSeeOrgWide(user)) scopes.push("org-wide");
   return scopes;
@@ -93,11 +96,9 @@ function getInitialDataScope(user: User | null): DataScope {
   const saved = localStorage.getItem("mitable:dataScope") as DataScope | null;
   if (saved && available.includes(saved)) return saved;
 
-  // Admins with no reports default to org-wide; managers default to all-reports
-  const isAdminNoReports =
-    (user?.role === "admin" || user?.originalRole === "admin") && !user?.isManager;
-  if (isAdminNoReports && available.includes("org-wide")) return "org-wide";
-  return "all-reports";
+  if (!user?.isManager && available.includes("org-wide")) return "org-wide";
+  if (available.includes("all-reports")) return "all-reports";
+  return available[0] ?? "org-wide";
 }
 
 export function UserProvider({ children }: { children: ReactNode }) {

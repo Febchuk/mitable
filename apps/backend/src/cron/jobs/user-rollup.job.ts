@@ -1,12 +1,13 @@
 /**
  * User Rollup Job (Layer 1)
  *
- * Runs every 30 minutes. For each user in the org:
- *   1. Fetches all sessions for today with classifier data, master stories, transcripts
- *   2. Feeds everything to the Day Analyzer RLM
- *   3. Writes structured activity blocks + day summary to user_daily_activities + activity_blocks
+ * DEPRECATED: The Day Analyzer RLM pipeline is no longer the primary block source.
+ * The Block Analyzer (per-session, triggered on session end) + Granola/Fireflies sync
+ * are now the sole sources of activity_blocks. This file's processUserDay() destructively
+ * deletes and replaces all blocks for a day, which conflicts with the incremental pipeline.
  *
- * This is the heaviest computation in the pipeline — one full RLM run per user per execution.
+ * Kept for potential backfill use only. All functions are guarded with a deprecation check.
+ * To run a backfill, set ALLOW_DAY_ANALYZER_BACKFILL=true in environment.
  */
 
 import { db } from "../../db/client";
@@ -47,6 +48,14 @@ export async function runUserRollup(
   usersFailed: number;
   totalTimeMs: number;
 }> {
+  if (!process.env.ALLOW_DAY_ANALYZER_BACKFILL) {
+    logger.warn(
+      "Day Analyzer rollup is DEPRECATED. Block Analyzer is the primary pipeline. " +
+        "Set ALLOW_DAY_ANALYZER_BACKFILL=true to force a backfill run."
+    );
+    return { usersProcessed: 0, usersSkipped: 0, usersFailed: 0, totalTimeMs: 0 };
+  }
+
   const startTime = Date.now();
   const today = targetDate ? new Date(targetDate) : new Date();
   today.setHours(0, 0, 0, 0);

@@ -101,20 +101,26 @@ function resolveDateRange(period: string): {
     case "today":
       return { startDate: todayStr, endDate: todayStr, periodType: "daily" };
     case "week": {
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      // Current calendar week: Monday to Sunday
+      const day = today.getDay();
+      const diffToMon = day === 0 ? 6 : day - 1;
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() - diffToMon);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
       return {
-        startDate: sevenDaysAgo.toISOString().split("T")[0]!,
-        endDate: todayStr,
+        startDate: monday.toISOString().split("T")[0]!,
+        endDate: sunday.toISOString().split("T")[0]!,
         periodType: "daily",
       };
     }
     case "month": {
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      // Current calendar month: 1st to last day
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       return {
-        startDate: thirtyDaysAgo.toISOString().split("T")[0]!,
-        endDate: todayStr,
+        startDate: firstOfMonth.toISOString().split("T")[0]!,
+        endDate: lastOfMonth.toISOString().split("T")[0]!,
         periodType: "daily",
       };
     }
@@ -144,11 +150,7 @@ function resolveDateRange(period: string): {
 // Used for "today" so the dashboard is always as fresh as the last capture rollup.
 // ============================================================================
 interface LiveOrgMetrics {
-  avgWorkMinutes: number;
-  avgMeetingMinutes: number;
-  avgActiveMinutes: number;
-  avgWorkPercentage: number;
-  avgMeetingPercentage: number;
+  totalActiveMinutes: number;
   totalUsersTracked: number;
   totalTeamWorkMinutes: number;
   totalTeamMeetingMinutes: number;
@@ -197,17 +199,6 @@ async function computeLiveOrgMetrics(
 
   if (userRows.length === 0) return null;
 
-  const count = userRows.length;
-
-  // Averages
-  const avgWorkMinutes =
-    Math.round((userRows.reduce((s, r) => s + r.totalWorkMinutes, 0) / count) * 10) / 10;
-  const avgMeetingMinutes =
-    Math.round((userRows.reduce((s, r) => s + r.totalMeetingMinutes, 0) / count) * 10) / 10;
-  const avgActiveMinutes =
-    Math.round((userRows.reduce((s, r) => s + r.totalActiveMinutes, 0) / count) * 10) / 10;
-
-  // Totals
   const totalTeamWorkMinutes = userRows.reduce((s, r) => s + r.totalWorkMinutes, 0);
   const totalTeamMeetingMinutes = userRows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
   const totalTeamSessionMinutes = userRows.reduce((s, r) => s + r.totalSessionMinutes, 0);
@@ -300,14 +291,8 @@ async function computeLiveOrgMetrics(
     .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
   return {
-    avgWorkMinutes,
-    avgMeetingMinutes,
-    avgActiveMinutes,
-    avgWorkPercentage:
-      avgActiveMinutes > 0 ? Math.round((avgWorkMinutes / avgActiveMinutes) * 100) : 0,
-    avgMeetingPercentage:
-      avgActiveMinutes > 0 ? Math.round((avgMeetingMinutes / avgActiveMinutes) * 100) : 0,
-    totalUsersTracked: count,
+    totalActiveMinutes: totalTeamActive,
+    totalUsersTracked: userRows.length,
     totalTeamWorkMinutes,
     totalTeamMeetingMinutes,
     totalTeamSessionMinutes,
@@ -347,15 +332,10 @@ router.get(
             period,
             hasData: false,
             metrics: {
-              avgWorkMinutes: 0,
-              avgMeetingMinutes: 0,
-              avgActiveMinutes: 0,
-              avgWorkPercentage: 0,
-              avgMeetingPercentage: 0,
+              totalActiveMinutes: 0,
               totalUsersTracked: 0,
               totalTeamWorkMinutes: 0,
               totalTeamMeetingMinutes: 0,
-              totalTeamSessionMinutes: 0,
             },
             activityDistribution: [],
             topApps: [],
@@ -370,11 +350,7 @@ router.get(
           period,
           hasData: true,
           metrics: {
-            avgWorkMinutes: live.avgWorkMinutes,
-            avgMeetingMinutes: live.avgMeetingMinutes,
-            avgActiveMinutes: live.avgActiveMinutes,
-            avgWorkPercentage: live.avgWorkPercentage,
-            avgMeetingPercentage: live.avgMeetingPercentage,
+            totalActiveMinutes: live.totalActiveMinutes,
             totalUsersTracked: live.totalUsersTracked,
             totalTeamWorkMinutes: live.totalTeamWorkMinutes,
             totalTeamMeetingMinutes: live.totalTeamMeetingMinutes,
@@ -386,10 +362,9 @@ router.get(
           subscriberDistribution: live.subscriberDistribution,
           dailyTrend: [
             {
-              date: todayStr,
-              avgActiveMinutes: live.avgActiveMinutes,
-              avgWorkMinutes: live.avgWorkMinutes,
-              avgMeetingMinutes: live.avgMeetingMinutes,
+              date: targetDate,
+              totalWorkMinutes: live.totalTeamWorkMinutes,
+              totalMeetingMinutes: live.totalTeamMeetingMinutes,
               usersTracked: live.totalUsersTracked,
             },
           ],
@@ -431,15 +406,10 @@ router.get(
           period,
           hasData: false,
           metrics: {
-            avgWorkMinutes: 0,
-            avgMeetingMinutes: 0,
-            avgActiveMinutes: 0,
-            avgWorkPercentage: 0,
-            avgMeetingPercentage: 0,
+            totalActiveMinutes: 0,
             totalUsersTracked: 0,
             totalTeamWorkMinutes: 0,
             totalTeamMeetingMinutes: 0,
-            totalTeamSessionMinutes: 0,
           },
           activityDistribution: [],
           topApps: [],
@@ -450,7 +420,7 @@ router.get(
         return;
       }
 
-      // ── Group by date for daily trend + per-day averages ──
+      // ── Group by date for daily trend ──
       const byDate = new Map<string, typeof allUserRows>();
       for (const row of allUserRows) {
         const existing = byDate.get(row.activityDate) || [];
@@ -458,56 +428,43 @@ router.get(
         byDate.set(row.activityDate, existing);
       }
 
-      // Build daily trend: per-day averages across users
+      // Build daily trend: per-day TOTALS across all tracked users
       const dailyTrend: {
         date: string;
-        avgActiveMinutes: number;
-        avgWorkMinutes: number;
-        avgMeetingMinutes: number;
+        totalWorkMinutes: number;
+        totalMeetingMinutes: number;
         usersTracked: number;
       }[] = [];
       let totalTeamWorkMinutes = 0;
       let totalTeamMeetingMinutes = 0;
       let totalTeamSessionMinutes = 0;
       let maxUsers = 0;
-      let sumAvgWork = 0;
-      let sumAvgMeeting = 0;
-      let sumAvgActive = 0;
 
       for (const [date, rows] of byDate.entries()) {
         const userCount = rows.length;
         const dayWork = rows.reduce((s, r) => s + r.totalWorkMinutes, 0);
         const dayMeeting = rows.reduce((s, r) => s + r.totalMeetingMinutes, 0);
-        const dayActive = rows.reduce((s, r) => s + r.totalActiveMinutes, 0);
-
-        const avgDayWork = dayWork / userCount;
-        const avgDayMeeting = dayMeeting / userCount;
-        const avgDayActive = dayActive / userCount;
 
         dailyTrend.push({
           date,
-          avgWorkMinutes: Math.round(avgDayWork * 10) / 10,
-          avgMeetingMinutes: Math.round(avgDayMeeting * 10) / 10,
-          avgActiveMinutes: Math.round(avgDayActive * 10) / 10,
+          totalWorkMinutes: Math.round(dayWork),
+          totalMeetingMinutes: Math.round(dayMeeting),
           usersTracked: userCount,
         });
 
         totalTeamWorkMinutes += dayWork;
         totalTeamMeetingMinutes += dayMeeting;
         totalTeamSessionMinutes += rows.reduce((s, r) => s + r.totalSessionMinutes, 0);
-        sumAvgWork += avgDayWork;
-        sumAvgMeeting += avgDayMeeting;
-        sumAvgActive += avgDayActive;
         if (userCount > maxUsers) maxUsers = userCount;
       }
 
       dailyTrend.sort((a, b) => a.date.localeCompare(b.date));
 
-      // Period-level averages: average of per-day averages
-      const dayCount = byDate.size;
-      const avgWork = sumAvgWork / dayCount;
-      const avgMeeting = sumAvgMeeting / dayCount;
-      const avgActive = sumAvgActive / dayCount;
+      const grandTotalActive = totalTeamWorkMinutes + totalTeamMeetingMinutes;
+
+      // Distinct user count for per-user averaging
+      const distinctUserIds = new Set(allUserRows.map((r) => r.userId));
+      const distinctUsersTracked = distinctUserIds.size;
 
       // ── Activity distribution (category totals across all days) ──
       const catTotals = new Map<string, number>();
@@ -591,15 +548,12 @@ router.get(
         period,
         hasData: true,
         metrics: {
-          avgWorkMinutes: Math.round(avgWork * 10) / 10,
-          avgMeetingMinutes: Math.round(avgMeeting * 10) / 10,
-          avgActiveMinutes: Math.round(avgActive * 10) / 10,
-          avgWorkPercentage: avgActive > 0 ? Math.round((avgWork / avgActive) * 100) : 0,
-          avgMeetingPercentage: avgActive > 0 ? Math.round((avgMeeting / avgActive) * 100) : 0,
+          totalActiveMinutes: Math.round(grandTotalActive),
           totalUsersTracked: maxUsers,
-          totalTeamWorkMinutes: totalTeamWorkMinutes,
-          totalTeamMeetingMinutes: totalTeamMeetingMinutes,
-          totalTeamSessionMinutes: totalTeamSessionMinutes,
+          distinctUsersTracked,
+          totalTeamWorkMinutes: Math.round(totalTeamWorkMinutes),
+          totalTeamMeetingMinutes: Math.round(totalTeamMeetingMinutes),
+          totalTeamSessionMinutes: Math.round(totalTeamSessionMinutes),
         },
         activityDistribution,
         topApps,
@@ -961,10 +915,10 @@ router.get(
         blocks = blocks.filter((b) => idSet.has(b.dailyActivityId));
       }
 
-      // Fetch recent sessions + docs independent of the period filter
-      // (admins should always see latest work without needing to switch to "all time")
-      // Fetch recent sessions, excluding noise/short sessions (same gate as summarization:
-      // sessions must be >= 3 min active duration OR have a real summary, not "Short session")
+      // Fetch sessions filtered by the selected period
+      const periodStart = new Date(startDate + "T00:00:00");
+      const periodEnd = new Date(endDate + "T23:59:59.999Z");
+
       const allSessionActivities = await db
         .select({
           id: schema.monitoringSessions.id,
@@ -975,24 +929,29 @@ router.get(
           keyActivities: schema.monitoringSessions.keyActivities,
           finalSummary: schema.monitoringSessions.finalSummary,
           taskBreakdown: schema.monitoringSessions.taskBreakdown,
+          timeBreakdown: schema.monitoringSessions.timeBreakdown,
         })
         .from(schema.monitoringSessions)
-        .where(eq(schema.monitoringSessions.userId, targetUserId))
+        .where(
+          and(
+            eq(schema.monitoringSessions.userId, targetUserId),
+            gte(schema.monitoringSessions.startedAt, periodStart),
+            lte(schema.monitoringSessions.startedAt, periodEnd)
+          )
+        )
         .orderBy(desc(schema.monitoringSessions.startedAt))
-        .limit(50);
+        .limit(200);
 
-      const MIN_SESSION_DURATION_MS = 3 * 60 * 1000; // 3 minutes
-      const sessionActivities = allSessionActivities
-        .filter((s) => {
-          if (s.name === "Short session") return false;
-          if (!s.endedAt) return true; // still active
-          const activeMs = Math.max(
-            0,
-            new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime() - (s.totalPausedMs || 0)
-          );
-          return activeMs >= MIN_SESSION_DURATION_MS;
-        })
-        .slice(0, 20);
+      const MIN_SESSION_DURATION_MS = 3 * 60 * 1000;
+      const sessionActivities = allSessionActivities.filter((s) => {
+        if (s.name === "Short session") return false;
+        if (!s.endedAt) return true;
+        const activeMs = Math.max(
+          0,
+          new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime() - (s.totalPausedMs || 0)
+        );
+        return activeMs >= MIN_SESSION_DURATION_MS;
+      });
 
       const userDocs = await db
         .select({
@@ -1126,6 +1085,8 @@ router.get(
           category: b.category,
           participants: b.participants,
           sequenceNumber: b.sequenceNumber,
+          sessionId: b.sessionId || null,
+          subscriberName: b.subscriberName || null,
         })),
         blocksByDate: Object.fromEntries(
           [...blocksByDate.entries()].map(([date, dateBlocks]) => [
@@ -1158,6 +1119,7 @@ router.get(
             summary: s.finalSummary,
             taskBreakdown: (s.taskBreakdown as any[]) || [],
             activities: (s.keyActivities as any[]) || [],
+            timeBreakdown: (s.timeBreakdown as Record<string, number>) || null,
           };
         }),
         // User-created documents in the period
@@ -2042,11 +2004,13 @@ router.get(
 );
 
 // ============================================================================
-// POST /admin/dashboard/chat
-// AI assistant that answers questions about dashboard data
+// POST /admin/dashboard/chat — DEPRECATED (UI removed)
+// Dashboard chat has been removed from the UI. The main Agent chat route
+// (POST /api/agent/ask) is the only agent that accesses dashboard metrics.
+// This route and its helpers are dead code — kept for now, cleanup planned.
 // ============================================================================
 
-// LLM clients (lazy init)
+// LLM clients (lazy init) — used only by deprecated dashboard chat below
 let anthropicClient: Anthropic | null = null;
 let openaiClient: OpenAI | null = null;
 let deepseekClient: OpenAI | null = null;

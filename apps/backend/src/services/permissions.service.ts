@@ -158,12 +158,12 @@ export async function getScopedUserIds(
       .select({ id: users.id })
       .from(users)
       .where(eq(users.managerId, actorId));
-    return [actorId, ...directs.map((u) => u.id)];
+    return directs.map((u) => u.id);
   }
 
-  // "all-reports" — self + transitive
+  // "all-reports" — transitive reports (excluding self)
   const reports = await getTransitiveReportIds(actorId);
-  return [actorId, ...reports];
+  return reports;
 }
 
 /**

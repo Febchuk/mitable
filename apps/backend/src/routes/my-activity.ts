@@ -71,20 +71,24 @@ function resolveDateRange(period: string): {
     case "today":
       return { startDate: todayStr, endDate: todayStr, periodType: "daily" };
     case "week": {
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const day = today.getDay();
+      const diffToMon = day === 0 ? 6 : day - 1;
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() - diffToMon);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
       return {
-        startDate: sevenDaysAgo.toISOString().split("T")[0]!,
-        endDate: todayStr,
+        startDate: monday.toISOString().split("T")[0]!,
+        endDate: sunday.toISOString().split("T")[0]!,
         periodType: "daily",
       };
     }
     case "month": {
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       return {
-        startDate: thirtyDaysAgo.toISOString().split("T")[0]!,
-        endDate: todayStr,
+        startDate: firstOfMonth.toISOString().split("T")[0]!,
+        endDate: lastOfMonth.toISOString().split("T")[0]!,
         periodType: "daily",
       };
     }
@@ -488,8 +492,10 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
       blocks = blocks.filter((b) => idSet.has(b.dailyActivityId));
     }
 
-    // Fetch recent sessions — always fresh, not period-gated
-    // Gate: >= 3 min active duration and not a noise "Short session" label
+    // Fetch sessions filtered by the selected period
+    const periodStart = new Date(startDate + "T00:00:00");
+    const periodEnd = new Date(endDate + "T23:59:59.999Z");
+
     const allSessionActivities = await db
       .select({
         id: schema.monitoringSessions.id,
@@ -500,24 +506,29 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         keyActivities: schema.monitoringSessions.keyActivities,
         finalSummary: schema.monitoringSessions.finalSummary,
         taskBreakdown: schema.monitoringSessions.taskBreakdown,
+        timeBreakdown: schema.monitoringSessions.timeBreakdown,
       })
       .from(schema.monitoringSessions)
-      .where(eq(schema.monitoringSessions.userId, userId))
+      .where(
+        and(
+          eq(schema.monitoringSessions.userId, userId),
+          gte(schema.monitoringSessions.startedAt, periodStart),
+          lte(schema.monitoringSessions.startedAt, periodEnd)
+        )
+      )
       .orderBy(desc(schema.monitoringSessions.startedAt))
-      .limit(50);
+      .limit(200);
 
-    const MIN_SESSION_DURATION_MS = 3 * 60 * 1000; // 3 minutes
-    const sessionActivities = allSessionActivities
-      .filter((s) => {
-        if (s.name === "Short session") return false;
-        if (!s.endedAt) return true; // still active
-        const activeMs = Math.max(
-          0,
-          new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime() - (s.totalPausedMs || 0)
-        );
-        return activeMs >= MIN_SESSION_DURATION_MS;
-      })
-      .slice(0, 20);
+    const MIN_SESSION_DURATION_MS = 3 * 60 * 1000;
+    const sessionActivities = allSessionActivities.filter((s) => {
+      if (s.name === "Short session") return false;
+      if (!s.endedAt) return true;
+      const activeMs = Math.max(
+        0,
+        new Date(s.endedAt).getTime() - new Date(s.startedAt).getTime() - (s.totalPausedMs || 0)
+      );
+      return activeMs >= MIN_SESSION_DURATION_MS;
+    });
 
     // Fetch user's documents (most recent 10, excluding in-progress ones)
     const userDocs = await db
@@ -639,6 +650,8 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
         category: b.category,
         participants: b.participants,
         sequenceNumber: b.sequenceNumber,
+        sessionId: b.sessionId || null,
+        subscriberName: b.subscriberName || null,
       })),
       blocksByDate: Object.fromEntries(
         [...blocksByDate.entries()].map(([date, dateBlocks]) => [
@@ -670,6 +683,7 @@ router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> 
           summary: s.finalSummary,
           taskBreakdown: (s.taskBreakdown as any[]) || [],
           activities: (s.keyActivities as any[]) || [],
+          timeBreakdown: (s.timeBreakdown as Record<string, number>) || null,
         };
       }),
       documents: userDocs.map((d) => ({

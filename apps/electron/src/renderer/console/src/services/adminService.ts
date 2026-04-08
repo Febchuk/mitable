@@ -498,15 +498,17 @@ export interface DashboardMetrics {
   period: string;
   hasData: boolean;
   metrics: {
-    avgWorkMinutes: number;
-    avgMeetingMinutes: number;
-    avgActiveMinutes: number;
-    avgWorkPercentage: number;
-    avgMeetingPercentage: number;
+    totalActiveMinutes?: number;
+    avgWorkMinutes?: number;
+    avgMeetingMinutes?: number;
+    avgActiveMinutes?: number;
+    avgWorkPercentage?: number;
+    avgMeetingPercentage?: number;
     totalUsersTracked: number;
+    distinctUsersTracked?: number;
     totalTeamWorkMinutes: number;
     totalTeamMeetingMinutes: number;
-    totalTeamSessionMinutes: number;
+    totalTeamSessionMinutes?: number;
   };
   activityDistribution: Array<{ category: string; percentage: number; totalMinutes: number }>;
   topApps: Array<{ app: string; totalMinutes: number; userCount: number }>;
@@ -520,9 +522,11 @@ export interface DashboardMetrics {
   subscriberDistribution?: SubscriberDistributionEntry[];
   dailyTrend: Array<{
     date: string;
-    avgActiveMinutes: number;
-    avgWorkMinutes: number;
-    avgMeetingMinutes: number;
+    totalWorkMinutes?: number;
+    totalMeetingMinutes?: number;
+    avgActiveMinutes?: number;
+    avgWorkMinutes?: number;
+    avgMeetingMinutes?: number;
     usersTracked: number;
   }>;
 }
@@ -562,6 +566,8 @@ export interface ActivityBlock {
   category: string | null;
   participants?: string[];
   sequenceNumber: number;
+  sessionId?: string | null;
+  subscriberName?: string | null;
 }
 
 export interface ClassifiedActivity {
@@ -580,6 +586,7 @@ export interface SessionActivity {
   summary: string | null;
   taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
   activities: ClassifiedActivity[];
+  timeBreakdown?: Record<string, number> | null;
 }
 
 export interface DashboardPersonDetail {

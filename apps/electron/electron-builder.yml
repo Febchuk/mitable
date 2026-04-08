@@ -79,6 +79,10 @@ nsis:
 extraResources:
   - from: "build/icon.png"
     to: "assets/icon.png"
+  - from: "resources/tray-icon.png"
+    to: "resources/tray-icon.png"
+  - from: "resources/tray-icon@2x.png"
+    to: "resources/tray-icon@2x.png"
 
 # Files to include (electron-vite bundles everything to out/)
 files:
