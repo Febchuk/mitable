@@ -2374,7 +2374,7 @@ function setupMonitoringSessionHandlers() {
     return { success: true };
   });
 
-  // Permissions IPC handlers (macOS onboarding)
+  // Permissions IPC handlers (macOS)
   ipcMain.handle(IPC_CHANNELS.PERMISSIONS_GET_STATUS, () => {
     if (process.platform === "darwin") {
       return {
@@ -2398,16 +2398,6 @@ function setupMonitoringSessionHandlers() {
         "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
       );
     }
-  });
-
-  // Onboarding IPC handlers
-  ipcMain.handle(IPC_CHANNELS.ONBOARDING_GET_VERSION, (_, userId: string) => {
-    return preferencesService.getUserOnboardingVersion(userId);
-  });
-
-  ipcMain.handle(IPC_CHANNELS.ONBOARDING_SET_VERSION, (_, userId: string, version: number) => {
-    preferencesService.setUserOnboardingVersion(userId, version);
-    return { success: true };
   });
 
   // Summary preferences IPC handlers

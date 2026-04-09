@@ -151,14 +151,10 @@ export const IPC_CHANNELS = {
   BROWSER_BRIDGE_GET_INFO: "browser-bridge-get-info", // Console → Main: get port/token/connected
   BROWSER_BRIDGE_CONNECTION_UPDATE: "browser-bridge-connection-update", // Main → Console: connection state changed
 
-  // Permissions (macOS onboarding)
+  // Permissions (macOS)
   PERMISSIONS_GET_STATUS: "permissions:get-status",
   PERMISSIONS_REQUEST_ACCESSIBILITY: "permissions:request-accessibility",
   PERMISSIONS_OPEN_SCREEN_RECORDING: "permissions:open-screen-recording",
-
-  // Onboarding
-  ONBOARDING_GET_VERSION: "onboarding:get-version",
-  ONBOARDING_SET_VERSION: "onboarding:set-version",
 
   // Feedback
   FEEDBACK_GET_LOGS: "feedback:get-logs",

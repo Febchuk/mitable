@@ -177,7 +177,6 @@ export interface StreamChunk {
  * Example tools:
  * - RespondTextTool: Answer general questions with text
  * - SearchKnowledgeTool: Search documentation with RAG
- * - GuideNextStepTool: Provide visual UI guidance
  */
 export abstract class BaseTool {
   /**

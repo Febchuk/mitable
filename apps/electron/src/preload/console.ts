@@ -114,9 +114,6 @@ const IPC_CHANNELS = {
   PERMISSIONS_GET_STATUS: "permissions:get-status",
   PERMISSIONS_REQUEST_ACCESSIBILITY: "permissions:request-accessibility",
   PERMISSIONS_OPEN_SCREEN_RECORDING: "permissions:open-screen-recording",
-  // Onboarding
-  ONBOARDING_GET_VERSION: "onboarding:get-version",
-  ONBOARDING_SET_VERSION: "onboarding:set-version",
   // Feedback
   FEEDBACK_GET_LOGS: "feedback:get-logs",
   FEEDBACK_APPEND_RENDERER_LOG: "feedback:append-renderer-log",
@@ -684,16 +681,6 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   openScreenRecordingSettings: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.PERMISSIONS_OPEN_SCREEN_RECORDING),
-
-  // Onboarding
-  getOnboardingVersion: (userId: string): Promise<number> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_GET_VERSION, userId),
-
-  setOnboardingVersion: (userId: string, version: number): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_SET_VERSION, userId, version),
-
-  resetOnboarding: (userId: string): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_SET_VERSION, userId, 0),
 
   // Browser Bridge
   getBrowserBridgeStatus: (): Promise<boolean> =>

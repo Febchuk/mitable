@@ -6,11 +6,9 @@ import {
   integer,
   timestamp,
   jsonb,
-  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations.schema";
-import { sourceMaterials } from "./source-materials.schema";
 
 // Roadmap Templates (admin-created reusable templates)
 export const roadmapTemplates = pgTable("roadmap_templates", {
@@ -43,21 +41,6 @@ export const roadmapTemplateTasks = pgTable("roadmap_template_tasks", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Template Task Sources (Many-to-Many)
-export const roadmapTemplateSources = pgTable(
-  "roadmap_template_sources",
-  {
-    templateTaskId: uuid("template_task_id")
-      .notNull()
-      .references(() => roadmapTemplateTasks.id, { onDelete: "cascade" }),
-    sourceId: uuid("source_id")
-      .notNull()
-      .references(() => sourceMaterials.id, { onDelete: "cascade" }),
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.templateTaskId, table.sourceId] }),
-  })
-);
 
 // Relations
 export const roadmapTemplatesRelations = relations(roadmapTemplates, ({ one, many }) => ({
@@ -68,22 +51,10 @@ export const roadmapTemplatesRelations = relations(roadmapTemplates, ({ one, man
   tasks: many(roadmapTemplateTasks),
 }));
 
-export const roadmapTemplateTasksRelations = relations(roadmapTemplateTasks, ({ one, many }) => ({
+export const roadmapTemplateTasksRelations = relations(roadmapTemplateTasks, ({ one }) => ({
   template: one(roadmapTemplates, {
     fields: [roadmapTemplateTasks.templateId],
     references: [roadmapTemplates.id],
-  }),
-  sources: many(roadmapTemplateSources),
-}));
-
-export const roadmapTemplateSourcesRelations = relations(roadmapTemplateSources, ({ one }) => ({
-  templateTask: one(roadmapTemplateTasks, {
-    fields: [roadmapTemplateSources.templateTaskId],
-    references: [roadmapTemplateTasks.id],
-  }),
-  source: one(sourceMaterials, {
-    fields: [roadmapTemplateSources.sourceId],
-    references: [sourceMaterials.id],
   }),
 }));
 
@@ -92,5 +63,3 @@ export type RoadmapTemplate = typeof roadmapTemplates.$inferSelect;
 export type NewRoadmapTemplate = typeof roadmapTemplates.$inferInsert;
 export type RoadmapTemplateTask = typeof roadmapTemplateTasks.$inferSelect;
 export type NewRoadmapTemplateTask = typeof roadmapTemplateTasks.$inferInsert;
-export type RoadmapTemplateSource = typeof roadmapTemplateSources.$inferSelect;
-export type NewRoadmapTemplateSource = typeof roadmapTemplateSources.$inferInsert;

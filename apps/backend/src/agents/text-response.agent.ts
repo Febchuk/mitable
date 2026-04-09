@@ -3,7 +3,6 @@ import { config } from "../config";
 import { BaseAgent } from "./base.agent";
 import type { StreamChunk, ToolContext, TextMessage } from "../tools/base.tool";
 // import { RespondTextTool } from "../tools/respond-text.tool"; // Unused - commented out
-import { wrapWithWorkflowState } from "../tools/utils/workflow-wrapper";
 
 /**
  * Text Response Agent
@@ -161,15 +160,12 @@ Answer the question using the workflow context above. Be concise and helpful. Re
         streamable: true,
       };
 
-      // Smart wrapper: automatically wraps if workflow state exists
-      const finalMessage = wrapWithWorkflowState(baseMessage, context, "custom_question");
-
       // Yield complete chunk
       yield {
         type: "complete",
-        messageType: finalMessage.messageType,
-        content: finalMessage.content,
-        cardData: "cardData" in finalMessage ? finalMessage.cardData : undefined,
+        messageType: baseMessage.messageType,
+        content: baseMessage.content,
+        cardData: undefined,
       };
     } catch (error) {
       console.error("[TextResponseAgent] Error:", error);

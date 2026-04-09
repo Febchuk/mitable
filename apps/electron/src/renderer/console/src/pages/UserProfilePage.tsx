@@ -7,7 +7,7 @@ import {
   useRef,
   useMemo,
 } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -30,7 +30,6 @@ import {
   Trash2,
   Shield,
   MousePointerClick,
-  ChevronRight,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
@@ -43,13 +42,120 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { usePreferences } from "@/console/src/hooks/usePreferences";
 import { usePermissions } from "../hooks/usePermissions";
-import { PermissionRow } from "./OnboardingPage";
 import { useSubscription } from "@/console/src/hooks/queries/billing";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
 import { apiRequest } from "../services/api";
 
 const logger = createLogger("UserProfilePage");
+
+/** Permission status row used in the Settings > Permissions section */
+function PermissionRow({
+  icon: Icon,
+  label,
+  description,
+  granted,
+  buttonLabel,
+  onAction,
+}: {
+  icon: React.ElementType;
+  label: string;
+  description: string;
+  granted: boolean;
+  buttonLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "14px 0",
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 8,
+          background: "var(--bg-overlay)",
+          border: "var(--border-subtle)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={18} style={{ color: "var(--text-secondary)" }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            color: "var(--text-primary)",
+            lineHeight: 1,
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--text-tertiary)",
+            marginTop: 4,
+            lineHeight: 1,
+          }}
+        >
+          {description}
+        </div>
+      </div>
+      {granted ? (
+        <div
+          role="status"
+          style={{
+            padding: "6px 14px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 500,
+            flexShrink: 0,
+            background: "rgba(var(--status-success-rgb), 0.14)",
+            color: "var(--status-success)",
+            border: "0.5px solid rgba(var(--status-success-rgb), 0.28)",
+          }}
+        >
+          Granted
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onAction}
+          style={{
+            padding: "6px 14px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 500,
+            color: "var(--text-primary)",
+            background: "rgba(var(--ui-rgb), 0.06)",
+            border: "var(--border-subtle)",
+            cursor: "pointer",
+            flexShrink: 0,
+            transition: "background 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+          }}
+        >
+          {buttonLabel}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** Logo mark uses theme text color for contrast on both light and dark surfaces */
 function MitableLogoMark({ size = 20 }: { size?: number }) {
@@ -215,8 +321,6 @@ export default function UserProfilePage() {
     requestAccessibility,
     openScreenRecording,
   } = usePermissions();
-
-  const navigate = useNavigate();
 
   // Block list state
   const [blockedApps, setBlockedApps] = useState<string[]>([]);
@@ -2406,7 +2510,7 @@ export default function UserProfilePage() {
 
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <PermissionRow
-                  variant="settings"
+
                   icon={Monitor}
                   label="Screen Recording"
                   description="Required to capture screenshots"
@@ -2416,7 +2520,7 @@ export default function UserProfilePage() {
                 />
                 <div style={{ height: 0.5, background: "var(--divider)" }} />
                 <PermissionRow
-                  variant="settings"
+
                   icon={MousePointerClick}
                   label="Accessibility"
                   description="Required to track keyboard & mouse activity"
@@ -2426,45 +2530,6 @@ export default function UserProfilePage() {
                 />
               </div>
 
-              {/* Re-run setup link */}
-              <div
-                style={{
-                  borderTop: "var(--border-hairline)",
-                  paddingTop: 14,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (user?.id) {
-                      await window.consoleAPI?.resetOnboarding(user.id);
-                      navigate("/onboarding");
-                    }
-                  }}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 12,
-                    color: "var(--text-secondary)",
-                    textDecoration: "none",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    fontFamily: "inherit",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--text-primary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-secondary)";
-                  }}
-                >
-                  Re-run setup
-                  <ChevronRight size={12} strokeWidth={1.5} />
-                </button>
-              </div>
             </div>
           )}
 

@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { config } from "../config.js";
-import { skillGenerationService } from "../services/skill-generation.service.js";
 import { slackService } from "../services/slack.service.js";
 import { createLogger } from "../lib/logger.js";
 import { db } from "../db/client.js";
@@ -118,24 +117,6 @@ agentRouter.all(
 
 // All remaining agent routes require JWT auth
 agentRouter.use(requireAuth);
-
-// ── Skill Generation ─────────────────────────────────────────────────
-// Extracts reusable work-pattern skills from a completed session using Gemini.
-agentRouter.post("/generate-skills", async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.body as { sessionId?: string };
-    if (!sessionId) {
-      res.status(400).json({ error: "sessionId required" });
-      return;
-    }
-
-    const skills = await skillGenerationService.generateFromSession(sessionId, req.userId!);
-    res.json({ skills });
-  } catch (error) {
-    logger.error({ error }, "Skill generation error");
-    res.status(500).json({ error: "Failed to generate skills" });
-  }
-});
 
 // ── Integration Tool Endpoints ───────────────────────────────────────
 // These endpoints are called by the Electron-side Agent SDK as custom MCP tools.
