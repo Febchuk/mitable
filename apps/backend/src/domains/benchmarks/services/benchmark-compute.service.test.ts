@@ -22,35 +22,37 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 // ---------------------------------------------------------------------------
 // Build a chainable mock where every .where() and .from() resolves to an
 // empty array so the service can iterate over the result without errors.
-const emptyWhereChain = () => ({
-  limit: jest.fn().mockResolvedValue([]),
-  orderBy: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }),
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const mockFn = () => jest.fn<any>();
+
+const emptyWhereChain = (): any => ({
+  limit: mockFn().mockResolvedValue([]),
+  orderBy: mockFn().mockReturnValue({ limit: mockFn().mockResolvedValue([]) }),
 });
 
 jest.mock("../../../db/client.js", () => ({
   db: {
-    select: jest.fn().mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockImplementation(() => ({
+    select: mockFn().mockReturnValue({
+      from: mockFn().mockReturnValue({
+        where: mockFn().mockImplementation((): any => ({
           ...emptyWhereChain(),
-          // resolve the where chain itself (for .from().where() without .limit())
           then: (resolve: (v: any[]) => void) => Promise.resolve([]).then(resolve),
         })),
-        innerJoin: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
+        innerJoin: mockFn().mockReturnValue({
+          where: mockFn().mockResolvedValue([]),
         }),
       }),
     }),
-    insert: jest.fn().mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+    insert: mockFn().mockReturnValue({
+      values: mockFn().mockResolvedValue(undefined),
     }),
-    update: jest.fn().mockReturnValue({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+    update: mockFn().mockReturnValue({
+      set: mockFn().mockReturnValue({
+        where: mockFn().mockResolvedValue(undefined),
       }),
     }),
-    delete: jest.fn().mockReturnValue({
-      where: jest.fn().mockResolvedValue(undefined),
+    delete: mockFn().mockReturnValue({
+      where: mockFn().mockResolvedValue(undefined),
     }),
   },
 }));

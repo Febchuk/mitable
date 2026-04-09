@@ -44,16 +44,16 @@ const mockDbSelect = jest.fn<any>().mockImplementation(() => {
   // Build a where-chain that:
   //  - can be awaited directly (no .limit call — permissions query)
   //  - also exposes .limit() for the first two selects
-  const whereResult = dbSelectResults[currentIndex] ?? [];
+  const whereResult: any = dbSelectResults[currentIndex] ?? [];
 
   // A thenable that resolves to whereResult when awaited directly
   const whereChain = Object.assign(Promise.resolve(whereResult), {
-    limit: jest.fn().mockResolvedValue(whereResult),
+    limit: jest.fn<any>().mockResolvedValue(whereResult),
   });
 
   return {
-    from: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue(whereChain),
+    from: jest.fn<any>().mockReturnValue({
+      where: jest.fn<any>().mockReturnValue(whereChain),
     }),
   };
 });
