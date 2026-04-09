@@ -11,8 +11,8 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, isNull, asc } from "drizzle-orm";
 import { config } from "../config.js";
-import { logger } from "../lib/logger.js";
-import { parseJsonResponse } from "../lib/parse-json";
+import { logger } from "../domains/shared-infra/lib/logger.js";
+import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
 import {
   getWorkstreamSystemPrompt,
   getWorkstreamUserPrompt,

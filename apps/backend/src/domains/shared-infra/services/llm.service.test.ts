@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { llmService, type ExtractedTask } from "./llm.service.js";
-import type { NotionBlock } from "./notion.service.js";
+import type { NotionBlock } from "../../../services/notion.service.js";
 
 /**
  * Unit tests for LLMService

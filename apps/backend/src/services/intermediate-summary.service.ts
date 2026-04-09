@@ -12,7 +12,7 @@ import { db } from "../db/client";
 import { monitoringSessions, sessionCaptures, sessionTranscripts } from "../db/schema";
 import { eq, and, isNotNull, asc } from "drizzle-orm";
 import { storytellerRLMService } from "./rlm/storyteller-rlm.service";
-import { createLogger } from "../lib/logger";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "intermediate-summary" });
 

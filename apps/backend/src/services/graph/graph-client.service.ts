@@ -1,6 +1,6 @@
 import neo4j, { type Driver, type Session } from "neo4j-driver";
 import { config } from "../../config";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "graph-client" });
 

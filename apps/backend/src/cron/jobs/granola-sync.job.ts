@@ -14,7 +14,7 @@ import { db } from "../../db/client";
 import * as schema from "../../db/schema/index";
 import { isNotNull } from "drizzle-orm";
 import { granolaSyncService } from "../../services/granola-sync.service";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "granola-sync-job" });
 

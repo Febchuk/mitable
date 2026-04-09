@@ -25,7 +25,7 @@ import {
 } from "./day-analyzer-environment";
 import { getDayAnalyzerToolByName } from "./day-analyzer-tools";
 import { getDayAnalyzerSystemPrompt, getDayAnalyzerUserPrompt } from "./day-analyzer-rlm-prompts";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "day-analyzer-rlm" });
 

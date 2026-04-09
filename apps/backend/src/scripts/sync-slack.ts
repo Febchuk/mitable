@@ -15,7 +15,7 @@ import { db } from "../db/client.js";
 import { integrations } from "../db/schema/integrations.schema.js";
 import { eq } from "drizzle-orm";
 import { slackIngestionService } from "../services/slack-ingestion.service.js";
-import { vectorService } from "../services/vector.service.js";
+import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 import { validateConfig } from "../config.js";
 
 async function main() {

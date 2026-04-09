@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { config, validateVectorDimensions } from "../config.js";
+import { config, validateVectorDimensions } from "../../../config.js";
 
 const RETRY_CONFIG = {
   MAX_RETRIES: 3,

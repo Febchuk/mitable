@@ -11,7 +11,7 @@
 import { and, eq, gte, sql, isNotNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import * as schema from "../../db/schema/index";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 import {
   ARCHETYPE_RULES,
   APP_NAME_ALIASES,

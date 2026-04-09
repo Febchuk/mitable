@@ -15,7 +15,7 @@ import {
   revokePermission,
   getUserPermissions,
 } from "../services/userPermissions.service.js";
-import { supabaseAdmin } from "../lib/supabase";
+import { supabaseAdmin } from "../domains/shared-infra/lib/supabase.js";
 import { encryptionService } from "../services/encryption.service.js";
 import { config } from "../config.js";
 import { sendWelcomeEmployeeEmail } from "../services/email/email.service.js";
@@ -816,7 +816,7 @@ router.post(
       );
 
       // Initialize vector service (required for Pinecone upserts)
-      const { vectorService } = await import("../services/vector.service.js");
+      const { vectorService } = await import("../domains/shared-infra/services/vector.service.js");
       vectorService.initialize();
       console.log("[Admin] Vector service initialized");
 

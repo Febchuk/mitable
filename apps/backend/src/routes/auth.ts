@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { supabase, supabaseAdmin } from "../lib/supabase.js";
+import { supabase, supabaseAdmin } from "../domains/shared-infra/lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";

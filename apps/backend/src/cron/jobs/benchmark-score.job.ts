@@ -15,7 +15,7 @@ import { db } from "../../db/client.js";
 import { benchmarks } from "../../db/schema/benchmarks.schema.js";
 import { eq, and, inArray } from "drizzle-orm";
 import { benchmarkComputeService } from "../../services/benchmark-compute.service.js";
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-score-job" });
 

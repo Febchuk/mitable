@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
-import { piiRedactionService } from "../services/pii-redaction.service.js";
+import { piiRedactionService } from "../domains/shared-infra/services/pii-redaction.service.js";
 import type { PIIDetectionRequest, PIIDetectionResponse } from "@mitable/shared";
 
 const router = Router();

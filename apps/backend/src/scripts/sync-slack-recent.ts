@@ -13,7 +13,7 @@ import { db } from "../db/client";
 import { integrations, searchContent } from "../db/schema";
 import { sql } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
-import { vectorService } from "../services/vector.service.js";
+import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 import { validateConfig } from "../config.js";
 
 async function main() {

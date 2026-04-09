@@ -22,7 +22,7 @@ import {
   getTransitiveReportIds,
   canViewUserData,
 } from "../services/permissions.service.js";
-import { createLogger } from "../lib/logger";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "my-activity-routes" });
 const router = Router();

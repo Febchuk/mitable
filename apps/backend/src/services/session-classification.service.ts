@@ -19,7 +19,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, asc } from "drizzle-orm";
 import { config } from "../config";
-import { createLogger } from "../lib/logger";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { getKnownCustomers, getOrgName, addDiscoveredCustomers } from "./known-customers.service";
 
 const logger = createLogger({ context: "session-classification" });

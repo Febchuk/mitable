@@ -24,7 +24,7 @@ import { integrations } from "../db/schema/integrations.schema.js";
 import { eq } from "drizzle-orm";
 import { notionIngestionService } from "../services/notion-ingestion.service.js";
 import { validateConfig } from "../config.js";
-import { vectorService } from "../services/vector.service.js";
+import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 
 async function main() {
   console.log("\n🚀 Starting Notion incremental sync\n");

@@ -10,7 +10,7 @@ export function registerIntegrationTools(server: McpServer, organizationId: stri
       inputSchema: {},
     },
     async () => {
-      const { slackService } = await import("../../services/slack.service.js");
+      const { slackService } = await import("../../../../services/slack.service.js");
 
       try {
         const channels = await slackService.listChannels(organizationId);
@@ -39,7 +39,7 @@ export function registerIntegrationTools(server: McpServer, organizationId: stri
       },
     },
     async ({ channelId, text }) => {
-      const { slackService } = await import("../../services/slack.service.js");
+      const { slackService } = await import("../../../../services/slack.service.js");
 
       try {
         const result = await slackService.sendMessage(organizationId, channelId, { text });

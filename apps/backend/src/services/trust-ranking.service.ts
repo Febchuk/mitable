@@ -1,6 +1,6 @@
 import type { IntentAnalysis, SourceType, TrustConfig } from "../types/trust.types.js";
 import { INTENT_TRUST_MAP, TRUST_CONFIDENCE_THRESHOLD } from "../types/trust.types.js";
-import type { QueryResult } from "./vector.service.js";
+import type { QueryResult } from "../domains/shared-infra/services/vector.service.js";
 
 /**
  * Extended QueryResult with trust ranking metadata

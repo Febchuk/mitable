@@ -14,7 +14,7 @@ import { db } from "../../db/client.js";
 import * as schema from "../../db/schema/index.js";
 import { isNotNull } from "drizzle-orm";
 import { firefliesSyncService } from "../../services/fireflies-sync.service.js";
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "fireflies-sync-job" });
 

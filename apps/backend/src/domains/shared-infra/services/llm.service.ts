@@ -6,9 +6,9 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { config } from "../config.js";
-import type { NotionBlock } from "./notion.service.js";
-import { toGeminiSchema } from "../utils/gemini-schema.js";
+import { config } from "../../../config.js";
+import type { NotionBlock } from "../../../services/notion.service.js";
+import { toGeminiSchema } from "../../../utils/gemini-schema.js";
 import { z } from "zod";
 
 // Manually create Zod schema matching Drizzle table fields

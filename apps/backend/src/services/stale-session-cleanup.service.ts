@@ -20,7 +20,7 @@
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, inArray, isNotNull, sql } from "drizzle-orm";
-import { createLogger } from "../lib/logger";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { materializeSession } from "./activity-materializer.service";
 import { masterStoryService } from "./master-story.service";
 import { sessionSummarizationService } from "./session-summarization.service";

@@ -20,7 +20,7 @@ import {
   getOrgName,
 } from "./known-customers.service.js";
 import { config } from "../config.js";
-import { createLogger } from "../lib/logger.js";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "fireflies-sync" });
 

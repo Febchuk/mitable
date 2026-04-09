@@ -25,7 +25,7 @@ import {
   DayMasterStory,
   DayAnalyzerUserProfile,
 } from "../../services/rlm/day-analyzer-environment";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 import {
   getKnownCustomers,
   getOrgName,

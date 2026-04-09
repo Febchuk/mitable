@@ -11,7 +11,7 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import { config } from "../config.js";
-import { createLogger } from "../lib/logger.js";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "bragbook-generator" });
 

@@ -4,8 +4,8 @@ import { Resend } from "resend";
 import { optionalAuth, requireAuth } from "../middleware/auth.js";
 import { feedbackLimiter } from "../middleware/rateLimiter.js";
 import { config } from "../config.js";
-import { createLogger } from "../lib/logger.js";
-import { sanitizeFeedbackLogs } from "../lib/feedback-log-sanitize.js";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { sanitizeFeedbackLogs } from "../domains/shared-infra/lib/feedback-log-sanitize.js";
 import {
   fetchBackendLogsForFeedbackUnauth,
   fetchBackendLogsForFeedbackUser,

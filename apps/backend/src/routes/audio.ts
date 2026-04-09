@@ -8,8 +8,8 @@ import { Router } from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { URL } from "url";
 import { deepgramTranscriptionService } from "../services/deepgramTranscriptionService.js";
-import { supabase } from "../lib/supabase.js";
-import { logger } from "../lib/logger.js";
+import { supabase } from "../domains/shared-infra/lib/supabase.js";
+import { logger } from "../domains/shared-infra/lib/logger.js";
 
 const router = Router();
 

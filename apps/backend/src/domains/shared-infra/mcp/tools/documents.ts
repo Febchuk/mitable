@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { eq, and, desc, or, ilike, sql } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import * as schema from "../../db/schema/index.js";
+import { db } from "../../../../db/client.js";
+import * as schema from "../../../../db/schema/index.js";
 
 export function registerDocumentTools(server: McpServer, organizationId: string) {
   // ─── search_documents ───────────────────────────────────────────────

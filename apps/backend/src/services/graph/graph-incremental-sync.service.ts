@@ -14,7 +14,7 @@ import { graphScoringService } from "./graph-scoring.service.js";
 import { SOURCE_RELIABILITY_WEIGHTS } from "./task-archetype-map.js";
 import { normalizeName } from "../normalize-name.js";
 import { config } from "../../config.js";
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "graph-incremental-sync" });
 

@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import * as schema from "../../db/schema/index.js";
+import { db } from "../../../../db/client.js";
+import * as schema from "../../../../db/schema/index.js";
 
 function resolveDateRange(period: string): { startDate: string; endDate: string } {
   const now = new Date();

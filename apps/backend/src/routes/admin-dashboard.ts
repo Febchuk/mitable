@@ -17,7 +17,7 @@ import {
   requireAccessToUser,
   getScopedVisibleUserIds,
 } from "../middleware/authorization.js";
-import { createLogger } from "../lib/logger";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { normalizeName } from "../services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
@@ -28,7 +28,7 @@ import { graphSyncService } from "../services/graph/graph-sync.service";
 import { AskEnvironment } from "../services/rlm/ask-environment";
 import { getAskToolByName } from "../services/rlm/ask-tools";
 import { getAskSystemPrompt } from "../services/rlm/ask-rlm-prompts";
-import { parseJsonResponse } from "../lib/parse-json";
+import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
 
 const logger = createLogger({ context: "admin-dashboard-routes" });
 const router = Router();

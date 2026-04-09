@@ -15,7 +15,7 @@
 
 import { geminiVisionFrameService } from "./gemini-vision-frame.service";
 import { SENSOR_SYSTEM_PROMPT, SENSOR_USER_PROMPT } from "../prompts/session-prompts";
-import { createSessionLogger, createTimer, CHECKPOINTS } from "../lib/sessionLogger";
+import { createSessionLogger, createTimer, CHECKPOINTS } from "../domains/shared-infra/lib/sessionLogger.js";
 
 // Types
 export type ChangeType =

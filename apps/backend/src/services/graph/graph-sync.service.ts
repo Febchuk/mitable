@@ -2,7 +2,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../../db/client";
 import * as schema from "../../db/schema/index";
 import { config } from "../../config";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 import { graphClientService } from "./graph-client.service";
 import { graphRetrievalService } from "./graph-retrieval.service";
 import { graphMapperService } from "./graph-mapper.service";

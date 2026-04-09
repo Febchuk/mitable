@@ -9,7 +9,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { config } from "../../config";
 import { StorytellerEnvironment } from "./storyteller-environment";
-import { createSessionLogger } from "../../lib/sessionLogger";
+import { createSessionLogger } from "../../domains/shared-infra/lib/sessionLogger.js";
 // Shared Anthropic client for tool sub-calls (Claude Sonnet 4.5 with thinking)
 let anthropicClient: Anthropic | null = null;
 if (config.anthropic.apiKey) {

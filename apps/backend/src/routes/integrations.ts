@@ -872,7 +872,7 @@ router.post("/slack/sync", requireAuth, async (req: Request, res: Response): Pro
     console.log(`🔄 Starting Slack sync for organization: ${org?.name || user.organizationId}`);
 
     // Initialize vector service (required for Pinecone upserts)
-    const { vectorService } = await import("../services/vector.service.js");
+    const { vectorService } = await import("../domains/shared-infra/services/vector.service.js");
     vectorService.initialize();
     console.log("[Integrations] Vector service initialized");
 
@@ -1316,7 +1316,7 @@ router.post("/notion/sync", requireAuth, async (req: Request, res: Response): Pr
     console.log(`🔄 Starting Notion sync for organization: ${org?.name || user.organizationId}`);
 
     // Initialize vector service (required for Pinecone upserts)
-    const { vectorService } = await import("../services/vector.service.js");
+    const { vectorService } = await import("../domains/shared-infra/services/vector.service.js");
     vectorService.initialize();
     console.log("[Integrations] Vector service initialized");
 
@@ -1658,7 +1658,7 @@ router.post("/github/sync", requireAuth, async (req: Request, res: Response): Pr
     console.log(`🔄 Starting GitHub sync for org: ${user.organizationId}`);
 
     // Initialize vector service (required for Pinecone upserts)
-    const { vectorService } = await import("../services/vector.service.js");
+    const { vectorService } = await import("../domains/shared-infra/services/vector.service.js");
     vectorService.initialize();
     console.log("[Integrations] Vector service initialized");
 

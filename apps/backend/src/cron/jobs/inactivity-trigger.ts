@@ -7,7 +7,7 @@
  * but do nothing.
  */
 
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "inactivity-trigger" });
 

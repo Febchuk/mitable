@@ -14,7 +14,7 @@ import {
   executeRefinementTool,
   type RefinementContext,
 } from "./refinement-tools";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "refinement-rlm" });
 

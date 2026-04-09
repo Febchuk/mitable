@@ -21,7 +21,7 @@
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { createLogger } from "../lib/logger";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { normalizeName } from "./normalize-name.js";
 import { syncSubscriberToGraph, syncTopicToGraph } from "./graph/graph-incremental-sync.service.js";
 import { getKnownCustomers } from "./known-customers.service.js";

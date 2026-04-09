@@ -18,7 +18,7 @@ import {
   OrgTopAppEntry,
   OrgUserSummaryEntry,
 } from "../../db/schema/daily-activities.schema";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "org-rollup-job" });
 

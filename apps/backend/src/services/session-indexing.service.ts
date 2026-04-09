@@ -12,7 +12,7 @@
  * Pattern: Thin retrieval by default, expand on demand via tools
  */
 
-import { embeddingService } from "./embedding.service.js";
+import { embeddingService } from "../domains/shared-infra/services/embedding.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, gte } from "drizzle-orm";

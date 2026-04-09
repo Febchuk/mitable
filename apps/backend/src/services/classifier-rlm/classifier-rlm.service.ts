@@ -10,8 +10,8 @@ import { config } from "../../config";
 import { ClassifierEnvironment, ClassifierContext } from "./classifier-environment";
 import { getToolByName } from "./classifier-tools";
 import { getClassifierSystemPrompt, getClassifierUserPrompt } from "./classifier-rlm-prompts";
-import { createTimer } from "../../lib/sessionLogger";
-import { parseJsonResponse } from "../../lib/parse-json";
+import { createTimer } from "../../domains/shared-infra/lib/sessionLogger.js";
+import { parseJsonResponse } from "../../domains/shared-infra/lib/parse-json.js";
 
 export interface ClassifierRLMInput {
   userId: string;

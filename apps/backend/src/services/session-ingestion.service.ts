@@ -9,7 +9,7 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, asc } from "drizzle-orm";
 import { SessionChunkingService } from "./session-chunking.service.js";
-import { embeddingService } from "./embedding.service.js";
+import { embeddingService } from "../domains/shared-infra/services/embedding.service.js";
 
 export class SessionIngestionService {
   /**

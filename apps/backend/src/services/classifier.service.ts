@@ -1,7 +1,7 @@
 import { db } from "../db/client";
 import { users, sessionCaptures, sessionTranscripts } from "../db/schema";
 import { eq, asc, desc, and, isNotNull, gte, lte } from "drizzle-orm";
-import { createSessionLogger } from "../lib/sessionLogger";
+import { createSessionLogger } from "../domains/shared-infra/lib/sessionLogger.js";
 import { classifierRLMService } from "./classifier-rlm/classifier-rlm.service";
 
 export interface ClassifierInput {

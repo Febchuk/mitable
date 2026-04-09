@@ -11,7 +11,7 @@ import { config } from "../config";
 import { db } from "../db/client";
 import { sessionCaptures } from "../db/schema/index";
 import { eq, and, isNotNull, asc } from "drizzle-orm";
-import { createLogger } from "../lib/logger";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "session-title" });
 

@@ -31,7 +31,7 @@ import {
 import { monitoringSessions } from "../db/schema/monitoring.schema.js";
 import { users } from "../db/schema/users.schema.js";
 import type { ActivityContext, SessionContext, DayContext } from "./benchmark-ai.service.js";
-import { createLogger } from "../lib/logger.js";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-compute" });
 

@@ -1,7 +1,7 @@
 import Groq from "groq-sdk";
 import { config } from "../config.js";
 import type { IntentAnalysis, IntentOptions } from "../types/trust.types.js";
-import { parseJsonResponse } from "../lib/parse-json";
+import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
 
 /**
  * Intent Detection Service

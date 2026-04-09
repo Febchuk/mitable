@@ -6,11 +6,11 @@ import { router } from "./routes.js";
 import { swaggerSpec } from "./swagger.js";
 import { config } from "./config.js";
 import { generalLimiter } from "./middleware/rateLimiter.js";
-import { correlationIdMiddleware } from "./middleware/correlationId.js";
-import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
-import { errorHandler } from "./middleware/errorHandler.js";
-import { setupSentryErrorHandler } from "./lib/sentry.js";
-import { mcpRouter } from "./mcp/transport.js";
+import { correlationIdMiddleware } from "./domains/shared-infra/middleware/correlationId.js";
+import { requestLoggerMiddleware } from "./domains/shared-infra/middleware/requestLogger.js";
+import { errorHandler } from "./domains/shared-infra/middleware/errorHandler.js";
+import { setupSentryErrorHandler } from "./domains/shared-infra/lib/sentry.js";
+import { mcpRouter } from "./domains/shared-infra/mcp/transport.js";
 
 export const app = express();
 

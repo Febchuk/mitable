@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { eq } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import * as schema from "../../db/schema/index.js";
+import { db } from "../../../../db/client.js";
+import * as schema from "../../../../db/schema/index.js";
 
 export function registerOrganizationResources(server: McpServer, organizationId: string) {
   // ─── mitable://organization ─────────────────────────────────────────

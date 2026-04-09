@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { eq, and, desc, inArray } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import * as schema from "../../db/schema/index.js";
+import { db } from "../../../../db/client.js";
+import * as schema from "../../../../db/schema/index.js";
 
 export function registerRecapTools(server: McpServer, organizationId: string) {
   // ─── generate_recap ─────────────────────────────────────────────────
@@ -43,7 +43,7 @@ export function registerRecapTools(server: McpServer, organizationId: string) {
       const validIds = sessions.map((s) => s.id);
       const userId = sessions[0].userId;
 
-      const { recapRLMService } = await import("../../services/recap-rlm.service.js");
+      const { recapRLMService } = await import("../../../../services/recap-rlm.service.js");
       const recap = await recapRLMService.generateRecap(validIds, userId, { tone, length });
 
       return { content: [{ type: "text" as const, text: JSON.stringify({ recap }) }] };

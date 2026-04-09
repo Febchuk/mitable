@@ -13,7 +13,7 @@
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { sql, eq, and, inArray, or } from "drizzle-orm";
-import { embeddingService } from "./embedding.service.js";
+import { embeddingService } from "../domains/shared-infra/services/embedding.service.js";
 import { SessionIngestionService } from "./session-ingestion.service.js";
 
 export interface SessionChunkResult {

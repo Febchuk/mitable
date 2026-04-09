@@ -9,7 +9,7 @@
  */
 
 import { generateForAllUsers } from "../../services/bragbook-generator.service.js";
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "bragbook-generate-job" });
 

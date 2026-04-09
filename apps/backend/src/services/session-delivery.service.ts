@@ -19,7 +19,7 @@ import {
   CHECKPOINTS,
   SESSION_EVENTS,
   createContentHash,
-} from "../lib/sessionLogger";
+} from "../domains/shared-infra/lib/sessionLogger.js";
 
 // ===========================
 // Types

@@ -1,4 +1,4 @@
-import { parseJsonResponse } from "../../lib/parse-json";
+import { parseJsonResponse } from "../../domains/shared-infra/lib/parse-json.js";
 
 /**
  * Capture Rollup Job (Lightweight Layer 1)
@@ -21,7 +21,7 @@ import * as schema from "../../db/schema/index";
 import { eq, and, gte, lte, asc, sql } from "drizzle-orm";
 import { AppBreakdownEntry, CategoryBreakdownEntry } from "../../db/schema/daily-activities.schema";
 import { config } from "../../config";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 import {
   getKnownCustomers,
   getOrgName,

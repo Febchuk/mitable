@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { config } from "../config.js";
 import { slackService } from "../services/slack.service.js";
-import { createLogger } from "../lib/logger.js";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, desc } from "drizzle-orm";
@@ -11,7 +11,7 @@ import { AgentQueryEnvironment } from "../services/rlm/agent-query-environment.j
 import { getAgentQueryToolByName } from "../services/rlm/agent-query-tools.js";
 import { getAgentQuerySystemPrompt } from "../services/rlm/agent-query-prompts.js";
 import { UserActivityQueryService } from "../services/user-activity-queries.js";
-import { parseJsonResponse } from "../lib/parse-json.js";
+import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 

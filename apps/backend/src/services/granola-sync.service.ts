@@ -27,8 +27,8 @@ import { recalculateDailyStats } from "./activity-materializer.service.js";
 import { addDiscoveredCustomers } from "./known-customers.service.js";
 import { getKnownCustomers, getOrgName } from "./known-customers.service.js";
 import { config } from "../config.js";
-import { createLogger } from "../lib/logger.js";
-import { parseJsonResponse } from "../lib/parse-json.js";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
 
 const logger = createLogger({ context: "granola-sync" });
 

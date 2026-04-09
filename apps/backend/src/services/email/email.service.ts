@@ -7,7 +7,7 @@
 
 import { Resend } from "resend";
 import { config } from "../../config";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 import {
   buildWelcomeAdminEmail,
   buildWelcomeEmployeeEmail,

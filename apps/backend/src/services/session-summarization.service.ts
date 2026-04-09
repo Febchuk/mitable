@@ -33,8 +33,8 @@ import {
   checkDuplicateSummary,
   CHECKPOINTS,
   SESSION_EVENTS,
-} from "../lib/sessionLogger";
-import { logger } from "../lib/logger";
+} from "../domains/shared-infra/lib/sessionLogger.js";
+import { logger } from "../domains/shared-infra/lib/logger.js";
 
 // Configuration
 const SUMMARIZATION_CONFIG = {

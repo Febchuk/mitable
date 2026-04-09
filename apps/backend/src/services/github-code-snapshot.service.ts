@@ -13,12 +13,12 @@
 
 import type { Octokit } from "@octokit/core";
 import { githubChunkingService } from "./github-chunking.service.js";
-import { embeddingService } from "./embedding.service.js";
-import { vectorService } from "./vector.service.js";
+import { embeddingService } from "../domains/shared-infra/services/embedding.service.js";
+import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, sql, inArray } from "drizzle-orm";
-import type { VectorRecord } from "./vector.service.js";
+import type { VectorRecord } from "../domains/shared-infra/services/vector.service.js";
 import type { NewSearchContent } from "../db/schema/search-content.schema.js";
 
 const SYNC_CONFIG = {

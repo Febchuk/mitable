@@ -14,8 +14,8 @@ import { config } from "../../config";
 import { StorytellerEnvironment, Activity, SessionMetadata } from "./storyteller-environment";
 import { getToolByName } from "./storyteller-tools";
 import { getStorytellerSystemPrompt, getStorytellerUserPrompt } from "./storyteller-rlm-prompts";
-import { createTimer } from "../../lib/sessionLogger";
-import { createLogger } from "../../lib/logger";
+import { createTimer } from "../../domains/shared-infra/lib/sessionLogger.js";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "storyteller-rlm" });
 

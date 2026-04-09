@@ -1,5 +1,5 @@
 import { Pinecone } from "@pinecone-database/pinecone";
-import { config } from "../config.js";
+import { config } from "../../../config.js";
 
 const RETRY_CONFIG = {
   MAX_RETRIES: 3,

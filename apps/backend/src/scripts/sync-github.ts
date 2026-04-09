@@ -23,7 +23,7 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, sql } from "drizzle-orm";
 import { validateConfig } from "../config.js";
-import { vectorService } from "../services/vector.service.js";
+import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 
 type IntegrationRow = typeof schema.integrations.$inferSelect;
 type GithubRepoRow = typeof schema.githubRepos.$inferSelect;

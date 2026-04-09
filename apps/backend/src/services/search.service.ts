@@ -1,10 +1,10 @@
-import { embeddingService } from "./embedding.service.js";
-import { vectorService } from "./vector.service.js";
+import { embeddingService } from "../domains/shared-infra/services/embedding.service.js";
+import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 import { db } from "../db/client.js";
 import { searchContent } from "../db/schema/index.js";
 import { sql, and, eq, gte, lte, inArray, SQL } from "drizzle-orm";
-import type { QueryResult } from "./vector.service.js";
-import { cacheService } from "./cache.service.js";
+import type { QueryResult } from "../domains/shared-infra/services/vector.service.js";
+import { cacheService } from "../domains/shared-infra/services/cache.service.js";
 import { searchLoggerService } from "./search-logger.service.js";
 
 /**

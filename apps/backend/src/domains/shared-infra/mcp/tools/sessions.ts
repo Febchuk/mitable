@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { eq, and, desc, sql, inArray, gte, lte } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import * as schema from "../../db/schema/index.js";
+import { db } from "../../../../db/client.js";
+import * as schema from "../../../../db/schema/index.js";
 
 export function registerSessionTools(server: McpServer, organizationId: string) {
   // ─── get_sessions ───────────────────────────────────────────────────
@@ -179,7 +179,7 @@ export function registerSessionTools(server: McpServer, organizationId: string) 
     async ({ query, userId, topK }) => {
       // Dynamic import to avoid circular dependency issues
       const { sessionRetrieverService } =
-        await import("../../services/session-retriever.service.js");
+        await import("../../../../services/session-retriever.service.js");
 
       // If no userId specified, we need to pick one for the service (it requires userId).
       // For org-wide search, we pass a placeholder and rely on org scoping.

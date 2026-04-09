@@ -1,4 +1,4 @@
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 import { graphSyncService } from "../../services/graph/graph-sync.service";
 
 const logger = createLogger({ context: "graph-sync-job" });

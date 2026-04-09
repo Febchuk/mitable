@@ -33,7 +33,7 @@ import {
   getBlockAnalyzerSystemPrompt,
   getBlockAnalyzerUserPrompt,
 } from "./block-analyzer-rlm-prompts";
-import { createLogger } from "../../lib/logger";
+import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "block-analyzer-rlm" });
 
