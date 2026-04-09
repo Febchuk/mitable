@@ -10,8 +10,8 @@
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
-import { slackService } from "./slack.service.js";
-import { gmailService } from "./gmail.service.js";
+import { slackService } from "../domains/integrations/slack/slack.service.js";
+import { gmailService } from "../domains/integrations/email/gmail.service.js";
 import { encryptionService } from "../domains/auth/services/encryption.service.js";
 import {
   createSessionLogger,

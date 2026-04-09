@@ -4,7 +4,7 @@ import { requireAuth, optionalAuth } from "./domains/auth/middleware/auth.js";
 import agentRouter from "./routes/agent.js";
 import adminRouter from "./domains/auth/routes/admin.js";
 import adminDashboardRouter from "./domains/insights/routes/admin-dashboard.js";
-import integrationsRouter from "./routes/integrations.js";
+import integrationsRouter from "./domains/integrations/routes/integrations.js";
 import piiRouter from "./domains/auth/routes/pii.js";
 import monitoringRouter from "./routes/monitoring.js";
 import documentsRouter from "./routes/documents.js";

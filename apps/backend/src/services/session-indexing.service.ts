@@ -16,7 +16,7 @@ import { embeddingService } from "../domains/shared-infra/services/embedding.ser
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, gte } from "drizzle-orm";
-import type { NewSearchContent } from "../db/schema/search-content.schema.js";
+import type { NewSearchContent } from "../domains/integrations/schema/search-content.schema.js";
 import type { MonitoringSession, SessionCapture } from "../db/schema/monitoring.schema.js";
 
 const INDEXING_CONFIG = {

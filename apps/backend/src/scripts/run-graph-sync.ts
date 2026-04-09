@@ -4,7 +4,7 @@
  * Usage:
  *   npm run graph:sync
  */
-import { graphSyncService } from "../services/graph/graph-sync.service";
+import { graphSyncService } from "../domains/integrations/graph/graph-sync.service";
 
 async function run() {
   const startedAt = Date.now();

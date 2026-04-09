@@ -19,7 +19,7 @@ import * as schema from "../../../db/schema/index.js";
 import { eq, and, inArray, asc } from "drizzle-orm";
 import { config } from "../../../config.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
-import { graphContextBuilderService } from "../../../services/graph/graph-context-builder.service";
+import { graphContextBuilderService } from "../../integrations/graph/graph-context-builder.service";
 
 const logger = createLogger({ context: "recap-rlm" });
 

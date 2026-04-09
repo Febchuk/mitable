@@ -12,9 +12,9 @@
  */
 
 import { db } from "../db/client.js";
-import { integrations } from "../db/schema/integrations.schema.js";
+import { integrations } from "../domains/integrations/schema/integrations.schema.js";
 import { eq } from "drizzle-orm";
-import { slackIngestionService } from "../services/slack-ingestion.service.js";
+import { slackIngestionService } from "../domains/integrations/slack/slack-ingestion.service.js";
 import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 import { validateConfig } from "../config.js";
 

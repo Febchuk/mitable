@@ -25,7 +25,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { masterStoryService } from "../domains/updates/services/master-story.service";
-import { graphContextBuilderService } from "./graph/graph-context-builder.service";
+import { graphContextBuilderService } from "../domains/integrations/graph/graph-context-builder.service";
 import {
   createSessionLogger,
   createContentHash,

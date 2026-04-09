@@ -825,14 +825,14 @@ router.post(
 
       switch (integration.provider) {
         case "slack": {
-          const { slackIngestionService } = await import("../../../services/slack-ingestion.service.js");
+          const { slackIngestionService } = await import("../../integrations/slack/slack-ingestion.service.js");
           syncResult = await slackIngestionService.syncMessages(currentUser.organizationId);
           break;
         }
 
         case "notion": {
           const { notionIngestionService } =
-            await import("../../../services/notion-ingestion.service.js");
+            await import("../../integrations/notion/notion-ingestion.service.js");
           syncResult = await notionIngestionService.syncPages(currentUser.organizationId);
           break;
         }
@@ -1480,13 +1480,13 @@ router.post(
 
       try {
         if (integration.provider === "slack") {
-          const { slackIngestionService } = await import("../../../services/slack-ingestion.service.js");
+          const { slackIngestionService } = await import("../../integrations/slack/slack-ingestion.service.js");
           const result = await slackIngestionService.syncMessages(currentUser.organizationId);
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;
         } else if (integration.provider === "notion") {
           const { notionIngestionService } =
-            await import("../../../services/notion-ingestion.service.js");
+            await import("../../integrations/notion/notion-ingestion.service.js");
           const result = await notionIngestionService.syncPages(currentUser.organizationId);
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;

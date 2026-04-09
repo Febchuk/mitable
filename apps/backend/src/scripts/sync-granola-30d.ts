@@ -90,10 +90,10 @@ async function main() {
   const { db } = await import("../db/client");
   const schema = await import("../db/schema/index");
   const { eq, and, isNotNull } = await import("drizzle-orm");
-  const { granolaService } = await import("../services/granola.service");
-  const { encryptionService } = await import("../services/encryption.service");
+  const { granolaService } = await import("../domains/integrations/granola/granola.service");
+  const { encryptionService } = await import("../domains/auth/services/encryption.service");
   const { recalculateDailyStats } = await import("../services/activity-materializer.service");
-  const { addDiscoveredCustomers } = await import("../services/known-customers.service");
+  const { addDiscoveredCustomers } = await import("../domains/auth/services/known-customers.service");
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║   Granola 30-Day Sync (DEV)              ║");

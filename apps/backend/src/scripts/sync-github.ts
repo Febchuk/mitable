@@ -17,8 +17,8 @@
  */
 
 import type { Octokit } from "@octokit/core";
-import { githubService } from "../services/github.service.js";
-import { githubIngestionService } from "../services/github-ingestion.service.js";
+import { githubService } from "../domains/integrations/github/github.service.js";
+import { githubIngestionService } from "../domains/integrations/github/github-ingestion.service.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, sql } from "drizzle-orm";

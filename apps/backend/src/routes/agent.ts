@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../domains/auth/middleware/auth.js";
 import { config } from "../config.js";
-import { slackService } from "../services/slack.service.js";
+import { slackService } from "../domains/integrations/slack/slack.service.js";
 import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";

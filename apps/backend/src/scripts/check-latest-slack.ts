@@ -13,7 +13,7 @@
  */
 
 import { db } from "../db/client.js";
-import { searchContent } from "../db/schema/search-content.schema.js";
+import { searchContent } from "../domains/integrations/schema/search-content.schema.js";
 import { eq, desc } from "drizzle-orm";
 
 interface ChannelStats {

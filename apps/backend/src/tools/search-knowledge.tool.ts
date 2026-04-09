@@ -11,7 +11,7 @@ import {
   type ThreadBundle,
 } from "../utils/slack-thread.utils.js";
 import { db } from "../db/client.js";
-import { integrations } from "../db/schema/integrations.schema.js";
+import { integrations } from "../domains/integrations/schema/integrations.schema.js";
 import { eq, and } from "drizzle-orm";
 
 /**

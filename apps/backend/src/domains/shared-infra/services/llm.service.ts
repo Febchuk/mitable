@@ -7,7 +7,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { config } from "../../../config.js";
-import type { NotionBlock } from "../../../services/notion.service.js";
+import type { NotionBlock } from "../../integrations/notion/notion.service.js";
 import { toGeminiSchema } from "../../../utils/gemini-schema.js";
 import { z } from "zod";
 

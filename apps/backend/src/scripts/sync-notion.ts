@@ -20,9 +20,9 @@
  */
 
 import { db } from "../db/client.js";
-import { integrations } from "../db/schema/integrations.schema.js";
+import { integrations } from "../domains/integrations/schema/integrations.schema.js";
 import { eq } from "drizzle-orm";
-import { notionIngestionService } from "../services/notion-ingestion.service.js";
+import { notionIngestionService } from "../domains/integrations/notion/notion-ingestion.service.js";
 import { validateConfig } from "../config.js";
 import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 

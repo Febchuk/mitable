@@ -22,8 +22,8 @@ import { normalizeName } from "../../auth/services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { config } from "../../../config.js";
-import { graphRetrievalService } from "../../../services/graph/graph-retrieval.service.js";
-import { graphSyncService } from "../../../services/graph/graph-sync.service.js";
+import { graphRetrievalService } from "../../integrations/graph/graph-retrieval.service.js";
+import { graphSyncService } from "../../integrations/graph/graph-sync.service.js";
 // DEPRECATED — Ask RLM only (callAskLLM, parseAskResponse, /admin/ask/*). Slated for deletion.
 import { AskEnvironment } from "../../../services/rlm/ask-environment.js";
 import { getAskToolByName } from "../../../services/rlm/ask-tools.js";
