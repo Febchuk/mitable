@@ -14,16 +14,16 @@
  * - Tool-based approach (no arbitrary code execution)
  */
 
-import { db } from "../db/client";
+import { db } from "../../../db/client";
 import {
   monitoringSessions,
   sessionCaptures,
   sessionTranscripts,
   sessionSummaries,
-} from "../db/schema";
+} from "../../../db/schema";
 import { eq, and, isNotNull, asc, desc } from "drizzle-orm";
-import { createSessionLogger, createTimer, CHECKPOINTS } from "../domains/shared-infra/lib/sessionLogger.js";
-import { storytellerRLMService } from "./rlm/storyteller-rlm.service";
+import { createSessionLogger, createTimer, CHECKPOINTS } from "../../shared-infra/lib/sessionLogger.js";
+import { storytellerRLMService } from "../../../services/rlm/storyteller-rlm.service";
 
 export interface GenerateStoryOptions {
   sessionId: string;

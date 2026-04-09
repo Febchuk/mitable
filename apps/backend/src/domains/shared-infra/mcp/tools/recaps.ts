@@ -43,7 +43,7 @@ export function registerRecapTools(server: McpServer, organizationId: string) {
       const validIds = sessions.map((s) => s.id);
       const userId = sessions[0].userId;
 
-      const { recapRLMService } = await import("../../../../services/recap-rlm.service.js");
+      const { recapRLMService } = await import("../../../updates/services/recap-rlm.service.js");
       const recap = await recapRLMService.generateRecap(validIds, userId, { tone, length });
 
       return { content: [{ type: "text" as const, text: JSON.stringify({ recap }) }] };

@@ -22,7 +22,7 @@ import * as schema from "../db/schema/index";
 import { eq, and, inArray, isNotNull, sql } from "drizzle-orm";
 import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { materializeSession } from "./activity-materializer.service";
-import { masterStoryService } from "./master-story.service";
+import { masterStoryService } from "../domains/updates/services/master-story.service";
 import { sessionSummarizationService } from "./session-summarization.service";
 
 const logger = createLogger({ context: "stale-session-cleanup" });

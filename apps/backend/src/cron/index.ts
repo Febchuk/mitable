@@ -17,7 +17,7 @@ import { runGraphSyncJob } from "./jobs/graph-sync.job";
 import { runGranolaSyncJob } from "./jobs/granola-sync.job";
 import { runFirefliesSyncJob } from "./jobs/fireflies-sync.job";
 import { runBenchmarkScoreJob } from "../domains/benchmarks/cron/benchmark-score.job";
-import { runBragbookGenerateJob } from "./jobs/bragbook-generate.job";
+import { runBragbookGenerateJob } from "../domains/updates/cron/bragbook-generate.job";
 import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });

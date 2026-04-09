@@ -16,7 +16,7 @@ import { eq, and, gte, lte, asc, sql } from "drizzle-orm";
 import {
   dayAnalyzerRLMService,
   DayAnalyzerInput,
-} from "../../services/rlm/day-analyzer-rlm.service";
+} from "../../domains/updates/rlm/day-analyzer/day-analyzer-rlm.service";
 import { recalculateDailyStats } from "../../services/activity-materializer.service";
 import {
   DaySession,
@@ -24,7 +24,7 @@ import {
   DayTranscript,
   DayMasterStory,
   DayAnalyzerUserProfile,
-} from "../../services/rlm/day-analyzer-environment";
+} from "../../domains/updates/rlm/day-analyzer/day-analyzer-environment";
 import { createLogger } from "../../domains/shared-infra/lib/logger.js";
 import {
   getKnownCustomers,

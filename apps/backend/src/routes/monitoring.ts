@@ -9,10 +9,10 @@ import {
   type MultiDeliveryTarget,
 } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
-import { recapRLMService } from "../services/recap-rlm.service.js";
+import { recapRLMService } from "../domains/updates/services/recap-rlm.service.js";
 import { frameAnalysisService } from "../services/frame-analysis.service.js";
 import { classifierService } from "../services/classifier.service.js";
-import { masterStoryService } from "../services/master-story.service.js";
+import { masterStoryService } from "../domains/updates/services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
 import { SessionIngestionService } from "../services/session-ingestion.service.js";
 import { workstreamAggregationService } from "../services/workstream-aggregation.service.js";

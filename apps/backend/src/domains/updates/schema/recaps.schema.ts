@@ -9,9 +9,9 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { users } from "./users.schema";
-import { organizations } from "./organizations.schema";
-import { monitoringSessions } from "./monitoring.schema";
+import { users } from "../../../db/schema/users.schema";
+import { organizations } from "../../../db/schema/organizations.schema";
+import { monitoringSessions } from "../../../db/schema/monitoring.schema";
 
 /**
  * Recaps

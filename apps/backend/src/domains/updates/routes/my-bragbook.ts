@@ -11,11 +11,11 @@
  */
 
 import { Router, Request, Response } from "express";
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { requireAuth } from "../../../middleware/auth.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 import { generateBragbookEntry } from "../services/bragbook-generator.service.js";
 
 const logger = createLogger({ context: "my-bragbook-routes" });

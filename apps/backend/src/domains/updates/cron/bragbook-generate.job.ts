@@ -8,8 +8,8 @@
  *   Quarterly: 1st of Jan/Apr/Jul/Oct at 03:00 UTC
  */
 
-import { generateForAllUsers } from "../../services/bragbook-generator.service.js";
-import { createLogger } from "../../domains/shared-infra/lib/logger.js";
+import { generateForAllUsers } from "../services/bragbook-generator.service.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "bragbook-generate-job" });
 

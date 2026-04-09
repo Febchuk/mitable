@@ -13,7 +13,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { config } from "../../config";
+import { config } from "../../../../config";
 import {
   DayAnalyzerEnvironment,
   DaySession,
@@ -25,7 +25,7 @@ import {
 } from "./day-analyzer-environment";
 import { getDayAnalyzerToolByName } from "./day-analyzer-tools";
 import { getDayAnalyzerSystemPrompt, getDayAnalyzerUserPrompt } from "./day-analyzer-rlm-prompts";
-import { createLogger } from "../../domains/shared-infra/lib/logger.js";
+import { createLogger } from "../../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "day-analyzer-rlm" });
 
