@@ -10,7 +10,7 @@ export * from "./workflows.schema";
 export * from "../../domains/sessions/schema/monitoring.schema";
 export * from "../../domains/sessions/schema/session-chunks.schema";
 export * from "../../domains/workstreams/schema/workstreams.schema";
-export * from "./documents.schema";
+export * from "../../domains/agent/schema/documents.schema";
 export * from "../../domains/auth/schema/billing.schema";
 export * from "../../domains/agent/schema/user-memories.schema";
 export * from "../../domains/sessions/schema/session-refinement-chats.schema";

@@ -9,7 +9,7 @@ import { sanitizeFeedbackLogs } from "../../shared-infra/lib/feedback-log-saniti
 import {
   fetchBackendLogsForFeedbackUnauth,
   fetchBackendLogsForFeedbackUser,
-} from "../../../services/railway-logs.service.js";
+} from "../../shared-infra/services/railway-logs.service.js";
 
 const logger = createLogger({ context: "feedback" });
 const router = Router();

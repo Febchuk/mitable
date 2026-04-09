@@ -9,9 +9,9 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { users } from "../../domains/auth/schema/users.schema";
-import { organizations } from "../../domains/auth/schema/organizations.schema";
-import { monitoringSessions } from "../../domains/sessions/schema/monitoring.schema";
+import { users } from "../../auth/schema/users.schema";
+import { organizations } from "../../auth/schema/organizations.schema";
+import { monitoringSessions } from "../../sessions/schema/monitoring.schema";
 
 /**
  * Documents (Knowledge Base)

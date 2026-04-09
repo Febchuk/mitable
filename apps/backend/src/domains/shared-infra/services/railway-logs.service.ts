@@ -11,9 +11,9 @@
  * Optional: `RAILWAY_BACKEND_SERVICE_ID` for `@service:` log filters.
  */
 
-import { config } from "../config.js";
-import { getDevBackendLogsForUser } from "../domains/shared-infra/lib/dev-log-buffer.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { config } from "../../../config.js";
+import { getDevBackendLogsForUser } from "../lib/dev-log-buffer.js";
+import { createLogger } from "../lib/logger.js";
 
 const log = createLogger({ context: "railway-logs" });
 

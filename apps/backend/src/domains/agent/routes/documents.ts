@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import { eq, sql, desc, and, ilike, or } from "drizzle-orm";
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
-import { requireAuth } from "../domains/auth/middleware/auth.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
+import { requireAuth } from "../../auth/middleware/auth.js";
 import type {
   DocType,
   DocStatus,
@@ -157,7 +157,7 @@ router.get(
     const userId = req.userId!;
 
     try {
-      const { googleDocsExportService } = await import("../domains/integrations/email/google-docs-export.service.js");
+      const { googleDocsExportService } = await import("../../integrations/email/google-docs-export.service.js");
 
       const folders = await googleDocsExportService.listFolders(userId);
       res.json({ folders });
@@ -696,7 +696,7 @@ router.post(
       }
 
       // Import notion export service
-      const { notionExportService } = await import("../domains/integrations/notion/notion-export.service.js");
+      const { notionExportService } = await import("../../integrations/notion/notion-export.service.js");
 
       // Export to Notion using user's personal token
       const result = await notionExportService.exportDocument({
@@ -766,7 +766,7 @@ router.post(
       }
 
       // Import Google Docs export service
-      const { googleDocsExportService } = await import("../domains/integrations/email/google-docs-export.service.js");
+      const { googleDocsExportService } = await import("../../integrations/email/google-docs-export.service.js");
 
       // Export to Google Docs using user's Gmail tokens
       const result = await googleDocsExportService.exportDocument(documentId, userId, folderId);
@@ -829,7 +829,7 @@ router.delete(
         return;
       }
 
-      const { googleDocsExportService } = await import("../domains/integrations/email/google-docs-export.service.js");
+      const { googleDocsExportService } = await import("../../integrations/email/google-docs-export.service.js");
 
       await googleDocsExportService.disconnectDocument(documentId);
       res.json({ success: true });
