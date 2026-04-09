@@ -13,7 +13,7 @@ import { testConnection } from "./db/client.js";
 import { vectorService } from "./domains/shared-infra/services/vector.service.js";
 import { piiRedactionService } from "./domains/shared-infra/services/pii-redaction.service.js";
 import { socketService } from "./domains/shared-infra/services/socket.service.js";
-import { setupWorkstreamSocketEmitter } from "./services/workstream-socket-emitter.js";
+import { setupWorkstreamSocketEmitter } from "./domains/workstreams/services/workstream-socket-emitter.js";
 import { db } from "./db/client.js";
 import * as schema from "./db/schema/index.js";
 import { isNotNull, and } from "drizzle-orm";

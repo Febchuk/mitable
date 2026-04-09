@@ -6,7 +6,7 @@
  * using environment tools, matching the Storyteller/Classifier RLM pattern.
  */
 
-import { WORKSTREAM_RLM_TOOLS } from "./workstream-tools";
+import { WORKSTREAM_RLM_TOOLS } from "./workstream-tools.js";
 
 /**
  * Build the system prompt for workstream RLM analysis

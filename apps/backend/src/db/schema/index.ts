@@ -9,7 +9,7 @@ export * from "./search-content.schema";
 export * from "./workflows.schema";
 export * from "./monitoring.schema";
 export * from "./session-chunks.schema";
-export * from "./workstreams.schema";
+export * from "../../domains/workstreams/schema/workstreams.schema";
 export * from "./documents.schema";
 export * from "./billing.schema";
 export * from "./user-memories.schema";

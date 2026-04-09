@@ -9,7 +9,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { monitoringSessions, sessionCaptures } from "./monitoring.schema";
+import { monitoringSessions, sessionCaptures } from "../../../db/schema/monitoring.schema";
 
 /**
  * Session Workstreams

@@ -13,7 +13,7 @@ import type {
 } from "@mitable/shared";
 import { WORKSTREAM_COLORS } from "@mitable/shared";
 import { workstreamDetectionService } from "./workstream-detection.service.js";
-import type { SessionWorkstream } from "../db/schema/workstreams.schema.js";
+import type { SessionWorkstream } from "../schema/workstreams.schema.js";
 
 // Configuration
 const CONFIG = {

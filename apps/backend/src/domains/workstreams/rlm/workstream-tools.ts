@@ -6,7 +6,7 @@
  * instead of processing everything in one massive prompt.
  */
 
-import { WorkstreamEnvironment } from "./workstream-environment";
+import { WorkstreamEnvironment } from "./workstream-environment.js";
 
 export interface WorkstreamRLMToolParameter {
   name: string;

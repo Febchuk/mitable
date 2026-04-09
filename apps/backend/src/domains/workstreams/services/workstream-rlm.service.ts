@@ -7,20 +7,20 @@
 
 import Groq from "groq-sdk";
 import { EventEmitter } from "events";
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, and, isNull, asc } from "drizzle-orm";
-import { config } from "../config.js";
-import { logger } from "../domains/shared-infra/lib/logger.js";
-import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
+import { config } from "../../../config.js";
+import { logger } from "../../shared-infra/lib/logger.js";
+import { parseJsonResponse } from "../../shared-infra/lib/parse-json.js";
 import {
   getWorkstreamSystemPrompt,
   getWorkstreamUserPrompt,
   type WorkstreamAnalysisResult,
-} from "./rlm/workstream-rlm-prompts.js";
-import { WorkstreamEnvironment } from "./rlm/workstream-environment.js";
-import { getWorkstreamToolByName } from "./rlm/workstream-tools.js";
-import type { WorkstreamCategory, AnalysisTriggerReason } from "../db/schema/workstreams.schema.js";
+} from "../rlm/workstream-rlm-prompts.js";
+import { WorkstreamEnvironment } from "../rlm/workstream-environment.js";
+import { getWorkstreamToolByName } from "../rlm/workstream-tools.js";
+import type { WorkstreamCategory, AnalysisTriggerReason } from "../schema/workstreams.schema.js";
 
 // Color palette for workstreams
 const WORKSTREAM_COLORS = ["violet", "blue", "pink", "emerald", "amber", "cyan"];

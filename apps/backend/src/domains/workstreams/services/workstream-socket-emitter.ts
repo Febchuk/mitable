@@ -6,8 +6,8 @@
  */
 
 import { workstreamRLMService, type WorkstreamUpdateEvent } from "./workstream-rlm.service.js";
-import { socketService, type WorkstreamUpdatePayload } from "../domains/shared-infra/services/socket.service.js";
-import { logger } from "../domains/shared-infra/lib/logger.js";
+import { socketService, type WorkstreamUpdatePayload } from "../../shared-infra/services/socket.service.js";
+import { logger } from "../../shared-infra/lib/logger.js";
 
 /**
  * Set up the event listener to bridge RLM service events to WebSocket
