@@ -12,8 +12,8 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { organizations } from "../../../db/schema/organizations.schema.js";
-import { users } from "../../../db/schema/users.schema.js";
+import { organizations } from "../../auth/schema/organizations.schema.js";
+import { users } from "../../auth/schema/users.schema.js";
 
 /**
  * Benchmarks

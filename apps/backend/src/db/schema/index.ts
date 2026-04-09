@@ -1,6 +1,6 @@
 // Export all schemas and relations
-export * from "./organizations.schema";
-export * from "./users.schema";
+export * from "../../domains/auth/schema/organizations.schema";
+export * from "../../domains/auth/schema/users.schema";
 export * from "./integrations.schema";
 export * from "./conversations.schema";
 export * from "./roadmap-templates.schema";
@@ -11,7 +11,7 @@ export * from "./monitoring.schema";
 export * from "./session-chunks.schema";
 export * from "../../domains/workstreams/schema/workstreams.schema";
 export * from "./documents.schema";
-export * from "./billing.schema";
+export * from "../../domains/auth/schema/billing.schema";
 export * from "./user-memories.schema";
 export * from "./session-refinement-chats.schema";
 export * from "./document-refinement-chats.schema";
@@ -19,7 +19,7 @@ export * from "../../domains/updates/schema/recaps.schema";
 export * from "./daily-activities.schema";
 export * from "./ask-threads.schema";
 export * from "./graph-sync.schema";
-export * from "./api-keys.schema";
+export * from "../../domains/auth/schema/api-keys.schema";
 
 // Agent chat schemas
 export * from "./agent-chats.schema";
@@ -31,5 +31,5 @@ export * from "./github/github-pull-requests.schema";
 export * from "./github/github-issues.schema";
 export * from "../../domains/benchmarks/schema/benchmarks.schema";
 export * from "../../domains/updates/schema/bragbook.schema";
-export * from "./teams.schema";
-export * from "./user-permissions.schema";
+export * from "../../domains/auth/schema/teams.schema";
+export * from "../../domains/auth/schema/user-permissions.schema";

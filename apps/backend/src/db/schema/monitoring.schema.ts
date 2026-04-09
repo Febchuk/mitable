@@ -12,8 +12,8 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { users } from "./users.schema";
-import { organizations } from "./organizations.schema";
+import { users } from "../../domains/auth/schema/users.schema";
+import { organizations } from "../../domains/auth/schema/organizations.schema";
 
 /**
  * Monitoring Sessions

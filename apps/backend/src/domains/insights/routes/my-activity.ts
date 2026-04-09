@@ -15,13 +15,13 @@ import { Router, Request, Response } from "express";
 import { db } from "../../../db/client.js";
 import * as schema from "../../../db/schema/index.js";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
-import { requireAuth } from "../../../middleware/auth.js";
-import { requireAccessToUser } from "../../../middleware/authorization.js";
+import { requireAuth } from "../../auth/middleware/auth.js";
+import { requireAccessToUser } from "../../auth/middleware/authorization.js";
 import {
   getDirectReports,
   getTransitiveReportIds,
   canViewUserData,
-} from "../../../services/permissions.service.js";
+} from "../../auth/services/permissions.service.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "my-activity-routes" });

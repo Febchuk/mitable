@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
-import { db } from "../db/client.js";
-import { users } from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import { users } from "../../../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { apiKeyService } from "../services/api-key.service.js";
 

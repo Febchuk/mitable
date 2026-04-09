@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { eq, sql, desc, and, ilike, or } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../domains/auth/middleware/auth.js";
 import type {
   DocType,
   DocStatus,

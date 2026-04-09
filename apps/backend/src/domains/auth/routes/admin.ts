@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
-import { db } from "../db/client";
-import * as schema from "../db/schema/index";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, sql, desc, and, asc, inArray } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth.js";
 import {
   requireAdmin,
   requireManagerOrAdmin,
@@ -15,10 +15,10 @@ import {
   revokePermission,
   getUserPermissions,
 } from "../services/userPermissions.service.js";
-import { supabaseAdmin } from "../domains/shared-infra/lib/supabase.js";
+import { supabaseAdmin } from "../../shared-infra/lib/supabase.js";
 import { encryptionService } from "../services/encryption.service.js";
-import { config } from "../config.js";
-import { sendWelcomeEmployeeEmail } from "../services/email/email.service.js";
+import { config } from "../../../config.js";
+import { sendWelcomeEmployeeEmail } from "../../../services/email/email.service.js";
 
 const router = Router();
 
@@ -816,7 +816,7 @@ router.post(
       );
 
       // Initialize vector service (required for Pinecone upserts)
-      const { vectorService } = await import("../domains/shared-infra/services/vector.service.js");
+      const { vectorService } = await import("../../shared-infra/services/vector.service.js");
       vectorService.initialize();
       console.log("[Admin] Vector service initialized");
 
@@ -825,20 +825,20 @@ router.post(
 
       switch (integration.provider) {
         case "slack": {
-          const { slackIngestionService } = await import("../services/slack-ingestion.service.js");
+          const { slackIngestionService } = await import("../../../services/slack-ingestion.service.js");
           syncResult = await slackIngestionService.syncMessages(currentUser.organizationId);
           break;
         }
 
         case "notion": {
           const { notionIngestionService } =
-            await import("../services/notion-ingestion.service.js");
+            await import("../../../services/notion-ingestion.service.js");
           syncResult = await notionIngestionService.syncPages(currentUser.organizationId);
           break;
         }
 
         case "github": {
-          const { syncIntegration } = await import("../scripts/sync-github.js");
+          const { syncIntegration } = await import("../../../scripts/sync-github.js");
           const result = await syncIntegration(integration);
           syncResult = {
             success: true,
@@ -1480,18 +1480,18 @@ router.post(
 
       try {
         if (integration.provider === "slack") {
-          const { slackIngestionService } = await import("../services/slack-ingestion.service.js");
+          const { slackIngestionService } = await import("../../../services/slack-ingestion.service.js");
           const result = await slackIngestionService.syncMessages(currentUser.organizationId);
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;
         } else if (integration.provider === "notion") {
           const { notionIngestionService } =
-            await import("../services/notion-ingestion.service.js");
+            await import("../../../services/notion-ingestion.service.js");
           const result = await notionIngestionService.syncPages(currentUser.organizationId);
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;
         } else if (integration.provider === "github") {
-          const { syncIntegration } = await import("../scripts/sync-github.js");
+          const { syncIntegration } = await import("../../../scripts/sync-github.js");
           const result = await syncIntegration(integration);
           itemsSynced = result.chunksCreated || 0;
           syncResult = result;

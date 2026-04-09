@@ -30,7 +30,7 @@ import {
   getKnownCustomers,
   getOrgName,
   addDiscoveredCustomers,
-} from "../../services/known-customers.service";
+} from "../../domains/auth/services/known-customers.service";
 
 const logger = createLogger({ context: "user-rollup-job" });
 

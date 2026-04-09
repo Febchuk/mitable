@@ -15,7 +15,7 @@ import { eq, asc, desc, and, isNotNull, gte } from "drizzle-orm";
 import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { blockAnalyzerRLMService } from "./rlm/block-analyzer-rlm.service";
 import { materializeBlockAnalyzerResult } from "./block-analyzer-materializer.service";
-import { getKnownCustomers, getOrgName } from "./known-customers.service";
+import { getKnownCustomers, getOrgName } from "../domains/auth/services/known-customers.service.js";
 import type {
   SessionMeta,
   SessionCapture,

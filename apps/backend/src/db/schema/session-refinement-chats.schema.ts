@@ -1,7 +1,7 @@
 import { pgTable, uuid, jsonb, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { monitoringSessions } from "./monitoring.schema";
-import { users } from "./users.schema";
+import { users } from "../../domains/auth/schema/users.schema";
 
 export const sessionRefinementChats = pgTable(
   "session_refinement_chats",

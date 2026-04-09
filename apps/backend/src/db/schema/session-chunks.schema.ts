@@ -10,8 +10,8 @@ import {
   vector,
 } from "drizzle-orm/pg-core";
 import { monitoringSessions } from "./monitoring.schema";
-import { organizations } from "./organizations.schema";
-import { users } from "./users.schema";
+import { organizations } from "../../domains/auth/schema/organizations.schema";
+import { users } from "../../domains/auth/schema/users.schema";
 
 export const sessionChunks = pgTable(
   "session_chunks",

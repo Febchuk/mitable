@@ -8,7 +8,7 @@ import {
   benchmarkSuggestions,
   benchmarkAccomplishments,
 } from "../schema/benchmarks.schema.js";
-import { users } from "../../../db/schema/users.schema.js";
+import { users } from "../../auth/schema/users.schema.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-service" });

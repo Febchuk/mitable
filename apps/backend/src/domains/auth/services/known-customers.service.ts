@@ -10,11 +10,11 @@
  * flywheel: more sessions → more customers discovered → better identification.
  */
 
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { normalizeName } from "./normalize-name.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "known-customers" });
 

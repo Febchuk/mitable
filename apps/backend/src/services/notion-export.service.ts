@@ -9,7 +9,7 @@ import { Client } from "@notionhq/client";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
-import { encryptionService } from "./encryption.service.js";
+import { encryptionService } from "../domains/auth/services/encryption.service.js";
 import type { ExportNotionResponse } from "@mitable/shared";
 import type { BlockObjectRequest } from "@notionhq/client/build/src/api-endpoints.js";
 

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { apiKeyService } from "../../../services/api-key.service.js";
+import { apiKeyService } from "../../auth/services/api-key.service.js";
 
 export interface McpAuthContext {
   organizationId: string;

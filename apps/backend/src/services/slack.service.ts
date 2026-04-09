@@ -2,7 +2,7 @@ import { WebClient } from "@slack/web-api";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
-import { encryptionService } from "./encryption.service.js";
+import { encryptionService } from "../domains/auth/services/encryption.service.js";
 
 export interface SlackChannel {
   id: string;

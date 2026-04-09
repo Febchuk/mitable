@@ -24,7 +24,7 @@
 import { db } from "../db/client.js";
 import { integrations } from "../db/schema/integrations.schema.js";
 import { isNotNull, eq } from "drizzle-orm";
-import { encryptionService } from "../services/encryption.service.js";
+import { encryptionService } from "../domains/auth/services/encryption.service.js";
 import { validateConfig } from "../config.js";
 
 const BATCH_SIZE = 100;

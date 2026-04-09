@@ -2,10 +2,10 @@ import { Router, Request, Response } from "express";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and, inArray, sql } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../domains/auth/middleware/auth.js";
 import { config } from "../config.js";
 import { NOTION_CONFIG } from "../services/notion.service.js";
-import { encryptionService } from "../services/encryption.service.js";
+import { encryptionService } from "../domains/auth/services/encryption.service.js";
 import { githubService } from "../services/github.service.js";
 
 const router = Router();

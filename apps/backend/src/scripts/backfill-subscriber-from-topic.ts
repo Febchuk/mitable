@@ -16,7 +16,7 @@
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, sql } from "drizzle-orm";
-import { getKnownCustomers, getOrgName } from "../services/known-customers.service.js";
+import { getKnownCustomers, getOrgName } from "../domains/auth/services/known-customers.service.js";
 import { recalculateDailyStats } from "../services/activity-materializer.service.js";
 
 const ORG_ID = process.env.ORG_ID || "7dd3c9f5-6c0a-479a-aa7d-34aa278ccc49";

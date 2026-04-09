@@ -1,5 +1,5 @@
 import { eq, and, sql, desc } from "drizzle-orm";
-import { db } from "../db/client.js";
+import { db } from "../../../db/client.js";
 import {
   usageTracking,
   subscriptions,
@@ -7,7 +7,7 @@ import {
   type UsageTracking,
   type QuotaStatus,
   type SubscriptionTier,
-} from "../db/schema/index.js";
+} from "../../../db/schema/index.js";
 import { subscriptionService } from "./subscription.service.js";
 
 /**

@@ -1,6 +1,6 @@
-import { db } from "../db/client.js";
-import { userPermissions } from "../db/schema/index.js";
-import { users } from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import { userPermissions } from "../../../db/schema/index.js";
+import { users } from "../../../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 
 /**

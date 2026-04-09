@@ -31,7 +31,7 @@ import type {
   SubscriberMapping,
   ActionType,
 } from "./types";
-import { normalizeName } from "../normalize-name.js";
+import { normalizeName } from "../../domains/auth/services/normalize-name.js";
 
 const logger = createLogger({ context: "graph-mapper" });
 

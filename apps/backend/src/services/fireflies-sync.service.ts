@@ -12,13 +12,13 @@ import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import { firefliesService, type FirefliesTranscript } from "./fireflies.service.js";
-import { encryptionService } from "./encryption.service.js";
+import { encryptionService } from "../domains/auth/services/encryption.service.js";
 import { recalculateDailyStats } from "./activity-materializer.service.js";
 import {
   addDiscoveredCustomers,
   getKnownCustomers,
   getOrgName,
-} from "./known-customers.service.js";
+} from "../domains/auth/services/known-customers.service.js";
 import { config } from "../config.js";
 import { createLogger } from "../domains/shared-infra/lib/logger.js";
 

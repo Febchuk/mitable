@@ -15,7 +15,7 @@
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
-import { encryptionService } from "./encryption.service.js";
+import { encryptionService } from "../domains/auth/services/encryption.service.js";
 
 const GOOGLE_DOCS_API_URL = "https://docs.googleapis.com/v1";
 const GOOGLE_DRIVE_API_URL = "https://www.googleapis.com/drive/v3";

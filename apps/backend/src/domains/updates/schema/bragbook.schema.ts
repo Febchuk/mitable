@@ -1,6 +1,6 @@
 import { pgTable, uuid, varchar, jsonb, timestamp, date, unique } from "drizzle-orm/pg-core";
-import { users } from "../../../db/schema/users.schema";
-import { organizations } from "../../../db/schema/organizations.schema";
+import { users } from "../../auth/schema/users.schema";
+import { organizations } from "../../auth/schema/organizations.schema";
 
 /**
  * Bragbook Entries

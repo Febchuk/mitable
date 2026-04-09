@@ -5,7 +5,7 @@ import swaggerUi from "swagger-ui-express";
 import { router } from "./routes.js";
 import { swaggerSpec } from "./swagger.js";
 import { config } from "./config.js";
-import { generalLimiter } from "./middleware/rateLimiter.js";
+import { generalLimiter } from "./domains/auth/middleware/rateLimiter.js";
 import { correlationIdMiddleware } from "./domains/shared-infra/middleware/correlationId.js";
 import { requestLoggerMiddleware } from "./domains/shared-infra/middleware/requestLogger.js";
 import { errorHandler } from "./domains/shared-infra/middleware/errorHandler.js";

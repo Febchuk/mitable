@@ -1,9 +1,9 @@
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
-import { db } from "../db/client.js";
-import { subscriptions, organizations } from "../db/schema/index.js";
-import { config } from "../config.js";
-import type { SubscriptionTier } from "../db/schema/billing.schema.js";
+import { db } from "../../../db/client.js";
+import { subscriptions, organizations } from "../../../db/schema/index.js";
+import { config } from "../../../config.js";
+import type { SubscriptionTier } from "../schema/billing.schema.js";
 
 const stripe = config.stripe.secretKey
   ? new Stripe(config.stripe.secretKey, {

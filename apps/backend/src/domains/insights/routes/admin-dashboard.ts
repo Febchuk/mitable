@@ -11,14 +11,14 @@ import { Router, Request, Response } from "express";
 import { db } from "../../../db/client.js";
 import * as schema from "../../../db/schema/index.js";
 import { eq, and, desc, asc, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
-import { requireAuth } from "../../../middleware/auth.js";
+import { requireAuth } from "../../auth/middleware/auth.js";
 import {
   requireManagerOrAdmin,
   requireAccessToUser,
   getScopedVisibleUserIds,
-} from "../../../middleware/authorization.js";
+} from "../../auth/middleware/authorization.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
-import { normalizeName } from "../../../services/normalize-name.js";
+import { normalizeName } from "../../auth/services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { config } from "../../../config.js";

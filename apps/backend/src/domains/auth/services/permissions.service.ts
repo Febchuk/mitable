@@ -1,5 +1,5 @@
-import { db } from "../db/client.js";
-import { users } from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import { users } from "../../../db/schema/index.js";
 import { eq, sql } from "drizzle-orm";
 
 /**

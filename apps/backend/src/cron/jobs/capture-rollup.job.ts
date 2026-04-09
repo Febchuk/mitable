@@ -26,7 +26,7 @@ import {
   getKnownCustomers,
   getOrgName,
   addDiscoveredCustomers,
-} from "../../services/known-customers.service";
+} from "../../domains/auth/services/known-customers.service";
 
 const groq = new Groq({ apiKey: config.groq.apiKey });
 

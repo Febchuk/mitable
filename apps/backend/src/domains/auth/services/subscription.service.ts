@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../db/client.js";
+import { db } from "../../../db/client.js";
 import {
   subscriptions,
   usageLimits,
@@ -7,8 +7,8 @@ import {
   type Subscription,
   type UsageLimits,
   type SubscriptionTier,
-} from "../db/schema/index.js";
-import { config } from "../config.js";
+} from "../../../db/schema/index.js";
+import { config } from "../../../config.js";
 
 /**
  * Subscription Service

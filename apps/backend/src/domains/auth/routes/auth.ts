@@ -1,17 +1,17 @@
 import { Router, Request, Response } from "express";
-import { supabase, supabaseAdmin } from "../domains/shared-infra/lib/supabase.js";
+import { supabase, supabaseAdmin } from "../../shared-infra/lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, sql } from "drizzle-orm";
 import { subscriptionService } from "../services/subscription.service.js";
 import { usageService } from "../services/usage.service.js";
-import { config } from "../config.js";
+import { config } from "../../../config.js";
 import {
   sendWelcomeAdminEmail,
   sendPasswordResetEmail,
   sendPasswordChangedEmail,
-} from "../services/email/email.service.js";
+} from "../../../services/email/email.service.js";
 
 export const authRouter = Router();
 
@@ -1266,7 +1266,7 @@ authRouter.post("/change-password", requireAuth, async (req: Request, res: Respo
     }
 
     // Validate new password strength
-    const { validatePassword } = await import("../utils/password-validator.js");
+    const { validatePassword } = await import("../../../utils/password-validator.js");
     const validation = validatePassword(newPassword);
 
     if (!validation.isValid) {

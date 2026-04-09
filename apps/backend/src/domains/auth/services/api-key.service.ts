@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { eq, and, isNull } from "drizzle-orm";
-import { db } from "../db/client.js";
-import { apiKeys } from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import { apiKeys } from "../../../db/schema/index.js";
 
 const KEY_PREFIX = "mk_live_";
 

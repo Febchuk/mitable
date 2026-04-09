@@ -12,7 +12,7 @@ import * as schema from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { slackService } from "./slack.service.js";
 import { gmailService } from "./gmail.service.js";
-import { encryptionService } from "./encryption.service.js";
+import { encryptionService } from "../domains/auth/services/encryption.service.js";
 import {
   createSessionLogger,
   createTimer,

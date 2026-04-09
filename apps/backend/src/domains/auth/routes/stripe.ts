@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { stripeService } from "../services/stripe.service.js";
-import { config } from "../config.js";
+import { config } from "../../../config.js";
 
 const router = Router();
 

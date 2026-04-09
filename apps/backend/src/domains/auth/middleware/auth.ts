@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { eq } from "drizzle-orm";
-import { supabase } from "../domains/shared-infra/lib/supabase.js";
-import { db } from "../db/client.js";
-import { users, userPermissions } from "../db/schema/index.js";
+import { supabase } from "../../shared-infra/lib/supabase.js";
+import { db } from "../../../db/client.js";
+import { users, userPermissions } from "../../../db/schema/index.js";
 
 /**
  * Middleware to require authentication

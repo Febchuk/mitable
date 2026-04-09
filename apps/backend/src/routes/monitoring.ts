@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { eq, sql, desc, and, inArray, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "../domains/auth/middleware/auth.js";
 import { config } from "../config.js";
 import {
   sessionDeliveryService,
@@ -22,7 +22,7 @@ import { summaryRefinementService } from "../services/summary-refinement.service
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
 import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../domains/shared-infra/lib/sessionLogger.js";
 import { closeAudioConnection } from "./audio.js";
-import { canEditSession } from "../services/permissions.service.js";
+import { canEditSession } from "../domains/auth/services/permissions.service.js";
 import { logger } from "../domains/shared-infra/lib/logger.js";
 import { runBlockAnalyzer } from "../services/block-analyzer-orchestrator.service";
 import { classifySession } from "../services/session-classification.service";

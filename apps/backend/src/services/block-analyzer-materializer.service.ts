@@ -16,7 +16,7 @@ import * as schema from "../db/schema/index";
 import { eq, and, sql } from "drizzle-orm";
 import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { syncSubscriberToGraph, syncTopicToGraph } from "./graph/graph-incremental-sync.service.js";
-import { addDiscoveredCustomers } from "./known-customers.service";
+import { addDiscoveredCustomers } from "../domains/auth/services/known-customers.service.js";
 import { recalculateDailyStats } from "./activity-materializer.service";
 import type { BlockAnalyzerResult } from "./rlm/block-analyzer-rlm.service";
 import type { EmittedBlock } from "./rlm/block-analyzer-environment";

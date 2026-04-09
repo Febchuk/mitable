@@ -10,7 +10,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { organizations } from "./organizations.schema";
+import { organizations } from "../../domains/auth/schema/organizations.schema";
 
 export const integrations = pgTable(
   "integrations",

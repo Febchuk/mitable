@@ -3,13 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Resend } from "resend";
 import { optionalAuth, requireAuth } from "../middleware/auth.js";
 import { feedbackLimiter } from "../middleware/rateLimiter.js";
-import { config } from "../config.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
-import { sanitizeFeedbackLogs } from "../domains/shared-infra/lib/feedback-log-sanitize.js";
+import { config } from "../../../config.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
+import { sanitizeFeedbackLogs } from "../../shared-infra/lib/feedback-log-sanitize.js";
 import {
   fetchBackendLogsForFeedbackUnauth,
   fetchBackendLogsForFeedbackUser,
-} from "../services/railway-logs.service.js";
+} from "../../../services/railway-logs.service.js";
 
 const logger = createLogger({ context: "feedback" });
 const router = Router();

@@ -15,8 +15,8 @@
  */
 
 import { Router } from "express";
-import { requireAuth } from "../../../middleware/auth.js";
-import { getScopedVisibleUserIds } from "../../../middleware/authorization.js";
+import { requireAuth } from "../../auth/middleware/auth.js";
+import { getScopedVisibleUserIds } from "../../auth/middleware/authorization.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
 import { benchmarkService } from "../services/benchmark.service.js";
 import { benchmarkComputeService } from "../services/benchmark-compute.service.js";
