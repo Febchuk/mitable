@@ -10,8 +10,8 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { config } from "../config.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { config } from "../../../config.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-ai" });
 

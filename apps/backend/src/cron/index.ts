@@ -16,7 +16,7 @@ import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { runGraphSyncJob } from "./jobs/graph-sync.job";
 import { runGranolaSyncJob } from "./jobs/granola-sync.job";
 import { runFirefliesSyncJob } from "./jobs/fireflies-sync.job";
-import { runBenchmarkScoreJob } from "./jobs/benchmark-score.job";
+import { runBenchmarkScoreJob } from "../domains/benchmarks/cron/benchmark-score.job";
 import { runBragbookGenerateJob } from "./jobs/bragbook-generate.job";
 import { config } from "../config";
 

@@ -11,11 +11,11 @@
  *   4. Updates percentiles, trends, snapshots, suggestions, accomplishments
  */
 
-import { db } from "../../db/client.js";
-import { benchmarks } from "../../db/schema/benchmarks.schema.js";
+import { db } from "../../../db/client.js";
+import { benchmarks } from "../schema/benchmarks.schema.js";
 import { eq, and, inArray } from "drizzle-orm";
-import { benchmarkComputeService } from "../../services/benchmark-compute.service.js";
-import { createLogger } from "../../domains/shared-infra/lib/logger.js";
+import { benchmarkComputeService } from "../services/benchmark-compute.service.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-score-job" });
 

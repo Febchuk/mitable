@@ -11,7 +11,7 @@
  */
 
 import { eq, and, gte, lte, lt, desc, inArray } from "drizzle-orm";
-import { db } from "../db/client.js";
+import { db } from "../../../db/client.js";
 import {
   benchmarks,
   benchmarkParameters,
@@ -21,17 +21,17 @@ import {
   benchmarkAccomplishments,
   benchmarkParameterScores,
   type BenchmarkParameter,
-} from "../db/schema/benchmarks.schema.js";
+} from "../schema/benchmarks.schema.js";
 import {
   userDailyActivities,
   activityBlocks,
   type AppBreakdownEntry,
   type CategoryBreakdownEntry,
-} from "../db/schema/daily-activities.schema.js";
-import { monitoringSessions } from "../db/schema/monitoring.schema.js";
-import { users } from "../db/schema/users.schema.js";
+} from "../../../db/schema/daily-activities.schema.js";
+import { monitoringSessions } from "../../../db/schema/monitoring.schema.js";
+import { users } from "../../../db/schema/users.schema.js";
 import type { ActivityContext, SessionContext, DayContext } from "./benchmark-ai.service.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-compute" });
 

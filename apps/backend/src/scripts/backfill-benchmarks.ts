@@ -20,7 +20,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../db/schema/index";
-import { benchmarkComputeService } from "../services/benchmark-compute.service.js";
+import { benchmarkComputeService } from "../domains/benchmarks/services/benchmark-compute.service.js";
 
 // Parse CLI args
 const args = process.argv.slice(2);

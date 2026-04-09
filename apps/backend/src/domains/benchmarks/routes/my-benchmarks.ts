@@ -11,8 +11,8 @@
  */
 
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { requireAuth } from "../../../middleware/auth.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 import { benchmarkService } from "../services/benchmark.service.js";
 
 const logger = createLogger({ context: "my-benchmarks-routes" });

@@ -1,5 +1,5 @@
 import { eq, and, avg, count, asc, desc, inArray } from "drizzle-orm";
-import { db } from "../db/client.js";
+import { db } from "../../../db/client.js";
 import {
   benchmarks,
   benchmarkParameters,
@@ -7,9 +7,9 @@ import {
   benchmarkSnapshots,
   benchmarkSuggestions,
   benchmarkAccomplishments,
-} from "../db/schema/benchmarks.schema.js";
-import { users } from "../db/schema/users.schema.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+} from "../schema/benchmarks.schema.js";
+import { users } from "../../../db/schema/users.schema.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "benchmark-service" });
 

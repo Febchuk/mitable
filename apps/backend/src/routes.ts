@@ -12,9 +12,9 @@ import billingRouter from "./routes/billing.js";
 import stripeRouter from "./routes/stripe.js";
 import apiKeysRouter from "./routes/api-keys.js";
 import myActivityRouter from "./routes/my-activity.js";
-import myBenchmarksRouter from "./routes/my-benchmarks.js";
+import myBenchmarksRouter from "./domains/benchmarks/routes/my-benchmarks.js";
 import myBragbookRouter from "./routes/my-bragbook.js";
-import adminBenchmarksRouter from "./routes/admin-benchmarks.js";
+import adminBenchmarksRouter from "./domains/benchmarks/routes/admin-benchmarks.js";
 import feedbackRouter from "./routes/feedback.js";
 import { authLimiter } from "./middleware/rateLimiter.js";
 

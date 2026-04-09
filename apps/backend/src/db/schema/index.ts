@@ -29,7 +29,7 @@ export * from "./github/github-repos.schema";
 export * from "./github/github-commits.schema";
 export * from "./github/github-pull-requests.schema";
 export * from "./github/github-issues.schema";
-export * from "./benchmarks.schema";
+export * from "../../domains/benchmarks/schema/benchmarks.schema";
 export * from "./bragbook.schema";
 export * from "./teams.schema";
 export * from "./user-permissions.schema";
