@@ -1,4 +1,4 @@
-import type { ToolResult, TextMessage, WorkflowMessage } from "../base.tool";
+import type { ToolResult, TextMessage, WorkflowMessage } from "../../domains/agent/tools/base.tool.js";
 
 /**
  * Type guard functions for discriminated union pattern.

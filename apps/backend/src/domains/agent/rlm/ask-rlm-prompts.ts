@@ -6,7 +6,7 @@
  * System prompt for the legacy Ask AI tool loop.
  */
 
-import { ASK_TOOLS } from "./ask-tools";
+import { ASK_TOOLS } from "./ask-tools.js";
 
 /**
  * Build the system prompt with tool descriptions and today's date

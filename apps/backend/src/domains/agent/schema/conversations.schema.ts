@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, text, jsonb, timestamp, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { users } from "../../domains/auth/schema/users.schema";
-import { workflowSessions } from "./workflows.schema";
+import { users } from "../../auth/schema/users.schema.js";
+import { workflowSessions } from "../../../db/schema/workflows.schema.js";
 
 // Conversations
 export const conversations = pgTable("conversations", {

@@ -1,4 +1,4 @@
-import type { SearchResult } from "../services/search.service.js";
+import type { SearchResult } from "../domains/agent/services/search.service.js";
 
 /**
  * Thread Bundle - Groups related Slack messages into a conversational unit

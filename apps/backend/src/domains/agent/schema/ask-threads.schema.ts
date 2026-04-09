@@ -6,7 +6,7 @@
 import { pgTable, uuid, varchar, text, timestamp } from "drizzle-orm/pg-core";
 // Note: organizationId uses uuid (not varchar) to match all other schemas
 import { relations } from "drizzle-orm";
-import { users } from "../../domains/auth/schema/users.schema";
+import { users } from "../../auth/schema/users.schema.js";
 
 // Ask Threads — legacy admin Ask RLM conversations
 export const askThreads = pgTable("ask_threads", {

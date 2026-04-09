@@ -15,10 +15,10 @@
 
 import Groq from "groq-sdk";
 import { encoding_for_model } from "tiktoken";
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, isNull } from "drizzle-orm";
-import { config } from "../config.js";
+import { config } from "../../../config.js";
 
 // Memory configuration
 const MEMORY_CONFIG = {

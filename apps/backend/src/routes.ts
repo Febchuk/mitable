@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authRouter } from "./domains/auth/routes/auth.js";
 import { requireAuth, optionalAuth } from "./domains/auth/middleware/auth.js";
-import agentRouter from "./routes/agent.js";
+import agentRouter from "./domains/agent/routes/agent.js";
 import adminRouter from "./domains/auth/routes/admin.js";
 import adminDashboardRouter from "./domains/insights/routes/admin-dashboard.js";
 import integrationsRouter from "./domains/integrations/routes/integrations.js";

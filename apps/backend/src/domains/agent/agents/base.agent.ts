@@ -1,4 +1,4 @@
-import type { StreamChunk, ToolContext } from "../tools/base.tool";
+import type { StreamChunk, ToolContext } from "../tools/base.tool.js";
 
 /**
  * Base class for all specialized agents in the multi-agent architecture.

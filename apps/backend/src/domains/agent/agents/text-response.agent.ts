@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { config } from "../config";
-import { BaseAgent } from "./base.agent";
-import type { StreamChunk, ToolContext, TextMessage } from "../tools/base.tool";
+import { config } from "../../../config.js";
+import { BaseAgent } from "./base.agent.js";
+import type { StreamChunk, ToolContext, TextMessage } from "../tools/base.tool.js";
 // import { RespondTextTool } from "../tools/respond-text.tool"; // Unused - commented out
 
 /**

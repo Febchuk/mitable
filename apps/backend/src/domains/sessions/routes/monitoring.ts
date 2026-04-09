@@ -13,7 +13,7 @@ import { recapRLMService } from "../../updates/services/recap-rlm.service.js";
 import { frameAnalysisService } from "../../capture/services/frame-analysis.service.js";
 import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../../updates/services/master-story.service.js";
-import { searchService } from "../../../services/search.service.js";
+import { searchService } from "../../agent/services/search.service.js";
 import { SessionIngestionService } from "../services/session-ingestion.service.js";
 import { workstreamAggregationService } from "../../workstreams/services/workstream-aggregation.service.js";
 import { workstreamRLMService } from "../../workstreams/services/workstream-rlm.service.js";

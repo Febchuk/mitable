@@ -1,12 +1,12 @@
 import Groq from "groq-sdk";
-import { config } from "../config";
-import { BaseAgent } from "./base.agent";
-import type { StreamChunk, ToolContext, Source } from "../tools/base.tool";
-import { codeRetriever } from "../retrievers/code.retriever.js";
-import { workRetriever } from "../retrievers/work.retriever.js";
-import { slackRetriever } from "../retrievers/slack.retriever";
-import { notionRetriever } from "../retrievers/notion.retriever.js";
-import { TemporalQueryParser } from "../utils/temporal-parser";
+import { config } from "../../../config.js";
+import { BaseAgent } from "./base.agent.js";
+import type { StreamChunk, ToolContext, Source } from "../tools/base.tool.js";
+import { codeRetriever } from "../../../retrievers/code.retriever.js";
+import { workRetriever } from "../../../retrievers/work.retriever.js";
+import { slackRetriever } from "../../../retrievers/slack.retriever.js";
+import { notionRetriever } from "../../../retrievers/notion.retriever.js";
+import { TemporalQueryParser } from "../../../utils/temporal-parser.js";
 import { memoryService } from "../services/memory.service.js";
 // import { orgContextService } from "../services/org-context.service";
 

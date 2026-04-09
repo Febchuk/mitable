@@ -15,9 +15,9 @@
  * Free (just GitHub API calls) - no summarization needed
  */
 
-import { githubService } from "../domains/integrations/github/github.service.js";
-import { db } from "../db/client.js";
-import { integrations, githubRepos } from "../db/schema/index.js";
+import { githubService } from "../../integrations/github/github.service.js";
+import { db } from "../../../db/client.js";
+import { integrations, githubRepos } from "../../../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 
 export interface ViewCodeParams {

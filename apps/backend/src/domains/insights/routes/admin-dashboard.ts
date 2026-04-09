@@ -25,9 +25,9 @@ import { config } from "../../../config.js";
 import { graphRetrievalService } from "../../integrations/graph/graph-retrieval.service.js";
 import { graphSyncService } from "../../integrations/graph/graph-sync.service.js";
 // DEPRECATED — Ask RLM only (callAskLLM, parseAskResponse, /admin/ask/*). Slated for deletion.
-import { AskEnvironment } from "../../../services/rlm/ask-environment.js";
-import { getAskToolByName } from "../../../services/rlm/ask-tools.js";
-import { getAskSystemPrompt } from "../../../services/rlm/ask-rlm-prompts.js";
+import { AskEnvironment } from "../../agent/rlm/ask-environment.js";
+import { getAskToolByName } from "../../agent/rlm/ask-tools.js";
+import { getAskSystemPrompt } from "../../agent/rlm/ask-rlm-prompts.js";
 import { parseJsonResponse } from "../../shared-infra/lib/parse-json.js";
 
 const logger = createLogger({ context: "admin-dashboard-routes" });

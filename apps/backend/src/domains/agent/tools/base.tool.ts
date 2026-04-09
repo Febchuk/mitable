@@ -1,4 +1,4 @@
-import type { Message } from "../db/schema/conversations.schema";
+import type { Message } from "../schema/conversations.schema.js";
 import type {
   SolutionObject,
   EmbeddingMatch,

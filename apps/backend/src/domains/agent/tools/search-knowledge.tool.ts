@@ -1,17 +1,17 @@
 import { BaseTool, ToolContext, ToolResult, ToolParameters } from "./base.tool";
-import { searchService } from "../services/search.service";
-import { intentService } from "../services/intent.service";
-import { trustRankingService } from "../services/trust-ranking.service";
-import { tokenCounter, MAX_CONTEXT_TOKENS } from "../utils/token-counter";
+import { searchService } from "../services/search.service.js";
+import { intentService } from "../services/intent.service.js";
+import { trustRankingService } from "../services/trust-ranking.service.js";
+import { tokenCounter, MAX_CONTEXT_TOKENS } from "../../../utils/token-counter.js";
 import {
   buildThreadBundles,
   scoreThreadBundle,
   buildThreadRollup,
   formatThreadForContext,
   type ThreadBundle,
-} from "../utils/slack-thread.utils.js";
-import { db } from "../db/client.js";
-import { integrations } from "../domains/integrations/schema/integrations.schema.js";
+} from "../../../utils/slack-thread.utils.js";
+import { db } from "../../../db/client.js";
+import { integrations } from "../../integrations/schema/integrations.schema.js";
 import { eq, and } from "drizzle-orm";
 
 /**

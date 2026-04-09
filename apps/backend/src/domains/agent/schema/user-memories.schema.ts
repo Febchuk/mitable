@@ -1,7 +1,7 @@
 import { pgTable, uuid, text, timestamp, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { users } from "../../domains/auth/schema/users.schema";
-import { organizations } from "../../domains/auth/schema/organizations.schema";
+import { users } from "../../auth/schema/users.schema.js";
+import { organizations } from "../../auth/schema/organizations.schema.js";
 
 export const userMemories = pgTable(
   "user_memories",

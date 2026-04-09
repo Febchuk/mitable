@@ -7,7 +7,7 @@
  * Predefined tools for the legacy Ask AI tool loop (max 31 days per query).
  */
 
-import { AskEnvironment } from "./ask-environment";
+import { AskEnvironment } from "./ask-environment.js";
 
 export interface AskToolParameter {
   name: string;

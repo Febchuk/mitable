@@ -1,11 +1,11 @@
 // import OpenAI from "openai"; // Unused - embeddings handled by separate service
 import Groq from "groq-sdk";
 // import { GoogleGenerativeAI } from "@google/generative-ai"; // Unused - commented out
-import { config } from "../config";
-import type { Message } from "../db/schema/conversations.schema";
-import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool";
-import { RespondTextTool } from "../tools/respond-text.tool";
-import { SearchKnowledgeTool } from "../tools/search-knowledge.tool";
+import { config } from "../../../config.js";
+import type { Message } from "../schema/conversations.schema.js";
+import { BaseTool, ToolContext, StreamChunk, ToolDefinition } from "../tools/base.tool.js";
+import { RespondTextTool } from "../tools/respond-text.tool.js";
+import { SearchKnowledgeTool } from "../tools/search-knowledge.tool.js";
 
 /**
  * System prompt that defines the agent's role and personality
