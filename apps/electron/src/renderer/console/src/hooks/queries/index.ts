@@ -1,9 +1,6 @@
 // Admin queries
 export * from "./admin";
 
-// Chats queries
-export * from "./chats";
-
 // Billing queries
 export * from "./billing";
 
