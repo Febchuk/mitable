@@ -13,8 +13,8 @@
  */
 
 import Groq from "groq-sdk";
-import { config } from "../config";
-import { withRetry } from "../utils/retry";
+import { config } from "../../../config.js";
+import { withRetry } from "../../../utils/retry.js";
 
 // Configuration
 const VISION_CONFIG = {

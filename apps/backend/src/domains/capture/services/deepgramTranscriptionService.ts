@@ -20,10 +20,10 @@ const _originalWebSocket = (globalThis as any).WebSocket;
 (globalThis as any).WebSocket = WS as any;
 
 import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
-import { db } from "../db/client.js";
-import { sessionTranscripts } from "../db/schema/monitoring.schema.js";
-import { logger } from "../domains/shared-infra/lib/logger.js";
-import { config } from "../config.js";
+import { db } from "../../../db/client.js";
+import { sessionTranscripts } from "../../../db/schema/monitoring.schema.js";
+import { logger } from "../../shared-infra/lib/logger.js";
+import { config } from "../../../config.js";
 
 // ===========================
 // Types & Interfaces

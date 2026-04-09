@@ -13,9 +13,9 @@
  * - Output is strictly physical/visual, not semantic.
  */
 
-import { geminiVisionFrameService } from "./gemini-vision-frame.service";
-import { SENSOR_SYSTEM_PROMPT, SENSOR_USER_PROMPT } from "../prompts/session-prompts";
-import { createSessionLogger, createTimer, CHECKPOINTS } from "../domains/shared-infra/lib/sessionLogger.js";
+import { geminiVisionFrameService } from "./gemini-vision-frame.service.js";
+import { SENSOR_SYSTEM_PROMPT, SENSOR_USER_PROMPT } from "../../../prompts/session-prompts.js";
+import { createSessionLogger, createTimer, CHECKPOINTS } from "../../shared-infra/lib/sessionLogger.js";
 
 // Types
 export type ChangeType =

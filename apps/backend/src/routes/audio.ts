@@ -7,7 +7,7 @@
 import { Router } from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { URL } from "url";
-import { deepgramTranscriptionService } from "../services/deepgramTranscriptionService.js";
+import { deepgramTranscriptionService } from "../domains/capture/services/deepgramTranscriptionService.js";
 import { supabase } from "../domains/shared-infra/lib/supabase.js";
 import { logger } from "../domains/shared-infra/lib/logger.js";
 

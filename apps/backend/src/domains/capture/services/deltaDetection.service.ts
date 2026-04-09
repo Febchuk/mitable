@@ -8,7 +8,7 @@
  * 3. Improving summary accuracy by focusing on delta changes
  */
 
-import { DeltaChangeType, DeltaAnalysis } from "../db/schema/monitoring.schema";
+import { DeltaChangeType, DeltaAnalysis } from "../../../db/schema/monitoring.schema.js";
 
 export interface FrameForDelta {
   frameId: string;

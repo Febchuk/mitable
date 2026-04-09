@@ -10,7 +10,7 @@ import {
 } from "../services/session-delivery.service.js";
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
 import { recapRLMService } from "../domains/updates/services/recap-rlm.service.js";
-import { frameAnalysisService } from "../services/frame-analysis.service.js";
+import { frameAnalysisService } from "../domains/capture/services/frame-analysis.service.js";
 import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../domains/updates/services/master-story.service.js";
 import { searchService } from "../services/search.service.js";
