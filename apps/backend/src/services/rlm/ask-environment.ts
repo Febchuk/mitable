@@ -7,7 +7,7 @@
  * Thin wrapper over OrgTeamActivityQueryService for legacy call sites only.
  */
 
-import { OrgTeamActivityQueryService } from "../org-team-activity-query.service.js";
+import { OrgTeamActivityQueryService } from "../../domains/insights/services/org-team-activity-query.service.js";
 
 export class AskEnvironment {
   private readonly org: OrgTeamActivityQueryService;

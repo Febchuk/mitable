@@ -5,8 +5,8 @@
  * sessions, documents). Used by both the Agent Query RLM layer and the REST tool endpoints.
  */
 
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 
 const MAX_RANGE_DAYS = 31;

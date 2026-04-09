@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { users } from "./users.schema";
-import { organizations } from "./organizations.schema";
+import { users } from "../../../db/schema/users.schema.js";
+import { organizations } from "../../../db/schema/organizations.schema.js";
 
 // Analytics Events
 export const analyticsEvents = pgTable("analytics_events", {

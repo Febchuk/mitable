@@ -4,8 +4,8 @@
  * Date ranges are capped at 31 days per query.
  */
 
-import { db } from "../db/client.js";
-import * as schema from "../db/schema/index.js";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 const MAX_DATE_RANGE_DAYS = 31;

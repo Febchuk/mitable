@@ -6,8 +6,8 @@
  * OrgTeamActivityQueryService when the user is an admin.
  */
 
-import { UserActivityQueryService } from "../user-activity-queries.js";
-import { OrgTeamActivityQueryService } from "../org-team-activity-query.service.js";
+import { UserActivityQueryService } from "../../domains/insights/services/user-activity-queries.js";
+import { OrgTeamActivityQueryService } from "../../domains/insights/services/org-team-activity-query.service.js";
 
 export class AgentQueryEnvironment {
   private queryService: UserActivityQueryService;

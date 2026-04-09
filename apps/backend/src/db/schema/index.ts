@@ -4,7 +4,7 @@ export * from "./users.schema";
 export * from "./integrations.schema";
 export * from "./conversations.schema";
 export * from "./roadmap-templates.schema";
-export * from "./analytics.schema";
+export * from "../../domains/insights/schema/analytics.schema.js";
 export * from "./search-content.schema";
 export * from "./workflows.schema";
 export * from "./monitoring.schema";

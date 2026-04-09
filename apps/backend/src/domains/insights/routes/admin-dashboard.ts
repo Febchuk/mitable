@@ -8,27 +8,27 @@
  */
 
 import { Router, Request, Response } from "express";
-import { db } from "../db/client";
-import * as schema from "../db/schema/index";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, and, desc, asc, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth } from "../../../middleware/auth.js";
 import {
   requireManagerOrAdmin,
   requireAccessToUser,
   getScopedVisibleUserIds,
-} from "../middleware/authorization.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
-import { normalizeName } from "../services/normalize-name.js";
+} from "../../../middleware/authorization.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
+import { normalizeName } from "../../../services/normalize-name.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { config } from "../config";
-import { graphRetrievalService } from "../services/graph/graph-retrieval.service";
-import { graphSyncService } from "../services/graph/graph-sync.service";
+import { config } from "../../../config.js";
+import { graphRetrievalService } from "../../../services/graph/graph-retrieval.service.js";
+import { graphSyncService } from "../../../services/graph/graph-sync.service.js";
 // DEPRECATED — Ask RLM only (callAskLLM, parseAskResponse, /admin/ask/*). Slated for deletion.
-import { AskEnvironment } from "../services/rlm/ask-environment";
-import { getAskToolByName } from "../services/rlm/ask-tools";
-import { getAskSystemPrompt } from "../services/rlm/ask-rlm-prompts";
-import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
+import { AskEnvironment } from "../../../services/rlm/ask-environment.js";
+import { getAskToolByName } from "../../../services/rlm/ask-tools.js";
+import { getAskSystemPrompt } from "../../../services/rlm/ask-rlm-prompts.js";
+import { parseJsonResponse } from "../../shared-infra/lib/parse-json.js";
 
 const logger = createLogger({ context: "admin-dashboard-routes" });
 const router = Router();

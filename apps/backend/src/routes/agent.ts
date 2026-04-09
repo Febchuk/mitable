@@ -10,7 +10,7 @@ import { AskEnvironment } from "../services/rlm/ask-environment.js";
 import { AgentQueryEnvironment } from "../services/rlm/agent-query-environment.js";
 import { getAgentQueryToolByName } from "../services/rlm/agent-query-tools.js";
 import { getAgentQuerySystemPrompt } from "../services/rlm/agent-query-prompts.js";
-import { UserActivityQueryService } from "../services/user-activity-queries.js";
+import { UserActivityQueryService } from "../domains/insights/services/user-activity-queries.js";
 import { parseJsonResponse } from "../domains/shared-infra/lib/parse-json.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";

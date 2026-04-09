@@ -12,17 +12,17 @@
  */
 
 import { Router, Request, Response } from "express";
-import { db } from "../db/client";
-import * as schema from "../db/schema/index";
+import { db } from "../../../db/client.js";
+import * as schema from "../../../db/schema/index.js";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth";
-import { requireAccessToUser } from "../middleware/authorization.js";
+import { requireAuth } from "../../../middleware/auth.js";
+import { requireAccessToUser } from "../../../middleware/authorization.js";
 import {
   getDirectReports,
   getTransitiveReportIds,
   canViewUserData,
-} from "../services/permissions.service.js";
-import { createLogger } from "../domains/shared-infra/lib/logger.js";
+} from "../../../services/permissions.service.js";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 
 const logger = createLogger({ context: "my-activity-routes" });
 const router = Router();
