@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "../../auth/schema/users.schema.js";
 import { organizations } from "../../auth/schema/organizations.schema.js";
@@ -16,7 +16,10 @@ export const agentConversations = pgTable("agent_conversations", {
   sessionId: varchar("session_id", { length: 255 }), // Claude Code session ID for resume
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_agent_conversations_user").on(table.userId, table.createdAt),
+  index("idx_agent_conversations_org").on(table.organizationId),
+]);
 
 // Agent Messages
 export const agentMessages = pgTable("agent_messages", {
@@ -28,7 +31,9 @@ export const agentMessages = pgTable("agent_messages", {
   content: text("content").notNull(),
   toolCalls: jsonb("tool_calls").default("[]"), // Array of {name, input, detail}
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_agent_messages_conversation").on(table.conversationId, table.createdAt),
+]);
 
 // Relations
 export const agentConversationsRelations = relations(agentConversations, ({ one, many }) => ({
