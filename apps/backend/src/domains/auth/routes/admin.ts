@@ -18,7 +18,7 @@ import {
 import { supabaseAdmin } from "../../shared-infra/lib/supabase.js";
 import { encryptionService } from "../services/encryption.service.js";
 import { config } from "../../../config.js";
-import { sendWelcomeEmployeeEmail } from "../../../services/email/email.service.js";
+import { sendWelcomeEmployeeEmail } from "../services/email.service.js";
 
 const router = Router();
 

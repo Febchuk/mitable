@@ -11,7 +11,7 @@ import {
   sendWelcomeAdminEmail,
   sendPasswordResetEmail,
   sendPasswordChangedEmail,
-} from "../../../services/email/email.service.js";
+} from "../services/email.service.js";
 
 export const authRouter = Router();
 

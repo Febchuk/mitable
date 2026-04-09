@@ -6,8 +6,8 @@
  */
 
 import { Resend } from "resend";
-import { config } from "../../config";
-import { createLogger } from "../../domains/shared-infra/lib/logger.js";
+import { config } from "../../../config";
+import { createLogger } from "../../shared-infra/lib/logger.js";
 import {
   buildWelcomeAdminEmail,
   buildWelcomeEmployeeEmail,
