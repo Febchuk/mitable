@@ -13,7 +13,7 @@ import * as schema from "../../../db/schema/index.js";
 import { eq, and } from "drizzle-orm";
 import { firefliesService, type FirefliesTranscript } from "./fireflies.service.js";
 import { encryptionService } from "../../auth/services/encryption.service.js";
-import { recalculateDailyStats } from "../../../services/activity-materializer.service.js";
+import { recalculateDailyStats } from "../../sessions/services/activity-materializer.service.js";
 import {
   addDiscoveredCustomers,
   getKnownCustomers,

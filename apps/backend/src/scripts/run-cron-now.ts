@@ -19,9 +19,9 @@ import minimist from "minimist";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { sql, and, gte, lte, eq, count } from "drizzle-orm";
-import { runUserRollup } from "../cron/jobs/user-rollup.job";
-import { runOrgRollup } from "../cron/jobs/org-rollup.job";
-import { runPeriodSnapshots } from "../cron/jobs/period-snapshot.job";
+import { runUserRollup } from "../domains/sessions/cron/user-rollup.job";
+import { runOrgRollup } from "../domains/sessions/cron/org-rollup.job";
+import { runPeriodSnapshots } from "../domains/sessions/cron/period-snapshot.job";
 
 const argv = minimist(process.argv.slice(2));
 const backfill = !!argv.backfill;

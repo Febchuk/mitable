@@ -6,7 +6,7 @@ import adminRouter from "./domains/auth/routes/admin.js";
 import adminDashboardRouter from "./domains/insights/routes/admin-dashboard.js";
 import integrationsRouter from "./domains/integrations/routes/integrations.js";
 import piiRouter from "./domains/auth/routes/pii.js";
-import monitoringRouter from "./routes/monitoring.js";
+import monitoringRouter from "./domains/sessions/routes/monitoring.js";
 import documentsRouter from "./routes/documents.js";
 import billingRouter from "./domains/auth/routes/billing.js";
 import stripeRouter from "./domains/auth/routes/stripe.js";

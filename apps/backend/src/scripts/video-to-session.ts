@@ -20,7 +20,7 @@ import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq } from "drizzle-orm";
 import { frameAnalysisService } from "../domains/capture/services/frame-analysis.service";
-import { sessionSummarizationService } from "../services/session-summarization.service";
+import { sessionSummarizationService } from "../domains/sessions/services/session-summarization.service";
 
 // ===========================
 // Types

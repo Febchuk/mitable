@@ -11,7 +11,7 @@
  */
 
 import cron from "node-cron";
-import { cleanupStaleSessions } from "../services/stale-session-cleanup.service";
+import { cleanupStaleSessions } from "../domains/sessions/services/stale-session-cleanup.service";
 import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { runGraphSyncJob } from "../domains/integrations/cron/graph-sync.job";
 import { runGranolaSyncJob } from "../domains/integrations/cron/granola-sync.job";

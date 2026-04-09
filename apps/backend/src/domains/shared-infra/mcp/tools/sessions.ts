@@ -179,7 +179,7 @@ export function registerSessionTools(server: McpServer, organizationId: string) 
     async ({ query, userId, topK }) => {
       // Dynamic import to avoid circular dependency issues
       const { sessionRetrieverService } =
-        await import("../../../../services/session-retriever.service.js");
+        await import("../../../sessions/services/session-retriever.service.js");
 
       // If no userId specified, we need to pick one for the service (it requires userId).
       // For org-wide search, we pass a placeholder and rely on org scoping.

@@ -15,7 +15,7 @@
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { eq, and, inArray, desc } from "drizzle-orm";
-import { materializeSession } from "../services/activity-materializer.service";
+import { materializeSession } from "../domains/sessions/services/activity-materializer.service";
 
 async function main() {
   const args = process.argv.slice(2);

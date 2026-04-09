@@ -23,7 +23,7 @@ import {
 } from "../../../db/schema";
 import { eq, and, isNotNull, asc, desc } from "drizzle-orm";
 import { createSessionLogger, createTimer, CHECKPOINTS } from "../../shared-infra/lib/sessionLogger.js";
-import { storytellerRLMService } from "../../../services/rlm/storyteller-rlm.service";
+import { storytellerRLMService } from "../../sessions/rlm/storyteller/storyteller-rlm.service";
 
 export interface GenerateStoryOptions {
   sessionId: string;

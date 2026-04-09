@@ -27,8 +27,8 @@ import {
   activityBlocks,
   type AppBreakdownEntry,
   type CategoryBreakdownEntry,
-} from "../../../db/schema/daily-activities.schema.js";
-import { monitoringSessions } from "../../../db/schema/monitoring.schema.js";
+} from "../../sessions/schema/daily-activities.schema.js";
+import { monitoringSessions } from "../../sessions/schema/monitoring.schema.js";
 import { users } from "../../auth/schema/users.schema.js";
 import type { ActivityContext, SessionContext, DayContext } from "./benchmark-ai.service.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";

@@ -21,7 +21,7 @@ const _originalWebSocket = (globalThis as any).WebSocket;
 
 import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
 import { db } from "../../../db/client.js";
-import { sessionTranscripts } from "../../../db/schema/monitoring.schema.js";
+import { sessionTranscripts } from "../../sessions/schema/monitoring.schema.js";
 import { logger } from "../../shared-infra/lib/logger.js";
 import { config } from "../../../config.js";
 
