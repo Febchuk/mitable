@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
+import { trackEvent } from "../../../lib/posthog";
 import AuthLogo from "../components/ui/AuthLogo";
 import HelpFeedbackButton from "../components/ui/HelpFeedbackButton";
 import type { AccountType } from "@mitable/shared";
@@ -84,8 +85,11 @@ export default function SignupOrganizationPage() {
         organizationId: response.profile.organizationId || "",
       });
 
+      trackEvent("console_signup_completed", { account_type: formData.accountType });
+
       navigate("/dashboard");
     } catch (err) {
+      trackEvent("console_signup_failed", { error_message: err instanceof Error ? err.message : "Unknown" });
       setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
       setIsLoading(false);

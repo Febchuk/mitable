@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
+import { trackEvent } from "../../../lib/posthog";
 import AuthLogo from "../components/ui/AuthLogo";
 import HelpFeedbackButton from "../components/ui/HelpFeedbackButton";
 
@@ -60,9 +61,12 @@ export default function LoginPage() {
         directReportCount: profile.directReportCount ?? 0,
       });
 
+      trackEvent("console_login_completed");
+
       // Redirect to default route (handles onboarding check)
       navigate("/");
     } catch (err) {
+      trackEvent("console_login_failed", { error_message: err instanceof Error ? err.message : "Unknown" });
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setIsLoading(false);
