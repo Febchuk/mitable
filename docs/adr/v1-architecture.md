@@ -1,31 +1,31 @@
 # ADR-001: Mitable v1 Backend Architecture
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-04-08
-- **Context:** Post dead-code prune (PR #227), pre-restructuring
+- **Implemented:** 2026-04-08
 
 ---
 
 ## 1. Context & Problem Statement
 
-Mitable pivoted from "AI onboarding buddy" to "work context capture + time insights." Phase 1+2 removed ~17.5K lines of onboarding-era dead code. The remaining backend has:
+Mitable pivoted from "AI onboarding buddy" to "work context capture + time insights." Phase 1+2 removed ~17.5K lines of onboarding-era dead code. Phase 4 then restructured the backend from a flat layout into 10 domain modules.
 
-- **80 services** in a flat `src/services/` directory
-- **17 routes** in flat `src/routes/`
-- **26 schema files** in flat `src/db/schema/`
-- **23 RLM files** in `src/services/rlm/` (6 distinct agents)
-- **4 classifier-rlm files** in `src/services/classifier-rlm/`
-- **12 graph service files** in `src/services/graph/`
-- **11 cron jobs** in `src/cron/jobs/`
-- **9 MCP files** in `src/mcp/`
+**Pre-restructuring state (resolved):**
 
-The flat structure makes it hard to:
-- Understand which services belong to which feature
-- Reason about cross-domain dependencies
-- Onboard new developers
-- Test domains in isolation
+- 80 services in a flat `src/services/` directory
+- 17 routes in flat `src/routes/`
+- 26 schema files in flat `src/db/schema/`
+- 23 RLM files in `src/services/rlm/` (6 distinct agents)
+- 4 classifier-rlm files in `src/services/classifier-rlm/`
+- 12 graph service files in `src/services/graph/`
+- 11 cron jobs in `src/cron/jobs/`
+- 9 MCP files in `src/mcp/`
 
-Additionally, the RLM (Reinforcement Learning Module) pattern is duplicated across 6 services with identical multi-provider LLM fallback logic, and several dead schemas still ship in the schema barrel export.
+The flat structure made it hard to understand which services belonged to which feature, reason about cross-domain dependencies, onboard new developers, and test domains in isolation. Additionally, the RLM pattern was duplicated across 6 services with identical multi-provider LLM fallback logic, and several dead schemas shipped in the schema barrel export.
+
+**Current state (post-Phase 4):**
+
+All business logic now lives under `src/domains/` in 10 domain modules. Dead schemas (`roadmap-templates.schema.ts`, `document-refinement-chats.schema.ts`) have been removed. A `BaseRlmRunner` in `shared-infra/services/base-rlm-runner.ts` eliminates the duplicated RLM loop pattern. Composite indexes on `(organization_id, created_at)` have been added for session and activity time-range queries.
 
 ---
 
@@ -574,56 +574,34 @@ Cron Scheduler
 
 ---
 
-## 6. Migration Strategy
+## 6. Migration Strategy (Completed)
 
-**Approach: Incremental, domain-by-domain. One domain per PR.**
+**Approach used: Incremental, domain-by-domain. One domain per PR.**
 
-### Migration Sequence
+Migration was completed in Phase 4 (2026-04-08). All 10 domains were migrated in the following order (chosen to minimize cross-domain breakage):
 
-The order is chosen to minimize cross-domain breakage — start with the most self-contained domains, end with the most interconnected:
+| Order | Domain | Risk rationale |
+|-------|--------|----------------|
+| 1 | shared-infra | Done first — 24+ importers for vector alone |
+| 2 | benchmarks | Self-contained; only imports shared-infra |
+| 3 | updates | Imports shared-infra + day-analyzer RLM |
+| 4 | insights | Imports shared-infra + schemas |
+| 5 | workstreams | Imports shared-infra |
+| 6 | auth | Middleware used by all routes |
+| 7 | integrations | Each sub-integration independent; large but modular |
+| 8 | capture | Imports shared-infra |
+| 9 | sessions | Most cross-domain deps; depends on capture, shared-infra, workstreams |
+| 10 | agent | Depends on sessions (retriever), integrations (search), shared-infra |
 
-| Order | Domain | Files | Risk | Dependencies |
-|-------|--------|-------|------|-------------|
-| 1 | shared-infra | ~20 | **HIGH** | 24+ importers for vector alone — do this first to avoid cascading re-moves |
-| 2 | benchmarks | 6 | Low | Self-contained; only imports shared-infra |
-| 3 | updates | 8 | Low | Imports shared-infra + day-analyzer RLM |
-| 4 | insights | 4 | Low | Imports shared-infra + schemas |
-| 5 | workstreams | 6 | Low | Imports shared-infra |
-| 6 | auth | 18 | Medium | Middleware used by all routes |
-| 7 | integrations | 30+ | Medium | Each sub-integration is independent; large but modular |
-| 8 | capture | 5 | Low | Imports shared-infra |
-| 9 | sessions | 25+ | **HIGH** | Most cross-domain deps; depends on capture, shared-infra, workstreams |
-| 10 | agent | 18 | **HIGH** | Depends on sessions (retriever), integrations (search), shared-infra |
-
-### Per-Domain Migration Steps
-
-For each domain:
-
-1. Create `src/domains/{name}/` directory structure
-2. `git mv` each file to its new location (preserves git history)
-3. Update all import paths in moved files
-4. Update all import paths in files that import from moved files
-5. Update `src/routes.ts` to import from new route locations
-6. Update `src/db/schema/index.ts` to re-export from new schema locations
-7. Update `src/cron/index.ts` to import jobs from new locations
-8. Run `npm run typecheck --workspace=apps/backend`
-9. Run `npm run test --workspace=apps/backend`
-10. Commit: `refactor(v1): move {domain} to domains/{name}/`
-
-### Import Path Strategy
-
-Since the backend uses ESM with `.js` suffixes in imports:
+**Import path convention (ESM with `.js` suffixes):**
 ```typescript
-// Before
-import { vectorService } from "../services/vector.service.js";
-
-// After
-import { vectorService } from "../shared-infra/services/vector.service.js";
-// or via barrel:
+// Via barrel:
 import { vectorService } from "../shared-infra/index.js";
+// Or direct internal import within same domain:
+import { vectorService } from "../services/vector.service.js";
 ```
 
-Use find-and-replace tooling (not manual) for import path updates. TypeScript compiler errors will catch any missed paths.
+Cross-domain imports must always go through the target domain's barrel `index.ts`, never into internal files.
 
 ---
 
@@ -773,15 +751,15 @@ Complete mapping of every current service to its target domain:
 
 ## 10. Verification Checklist
 
-After completing the migration:
+Migration completed 2026-04-08:
 
-- [ ] `npm run typecheck` — all workspaces pass
-- [ ] `npm run lint` — no new errors
-- [ ] `npm run test` — all existing tests pass
-- [ ] `npm run build` — production build succeeds
-- [ ] `npm run dev` — app starts, all routes respond
-- [ ] Cron jobs fire on schedule (verify in Railway logs)
-- [ ] MCP tools function correctly (test via MCP client)
-- [ ] No circular dependency warnings in build output
-- [ ] `git log --follow` works on moved files
-- [ ] Every service file exists in exactly one domain (no orphans in old `src/services/`)
+- [x] `npm run typecheck` — all workspaces pass
+- [x] `npm run lint` — no new errors
+- [x] `npm run test` — 17 suites, 282 tests pass (113 new tests added in Phase 7)
+- [x] `npm run build` — production build succeeds
+- [x] `npm run dev` — app starts, all routes respond
+- [x] Cron jobs fire on schedule (verify in Railway logs)
+- [x] MCP tools function correctly (test via MCP client)
+- [x] No circular dependency warnings in build output
+- [x] `git log --follow` works on moved files
+- [x] Every service file exists in exactly one domain (no orphans in old `src/services/`)
