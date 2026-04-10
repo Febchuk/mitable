@@ -1,14 +1,15 @@
 import { PostHog } from "posthog-node";
 
 let client: PostHog | null = null;
-const POSTHOG_KEY = "phc_tikntyG4XRScqlQpA1vFzeai3rFBKC3cVVCUkfyaQ6Q";
-const POSTHOG_HOST = "https://us.i.posthog.com";
 
 export function initAnalytics() {
   if (client) return;
 
-  client = new PostHog(POSTHOG_KEY, {
-    host: POSTHOG_HOST,
+  const key = process.env.POSTHOG_API_KEY;
+  if (!key) return;
+
+  client = new PostHog(key, {
+    host: process.env.POSTHOG_HOST || "https://us.i.posthog.com",
     flushAt: 20,
     flushInterval: 10000,
   });
