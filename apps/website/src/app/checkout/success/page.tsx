@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
+import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
 
@@ -49,6 +52,13 @@ const buttonSecondary: React.CSSProperties = {
 };
 
 export default function CheckoutSuccessPage() {
+    const posthog = usePostHog();
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        posthog?.capture("checkout_completed", { session_id: searchParams?.get("session_id") });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     return (
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
             <LandingNav />

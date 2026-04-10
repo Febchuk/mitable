@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Inter, JetBrains_Mono, Manrope, Newsreader } from "next/font/google";
 import { RouteProvider } from "@/providers/router-provider";
+import { PostHogProvider } from "@/providers/posthog-provider";
 import { Theme } from "@/providers/theme";
 import "@/styles/globals.css";
 import "@/styles/landing.css";
@@ -58,9 +59,11 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={cx(inter.variable, manrope.variable, jetbrainsMono.variable, newsreader.variable, dmSans.variable, "bg-primary antialiased")}>
-                <RouteProvider>
-                    <Theme>{children}</Theme>
-                </RouteProvider>
+                <PostHogProvider>
+                    <RouteProvider>
+                        <Theme>{children}</Theme>
+                    </RouteProvider>
+                </PostHogProvider>
             </body>
         </html>
     );

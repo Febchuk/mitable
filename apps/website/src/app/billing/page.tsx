@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PRICING_TIERS, type QuotaStatus, type SubscriptionResponse } from "@mitable/shared";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
@@ -110,6 +111,7 @@ function statusBadgeStyle(status: string): React.CSSProperties {
 
 export default function BillingPage() {
     const router = useRouter();
+    const posthog = usePostHog();
     const [data, setData] = useState<BillingData>({ subscription: null, quota: null });
     const [loading, setLoading] = useState(true);
     const [portalLoading, setPortalLoading] = useState(false);
@@ -154,6 +156,10 @@ export default function BillingPage() {
             const subscription = subRes.ok ? await subRes.json() : null;
             const quota = quotaRes.ok ? await quotaRes.json() : null;
             setData({ subscription, quota });
+
+            const planTier = subscription?.plan?.tier || "free";
+            const usagePct = quota?.usage?.overallPercent ?? 0;
+            posthog?.capture("billing_page_viewed", { plan_tier: planTier, quota_usage_pct: usagePct });
         } catch (error) {
             console.error("Failed to load billing data:", error);
         } finally {
@@ -162,6 +168,7 @@ export default function BillingPage() {
     }
 
     async function handleManageBilling() {
+        posthog?.capture("manage_billing_clicked", { plan_tier: data.subscription?.plan?.tier || "free" });
         setPortalLoading(true);
         try {
             const token = await getAccessToken();
