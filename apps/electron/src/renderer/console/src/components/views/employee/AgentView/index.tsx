@@ -24,6 +24,7 @@ import {
   useUpdateAgentChatSession,
 } from "../../../../hooks/queries/agent-chats";
 import { askAgentQuery } from "../../../../services/agentChatService";
+import { trackEvent } from "@/lib/posthog";
 
 interface ChatMessage {
   id: string;
@@ -269,6 +270,8 @@ export default function AgentView() {
       }
 
       const trimmed = text.trim();
+      trackEvent("agent_message_sent", { message_length: trimmed.length, is_new_conversation: isNew });
+
       const userMessage: ChatMessage = {
         id: generateId(),
         role: "user",

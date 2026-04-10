@@ -12,6 +12,7 @@ import {
   sendPasswordResetEmail,
   sendPasswordChangedEmail,
 } from "../services/email.service.js";
+import { analytics } from "../../shared-infra/lib/analytics.js";
 
 export const authRouter = Router();
 
@@ -405,6 +406,19 @@ authRouter.post("/signup-organization", async (req: Request, res: Response) => {
       firstName,
       organizationName: organization.name,
     }).catch((err) => console.error("Welcome email failed:", err));
+
+    // Track signup in PostHog
+    analytics.track(data.user!.id, "user_signed_up", {
+      account_type: accountType,
+      organization_id: organization.id,
+      has_domain: !!organizationDomain,
+    });
+    analytics.identify(data.user!.id, {
+      email,
+      organizationId: organization.id,
+      role: "admin",
+      accountType,
+    });
 
     res.status(201).json({
       success: true,
@@ -894,6 +908,14 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
               .where(eq(schema.users.managerId, req.userId!))
           )[0]?.count ?? 0)
         : 0;
+
+    // Identify user in PostHog on each /me call (keeps properties fresh)
+    analytics.identify(req.userId!, {
+      email: userProfile.email,
+      organizationId: userProfile.organizationId,
+      role: userProfile.role,
+      isManager: reportCheck.length > 0,
+    });
 
     res.json({
       user: req.user,

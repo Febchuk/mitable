@@ -22,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, List, Sparkles } from "lucide-react";
 import { createLogger } from "../../../../../../../lib/logger";
+import { trackEvent } from "@/lib/posthog";
 
 const logger = createLogger("EndSessionDialog");
 
@@ -119,6 +120,8 @@ export default function EndSessionDialog({
     // Reset checkboxes for next time
     setSaveAsDefaults(false);
     setDontAskAgain(false);
+
+    trackEvent("session_end_clicked", { summary_style: style, summary_format: format });
 
     await onConfirm({
       style,

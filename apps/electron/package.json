@@ -121,6 +121,8 @@
     "mermaid": "^11.12.1",
     "pdf-lib": "^1.17.1",
     "platejs": "^52.0.15",
+    "posthog-js": "^1.367.0",
+    "posthog-node": "^5.29.2",
     "quill": "^2.0.3",
     "react-aria": "^3.46.0",
     "react-aria-components": "^1.15.1",

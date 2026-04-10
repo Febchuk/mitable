@@ -7,6 +7,7 @@ import { config } from "../../../config.js";
 import { NOTION_CONFIG } from "../notion/notion.service.js";
 import { encryptionService } from "../../auth/services/encryption.service.js";
 import { githubService } from "../github/github.service.js";
+import { analytics } from "../../shared-infra/lib/analytics.js";
 
 const router = Router();
 
@@ -366,6 +367,7 @@ router.get("/slack/callback", async (req: Request, res: Response): Promise<void>
       });
 
     console.log(`✅ Slack connected for organization: ${organizationId} (${data.team.name})`);
+    analytics.track(organizationId, "integration_connected", { integration_type: "slack" });
 
     // Return success page
     res.send(`
@@ -482,6 +484,7 @@ router.delete(
         );
 
       console.log(`✅ Slack disconnected for organization: ${user.organizationId}`);
+      analytics.track(req.userId!, "integration_disconnected", { integration_type: "slack" });
 
       res.json({ success: true, message: "Slack integration disconnected" });
     } catch (error) {
@@ -1120,6 +1123,7 @@ router.get("/notion/callback", async (req: Request, res: Response): Promise<void
     console.log(
       `✅ Notion connected for organization: ${organizationId} (${data.workspace_name || "Workspace"})`
     );
+    analytics.track(organizationId, "integration_connected", { integration_type: "notion" });
 
     // Return success page
     res.send(`
@@ -1480,6 +1484,8 @@ router.get("/github/callback", async (req: Request, res: Response): Promise<void
     } catch (repoError) {
       console.error("Failed to fetch repos:", repoError);
     }
+
+    analytics.track(organizationId, "integration_connected", { integration_type: "github" });
 
     res.send(`
       <html>

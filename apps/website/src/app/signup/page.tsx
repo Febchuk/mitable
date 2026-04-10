@@ -2,6 +2,7 @@
 
 import { type FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
@@ -35,6 +36,7 @@ const inputStyle = {
 function SignupForm() {
     const searchParams = useSearchParams();
     const redirect = searchParams.get("redirect") || "/billing";
+    const posthog = usePostHog();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -72,6 +74,8 @@ function SignupForm() {
             return;
         }
 
+        posthog?.capture("signup_form_submitted", { email_domain: email.split("@")[1] });
+
         try {
             const res = await fetch(`${API_URL}/api/auth/signup-organization`, {
                 method: "POST",
@@ -89,6 +93,7 @@ function SignupForm() {
             const data = await res.json();
 
             if (!res.ok) {
+                posthog?.capture("signup_failed", { error_message: data.error?.message });
                 setError(data.error?.message || "Signup failed. Please try again.");
                 return;
             }
@@ -99,6 +104,9 @@ function SignupForm() {
                     refresh_token: data.session.refresh_token,
                 });
             }
+
+            posthog?.identify(data.user?.id, { email, organizationId: data.organization?.id });
+            posthog?.capture("signup_completed", { account_type: "personal" });
 
             window.location.href = redirect;
         } catch {

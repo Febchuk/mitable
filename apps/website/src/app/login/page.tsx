@@ -2,6 +2,7 @@
 
 import { type FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
@@ -35,6 +36,7 @@ const inputStyle = {
 function LoginForm() {
     const searchParams = useSearchParams();
     const redirect = searchParams.get("redirect") || "/billing";
+    const posthog = usePostHog();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -64,6 +66,8 @@ function LoginForm() {
         setError("");
         setLoading(true);
 
+        posthog?.capture("login_form_submitted", { email_domain: email.split("@")[1] });
+
         try {
             const { data: signInData, error: authError } = await supabase.auth.signInWithPassword({
                 email,
@@ -71,6 +75,7 @@ function LoginForm() {
             });
 
             if (authError) {
+                posthog?.capture("login_failed", { error_message: authError.message });
                 setError(authError.message);
                 return;
             }
@@ -114,15 +119,23 @@ function LoginForm() {
                     });
                 }
 
+                posthog?.identify(signInData.user?.id);
+                posthog?.capture("login_account_repaired");
+                posthog?.capture("login_completed", { had_account_repair: true });
+
                 window.location.href = redirect;
                 return;
             }
 
             if (!meRes.ok) {
                 await supabase.auth.signOut();
+                posthog?.capture("login_failed", { error_message: "Account verification failed" });
                 setError("Something went wrong verifying your account. Please try again.");
                 return;
             }
+
+            posthog?.identify(signInData.user?.id);
+            posthog?.capture("login_completed", { had_account_repair: false });
 
             window.location.href = redirect;
         } catch {

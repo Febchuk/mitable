@@ -38,6 +38,12 @@ import { notificationService } from "./services/notificationService";
 import { agentSdkService } from "./services/agentSdkService";
 import { skillsStore } from "./services/skillsStore";
 import { browserBridgeService } from "./services/browserBridgeService";
+import {
+  initAnalytics,
+  trackMainEvent,
+  identifyMainUser,
+  shutdownAnalytics,
+} from "./services/analyticsService";
 
 // Set theme from stored preference (defaults to "system" which follows OS)
 nativeTheme.themeSource = preferencesService.getTheme();
@@ -1081,6 +1087,9 @@ function setupIPC() {
     await authManager.clearTokens(userCtx);
     authLogger.info(" Auth manager and keychain cleared");
 
+    if (currentUserContext?.userId) {
+      trackMainEvent(currentUserContext.userId, "electron_auth_cleared");
+    }
     currentUserContext = null;
 
     // Broadcast token clear to all windows
@@ -1466,6 +1475,12 @@ function setupIPC() {
     (_event, user: { userId: string; organizationId: string; role?: string }) => {
       consoleLogger.info(" Set:", user);
       currentUserContext = user;
+
+      // Identify user in PostHog
+      identifyMainUser(user.userId, {
+        organizationId: user.organizationId,
+        role: user.role,
+      });
 
       // Store user role in auth manager so services (e.g. agent) can check it
       if (user.role) {
@@ -1902,6 +1917,11 @@ function setupMonitoringSessionHandlers() {
 
       // After session starts successfully, show the watching pill if preference allows
       if (!result.error) {
+        trackMainEvent(config.userId, "electron_session_started", {
+          session_id: config.sessionId,
+          window_count: config.selectedWindows.length,
+          capture_interval_ms: config.captureIntervalMs || SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
+        });
         const shouldShowPill = preferencesService.getShowPillOnSessionStart();
         if (shouldShowPill) {
           if (!watchingPillWindow || watchingPillWindow.isDestroyed()) {
@@ -1921,6 +1941,11 @@ function setupMonitoringSessionHandlers() {
   // Pause the active session — also stops audio recording
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_PAUSE, async () => {
     monitoringLogger.info(" Pausing session");
+    if (currentUserContext?.userId) {
+      trackMainEvent(currentUserContext.userId, "electron_session_paused", {
+        session_id: monitoringSessionService.getSessionState()?.id,
+      });
+    }
 
     audioActiveBeforePause = audioWebSocketService.isConnected();
     const sessionState = monitoringSessionService.getSessionState();
@@ -1948,6 +1973,11 @@ function setupMonitoringSessionHandlers() {
   // Resume the paused session — restarts audio if it was active before pause
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_RESUME, async () => {
     monitoringLogger.info(" Resuming session");
+    if (currentUserContext?.userId) {
+      trackMainEvent(currentUserContext.userId, "electron_session_resumed", {
+        session_id: monitoringSessionService.getSessionState()?.id,
+      });
+    }
     const result = await monitoringSessionService.resumeSession();
 
     if (result.success && audioActiveBeforePause) {
@@ -1980,6 +2010,12 @@ function setupMonitoringSessionHandlers() {
 
     // Stop captures / trackers — fast now that Top-K is removed
     const result = await monitoringSessionService.endSession();
+
+    if (result.success && currentUserContext?.userId) {
+      trackMainEvent(currentUserContext.userId, "electron_session_ended", {
+        session_id: preEndState?.id,
+      });
+    }
 
     // Always hide watching pill when session ends
     if (result.success && watchingPillWindow && !watchingPillWindow.isDestroyed()) {
@@ -2152,6 +2188,12 @@ function setupMonitoringSessionHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.PREFERENCES_SET, (_, key: string, value: boolean) => {
+    if (currentUserContext?.userId) {
+      trackMainEvent(currentUserContext.userId, "electron_preference_changed", {
+        preference_key: key,
+        new_value: value,
+      });
+    }
     return preferencesService.setPreference(key, value);
   });
 
@@ -2228,6 +2270,11 @@ function setupMonitoringSessionHandlers() {
   // Audio recording IPC handlers
   ipcMain.handle(IPC_CHANNELS.MONITORING_AUDIO_START, async () => {
     monitoringLogger.info("🎤 Starting audio recording");
+    if (currentUserContext?.userId) {
+      trackMainEvent(currentUserContext.userId, "electron_audio_started", {
+        session_id: monitoringSessionService.getSessionState()?.id,
+      });
+    }
 
     // Reset cleanup flag so audio chunks are processed again
     audioCleanupDone = false;
@@ -2331,6 +2378,11 @@ function setupMonitoringSessionHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.MONITORING_AUDIO_STOP, async () => {
+    if (currentUserContext?.userId) {
+      trackMainEvent(currentUserContext.userId, "electron_audio_stopped", {
+        session_id: monitoringSessionService.getSessionState()?.id,
+      });
+    }
     monitoringLogger.info("🔇 Stopping audio recording");
 
     const sessionState = monitoringSessionService.getSessionState();
@@ -2986,6 +3038,14 @@ app.whenReady().then(async () => {
     app.setName("Mitable Dev");
   }
 
+  // Initialize PostHog analytics
+  initAnalytics();
+  trackMainEvent("anonymous", "electron_app_launched", {
+    version: app.getVersion(),
+    arch: process.arch,
+    is_packaged: app.isPackaged,
+  });
+
   // Set App User Model ID for Windows notification center integration
   if (process.platform === "win32") {
     app.setAppUserModelId(app.isPackaged ? "com.mitable.app" : "com.mitable.dev");
@@ -3583,4 +3643,10 @@ app.on("before-quit", () => {
   passiveMonitorService.forceReset();
   // Stop browser bridge WebSocket server
   browserBridgeService.stop();
+
+  // Track app quit and flush PostHog events
+  if (currentUserContext?.userId) {
+    trackMainEvent(currentUserContext.userId, "electron_app_quit");
+  }
+  shutdownAnalytics();
 });
