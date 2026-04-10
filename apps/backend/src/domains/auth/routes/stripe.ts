@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { stripeService } from "../services/stripe.service.js";
 import { config } from "../../../config.js";
+import { analytics } from "../../shared-infra/lib/analytics.js";
 
 const router = Router();
 
@@ -42,6 +43,11 @@ router.post("/create-checkout-session", requireAuth, async (req: Request, res: R
       cancelUrl
     );
 
+    analytics.track(req.userId!, "checkout_session_created", {
+      price_id: priceId,
+      organization_id: organizationId,
+    });
+
     res.json({ url });
   } catch (error) {
     console.error("Failed to create checkout session:", error);
@@ -72,6 +78,7 @@ router.post("/create-portal-session", requireAuth, async (req: Request, res: Res
     }
 
     const url = await stripeService.createPortalSession(organizationId, returnUrl);
+    analytics.track(req.userId!, "billing_portal_opened", { organization_id: organizationId });
     res.json({ url });
   } catch (error) {
     console.error("Failed to create portal session:", error);
@@ -103,21 +110,31 @@ router.post("/webhooks", async (req: Request, res: Response) => {
       case "checkout.session.completed": {
         const session = event.data.object;
         await stripeService.handleCheckoutCompleted(session);
+        analytics.track(session.client_reference_id || "stripe", "checkout_completed", {
+          subscription_id: session.subscription,
+        });
         break;
       }
       case "customer.subscription.updated": {
         const subscription = event.data.object;
         await stripeService.handleSubscriptionUpdated(subscription);
+        analytics.track(subscription.metadata?.organizationId || "stripe", "subscription_updated", {
+          new_status: subscription.status,
+        });
         break;
       }
       case "customer.subscription.deleted": {
         const subscription = event.data.object;
         await stripeService.handleSubscriptionDeleted(subscription);
+        analytics.track(subscription.metadata?.organizationId || "stripe", "subscription_cancelled");
         break;
       }
       case "invoice.payment_failed": {
         const invoice = event.data.object;
         await stripeService.handlePaymentFailed(invoice);
+        analytics.track("stripe", "payment_failed", {
+          amount: invoice.amount_due,
+        });
         break;
       }
       default:
