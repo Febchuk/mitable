@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
-import { trackEvent } from "../../../lib/posthog";
+import { trackEvent } from "@/lib/posthog";
 import AuthLogo from "../components/ui/AuthLogo";
 import HelpFeedbackButton from "../components/ui/HelpFeedbackButton";
 
