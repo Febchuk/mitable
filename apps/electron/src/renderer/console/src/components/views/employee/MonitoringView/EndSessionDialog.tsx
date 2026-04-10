@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, List, Sparkles } from "lucide-react";
 import { createLogger } from "../../../../../../../lib/logger";
-import { trackEvent } from "../../../../../../../lib/posthog";
+import { trackEvent } from "@/lib/posthog";
 
 const logger = createLogger("EndSessionDialog");
 

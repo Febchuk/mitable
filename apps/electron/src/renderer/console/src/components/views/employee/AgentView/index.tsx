@@ -24,7 +24,7 @@ import {
   useUpdateAgentChatSession,
 } from "../../../../hooks/queries/agent-chats";
 import { askAgentQuery } from "../../../../services/agentChatService";
-import { trackEvent } from "../../../../../../../lib/posthog";
+import { trackEvent } from "@/lib/posthog";
 
 interface ChatMessage {
   id: string;

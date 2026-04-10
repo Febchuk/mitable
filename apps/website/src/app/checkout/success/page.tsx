@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { usePostHog } from "posthog-js/react";
@@ -51,16 +51,23 @@ const buttonSecondary: React.CSSProperties = {
     cursor: "pointer",
 };
 
-export default function CheckoutSuccessPage() {
+function CheckoutTracker() {
     const posthog = usePostHog();
     const searchParams = useSearchParams();
 
     useEffect(() => {
         posthog?.capture("checkout_completed", { session_id: searchParams?.get("session_id") });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
+    return null;
+}
+
+export default function CheckoutSuccessPage() {
     return (
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans, display: "flex", flexDirection: "column" }}>
+            <Suspense fallback={null}>
+                <CheckoutTracker />
+            </Suspense>
             <LandingNav />
 
             <main

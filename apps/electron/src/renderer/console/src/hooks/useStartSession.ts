@@ -15,7 +15,7 @@ import { createSession, startMonitoringSession } from "@/console/src/services/mo
 import { authService } from "@/console/src/services/authService";
 import { SESSION_DEFAULTS } from "@mitable/shared";
 import { createLogger } from "../../../../lib/logger";
-import { trackEvent } from "../../../../lib/posthog";
+import { trackEvent } from "@/lib/posthog";
 
 const logger = createLogger("useStartSession");
 

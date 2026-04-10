@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useUser } from "./UserContext";
-import { initPostHog, identifyUser, trackEvent, resetUser } from "../../../lib/posthog";
+import { initPostHog, identifyUser, trackEvent, resetUser } from "@/lib/posthog";
 
 /**
  * PostHog analytics provider for the console renderer.

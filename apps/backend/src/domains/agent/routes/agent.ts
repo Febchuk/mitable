@@ -14,6 +14,7 @@ import { UserActivityQueryService } from "../../insights/services/user-activity-
 import { parseJsonResponse } from "../../shared-infra/lib/parse-json.js";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import { analytics } from "../../shared-infra/lib/analytics.js";
 
 const logger = createLogger({ module: "AgentRoutes" });
 const agentRouter = Router();
@@ -447,6 +448,13 @@ agentRouter.post("/chats/:id/messages", async (req: Request, res: Response) => {
     if (!conversation) {
       res.status(404).json({ error: "Conversation not found" });
       return;
+    }
+
+    if (role === "user") {
+      analytics.track(req.userId!, "agent_query_processed", {
+        conversation_id: req.params.id,
+        has_tool_calls: !!toolCalls?.length,
+      });
     }
 
     const [message] = await db
