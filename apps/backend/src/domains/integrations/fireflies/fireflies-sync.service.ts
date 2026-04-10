@@ -317,7 +317,7 @@ Respond ONLY with JSON:
       }
     }
 
-    // Fallback: OpenAI GPT-4o-mini
+    // Fallback: OpenAI GPT-5.4
     if (config.openai.apiKey) {
       try {
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -327,8 +327,8 @@ Respond ONLY with JSON:
             Authorization: `Bearer ${config.openai.apiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
-            max_tokens: 256,
+            model: "gpt-5.4",
+            max_completion_tokens: 256,
             messages: [{ role: "user", content: prompt }],
           }),
         });

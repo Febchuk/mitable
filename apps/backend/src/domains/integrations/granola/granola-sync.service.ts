@@ -361,7 +361,7 @@ class GranolaSyncService {
     // 2. Try GPT-5
     if (this.openai) {
       try {
-        return await this.classifyWithOpenAI(prompt, this.openai, "gpt-5");
+        return await this.classifyWithOpenAI(prompt, this.openai, "gpt-5.4");
       } catch (error) {
         logger.warn(
           { error: String(error), meetingId: meeting.id },
@@ -463,7 +463,7 @@ Respond ONLY with JSON:
   ): Promise<MeetingClassification> {
     const response = await client.chat.completions.create({
       model,
-      max_tokens: 200,
+      max_completion_tokens: 200,
       temperature: 0.2,
       messages: [
         {

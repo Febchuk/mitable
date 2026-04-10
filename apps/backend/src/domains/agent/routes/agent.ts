@@ -573,7 +573,7 @@ async function callAgentQueryLLM(
   if (oai) {
     try {
       const completion = await oai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-5.4",
         messages: [{ role: "system", content: systemPrompt }, ...messages],
         temperature: 0.7,
         max_completion_tokens: 4000,
@@ -581,7 +581,7 @@ async function callAgentQueryLLM(
       const content = completion.choices[0]?.message?.content?.trim();
       if (content) return content;
     } catch (error) {
-      logger.warn({ error: String(error) }, "Agent query: GPT-5 failed — trying DeepSeek");
+      logger.warn({ error: String(error) }, "Agent query: GPT-5.4 failed — trying DeepSeek");
     }
   }
 

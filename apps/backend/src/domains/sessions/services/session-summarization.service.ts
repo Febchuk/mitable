@@ -716,14 +716,14 @@ EXAMPLE (structure only — your content must come from the actual master story,
     if (!response && this.openai) {
       try {
         const openaiResult = await this.openai.chat.completions.create({
-          model: "gpt-5",
+          model: "gpt-5.4",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.3,
-          max_tokens: 16384,
+          max_completion_tokens: 16384,
         });
         response = openaiResult.choices[0]?.message?.content || "";
         tokensUsed = openaiResult.usage?.total_tokens || 0;
-        modelUsed = "gpt-5";
+        modelUsed = "gpt-5.4";
         log.debug("Extraction via OpenAI fallback");
       } catch (openaiError) {
         log.warn("OpenAI extraction failed, falling back to DeepSeek", {
@@ -1632,14 +1632,14 @@ Example good output:
     if (this.openai) {
       try {
         const completion = await this.openai.chat.completions.create({
-          model: "gpt-5",
+          model: "gpt-5.4",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.4,
           max_completion_tokens: maxTokens,
         });
         const content = completion.choices[0]?.message?.content?.trim();
         if (content) {
-          logger.info("Recap/revise via OpenAI GPT-5 (fallback)");
+          logger.info("Recap/revise via OpenAI GPT-5.4 (fallback)");
           return content;
         }
       } catch (error) {
@@ -1974,10 +1974,10 @@ RULES:
       if (!raw && this.openai) {
         try {
           const openaiResult = await this.openai.chat.completions.create({
-            model: "gpt-5",
+            model: "gpt-5.4",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.1,
-            max_tokens: 2000,
+            max_completion_tokens: 2000,
           });
           raw = openaiResult.choices[0]?.message?.content || "";
         } catch (openaiErr) {

@@ -114,7 +114,7 @@ class BlockAnalyzerRLMService {
     const modelUsed = this.anthropic
       ? "claude-haiku-4-5-20251001"
       : this.openai
-        ? "gpt-5"
+        ? "gpt-5.4"
         : "deepseek-chat";
 
     logger.info(
@@ -404,7 +404,7 @@ class BlockAnalyzerRLMService {
 
     const completion = await this.openai.chat.completions.create({
       messages: openaiMessages as any,
-      model: "gpt-5",
+      model: "gpt-5.4",
       max_completion_tokens: 8000,
     });
 

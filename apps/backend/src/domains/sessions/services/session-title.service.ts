@@ -173,11 +173,11 @@ class SessionTitleService {
       }
     }
 
-    // OpenAI GPT-5 fallback
+    // OpenAI GPT-5.4 fallback
     if (this.openai) {
       try {
         const completion = await this.openai.chat.completions.create({
-          model: "gpt-5",
+          model: "gpt-5.4",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: activitySummary },
@@ -188,7 +188,7 @@ class SessionTitleService {
 
         const title = completion.choices[0]?.message?.content?.trim();
         if (title) {
-          logger.info("⚠️ Title generated via GPT-5 (fallback)");
+          logger.info("⚠️ Title generated via GPT-5.4 (fallback)");
           return title;
         }
       } catch (error) {
