@@ -11,13 +11,13 @@
  */
 
 import cron from "node-cron";
-import { cleanupStaleSessions } from "../services/stale-session-cleanup.service";
-import { createLogger } from "../lib/logger";
-import { runGraphSyncJob } from "./jobs/graph-sync.job";
-import { runGranolaSyncJob } from "./jobs/granola-sync.job";
-import { runFirefliesSyncJob } from "./jobs/fireflies-sync.job";
-import { runBenchmarkScoreJob } from "./jobs/benchmark-score.job";
-import { runBragbookGenerateJob } from "./jobs/bragbook-generate.job";
+import { cleanupStaleSessions } from "../domains/sessions/services/stale-session-cleanup.service";
+import { createLogger } from "../domains/shared-infra/lib/logger.js";
+import { runGraphSyncJob } from "../domains/integrations/cron/graph-sync.job";
+import { runGranolaSyncJob } from "../domains/integrations/cron/granola-sync.job";
+import { runFirefliesSyncJob } from "../domains/integrations/cron/fireflies-sync.job";
+import { runBenchmarkScoreJob } from "../domains/benchmarks/cron/benchmark-score.job";
+import { runBragbookGenerateJob } from "../domains/updates/cron/bragbook-generate.job";
 import { config } from "../config";
 
 const logger = createLogger({ context: "cron-scheduler" });

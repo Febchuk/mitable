@@ -4,7 +4,7 @@
  */
 
 import { db } from "../db/client.js";
-import { integrations } from "../db/schema/integrations.schema.js";
+import { integrations } from "../domains/integrations/schema/integrations.schema.js";
 
 async function main() {
   console.log("\n🔍 Checking token encryption status...\n");

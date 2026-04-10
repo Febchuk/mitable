@@ -9,8 +9,8 @@ async function main() {
   const { db } = await import("../db/client");
   const schema = await import("../db/schema/index");
   const { isNotNull } = await import("drizzle-orm");
-  const { encryptionService } = await import("../services/encryption.service");
-  const { granolaService } = await import("../services/granola.service");
+  const { encryptionService } = await import("../domains/auth/services/encryption.service");
+  const { granolaService } = await import("../domains/integrations/granola/granola.service");
 
   const [user] = await db
     .select({ token: schema.users.granolaAccessTokenEncrypted })

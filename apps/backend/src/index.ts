@@ -1,7 +1,7 @@
 // Initialize observability FIRST (before any other imports that might throw)
-import { initSentry } from "./lib/sentry.js";
-import { initAnalytics, analytics } from "./lib/analytics.js";
-import { logger } from "./lib/logger.js";
+import { initSentry } from "./domains/shared-infra/lib/sentry.js";
+import { initAnalytics, analytics } from "./domains/shared-infra/lib/analytics.js";
+import { logger } from "./domains/shared-infra/lib/logger.js";
 
 initSentry();
 initAnalytics();
@@ -10,15 +10,15 @@ import { createServer } from "http";
 import { app } from "./app.js";
 import { config, validateConfig, checkPortAvailability } from "./config.js";
 import { testConnection } from "./db/client.js";
-import { vectorService } from "./services/vector.service.js";
-import { piiRedactionService } from "./services/pii-redaction.service.js";
-import { socketService } from "./services/socket.service.js";
-import { setupWorkstreamSocketEmitter } from "./services/workstream-socket-emitter.js";
+import { vectorService } from "./domains/shared-infra/services/vector.service.js";
+import { piiRedactionService } from "./domains/shared-infra/services/pii-redaction.service.js";
+import { socketService } from "./domains/shared-infra/services/socket.service.js";
+import { setupWorkstreamSocketEmitter } from "./domains/workstreams/services/workstream-socket-emitter.js";
 import { db } from "./db/client.js";
 import * as schema from "./db/schema/index.js";
 import { isNotNull, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { initializeAudioWebSocket } from "./routes/audio.js";
+import { initializeAudioWebSocket } from "./domains/capture/routes/audio.js";
 // Cron loaded dynamically to avoid node-cron blocking event loop on module init
 
 async function startServer() {

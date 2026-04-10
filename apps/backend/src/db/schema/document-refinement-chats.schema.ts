@@ -1,7 +1,7 @@
 import { pgTable, uuid, jsonb, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { documents } from "./documents.schema";
-import { users } from "./users.schema";
+import { documents } from "../../domains/agent/schema/documents.schema";
+import { users } from "../../domains/auth/schema/users.schema";
 
 export const documentRefinementChats = pgTable(
   "document_refinement_chats",

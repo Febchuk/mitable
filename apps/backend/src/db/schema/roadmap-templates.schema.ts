@@ -8,7 +8,7 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { organizations } from "./organizations.schema";
+import { organizations } from "../../domains/auth/schema/organizations.schema";
 
 // Roadmap Templates (admin-created reusable templates)
 export const roadmapTemplates = pgTable("roadmap_templates", {

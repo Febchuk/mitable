@@ -13,8 +13,8 @@
  * This is FOCUSED on code's structural nature.
  */
 
-import { embeddingService } from "../services/embedding.service.js";
-import { vectorService } from "../services/vector.service.js";
+import { embeddingService } from "../domains/shared-infra/services/embedding.service.js";
+import { vectorService } from "../domains/shared-infra/services/vector.service.js";
 import { db } from "../db/client.js";
 import { searchContent } from "../db/schema/index.js";
 import { sql, and, eq, desc } from "drizzle-orm";

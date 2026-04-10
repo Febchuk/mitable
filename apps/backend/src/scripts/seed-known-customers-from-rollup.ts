@@ -5,7 +5,7 @@
 import { db } from "../db/client.js";
 import * as schema from "../db/schema/index.js";
 import { eq, isNotNull, sql } from "drizzle-orm";
-import { normalizeName } from "../services/normalize-name.js";
+import { normalizeName } from "../domains/auth/services/normalize-name.js";
 
 const ORG_ID = process.env.ORG_ID || "7dd3c9f5-6c0a-479a-aa7d-34aa278ccc49";
 

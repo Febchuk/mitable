@@ -1,8 +1,8 @@
 import { pgTable, uuid, varchar, text, jsonb, timestamp, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { conversations } from "./conversations.schema";
-import { users } from "./users.schema";
-import { organizations } from "./organizations.schema";
+import { conversations } from "../../domains/agent/schema/conversations.schema.js";
+import { users } from "../../domains/auth/schema/users.schema";
+import { organizations } from "../../domains/auth/schema/organizations.schema";
 
 /**
  * Workflow Sessions
