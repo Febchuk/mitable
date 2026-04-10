@@ -118,7 +118,11 @@ export const monitoringSessions = pgTable("monitoring_sessions", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_sessions_user_created").on(table.userId, table.createdAt),
+  index("idx_sessions_org_created").on(table.organizationId, table.createdAt),
+  index("idx_sessions_user_status").on(table.userId, table.status),
+]);
 
 /**
  * Session Captures
