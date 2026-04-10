@@ -51,7 +51,6 @@ interface PreferencesSchema {
       autoSessionStart: boolean; // Auto-start session on powerMonitor resume
       autoRecap: boolean; // Auto-create recap after session ends
       passiveMonitoringEnabled: boolean; // Auto-detect activity and start/stop sessions
-      onboardingVersion: number; // Version of onboarding the user has completed (0 = never)
     };
   };
 }
@@ -273,21 +272,6 @@ class PreferencesService {
       passiveMonitoringEnabled: enabled,
     });
     logger.info(` Passive monitoring for user ${userId} set to: ${enabled}`);
-  }
-
-  // Onboarding version preference (user-scoped)
-  getUserOnboardingVersion(userId: string): number {
-    const userPrefs = this.store.get(`users.${userId}`, {});
-    return userPrefs.onboardingVersion ?? 0;
-  }
-
-  setUserOnboardingVersion(userId: string, version: number): void {
-    const userPrefs = this.store.get(`users.${userId}`, {});
-    this.store.set(`users.${userId}`, {
-      ...userPrefs,
-      onboardingVersion: version,
-    });
-    logger.info(`Onboarding version for user ${userId} set to: ${version}`);
   }
 
   // Agent feature toggle (user-scoped, default OFF)

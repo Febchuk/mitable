@@ -28,8 +28,6 @@ import RecapDetail from "./components/views/employee/RecapsView/RecapDetail";
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
-import TodosView from "./components/views/employee/TodosView";
-import ArtifactsView from "./components/views/employee/ArtifactsView";
 import UserProfilePage from "./pages/UserProfilePage";
 import DashboardView from "./components/views/admin/DashboardView";
 import CustomerDetailView from "./components/views/admin/DashboardView/CustomerDetailView";
@@ -37,18 +35,15 @@ import PeopleView from "./components/views/admin/PeopleView";
 import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
 import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
 import IntegrationsView from "./components/views/admin/IntegrationsView";
-import ReportsView from "./components/views/admin/ReportsView";
 import AgentView from "./components/views/employee/AgentView";
-import UploadsView from "./components/views/employee/UploadsView";
 import MeView from "./components/views/employee/MeView";
 import BragbookView from "./components/views/employee/BragbookView";
 import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
 import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
 import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
 import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEditor";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTheme } from "./hooks/useTheme";
-import OnboardingPage from "./pages/OnboardingPage";
 import TeamsView from "./components/views/admin/TeamsView";
 import OrgSetupView from "./components/views/admin/OrgSetupView";
 
@@ -189,36 +184,9 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Bump this number to force all users through onboarding again
-const ONBOARDING_VERSION = 1;
-export { ONBOARDING_VERSION };
-
-// Default route -- checks onboarding status before redirecting
+// Default route -- redirects based on user role
 function DefaultRoute() {
   const { user } = useUser();
-  const [checked, setChecked] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    window.consoleAPI
-      ?.getOnboardingVersion(user.id)
-      .then((version) => {
-        setNeedsOnboarding(version < ONBOARDING_VERSION);
-        setChecked(true);
-      })
-      .catch(() => setChecked(true)); // fallback: skip onboarding if IPC fails
-  }, [user?.id]);
-
-  if (!checked) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
   if (user?.role === "admin" || user?.isManager) return <Navigate to="/dashboard" replace />;
   return <Navigate to="/calendar" replace />;
 }
@@ -299,15 +267,6 @@ function App() {
                       <Route path="/signup-organization" element={<SignupOrganizationPage />} />
                       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                       <Route path="/reset-password" element={<ResetPasswordPage />} />
-                      {/* Onboarding (full-page, no sidebar) */}
-                      <Route
-                        path="/onboarding"
-                        element={
-                          <ProtectedRoute>
-                            <OnboardingPage />
-                          </ProtectedRoute>
-                        }
-                      />
                       {/* Protected routes */}
                       <Route
                         path="/"
@@ -324,9 +283,6 @@ function App() {
                         <Route path="people" element={<PeopleView />} />
                         <Route path="people/new" element={<AddNewUser />} />
                         <Route path="people/:id" element={<PersonDetail />} />
-                        {/* DEPRECATED Ask RLM: old path redirects; AskView unused — slated for deletion */}
-                        <Route path="ask" element={<Navigate to="/reports" replace />} />
-                        <Route path="reports" element={<ReportsView />} />
                         <Route path="reports/:docId" element={<DocDetail />} />
                         <Route path="benchmarks" element={<BenchmarksRouter />} />
                         <Route
@@ -378,8 +334,6 @@ function App() {
                         <Route path="bragbook" element={<BragbookView />} />
                         <Route path="docs" element={<DocsView />} />
                         <Route path="docs/:docId" element={<DocDetail />} />
-                        <Route path="artefacts" element={<ArtifactsView />} />
-                        <Route path="todos" element={<TodosView />} />
                         {/* Calendar/Journal Routes */}
                         <Route path="calendar" element={<CalendarView />} />
                         <Route path="recaps" element={<RecapsView />} />
@@ -389,11 +343,7 @@ function App() {
                         <Route path="monitoring/:sessionId" element={<SessionDetail />} />
                         <Route path="agent" element={<AgentView />} />
                         <Route path="agent/:chatId" element={<AgentView />} />
-                        <Route path="uploads" element={<UploadsView />} />
                         <Route path="profile" element={<UserProfilePage />} />
-                        {/* Legacy redirect: /chats → /agent */}
-                        <Route path="chats" element={<Navigate to="/agent" replace />} />
-                        <Route path="chats/:chatId" element={<Navigate to="/agent" replace />} />
                       </Route>
                     </Routes>
                   </RecapsProvider>

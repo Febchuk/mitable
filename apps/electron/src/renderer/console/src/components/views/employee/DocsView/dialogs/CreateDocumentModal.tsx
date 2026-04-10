@@ -7,12 +7,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ChevronDown, Loader2, Check, ArrowUp, Paperclip, Layers } from "lucide-react";
+import { X, ChevronDown, Loader2, Check, ArrowUp, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useGenerateDocumentStream } from "@/console/src/hooks/queries/documents/useGenerateDocumentStream";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
-import { useUploadArtifact } from "@/console/src/hooks/queries/artifacts";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
 import type { DocType } from "@mitable/shared";
 
@@ -65,12 +64,10 @@ export default function CreateDocumentModal({
 }: CreateDocumentModalProps) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [input, setInput] = useState("");
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [blocksOpen, setBlocksOpen] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; id: string }[]>([]);
 
   const { generate, isGenerating, documentId, progress, error, reset } =
     useGenerateDocumentStream();
@@ -81,7 +78,6 @@ export default function CreateDocumentModal({
     (s: SessionListItem) => ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
   );
 
-  const uploadMutation = useUploadArtifact();
   const entityLabelTitle = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
   const phaseLabels: Record<string, string> = {
     ...PHASE_LABELS,
@@ -101,7 +97,6 @@ export default function CreateDocumentModal({
       setInput("");
       setSelectedSessionIds(new Set());
       setBlocksOpen(false);
-      setUploadedFiles([]);
     }
   }, [open]);
 
@@ -119,8 +114,7 @@ export default function CreateDocumentModal({
   const handleGenerate = async () => {
     if (!input.trim()) return;
     const sessionIds = selectedSessionIds.size > 0 ? Array.from(selectedSessionIds) : undefined;
-    const artifactIds = uploadedFiles.length > 0 ? uploadedFiles.map((f) => f.id) : undefined;
-    await generate(input, docType, { sessionIds, artifactIds, tags: defaultTags });
+    await generate(input, docType, { sessionIds, tags: defaultTags });
   };
 
   const handleClose = () => {
@@ -143,24 +137,6 @@ export default function CreateDocumentModal({
       else next.add(sessionId);
       return next;
     });
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const result = await uploadMutation.mutateAsync(file);
-      if (result?.artifact?.id) {
-        setUploadedFiles((prev) => [...prev, { name: file.name, id: result.artifact.id }]);
-      }
-    } catch {
-      console.error("[CreateDocModal] Upload failed");
-    }
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const removeUploadedFile = (id: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
   const showForm = !isGenerating && !isComplete && !error;
@@ -213,52 +189,6 @@ export default function CreateDocumentModal({
         {/* ── Form state ──────────────────────────────────────── */}
         {showForm && (
           <div style={{ padding: "20px 20px 16px" }}>
-            {/* Attached files */}
-            {uploadedFiles.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                  marginBottom: 10,
-                }}
-              >
-                {uploadedFiles.map((file) => (
-                  <span
-                    key={file.id}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      padding: "3px 8px",
-                      borderRadius: 6,
-                      background: "rgba(var(--mi-accent-rgb, 130,192,204), 0.08)",
-                      border: "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.2)",
-                      fontSize: 11,
-                      color: "var(--mi-accent)",
-                    }}
-                  >
-                    <Paperclip size={10} />
-                    {file.name}
-                    <button
-                      onClick={() => removeUploadedFile(file.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "var(--mi-accent)",
-                        padding: 0,
-                        display: "flex",
-                        marginLeft: 2,
-                      }}
-                    >
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
             {/* Selected blocks indicator */}
             {selectedSessionIds.size > 0 && (
               <div
@@ -316,49 +246,6 @@ export default function CreateDocumentModal({
                 paddingTop: 12,
               }}
             >
-              {/* Upload */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadMutation.isPending}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "5px 10px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--text-tertiary)",
-                  fontSize: 12,
-                  fontFamily: "var(--font-sans)",
-                  cursor: uploadMutation.isPending ? "default" : "pointer",
-                  transition: "color 0.15s ease",
-                  opacity: uploadMutation.isPending ? 0.5 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!uploadMutation.isPending)
-                    e.currentTarget.style.color = "var(--text-primary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "var(--text-tertiary)";
-                }}
-              >
-                {uploadMutation.isPending ? (
-                  <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
-                ) : (
-                  <Paperclip size={13} />
-                )}
-                Upload
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileUpload}
-                style={{ display: "none" }}
-                accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
-              />
-
               {/* Blocks dropdown */}
               <div style={{ position: "relative" }}>
                 <button
