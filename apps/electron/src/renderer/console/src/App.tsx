@@ -12,6 +12,7 @@ import { UpdateProvider } from "./context/UpdateContext";
 import { VariantProvider } from "./context/VariantContext";
 import { RecapsProvider } from "./context/RecapsContext";
 import { DevFlagsProvider } from "./context/DevFlagsContext";
+import { PostHogTracker } from "./context/PostHogContext";
 import type { OrgVariant } from "@mitable/shared";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -258,6 +259,7 @@ function App() {
           <MonitoringSessionHandler />
           <UpdateProvider>
             <UserProvider>
+              <PostHogTracker />
               <VariantWrapper>
                 <DevFlagsProvider>
                   <RecapsProvider>
