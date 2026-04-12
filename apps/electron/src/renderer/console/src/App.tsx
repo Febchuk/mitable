@@ -7,6 +7,7 @@ import { createLogger } from "../../lib/logger";
 
 installConsoleCaptureForFeedback();
 const logger = createLogger("ConsoleApp");
+import { Skeleton } from "@/components/ui/skeleton";
 import { UserProvider, useUser } from "./context/UserContext";
 import { UpdateProvider } from "./context/UpdateContext";
 import { VariantProvider } from "./context/VariantContext";
@@ -198,10 +199,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-sm text-muted-foreground">Loading...</p>
+      <div className="flex h-screen">
+        {/* Sidebar skeleton */}
+        <div className="w-[220px] flex-shrink-0 border-r border-stroke-subtle p-4 space-y-4">
+          <Skeleton className="h-8 w-24 mb-6" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-full rounded-lg" />
+          ))}
+        </div>
+        {/* Main content skeleton */}
+        <div className="flex-1 p-8 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72" />
+          <div className="pt-4 space-y-3">
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+          </div>
         </div>
       </div>
     );

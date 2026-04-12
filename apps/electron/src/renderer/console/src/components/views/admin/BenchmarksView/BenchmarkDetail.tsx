@@ -8,9 +8,8 @@ import { useTriggerCompute } from "@/console/src/hooks/queries/benchmarks/useBen
 
 import { TrendArrow } from "../../shared/benchmarks/TrendArrow";
 import { AssignBenchmarkModal } from "./AssignBenchmarkModal";
+import AdminBenchmarkDetailSkeleton from "./AdminBenchmarkDetailSkeleton";
 import type { BenchmarkAssignment } from "@/console/src/services/benchmarkService";
-
-const SPINNER_COLOR = "#82C0CC";
 
 const MINI_RING = 36;
 const MINI_STROKE = 3;
@@ -278,31 +277,7 @@ export function BenchmarkDetail() {
   };
 
   if (isLoading || !benchmark) {
-    return (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "column",
-          gap: 12,
-        }}
-      >
-        <div
-          className="animate-spin"
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: "50%",
-            border: `2px solid ${SPINNER_COLOR}33`,
-            borderTopColor: SPINNER_COLOR,
-          }}
-        />
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading benchmark...</span>
-      </div>
-    );
+    return <AdminBenchmarkDetailSkeleton />;
   }
 
   const existingUserIds = benchmark.assignments.map((a) => a.userId);

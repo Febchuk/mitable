@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useSubscriberDrillDown } from "@/console/src/hooks/queries/admin";
 import type { DashboardPeriod } from "@/console/src/services/adminService";
+import CustomerDetailSkeleton from "./CustomerDetailSkeleton";
 
 type TimeRange = "yesterday" | "week" | "month" | "ytd" | "all";
 
@@ -86,11 +87,7 @@ export default function CustomerDetailView() {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo border-t-transparent" />
-      </div>
-    );
+    return <CustomerDetailSkeleton />;
   }
 
   if (!data) {

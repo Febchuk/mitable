@@ -12,6 +12,7 @@ import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw } from "lucide-rea
 import { EmptyState } from "@/components/ui/EmptyState";
 import WeekStrip from "./WeekStrip";
 import ActivityBlock from "./ActivityBlock";
+import CalendarViewSkeleton from "./CalendarViewSkeleton";
 import type { ActivityDay } from "./types";
 import {
   useCalendarDays,
@@ -589,25 +590,7 @@ export default function CalendarView() {
 
       {/* Activity section */}
       <div>
-        {isLoading && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "64px 0",
-            }}
-          >
-            <Loader2
-              size={24}
-              style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
-            />
-            <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
-              Loading activity data...
-            </p>
-          </div>
-        )}
+        {isLoading && <CalendarViewSkeleton />}
 
         {error && (
           <div

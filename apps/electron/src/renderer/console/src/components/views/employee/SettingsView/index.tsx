@@ -13,6 +13,7 @@ const logger = createLogger("SettingsView");
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/console/src/services/authService";
 import { usePreferences, useSummaryPreferences } from "@/console/src/hooks/usePreferences";
@@ -663,7 +664,7 @@ export default function SettingsView() {
                 </div>
 
                 {isPreferencesLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <Skeleton className="w-9 h-5 rounded-full" />
                 ) : (
                   <Switch
                     id="show-pill-toggle"
@@ -706,7 +707,7 @@ export default function SettingsView() {
                 </div>
 
                 {isPreferencesLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <Skeleton className="w-9 h-5 rounded-full" />
                 ) : (
                   <Switch
                     id="hide-pill-toggle"
@@ -760,7 +761,7 @@ export default function SettingsView() {
                 </div>
 
                 {isSummaryPrefsLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <Skeleton className="w-9 h-5 rounded-full" />
                 ) : (
                   <Switch
                     id="always-ask-toggle"
@@ -805,7 +806,7 @@ export default function SettingsView() {
                     </div>
 
                     {isSummaryPrefsLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      <Skeleton className="w-9 h-5 rounded-full" />
                     ) : (
                       <div className="flex gap-2">
                         <Button
@@ -850,7 +851,7 @@ export default function SettingsView() {
                     </div>
 
                     {isSummaryPrefsLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      <Skeleton className="w-9 h-5 rounded-full" />
                     ) : (
                       <div className="flex gap-2">
                         <Button
@@ -900,7 +901,7 @@ export default function SettingsView() {
                     </div>
 
                     {isSummaryPrefsLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      <Skeleton className="w-9 h-5 rounded-full" />
                     ) : (
                       <Switch
                         id="include-screenshots-toggle"
@@ -950,7 +951,7 @@ export default function SettingsView() {
 
             {/* Action Button */}
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <Skeleton className="w-20 h-5 rounded-md" />
             ) : linearStatus?.connected ? (
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1 text-sm text-status-success">
@@ -1014,7 +1015,7 @@ export default function SettingsView() {
 
             {/* Action Button */}
             {isNotionLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <Skeleton className="w-20 h-5 rounded-md" />
             ) : notionStatus?.connected ? (
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1 text-sm text-status-success">
@@ -1095,7 +1096,7 @@ export default function SettingsView() {
 
             {/* Action Button */}
             {isGmailLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <Skeleton className="w-20 h-5 rounded-md" />
             ) : gmailStatus?.connected ? (
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1 text-sm text-status-success">

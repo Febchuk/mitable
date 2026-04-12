@@ -42,6 +42,7 @@ import { reviseDocument } from "@/console/src/services/documentsService";
 import ExportNotionDialog from "./dialogs/ExportNotionDialog";
 import ExportGoogleDocsDialog from "./dialogs/ExportGoogleDocsDialog";
 import ExportPopover, { type ExportDestination } from "./components/ExportPopover";
+import DocDetailSkeleton from "./DocDetailSkeleton";
 import { useUser } from "@/console/src/context/UserContext";
 import { apiRequest } from "@/console/src/services/api";
 
@@ -474,11 +475,7 @@ export default function DocDetail() {
   }
 
   if (isLoading && !isNewDocument) {
-    return (
-      <div className="p-8 flex items-center justify-center">
-        <Loader2 className="animate-spin text-text-secondary" size={32} />
-      </div>
-    );
+    return <DocDetailSkeleton />;
   }
 
   if (!document && !isNewDocument) {

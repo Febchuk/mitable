@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { OrgVariant } from "@mitable/shared";
+import SetupViewSkeleton from "./SetupViewSkeleton";
 
 const VARIANT_OPTIONS: { value: OrgVariant; label: string; description: string }[] = [
   {
@@ -78,22 +79,7 @@ export default function SetupView() {
   };
 
   if (isLoading) {
-    return (
-      <div style={{ padding: "64px 0", textAlign: "center" }}>
-        <div
-          className="animate-spin"
-          style={{
-            width: 24,
-            height: 24,
-            margin: "0 auto 12px",
-            borderRadius: "50%",
-            border: "2px solid rgba(var(--ui-rgb), 0.1)",
-            borderTopColor: "var(--text-secondary)",
-          }}
-        />
-        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading settings...</div>
-      </div>
-    );
+    return <SetupViewSkeleton />;
   }
 
   if (error) {

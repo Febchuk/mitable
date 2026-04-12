@@ -6,8 +6,7 @@ import { useBenchmarks, useDeleteBenchmark } from "@/console/src/hooks/queries/b
 import type { Benchmark } from "@/console/src/services/benchmarkService";
 import { BenchmarkCard } from "./BenchmarkCard";
 import DataScopeFilter from "@/console/src/components/shared/DataScopeFilter";
-const SPINNER_COLOR = "#82C0CC";
-
+import AdminBenchmarksViewSkeleton from "./AdminBenchmarksViewSkeleton";
 export default function BenchmarksView() {
   const navigate = useNavigate();
   const { data: benchmarks = [], isLoading } = useBenchmarks();
@@ -241,20 +240,7 @@ export default function BenchmarksView() {
 
       {/* Benchmark grid */}
       {isLoading ? (
-        <div style={{ padding: "64px 0", textAlign: "center" }}>
-          <div
-            className="animate-spin"
-            style={{
-              width: 24,
-              height: 24,
-              margin: "0 auto 12px",
-              borderRadius: "50%",
-              border: `2px solid ${SPINNER_COLOR}33`,
-              borderTopColor: SPINNER_COLOR,
-            }}
-          />
-          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading benchmarks...</div>
-        </div>
+        <AdminBenchmarksViewSkeleton />
       ) : benchmarks.length === 0 ? (
         /* Empty state — no benchmarks created yet */
         <div style={{ padding: "80px 0" }}>

@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMyBenchmarkDetail } from "@/console/src/hooks/queries/benchmarks";
 import type { BenchmarkSnapshot } from "@/console/src/services/benchmarkService";
+import BenchmarkDetailSkeleton from "./BenchmarkDetailSkeleton";
 
 // ── Chart drawing ─────────────────────────────────────────────
 
@@ -128,24 +129,7 @@ export function BenchmarkDetailView() {
   }, [detail]);
 
   if (isLoading) {
-    return (
-      <div
-        style={{
-          height: "100vh",
-          overflowY: "auto",
-          paddingTop: 120,
-          paddingRight: 0,
-          paddingBottom: 28,
-          paddingLeft: 0,
-          color: "var(--text-tertiary)",
-          fontSize: 13,
-          fontFamily: "var(--font-sans)",
-          textAlign: "center",
-        }}
-      >
-        Loading...
-      </div>
-    );
+    return <BenchmarkDetailSkeleton />;
   }
 
   if (!detail) return null;

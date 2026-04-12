@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import SessionRow from "./SessionRow";
+import MonitoringViewSkeleton from "./MonitoringViewSkeleton";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
 
 // Group sessions by date category (calendar week based on user locale)
@@ -114,16 +115,7 @@ export default function MonitoringView() {
   const groupedSessions = useMemo(() => groupSessionsByDate(filteredSessions), [filteredSessions]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-[500px] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full border-2 border-indigo/20 border-t-indigo animate-spin" />
-          </div>
-          <span className="text-ink-tertiary text-sm font-medium">Loading sessions...</span>
-        </div>
-      </div>
-    );
+    return <MonitoringViewSkeleton />;
   }
 
   if (error) {

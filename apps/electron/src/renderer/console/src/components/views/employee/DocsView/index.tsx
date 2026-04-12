@@ -8,10 +8,11 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDocuments } from "@/console/src/hooks/queries/documents";
-import { Loader2, AlertCircle, Plus, Lock } from "lucide-react";
+import { AlertCircle, Plus, Lock } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import CreateDocumentModal from "./dialogs/CreateDocumentModal";
 import { groupByDay } from "@/console/src/components/shared/groupByDay";
+import DocsViewSkeleton from "./DocsViewSkeleton";
 import type { Document } from "@mitable/shared";
 
 function isReportDocument(doc: Document): boolean {
@@ -50,25 +51,7 @@ export default function DocsView() {
   );
 
   if (isLoading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "80px 0",
-        }}
-      >
-        <Loader2
-          size={24}
-          style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
-        />
-        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
-          Loading docs...
-        </p>
-      </div>
-    );
+    return <DocsViewSkeleton />;
   }
 
   if (error) {

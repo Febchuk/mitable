@@ -6,13 +6,14 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Loader2, AlertCircle, Plus, X } from "lucide-react";
+import { AlertCircle, Plus, X } from "lucide-react";
 import {
   useBragbook,
   useSaveBragbookPeriod,
   useGenerateBragbookPeriod,
 } from "@/console/src/hooks/queries/bragbook";
 import type { BragbookView as BragbookViewType } from "@/console/src/services/bragbookService";
+import BragbookViewSkeleton from "./BragbookViewSkeleton";
 import type { BragbookPeriod } from "@/console/src/services/bragbookService";
 
 // ============================================================================
@@ -137,17 +138,7 @@ export default function BragbookView() {
 
   // Loading state
   if (isLoading) {
-    return (
-      <div style={styles.centerContainer}>
-        <Loader2
-          size={24}
-          style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite" }}
-        />
-        <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 12 }}>
-          Loading bragbook...
-        </p>
-      </div>
-    );
+    return <BragbookViewSkeleton />;
   }
 
   // Error state
