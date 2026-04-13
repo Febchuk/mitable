@@ -3,10 +3,6 @@
  * Download links, footer, social links, navigation structure.
  */
 
-// Single source of truth for version - update this when releasing
-export const MITABLE_VERSION = "0.1.48";
-const R2_BASE = "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev";
-
 export const baseContent = {
     brand: {
         name: "Mitable",
@@ -15,26 +11,6 @@ export const baseContent = {
     downloads: {
         headline: "Download Mitable",
         subheadline: "Choose the right version for your platform.",
-        builds: [
-            {
-                platform: "macOS (Apple Silicon)",
-                description: "For M1, M2, M3, and M4 Macs",
-                href: `${R2_BASE}/Mitable-${MITABLE_VERSION}-arm64.dmg`,
-                icon: "apple" as const,
-            },
-            {
-                platform: "macOS (Intel)",
-                description: "For Intel-based Macs",
-                href: `${R2_BASE}/Mitable-${MITABLE_VERSION}-x64.dmg`,
-                icon: "apple" as const,
-            },
-            {
-                platform: "Windows",
-                description: "For Windows 10 and later",
-                href: `${R2_BASE}/Mitable-${MITABLE_VERSION}-x64.exe`,
-                icon: "windows" as const,
-            },
-        ],
     },
 
     footer: {

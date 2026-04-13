@@ -2,8 +2,7 @@
 
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
-import { MITABLE_VERSION } from "@/config/content/base";
-import { DOWNLOAD_URLS, type OsPlatform, useOsDetection } from "@/hooks/use-os-detection";
+import { type OsPlatform, useLatestVersion, useOsDetection } from "@/hooks/use-os-detection";
 
 const BUILDS: { id: OsPlatform; platform: string; description: string; icon: "apple" | "windows" }[] = [
     { id: "mac-arm", platform: "macOS (Apple Silicon)", description: "For M1, M2, M3, and M4 Macs", icon: "apple" },
@@ -11,11 +10,11 @@ const BUILDS: { id: OsPlatform; platform: string; description: string; icon: "ap
     { id: "windows", platform: "Windows", description: "For Windows 10 and later", icon: "windows" },
 ];
 
-function hrefForBuild(id: OsPlatform): string {
+function hrefForBuild(id: OsPlatform, urls: Record<string, string>): string {
     if (id === "mac-arm" || id === "mac-intel") {
         return `/download/thanks?p=${id}`;
     }
-    return DOWNLOAD_URLS[id];
+    return urls[id] ?? "/download";
 }
 
 const C = {
@@ -46,6 +45,7 @@ const iconMap = { apple: AppleIcon, windows: WindowsIcon };
 
 export const DownloadScreen = () => {
     const os = useOsDetection();
+    const { version, urls, isLoading } = useLatestVersion();
 
     const recommended = BUILDS.find((b) => b.id === os.platform);
     const others = BUILDS.filter((b) => b.id !== os.platform);
@@ -74,7 +74,7 @@ export const DownloadScreen = () => {
                 </div>
 
                 {/* Recommended build */}
-                {os.ready && recommended && (
+                {os.ready && recommended && !isLoading && (
                     <div style={{ marginBottom: 32 }}>
                         <span
                             style={{
@@ -89,7 +89,7 @@ export const DownloadScreen = () => {
                             Recommended for your device
                         </span>
                         <a
-                            href={hrefForBuild(recommended.id)}
+                            href={hrefForBuild(recommended.id, urls)}
                             style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -144,77 +144,87 @@ export const DownloadScreen = () => {
                 )}
 
                 {/* Other platforms */}
-                <div>
-                    <span
-                        style={{
-                            display: "block",
-                            fontSize: 10,
-                            color: C.textTer,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.09em",
-                            marginBottom: 12,
-                        }}
-                    >
-                        {os.ready && recommended ? "Other platforms" : "All platforms"}
-                    </span>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-                        {(os.ready && recommended ? others : BUILDS).map((build) => {
-                            const Icon = iconMap[build.icon];
-                            return (
-                                <a
-                                    key={build.id}
-                                    href={hrefForBuild(build.id)}
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: 14,
-                                        padding: "22px 24px",
-                                        background: C.raised,
-                                        border: `1px solid ${C.border}`,
-                                        borderRadius: 14,
-                                        textDecoration: "none",
-                                        transition: "border-color 0.2s",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = "var(--l-border, #33312B)";
-                                    }}
-                                >
-                                    <div style={{ color: C.textSec }}>
-                                        <Icon />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 15, fontWeight: 500, color: C.text, marginBottom: 3 }}>{build.platform}</div>
-                                        <div style={{ fontSize: 12, color: C.textTer }}>{build.description}</div>
-                                    </div>
-                                    <div
+                {!isLoading && (
+                    <div>
+                        <span
+                            style={{
+                                display: "block",
+                                fontSize: 10,
+                                color: C.textTer,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.09em",
+                                marginBottom: 12,
+                            }}
+                        >
+                            {os.ready && recommended ? "Other platforms" : "All platforms"}
+                        </span>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                            {(os.ready && recommended ? others : BUILDS).map((build) => {
+                                const Icon = iconMap[build.icon];
+                                return (
+                                    <a
+                                        key={build.id}
+                                        href={hrefForBuild(build.id, urls)}
                                         style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: 6,
-                                            fontSize: 13,
-                                            fontWeight: 500,
-                                            color: C.accent,
-                                            marginTop: "auto",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 14,
+                                            padding: "22px 24px",
+                                            background: C.raised,
+                                            border: `1px solid ${C.border}`,
+                                            borderRadius: 14,
+                                            textDecoration: "none",
+                                            transition: "border-color 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.borderColor = "rgba(236, 232, 224, 0.12)";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.borderColor = "var(--l-border, #33312B)";
                                         }}
                                     >
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                            <polyline points="7 10 12 15 17 10" />
-                                            <line x1="12" y1="15" x2="12" y2="3" />
-                                        </svg>
-                                        Download
-                                    </div>
-                                </a>
-                            );
-                        })}
+                                        <div style={{ color: C.textSec }}>
+                                            <Icon />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: 15, fontWeight: 500, color: C.text, marginBottom: 3 }}>{build.platform}</div>
+                                            <div style={{ fontSize: 12, color: C.textTer }}>{build.description}</div>
+                                        </div>
+                                        <div
+                                            style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: 6,
+                                                fontSize: 13,
+                                                fontWeight: 500,
+                                                color: C.accent,
+                                                marginTop: "auto",
+                                            }}
+                                        >
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                            >
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                <polyline points="7 10 12 15 17 10" />
+                                                <line x1="12" y1="15" x2="12" y2="3" />
+                                            </svg>
+                                            Download
+                                        </div>
+                                    </a>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Version */}
-                <p style={{ textAlign: "center", fontSize: 12, color: C.textTer, marginTop: 48 }}>Version {MITABLE_VERSION}</p>
+                {version && <p style={{ textAlign: "center", fontSize: 12, color: C.textTer, marginTop: 48 }}>Version {version}</p>}
             </main>
 
             <LandingFooter />

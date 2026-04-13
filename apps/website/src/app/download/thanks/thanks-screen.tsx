@@ -4,8 +4,7 @@ import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
-import { MITABLE_VERSION } from "@/config/content/base";
-import { DOWNLOAD_URLS, type OsPlatform } from "@/hooks/use-os-detection";
+import { type OsPlatform, useLatestVersion } from "@/hooks/use-os-detection";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
@@ -75,7 +74,7 @@ const StepVisual = ({ children }: { children: React.ReactNode }) => (
     </div>
 );
 
-/* ── Illustration: Downloads folder with .dmg ── */
+/* Illustration: Downloads folder with .dmg */
 const DownloadsFolderIllustration = () => (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <div
@@ -129,7 +128,7 @@ const DownloadsFolderIllustration = () => (
     </div>
 );
 
-/* ── Illustration: Drag to Applications ── */
+/* Illustration: Drag to Applications */
 const DragToAppsIllustration = () => (
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div
@@ -169,7 +168,7 @@ const DragToAppsIllustration = () => (
     </div>
 );
 
-/* ── Illustration: Open from Applications list ── */
+/* Illustration: Open from Applications list */
 const OpenFromAppsIllustration = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, width: "70%" }}>
         <div
@@ -245,12 +244,13 @@ const OpenFromAppsIllustration = () => (
 export const ThanksScreen = () => {
     const searchParams = useSearchParams();
     const downloadTriggered = useRef(false);
+    const { version, urls, isLoading } = useLatestVersion();
 
     const platformParam = (searchParams.get("p") || "mac-arm") as OsPlatform;
-    const downloadUrl = DOWNLOAD_URLS[platformParam] || DOWNLOAD_URLS["mac-arm"];
+    const downloadUrl = urls[platformParam] || urls["mac-arm"] || "";
 
     useEffect(() => {
-        if (downloadTriggered.current) return;
+        if (isLoading || !downloadUrl || downloadTriggered.current) return;
         downloadTriggered.current = true;
         const a = document.createElement("a");
         a.href = downloadUrl;
@@ -258,7 +258,7 @@ export const ThanksScreen = () => {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-    }, [downloadUrl]);
+    }, [isLoading, downloadUrl]);
 
     return (
         <div className="landing" style={{ minHeight: "100dvh", background: C.bg, fontFamily: C.sans }}>
@@ -307,9 +307,15 @@ export const ThanksScreen = () => {
 
                 <p style={{ textAlign: "center", fontSize: 15, color: C.textSec, lineHeight: 1.6, margin: "0 auto 56px", maxWidth: 480 }}>
                     Your download will begin automatically. If it didn&apos;t start,{" "}
-                    <a href={downloadUrl} style={{ color: C.accent, textDecoration: "underline", textUnderlineOffset: 3 }}>
-                        download Mitable manually
-                    </a>
+                    {downloadUrl ? (
+                        <a href={downloadUrl} style={{ color: C.accent, textDecoration: "underline", textUnderlineOffset: 3 }}>
+                            download Mitable manually
+                        </a>
+                    ) : (
+                        <a href="/download" style={{ color: C.accent, textDecoration: "underline", textUnderlineOffset: 3 }}>
+                            try again
+                        </a>
+                    )}
                     .
                 </p>
 
@@ -360,7 +366,7 @@ export const ThanksScreen = () => {
                 </div>
 
                 {/* Version */}
-                <p style={{ textAlign: "center", fontSize: 12, color: C.textTer }}>Version {MITABLE_VERSION}</p>
+                {version && <p style={{ textAlign: "center", fontSize: 12, color: C.textTer }}>Version {version}</p>}
             </main>
 
             <LandingFooter />

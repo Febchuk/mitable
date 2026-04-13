@@ -1,27 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MITABLE_VERSION } from "@/config/content/base";
 
 export type OsPlatform = "mac-arm" | "mac-intel" | "windows" | "linux" | "unknown";
-
-const R2_BASE = "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev";
-
-const DOWNLOAD_URLS: Record<OsPlatform, string> = {
-    "mac-arm": `${R2_BASE}/Mitable-${MITABLE_VERSION}-arm64.dmg`,
-    "mac-intel": `${R2_BASE}/Mitable-${MITABLE_VERSION}-x64.dmg`,
-    windows: `${R2_BASE}/Mitable-${MITABLE_VERSION}-x64.exe`,
-    linux: "/download",
-    unknown: "/download",
-};
-
-export interface OsInfo {
-    platform: OsPlatform;
-    label: string;
-    /** Direct binary URL for this platform */
-    downloadUrl: string;
-    ready: boolean;
-}
 
 function detectAppleSilicon(): boolean {
     try {
@@ -56,11 +37,16 @@ const LABELS: Record<OsPlatform, string> = {
     unknown: "Download",
 };
 
+export interface OsInfo {
+    platform: OsPlatform;
+    label: string;
+    ready: boolean;
+}
+
 export function useOsDetection(): OsInfo {
     const [info, setInfo] = useState<OsInfo>({
         platform: "unknown",
         label: "Download",
-        downloadUrl: "/download",
         ready: false,
     });
 
@@ -69,7 +55,6 @@ export function useOsDetection(): OsInfo {
         setInfo({
             platform,
             label: LABELS[platform],
-            downloadUrl: DOWNLOAD_URLS[platform],
             ready: true,
         });
     }, []);
@@ -77,4 +62,29 @@ export function useOsDetection(): OsInfo {
     return info;
 }
 
-export { DOWNLOAD_URLS };
+export interface VersionInfo {
+    version: string;
+    urls: Record<string, string>;
+    isLoading: boolean;
+}
+
+export function useLatestVersion(): VersionInfo {
+    const [info, setInfo] = useState<VersionInfo>({
+        version: "",
+        urls: {},
+        isLoading: true,
+    });
+
+    useEffect(() => {
+        fetch("/api/version")
+            .then((res) => res.json())
+            .then((data: { version: string; urls: Record<string, string> }) => {
+                setInfo({ version: data.version, urls: data.urls, isLoading: false });
+            })
+            .catch(() => {
+                setInfo({ version: "", urls: {}, isLoading: false });
+            });
+    }, []);
+
+    return info;
+}
