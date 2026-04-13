@@ -6,6 +6,10 @@ on:
   issue_comment:
     types: [created]
 
+concurrency:
+  group: code-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     if: |
@@ -17,7 +21,8 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: anthropics/claude-code-action@beta
+      # anthropics/claude-code-action@beta
+      - uses: anthropics/claude-code-action@28f83620103c48a57093dcc2837eec89e036bb9f
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-sonnet-4-20250514
