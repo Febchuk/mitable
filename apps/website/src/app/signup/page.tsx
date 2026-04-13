@@ -6,6 +6,7 @@ import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
+import { getSafeRedirect } from "@/lib/auth-utils";
 import { supabase } from "@/lib/supabase";
 
 const C = {
@@ -35,7 +36,7 @@ const inputStyle = {
 
 function SignupForm() {
     const searchParams = useSearchParams();
-    const redirect = searchParams.get("redirect") || "/billing";
+    const redirect = getSafeRedirect(searchParams.get("redirect"));
     const posthog = usePostHog();
 
     const [email, setEmail] = useState("");

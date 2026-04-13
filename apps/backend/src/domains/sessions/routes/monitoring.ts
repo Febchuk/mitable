@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import express, { Router, Request, Response } from "express";
 import { eq, sql, desc, and, inArray, isNull, isNotNull, gte, lte } from "drizzle-orm";
 import { db } from "../../../db/client.js";
 import * as schema from "../../../db/schema/index.js";
@@ -1352,9 +1352,11 @@ router.post(
 /**
  * POST /api/monitoring/sessions/:id/captures
  * Upload captures batch (from Electron)
+ * Route-level 50 mb limit to accommodate 16+ base64-encoded screenshots per batch.
  */
 router.post(
   "/sessions/:id/captures",
+  express.json({ limit: "50mb" }),
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
