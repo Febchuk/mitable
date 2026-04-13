@@ -1,15 +1,27 @@
 // Initialize observability FIRST (before any other imports that might throw)
-import { initSentry } from "./domains/shared-infra/lib/sentry.js";
+import { initSentry, Sentry } from "./domains/shared-infra/lib/sentry.js";
 import { initAnalytics, analytics } from "./domains/shared-infra/lib/analytics.js";
 import { logger } from "./domains/shared-infra/lib/logger.js";
 
 initSentry();
 initAnalytics();
 
+// Global error handlers — must be registered immediately after observability init
+process.on("unhandledRejection", (reason) => {
+  logger.fatal({ err: reason }, "Unhandled promise rejection");
+  Sentry?.captureException(reason);
+});
+
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "Uncaught exception — shutting down");
+  Sentry?.captureException(err);
+  process.exit(1);
+});
+
 import { createServer } from "http";
 import { app } from "./app.js";
 import { config, validateConfig, checkPortAvailability } from "./config.js";
-import { testConnection } from "./db/client.js";
+import { testConnection, pool } from "./db/client.js";
 import { vectorService } from "./domains/shared-infra/services/vector.service.js";
 import { piiRedactionService } from "./domains/shared-infra/services/pii-redaction.service.js";
 import { socketService } from "./domains/shared-infra/services/socket.service.js";
@@ -20,6 +32,10 @@ import { isNotNull, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { initializeAudioWebSocket } from "./domains/capture/routes/audio.js";
 // Cron loaded dynamically to avoid node-cron blocking event loop on module init
+
+// Module-level reference to httpServer so shutdown handlers can access it
+let httpServer: ReturnType<typeof createServer> | null = null;
+let stopCronJobs: (() => void) | null = null;
 
 async function startServer() {
   // Validate environment variables
@@ -70,7 +86,7 @@ async function startServer() {
   logger.info("PII redaction service ready (5 workers)");
 
   // Create HTTP server and initialize Socket.IO
-  const httpServer = createServer(app);
+  httpServer = createServer(app);
   socketService.initialize(httpServer);
 
   // Initialize audio WebSocket for Deepgram transcription
@@ -80,8 +96,9 @@ async function startServer() {
   setupWorkstreamSocketEmitter();
 
   // Initialize cron jobs for admin dashboard data pipeline
-  const { initCronJobs } = await import("./cron/index.js");
+  const { initCronJobs, stopCronJobs: _stopCronJobs } = await import("./cron/index.js");
   initCronJobs();
+  stopCronJobs = _stopCronJobs;
 
   // Startup cleanup: clear stale imageData from sessions that ended >1 hour ago
   // This catches any images missed due to server restarts (replaces fragile setTimeout)
@@ -132,18 +149,55 @@ async function cleanupStaleImageData() {
   logger.info("Stale imageData cleanup completed");
 }
 
-// Graceful shutdown
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received, shutting down gracefully...");
-  await analytics.shutdown();
-  process.exit(0);
-});
+// Graceful shutdown — shared handler for SIGTERM and SIGINT
+async function shutdown(signal: string) {
+  logger.info({ signal }, "Shutdown signal received, shutting down gracefully...");
 
-process.on("SIGINT", async () => {
-  logger.info("SIGINT received, shutting down gracefully...");
-  await analytics.shutdown();
-  process.exit(0);
-});
+  // Force-exit if cleanup takes longer than 10 seconds
+  const forceExit = setTimeout(() => {
+    logger.error("Graceful shutdown timed out — forcing exit");
+    process.exit(1);
+  }, 10000);
+  forceExit.unref();
+
+  try {
+    // 1. Stop accepting new HTTP connections (let in-flight requests finish)
+    if (httpServer) {
+      await new Promise<void>((resolve) => httpServer!.close(() => resolve()));
+      logger.info("HTTP server closed");
+    }
+
+    // 2. Stop Socket.IO from accepting new connections
+    const io = socketService.getIO?.();
+    if (io) {
+      await new Promise<void>((resolve) => io.close(() => resolve()));
+      logger.info("Socket.IO closed");
+    }
+
+    // 3. Stop cron jobs
+    if (stopCronJobs) {
+      stopCronJobs();
+      logger.info("Cron jobs stopped");
+    }
+
+    // 4. Flush analytics
+    await analytics.shutdown();
+    logger.info("Analytics flushed");
+
+    // 5. Close the database pool last
+    await pool.end();
+    logger.info("Database pool closed");
+
+    logger.info("Graceful shutdown complete");
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, "Error during graceful shutdown");
+    process.exit(1);
+  }
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 startServer().catch((error) => {
   logger.error({ err: error }, "Failed to start server");
