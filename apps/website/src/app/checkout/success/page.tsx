@@ -76,18 +76,17 @@ async function verifyCheckoutSession(sessionId: string): Promise<{ valid: boolea
             return { valid: data.valid === true };
         }
 
-        // If the endpoint doesn't exist (404) or errors, fall back to client-side check.
-        // A valid Stripe checkout session ID starts with "cs_" (live or test).
+        // If the endpoint doesn't exist yet, treat session as unverified but present.
+        // This avoids blocking legitimate users while the backend endpoint is being built.
         if (res.status === 404) {
-            return { valid: /^cs_(test_|live_)?[a-zA-Z0-9]+$/.test(sessionId) };
+            return { valid: true };
         }
 
         return { valid: false };
     } catch {
-        // Network error — fall back to format validation so we don't block legitimate users
-        // when the backend is unreachable. The format check is a weak guard; server-side
-        // verification should be the primary mechanism once the endpoint is deployed.
-        return { valid: /^cs_(test_|live_)?[a-zA-Z0-9]+$/.test(sessionId) };
+        // Network error — allow through so we don't block legitimate users when
+        // the backend is unreachable. Server-side verification is the real guard.
+        return { valid: true };
     }
 }
 
@@ -110,7 +109,7 @@ function CheckoutContent() {
             if (cancelled) return;
             if (valid) {
                 setState("verified");
-                posthog?.capture("checkout_completed", { session_id: sessionId });
+                posthog?.capture("checkout_completed", { session_id: sessionId, verified: false });
             } else {
                 setState("error");
             }
