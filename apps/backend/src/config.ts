@@ -259,7 +259,7 @@ export const config = {
 
 // Validate required environment variables
 export function validateConfig() {
-  const required = [
+  const required: { key: string; value: string | undefined }[] = [
     { key: "DATABASE_URL", value: config.database.url },
     { key: "SUPABASE_URL", value: config.supabase.url },
     { key: "SUPABASE_ANON_KEY", value: config.supabase.anonKey },
