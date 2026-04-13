@@ -9,7 +9,14 @@ import { ipcMain } from "electron";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger("ActiveWindowBridge");
-// Dynamic import for active-win (ESM-only package) - used in IPC handler
+
+// Cache the dynamic import of active-win (ESM-only, requires dynamic import from CJS)
+let activeWinModule: { default: () => Promise<import("active-win").Result | undefined> } | null =
+  null;
+async function getActiveWin() {
+  if (!activeWinModule) activeWinModule = await import("active-win");
+  return activeWinModule.default;
+}
 
 export type ActiveWindowInfo = {
   title: string;
@@ -25,8 +32,7 @@ const IPC_CHANNEL = "mitable:get-active-window";
 export function registerActiveWindowIPC(): void {
   ipcMain.handle(IPC_CHANNEL, async () => {
     try {
-      // Dynamic import for ESM-only package (required for CJS main process)
-      const activeWin = (await import("active-win")).default;
+      const activeWin = await getActiveWin();
       const activeWindow = await activeWin();
 
       if (!activeWindow) {

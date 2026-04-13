@@ -480,25 +480,9 @@ function createWatchingPillWindow() {
 function startClosedWindowCheck() {
   if (closedWindowCheckInterval) return; // Already running
 
-  closedWindowCheckInterval = setInterval(async () => {
-    const closedWindows = await windowDetectionService.checkForClosedWindows();
-
-    if (closedWindows.length > 0) {
-      // Notify pill and console windows about the update
-      const selectedWindows = windowDetectionService.getSelectedWindows();
-      const windows = [consoleWindow, watchingPillWindow];
-
-      for (const window of windows) {
-        if (window && !window.isDestroyed()) {
-          window.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
-        }
-      }
-
-      watchModeLogger.info(` Notified windows of ${closedWindows.length} closed windows`);
-    }
-  }, 2000); // Check every 2 seconds
-
-  watchModeLogger.info(" Started periodic check for closed windows");
+  // Closed-window checks are handled by monitoringSessionService.startWindowCleanupLoop()
+  // (every 10s) — no need for a duplicate 2s check here.
+  watchModeLogger.info(" Closed-window check delegated to monitoring session service");
 }
 
 /**
@@ -600,7 +584,7 @@ function startPillCursorTracking() {
       movePillToDisplay(cursorDisplay);
       watchingPillLogger.info(` Pill moved to display ${cursorDisplay.id}`);
     }
-  }, 500);
+  }, 2000);
 
   watchingPillLogger.info(" Started pill cursor tracking");
 }

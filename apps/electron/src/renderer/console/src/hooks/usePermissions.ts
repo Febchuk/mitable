@@ -30,9 +30,13 @@ export function usePermissions() {
 
   useEffect(() => {
     fetchStatus();
+    // Stop polling once both permissions are granted — no need to keep checking
+    if (status.screen === "granted" && status.accessibility) {
+      return;
+    }
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
-  }, [fetchStatus]);
+  }, [fetchStatus, status.screen, status.accessibility]);
 
   const requestAccessibility = useCallback(async () => {
     await window.consoleAPI?.requestAccessibilityPermission();

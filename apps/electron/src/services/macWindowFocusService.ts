@@ -1,10 +1,16 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createLogger } from "../lib/logger";
-// Dynamic import for active-win (ESM-only package) - used in resolveWindowUrlForWatchSelection()
-
 const execFileAsync = promisify(execFile);
 const logger = createLogger("MacWindowFocus");
+
+// Cache the dynamic import of active-win (ESM-only, requires dynamic import from CJS)
+let activeWinModule: { default: () => Promise<import("active-win").Result | undefined> } | null =
+  null;
+async function getActiveWin() {
+  if (!activeWinModule) activeWinModule = await import("active-win");
+  return activeWinModule.default;
+}
 
 export interface WindowProcessInfo {
   processId?: number;
@@ -69,8 +75,7 @@ export async function resolveWindowUrlForWatchSelection(
     // Small delay to allow macOS to bring the app to the front
     await delay(200);
 
-    // Dynamic import for ESM-only package (required for CJS main process)
-    const activeWin = (await import("active-win")).default;
+    const activeWin = await getActiveWin();
     const activeWindow = await activeWin();
 
     if (!activeWindow) {
