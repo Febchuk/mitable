@@ -2,7 +2,7 @@
 
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
-import { type OsPlatform, useOsDetection, useLatestVersion } from "@/hooks/use-os-detection";
+import { type OsPlatform, useLatestVersion, useOsDetection } from "@/hooks/use-os-detection";
 
 const BUILDS: { id: OsPlatform; platform: string; description: string; icon: "apple" | "windows" }[] = [
     { id: "mac-arm", platform: "macOS (Apple Silicon)", description: "For M1, M2, M3, and M4 Macs", icon: "apple" },
@@ -201,7 +201,15 @@ export const DownloadScreen = () => {
                                                 marginTop: "auto",
                                             }}
                                         >
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                            <svg
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                            >
                                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                                                 <polyline points="7 10 12 15 17 10" />
                                                 <line x1="12" y1="15" x2="12" y2="3" />

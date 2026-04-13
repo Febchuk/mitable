@@ -30,9 +30,6 @@ export async function GET() {
             },
         );
     } catch {
-        return NextResponse.json(
-            { version: FALLBACK_VERSION, urls: buildUrls(FALLBACK_VERSION) },
-            { status: 200 },
-        );
+        return NextResponse.json({ version: FALLBACK_VERSION, urls: buildUrls(FALLBACK_VERSION) }, { status: 200 });
     }
 }
