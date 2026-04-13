@@ -145,6 +145,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           # Cloudflare R2 public URL for electron-builder generic provider
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Windows code signing — add CSC_LINK and CSC_KEY_PASSWORD as GitHub secrets
+          # to enable signing and avoid SmartScreen warnings on production builds.
+          # CSC_LINK: base64-encoded .pfx certificate or path to the file
+          # CSC_KEY_PASSWORD: password for the .pfx certificate
+          # electron-builder will skip signing automatically if these are not set.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - name: List build artifacts
         shell: bash

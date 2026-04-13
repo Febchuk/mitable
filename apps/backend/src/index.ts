@@ -15,7 +15,7 @@ process.on("unhandledRejection", (reason) => {
 process.on("uncaughtException", (err) => {
   logger.fatal({ err }, "Uncaught exception — shutting down");
   Sentry?.captureException(err);
-  process.exit(1);
+  Sentry?.flush(2000).finally(() => process.exit(1));
 });
 
 import { createServer } from "http";
