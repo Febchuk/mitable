@@ -27,11 +27,23 @@ const execFileAsync = promisify(execFile);
 
 const logger = createLogger("FocusWindowTracker");
 
+// Cache the dynamic import of active-win to avoid re-importing on every poll tick
+let activeWinModule: { default: () => Promise<import("active-win").Result | undefined> } | null =
+  null;
+async function getActiveWin() {
+  if (!activeWinModule) activeWinModule = await import("active-win");
+  return activeWinModule.default;
+}
+
+// Throttle desktopCapturer fallback — it's very expensive
+let lastDesktopCapturerFallback = 0;
+const DESKTOP_CAPTURER_FALLBACK_COOLDOWN_MS = 10_000;
+
 // TTL for watched windows (10 minutes in ms)
 const WINDOW_TTL_MS = 10 * 60 * 1000;
 
-// Polling interval for active window detection (2 seconds)
-const POLL_INTERVAL_MS = 2000;
+// Polling interval for active window detection (5 seconds — reduced from 2s to lower CPU)
+const POLL_INTERVAL_MS = 5000;
 
 // Cleanup interval for expired windows (30 seconds)
 const CLEANUP_INTERVAL_MS = 30 * 1000;
@@ -283,8 +295,8 @@ class FocusWindowTracker {
     }
 
     try {
-      // Dynamic import for ESM-only package
-      const activeWin = (await import("active-win")).default;
+      // Use cached import for ESM-only package (avoids re-import overhead every tick)
+      const activeWin = await getActiveWin();
       const activeWindow = await activeWin();
 
       // active-win can return null for full-screen apps (own Space) and other edge cases.
@@ -496,6 +508,13 @@ end tell`;
    * system/Electron windows when multiple are returned.
    */
   private async tryAddFrontmostFromDesktopCapturer(): Promise<void> {
+    // Throttle: desktopCapturer.getSources() is expensive — skip if called recently
+    const now = Date.now();
+    if (now - lastDesktopCapturerFallback < DESKTOP_CAPTURER_FALLBACK_COOLDOWN_MS) {
+      return;
+    }
+    lastDesktopCapturerFallback = now;
+
     try {
       const sources = await desktopCapturer.getSources({
         types: ["window"],
