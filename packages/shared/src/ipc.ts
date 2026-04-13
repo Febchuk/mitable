@@ -168,6 +168,7 @@ export const IPC_CHANNELS = {
   ON_DEVICE_DOWNLOAD_ASSET: "on-device:download-asset",
   ON_DEVICE_DOWNLOAD_ALL: "on-device:download-all",
   ON_DEVICE_REMOVE_ALL: "on-device:remove-all",
+  ON_DEVICE_REMOVE_ASSET: "on-device:remove-asset",
   ON_DEVICE_START_SERVER: "on-device:start-server",
   ON_DEVICE_STOP_SERVER: "on-device:stop-server",
   ON_DEVICE_SERVER_STATUS: "on-device:server-status",

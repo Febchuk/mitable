@@ -321,7 +321,21 @@ interface ConsoleAPI {
   onDeviceGetStatus: () => Promise<{
     isSetUp: boolean;
     serverStatus: string;
+    whisperStatus?: string;
     installedAssets: Array<{ id: string; version: string; filePath: string; sizeBytes: number }>;
+    enabled?: boolean;
+    windowsRequiresNvidia?: boolean;
+    windowsNvidiaOk?: boolean;
+    onDeviceAllowed?: boolean;
+    onDeviceBlockReason?: string | null;
+    gpuDescription?: string;
+    inferenceTuning?: {
+      llamaFlashAttn: "off" | "auto" | "on";
+      whisperUseFlashAttn: boolean;
+      llamaGpuLayers: number;
+      llamaVramFit?: boolean;
+      llamaContextSize?: number;
+    };
     error?: string;
   }>;
   onDeviceGetPlatform: () => Promise<string>;
@@ -333,6 +347,7 @@ interface ConsoleAPI {
   onDeviceDownloadAsset: (assetId: string) => Promise<{ success: boolean; error?: string }>;
   onDeviceDownloadAll: () => Promise<{ success: boolean; error?: string }>;
   onDeviceRemoveAll: () => Promise<{ success: boolean; error?: string }>;
+  onDeviceRemoveAsset: (assetId: string) => Promise<{ success: boolean; error?: string }>;
   onDeviceStartServer: () => Promise<{ success: boolean; port?: number; error?: string }>;
   onDeviceStopServer: () => Promise<{ success: boolean; error?: string }>;
   onDeviceServerStatus: () => Promise<{

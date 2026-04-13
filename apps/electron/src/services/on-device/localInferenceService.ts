@@ -357,7 +357,9 @@ Respond in this exact JSON format:
     tasks: string[];
   }> {
     const classifications = localDb.getClassificationsForSession(sessionId);
-    if (classifications.length === 0) {
+    const transcriptions = localDb.getTranscriptionsForSession(sessionId);
+
+    if (classifications.length === 0 && transcriptions.length === 0) {
       return { narrative: "No activity was recorded during this session.", tasks: [] };
     }
 
@@ -365,12 +367,24 @@ Respond in this exact JSON format:
       .map((c) => `[Batch ${c.batchIndex}] ${c.activityDescription}`)
       .join("\n\n");
 
-    const prompt = `You are analyzing a complete work session. Below are the classified activity blocks from the session. Generate:
+    const transcriptBlock =
+      transcriptions.length > 0
+        ? `\n\nAudio transcriptions from the session (spoken by the user or in meetings):\n${transcriptions
+            .map(
+              (t) =>
+                `[${new Date(t.startTimeMs).toISOString().slice(11, 19)} - ${new Date(t.endTimeMs).toISOString().slice(11, 19)}] ${t.transcript}`
+            )
+            .join("\n")}`
+        : "";
+
+    const prompt = `You are analyzing a complete work session. Below are the classified activity blocks from screen capture, and any audio transcriptions from the session. Use both to generate:
 1. A coherent narrative summary (3-5 paragraphs) of what the user accomplished
 2. A list of concrete tasks/accomplishments extracted from the session
 
+When audio transcriptions are available, integrate what was said with what was seen on screen. For example, if the user was in a video call and spoke about project deadlines, combine that with the visual context of the call.
+
 Activity blocks:
-${timeline}
+${timeline}${transcriptBlock}
 
 Respond in this exact JSON format:
 {

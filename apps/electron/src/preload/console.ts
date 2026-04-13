@@ -117,6 +117,18 @@ const IPC_CHANNELS = {
   // Feedback
   FEEDBACK_GET_LOGS: "feedback:get-logs",
   FEEDBACK_APPEND_RENDERER_LOG: "feedback:append-renderer-log",
+  // On-Device AI
+  ON_DEVICE_GET_STATUS: "on-device:get-status",
+  ON_DEVICE_GET_PLATFORM: "on-device:get-platform",
+  ON_DEVICE_GET_DOWNLOAD_SUMMARY: "on-device:get-download-summary",
+  ON_DEVICE_DOWNLOAD_ASSET: "on-device:download-asset",
+  ON_DEVICE_DOWNLOAD_ALL: "on-device:download-all",
+  ON_DEVICE_REMOVE_ALL: "on-device:remove-all",
+  ON_DEVICE_REMOVE_ASSET: "on-device:remove-asset",
+  ON_DEVICE_START_SERVER: "on-device:start-server",
+  ON_DEVICE_STOP_SERVER: "on-device:stop-server",
+  ON_DEVICE_SERVER_STATUS: "on-device:server-status",
+  ON_DEVICE_DOWNLOAD_PROGRESS: "on-device:download-progress",
 } as const;
 
 contextBridge.exposeInMainWorld("consoleAPI", {
@@ -734,6 +746,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   onDeviceRemoveAll: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL),
+
+  onDeviceRemoveAsset: (assetId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, assetId),
 
   onDeviceStartServer: (): Promise<{ success: boolean; port?: number; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_START_SERVER),

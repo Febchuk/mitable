@@ -2,7 +2,10 @@
  * Model Manager Service
  *
  * Handles downloading, verifying, and managing on-device ML assets:
- * - llama-server binary (platform-specific: CUDA for Windows, Metal for macOS)
+ * - llama-server binary (platform-specific: CUDA for Windows + NVIDIA GPU only, Metal for macOS)
+ *
+ * Windows note: CUDA is NVIDIA-only. AMD GPUs do not run CUDA; a future path could use
+ * Vulkan/DirectML/ROCm-style builds from upstream llama.cpp — not bundled here.
  * - Vision model (SmolVLM2-2.2B-Agentic-GUI GGUF + mmproj)
  * - Text model (Phi-3 mini 3.8B GGUF for Classifier + Storyteller)
  *
@@ -17,7 +20,7 @@
 
 import { app } from "electron";
 import { createWriteStream, promises as fs } from "fs";
-import { join } from "path";
+import { dirname, join, normalize } from "path";
 import { createHash } from "crypto";
 import { pipeline } from "stream/promises";
 import { createLogger } from "../../lib/logger";
@@ -27,7 +30,7 @@ const logger = createLogger("ModelManager");
 // ── Asset registry ──────────────────────────────────────────────────────────
 
 export type Platform = "win32-cuda" | "win32-cpu" | "darwin-metal" | "darwin-cpu" | "linux-cpu";
-export type AssetId = "llama-server" | "vision-model" | "vision-mmproj" | "text-model";
+export type AssetId = "llama-server" | "vision-model" | "vision-mmproj" | "text-model" | "whisper-server" | "whisper-model";
 
 export interface AssetDefinition {
   id: AssetId;
@@ -37,6 +40,7 @@ export interface AssetDefinition {
   urls: Partial<Record<Platform, string>>;
   sha256: Partial<Record<Platform, string>>;
   filename: Partial<Record<Platform, string>>;
+  isArchive?: boolean;
   required: boolean;
 }
 
@@ -54,13 +58,13 @@ const ASSET_REGISTRY: AssetDefinition[] = [
     sizeBytes: 55_000_000,
     urls: {
       "win32-cuda":
-        "https://github.com/ggml-org/llama.cpp/releases/download/b8390/llama-b8390-bin-win-cuda-cu12.4-x64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b8690/llama-b8690-bin-win-cuda-12.4-x64.zip",
       "win32-cpu":
-        "https://github.com/ggml-org/llama.cpp/releases/download/b8390/llama-b8390-bin-win-avx2-x64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b8690/llama-b8690-bin-win-cpu-x64.zip",
       "darwin-metal":
-        "https://github.com/ggml-org/llama.cpp/releases/download/b8390/llama-b8390-bin-macos-arm64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b8690/llama-b8690-bin-macos-arm64.tar.gz",
       "darwin-cpu":
-        "https://github.com/ggml-org/llama.cpp/releases/download/b8390/llama-b8390-bin-macos-x64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b8690/llama-b8690-bin-macos-x64.tar.gz",
     },
     sha256: {},
     filename: {
@@ -75,7 +79,7 @@ const ASSET_REGISTRY: AssetDefinition[] = [
     id: "vision-model",
     label: "Vision Model (SmolVLM2 2.2B)",
     description: "Screen understanding model — classifies what's happening on your screen",
-    sizeBytes: 1_000_000_000,
+    sizeBytes: 1_112_600_928,
     urls: {
       "win32-cuda":
         "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.Q4_K_M.gguf",
@@ -99,23 +103,23 @@ const ASSET_REGISTRY: AssetDefinition[] = [
     id: "vision-mmproj",
     label: "Vision Encoder",
     description: "Image encoder for the vision model",
-    sizeBytes: 400_000_000,
+    sizeBytes: 592_520_928,
     urls: {
       "win32-cuda":
-        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-BF16.gguf",
+        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-Q8_0.gguf",
       "win32-cpu":
-        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-BF16.gguf",
+        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-Q8_0.gguf",
       "darwin-metal":
-        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-BF16.gguf",
+        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-Q8_0.gguf",
       "darwin-cpu":
-        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-BF16.gguf",
+        "https://huggingface.co/mradermacher/SmolVLM2-2.2B-Instruct-Agentic-GUI-GGUF/resolve/main/SmolVLM2-2.2B-Instruct-Agentic-GUI.mmproj-Q8_0.gguf",
     },
     sha256: {},
     filename: {
-      "win32-cuda": "smolvlm2-2.2b-gui.mmproj-BF16.gguf",
-      "win32-cpu": "smolvlm2-2.2b-gui.mmproj-BF16.gguf",
-      "darwin-metal": "smolvlm2-2.2b-gui.mmproj-BF16.gguf",
-      "darwin-cpu": "smolvlm2-2.2b-gui.mmproj-BF16.gguf",
+      "win32-cuda": "smolvlm2-2.2b-gui.mmproj-Q8_0.gguf",
+      "win32-cpu": "smolvlm2-2.2b-gui.mmproj-Q8_0.gguf",
+      "darwin-metal": "smolvlm2-2.2b-gui.mmproj-Q8_0.gguf",
+      "darwin-cpu": "smolvlm2-2.2b-gui.mmproj-Q8_0.gguf",
     },
     required: true,
   },
@@ -143,6 +147,55 @@ const ASSET_REGISTRY: AssetDefinition[] = [
     },
     required: true,
   },
+  {
+    id: "whisper-server",
+    label: "Whisper Server",
+    description: "whisper.cpp server binary for on-device audio transcription",
+    sizeBytes: 457_024_596,
+    urls: {
+      "win32-cuda":
+        "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-cublas-12.4.0-bin-x64.zip",
+      "win32-cpu":
+        "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip",
+      "darwin-metal":
+        "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip",
+      "darwin-cpu":
+        "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip",
+    },
+    sha256: {},
+    filename: {
+      "win32-cuda": "whisper-server.exe",
+      "win32-cpu": "whisper-server.exe",
+      "darwin-metal": "whisper-server",
+      "darwin-cpu": "whisper-server",
+    },
+    isArchive: true,
+    required: true,
+  },
+  {
+    id: "whisper-model",
+    label: "Audio Model (Whisper Small)",
+    description: "Speech-to-text model for on-device audio transcription",
+    sizeBytes: 487_601_967,
+    urls: {
+      "win32-cuda":
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+      "win32-cpu":
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+      "darwin-metal":
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+      "darwin-cpu":
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+    },
+    sha256: {},
+    filename: {
+      "win32-cuda": "ggml-whisper-small.bin",
+      "win32-cpu": "ggml-whisper-small.bin",
+      "darwin-metal": "ggml-whisper-small.bin",
+      "darwin-cpu": "ggml-whisper-small.bin",
+    },
+    required: true,
+  },
 ];
 
 // ── Manifest (tracks installed state) ───────────────────────────────────────
@@ -159,15 +212,47 @@ interface OnDeviceManifest {
   version: 1;
   platform: Platform;
   assets: InstalledAsset[];
+  enabled?: boolean;
 }
 
 // ── GPU detection ───────────────────────────────────────────────────────────
+
+/** Tuning derived from NVIDIA compute capability (and name fallback). */
+export interface NvidiaInferenceTuning {
+  /** llama-server `--flash-attn` value */
+  llamaFlashAttn: "off" | "auto" | "on";
+  /** When false, whisper-server is started with `--no-flash-attn` */
+  whisperUseFlashAttn: boolean;
+  /**
+   * llama-server `--n-gpu-layers` (-1 = all layers on GPU). Ollama supports Pascal (e.g. GTX 1070);
+   * we still use full GPU offload here and mitigate with flash-attn off + `--fit off` on older cards.
+   */
+  llamaGpuLayers: number;
+  /**
+   * When false, llama-server is started with `--fit off`. On Windows, VRAM auto-fit can spawn a
+   * subprocess that misbehaves on some setups (see ggml-org/llama.cpp server issues).
+   */
+  llamaVramFit: boolean;
+  /** If set, overrides default llama-server `--ctx-size` (lower on 8GB Pascal for headroom). */
+  llamaContextSize?: number;
+}
 
 interface GpuInfo {
   hasNvidiaGpu: boolean;
   hasMetal: boolean;
   platform: Platform;
   description: string;
+  /** Windows CUDA path: first GPU from nvidia-smi */
+  nvidiaGpuName?: string;
+  /** e.g. "6.1", "8.9" */
+  nvidiaComputeCap?: string;
+}
+
+function parseNvidiaComputeCap(cap: string): { major: number; minor: number } | null {
+  const t = cap.trim();
+  const m = t.match(/^(\d+)\.(\d+)$/);
+  if (!m) return null;
+  return { major: parseInt(m[1], 10), minor: parseInt(m[2], 10) };
 }
 
 // ── Download progress ───────────────────────────────────────────────────────
@@ -193,6 +278,8 @@ class ModelManager {
   private manifestPath: string = "";
   private manifest: OnDeviceManifest | null = null;
   private detectedPlatform: Platform | null = null;
+  /** Set alongside detectedPlatform; used to enforce NVIDIA-only downloads on Windows. */
+  private lastGpuInfo: GpuInfo | null = null;
 
   async initialize(): Promise<void> {
     this.baseDir = join(app.getPath("userData"), "on-device");
@@ -205,6 +292,7 @@ class ModelManager {
 
     this.detectedPlatform = await this.detectPlatform();
     this.manifest = await this.loadManifest();
+    await this.disableIfWindowsWithoutNvidia();
 
     logger.info("Initialized", {
       baseDir: this.baseDir,
@@ -216,12 +304,133 @@ class ModelManager {
   // ── Public API ──────────────────────────────────────────────────────────
 
   async detectPlatform(): Promise<Platform> {
-    if (this.detectedPlatform) return this.detectedPlatform;
+    if (this.detectedPlatform && this.lastGpuInfo) return this.detectedPlatform;
 
     const gpuInfo = await this.detectGpu();
+    this.lastGpuInfo = gpuInfo;
     this.detectedPlatform = gpuInfo.platform;
     logger.info("Detected platform:", gpuInfo.description);
     return gpuInfo.platform;
+  }
+
+  /**
+   * Platform key used for ASSET_REGISTRY URLs. On Windows without NVIDIA, returns null
+   * so we never download CPU inference binaries (parallel vision + whisper is impractical).
+   */
+  getDownloadPlatform(): Platform | null {
+    if (!this.detectedPlatform || !this.lastGpuInfo) return null;
+    if (process.platform === "win32" && !this.lastGpuInfo.hasNvidiaGpu) return null;
+    if (process.platform === "win32") return "win32-cuda";
+    return this.detectedPlatform;
+  }
+
+  /** Windows: NVIDIA + CUDA builds only. macOS/Linux: allowed (CPU/Metal per detectGpu). */
+  canUseOnDeviceInference(): boolean {
+    if (process.platform !== "win32") return true;
+    return this.lastGpuInfo?.hasNvidiaGpu === true;
+  }
+
+  getOnDeviceBlockedReason(): string | null {
+    if (process.platform !== "win32") return null;
+    if (this.lastGpuInfo?.hasNvidiaGpu) return null;
+    return (
+      "On-device AI on Windows requires an NVIDIA GPU with working drivers (nvidia-smi). " +
+      "CUDA is NVIDIA-only; AMD GPUs are not supported in this build."
+    );
+  }
+
+  getGpuDescription(): string {
+    return this.lastGpuInfo?.description ?? "Unknown";
+  }
+
+  /**
+   * Flash-attention and related flags for local servers.
+   * Pascal / older GTX (e.g. 10-series): flash off + `--fit off` + slightly lower ctx — still
+   * full GPU layer offload (`-ngl -1`) like Ollama-class setups on the same hardware.
+   * Turing (RTX 20xx, GTX 16xx): auto / flash on for whisper.
+   * Ampere+ (RTX 30xx/40xx, sm_80+): on for llama, flash on for whisper.
+   * Non-Windows or no NVIDIA: conservative defaults for llama `auto`, whisper flash on.
+   */
+  getNvidiaInferenceTuning(): NvidiaInferenceTuning {
+    const nonWin: NvidiaInferenceTuning = {
+      llamaFlashAttn: "auto",
+      whisperUseFlashAttn: true,
+      llamaGpuLayers: -1,
+      llamaVramFit: true,
+    };
+
+    if (process.platform !== "win32" || !this.lastGpuInfo?.hasNvidiaGpu) {
+      return nonWin;
+    }
+
+    const name = this.lastGpuInfo.nvidiaGpuName ?? "";
+    const capStr = this.lastGpuInfo.nvidiaComputeCap ?? "";
+    const cap = parseNvidiaComputeCap(capStr);
+    const looksRtx = /\bRTX\b/i.test(name);
+    const looksLegacyGtx = /\bGTX\b/i.test(name) || /\bGT\s*\d/i.test(name);
+
+    if (cap) {
+      if (cap.major >= 8) {
+        return {
+          llamaFlashAttn: "on",
+          whisperUseFlashAttn: true,
+          llamaGpuLayers: -1,
+          llamaVramFit: true,
+        };
+      }
+      if (cap.major >= 7) {
+        return {
+          llamaFlashAttn: "auto",
+          whisperUseFlashAttn: true,
+          llamaGpuLayers: -1,
+          llamaVramFit: true,
+        };
+      }
+      return {
+        llamaFlashAttn: "off",
+        whisperUseFlashAttn: false,
+        llamaGpuLayers: -1,
+        llamaVramFit: false,
+        llamaContextSize: 2048,
+      };
+    }
+
+    if (looksRtx) {
+      return {
+        llamaFlashAttn: "auto",
+        whisperUseFlashAttn: true,
+        llamaGpuLayers: -1,
+        llamaVramFit: true,
+      };
+    }
+    if (looksLegacyGtx) {
+      return {
+        llamaFlashAttn: "off",
+        whisperUseFlashAttn: false,
+        llamaGpuLayers: -1,
+        llamaVramFit: false,
+        llamaContextSize: 2048,
+      };
+    }
+
+    return {
+      llamaFlashAttn: "auto",
+      whisperUseFlashAttn: true,
+      llamaGpuLayers: -1,
+      llamaVramFit: true,
+    };
+  }
+
+  windowsRequiresNvidia(): boolean {
+    return process.platform === "win32";
+  }
+
+  private async disableIfWindowsWithoutNvidia(): Promise<void> {
+    if (!this.manifest) return;
+    if (!this.canUseOnDeviceInference() && this.isEnabled()) {
+      await this.setEnabled(false);
+      logger.warn("Disabled on-device AI in manifest: Windows requires an NVIDIA GPU");
+    }
   }
 
   getAssetRegistry(): AssetDefinition[] {
@@ -262,11 +471,30 @@ class ModelManager {
     return this.getAssetPath("text-model");
   }
 
+  getWhisperServerPath(): string | null {
+    return this.getAssetPath("whisper-server");
+  }
+
+  getWhisperModelPath(): string | null {
+    return this.getAssetPath("whisper-model");
+  }
+
+  isEnabled(): boolean {
+    return this.manifest?.enabled ?? false;
+  }
+
+  async setEnabled(enabled: boolean): Promise<void> {
+    if (!this.manifest) return;
+    this.manifest.enabled = enabled;
+    await this.saveManifest();
+    logger.info(`On-device AI ${enabled ? "enabled" : "disabled"}`);
+  }
+
   /**
    * Get a summary of what needs to be downloaded and total size.
    */
   getDownloadSummary(): { assets: AssetDefinition[]; totalBytes: number } {
-    const platform = this.detectedPlatform;
+    const platform = this.getDownloadPlatform();
     if (!platform) return { assets: [], totalBytes: 0 };
 
     const missing = ASSET_REGISTRY.filter(
@@ -280,8 +508,13 @@ class ModelManager {
    * Download and install a single asset.
    */
   async downloadAsset(id: AssetId, onProgress?: ProgressCallback): Promise<void> {
-    const platform = this.detectedPlatform;
-    if (!platform) throw new Error("Platform not detected — call initialize() first");
+    const platform = this.getDownloadPlatform();
+    if (!platform) {
+      throw new Error(
+        this.getOnDeviceBlockedReason() ??
+          "On-device downloads are not available on this system."
+      );
+    }
 
     const def = ASSET_REGISTRY.find((a) => a.id === id);
     if (!def) throw new Error(`Unknown asset: ${id}`);
@@ -292,8 +525,9 @@ class ModelManager {
     const filename = def.filename[platform];
     if (!filename) throw new Error(`No filename for ${id} on ${platform}`);
 
-    const isZip = url.endsWith(".zip");
-    const destDir = id === "llama-server" ? this.binDir : this.modelsDir;
+    const isArchive = url.endsWith(".zip") || url.endsWith(".tar.gz");
+    const isBinary = id === "llama-server" || id === "whisper-server";
+    const destDir = isBinary ? this.binDir : this.modelsDir;
     const destPath = join(destDir, filename);
 
     const progress: DownloadProgress = {
@@ -309,13 +543,13 @@ class ModelManager {
       logger.info(`Downloading ${def.label} from ${url}`);
       onProgress?.(progress);
 
-      if (isZip) {
-        await this.downloadAndExtractZip(url, destDir, filename, progress, onProgress);
+      if (isArchive) {
+        await this.downloadAndExtractArchive(url, destDir, filename, progress, onProgress);
       } else {
         await this.downloadFile(url, destPath, progress, onProgress);
       }
 
-      if (process.platform !== "win32" && id === "llama-server") {
+      if (process.platform !== "win32" && isBinary) {
         await fs.chmod(destPath, 0o755);
       }
 
@@ -335,13 +569,11 @@ class ModelManager {
   }
 
   /**
-   * Download all missing required assets.
+   * Download all missing required assets in parallel.
    */
   async downloadAll(onProgress?: ProgressCallback): Promise<void> {
     const { assets } = this.getDownloadSummary();
-    for (const asset of assets) {
-      await this.downloadAsset(asset.id, onProgress);
-    }
+    await Promise.all(assets.map((asset) => this.downloadAsset(asset.id, onProgress)));
   }
 
   /**
@@ -360,6 +592,32 @@ class ModelManager {
     }
   }
 
+  /**
+   * Remove one installed asset (file on disk + manifest entry).
+   * Does not delete unrelated DLLs that may sit next to CUDA binaries in bin/.
+   */
+  async removeAsset(id: string): Promise<void> {
+    const assetId = id as AssetId;
+    if (!ASSET_REGISTRY.some((a) => a.id === assetId)) {
+      throw new Error(`Unknown asset: ${id}`);
+    }
+    if (!this.manifest) throw new Error("Model manager not initialized");
+
+    const idx = this.manifest.assets.findIndex((a) => a.id === assetId);
+    if (idx < 0) throw new Error(`"${id}" is not installed`);
+
+    const entry = this.manifest.assets[idx]!;
+    try {
+      await fs.unlink(entry.filePath);
+    } catch (err) {
+      logger.warn(`Could not delete file for ${id} (${entry.filePath}):`, String(err));
+    }
+
+    this.manifest.assets.splice(idx, 1);
+    await this.saveManifest();
+    logger.info(`Removed on-device asset ${id}`);
+  }
+
   // ── Internal helpers ────────────────────────────────────────────────────
 
   private async detectGpu(): Promise<GpuInfo> {
@@ -374,12 +632,19 @@ class ModelManager {
     }
 
     if (process.platform === "win32") {
-      const hasNvidia = await this.checkNvidiaCuda();
+      const probe = await this.probeNvidiaWindows();
+      const desc = probe.ok
+        ? probe.computeCap
+          ? `Windows / ${probe.name ?? "NVIDIA GPU"} (CUDA, sm_${probe.computeCap})`
+          : `Windows / ${probe.name ?? "NVIDIA GPU"} (CUDA)`
+        : "Windows — NVIDIA GPU required (not detected). AMD/Intel only: not supported for this build.";
       return {
-        hasNvidiaGpu: hasNvidia,
+        hasNvidiaGpu: probe.ok,
         hasMetal: false,
-        platform: hasNvidia ? "win32-cuda" : "win32-cpu",
-        description: hasNvidia ? "Windows with NVIDIA GPU (CUDA)" : "Windows CPU only",
+        platform: probe.ok ? "win32-cuda" : "win32-cpu",
+        description: desc,
+        nvidiaGpuName: probe.name,
+        nvidiaComputeCap: probe.computeCap,
       };
     }
 
@@ -391,23 +656,56 @@ class ModelManager {
     };
   }
 
-  private async checkNvidiaCuda(): Promise<boolean> {
+  /** Query first NVIDIA GPU name + compute capability (Windows). */
+  private async probeNvidiaWindows(): Promise<{
+    ok: boolean;
+    name?: string;
+    computeCap?: string;
+  }> {
     try {
       const { execFile } = await import("child_process");
-      return new Promise((resolve) => {
-        execFile("nvidia-smi", ["--query-gpu=name", "--format=csv,noheader"], (err, stdout) => {
-          if (err) {
-            logger.info("nvidia-smi not found — falling back to CPU");
-            resolve(false);
-            return;
-          }
-          const gpuName = stdout.trim();
-          logger.info("Detected NVIDIA GPU:", gpuName);
-          resolve(gpuName.length > 0);
+      const candidates =
+        process.platform === "win32"
+          ? [
+              "nvidia-smi",
+              String.raw`C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe`,
+            ]
+          : ["nvidia-smi"];
+
+      const queryOne = (
+        bin: string,
+        query: string
+      ): Promise<string | undefined> =>
+        new Promise((resolve) => {
+          execFile(
+            bin,
+            ["-i", "0", `--query-gpu=${query}`, "--format=csv,noheader,nounits"],
+            { windowsHide: true },
+            (err, stdout) => {
+              if (err) {
+                resolve(undefined);
+                return;
+              }
+              const line = stdout.trim().split(/\r?\n/)[0]?.trim();
+              resolve(line && line.length > 0 ? line : undefined);
+            }
+          );
         });
-      });
+
+      for (const bin of candidates) {
+        const name = await queryOne(bin, "name");
+        if (!name) continue;
+        const computeCap = await queryOne(bin, "compute_cap");
+        logger.info("NVIDIA probe:", name, "compute_cap:", computeCap ?? "(unknown)");
+        return { ok: true, name, computeCap };
+      }
+
+      logger.info(
+        "No NVIDIA GPU detected for CUDA path (AMD does not use CUDA; separate build TBD)"
+      );
+      return { ok: false };
     } catch {
-      return false;
+      return { ok: false };
     }
   }
 
@@ -450,17 +748,19 @@ class ModelManager {
     }
   }
 
-  private async downloadAndExtractZip(
+  private async downloadAndExtractArchive(
     url: string,
     destDir: string,
     targetFilename: string,
     progress: DownloadProgress,
     onProgress?: ProgressCallback
   ): Promise<void> {
-    const tmpZip = join(this.baseDir, `_tmp_${Date.now()}.zip`);
+    const isTarGz = url.endsWith(".tar.gz");
+    const ext = isTarGz ? ".tar.gz" : ".zip";
+    const tmpFile = join(this.baseDir, `_tmp_${Date.now()}${ext}`);
 
     try {
-      await this.downloadFile(url, tmpZip, progress, onProgress);
+      await this.downloadFile(url, tmpFile, progress, onProgress);
 
       progress.phase = "extracting";
       onProgress?.(progress);
@@ -469,12 +769,11 @@ class ModelManager {
       const { promisify } = await import("util");
       const execAsync = promisify(exec);
 
-      if (process.platform === "win32") {
-        await execAsync(
-          `powershell -Command "Expand-Archive -Path '${tmpZip}' -DestinationPath '${destDir}' -Force"`
-        );
+      // tar.exe ships with Windows 10+ and handles both .zip and .tar.gz
+      if (isTarGz) {
+        await execAsync(`tar -xzf "${tmpFile}" -C "${destDir}"`);
       } else {
-        await execAsync(`unzip -o "${tmpZip}" -d "${destDir}"`);
+        await execAsync(`tar -xf "${tmpFile}" -C "${destDir}"`);
       }
 
       const expectedPath = join(destDir, targetFilename);
@@ -483,6 +782,12 @@ class ModelManager {
       } catch {
         const extracted = await this.findFileRecursive(destDir, targetFilename);
         if (extracted) {
+          const sourceDir = dirname(extracted);
+          // whisper-cublas / llama zips often nest the exe with CUDA DLLs in a subfolder.
+          // Moving only the .exe breaks LoadLibrary (exit 0xC0000135). Copy DLLs up to bin/.
+          if (normalize(sourceDir) !== normalize(destDir)) {
+            await this.copyWindowsDllsFromDir(sourceDir, destDir);
+          }
           await fs.rename(extracted, expectedPath);
         } else {
           throw new Error(`Could not find ${targetFilename} after extraction`);
@@ -490,11 +795,34 @@ class ModelManager {
       }
     } finally {
       try {
-        await fs.unlink(tmpZip);
+        await fs.unlink(tmpFile);
       } catch {
         // ignore cleanup failures
       }
     }
+  }
+
+  /** Copy companion .dll next to the final binary (Windows CUDA builds). */
+  private async copyWindowsDllsFromDir(fromDir: string, toDir: string): Promise<void> {
+    if (process.platform !== "win32") return;
+    let names: string[];
+    try {
+      names = await fs.readdir(fromDir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      if (!name.toLowerCase().endsWith(".dll")) continue;
+      const src = join(fromDir, name);
+      const dst = join(toDir, name);
+      try {
+        const st = await fs.stat(src);
+        if (st.isFile()) await fs.copyFile(src, dst);
+      } catch {
+        // skip individual copy failures
+      }
+    }
+    logger.info(`Copied CUDA/companion DLLs from ${fromDir} to ${toDir}`);
   }
 
   private async findFileRecursive(dir: string, filename: string): Promise<string | null> {
@@ -532,7 +860,7 @@ class ModelManager {
     this.manifest.assets = this.manifest.assets.filter((a) => a.id !== id);
     this.manifest.assets.push({
       id,
-      version: "b8390",
+      version: "b8690",
       installedAt: new Date().toISOString(),
       filePath,
       sizeBytes,

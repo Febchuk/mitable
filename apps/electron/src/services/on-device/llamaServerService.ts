@@ -15,9 +15,11 @@
  */
 
 import { ChildProcess, spawn } from "child_process";
+import { dirname } from "path";
 import { createServer } from "net";
 import { createLogger } from "../../lib/logger";
 import { modelManager } from "./modelManager";
+import { augmentPathWithCudaBins } from "./windowsCudaEnv";
 
 const logger = createLogger("LlamaServer");
 
@@ -32,6 +34,10 @@ export interface LlamaServerConfig {
   parallelSlots: number;
   /** Host to bind to */
   host: string;
+  /**
+   * llama-server `--flash-attn`. If omitted, chosen from GPU compute capability (Pascal off, Ampere+ on).
+   */
+  flashAttn?: "off" | "auto" | "on";
 }
 
 type ServerStatus = "stopped" | "starting" | "running" | "error";
@@ -86,7 +92,18 @@ class LlamaServerService {
       return;
     }
 
-    this.config = { ...DEFAULT_CONFIG, ...overrides };
+    const tuning = modelManager.getNvidiaInferenceTuning();
+    const o = overrides ?? {};
+    this.config = { ...DEFAULT_CONFIG, ...o };
+    if (o.gpuLayers === undefined) {
+      this.config.gpuLayers = tuning.llamaGpuLayers;
+    }
+    if (o.flashAttn === undefined) {
+      this.config.flashAttn = tuning.llamaFlashAttn;
+    }
+    if (o.contextSize === undefined && tuning.llamaContextSize != null) {
+      this.config.contextSize = tuning.llamaContextSize;
+    }
 
     const serverBin = modelManager.getLlamaServerPath();
     const modelPath = modelManager.getVisionModelPath();
@@ -99,6 +116,9 @@ class LlamaServerService {
     this.port = await this.findFreePort();
     this.status = "starting";
 
+    const flashAttn = this.config.flashAttn!;
+    const vramFitOn = tuning.llamaVramFit;
+
     const args = [
       "--model", modelPath,
       "--mmproj", mmprojPath,
@@ -108,9 +128,23 @@ class LlamaServerService {
       "--n-gpu-layers", String(this.config.gpuLayers),
       "--parallel", String(this.config.parallelSlots),
       "--flash-attn",
+      flashAttn,
     ];
+    if (!vramFitOn) {
+      args.push("--fit", "off");
+    }
 
-    logger.info("Starting llama-server", { bin: serverBin, port: this.port, args });
+    logger.info("Starting llama-server", {
+      bin: serverBin,
+      port: this.port,
+      flashAttn,
+      gpuLayers: this.config.gpuLayers,
+      ctxSize: this.config.contextSize,
+      vramFit: vramFitOn ? "on" : "off",
+      args,
+    });
+
+    const binFolder = dirname(serverBin);
 
     return new Promise<void>((resolve, reject) => {
       this.startupResolve = resolve;
@@ -119,6 +153,8 @@ class LlamaServerService {
       this.process = spawn(serverBin, args, {
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
+        cwd: binFolder,
+        env: augmentPathWithCudaBins(process.env),
       });
 
       this.process.stdout?.on("data", (data: Buffer) => {

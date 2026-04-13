@@ -67,6 +67,18 @@ export interface LocalStory {
   createdAt: number;
 }
 
+export interface LocalTranscription {
+  id: string;
+  sessionId: string;
+  chunkIndex: number;
+  speakerId: number;
+  transcript: string;
+  startTimeMs: number;
+  endTimeMs: number;
+  confidence: number;
+  createdAt: number;
+}
+
 // ── Initialization ──────────────────────────────────────────────────────────
 
 const SCHEMA_SQL = `
@@ -117,6 +129,21 @@ CREATE TABLE IF NOT EXISTS stories (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stories_session ON stories(session_id);
+
+CREATE TABLE IF NOT EXISTS transcriptions (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  chunk_index INTEGER NOT NULL,
+  speaker_id INTEGER NOT NULL DEFAULT 0,
+  transcript TEXT NOT NULL DEFAULT '',
+  start_time_ms INTEGER NOT NULL,
+  end_time_ms INTEGER NOT NULL,
+  confidence REAL NOT NULL DEFAULT 0.0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_transcriptions_session ON transcriptions(session_id);
+CREATE INDEX IF NOT EXISTS idx_transcriptions_session_time ON transcriptions(session_id, start_time_ms);
 `;
 
 // ── Service ─────────────────────────────────────────────────────────────────
@@ -244,6 +271,45 @@ class LocalDatabase {
     );
   }
 
+  // ── Transcriptions ──────────────────────────────────────────────────────
+
+  insertTranscription(transcription: Omit<LocalTranscription, "createdAt">): void {
+    if (!db) return;
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO transcriptions
+        (id, session_id, chunk_index, speaker_id, transcript,
+         start_time_ms, end_time_ms, confidence)
+      VALUES
+        (@id, @sessionId, @chunkIndex, @speakerId, @transcript,
+         @startTimeMs, @endTimeMs, @confidence)
+    `);
+    stmt.run(transcription);
+  }
+
+  getTranscriptionsForSession(sessionId: string): LocalTranscription[] {
+    if (!db) return [];
+    return db
+      .prepare(
+        `SELECT * FROM transcriptions WHERE session_id = ? ORDER BY start_time_ms ASC`
+      )
+      .all(sessionId) as LocalTranscription[];
+  }
+
+  getTranscriptionRange(
+    sessionId: string,
+    startMs: number,
+    endMs: number
+  ): LocalTranscription[] {
+    if (!db) return [];
+    return db
+      .prepare(
+        `SELECT * FROM transcriptions
+         WHERE session_id = ? AND start_time_ms >= ? AND end_time_ms <= ?
+         ORDER BY start_time_ms ASC`
+      )
+      .all(sessionId, startMs, endMs) as LocalTranscription[];
+  }
+
   // ── Queries for the Mitable agent ───────────────────────────────────────
 
   /**
@@ -253,7 +319,7 @@ class LocalDatabase {
   searchSessions(query: string, limit = 20): Array<{
     sessionId: string;
     text: string;
-    source: "capture" | "classification" | "story";
+    source: "capture" | "classification" | "story" | "transcription";
     timestamp: number;
   }> {
     if (!db) return [];
@@ -262,7 +328,7 @@ class LocalDatabase {
     const results: Array<{
       sessionId: string;
       text: string;
-      source: "capture" | "classification" | "story";
+      source: "capture" | "classification" | "story" | "transcription";
       timestamp: number;
     }> = [];
 
@@ -301,6 +367,25 @@ class LocalDatabase {
         text: c.activity_description,
         source: "classification",
         timestamp: c.created_at,
+      });
+    }
+
+    const transcriptions = db
+      .prepare(
+        `SELECT session_id, transcript, start_time_ms
+         FROM transcriptions WHERE transcript LIKE ? LIMIT ?`
+      )
+      .all(likeQuery, limit) as Array<{
+        session_id: string;
+        transcript: string;
+        start_time_ms: number;
+      }>;
+    for (const t of transcriptions) {
+      results.push({
+        sessionId: t.session_id,
+        text: t.transcript,
+        source: "transcription" as any,
+        timestamp: t.start_time_ms,
       });
     }
 

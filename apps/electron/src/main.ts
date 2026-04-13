@@ -124,10 +124,17 @@ let audioActiveBeforePause = false;
  * Called from all session-end paths so audio doesn't keep streaming after the session is gone.
  */
 async function cleanupAudioRecording(sessionId?: string): Promise<void> {
-  // Mark cleanup done so audio-chunk handler silently drops incoming chunks
   audioCleanupDone = true;
 
-  // 1. Disconnect the backend WebSocket (stops forwarding chunks)
+  // Flush and stop local audio service if running
+  try {
+    const { localAudioService } = await import("./services/on-device");
+    await localAudioService.flushRemaining();
+    localAudioService.stop();
+  } catch {
+    // on-device module not available
+  }
+
   audioWebSocketService.disconnect();
 
   // 2. Tell the WatchingPill renderer to stop its AudioWorklet (stops IPC flood)
@@ -2334,9 +2341,19 @@ function setupMonitoringSessionHandlers() {
       };
     }
 
-    // Proactively refresh the access token before connecting the audio WebSocket.
-    // Supabase JWTs expire after ~1 hour. If the user clicks mic after a long
-    // idle period, the main-process token may be stale.
+    // On-device path: start local audio service instead of cloud WebSocket
+    try {
+      const { whisperServerService, localAudioService } = await import("./services/on-device");
+      if (whisperServerService.isRunning()) {
+        localAudioService.start(sessionState.id);
+        monitoringLogger.info("✅ Local audio transcription started (on-device Whisper)");
+        return { success: true, hasSystemAudio: false };
+      }
+    } catch {
+      // on-device module not available, fall through to cloud path
+    }
+
+    // Cloud path: connect WebSocket to backend for Deepgram
     const userCtx = currentUserContext
       ? { orgId: currentUserContext.organizationId, userId: currentUserContext.userId }
       : undefined;
@@ -2356,7 +2373,6 @@ function setupMonitoringSessionHandlers() {
       };
     }
 
-    // Note: VITE_* env vars are NOT available in main process at runtime
     const PROD_API_URL = "https://mitablebackend-production.up.railway.app";
     const backendUrl = app.isPackaged
       ? PROD_API_URL
@@ -2371,7 +2387,6 @@ function setupMonitoringSessionHandlers() {
       };
     }
 
-    // Notify backend to start tracking audio recording duration
     try {
       const token = authTokens.accessToken;
       if (token) {
@@ -2385,24 +2400,20 @@ function setupMonitoringSessionHandlers() {
       }
     } catch (error) {
       monitoringLogger.error("Failed to notify backend of audio start:", error);
-      // Don't fail the audio recording if backend notification fails
     }
 
     monitoringLogger.info("✅ Audio WebSocket connected, ready for renderer to start capture");
 
     return {
       success: true,
-      hasSystemAudio: false, // Will be set by renderer audio service
+      hasSystemAudio: false,
     };
   });
 
-  // Handle audio chunks from renderer
+  // Handle audio chunks from renderer — route to local or cloud
   ipcMain.on("audio-chunk", (_event, audioBuffer: ArrayBuffer) => {
     try {
-      // After cleanup, silently discard all chunks (renderer AudioWorklet may still be running)
-      if (audioCleanupDone) {
-        return;
-      }
+      if (audioCleanupDone) return;
 
       const sessionState = monitoringSessionService.getSessionState();
       if (!sessionState?.id) {
@@ -2416,8 +2427,18 @@ function setupMonitoringSessionHandlers() {
         return;
       }
 
-      // Forward audio chunk to backend via WebSocket
-      audioWebSocketService.sendAudioChunk(audioBuffer);
+      // On-device path: buffer locally for whisper transcription
+      import("./services/on-device")
+        .then(({ whisperServerService, localAudioService }) => {
+          if (whisperServerService.isRunning()) {
+            localAudioService.addChunk(Buffer.from(audioBuffer));
+          } else {
+            audioWebSocketService.sendAudioChunk(audioBuffer);
+          }
+        })
+        .catch(() => {
+          audioWebSocketService.sendAudioChunk(audioBuffer);
+        });
     } catch (error) {
       monitoringLogger.error("❌ Error processing audio chunk:", error);
     }
@@ -2433,10 +2454,22 @@ function setupMonitoringSessionHandlers() {
 
     const sessionState = monitoringSessionService.getSessionState();
 
-    // Close WebSocket connection to backend
+    // On-device path: flush remaining audio and stop local service
+    try {
+      const { whisperServerService, localAudioService } = await import("./services/on-device");
+      if (whisperServerService.isRunning()) {
+        await localAudioService.flushRemaining();
+        localAudioService.stop();
+        monitoringLogger.info("✅ Local audio transcription stopped and flushed");
+        return { success: true };
+      }
+    } catch {
+      // on-device module not available, fall through to cloud path
+    }
+
+    // Cloud path: disconnect WebSocket
     audioWebSocketService.disconnect();
 
-    // Notify backend to stop tracking and accumulate duration
     if (sessionState?.id) {
       try {
         await authManager.authenticatedFetch(
@@ -2445,7 +2478,6 @@ function setupMonitoringSessionHandlers() {
         );
       } catch (error) {
         monitoringLogger.error("Failed to notify backend of audio stop:", error);
-        // Don't fail the stop operation if backend notification fails
       }
     }
 
@@ -3161,12 +3193,26 @@ app.whenReady().then(async () => {
   setupIPC();
   registerGlobalShortcuts();
 
-  // Initialize on-device AI model manager (non-blocking)
+  // Initialize on-device AI module and auto-start server if previously enabled
   import("./services/on-device")
-    .then(({ modelManager, localDb }) =>
-      modelManager.initialize().then(() => localDb.initialize())
-    )
-    .then(() => consoleLogger.info("On-device AI module initialized"))
+    .then(async ({ modelManager, localDb, startOnDeviceServersAtomic, stopOnDeviceServersBoth }) => {
+      await modelManager.initialize();
+      await localDb.initialize();
+      consoleLogger.info("On-device AI module initialized");
+      if (
+        modelManager.canUseOnDeviceInference() &&
+        modelManager.isEnabled() &&
+        modelManager.isFullySetUp()
+      ) {
+        consoleLogger.info("Auto-starting on-device servers (previously enabled)");
+        try {
+          await startOnDeviceServersAtomic();
+        } catch (err) {
+          await stopOnDeviceServersBoth();
+          consoleLogger.warn("On-device auto-start failed:", String(err));
+        }
+      }
+    })
     .catch((err) => consoleLogger.warn("On-device AI init skipped:", String(err)));
 
   // Start Browser Bridge WebSocket server for Chrome Extension
@@ -3309,14 +3355,40 @@ app.whenReady().then(async () => {
   // ── On-Device AI IPC handlers ──────────────────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
     try {
-      const { modelManager, llamaServerService } = await import("./services/on-device");
+      const { modelManager, llamaServerService, whisperServerService } = await import("./services/on-device");
       return {
         isSetUp: modelManager.isFullySetUp(),
         serverStatus: llamaServerService.getStatus(),
+        whisperStatus: whisperServerService.getStatus(),
         installedAssets: modelManager.getInstalledAssets(),
+        enabled: modelManager.isEnabled(),
+        windowsRequiresNvidia: modelManager.windowsRequiresNvidia(),
+        windowsNvidiaOk: modelManager.canUseOnDeviceInference(),
+        onDeviceAllowed: modelManager.canUseOnDeviceInference(),
+        onDeviceBlockReason: modelManager.getOnDeviceBlockedReason(),
+        gpuDescription: modelManager.getGpuDescription(),
+        inferenceTuning: modelManager.getNvidiaInferenceTuning(),
       };
     } catch (err) {
-      return { isSetUp: false, serverStatus: "stopped", installedAssets: [], error: String(err) };
+      return {
+        isSetUp: false,
+        serverStatus: "stopped",
+        whisperStatus: "stopped",
+        installedAssets: [],
+        enabled: false,
+        windowsRequiresNvidia: false,
+        windowsNvidiaOk: true,
+        onDeviceAllowed: true,
+        onDeviceBlockReason: null,
+        gpuDescription: "",
+        inferenceTuning: {
+          llamaFlashAttn: "auto" as const,
+          whisperUseFlashAttn: true,
+          llamaGpuLayers: -1,
+          llamaVramFit: true,
+        },
+        error: String(err),
+      };
     }
   });
 
@@ -3377,9 +3449,23 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL, async () => {
     try {
-      const { modelManager, llamaServerService } = await import("./services/on-device");
-      await llamaServerService.stop();
+      const { modelManager, llamaServerService, whisperServerService } = await import("./services/on-device");
+      await Promise.all([llamaServerService.stop(), whisperServerService.stop()]);
       await modelManager.removeAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, async (_event, assetId: string) => {
+    try {
+      const { modelManager, llamaServerService, whisperServerService } = await import("./services/on-device");
+      if (llamaServerService.isRunning() || whisperServerService.isRunning()) {
+        await Promise.all([llamaServerService.stop(), whisperServerService.stop()]);
+        await modelManager.setEnabled(false);
+      }
+      await modelManager.removeAsset(assetId);
       return { success: true };
     } catch (err) {
       return { success: false, error: String(err) };
@@ -3388,9 +3474,31 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_START_SERVER, async () => {
     try {
-      const { llamaServerService } = await import("./services/on-device");
-      await llamaServerService.start();
-      return { success: true, port: llamaServerService.getPort() };
+      const {
+        modelManager,
+        startOnDeviceServersAtomic,
+        stopOnDeviceServersBoth,
+        llamaServerService,
+        whisperServerService,
+      } = await import("./services/on-device");
+      if (!modelManager.canUseOnDeviceInference()) {
+        return {
+          success: false,
+          error: modelManager.getOnDeviceBlockedReason() ?? "On-device AI is not available on this system.",
+        };
+      }
+      try {
+        await startOnDeviceServersAtomic();
+      } catch (startErr) {
+        await stopOnDeviceServersBoth();
+        return { success: false, error: String(startErr) };
+      }
+      await modelManager.setEnabled(true);
+      return {
+        success: true,
+        llamaPort: llamaServerService.getPort(),
+        whisperPort: whisperServerService.getPort(),
+      };
     } catch (err) {
       return { success: false, error: String(err) };
     }
@@ -3398,8 +3506,12 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_STOP_SERVER, async () => {
     try {
-      const { llamaServerService } = await import("./services/on-device");
-      await llamaServerService.stop();
+      const { llamaServerService, whisperServerService, modelManager } = await import("./services/on-device");
+      await Promise.all([
+        llamaServerService.stop(),
+        whisperServerService.stop(),
+      ]);
+      await modelManager.setEnabled(false);
       return { success: true };
     } catch (err) {
       return { success: false, error: String(err) };

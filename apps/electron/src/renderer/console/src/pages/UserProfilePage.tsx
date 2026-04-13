@@ -30,6 +30,7 @@ import {
   Trash2,
   Shield,
   MousePointerClick,
+  HardDrive,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { SiLinear, SiGmail, SiNotion, SiSlack } from "react-icons/si";
@@ -46,6 +47,7 @@ import { useSubscription } from "@/console/src/hooks/queries/billing";
 import { createLogger } from "../../../lib/logger";
 import { API_BASE_URL } from "../lib/config";
 import { apiRequest } from "../services/api";
+import OnDeviceAIView from "../components/views/employee/OnDeviceAIView";
 
 const logger = createLogger("UserProfilePage");
 
@@ -1948,6 +1950,7 @@ export default function UserProfilePage() {
     "permissions",
     "preferences",
     "integrations",
+    "on-device-ai",
     "update",
   ] as const;
   type TabId = (typeof validTabs)[number];
@@ -1969,6 +1972,7 @@ export default function UserProfilePage() {
     { id: "permissions" as const, label: "Permissions", icon: Shield },
     { id: "preferences" as const, label: "Preferences", icon: Settings },
     { id: "integrations" as const, label: "Integrations", icon: Link2 },
+    { id: "on-device-ai" as const, label: "On-Device AI", icon: HardDrive },
     { id: "update" as const, label: "Update", icon: RefreshCw },
   ];
 
@@ -4078,6 +4082,9 @@ export default function UserProfilePage() {
               </div>
             </div>
           )}
+
+          {/* On-Device AI Tab */}
+          {activeTab === "on-device-ai" && <OnDeviceAIView embedded />}
         </div>
       </div>
     </div>
