@@ -3112,7 +3112,7 @@ app.whenReady().then(async () => {
   // Content Security Policy — mitigates XSS in AI responses / markdown
   const isDev = !app.isPackaged;
   const scriptSrc = isDev
-    ? " script-src 'self' http://localhost:* ws://localhost:*;"
+    ? " script-src 'self' 'unsafe-eval' http://localhost:* ws://localhost:*;"
     : " script-src 'self';";
   const connectSrc =
     " connect-src 'self'" +
@@ -3120,7 +3120,7 @@ app.whenReady().then(async () => {
     " https://*.posthog.com https://*.deepgram.com wss://*.deepgram.com" +
     " https://generativelanguage.googleapis.com https://api.openai.com" +
     " https://api.groq.com https://api.anthropic.com" +
-    (isDev ? " http://localhost:* ws://localhost:*" : " http://localhost:*") +
+    (isDev ? " http://localhost:* ws://localhost:*" : "") +
     ";";
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

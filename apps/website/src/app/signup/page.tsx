@@ -8,12 +8,7 @@ import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
-/** Validate redirect param to prevent open redirect attacks. */
-function getSafeRedirect(redirect: string | null): string {
-    if (!redirect) return "/billing";
-    if (redirect.startsWith("/") && !redirect.startsWith("//")) return redirect;
-    return "/billing";
-}
+import { getSafeRedirect } from "@/lib/auth-utils";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",

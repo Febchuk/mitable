@@ -263,7 +263,6 @@ export function validateConfig() {
     { key: "DATABASE_URL", value: config.database.url },
     { key: "SUPABASE_URL", value: config.supabase.url },
     { key: "SUPABASE_ANON_KEY", value: config.supabase.anonKey },
-    { key: "SUPABASE_SERVICE_ROLE_KEY", value: config.supabase.serviceRoleKey },
     { key: "OPENAI_API_KEY", value: config.openai.apiKey },
     { key: "GROQ_API_KEY", value: config.groq.apiKey },
     { key: "PINECONE_API_KEY", value: config.pinecone.apiKey },
@@ -274,15 +273,19 @@ export function validateConfig() {
     { key: "NOTION_CLIENT_ID", value: config.notion.clientId },
     { key: "NOTION_CLIENT_SECRET", value: config.notion.clientSecret },
     { key: "JWT_SECRET", value: config.jwtSecret },
-    { key: "STRIPE_SECRET_KEY", value: config.stripe.secretKey },
-    { key: "STRIPE_WEBHOOK_SECRET", value: config.stripe.webhookSecret },
   ];
 
   const missing = required.filter((item) => !item.value);
 
-  // SENTRY_DSN is required in production
-  if (config.nodeEnv === "production" && !process.env.SENTRY_DSN) {
-    missing.push({ key: "SENTRY_DSN", value: "" });
+  // These keys are only required in production
+  if (config.nodeEnv === "production") {
+    const productionRequired = [
+      { key: "SUPABASE_SERVICE_ROLE_KEY", value: config.supabase.serviceRoleKey },
+      { key: "STRIPE_SECRET_KEY", value: config.stripe.secretKey },
+      { key: "STRIPE_WEBHOOK_SECRET", value: config.stripe.webhookSecret },
+      { key: "SENTRY_DSN", value: process.env.SENTRY_DSN },
+    ];
+    missing.push(...productionRequired.filter((item) => !item.value));
   }
 
   if (missing.length > 0) {
