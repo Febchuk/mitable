@@ -97,7 +97,7 @@ jobs:
           destination-dir: ./
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             apps/electron/dist/*.dmg
@@ -179,7 +179,7 @@ jobs:
           destination-dir: ./
 
       - name: Append to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             apps/electron/dist/*.exe
