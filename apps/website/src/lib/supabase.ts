@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import type { cookies } from "next/headers";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -21,23 +21,19 @@ export const supabase = createClient(supabaseUrl || "http://placeholder", supaba
  *   const supabase = createServerSupabaseClient(cookieStore);
  */
 export function createServerSupabaseClient(cookieStore: Awaited<ReturnType<typeof cookies>>) {
-    return createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return cookieStore.getAll();
-                },
-                setAll(cookiesToSet) {
-                    try {
-                        cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-                    } catch {
-                        // setAll can throw in Server Components (read-only).
-                        // This is expected — the middleware handles session refresh.
-                    }
-                },
+    return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+        cookies: {
+            getAll() {
+                return cookieStore.getAll();
             },
-        }
-    );
+            setAll(cookiesToSet) {
+                try {
+                    cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+                } catch {
+                    // setAll can throw in Server Components (read-only).
+                    // This is expected — the middleware handles session refresh.
+                }
+            },
+        },
+    });
 }

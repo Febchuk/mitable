@@ -2224,7 +2224,9 @@ function setupMonitoringSessionHandlers() {
       return { success: false, error: "Invalid userId" };
     }
     if (!Array.isArray(blockedApps) || blockedApps.length > 1000) {
-      ipcLogger.warn("BLOCK_LIST_SET rejected: blockedApps must be an array with at most 1000 items");
+      ipcLogger.warn(
+        "BLOCK_LIST_SET rejected: blockedApps must be an array with at most 1000 items"
+      );
       return { success: false, error: "Invalid blockedApps" };
     }
     for (const app of blockedApps) {
@@ -2294,7 +2296,9 @@ function setupMonitoringSessionHandlers() {
       return { success: false, error: "Invalid userId" };
     }
     if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
-      ipcLogger.warn("NOTIFICATION_FREQUENCY_SET rejected: minutes must be a number between 1 and 1440");
+      ipcLogger.warn(
+        "NOTIFICATION_FREQUENCY_SET rejected: minutes must be a number between 1 and 1440"
+      );
       return { success: false, error: "Invalid minutes value" };
     }
 
@@ -3663,7 +3667,9 @@ function setupAgentHandlers() {
         return { success: false, error: "Invalid conversationId" };
       }
       if (typeof message !== "string" || message.length === 0 || message.length > 50_000) {
-        agentLogger.warn("AGENT_SEND_MESSAGE rejected: message must be a non-empty string with max 50000 chars");
+        agentLogger.warn(
+          "AGENT_SEND_MESSAGE rejected: message must be a non-empty string with max 50000 chars"
+        );
         return { success: false, error: "Invalid message" };
       }
 

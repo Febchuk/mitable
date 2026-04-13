@@ -6,9 +6,8 @@ import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
-
 import { getSafeRedirect } from "@/lib/auth-utils";
+import { supabase } from "@/lib/supabase";
 
 const C = {
     bg: "var(--l-bg, #1A1916)",
