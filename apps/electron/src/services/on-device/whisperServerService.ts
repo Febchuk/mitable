@@ -16,6 +16,7 @@
 import { ChildProcess, spawn } from "child_process";
 import { dirname } from "path";
 import { createServer } from "net";
+import { request as httpRequest } from "http";
 import { createLogger } from "../../lib/logger";
 import { modelManager } from "./modelManager";
 import { augmentPathWithCudaBins } from "./windowsCudaEnv";
@@ -117,13 +118,13 @@ class WhisperServerService {
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
         cwd: binFolder,
-        env: augmentPathWithCudaBins(process.env),
+        env: augmentPathWithCudaBins(process.env, modelManager.getServerBinDirs()),
       });
 
       this.process.stdout?.on("data", (data: Buffer) => {
         const line = data.toString().trim();
         if (line) logger.debug("[whisper-server stdout]", line);
-        if (line.includes("whisper server listening on")) {
+        if (line.includes("whisper server listening")) {
           this.onReady();
         }
       });
@@ -131,10 +132,14 @@ class WhisperServerService {
       this.process.stderr?.on("data", (data: Buffer) => {
         const line = data.toString().trim();
         if (line) logger.debug("[whisper-server stderr]", line);
-        if (line.includes("whisper server listening on")) {
+        if (line.includes("whisper server listening")) {
           this.onReady();
         }
       });
+
+      // whisper-server prints its "listening" message to stdout via printf,
+      // which is fully buffered when piped. Poll the HTTP port as a fallback.
+      this.pollUntilReady();
 
       this.process.on("error", (err) => {
         logger.error("Failed to spawn whisper-server:", String(err));
@@ -207,33 +212,51 @@ class WhisperServerService {
     if (!this.isRunning()) throw new Error("whisper-server is not running");
 
     const boundary = "----WhisperBoundary" + Date.now();
-    const fieldName = "file";
-    const fileName = "audio.wav";
 
-    const header = Buffer.from(
+    const preamble = Buffer.from(
       `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="${fieldName}"; filename="${fileName}"\r\n` +
-      `Content-Type: audio/wav\r\n\r\n`
+      `Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n` +
+      `Content-Type: application/octet-stream\r\n\r\n`,
     );
-    const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
-    const body = Buffer.concat([header, wavBuffer, footer]);
+    const epilogue = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const body = Buffer.concat([preamble, wavBuffer, epilogue]);
 
-    const response = await fetch(`${this.getBaseUrl()}/inference`, {
-      method: "POST",
-      headers: {
-        "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        "Content-Length": String(body.length),
-      },
-      body,
+    return new Promise<string>((resolve, reject) => {
+      const url = new URL(`${this.getBaseUrl()}/inference`);
+      const req = httpRequest(
+        {
+          hostname: url.hostname,
+          port: url.port,
+          path: url.pathname,
+          method: "POST",
+          headers: {
+            "Content-Type": `multipart/form-data; boundary=${boundary}`,
+            "Content-Length": body.length,
+          },
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => {
+            const raw = Buffer.concat(chunks).toString("utf-8");
+            if (res.statusCode && res.statusCode >= 400) {
+              reject(new Error(`whisper-server error ${res.statusCode}: ${raw}`));
+              return;
+            }
+            try {
+              const result = JSON.parse(raw) as { text?: string };
+              resolve((result.text ?? "").trim());
+            } catch {
+              reject(new Error(`whisper-server returned invalid JSON: ${raw.slice(0, 200)}`));
+            }
+          });
+        },
+      );
+
+      req.on("error", (err) => reject(new Error(`whisper-server request failed: ${err.message}`)));
+      req.write(body);
+      req.end();
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`whisper-server error ${response.status}: ${errorText}`);
-    }
-
-    const result = await response.json() as { text?: string };
-    return (result.text ?? "").trim();
   }
 
   private onReady(): void {
@@ -269,6 +292,26 @@ class WhisperServerService {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = null;
     }
+  }
+
+  private pollUntilReady(): void {
+    const interval = setInterval(async () => {
+      if (this.status !== "starting") {
+        clearInterval(interval);
+        return;
+      }
+      try {
+        const res = await fetch(`${this.getBaseUrl()}/`, {
+          signal: AbortSignal.timeout(1000),
+        });
+        if (res.ok || res.status < 500) {
+          clearInterval(interval);
+          this.onReady();
+        }
+      } catch {
+        // server not up yet
+      }
+    }, 1500);
   }
 
   private findFreePort(): Promise<number> {

@@ -724,8 +724,14 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
-    const { autoRecap } = req.body as {
+    const { autoRecap, onDeviceSummary } = req.body as {
       autoRecap?: boolean;
+      onDeviceSummary?: {
+        narrative: string;
+        taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
+        timeBreakdown: Record<string, number> | null;
+        modelUsed: string;
+      };
     };
 
     try {
@@ -862,6 +868,154 @@ router.post(
 
       // Proactively close audio WebSocket to stop orphaned audio chunks
       closeAudioConnection(id);
+
+      // ── On-device fast path ─────────────────────────────────────────────
+      // The Electron client ran the full AI pipeline locally (vision + classifier +
+      // storyteller). Only the final narrative + task breakdown are sent here — no
+      // raw captures or classifications leave the device. We persist the results
+      // directly and skip cloud-side summarization.
+      if (onDeviceSummary) {
+        log.info("On-device summary received, persisting directly", {
+          sessionId: id,
+          taskCount: onDeviceSummary.taskBreakdown?.length ?? 0,
+          modelUsed: onDeviceSummary.modelUsed,
+        });
+
+        const sessionTitle =
+          onDeviceSummary.taskBreakdown?.[0]?.shortTitle || "Work session";
+
+        await db.insert(schema.sessionSummaries).values({
+          sessionId: id,
+          version: 1,
+          summaryType: "master_story",
+          narrativeSummary: onDeviceSummary.narrative,
+          modelUsed: onDeviceSummary.modelUsed || "on-device",
+          generationTimeMs: 0,
+        });
+
+        await db
+          .update(schema.monitoringSessions)
+          .set({
+            status: "ready",
+            summarizationProgress: null,
+            name: sessionTitle,
+            finalSummary: onDeviceSummary.narrative,
+            taskBreakdown: onDeviceSummary.taskBreakdown,
+            ...(onDeviceSummary.timeBreakdown
+              ? { timeBreakdown: onDeviceSummary.timeBreakdown }
+              : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.monitoringSessions.id, id));
+
+        // Auto-recap (reuses the same logic as the cloud path)
+        if (autoRecap !== false) {
+          try {
+            const sessionStart = new Date(session.startedAt);
+            const sessionEnd = endTime;
+            const activeMinutes = Math.max(1, Math.round(activeDurationMs / 60000));
+
+            const newBlock = {
+              id,
+              startTime: sessionStart.toISOString(),
+              endTime: sessionEnd.toISOString(),
+              duration: activeMinutes,
+              goal: session.sessionGoal || undefined,
+              sessionId: id,
+              title: sessionTitle,
+              durationMinutes: activeMinutes,
+            };
+
+            const sessionDay = new Date(session.startedAt);
+            const todayStart = new Date(sessionDay);
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date(sessionDay);
+            todayEnd.setHours(23, 59, 59, 999);
+
+            const [existingRecap] = await db
+              .select()
+              .from(schema.recaps)
+              .where(
+                and(
+                  eq(schema.recaps.userId, userId),
+                  sql`${schema.recaps.createdAt} >= ${todayStart.toISOString()}`,
+                  sql`${schema.recaps.createdAt} <= ${todayEnd.toISOString()}`
+                )
+              )
+              .orderBy(desc(schema.recaps.createdAt))
+              .limit(1);
+
+            if (existingRecap) {
+              const existingBlocks = (
+                Array.isArray(existingRecap.blocks) ? existingRecap.blocks : []
+              ) as Array<Record<string, unknown>>;
+              const alreadyAdded = existingBlocks.some((b) => (b.id || b.sessionId) === id);
+              if (!alreadyAdded) {
+                const allBlocks = [...existingBlocks, newBlock];
+                const totalDuration = allBlocks.reduce(
+                  (sum, b) => sum + (Number(b.duration) || Number(b.durationMinutes) || 0),
+                  0
+                );
+                const allSessionIds = allBlocks.map((b) => String(b.id || b.sessionId));
+                const recapContent = await recapRLMService.generateRecap(allSessionIds, userId);
+                const dateLabel = sessionDay.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                });
+                await db
+                  .update(schema.recaps)
+                  .set({
+                    title: `Daily Recap — ${dateLabel}`,
+                    content: recapContent,
+                    blocks: allBlocks,
+                    totalDuration,
+                    sessionId: id,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(schema.recaps.id, existingRecap.id));
+                log.info("Updated daily recap with on-device session", {
+                  recapId: existingRecap.id,
+                  sessionId: id,
+                });
+              }
+            } else {
+              const recapContent = await recapRLMService.generateRecap([id], userId);
+              await db.insert(schema.recaps).values({
+                userId,
+                organizationId: session.organizationId,
+                title: sessionTitle,
+                content: recapContent,
+                blocks: [newBlock],
+                totalDuration: activeMinutes,
+                sessionId: id,
+              });
+              log.info("Auto-created daily recap for on-device session", { sessionId: id });
+            }
+          } catch (recapError) {
+            log.error("On-device auto-recap failed (non-blocking)", {
+              sessionId: id,
+              error: recapError instanceof Error ? recapError.message : String(recapError),
+            });
+          }
+        }
+
+        res.json({
+          success: true,
+          session: {
+            id: updated.id,
+            status: "ready",
+            startedAt: updated.startedAt,
+            endedAt: updated.endedAt,
+            duration: {
+              totalMs: endTime.getTime() - startTime,
+              activeMs: activeDurationMs,
+              pausedMs: totalPausedMs,
+            },
+            captureCount,
+          },
+        });
+        return;
+      }
 
       // Short-session guard: skip storyteller if not enough data
       const MIN_DURATION_MS = 3 * 60 * 1000; // 3 minutes

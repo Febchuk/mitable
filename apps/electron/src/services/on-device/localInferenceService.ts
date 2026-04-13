@@ -428,6 +428,61 @@ Respond in this exact JSON format:
       };
     }
   }
+
+  /**
+   * Export the locally-generated story for a session in the format the cloud
+   * backend expects. Only the narrative + task breakdown leave the device —
+   * raw captures, classifications, and transcriptions stay in local SQLite.
+   */
+  exportResultsForBackend(
+    sessionId: string,
+    activeDurationMs: number
+  ): OnDeviceSummary | null {
+    const story = localDb.getStoryForSession(sessionId);
+    if (!story) return null;
+
+    let rawTasks: string[] = [];
+    try {
+      rawTasks = JSON.parse(story.tasks);
+      if (!Array.isArray(rawTasks)) rawTasks = [];
+    } catch {
+      rawTasks = [];
+    }
+
+    const minutesPerTask =
+      rawTasks.length > 0
+        ? Math.max(1, Math.round(activeDurationMs / 60_000 / rawTasks.length))
+        : 0;
+
+    const taskBreakdown = rawTasks.map((desc) => ({
+      shortTitle: desc.length > 40 ? desc.slice(0, 37) + "..." : desc,
+      description: desc,
+      minutes: minutesPerTask,
+    }));
+
+    let timeBreakdown: Record<string, number> | null = null;
+    if (story.timeBreakdown) {
+      try {
+        timeBreakdown = JSON.parse(story.timeBreakdown);
+      } catch {
+        /* ignore malformed */
+      }
+    }
+
+    return {
+      narrative: story.narrative,
+      taskBreakdown,
+      timeBreakdown,
+      modelUsed: story.modelUsed,
+    };
+  }
+}
+
+export interface OnDeviceSummary {
+  narrative: string;
+  taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
+  timeBreakdown: Record<string, number> | null;
+  modelUsed: string;
 }
 
 export const localInferenceService = new LocalInferenceService();

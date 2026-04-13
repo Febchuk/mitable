@@ -154,6 +154,19 @@ class LocalDatabase {
   async initialize(): Promise<void> {
     this.dbPath = join(app.getPath("userData"), "on-device", "mitable-local.db");
 
+    const { mkdirSync } = await import("fs");
+    mkdirSync(join(app.getPath("userData"), "on-device"), { recursive: true });
+
+    await this.tryOpen();
+  }
+
+  /**
+   * Re-attempt opening the database (e.g. after electron-rebuild).
+   * Safe to call multiple times; no-ops if already open.
+   */
+  async tryOpen(): Promise<boolean> {
+    if (db) return true;
+
     try {
       const betterSqlite3 = await import("better-sqlite3");
       Database = betterSqlite3;
@@ -166,11 +179,13 @@ class LocalDatabase {
       db.exec(SCHEMA_SQL);
 
       logger.info("Local database initialized at", this.dbPath);
+      return true;
     } catch (err) {
       logger.error("Failed to initialize local database:", String(err));
-      logger.info(
-        "Local SQLite not available — install better-sqlite3 to enable on-device storage"
+      logger.warn(
+        "Run `npm run rebuild-native` in apps/electron to compile better-sqlite3 for Electron"
       );
+      return false;
     }
   }
 

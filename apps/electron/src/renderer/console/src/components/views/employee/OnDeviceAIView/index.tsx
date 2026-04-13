@@ -254,7 +254,30 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
     }
   };
 
-  /** Per-component download (no need to enable On-Device AI first). */
+  const handleDownloadAll = async () => {
+    if (!onDeviceAllowed) {
+      setError(onDeviceBlockReason ?? "Cannot download on this system.");
+      return;
+    }
+    setError(null);
+    setIsDownloading(true);
+    setCompletedIds(new Set());
+    setActiveDownloads(new Map());
+    try {
+      const result = await window.consoleAPI.onDeviceDownloadAll();
+      if (!result.success) {
+        setError(result.error || "Download failed");
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsDownloading(false);
+      setActiveDownloads(new Map());
+      setCompletedIds(new Set());
+      await loadStatus();
+    }
+  };
+
   const handleDownloadOne = async (assetId: string) => {
     if (!onDeviceAllowed) {
       setError(onDeviceBlockReason ?? "Cannot download on this system.");
@@ -553,16 +576,53 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
 
       {/* Components list */}
       <div style={{ marginBottom: 24 }}>
-        <h2
+        <div
           style={{
-            fontSize: 14,
-            fontWeight: 600,
-            color: "var(--text-primary)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             margin: "0 0 12px",
           }}
         >
-          Components
-        </h2>
+          <h2
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
+            Components
+          </h2>
+          {missingAssets.length > 0 && (
+            <button
+              type="button"
+              onClick={handleDownloadAll}
+              disabled={!onDeviceAllowed || isDownloading || isStarting || isStopping}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+                background: "var(--bg-overlay)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: 6,
+                cursor:
+                  !onDeviceAllowed || isDownloading || isStarting || isStopping
+                    ? "not-allowed"
+                    : "pointer",
+                opacity:
+                  !onDeviceAllowed || isDownloading || isStarting || isStopping ? 0.5 : 1,
+              }}
+            >
+              <Download size={13} />
+              {isDownloading ? "Downloading..." : "Download All"}
+            </button>
+          )}
+        </div>
 
         <div
           style={{
@@ -755,7 +815,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                     <button
                       type="button"
                       onClick={() => handleDownloadOne(asset.id)}
-                      disabled={!onDeviceAllowed || isToggleBusy}
+                      disabled={!onDeviceAllowed || isDownloading || isStarting || isStopping}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -768,8 +828,8 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                         border: "1px solid var(--border-subtle)",
                         borderRadius: 6,
                         cursor:
-                          !onDeviceAllowed || isToggleBusy ? "not-allowed" : "pointer",
-                        opacity: !onDeviceAllowed || isToggleBusy ? 0.5 : 1,
+                          !onDeviceAllowed || isDownloading || isStarting || isStopping ? "not-allowed" : "pointer",
+                        opacity: !onDeviceAllowed || isDownloading || isStarting || isStopping ? 0.5 : 1,
                       }}
                     >
                       <Download size={14} />

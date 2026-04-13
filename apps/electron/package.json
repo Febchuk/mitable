@@ -26,7 +26,8 @@
     "lint": "eslint src",
     "clean": "rm -rf out dist",
     "logs": "tail -f ~/Library/Logs/mitable/main.log",
-    "logs:clear": "rm -f ~/Library/Logs/mitable/*.log && echo 'Logs cleared'"
+    "logs:clear": "rm -f ~/Library/Logs/mitable/*.log && echo 'Logs cleared'",
+    "rebuild-native": "npx @electron/rebuild -f -m ../../node_modules/better-sqlite3"
   },
   "dependencies": {
     "@ai-sdk/react": "^2.0.28",

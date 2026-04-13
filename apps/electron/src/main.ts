@@ -1391,10 +1391,34 @@ function setupIPC() {
               return result;
             }
 
-            // 2. Upload captures and end backend session with defaults
+            // 2. Upload captures (cloud) or on-device summary, then end backend session
             try {
-              // Upload captures if any exist
-              if (result.captures && result.captures.length > 0) {
+              const autoRecapEnabled = currentUserContext?.userId
+                ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+                : true;
+
+              // Check for on-device story
+              let onDeviceSummary: import("./services/on-device/localInferenceService").OnDeviceSummary | undefined;
+              try {
+                const { localInferenceService } = await import("./services/on-device");
+                const activeDurationMs = preEndState
+                  ? Date.now() - preEndState.startedAt - (preEndState.totalPausedMs || 0)
+                  : 0;
+                const exported = localInferenceService.exportResultsForBackend(
+                  result.sessionId,
+                  activeDurationMs
+                );
+                if (exported) {
+                  onDeviceSummary = exported;
+                  monitoringLogger.info(
+                    ` On-device summary ready: ${exported.taskBreakdown.length} tasks`
+                  );
+                }
+              } catch {
+                // on-device module not available
+              }
+
+              if (!onDeviceSummary && result.captures && result.captures.length > 0) {
                 monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
                 await authManager.authenticatedFetch(
                   `/api/monitoring/sessions/${result.sessionId}/captures`,
@@ -1405,11 +1429,7 @@ function setupIPC() {
                 );
               }
 
-              // End backend session with stored preferences
               monitoringLogger.info(` Triggering backend summarization with defaults`);
-              const autoRecapEnabled = currentUserContext?.userId
-                ? preferencesService.getUserAutoRecap(currentUserContext.userId)
-                : true;
               await authManager.authenticatedFetch(
                 `/api/monitoring/sessions/${result.sessionId}/end`,
                 {
@@ -1421,6 +1441,7 @@ function setupIPC() {
                       includeScreenshots: summaryDefaults.includeScreenshots,
                     },
                     autoRecap: autoRecapEnabled,
+                    ...(onDeviceSummary ? { onDeviceSummary } : {}),
                   }),
                 }
               );
@@ -2697,9 +2718,34 @@ function setupMonitoringSessionHandlers() {
       return result;
     }
 
-    // Upload captures and trigger backend summarization
+    // Upload captures (cloud path) or on-device summary, then trigger backend end
     try {
-      if (result.captures && result.captures.length > 0) {
+      const autoRecap = currentUserContext?.userId
+        ? preferencesService.getUserAutoRecap(currentUserContext.userId)
+        : true;
+
+      // Check if on-device AI produced a local story for this session
+      let onDeviceSummary: import("./services/on-device/localInferenceService").OnDeviceSummary | undefined;
+      try {
+        const { localInferenceService } = await import("./services/on-device");
+        const activeDurationMs = preEndState
+          ? Date.now() - preEndState.startedAt - (preEndState.totalPausedMs || 0)
+          : 0;
+        const exported = localInferenceService.exportResultsForBackend(
+          result.sessionId,
+          activeDurationMs
+        );
+        if (exported) {
+          onDeviceSummary = exported;
+          monitoringLogger.info(
+            ` On-device summary ready: ${exported.taskBreakdown.length} tasks, sending to backend`
+          );
+        }
+      } catch {
+        // on-device module not available — fall through to cloud path
+      }
+
+      if (!onDeviceSummary && result.captures && result.captures.length > 0) {
         monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
         await authManager.authenticatedFetch(
           `/api/monitoring/sessions/${result.sessionId}/captures`,
@@ -2711,12 +2757,12 @@ function setupMonitoringSessionHandlers() {
       }
 
       monitoringLogger.info(` Triggering backend summarization`);
-      const autoRecap = currentUserContext?.userId
-        ? preferencesService.getUserAutoRecap(currentUserContext.userId)
-        : true;
       await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
         method: "POST",
-        body: JSON.stringify({ autoRecap }),
+        body: JSON.stringify({
+          autoRecap,
+          ...(onDeviceSummary ? { onDeviceSummary } : {}),
+        }),
       });
     } catch (error) {
       monitoringLogger.error(" Error ending session:", error);
@@ -3198,9 +3244,12 @@ app.whenReady().then(async () => {
     .then(async ({ modelManager, localDb, startOnDeviceServersAtomic, stopOnDeviceServersBoth }) => {
       await modelManager.initialize();
       await localDb.initialize();
-      consoleLogger.info("On-device AI module initialized");
+      consoleLogger.info(
+        `On-device AI module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
+      );
       if (
         modelManager.canUseOnDeviceInference() &&
+        localDb.isAvailable() &&
         modelManager.isEnabled() &&
         modelManager.isFullySetUp()
       ) {
@@ -3211,6 +3260,10 @@ app.whenReady().then(async () => {
           await stopOnDeviceServersBoth();
           consoleLogger.warn("On-device auto-start failed:", String(err));
         }
+      } else if (!localDb.isAvailable() && modelManager.isEnabled()) {
+        consoleLogger.warn(
+          "On-device AI is enabled but SQLite is unavailable — run `npm run rebuild-native` in apps/electron"
+        );
       }
     })
     .catch((err) => consoleLogger.warn("On-device AI init skipped:", String(err)));
@@ -3355,7 +3408,15 @@ app.whenReady().then(async () => {
   // ── On-Device AI IPC handlers ──────────────────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
     try {
-      const { modelManager, llamaServerService, whisperServerService } = await import("./services/on-device");
+      const { modelManager, llamaServerService, whisperServerService, localDb } = await import("./services/on-device");
+      const sqliteAvailable = localDb.isAvailable() || await localDb.tryOpen();
+      const gpuOk = modelManager.canUseOnDeviceInference();
+      const allowed = gpuOk && sqliteAvailable;
+      let blockReason = modelManager.getOnDeviceBlockedReason();
+      if (!sqliteAvailable) {
+        blockReason = (blockReason ? blockReason + " " : "") +
+          "Local SQLite database is unavailable — run `npm run rebuild-native` in apps/electron.";
+      }
       return {
         isSetUp: modelManager.isFullySetUp(),
         serverStatus: llamaServerService.getStatus(),
@@ -3363,11 +3424,12 @@ app.whenReady().then(async () => {
         installedAssets: modelManager.getInstalledAssets(),
         enabled: modelManager.isEnabled(),
         windowsRequiresNvidia: modelManager.windowsRequiresNvidia(),
-        windowsNvidiaOk: modelManager.canUseOnDeviceInference(),
-        onDeviceAllowed: modelManager.canUseOnDeviceInference(),
-        onDeviceBlockReason: modelManager.getOnDeviceBlockedReason(),
+        windowsNvidiaOk: gpuOk,
+        onDeviceAllowed: allowed,
+        onDeviceBlockReason: blockReason,
         gpuDescription: modelManager.getGpuDescription(),
         inferenceTuning: modelManager.getNvidiaInferenceTuning(),
+        sqliteAvailable,
       };
     } catch (err) {
       return {
@@ -3480,11 +3542,19 @@ app.whenReady().then(async () => {
         stopOnDeviceServersBoth,
         llamaServerService,
         whisperServerService,
+        localDb,
       } = await import("./services/on-device");
       if (!modelManager.canUseOnDeviceInference()) {
         return {
           success: false,
           error: modelManager.getOnDeviceBlockedReason() ?? "On-device AI is not available on this system.",
+        };
+      }
+      const sqliteOk = localDb.isAvailable() || await localDb.tryOpen();
+      if (!sqliteOk) {
+        return {
+          success: false,
+          error: "Local SQLite database is unavailable. Run `npm run rebuild-native` in apps/electron to recompile better-sqlite3 for Electron.",
         };
       }
       try {

@@ -127,8 +127,9 @@ class LlamaServerService {
       "--ctx-size", String(this.config.contextSize),
       "--n-gpu-layers", String(this.config.gpuLayers),
       "--parallel", String(this.config.parallelSlots),
-      "--flash-attn",
-      flashAttn,
+      "--flash-attn", flashAttn,
+      "--no-jinja",
+      "--chat-template", "smolvlm",
     ];
     if (!vramFitOn) {
       args.push("--fit", "off");
@@ -154,7 +155,7 @@ class LlamaServerService {
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
         cwd: binFolder,
-        env: augmentPathWithCudaBins(process.env),
+        env: augmentPathWithCudaBins(process.env, modelManager.getServerBinDirs()),
       });
 
       this.process.stdout?.on("data", (data: Buffer) => {

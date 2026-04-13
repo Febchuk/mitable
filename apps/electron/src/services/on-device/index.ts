@@ -22,7 +22,7 @@ export { localDb } from "./localDb";
 export type { LocalCapture, LocalClassification, LocalStory, LocalTranscription } from "./localDb";
 
 export { localInferenceService } from "./localInferenceService";
-export type { BufferedFrame } from "./localInferenceService";
+export type { BufferedFrame, OnDeviceSummary } from "./localInferenceService";
 
 export { localAudioService } from "./localAudioService";
 

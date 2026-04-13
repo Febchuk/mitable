@@ -96,7 +96,15 @@ class LocalAudioService {
     this.pcmBufferBytes = 0;
 
     const stereoPcm = Buffer.concat(chunks);
-    const samplesPerChannel = totalBytes / (BYTES_PER_SAMPLE * CHANNELS);
+    const frameBytes = BYTES_PER_SAMPLE * CHANNELS; // 4 bytes per stereo frame
+    const alignedBytes = Math.floor(totalBytes / frameBytes) * frameBytes;
+    const samplesPerChannel = alignedBytes / frameBytes;
+
+    if (samplesPerChannel === 0) {
+      logger.debug("Audio buffer too small to form a complete frame, skipping");
+      this.processing = false;
+      return;
+    }
 
     const startSample = this.totalSamplesProcessed;
     this.totalSamplesProcessed += samplesPerChannel;
@@ -105,7 +113,8 @@ class LocalAudioService {
     const endTimeMs = this.sessionStartMs + Math.round((this.totalSamplesProcessed / SAMPLE_RATE) * 1000);
 
     try {
-      const monoWav = this.stereoToMonoWav(stereoPcm, samplesPerChannel);
+      const monoWav = this.stereoToMonoWav(stereoPcm.subarray(0, alignedBytes), samplesPerChannel);
+      logger.debug(`WAV buffer: ${monoWav.length} bytes, ${samplesPerChannel} samples, ${Math.round(samplesPerChannel / SAMPLE_RATE)}s`);
 
       const transcript = await whisperServerService.transcribe(monoWav);
 

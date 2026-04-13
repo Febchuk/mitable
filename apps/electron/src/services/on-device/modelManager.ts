@@ -274,6 +274,8 @@ export type ProgressCallback = (progress: DownloadProgress) => void;
 class ModelManager {
   private baseDir: string = "";
   private binDir: string = "";
+  private llamaBinDir: string = "";
+  private whisperBinDir: string = "";
   private modelsDir: string = "";
   private manifestPath: string = "";
   private manifest: OnDeviceManifest | null = null;
@@ -284,14 +286,18 @@ class ModelManager {
   async initialize(): Promise<void> {
     this.baseDir = join(app.getPath("userData"), "on-device");
     this.binDir = join(this.baseDir, "bin");
+    this.llamaBinDir = join(this.binDir, "llama");
+    this.whisperBinDir = join(this.binDir, "whisper");
     this.modelsDir = join(this.baseDir, "models");
     this.manifestPath = join(this.baseDir, "manifest.json");
 
-    await fs.mkdir(this.binDir, { recursive: true });
+    await fs.mkdir(this.llamaBinDir, { recursive: true });
+    await fs.mkdir(this.whisperBinDir, { recursive: true });
     await fs.mkdir(this.modelsDir, { recursive: true });
 
     this.detectedPlatform = await this.detectPlatform();
     this.manifest = await this.loadManifest();
+    await this.migrateFlatBinLayout();
     await this.disableIfWindowsWithoutNvidia();
 
     logger.info("Initialized", {
@@ -475,6 +481,11 @@ class ModelManager {
     return this.getAssetPath("whisper-server");
   }
 
+  /** All server bin directories — used to cross-reference CUDA runtime DLLs via PATH. */
+  getServerBinDirs(): string[] {
+    return [this.llamaBinDir, this.whisperBinDir].filter(Boolean);
+  }
+
   getWhisperModelPath(): string | null {
     return this.getAssetPath("whisper-model");
   }
@@ -526,8 +537,10 @@ class ModelManager {
     if (!filename) throw new Error(`No filename for ${id} on ${platform}`);
 
     const isArchive = url.endsWith(".zip") || url.endsWith(".tar.gz");
-    const isBinary = id === "llama-server" || id === "whisper-server";
-    const destDir = isBinary ? this.binDir : this.modelsDir;
+    const destDir =
+      id === "llama-server" ? this.llamaBinDir
+        : id === "whisper-server" ? this.whisperBinDir
+          : this.modelsDir;
     const destPath = join(destDir, filename);
 
     const progress: DownloadProgress = {
@@ -549,6 +562,7 @@ class ModelManager {
         await this.downloadFile(url, destPath, progress, onProgress);
       }
 
+      const isBinary = id === "llama-server" || id === "whisper-server";
       if (process.platform !== "win32" && isBinary) {
         await fs.chmod(destPath, 0o755);
       }
@@ -582,7 +596,8 @@ class ModelManager {
   async removeAll(): Promise<void> {
     try {
       await fs.rm(this.baseDir, { recursive: true, force: true });
-      await fs.mkdir(this.binDir, { recursive: true });
+      await fs.mkdir(this.llamaBinDir, { recursive: true });
+      await fs.mkdir(this.whisperBinDir, { recursive: true });
       await fs.mkdir(this.modelsDir, { recursive: true });
       this.manifest = { version: 1, platform: this.detectedPlatform!, assets: [] };
       await this.saveManifest();
@@ -594,7 +609,8 @@ class ModelManager {
 
   /**
    * Remove one installed asset (file on disk + manifest entry).
-   * Does not delete unrelated DLLs that may sit next to CUDA binaries in bin/.
+   * For server binaries (llama-server, whisper-server), wipes the entire
+   * subdirectory (bin/llama/ or bin/whisper/) so companion DLLs are cleaned up.
    */
   async removeAsset(id: string): Promise<void> {
     const assetId = id as AssetId;
@@ -607,10 +623,20 @@ class ModelManager {
     if (idx < 0) throw new Error(`"${id}" is not installed`);
 
     const entry = this.manifest.assets[idx]!;
+    const serverDir =
+      assetId === "llama-server" ? this.llamaBinDir
+        : assetId === "whisper-server" ? this.whisperBinDir
+          : null;
+
     try {
-      await fs.unlink(entry.filePath);
+      if (serverDir) {
+        await fs.rm(serverDir, { recursive: true, force: true });
+        await fs.mkdir(serverDir, { recursive: true });
+      } else {
+        await fs.unlink(entry.filePath);
+      }
     } catch (err) {
-      logger.warn(`Could not delete file for ${id} (${entry.filePath}):`, String(err));
+      logger.warn(`Could not delete files for ${id}:`, String(err));
     }
 
     this.manifest.assets.splice(idx, 1);
@@ -619,6 +645,28 @@ class ModelManager {
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────
+
+  /**
+   * Older installs put llama-server and whisper-server in a flat bin/ directory,
+   * causing shared DLL collisions (ggml-cuda.dll, ggml-base.dll, etc.).
+   * Invalidate those manifest entries so assets re-download to bin/llama/ and bin/whisper/.
+   */
+  private async migrateFlatBinLayout(): Promise<void> {
+    if (!this.manifest) return;
+    const binaries: AssetId[] = ["llama-server", "whisper-server"];
+    let changed = false;
+    for (const id of binaries) {
+      const entry = this.manifest.assets.find((a) => a.id === id);
+      if (!entry) continue;
+      const expectedParent = id === "llama-server" ? this.llamaBinDir : this.whisperBinDir;
+      if (normalize(dirname(entry.filePath)) !== normalize(expectedParent)) {
+        logger.info(`Migrating ${id}: removing stale flat-bin entry (${entry.filePath})`);
+        this.manifest.assets = this.manifest.assets.filter((a) => a.id !== id);
+        changed = true;
+      }
+    }
+    if (changed) await this.saveManifest();
+  }
 
   private async detectGpu(): Promise<GpuInfo> {
     if (process.platform === "darwin") {
