@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "prepare": "husky",
     "postinstall": "(node scripts/fix-esbuild.js || true) && (node scripts/patch-node-cron.js || true)",
     "dev": "turbo run dev",
     "dev:debug-screenshots": "cross-env DEBUG_SAVE_SCREENSHOTS=true turbo run dev",
@@ -32,21 +33,32 @@
     "ci": "npm run build --workspace=packages/shared && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
     "clean": "turbo run clean && rm -rf node_modules"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
-    "drizzle-orm": "^0.44.6",
+    "@types/jest": "^30.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@types/jest": "^30.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "baseline-browser-mapping": "^2.9.8",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
+    "drizzle-orm": "^0.44.6",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.2.5",
     "shadcn": "^3.4.0",
     "ts-jest": "^29.4.5",

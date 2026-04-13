@@ -42,9 +42,4 @@ export async function testConnection() {
   }
 }
 
-// Graceful shutdown
-process.on("SIGINT", async () => {
-  await pool.end();
-  console.log("Database pool closed");
-  process.exit(0);
-});
+// Pool lifecycle is managed centrally in index.ts shutdown handler.
