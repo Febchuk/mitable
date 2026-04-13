@@ -34,7 +34,9 @@ mitable/
 ## v1 Core Functionality (KEEP — 11 Pillars)
 
 ### 1. Work Context Capture
+
 Screenshot capture at configurable intervals, active window detection, foreground app tracking.
+
 - `apps/electron/src/services/captureService.ts`
 - `apps/electron/src/services/capturePolicy.ts`
 - `apps/electron/src/services/frameQueueService.ts`
@@ -45,11 +47,15 @@ Screenshot capture at configurable intervals, active window detection, foregroun
 - `apps/backend/src/services/screenshot.service.ts`
 
 ### 2. Activity Tracking
+
 Keyboard, mouse, and clipboard event tracking via uiohook-napi. Activity metrics feed into session detection and time insights.
+
 - `apps/electron/src/services/activityTracker.ts`
 
 ### 3. Session Management
+
 Focused (manual) and passive (auto-detected) session lifecycle. State machine: disabled → detecting → active_session → ending → detecting/deferred.
+
 - `apps/electron/src/services/monitoringSessionService.ts`
 - `apps/electron/src/services/passiveMonitorService.ts`
 - `apps/electron/src/services/checkpointService.ts`
@@ -58,7 +64,9 @@ Focused (manual) and passive (auto-detected) session lifecycle. State machine: d
 - `apps/backend/src/db/schema/monitoring.schema.ts`
 
 ### 4. AI Processing Pipeline
+
 Frame analysis (Gemini Vision), session classification, workstream detection, summarization, vector indexing.
+
 - `apps/backend/src/services/frame-analysis.service.ts`
 - `apps/backend/src/services/gemini-vision-frame.service.ts`
 - `apps/backend/src/services/session-classification.service.ts`
@@ -92,7 +100,9 @@ Frame analysis (Gemini Vision), session classification, workstream detection, su
 - `apps/backend/src/services/activity-materializer.service.ts`
 
 ### 5. Time Insights
+
 How employees spend time across apps, projects, workstreams. MeView (employee) and Dashboard (admin).
+
 - `apps/backend/src/routes/my-activity.ts`
 - `apps/backend/src/routes/admin-dashboard.ts`
 - `apps/backend/src/services/user-activity-queries.ts`
@@ -101,7 +111,9 @@ How employees spend time across apps, projects, workstreams. MeView (employee) a
 - `apps/backend/src/db/schema/analytics.schema.ts`
 
 ### 6. Benchmarks
+
 Individual and team performance benchmarks computed from session data.
+
 - `apps/backend/src/routes/my-benchmarks.ts`
 - `apps/backend/src/routes/admin-benchmarks.ts`
 - `apps/backend/src/services/benchmark.service.ts`
@@ -110,7 +122,9 @@ Individual and team performance benchmarks computed from session data.
 - `apps/backend/src/db/schema/benchmarks.schema.ts`
 
 ### 7. Update Drafting (BragBook)
+
 AI-assisted work update generation from captured session data, recaps, master stories.
+
 - `apps/backend/src/routes/my-bragbook.ts`
 - `apps/backend/src/services/bragbook-generator.service.ts`
 - `apps/backend/src/services/recap-rlm.service.ts`
@@ -119,7 +133,9 @@ AI-assisted work update generation from captured session data, recaps, master st
 - `apps/backend/src/db/schema/recaps.schema.ts`
 
 ### 8. Agent Tab
+
 AI assistant in Console that answers questions about work context using captured session data + integrations.
+
 - `apps/backend/src/routes/agent.ts`
 - `apps/backend/src/services/agent.service.ts`
 - `apps/backend/src/agents/` (all agent definitions)
@@ -135,7 +151,9 @@ AI assistant in Console that answers questions about work context using captured
 - `apps/electron/src/services/agentSdkService.ts`
 
 ### 9. Integrations
+
 External data source syncing: Slack, Notion, GitHub, Granola, Fireflies, Gmail, Google Docs, Linear.
+
 - `apps/backend/src/routes/integrations.ts`
 - `apps/backend/src/services/slack.service.ts`, `slack-ingestion.service.ts`, `slack-chunking.service.ts`
 - `apps/backend/src/services/notion.service.ts`, `notion-ingestion.service.ts`, `notion-chunking.service.ts`, `notion-export.service.ts`, `notion-user-oauth.service.ts`
@@ -152,7 +170,9 @@ External data source syncing: Slack, Notion, GitHub, Granola, Fireflies, Gmail, 
 - `apps/backend/src/services/graph/` (knowledge graph services)
 
 ### 10. Auth & Billing
+
 User management, organization management, teams, permissions, Stripe subscriptions.
+
 - `apps/backend/src/routes/auth.ts`
 - `apps/backend/src/routes/billing.ts`
 - `apps/backend/src/routes/stripe.ts`
@@ -179,7 +199,9 @@ User management, organization management, teams, permissions, Stripe subscriptio
 - `apps/electron/src/services/keychainService.ts`
 
 ### 11. Desktop Shell & Chrome Extension
+
 Multi-window Electron app + Chrome Extension for web context.
+
 - `apps/electron/src/main.ts` (main process, window creation)
 - `apps/electron/src/preload/` (all preload scripts)
 - `apps/electron/src/renderer/console/` (main console app)
@@ -200,37 +222,37 @@ Multi-window Electron app + Chrome Extension for web context.
 
 ### Confirmed Dead — Onboarding Era
 
-| System | Files to Remove |
-|--------|----------------|
-| **Roadmaps/Onboarding** | `apps/backend/src/routes/roadmaps.ts`, `apps/backend/src/db/schema/roadmap-templates.schema.ts`, `apps/backend/src/db/schema/user-roadmaps.schema.ts`, `apps/backend/src/services/guideGeneration.service.ts`, `apps/backend/src/routes/guides.routes.ts`, `apps/backend/src/services/skill-generation.service.ts`, `apps/electron/src/renderer/console/src/pages/OnboardingPage.tsx` |
-| **Artifacts** | `apps/backend/src/routes/artifacts.ts`, `apps/backend/src/db/schema/artifacts.schema.ts`, `apps/backend/src/services/artifact-embedding.service.ts`, `apps/backend/src/services/artifact-storage.service.ts` — pre-existing TS errors confirm WIP/dead |
-| **Document Generation** | `apps/backend/src/routes/documents.ts`, `apps/backend/src/services/document-generation/` (agent.ts, environment.ts, tools.ts), `apps/backend/src/services/doc-generation.service.ts`, `apps/backend/src/services/doc-generation-stream.service.ts`, `apps/backend/src/services/doc-generation-config.ts`, `apps/backend/src/services/doc-refinement.service.ts`, `apps/backend/src/services/document-extraction.service.ts`, `apps/backend/src/db/schema/documents.schema.ts`, `apps/backend/src/db/schema/document-refinement-chats.schema.ts` |
-| **Coordinate/Overlay Guidance** | `apps/backend/src/services/coordinate-converter.service.ts`, `apps/backend/src/services/gemini-vision.service.ts` (the old UI object detection — NOT `gemini-vision-frame.service.ts` which is live) |
-| **Audio/Transcription** | `apps/backend/src/routes/audio.ts`, `apps/electron/src/services/audioWebSocketService.ts`, `apps/backend/src/services/deepgramTranscriptionService.ts` |
-| **Workflow System** | `apps/backend/src/services/workflow.service.ts`, `apps/backend/src/db/schema/workflows.schema.ts` |
-| **Source Materials** | `apps/backend/src/db/schema/source-materials.schema.ts` |
-| **Known Customers** | `apps/backend/src/services/known-customers.service.ts` |
+| System                          | Files to Remove                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Roadmaps/Onboarding**         | `apps/backend/src/routes/roadmaps.ts`, `apps/backend/src/db/schema/roadmap-templates.schema.ts`, `apps/backend/src/db/schema/user-roadmaps.schema.ts`, `apps/backend/src/services/guideGeneration.service.ts`, `apps/backend/src/routes/guides.routes.ts`, `apps/backend/src/services/skill-generation.service.ts`, `apps/electron/src/renderer/console/src/pages/OnboardingPage.tsx`                                                                                                                                                           |
+| **Artifacts**                   | `apps/backend/src/routes/artifacts.ts`, `apps/backend/src/db/schema/artifacts.schema.ts`, `apps/backend/src/services/artifact-embedding.service.ts`, `apps/backend/src/services/artifact-storage.service.ts` — pre-existing TS errors confirm WIP/dead                                                                                                                                                                                                                                                                                          |
+| **Document Generation**         | `apps/backend/src/routes/documents.ts`, `apps/backend/src/services/document-generation/` (agent.ts, environment.ts, tools.ts), `apps/backend/src/services/doc-generation.service.ts`, `apps/backend/src/services/doc-generation-stream.service.ts`, `apps/backend/src/services/doc-generation-config.ts`, `apps/backend/src/services/doc-refinement.service.ts`, `apps/backend/src/services/document-extraction.service.ts`, `apps/backend/src/db/schema/documents.schema.ts`, `apps/backend/src/db/schema/document-refinement-chats.schema.ts` |
+| **Coordinate/Overlay Guidance** | `apps/backend/src/services/coordinate-converter.service.ts`, `apps/backend/src/services/gemini-vision.service.ts` (the old UI object detection — NOT `gemini-vision-frame.service.ts` which is live)                                                                                                                                                                                                                                                                                                                                            |
+| **Audio/Transcription**         | `apps/backend/src/routes/audio.ts`, `apps/electron/src/services/audioWebSocketService.ts`, `apps/backend/src/services/deepgramTranscriptionService.ts`                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Workflow System**             | `apps/backend/src/services/workflow.service.ts`, `apps/backend/src/db/schema/workflows.schema.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Source Materials**            | `apps/backend/src/db/schema/source-materials.schema.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Known Customers**             | `apps/backend/src/services/known-customers.service.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### Verify Before Removing — May Have Live Dependencies
 
-| System | Files | Check |
-|--------|-------|-------|
-| **Feedback Route** | `apps/backend/src/routes/feedback.ts` | Is any frontend calling this endpoint? |
-| **PII Route** | `apps/backend/src/routes/pii.ts` | Is this used beyond the pii-redaction service? |
-| **Conversations Route** | `apps/backend/src/routes/conversations.ts` | Does the Agent tab use this, or only agent.ts route? |
-| **Intent Service** | `apps/backend/src/services/intent.service.ts` | Is this used by the Agent system? |
-| **Title Generation** | `apps/backend/src/services/titleGeneration.service.ts` | Is this used by sessions or only old conversations? |
-| **Editor Components** | `apps/electron/src/renderer/components/editor/` | Does Agent tab chat use this rich text editor? |
-| **Calendar Components** | `apps/electron/src/renderer/components/application/calendar/` | Used in any console page? |
-| **DatePicker Components** | `apps/electron/src/renderer/components/application/date-picker/` | Used in any console page? |
+| System                    | Files                                                            | Check                                                |
+| ------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------- |
+| **Feedback Route**        | `apps/backend/src/routes/feedback.ts`                            | Is any frontend calling this endpoint?               |
+| **PII Route**             | `apps/backend/src/routes/pii.ts`                                 | Is this used beyond the pii-redaction service?       |
+| **Conversations Route**   | `apps/backend/src/routes/conversations.ts`                       | Does the Agent tab use this, or only agent.ts route? |
+| **Intent Service**        | `apps/backend/src/services/intent.service.ts`                    | Is this used by the Agent system?                    |
+| **Title Generation**      | `apps/backend/src/services/titleGeneration.service.ts`           | Is this used by sessions or only old conversations?  |
+| **Editor Components**     | `apps/electron/src/renderer/components/editor/`                  | Does Agent tab chat use this rich text editor?       |
+| **Calendar Components**   | `apps/electron/src/renderer/components/application/calendar/`    | Used in any console page?                            |
+| **DatePicker Components** | `apps/electron/src/renderer/components/application/date-picker/` | Used in any console page?                            |
 
 ### Definite Cleanup — Duplicate/Broken Directories
 
-| Item | Action |
-|------|--------|
+| Item                                | Action                                |
+| ----------------------------------- | ------------------------------------- |
 | `apps/backend/src/mcp/resources 2/` | Remove (duplicate with space in name) |
-| `apps/backend/src/mcp/tools 2/` | Remove (duplicate with space in name) |
-| `apps/electron/src/src/` | Remove (nested duplicate renderer) |
+| `apps/backend/src/mcp/tools 2/`     | Remove (duplicate with space in name) |
+| `apps/electron/src/src/`            | Remove (nested duplicate renderer)    |
 
 ---
 
@@ -241,11 +263,11 @@ Multi-window Electron app + Chrome Extension for web context.
 ```
 TASK: Perform a comprehensive dead code analysis of the Mitable monorepo.
 
-CONTEXT: Mitable pivoted from "AI onboarding buddy" to "work context capture + time insights." 
+CONTEXT: Mitable pivoted from "AI onboarding buddy" to "work context capture + time insights."
 The onboarding-era features are dead code. The product's 11 core pillars are documented above.
 
 CRITICAL — DO NOT FLAG AS DEAD:
-- Agent system (agent.service.ts, agent.ts route, agents/, agentSdkService.ts, 
+- Agent system (agent.service.ts, agent.ts route, agents/, agentSdkService.ts,
   agent-chats.schema.ts, ask-threads.schema.ts, rlm/ask-*, rlm/agent-query-*)
 - Chrome Extension (apps/chrome-extension/)
 - Browser Bridge (browserBridgeService.ts)
@@ -302,7 +324,7 @@ OUTPUT: A JSON manifest at docs/dead-code-manifest.json:
 **claude-flow Agent: `coder`**
 
 ```
-TASK: Systematically remove all confirmed dead code from the Mitable monorepo using 
+TASK: Systematically remove all confirmed dead code from the Mitable monorepo using
 the manifest from Phase 1 (docs/dead-code-manifest.json).
 
 ORDER OF OPERATIONS (each step followed by typecheck verification):
@@ -382,7 +404,7 @@ CURRENT STATE (post-prune):
 - ~80+ backend services in a flat src/services/ directory
 - ~15 route files in flat src/routes/
 - ~25 schema files in flat src/db/schema/
-- 11 core feature pillars (capture, activity, sessions, AI processing, insights, 
+- 11 core feature pillars (capture, activity, sessions, AI processing, insights,
   benchmarks, updates, agent, integrations, auth/billing, desktop shell)
 - RLM (Reinforcement Learning Module) agent pattern used for AI processing steps
 
@@ -390,7 +412,7 @@ QUESTIONS TO ANSWER:
 
 1. BACKEND DOMAIN STRUCTURE
    Should src/services/ be reorganized into domain modules? Proposed:
-   
+
    src/domains/
    ├── capture/        # Frame ingestion, screenshot storage, delta detection
    ├── processing/     # Session classification, summarization, indexing, RLM agents
@@ -409,14 +431,14 @@ QUESTIONS TO ANSWER:
 
 2. SERVICE CONSOLIDATION
    Are there services that should be merged?
-   - 9 session-* services (chunking, classification, summarization, indexing, 
+   - 9 session-* services (chunking, classification, summarization, indexing,
      ingestion, retriever, delivery, title, session-refinement) — too granular?
    - 3 workstream-* services (detection, aggregation, rlm) — merge?
    - Multiple *-materializer services — combine with their parent domain?
 
 3. RLM AGENT PATTERN
    The backend uses an RLM pattern (environment + prompts + tools) for:
-   - classifier, block-analyzer, day-analyzer, storyteller, workstream, 
+   - classifier, block-analyzer, day-analyzer, storyteller, workstream,
      refinement, ask, agent-query
    Should this pattern be standardized? Simplified? Are all these agents needed?
 
@@ -607,12 +629,12 @@ RULES:
 TASK: Clean up and restructure the Mitable Electron renderer for v1.
 
 CURRENT STATE:
-- apps/electron/src/renderer/components/ has base UI kit, application components, 
+- apps/electron/src/renderer/components/ has base UI kit, application components,
   domain components, icons, editor, common, foundations, and UI directories
-- apps/electron/src/renderer/console/src/ has the main Console app with pages, 
+- apps/electron/src/renderer/console/src/ has the main Console app with pages,
   components, context, data, hooks, lib, services, types
 - Separate window renderers: watchButton/, watchingPill/, watchingPillDropdown/, notifications/
-- Console has employee mode (Home, activity insights, updates) and admin mode 
+- Console has employee mode (Home, activity insights, updates) and admin mode
   (Dashboard, Integrations, Setup)
 
 ACTIONS:
@@ -621,7 +643,7 @@ ACTIONS:
    For every component in apps/electron/src/renderer/components/:
    - Trace imports to find which console pages or window renderers use it
    - Flag unused components for removal
-   - Specifically check: calendar/, date-picker/, editor/, domain/workflow/, 
+   - Specifically check: calendar/, date-picker/, editor/, domain/workflow/,
      domain/messages/ — are these imported anywhere in v1 pages?
 
 2. REMOVE DEAD COMPONENTS
@@ -637,7 +659,7 @@ ACTIONS:
 
 4. RESTRUCTURE CONSOLE COMPONENTS
    Organize console/src/components/ by v1 feature:
-   
+
    console/src/components/
    ├── sessions/        # Session cards, session detail, session timeline
    ├── activity/        # Activity charts, time breakdowns, app usage
@@ -651,7 +673,7 @@ ACTIONS:
 
 5. RESTRUCTURE CONSOLE SERVICES
    Organize console/src/services/ by v1 domain to match backend:
-   
+
    console/src/services/
    ├── capture.api.ts       # Session/monitoring API calls
    ├── insights.api.ts      # Activity/time insights API calls
@@ -695,16 +717,16 @@ TASK: Clean up and optimize the Mitable PostgreSQL schema for v1.
 CURRENT STATE (post Phase 2 pruning):
 - Supabase PostgreSQL with Drizzle ORM
 - Schema files in apps/backend/src/db/schema/
-- Remaining schemas serve: monitoring/sessions, daily-activities, analytics, 
-  benchmarks, bragbook, recaps, agent-chats, ask-threads, conversations, 
-  user-memories, integrations, search-content, github/*, graph-sync, 
+- Remaining schemas serve: monitoring/sessions, daily-activities, analytics,
+  benchmarks, bragbook, recaps, agent-chats, ask-threads, conversations,
+  user-memories, integrations, search-content, github/*, graph-sync,
   session-chunks, users, organizations, teams, user-permissions, api-keys, billing
 
 ACTIONS:
 
 1. COLUMN AUDIT
    For each remaining schema file:
-   - Identify columns that reference removed features (e.g., roadmap IDs, 
+   - Identify columns that reference removed features (e.g., roadmap IDs,
      artifact references, document IDs, workflow references)
    - List columns that are nullable and never populated (check with sample queries)
    - Flag columns for removal or deprecation
@@ -718,7 +740,7 @@ ACTIONS:
    - Agent chats by userId + threadId
    - Search content by orgId + source type
    - Session chunks by sessionId
-   
+
 3. SCHEMA NORMALIZATION
    - Are there any denormalized fields that cause update anomalies?
    - Should session_chunks be restructured for the v1 retrieval pipeline?
@@ -727,7 +749,7 @@ ACTIONS:
 4. MIGRATION GENERATION
    For any changes:
    - Generate Drizzle migration scripts
-   - Ensure migrations are backwards-compatible (add columns nullable, 
+   - Ensure migrations are backwards-compatible (add columns nullable,
      drop columns in separate migration)
    - Test migrations against a fresh database
 
@@ -755,7 +777,7 @@ TASK: Create comprehensive test coverage for Mitable v1 core systems after the o
 PRIORITY ORDER (highest impact first):
 
 1. SESSION LIFECYCLE (apps/backend)
-   Test the full pipeline: frame upload → session creation → classification → 
+   Test the full pipeline: frame upload → session creation → classification →
    summarization → indexing → retrieval
    - Unit tests for each processing service
    - Integration test for the full pipeline
@@ -990,18 +1012,18 @@ claude-flow agent spawn \
 
 ### Agent Summary Table
 
-| Phase | Agent Type | Name | Depends On | Priority |
-|-------|-----------|------|------------|----------|
-| 1 | `code-analyzer` | dead-code-auditor | — | Critical |
-| 2 | `coder` | dead-code-remover | Phase 1 | Critical |
-| 3 | `system-architect` | v1-architect | — | High |
-| 4 | `backend-api-architect` | backend-restructure | Phases 2, 3 | High |
-| 5 | `frontend-architect` | frontend-restructure | Phase 2 | High |
-| 6 | `database-architect` | schema-cleanup | Phase 2 | Medium |
-| 7 | `test-engineer` | test-coverage | Phases 4, 5, 6 | High |
-| 8 | `technical-documentation-specialist` | docs-updater | Phase 7 | Medium |
-| — | `reviewer` | quality-gate | Continuous | High |
-| — | `production-validator` | final-validator | Phase 8 | Critical |
+| Phase | Agent Type                           | Name                 | Depends On     | Priority |
+| ----- | ------------------------------------ | -------------------- | -------------- | -------- |
+| 1     | `code-analyzer`                      | dead-code-auditor    | —              | Critical |
+| 2     | `coder`                              | dead-code-remover    | Phase 1        | Critical |
+| 3     | `system-architect`                   | v1-architect         | —              | High     |
+| 4     | `backend-api-architect`              | backend-restructure  | Phases 2, 3    | High     |
+| 5     | `frontend-architect`                 | frontend-restructure | Phase 2        | High     |
+| 6     | `database-architect`                 | schema-cleanup       | Phase 2        | Medium   |
+| 7     | `test-engineer`                      | test-coverage        | Phases 4, 5, 6 | High     |
+| 8     | `technical-documentation-specialist` | docs-updater         | Phase 7        | Medium   |
+| —     | `reviewer`                           | quality-gate         | Continuous     | High     |
+| —     | `production-validator`               | final-validator      | Phase 8        | Critical |
 
 ### Estimated Effort
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
+import { useSearchParams } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";

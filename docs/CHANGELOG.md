@@ -59,18 +59,18 @@ These eliminate sequential scans on the most common dashboard and insights queri
 
 **After:** All business logic organized into 10 domain modules under `src/domains/`. Each domain owns its services, routes, schemas, RLM agents, and cron jobs.
 
-| Domain | Responsibility |
-|--------|---------------|
-| `shared-infra` | Vector, embedding, LLM, cache, PII redaction, chunking, MCP, shared middleware |
-| `capture` | Screenshot capture, Gemini Vision frame analysis, delta detection, audio transcription |
-| `sessions` | Full session pipeline (ingestion → chunking → classification → summarization → indexing → title → delivery → retrieval), RLM agents, activity materialization |
-| `workstreams` | Workstream detection, aggregation, socket emission, workstream RLM |
-| `insights` | User activity queries, org/team dashboard queries |
-| `benchmarks` | Benchmark scoring, AI-generated insights, admin benchmark routes |
-| `updates` | Bragbook generation, recap RLM, master story, day-analyzer RLM |
-| `agent` | Conversational AI agent, memory, search, trust ranking, knowledge tools |
-| `integrations` | Slack, Notion, GitHub, Granola, Fireflies, Gmail, Linear, knowledge graph |
-| `auth` | Stripe billing, subscriptions, usage, permissions, API keys, encryption |
+| Domain         | Responsibility                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared-infra` | Vector, embedding, LLM, cache, PII redaction, chunking, MCP, shared middleware                                                                                |
+| `capture`      | Screenshot capture, Gemini Vision frame analysis, delta detection, audio transcription                                                                        |
+| `sessions`     | Full session pipeline (ingestion → chunking → classification → summarization → indexing → title → delivery → retrieval), RLM agents, activity materialization |
+| `workstreams`  | Workstream detection, aggregation, socket emission, workstream RLM                                                                                            |
+| `insights`     | User activity queries, org/team dashboard queries                                                                                                             |
+| `benchmarks`   | Benchmark scoring, AI-generated insights, admin benchmark routes                                                                                              |
+| `updates`      | Bragbook generation, recap RLM, master story, day-analyzer RLM                                                                                                |
+| `agent`        | Conversational AI agent, memory, search, trust ranking, knowledge tools                                                                                       |
+| `integrations` | Slack, Notion, GitHub, Granola, Fireflies, Gmail, Linear, knowledge graph                                                                                     |
+| `auth`         | Stripe billing, subscriptions, usage, permissions, API keys, encryption                                                                                       |
 
 Remaining top-level files (not in domains): `app.ts`, `index.ts`, `config.ts`, `routes.ts`, `db/`, `cron/index.ts`, `utils/`, `prompts/`, `retrievers/`, `scripts/`, `swagger.ts`.
 
@@ -98,13 +98,13 @@ Added `SessionPipeline` class in `src/domains/sessions/services/session-pipeline
 
 113 new tests added across 5 priority domains. Test totals: 17 suites, 282 tests.
 
-| Domain | New tests |
-|--------|----------|
+| Domain         | New tests                                                        |
+| -------------- | ---------------------------------------------------------------- |
 | `shared-infra` | vector.service, embedding.service, llm.service, chunking.service |
-| `auth` | auth middleware, encryption.service |
-| `agent` | agent.service |
-| `updates` | bragbook-generator.service |
-| `integrations` | graph-scoring.service, graph-sync.service |
+| `auth`         | auth middleware, encryption.service                              |
+| `agent`        | agent.service                                                    |
+| `updates`      | bragbook-generator.service                                       |
+| `integrations` | graph-scoring.service, graph-sync.service                        |
 
 ---
 

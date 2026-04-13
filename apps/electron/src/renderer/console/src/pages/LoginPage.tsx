@@ -66,7 +66,9 @@ export default function LoginPage() {
       // Redirect to default route (handles onboarding check)
       navigate("/");
     } catch (err) {
-      trackEvent("console_login_failed", { error_message: err instanceof Error ? err.message : "Unknown" });
+      trackEvent("console_login_failed", {
+        error_message: err instanceof Error ? err.message : "Unknown",
+      });
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setIsLoading(false);

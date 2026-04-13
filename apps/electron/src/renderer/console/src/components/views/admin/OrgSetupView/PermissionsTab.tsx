@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { useUsers } from "@/console/src/hooks/queries/admin";
 import { apiRequest } from "@/console/src/services/api";
 import { useQueryClient } from "@tanstack/react-query";
+import PermissionsTabSkeleton from "./PermissionsTabSkeleton";
 
 interface UserWithPermissions {
   id: string;
@@ -43,22 +44,7 @@ export default function PermissionsTab() {
   };
 
   if (isLoading) {
-    return (
-      <div style={{ padding: "64px 0", textAlign: "center" }}>
-        <div
-          className="animate-spin"
-          style={{
-            width: 24,
-            height: 24,
-            margin: "0 auto 12px",
-            borderRadius: "50%",
-            border: "2px solid rgba(var(--ui-rgb), 0.1)",
-            borderTopColor: "var(--text-secondary)",
-          }}
-        />
-        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading users...</div>
-      </div>
-    );
+    return <PermissionsTabSkeleton />;
   }
 
   return (

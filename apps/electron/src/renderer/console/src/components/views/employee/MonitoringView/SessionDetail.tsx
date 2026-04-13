@@ -67,6 +67,7 @@ import LinearUpdateDialog from "./LinearUpdateDialog";
 // import ActivityTimeline from "./ActivityTimeline";
 import SessionTimeline from "./SessionTimeline";
 import SummarizationProgress from "./SummarizationProgress";
+import SessionDetailSkeleton from "./SessionDetailSkeleton";
 import { SiLinear } from "react-icons/si";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
@@ -646,11 +647,7 @@ export default function SessionDetail() {
         </div>
       );
     }
-    return (
-      <div className="p-8 flex items-center justify-center">
-        <Loader2 className="animate-spin text-text-secondary" size={32} />
-      </div>
-    );
+    return <SessionDetailSkeleton />;
   }
 
   if (!session) {

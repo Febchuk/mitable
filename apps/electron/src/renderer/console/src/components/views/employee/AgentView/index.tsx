@@ -270,7 +270,10 @@ export default function AgentView() {
       }
 
       const trimmed = text.trim();
-      trackEvent("agent_message_sent", { message_length: trimmed.length, is_new_conversation: isNew });
+      trackEvent("agent_message_sent", {
+        message_length: trimmed.length,
+        is_new_conversation: isNew,
+      });
 
       const userMessage: ChatMessage = {
         id: generateId(),

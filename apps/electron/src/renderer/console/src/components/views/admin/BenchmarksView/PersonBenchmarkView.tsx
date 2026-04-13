@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { usePersonBenchmarkDetail } from "@/console/src/hooks/queries/benchmarks";
 import type { BenchmarkSnapshot } from "@/console/src/services/benchmarkService";
+import PersonBenchmarkSkeleton from "./PersonBenchmarkSkeleton";
 
 // ── Chart ─────────────────────────────────────────────────────
 
@@ -114,21 +115,7 @@ export default function PersonBenchmarkView() {
   }, [detail]);
 
   if (isLoading) {
-    return (
-      <div
-        style={{
-          height: "100%",
-          padding: "28px 0",
-          color: "var(--text-tertiary)",
-          fontSize: 13,
-          fontFamily: "var(--font-sans)",
-          textAlign: "center",
-          paddingTop: 120,
-        }}
-      >
-        Loading...
-      </div>
-    );
+    return <PersonBenchmarkSkeleton />;
   }
 
   if (!detail) return null;

@@ -455,7 +455,10 @@ function transformApiToPersonViewModel(api: PersonDetailData, range: TimeRange):
     if (sorted.length > 0) {
       const firstDay = new Date(sorted[0]!);
       const lastDay = new Date(sorted[sorted.length - 1]!);
-      const weekSpan = Math.max(1, Math.ceil((lastDay.getTime() - firstDay.getTime()) / (7 * 86400000)) + 1);
+      const weekSpan = Math.max(
+        1,
+        Math.ceil((lastDay.getTime() - firstDay.getTime()) / (7 * 86400000)) + 1
+      );
       metricMinutes = effectiveActiveMinutes / Math.max(1, weekSpan);
     }
   }

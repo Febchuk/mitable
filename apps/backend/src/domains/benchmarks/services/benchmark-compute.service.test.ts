@@ -81,7 +81,10 @@ jest.mock("../../shared-infra/lib/logger.js", () => ({
 // We need access to the internal helpers; they are exported as part of the
 // service object for testing purposes.
 // ---------------------------------------------------------------------------
-import { benchmarkComputeService, type PeriodActivitySummary } from "./benchmark-compute.service.js";
+import {
+  benchmarkComputeService,
+  type PeriodActivitySummary,
+} from "./benchmark-compute.service.js";
 
 // ---------------------------------------------------------------------------
 // Shared test data factory
@@ -118,10 +121,7 @@ describe("benchmarkComputeService", () => {
 
   describe("gatherPeriodActivity", () => {
     it("returns a valid summary with zeros when there is no DB data", async () => {
-      const summary = await benchmarkComputeService.gatherPeriodActivity(
-        "user-123",
-        "weekly"
-      );
+      const summary = await benchmarkComputeService.gatherPeriodActivity("user-123", "weekly");
 
       // Shape assertions — all numeric fields should be numbers
       expect(typeof summary.totalWorkMinutes).toBe("number");
@@ -345,20 +345,12 @@ describe("computeDirectMetric (invariants)", () => {
     });
 
     it("uses accomplishmentCount for non-days/week units", () => {
-      const score = computeDirectMetric(
-        "count",
-        "",
-        makeSummary({ accomplishmentCount: 10 })
-      );
+      const score = computeDirectMetric("count", "", makeSummary({ accomplishmentCount: 10 }));
       expect(score).toBe(5); // 10/10 * 4 + 1 = 5
     });
 
     it("returns 1 for 0 accomplishments", () => {
-      const score = computeDirectMetric(
-        "count",
-        "",
-        makeSummary({ accomplishmentCount: 0 })
-      );
+      const score = computeDirectMetric("count", "", makeSummary({ accomplishmentCount: 0 }));
       expect(score).toBe(1);
     });
   });
@@ -372,10 +364,7 @@ describe("calculatePercentile (invariants)", () => {
   /**
    * Mirrors the actual calculatePercentile from the service.
    */
-  function calculatePercentile(
-    userProgress: number,
-    allProgresses: number[]
-  ): string {
+  function calculatePercentile(userProgress: number, allProgresses: number[]): string {
     if (allProgresses.length <= 1) return "top_1";
 
     const sorted = [...allProgresses].sort((a, b) => b - a);

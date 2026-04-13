@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Inter, JetBrains_Mono, Manrope, Newsreader } from "next/font/google";
-import { RouteProvider } from "@/providers/router-provider";
 import { PostHogProvider } from "@/providers/posthog-provider";
+import { RouteProvider } from "@/providers/router-provider";
 import { Theme } from "@/providers/theme";
 import "@/styles/globals.css";
 import "@/styles/landing.css";

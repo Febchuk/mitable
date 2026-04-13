@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { useMyBenchmarks } from "@/console/src/hooks/queries/benchmarks";
 import { BenchmarkProgressCard } from "./BenchmarkProgressCard";
+import BenchmarksViewSkeleton from "./BenchmarksViewSkeleton";
 
 // Frequency filters — commented out in UI for now
 // type FrequencyFilter = "all" | BenchmarkFrequency;
@@ -164,19 +165,7 @@ export default function BenchmarksView() {
       </div>
 
       {/* Loading */}
-      {isLoading && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "120px 0",
-            color: "var(--text-tertiary)",
-            fontSize: 13,
-            fontFamily: "var(--font-sans)",
-          }}
-        >
-          Loading...
-        </div>
-      )}
+      {isLoading && <BenchmarksViewSkeleton />}
 
       {/* Empty state */}
       {!isLoading && filtered.length === 0 && (

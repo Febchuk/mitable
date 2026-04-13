@@ -828,26 +828,9 @@ function DeleteConfirmModal({
   );
 }
 
-// ─── Loading spinner ──────────────────────────────────────────────────────────
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
 
-function Spinner() {
-  return (
-    <div style={{ padding: "64px 0", textAlign: "center" }}>
-      <div
-        className="animate-spin"
-        style={{
-          width: 24,
-          height: 24,
-          margin: "0 auto 12px",
-          borderRadius: "50%",
-          border: "2px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.2)",
-          borderTopColor: "var(--mi-accent)",
-        }}
-      />
-      <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Loading teams...</div>
-    </div>
-  );
-}
+import TeamsViewSkeleton from "./TeamsViewSkeleton";
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
@@ -1049,7 +1032,7 @@ export default function TeamsView() {
 
         {/* Content */}
         {isLoading ? (
-          <Spinner />
+          <TeamsViewSkeleton />
         ) : error ? (
           <div
             style={{

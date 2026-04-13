@@ -89,7 +89,9 @@ export default function SignupOrganizationPage() {
 
       navigate("/dashboard");
     } catch (err) {
-      trackEvent("console_signup_failed", { error_message: err instanceof Error ? err.message : "Unknown" });
+      trackEvent("console_signup_failed", {
+        error_message: err instanceof Error ? err.message : "Unknown",
+      });
       setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
       setIsLoading(false);

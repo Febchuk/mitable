@@ -244,10 +244,7 @@ async function gatherPeriodActivity(
 // gatherSessionContext — rich session-level data for accomplishment generation
 // ---------------------------------------------------------------------------
 
-async function gatherSessionContext(
-  userId: string,
-  frequency: string
-): Promise<ActivityContext> {
+async function gatherSessionContext(userId: string, frequency: string): Promise<ActivityContext> {
   const startDate = periodStartDate(frequency);
   const endDate = todayDateString();
 

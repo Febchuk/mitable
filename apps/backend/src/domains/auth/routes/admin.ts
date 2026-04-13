@@ -389,7 +389,6 @@ router.get(
   }
 );
 
-
 /**
  * @openapi
  * /admin/integrations:
@@ -825,7 +824,8 @@ router.post(
 
       switch (integration.provider) {
         case "slack": {
-          const { slackIngestionService } = await import("../../integrations/slack/slack-ingestion.service.js");
+          const { slackIngestionService } =
+            await import("../../integrations/slack/slack-ingestion.service.js");
           syncResult = await slackIngestionService.syncMessages(currentUser.organizationId);
           break;
         }
@@ -1480,7 +1480,8 @@ router.post(
 
       try {
         if (integration.provider === "slack") {
-          const { slackIngestionService } = await import("../../integrations/slack/slack-ingestion.service.js");
+          const { slackIngestionService } =
+            await import("../../integrations/slack/slack-ingestion.service.js");
           const result = await slackIngestionService.syncMessages(currentUser.organizationId);
           itemsSynced = result.messagesEmbedded || 0;
           syncResult = result;

@@ -65,7 +65,7 @@ src/domains/
 
 ### 3.2 Session Service Consolidation
 
-**Decision: Do NOT merge the 8 session-* services. Colocate them and add a `SessionPipeline` facade.**
+**Decision: Do NOT merge the 8 session-\* services. Colocate them and add a `SessionPipeline` facade.**
 
 The session pipeline is a genuine multi-stage pipeline with distinct responsibilities:
 
@@ -74,6 +74,7 @@ ingestion → chunking → classification → summarization → indexing → tit
 ```
 
 Merging would create a god-service. Instead:
+
 - Move all 8 into `src/domains/sessions/services/`
 - Create a `SessionPipeline` class that orchestrates the stages in order
 - Routes and cron jobs call the facade; individual stages remain testable in isolation
@@ -91,6 +92,7 @@ Merging would create a god-service. Instead:
 **Decision: Extract a `BaseRlmRunner` in shared-infra.**
 
 Every RLM agent currently duplicates the same pattern:
+
 1. Initialize Anthropic / OpenAI / DeepSeek clients in constructor
 2. Build system prompt + user prompt from environment
 3. Enter a tool-call loop: LLM decision → execute tool → append result → repeat
@@ -99,6 +101,7 @@ Every RLM agent currently duplicates the same pattern:
 This is duplicated across `block-analyzer-rlm.service.ts`, `storyteller-rlm.service.ts`, `day-analyzer-rlm.service.ts`, `classifier-rlm.service.ts`, `refinement-rlm.service.ts`, and partially in `recap-rlm.service.ts`.
 
 The `BaseRlmRunner` should:
+
 - Accept: environment class, prompts factory, tools map, max iterations
 - Handle: client initialization, fallback chain, tool-call loop, logging, error recovery
 - Return: typed result from the final environment state
@@ -110,10 +113,12 @@ Each RLM agent becomes ~50 lines (environment + prompts + tools + config), down 
 **Decision: Colocate schemas with their domains. Keep a root re-export barrel for Drizzle.**
 
 Current dead schemas to remove:
+
 - `roadmap-templates.schema.ts` — only referenced by seed.ts (not runtime)
 - `document-refinement-chats.schema.ts` — only referenced by index.ts barrel
 
 Schemas that must stay despite being onboarding-adjacent:
+
 - `workflows.schema.ts` — `conversations.schema.ts` imports `workflowSessions` from it
 - `conversations.schema.ts` — used by `agent.service.ts`, `memory.service.ts`, `admin.ts`, `base.tool.ts`
 
@@ -125,12 +130,13 @@ After domain restructuring, `src/db/schema/index.ts` becomes a thin re-export fi
 
 **Decision: Keep the current boundary. No processing moves to Electron.**
 
-| Layer | Responsibility |
-|-------|---------------|
+| Layer        | Responsibility                                                                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Electron** | Screenshot capture, activity tracking (keyboard/mouse/clipboard), window detection, local frame storage, session state machine, passive monitor |
-| **Backend** | All AI processing, all persistent storage, all integrations, vector operations, cron jobs |
+| **Backend**  | All AI processing, all persistent storage, all integrations, vector operations, cron jobs                                                       |
 
 Reasons to keep the split:
+
 - AI models require API keys that should not ship to client devices
 - Vector operations require server-side Pinecone access
 - Offline AI would require shipping large models with the app — not practical for v1
@@ -143,6 +149,7 @@ Reasons to keep the split:
 **Decision: Do NOT restructure by domain yet.**
 
 With only 13 files, domain directories would add structure without benefit. Instead:
+
 - Keep flat layout
 - Adopt naming convention: `{domain}.types.ts` (partially followed already: `billing.ts`, `documents.ts`, `session.ts`, `workstream.ts`)
 - Group IPC channels by domain within `ipc.ts` using comment sections
@@ -154,11 +161,13 @@ With only 13 files, domain directories would add structure without benefit. Inst
 **Decision: Standardize Pino logging, add pipeline timing, defer distributed tracing.**
 
 Current state:
+
 - Backend uses Pino via `createLogger` — but some files still use `console.log`
 - Electron uses a custom logger
 - `correlationId` middleware exists but doesn't propagate through async service calls
 
 Recommendations:
+
 1. **Standardize `createLogger`** — audit and replace all `console.log` in services with structured Pino calls
 2. **Add context fields** to every log: `{ domain, sessionId, organizationId, userId, durationMs }`
 3. **Add pipeline timing** — each session pipeline stage emits start/end with duration (enables bottleneck detection)
@@ -467,10 +476,10 @@ src/
 ```
 Electron                           Backend
 ────────                           ───────
-captureService.ts                  
-  ↓ screenshot                     
-frameQueueService.ts               
-  ↓ queued frames                  
+captureService.ts
+  ↓ screenshot
+frameQueueService.ts
+  ↓ queued frames
   ───── HTTP POST /monitoring ───→ monitoring.ts route
                                      ↓
                                    frame-analysis.service.ts
@@ -580,20 +589,21 @@ Cron Scheduler
 
 Migration was completed in Phase 4 (2026-04-08). All 10 domains were migrated in the following order (chosen to minimize cross-domain breakage):
 
-| Order | Domain | Risk rationale |
-|-------|--------|----------------|
-| 1 | shared-infra | Done first — 24+ importers for vector alone |
-| 2 | benchmarks | Self-contained; only imports shared-infra |
-| 3 | updates | Imports shared-infra + day-analyzer RLM |
-| 4 | insights | Imports shared-infra + schemas |
-| 5 | workstreams | Imports shared-infra |
-| 6 | auth | Middleware used by all routes |
-| 7 | integrations | Each sub-integration independent; large but modular |
-| 8 | capture | Imports shared-infra |
-| 9 | sessions | Most cross-domain deps; depends on capture, shared-infra, workstreams |
-| 10 | agent | Depends on sessions (retriever), integrations (search), shared-infra |
+| Order | Domain       | Risk rationale                                                        |
+| ----- | ------------ | --------------------------------------------------------------------- |
+| 1     | shared-infra | Done first — 24+ importers for vector alone                           |
+| 2     | benchmarks   | Self-contained; only imports shared-infra                             |
+| 3     | updates      | Imports shared-infra + day-analyzer RLM                               |
+| 4     | insights     | Imports shared-infra + schemas                                        |
+| 5     | workstreams  | Imports shared-infra                                                  |
+| 6     | auth         | Middleware used by all routes                                         |
+| 7     | integrations | Each sub-integration independent; large but modular                   |
+| 8     | capture      | Imports shared-infra                                                  |
+| 9     | sessions     | Most cross-domain deps; depends on capture, shared-infra, workstreams |
+| 10    | agent        | Depends on sessions (retriever), integrations (search), shared-infra  |
 
 **Import path convention (ESM with `.js` suffixes):**
+
 ```typescript
 // Via barrel:
 import { vectorService } from "../shared-infra/index.js";
@@ -607,15 +617,15 @@ Cross-domain imports must always go through the target domain's barrel `index.ts
 
 ## 7. Risks & Mitigations
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| **ESM import path breakage** | High — app won't start | Medium | Typecheck after every domain move; TypeScript will flag all broken imports |
-| **Circular dependencies between domains** | Medium — build failure | Low | Barrel exports enforce direction; shared-infra breaks cycles; lint rule to prevent domain→domain direct imports |
-| **Cron jobs break silently** | High — missed data processing | Medium | After each move, run cron job handlers once in test mode; add startup verification that all jobs resolve their imports |
-| **Git blame history loss** | Low — debugging friction | Certain | Use `git mv` (not copy+delete) for every file; `git log --follow` still works |
-| **Developer velocity drop during migration** | Medium — PR conflicts | Medium | Batch each domain into a single PR; merge within 1 day; coordinate with active contributors |
-| **MCP tools break** | Medium — external tool integrations fail | Low | MCP tools query DB directly (not services) — only schema import paths change |
-| **Dead schemas still exported** | Low — unused code ships | Certain | Remove `roadmap-templates.schema.ts` and `document-refinement-chats.schema.ts` before or during migration |
+| Risk                                         | Impact                                   | Likelihood | Mitigation                                                                                                             |
+| -------------------------------------------- | ---------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **ESM import path breakage**                 | High — app won't start                   | Medium     | Typecheck after every domain move; TypeScript will flag all broken imports                                             |
+| **Circular dependencies between domains**    | Medium — build failure                   | Low        | Barrel exports enforce direction; shared-infra breaks cycles; lint rule to prevent domain→domain direct imports        |
+| **Cron jobs break silently**                 | High — missed data processing            | Medium     | After each move, run cron job handlers once in test mode; add startup verification that all jobs resolve their imports |
+| **Git blame history loss**                   | Low — debugging friction                 | Certain    | Use `git mv` (not copy+delete) for every file; `git log --follow` still works                                          |
+| **Developer velocity drop during migration** | Medium — PR conflicts                    | Medium     | Batch each domain into a single PR; merge within 1 day; coordinate with active contributors                            |
+| **MCP tools break**                          | Medium — external tool integrations fail | Low        | MCP tools query DB directly (not services) — only schema import paths change                                           |
+| **Dead schemas still exported**              | Low — unused code ships                  | Certain    | Remove `roadmap-templates.schema.ts` and `document-refinement-chats.schema.ts` before or during migration              |
 
 ---
 
@@ -644,108 +654,118 @@ These should be resolved during implementation:
 Complete mapping of every current service to its target domain:
 
 ### capture/
-| Service | Responsibility |
-|---------|---------------|
-| `frame-analysis.service.ts` | Analyze screenshot frames with Gemini Vision |
-| `gemini-vision-frame.service.ts` | Gemini Vision API client for frame analysis |
-| `screenshot.service.ts` | Screenshot storage and retrieval |
-| `deltaDetection.service.ts` | Detect meaningful changes between frames |
-| `groq-vision.service.ts` | Alternative vision model client |
-| `deepgramTranscriptionService.ts` | Audio transcription |
+
+| Service                           | Responsibility                               |
+| --------------------------------- | -------------------------------------------- |
+| `frame-analysis.service.ts`       | Analyze screenshot frames with Gemini Vision |
+| `gemini-vision-frame.service.ts`  | Gemini Vision API client for frame analysis  |
+| `screenshot.service.ts`           | Screenshot storage and retrieval             |
+| `deltaDetection.service.ts`       | Detect meaningful changes between frames     |
+| `groq-vision.service.ts`          | Alternative vision model client              |
+| `deepgramTranscriptionService.ts` | Audio transcription                          |
 
 ### sessions/
-| Service | Responsibility |
-|---------|---------------|
-| `session-ingestion.service.ts` | Ingest raw session data from captures |
-| `session-chunking.service.ts` | Break sessions into semantic chunks |
-| `session-classification.service.ts` | Classify session activity type |
-| `session-summarization.service.ts` | Generate session summaries |
-| `session-indexing.service.ts` | Embed and index sessions in Pinecone |
-| `session-title.service.ts` | Generate human-readable session titles |
-| `session-delivery.service.ts` | Deliver processed session data to consumers |
-| `session-retriever.service.ts` | Retrieve sessions by similarity/filter |
-| `stale-session-cleanup.service.ts` | Auto-end abandoned sessions |
-| `continuation-detector.service.ts` | Detect if new activity continues a session |
-| `intermediate-summary.service.ts` | Mid-session summary snapshots |
-| `summary-refinement.service.ts` | Improve summary quality iteratively |
-| `block-analyzer-materializer.service.ts` | Materialize block analysis into DB |
-| `block-analyzer-orchestrator.service.ts` | Orchestrate block analysis pipeline |
-| `activity-materializer.service.ts` | Materialize activity data from sessions |
-| `classifier.service.ts` | Lightweight session classifier |
+
+| Service                                  | Responsibility                              |
+| ---------------------------------------- | ------------------------------------------- |
+| `session-ingestion.service.ts`           | Ingest raw session data from captures       |
+| `session-chunking.service.ts`            | Break sessions into semantic chunks         |
+| `session-classification.service.ts`      | Classify session activity type              |
+| `session-summarization.service.ts`       | Generate session summaries                  |
+| `session-indexing.service.ts`            | Embed and index sessions in Pinecone        |
+| `session-title.service.ts`               | Generate human-readable session titles      |
+| `session-delivery.service.ts`            | Deliver processed session data to consumers |
+| `session-retriever.service.ts`           | Retrieve sessions by similarity/filter      |
+| `stale-session-cleanup.service.ts`       | Auto-end abandoned sessions                 |
+| `continuation-detector.service.ts`       | Detect if new activity continues a session  |
+| `intermediate-summary.service.ts`        | Mid-session summary snapshots               |
+| `summary-refinement.service.ts`          | Improve summary quality iteratively         |
+| `block-analyzer-materializer.service.ts` | Materialize block analysis into DB          |
+| `block-analyzer-orchestrator.service.ts` | Orchestrate block analysis pipeline         |
+| `activity-materializer.service.ts`       | Materialize activity data from sessions     |
+| `classifier.service.ts`                  | Lightweight session classifier              |
 
 ### workstreams/
-| Service | Responsibility |
-|---------|---------------|
-| `workstream-detection.service.ts` | Detect workstream boundaries → merge into `workstream.service.ts` |
-| `workstream-aggregation.service.ts` | Aggregate workstream data → merge into `workstream.service.ts` |
-| `workstream-socket-emitter.ts` | Real-time workstream updates via WebSocket |
+
+| Service                             | Responsibility                                                    |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `workstream-detection.service.ts`   | Detect workstream boundaries → merge into `workstream.service.ts` |
+| `workstream-aggregation.service.ts` | Aggregate workstream data → merge into `workstream.service.ts`    |
+| `workstream-socket-emitter.ts`      | Real-time workstream updates via WebSocket                        |
 
 ### insights/
-| Service | Responsibility |
-|---------|---------------|
-| `user-activity-queries.ts` | Query activity data for individual users |
+
+| Service                              | Responsibility                              |
+| ------------------------------------ | ------------------------------------------- |
+| `user-activity-queries.ts`           | Query activity data for individual users    |
 | `org-team-activity-query.service.ts` | Query activity data for org/team dashboards |
 
 ### benchmarks/
-| Service | Responsibility |
-|---------|---------------|
-| `benchmark.service.ts` | Benchmark CRUD and retrieval |
+
+| Service                        | Responsibility                              |
+| ------------------------------ | ------------------------------------------- |
+| `benchmark.service.ts`         | Benchmark CRUD and retrieval                |
 | `benchmark-compute.service.ts` | Compute benchmark scores from activity data |
-| `benchmark-ai.service.ts` | AI-generated benchmark insights |
+| `benchmark-ai.service.ts`      | AI-generated benchmark insights             |
 
 ### updates/
-| Service | Responsibility |
-|---------|---------------|
-| `bragbook-generator.service.ts` | Generate polished accomplishment summaries |
-| `recap-rlm.service.ts` | RLM-powered recap generation |
-| `master-story.service.ts` | Aggregate session stories into master narrative |
+
+| Service                         | Responsibility                                  |
+| ------------------------------- | ----------------------------------------------- |
+| `bragbook-generator.service.ts` | Generate polished accomplishment summaries      |
+| `recap-rlm.service.ts`          | RLM-powered recap generation                    |
+| `master-story.service.ts`       | Aggregate session stories into master narrative |
 
 ### agent/
-| Service | Responsibility |
-|---------|---------------|
-| `agent.service.ts` | Central agent orchestrator (tool selection, conversation management) |
-| `memory.service.ts` | Agent memory / conversation history |
-| `trust-ranking.service.ts` | Rank search results by trust/relevance |
-| `search-logger.service.ts` | Log search queries and results |
-| `search.service.ts` | Unified search across vectors + integrations |
-| `intent.service.ts` | Classify user intent for agent routing |
+
+| Service                    | Responsibility                                                       |
+| -------------------------- | -------------------------------------------------------------------- |
+| `agent.service.ts`         | Central agent orchestrator (tool selection, conversation management) |
+| `memory.service.ts`        | Agent memory / conversation history                                  |
+| `trust-ranking.service.ts` | Rank search results by trust/relevance                               |
+| `search-logger.service.ts` | Log search queries and results                                       |
+| `search.service.ts`        | Unified search across vectors + integrations                         |
+| `intent.service.ts`        | Classify user intent for agent routing                               |
 
 ### integrations/ (by sub-domain)
-| Sub-domain | Services |
-|-----------|---------|
-| slack | `slack.service.ts`, `slack-ingestion.service.ts`, `slack-chunking.service.ts` |
-| notion | `notion.service.ts`, `notion-ingestion.service.ts`, `notion-chunking.service.ts`, `notion-export.service.ts`, `notion-user-oauth.service.ts` |
-| github | `github.service.ts`, `github-ingestion.service.ts`, `github-chunking.service.ts`, `github-sync.service.ts`, `github-code-snapshot.service.ts` |
-| granola | `granola.service.ts`, `granola-sync.service.ts` |
-| fireflies | `fireflies.service.ts`, `fireflies-sync.service.ts` |
-| email | `gmail.service.ts`, `google-docs-export.service.ts` |
-| linear | `linear.service.ts` |
-| graph | 9 files (client, context-builder, incremental-sync, mapper, retrieval, scoring, sync, task-archetype-map, types) |
+
+| Sub-domain | Services                                                                                                                                      |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| slack      | `slack.service.ts`, `slack-ingestion.service.ts`, `slack-chunking.service.ts`                                                                 |
+| notion     | `notion.service.ts`, `notion-ingestion.service.ts`, `notion-chunking.service.ts`, `notion-export.service.ts`, `notion-user-oauth.service.ts`  |
+| github     | `github.service.ts`, `github-ingestion.service.ts`, `github-chunking.service.ts`, `github-sync.service.ts`, `github-code-snapshot.service.ts` |
+| granola    | `granola.service.ts`, `granola-sync.service.ts`                                                                                               |
+| fireflies  | `fireflies.service.ts`, `fireflies-sync.service.ts`                                                                                           |
+| email      | `gmail.service.ts`, `google-docs-export.service.ts`                                                                                           |
+| linear     | `linear.service.ts`                                                                                                                           |
+| graph      | 9 files (client, context-builder, incremental-sync, mapper, retrieval, scoring, sync, task-archetype-map, types)                              |
 
 ### auth/
-| Service | Responsibility |
-|---------|---------------|
-| `stripe.service.ts` | Stripe API client |
-| `subscription.service.ts` | Subscription lifecycle management |
-| `usage.service.ts` | Usage tracking and rate limiting |
-| `permissions.service.ts` | Permission checking |
-| `userPermissions.service.ts` | User-level permission management |
-| `api-key.service.ts` | API key CRUD and validation |
-| `encryption.service.ts` | Encryption utilities |
+
+| Service                      | Responsibility                    |
+| ---------------------------- | --------------------------------- |
+| `stripe.service.ts`          | Stripe API client                 |
+| `subscription.service.ts`    | Subscription lifecycle management |
+| `usage.service.ts`           | Usage tracking and rate limiting  |
+| `permissions.service.ts`     | Permission checking               |
+| `userPermissions.service.ts` | User-level permission management  |
+| `api-key.service.ts`         | API key CRUD and validation       |
+| `encryption.service.ts`      | Encryption utilities              |
 | `known-customers.service.ts` | Org-level customer reference data |
-| `normalize-name.ts` | Name normalization utility |
+| `normalize-name.ts`          | Name normalization utility        |
 
 ### shared-infra/
-| Service | Responsibility |
-|---------|---------------|
-| `vector.service.ts` | Pinecone vector operations (24 importers) |
-| `embedding.service.ts` | OpenAI text embeddings (13 importers) |
-| `llm.service.ts` | Multi-provider LLM client |
-| `cache.service.ts` | In-memory cache with TTL |
-| `socket.service.ts` | WebSocket server management |
-| `pii-redaction.service.ts` | PII detection and redaction |
-| `chunking.service.ts` | Generic text chunking utilities |
-| `base-rlm-runner.ts` | NEW — shared RLM execution engine |
+
+| Service                    | Responsibility                            |
+| -------------------------- | ----------------------------------------- |
+| `vector.service.ts`        | Pinecone vector operations (24 importers) |
+| `embedding.service.ts`     | OpenAI text embeddings (13 importers)     |
+| `llm.service.ts`           | Multi-provider LLM client                 |
+| `cache.service.ts`         | In-memory cache with TTL                  |
+| `socket.service.ts`        | WebSocket server management               |
+| `pii-redaction.service.ts` | PII detection and redaction               |
+| `chunking.service.ts`      | Generic text chunking utilities           |
+| `base-rlm-runner.ts`       | NEW — shared RLM execution engine         |
 
 ---
 

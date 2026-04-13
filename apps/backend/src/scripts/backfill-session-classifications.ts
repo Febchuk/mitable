@@ -15,7 +15,10 @@ import minimist from "minimist";
 import { db } from "../db/client";
 import * as schema from "../db/schema/index";
 import { desc, isNotNull, eq, count } from "drizzle-orm";
-import { classifySession, isSessionClassified } from "../domains/sessions/services/session-classification.service";
+import {
+  classifySession,
+  isSessionClassified,
+} from "../domains/sessions/services/session-classification.service";
 
 const argv = minimist(process.argv.slice(2));
 const force = !!argv.force;
