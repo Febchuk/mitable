@@ -168,7 +168,7 @@ export default function BillingPage() {
     }
 
     async function handleManageBilling() {
-        posthog?.capture("manage_billing_clicked", { plan_tier: data.subscription?.plan?.tier || "free" });
+        posthog?.capture("manage_billing_clicked", { plan_tier: data.subscription?.subscription?.tier || "free" });
         setPortalLoading(true);
         try {
             const token = await getAccessToken();

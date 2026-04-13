@@ -37,7 +37,7 @@ const MobileFooter = ({ isSignedIn, onSignOut }: { isSignedIn: boolean; onSignOu
     return (
         <div className="flex flex-col gap-3 border-t border-gray-800 px-4 py-6">
             {isSignedIn ? (
-                <Button size="lg" className="rounded-full" onPress={onSignOut}>
+                <Button size="lg" className="rounded-full" onClick={onSignOut}>
                     Sign Out
                 </Button>
             ) : (

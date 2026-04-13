@@ -9,8 +9,7 @@ const nextConfig = {
         optimizePackageImports: ["@untitledui/icons"],
     },
     typescript: {
-        // Pre-existing @untitledui/icons type incompatibility with React 19
-        ignoreBuildErrors: true,
+        ignoreBuildErrors: false,
     },
     // Set the monorepo root so Next.js traces files correctly
     outputFileTracingRoot: path.resolve(websiteDir, "../../"),
