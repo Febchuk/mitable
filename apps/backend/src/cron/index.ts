@@ -10,7 +10,7 @@
  *   - Stale Session Cleanup: Every 15 minutes — auto-ends abandoned sessions
  */
 
-import cron from "node-cron";
+import cron, { type ScheduledTask } from "node-cron";
 import { cleanupStaleSessions } from "../domains/sessions/services/stale-session-cleanup.service";
 import { createLogger } from "../domains/shared-infra/lib/logger.js";
 import { runGraphSyncJob } from "../domains/integrations/cron/graph-sync.job";
@@ -23,7 +23,7 @@ import { config } from "../config";
 const logger = createLogger({ context: "cron-scheduler" });
 
 // Holds all scheduled task references so they can be stopped on shutdown
-const scheduledTasks: cron.ScheduledTask[] = [];
+const scheduledTasks: ScheduledTask[] = [];
 
 let isStaleCleanupRunning = false;
 
