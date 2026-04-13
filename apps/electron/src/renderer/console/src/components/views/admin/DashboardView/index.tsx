@@ -411,7 +411,10 @@ export default function DashboardView() {
     if (!sorted.length) return 0;
     const firstDay = getMonday(new Date(sorted[0]!.date));
     const lastDay = new Date(sorted[sorted.length - 1]!.date);
-    const weekSpan = Math.max(1, Math.ceil((lastDay.getTime() - firstDay.getTime()) / (7 * 86400000)) + 1);
+    const weekSpan = Math.max(
+      1,
+      Math.ceil((lastDay.getTime() - firstDay.getTime()) / (7 * 86400000)) + 1
+    );
     return raw / users / weekSpan;
   }, [apiData, filter, isAvgMode]);
 

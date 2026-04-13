@@ -82,10 +82,9 @@ jest.mock("../../../db/client.js", () => ({
     selectDistinct: () => ({
       from: () => ({
         where: () =>
-          Object.assign(
-            Promise.resolve(__bbState.distinctResult),
-            { limit: () => Promise.resolve(__bbState.distinctResult) }
-          ),
+          Object.assign(Promise.resolve(__bbState.distinctResult), {
+            limit: () => Promise.resolve(__bbState.distinctResult),
+          }),
       }),
     }),
     insert: () => ({ values: mockDbInsertValues }),
@@ -122,10 +121,7 @@ jest.mock("../../../db/schema/index.js", () => ({
 }));
 
 // Import after mocks are set up
-import {
-  generateBragbookEntry,
-  generateForAllUsers,
-} from "./bragbook-generator.service.js";
+import { generateBragbookEntry, generateForAllUsers } from "./bragbook-generator.service.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -213,9 +209,7 @@ describe("generateBragbookEntry — weekly", () => {
   });
 
   it("skips DB write if the existing entry has source=user-edited", async () => {
-    mockGenerateContent.mockResolvedValueOnce(
-      makeGeminiResponse(["AI generated item"])
-    );
+    mockGenerateContent.mockResolvedValueOnce(makeGeminiResponse(["AI generated item"]));
 
     // Select 0: sessions found
     __bbState.selectResults[0] = [makeSession()];
@@ -229,9 +223,7 @@ describe("generateBragbookEntry — weekly", () => {
   });
 
   it("updates an existing auto-generated bragbook entry", async () => {
-    mockGenerateContent.mockResolvedValueOnce(
-      makeGeminiResponse(["New accomplishment"])
-    );
+    mockGenerateContent.mockResolvedValueOnce(makeGeminiResponse(["New accomplishment"]));
 
     __bbState.selectResults[0] = [makeSession()];
     // Existing entry with auto-generated source
@@ -243,9 +235,7 @@ describe("generateBragbookEntry — weekly", () => {
   });
 
   it("inserts a new bragbook entry when no previous entry exists", async () => {
-    mockGenerateContent.mockResolvedValueOnce(
-      makeGeminiResponse(["Fresh accomplishment"])
-    );
+    mockGenerateContent.mockResolvedValueOnce(makeGeminiResponse(["Fresh accomplishment"]));
 
     __bbState.selectResults[0] = [makeSession()];
     __bbState.selectResults[1] = []; // no existing entry

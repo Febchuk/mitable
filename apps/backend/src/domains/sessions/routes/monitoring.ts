@@ -20,7 +20,11 @@ import { workstreamRLMService } from "../../workstreams/services/workstream-rlm.
 import { intermediateSummaryService } from "../services/intermediate-summary.service.js";
 import { summaryRefinementService } from "../services/summary-refinement.service.js";
 import type { SelectedWindowInfo, MonitoringSessionState } from "@mitable/shared";
-import { createSessionLogger, CHECKPOINTS, SESSION_EVENTS } from "../../shared-infra/lib/sessionLogger.js";
+import {
+  createSessionLogger,
+  CHECKPOINTS,
+  SESSION_EVENTS,
+} from "../../shared-infra/lib/sessionLogger.js";
 import { closeAudioConnection } from "../../capture/routes/audio.js";
 import { canEditSession } from "../../auth/services/permissions.service.js";
 import { logger } from "../../shared-infra/lib/logger.js";

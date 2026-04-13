@@ -24,105 +24,109 @@ import { organizations } from "../../auth/schema/organizations.schema";
  *
  * Flow: Start Session → Select Windows → Periodic Captures → End Session → Summary → Deliver
  */
-export const monitoringSessions = pgTable("monitoring_sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+export const monitoringSessions = pgTable(
+  "monitoring_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
 
-  // Session metadata
-  name: varchar("name", { length: 255 }), // Optional user-provided session name
-  sessionGoal: text("session_goal"), // Optional: "Working on LIN-341: Add JWT auth" - improves on_task detection
+    // Session metadata
+    name: varchar("name", { length: 255 }), // Optional user-provided session name
+    sessionGoal: text("session_goal"), // Optional: "Working on LIN-341: Add JWT auth" - improves on_task detection
 
-  // Goal context (optional - for enhanced analysis)
-  linearIssueId: varchar("linear_issue_id", { length: 100 }), // e.g., "LIN-341"
-  linearIssueTitle: text("linear_issue_title"), // e.g., "Add JWT authentication"
-  linearIssueDescription: text("linear_issue_description"), // Full issue description
-  additionalContext: text("additional_context"), // User's free-text context about what they're working on
-  relatedDocsContext: text("related_docs_context"), // RAG-retrieved docs at session start
+    // Goal context (optional - for enhanced analysis)
+    linearIssueId: varchar("linear_issue_id", { length: 100 }), // e.g., "LIN-341"
+    linearIssueTitle: text("linear_issue_title"), // e.g., "Add JWT authentication"
+    linearIssueDescription: text("linear_issue_description"), // Full issue description
+    additionalContext: text("additional_context"), // User's free-text context about what they're working on
+    relatedDocsContext: text("related_docs_context"), // RAG-retrieved docs at session start
 
-  // Session type: 'focused' (manual) or 'passive' (auto-detected)
-  sessionType: varchar("session_type", { length: 20 }).notNull().default("focused"),
+    // Session type: 'focused' (manual) or 'passive' (auto-detected)
+    sessionType: varchar("session_type", { length: 20 }).notNull().default("focused"),
 
-  // Session state
-  status: varchar("status", { length: 50 }).notNull().default("active"),
-  // States:
-  //   - 'active': Session in progress, capturing screenshots
-  //   - 'paused': Temporarily paused, not capturing
-  //   - 'ended': Session finished, ready for summary
-  //   - 'summarizing': AI is generating summary
-  //   - 'ready': Summary ready for delivery
-  //   - 'delivered': Summary sent to channel
+    // Session state
+    status: varchar("status", { length: 50 }).notNull().default("active"),
+    // States:
+    //   - 'active': Session in progress, capturing screenshots
+    //   - 'paused': Temporarily paused, not capturing
+    //   - 'ended': Session finished, ready for summary
+    //   - 'summarizing': AI is generating summary
+    //   - 'ready': Summary ready for delivery
+    //   - 'delivered': Summary sent to channel
 
-  // RAG ingestion state (separate from session status to avoid race condition)
-  ingestionStatus: varchar("ingestion_status", { length: 50 }).notNull().default("pending"),
-  // States:
-  //   - 'pending': Not yet ingested
-  //   - 'ingesting': Currently being chunked and embedded
-  //   - 'completed': Successfully ingested to session_chunks
-  //   - 'failed': Ingestion failed
+    // RAG ingestion state (separate from session status to avoid race condition)
+    ingestionStatus: varchar("ingestion_status", { length: 50 }).notNull().default("pending"),
+    // States:
+    //   - 'pending': Not yet ingested
+    //   - 'ingesting': Currently being chunked and embedded
+    //   - 'completed': Successfully ingested to session_chunks
+    //   - 'failed': Ingestion failed
 
-  // Configuration
-  captureIntervalMs: integer("capture_interval_ms").notNull().default(30000), // Default 30 seconds
-  selectedWindows: jsonb("selected_windows").notNull().default("[]"),
-  // Array of: { windowId: string, appName: string, windowTitle: string }
+    // Configuration
+    captureIntervalMs: integer("capture_interval_ms").notNull().default(30000), // Default 30 seconds
+    selectedWindows: jsonb("selected_windows").notNull().default("[]"),
+    // Array of: { windowId: string, appName: string, windowTitle: string }
 
-  // Intermediate summary configuration (real-time updates during active sessions)
-  intermediateSummaryIntervalMs: integer("intermediate_summary_interval_ms")
-    .notNull()
-    .default(1800000), // Default 30 minutes
-  intermediateSummaryEnabled: boolean("intermediate_summary_enabled").notNull().default(true),
-  lastIntermediateSummaryAt: timestamp("last_intermediate_summary_at"),
-  intermediateSummary: text("intermediate_summary"),
-  intermediateSummaryStatus: varchar("intermediate_summary_status", { length: 50 }),
-  // States: null | 'generating' | 'completed' | 'failed'
+    // Intermediate summary configuration (real-time updates during active sessions)
+    intermediateSummaryIntervalMs: integer("intermediate_summary_interval_ms")
+      .notNull()
+      .default(1800000), // Default 30 minutes
+    intermediateSummaryEnabled: boolean("intermediate_summary_enabled").notNull().default(true),
+    lastIntermediateSummaryAt: timestamp("last_intermediate_summary_at"),
+    intermediateSummary: text("intermediate_summary"),
+    intermediateSummaryStatus: varchar("intermediate_summary_status", { length: 50 }),
+    // States: null | 'generating' | 'completed' | 'failed'
 
-  // Timing
-  startedAt: timestamp("started_at").defaultNow().notNull(),
-  pausedAt: timestamp("paused_at"), // Last pause timestamp
-  totalPausedMs: integer("total_paused_ms").notNull().default(0), // Cumulative pause duration
-  endedAt: timestamp("ended_at"),
+    // Timing
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    pausedAt: timestamp("paused_at"), // Last pause timestamp
+    totalPausedMs: integer("total_paused_ms").notNull().default(0), // Cumulative pause duration
+    endedAt: timestamp("ended_at"),
 
-  // Audio recording tracking
-  audioRecordingStartedAt: timestamp("audio_recording_started_at"), // When audio recording was last started (null when not recording)
-  audioRecordingTotalMs: integer("audio_recording_total_ms").notNull().default(0), // Cumulative audio recording duration
+    // Audio recording tracking
+    audioRecordingStartedAt: timestamp("audio_recording_started_at"), // When audio recording was last started (null when not recording)
+    audioRecordingTotalMs: integer("audio_recording_total_ms").notNull().default(0), // Cumulative audio recording duration
 
-  // Summarization progress tracking (step-based progress for UI)
-  summarizationProgress: varchar("summarization_progress", { length: 50 }),
-  // Steps: null | 'generating_title' | 'analyzing_activities' | 'writing_summary' | 'finalizing'
+    // Summarization progress tracking (step-based progress for UI)
+    summarizationProgress: varchar("summarization_progress", { length: 50 }),
+    // Steps: null | 'generating_title' | 'analyzing_activities' | 'writing_summary' | 'finalizing'
 
-  // Summary (populated at session end)
-  rawActivitySummary: text("raw_activity_summary"), // Initial AI-generated summary
-  finalSummary: text("final_summary"), // User-edited final summary
-  keyActivities: jsonb("key_activities").default("[]"),
-  // Array of: { activity: string, timestamp: string, confidence: number }
-  accomplishments: jsonb("accomplishments").default("[]"),
-  blockers: jsonb("blockers").default("[]"),
-  timeBreakdown: jsonb("time_breakdown"), // { appName: durationMs }
-  taskBreakdown: jsonb("task_breakdown"), // [{ shortTitle, description, minutes }]
+    // Summary (populated at session end)
+    rawActivitySummary: text("raw_activity_summary"), // Initial AI-generated summary
+    finalSummary: text("final_summary"), // User-edited final summary
+    keyActivities: jsonb("key_activities").default("[]"),
+    // Array of: { activity: string, timestamp: string, confidence: number }
+    accomplishments: jsonb("accomplishments").default("[]"),
+    blockers: jsonb("blockers").default("[]"),
+    timeBreakdown: jsonb("time_breakdown"), // { appName: durationMs }
+    taskBreakdown: jsonb("task_breakdown"), // [{ shortTitle, description, minutes }]
 
-  // Delivery tracking
-  deliveryStatus: varchar("delivery_status", { length: 50 }),
-  // States: null | 'pending' | 'sent' | 'failed'
-  deliveryChannel: varchar("delivery_channel", { length: 50 }),
-  // Channels: 'slack' | 'email' (future)
-  deliveryTarget: jsonb("delivery_target"),
-  // For Slack: { channelId: string, channelName: string }
-  // For Email: { email: string } (future)
-  deliveredAt: timestamp("delivered_at"),
-  deliveryError: text("delivery_error"),
-  slackMessageTs: varchar("slack_message_ts", { length: 50 }), // Slack message timestamp for updates
+    // Delivery tracking
+    deliveryStatus: varchar("delivery_status", { length: 50 }),
+    // States: null | 'pending' | 'sent' | 'failed'
+    deliveryChannel: varchar("delivery_channel", { length: 50 }),
+    // Channels: 'slack' | 'email' (future)
+    deliveryTarget: jsonb("delivery_target"),
+    // For Slack: { channelId: string, channelName: string }
+    // For Email: { email: string } (future)
+    deliveredAt: timestamp("delivered_at"),
+    deliveryError: text("delivery_error"),
+    slackMessageTs: varchar("slack_message_ts", { length: 50 }), // Slack message timestamp for updates
 
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => [
-  index("idx_sessions_user_created").on(table.userId, table.createdAt),
-  index("idx_sessions_org_created").on(table.organizationId, table.createdAt),
-  index("idx_sessions_user_status").on(table.userId, table.status),
-]);
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_sessions_user_created").on(table.userId, table.createdAt),
+    index("idx_sessions_org_created").on(table.organizationId, table.createdAt),
+    index("idx_sessions_user_status").on(table.userId, table.status),
+  ]
+);
 
 /**
  * Session Captures

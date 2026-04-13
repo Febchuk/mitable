@@ -141,7 +141,6 @@ export class AgentService {
 
     // Register Phase 2 tools - RAG Knowledge Search
     this.registerTool(new SearchKnowledgeTool());
-
   }
 
   /**

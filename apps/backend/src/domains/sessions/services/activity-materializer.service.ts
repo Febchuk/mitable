@@ -23,7 +23,10 @@ import * as schema from "../../../db/schema/index";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { createLogger } from "../../shared-infra/lib/logger.js";
 import { normalizeName } from "../../auth/services/normalize-name.js";
-import { syncSubscriberToGraph, syncTopicToGraph } from "../../integrations/graph/graph-incremental-sync.service.js";
+import {
+  syncSubscriberToGraph,
+  syncTopicToGraph,
+} from "../../integrations/graph/graph-incremental-sync.service.js";
 import { getKnownCustomers } from "../../auth/services/known-customers.service.js";
 
 const logger = createLogger({ context: "activity-materializer" });

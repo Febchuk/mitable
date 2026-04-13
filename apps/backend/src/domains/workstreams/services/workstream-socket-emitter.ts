@@ -6,7 +6,10 @@
  */
 
 import { workstreamRLMService, type WorkstreamUpdateEvent } from "./workstream-rlm.service.js";
-import { socketService, type WorkstreamUpdatePayload } from "../../shared-infra/services/socket.service.js";
+import {
+  socketService,
+  type WorkstreamUpdatePayload,
+} from "../../shared-infra/services/socket.service.js";
 import { logger } from "../../shared-infra/lib/logger.js";
 
 /**

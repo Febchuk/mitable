@@ -47,7 +47,11 @@ jest.mock("../tools/respond-text.tool.js", () => ({
   RespondTextTool: jest.fn().mockImplementation(() => ({
     name: "respond_with_text",
     description: "Respond with text",
-    parameters: { type: "object", properties: { response: { type: "string" } }, required: ["response"] },
+    parameters: {
+      type: "object",
+      properties: { response: { type: "string" } },
+      required: ["response"],
+    },
     getDefinition: jest.fn().mockReturnValue({
       type: "function",
       function: {
@@ -88,7 +92,12 @@ jest.mock("../tools/search-knowledge.tool.js", () => ({
 
 // Import AFTER mocks are registered
 import { AgentService } from "./agent.service.js";
-import { BaseTool, type ToolContext, type ToolResult, type ToolParameters } from "../tools/base.tool.js";
+import {
+  BaseTool,
+  type ToolContext,
+  type ToolResult,
+  type ToolParameters,
+} from "../tools/base.tool.js";
 import type { Message } from "../schema/conversations.schema.js";
 
 // ---------------------------------------------------------------------------
@@ -322,9 +331,7 @@ describe("AgentService — processMessage", () => {
   it("yields a 'complete' chunk with text content for a direct text response", async () => {
     mockCreate.mockResolvedValueOnce(makeTextStreamResponse("This is the answer"));
 
-    const chunks = await collectChunks(
-      service.processMessage("Tell me something", makeContext())
-    );
+    const chunks = await collectChunks(service.processMessage("Tell me something", makeContext()));
 
     const completeChunk = chunks.find((c) => c.type === "complete");
     expect(completeChunk).toBeDefined();
@@ -363,9 +370,7 @@ describe("AgentService — processMessage", () => {
       streamable: true,
     });
 
-    const chunks = await collectChunks(
-      service.processMessage("Say hello", makeContext())
-    );
+    const chunks = await collectChunks(service.processMessage("Say hello", makeContext()));
 
     const completeChunk = chunks.find((c) => c.type === "complete");
     expect(completeChunk).toBeDefined();
@@ -375,9 +380,7 @@ describe("AgentService — processMessage", () => {
   it("yields an 'error' chunk when the Groq API throws", async () => {
     mockCreate.mockRejectedValueOnce(new Error("Groq API failure"));
 
-    const chunks = await collectChunks(
-      service.processMessage("Trigger error", makeContext())
-    );
+    const chunks = await collectChunks(service.processMessage("Trigger error", makeContext()));
 
     const errorChunk = chunks.find((c) => c.type === "error");
     expect(errorChunk).toBeDefined();
@@ -402,9 +405,7 @@ describe("AgentService — processMessage", () => {
     // Each iteration calls Groq; repeat the incomplete stream each time
     mockCreate.mockResolvedValue(incompleteStream);
 
-    const chunks = await collectChunks(
-      service.processMessage("Keep iterating", makeContext())
-    );
+    const chunks = await collectChunks(service.processMessage("Keep iterating", makeContext()));
 
     const completeChunk = chunks.find((c) => c.type === "complete");
     expect(completeChunk).toBeDefined();
@@ -439,9 +440,7 @@ describe("AgentService — processMessage", () => {
       triggerWindow: { window: "guide", data: { stepId: "1" } },
     });
 
-    const chunks = await collectChunks(
-      service.processMessage("Open the guide", makeContext())
-    );
+    const chunks = await collectChunks(service.processMessage("Open the guide", makeContext()));
 
     const triggerChunk = chunks.find((c) => c.type === "window_trigger");
     expect(triggerChunk).toBeDefined();

@@ -33,10 +33,7 @@ export function trackMainEvent(
   });
 }
 
-export function identifyMainUser(
-  userId: string,
-  properties: Record<string, unknown>
-) {
+export function identifyMainUser(userId: string, properties: Record<string, unknown>) {
   if (!client) return;
 
   client.identify({

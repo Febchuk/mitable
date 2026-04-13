@@ -47,7 +47,9 @@ jest.mock("../../../db/client", () => ({
 
 // Convenience references used in tests
 // Shorthand helper used in tests — always reads from __dbState
-const setDbResult = (idx: number, val: any[]) => { __dbState.results[idx] = val; };
+const setDbResult = (idx: number, val: any[]) => {
+  __dbState.results[idx] = val;
+};
 
 // Mock the database schema
 jest.mock("../../../db/schema/index", () => ({
@@ -201,7 +203,12 @@ describe("parseActivitiesJson (internal JSON parsing logic)", () => {
   it("parses a valid activities JSON response", () => {
     const text = JSON.stringify({
       activities: [
-        { activity: "Code review", category: "Development", minutes: 45, description: "Reviewing PR" },
+        {
+          activity: "Code review",
+          category: "Development",
+          minutes: 45,
+          description: "Reviewing PR",
+        },
       ],
     });
     const result = parseActivitiesJson(text);
@@ -215,9 +222,24 @@ describe("parseActivitiesJson (internal JSON parsing logic)", () => {
   it("parses multiple activities correctly", () => {
     const text = JSON.stringify({
       activities: [
-        { activity: "Sprint planning", category: "Meeting", minutes: 60, description: "Weekly planning" },
-        { activity: "Feature development", category: "Development", minutes: 120, description: "Building auth" },
-        { activity: "Documentation", category: "Documentation", minutes: 30, description: "API docs" },
+        {
+          activity: "Sprint planning",
+          category: "Meeting",
+          minutes: 60,
+          description: "Weekly planning",
+        },
+        {
+          activity: "Feature development",
+          category: "Development",
+          minutes: 120,
+          description: "Building auth",
+        },
+        {
+          activity: "Documentation",
+          category: "Documentation",
+          minutes: 30,
+          description: "API docs",
+        },
       ],
     });
     const result = parseActivitiesJson(text);
@@ -349,7 +371,12 @@ describe("isSessionClassified", () => {
     setDbResult(0, [
       {
         keyActivities: [
-          { activity: "Work session in Chrome", category: "Other", minutes: 30, description: "30 min" },
+          {
+            activity: "Work session in Chrome",
+            category: "Other",
+            minutes: 30,
+            description: "30 min",
+          },
         ],
       },
     ]);
@@ -372,7 +399,12 @@ describe("isSessionClassified", () => {
     setDbResult(0, [
       {
         keyActivities: [
-          { activity: "Deep work on feature", category: "Development", minutes: 120, description: "..." },
+          {
+            activity: "Deep work on feature",
+            category: "Development",
+            minutes: 120,
+            description: "...",
+          },
         ],
       },
     ]);
@@ -401,7 +433,12 @@ describe("classifySession (with mocked DB and LLMs)", () => {
     const now = new Date();
     // Call 0: captures found
     setDbResult(0, [
-      { appName: "Chrome", windowTitle: "Google", activityDescription: "Browsing", capturedAt: now },
+      {
+        appName: "Chrome",
+        windowTitle: "Google",
+        activityDescription: "Browsing",
+        capturedAt: now,
+      },
     ]);
     // Call 1: session record not found
     setDbResult(1, []);
@@ -416,7 +453,12 @@ describe("classifySession (with mocked DB and LLMs)", () => {
 
     // Call 0: captures
     setDbResult(0, [
-      { appName: "VS Code", windowTitle: "main.ts", activityDescription: "Editing TypeScript", capturedAt: now },
+      {
+        appName: "VS Code",
+        windowTitle: "main.ts",
+        activityDescription: "Editing TypeScript",
+        capturedAt: now,
+      },
     ]);
     // Call 1: session record
     setDbResult(1, [

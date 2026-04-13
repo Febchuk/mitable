@@ -126,7 +126,10 @@ router.post("/webhooks", async (req: Request, res: Response) => {
       case "customer.subscription.deleted": {
         const subscription = event.data.object;
         await stripeService.handleSubscriptionDeleted(subscription);
-        analytics.track(subscription.metadata?.organizationId || "stripe", "subscription_cancelled");
+        analytics.track(
+          subscription.metadata?.organizationId || "stripe",
+          "subscription_cancelled"
+        );
         break;
       }
       case "invoice.payment_failed": {

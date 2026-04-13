@@ -116,9 +116,7 @@ describe("requireAuth", () => {
       await requireAuth(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({ error: "Unauthorized" })
-      );
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: "Unauthorized" }));
       expect(next).not.toHaveBeenCalled();
     });
 
@@ -269,10 +267,7 @@ describe("requireAuth", () => {
     it("populates userPermissions from DB rows", async () => {
       dbSelectResults[0] = [{ organizationId: "org-xyz", role: "member" }];
       dbSelectResults[1] = [];
-      dbSelectResults[2] = [
-        { permission: "view_dashboard" },
-        { permission: "edit_sessions" },
-      ];
+      dbSelectResults[2] = [{ permission: "view_dashboard" }, { permission: "edit_sessions" }];
 
       const req = makeMockRequest({ authorization: "Bearer valid-token" });
       const res = makeMockResponse();

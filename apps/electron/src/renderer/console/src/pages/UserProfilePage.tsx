@@ -2510,7 +2510,6 @@ export default function UserProfilePage() {
 
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <PermissionRow
-
                   icon={Monitor}
                   label="Screen Recording"
                   description="Required to capture screenshots"
@@ -2520,7 +2519,6 @@ export default function UserProfilePage() {
                 />
                 <div style={{ height: 0.5, background: "var(--divider)" }} />
                 <PermissionRow
-
                   icon={MousePointerClick}
                   label="Accessibility"
                   description="Required to track keyboard & mouse activity"
@@ -2529,7 +2527,6 @@ export default function UserProfilePage() {
                   onAction={requestAccessibility}
                 />
               </div>
-
             </div>
           )}
 
