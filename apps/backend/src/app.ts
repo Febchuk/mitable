@@ -70,7 +70,10 @@ app.use(
 // Stripe webhooks require the raw body for signature verification — must come BEFORE json parser
 app.use("/api/stripe/webhooks", express.raw({ type: "application/json" }));
 
-app.use(express.json({ limit: "100mb" })); // Large limit for batch screenshot uploads (16+ captures with base64 images)
+// Default limit covers standard API payloads. Routes that receive batch screenshot
+// uploads (e.g. POST /api/monitoring/sessions/:id/captures) apply their own
+// route-level parser with a higher limit.
+app.use(express.json({ limit: "10mb" }));
 
 // Swagger API Documentation
 app.use(

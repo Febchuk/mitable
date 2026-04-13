@@ -15,6 +15,7 @@ import {
   Notification,
   powerMonitor,
   screen,
+  session,
   shell,
   systemPreferences,
   Tray,
@@ -1037,6 +1038,16 @@ function setupIPC() {
   // Auth Management - Cross-window token sharing
   // Console sets tokens after login
   ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
+    // Input validation: tokens must be strings with reasonable length
+    if (typeof accessToken !== "string" || typeof refreshToken !== "string") {
+      authLogger.warn("AUTH_SET_TOKENS rejected: tokens must be strings");
+      return;
+    }
+    if (accessToken.length > 10_000 || refreshToken.length > 10_000) {
+      authLogger.warn("AUTH_SET_TOKENS rejected: token exceeds max length (10000)");
+      return;
+    }
+
     authLogger.info(" Tokens received from Console window", {
       hasAccessToken: !!accessToken,
       accessTokenLength: accessToken?.length || 0,
@@ -2207,6 +2218,22 @@ function setupMonitoringSessionHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_SET, (_, userId: string, blockedApps: string[]) => {
+    // Input validation
+    if (typeof userId !== "string" || !userId) {
+      ipcLogger.warn("BLOCK_LIST_SET rejected: invalid userId");
+      return { success: false, error: "Invalid userId" };
+    }
+    if (!Array.isArray(blockedApps) || blockedApps.length > 1000) {
+      ipcLogger.warn("BLOCK_LIST_SET rejected: blockedApps must be an array with at most 1000 items");
+      return { success: false, error: "Invalid blockedApps" };
+    }
+    for (const app of blockedApps) {
+      if (typeof app !== "string" || app.length > 500) {
+        ipcLogger.warn("BLOCK_LIST_SET rejected: each item must be a string with max 500 chars");
+        return { success: false, error: "Invalid app name in blockedApps" };
+      }
+    }
+
     preferencesService.setUserBlockedApps(userId, blockedApps);
     focusWindowTracker.removeBlockedWindows();
     return { success: true };
@@ -2261,6 +2288,16 @@ function setupMonitoringSessionHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.NOTIFICATION_FREQUENCY_SET, (_, userId: string, minutes: number) => {
+    // Input validation
+    if (typeof userId !== "string" || !userId) {
+      ipcLogger.warn("NOTIFICATION_FREQUENCY_SET rejected: invalid userId");
+      return { success: false, error: "Invalid userId" };
+    }
+    if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+      ipcLogger.warn("NOTIFICATION_FREQUENCY_SET rejected: minutes must be a number between 1 and 1440");
+      return { success: false, error: "Invalid minutes value" };
+    }
+
     preferencesService.setUserNotificationFrequency(userId, minutes);
     // Restart the notification timer with the new frequency
     startNotificationTimer();
@@ -3072,6 +3109,38 @@ app.whenReady().then(async () => {
   // Initialize active window bridge for capture policy
   initActiveWindowBridge();
 
+  // Content Security Policy — mitigates XSS in AI responses / markdown
+  const isDev = !app.isPackaged;
+  const scriptSrc = isDev
+    ? " script-src 'self' http://localhost:* ws://localhost:*;"
+    : " script-src 'self';";
+  const connectSrc =
+    " connect-src 'self'" +
+    " https://*.mitable.ai https://*.supabase.co wss://*.supabase.co" +
+    " https://*.posthog.com https://*.deepgram.com wss://*.deepgram.com" +
+    " https://generativelanguage.googleapis.com https://api.openai.com" +
+    " https://api.groq.com https://api.anthropic.com" +
+    (isDev ? " http://localhost:* ws://localhost:*" : " http://localhost:*") +
+    ";";
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [
+          "default-src 'self';" +
+            scriptSrc +
+            " style-src 'self' 'unsafe-inline';" +
+            " img-src 'self' data: https: blob:;" +
+            " font-src 'self' data:;" +
+            connectSrc +
+            " media-src 'self' blob:;" +
+            " worker-src 'self' blob:;",
+        ],
+      },
+    });
+  });
+
   // Create Console window (main dashboard)
   createConsoleWindow();
   // WatchingPill is created on-demand when session starts
@@ -3588,6 +3657,16 @@ function setupAgentHandlers() {
   ipcMain.handle(
     IPC_CHANNELS.AGENT_SEND_MESSAGE,
     async (_event, conversationId: string, message: string) => {
+      // Input validation
+      if (typeof conversationId !== "string" || !conversationId) {
+        agentLogger.warn("AGENT_SEND_MESSAGE rejected: invalid conversationId");
+        return { success: false, error: "Invalid conversationId" };
+      }
+      if (typeof message !== "string" || message.length === 0 || message.length > 50_000) {
+        agentLogger.warn("AGENT_SEND_MESSAGE rejected: message must be a non-empty string with max 50000 chars");
+        return { success: false, error: "Invalid message" };
+      }
+
       agentLogger.info("Agent message received", { conversationId });
       await agentSdkService.sendMessage(conversationId, message, {
         onEvent: (event) => {

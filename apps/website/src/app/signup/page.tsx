@@ -8,6 +8,13 @@ import { LandingNav } from "@/components/landing/landing-nav";
 import { API_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
+/** Validate redirect param to prevent open redirect attacks. */
+function getSafeRedirect(redirect: string | null): string {
+    if (!redirect) return "/billing";
+    if (redirect.startsWith("/") && !redirect.startsWith("//")) return redirect;
+    return "/billing";
+}
+
 const C = {
     bg: "var(--l-bg, #1A1916)",
     raised: "var(--l-bg-raised, #211F1B)",
@@ -35,7 +42,7 @@ const inputStyle = {
 
 function SignupForm() {
     const searchParams = useSearchParams();
-    const redirect = searchParams.get("redirect") || "/billing";
+    const redirect = getSafeRedirect(searchParams.get("redirect"));
     const posthog = usePostHog();
 
     const [email, setEmail] = useState("");
