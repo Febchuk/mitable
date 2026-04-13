@@ -168,7 +168,7 @@ async function shutdown(signal: string) {
     }
 
     // 2. Stop Socket.IO from accepting new connections
-    const io = socketService.getIO?.();
+    const io = socketService.getIO();
     if (io) {
       await new Promise<void>((resolve) => io.close(() => resolve()));
       logger.info("Socket.IO closed");

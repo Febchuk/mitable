@@ -26,6 +26,7 @@ const logger = createLogger({ context: "cron-scheduler" });
 const scheduledTasks: ScheduledTask[] = [];
 
 let isStaleCleanupRunning = false;
+let isGraphSyncRunning = false;
 
 /**
  * Initialize all cron jobs.
@@ -97,7 +98,19 @@ export function initCronJobs(): void {
   if (config.graph.enabled) {
     scheduledTasks.push(
       cron.schedule("15 2 * * *", async () => {
-        await runGraphSyncJob();
+        if (isGraphSyncRunning) {
+          logger.warn("Graph sync still running — skipping");
+          return;
+        }
+
+        isGraphSyncRunning = true;
+        try {
+          await runGraphSyncJob();
+        } catch (error) {
+          logger.error({ error: String(error) }, "Graph sync job failed");
+        } finally {
+          isGraphSyncRunning = false;
+        }
       })
     );
     logger.info("Graph sync scheduled — daily at 02:15");

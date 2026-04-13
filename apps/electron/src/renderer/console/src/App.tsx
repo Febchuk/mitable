@@ -1,7 +1,7 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
+import { ErrorBoundary } from "../../components/common/ErrorBoundary";
 import { installConsoleCaptureForFeedback } from "../../lib/feedback-log-buffer";
 import { createLogger } from "../../lib/logger";
 
@@ -44,7 +44,7 @@ import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
 import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
 import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
 import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEditor";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { useTheme } from "./hooks/useTheme";
 import TeamsView from "./components/views/admin/TeamsView";
 import OrgSetupView from "./components/views/admin/OrgSetupView";
@@ -265,114 +265,132 @@ function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <TooltipProvider>
-          <ThemeInitializer />
-          <NavigationHandler />
-          <MonitoringSessionHandler />
-          <UpdateProvider>
-            <UserProvider>
-              <PostHogTracker />
-              <VariantWrapper>
-                <DevFlagsProvider>
-                  <RecapsProvider>
-                    <Routes>
-                      {/* Public routes */}
-                      <Route path="/login" element={<LoginPage />} />
-                      <Route path="/signup-organization" element={<SignupOrganizationPage />} />
-                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                      <Route path="/reset-password" element={<ResetPasswordPage />} />
-                      {/* Protected routes */}
-                      <Route
-                        path="/"
-                        element={
-                          <ProtectedRoute>
-                            <ConsoleLayout />
-                          </ProtectedRoute>
-                        }
-                      >
-                        <Route index element={<DefaultRoute />} />
-                        {/* Admin Routes */}
-                        <Route path="dashboard" element={<DashboardView />} />
-                        <Route path="customer/:name" element={<CustomerDetailView />} />
-                        <Route path="people" element={<PeopleView />} />
-                        <Route path="people/new" element={<AddNewUser />} />
-                        <Route path="people/:id" element={<PersonDetail />} />
-                        <Route path="reports/:docId" element={<DocDetail />} />
-                        <Route path="benchmarks" element={<BenchmarksRouter />} />
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <HashRouter>
+          <TooltipProvider>
+            <ThemeInitializer />
+            <NavigationHandler />
+            <MonitoringSessionHandler />
+            <UpdateProvider>
+              <UserProvider>
+                <PostHogTracker />
+                <VariantWrapper>
+                  <DevFlagsProvider>
+                    <RecapsProvider>
+                      <Routes>
+                        {/* Public routes */}
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/signup-organization" element={<SignupOrganizationPage />} />
+                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        {/* Protected routes */}
                         <Route
-                          path="benchmarks/new"
+                          path="/"
                           element={
-                            <RoleGate requireManager>
-                              <BenchmarkEditor />
-                            </RoleGate>
+                            <ProtectedRoute>
+                              <ConsoleLayout />
+                            </ProtectedRoute>
                           }
-                        />
-                        <Route
-                          path="benchmarks/:id/edit"
-                          element={
-                            <RoleGate requireManager>
-                              <BenchmarkEditor />
-                            </RoleGate>
-                          }
-                        />
-                        <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
-                        <Route
-                          path="benchmarks/:id/person/:userId"
-                          element={
-                            <RoleGate requireManager>
-                              <PersonBenchmarkView />
-                            </RoleGate>
-                          }
-                        />
-                        <Route path="integrations" element={<IntegrationsView />} />
-                        <Route
-                          path="org-setup"
-                          element={
-                            <RoleGate requireAdmin>
-                              <OrgSetupView />
-                            </RoleGate>
-                          }
-                        />
-                        <Route path="setup" element={<Navigate to="/org-setup" replace />} />
-                        <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
-                        <Route
-                          path="teams"
-                          element={
-                            <RoleGate requireAdmin>
-                              <TeamsView />
-                            </RoleGate>
-                          }
-                        />
-                        {/* Employee Routes */}
-                        <Route path="me" element={<MeView />} />
-                        <Route path="bragbook" element={<BragbookView />} />
-                        <Route path="docs" element={<DocsView />} />
-                        <Route path="docs/:docId" element={<DocDetail />} />
-                        {/* Calendar/Journal Routes */}
-                        <Route path="calendar" element={<CalendarView />} />
-                        <Route path="recaps" element={<RecapsView />} />
-                        <Route path="recaps/:recapId" element={<RecapDetail />} />
-                        {/* Focused Sessions Routes */}
-                        <Route path="monitoring" element={<MonitoringView />} />
-                        <Route path="monitoring/:sessionId" element={<SessionDetail />} />
-                        <Route path="agent" element={<AgentView />} />
-                        <Route path="agent/:chatId" element={<AgentView />} />
-                        <Route path="profile" element={<UserProfilePage />} />
-                      </Route>
-                    </Routes>
-                  </RecapsProvider>
-                </DevFlagsProvider>
-                <Toaster />
-              </VariantWrapper>
-            </UserProvider>
-          </UpdateProvider>
-        </TooltipProvider>
-      </HashRouter>
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
+                        >
+                          <Route index element={<DefaultRoute />} />
+                          {/* Admin Routes */}
+                          <Route path="dashboard" element={<DashboardView />} />
+                          <Route path="customer/:name" element={<CustomerDetailView />} />
+                          <Route path="people" element={<PeopleView />} />
+                          <Route path="people/new" element={<AddNewUser />} />
+                          <Route path="people/:id" element={<PersonDetail />} />
+                          <Route path="reports/:docId" element={<DocDetail />} />
+                          <Route path="benchmarks" element={<BenchmarksRouter />} />
+                          <Route
+                            path="benchmarks/new"
+                            element={
+                              <RoleGate requireManager>
+                                <BenchmarkEditor />
+                              </RoleGate>
+                            }
+                          />
+                          <Route
+                            path="benchmarks/:id/edit"
+                            element={
+                              <RoleGate requireManager>
+                                <BenchmarkEditor />
+                              </RoleGate>
+                            }
+                          />
+                          <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
+                          <Route
+                            path="benchmarks/:id/person/:userId"
+                            element={
+                              <RoleGate requireManager>
+                                <PersonBenchmarkView />
+                              </RoleGate>
+                            }
+                          />
+                          <Route path="integrations" element={<IntegrationsView />} />
+                          <Route
+                            path="org-setup"
+                            element={
+                              <RoleGate requireAdmin>
+                                <OrgSetupView />
+                              </RoleGate>
+                            }
+                          />
+                          <Route path="setup" element={<Navigate to="/org-setup" replace />} />
+                          <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
+                          <Route
+                            path="teams"
+                            element={
+                              <RoleGate requireAdmin>
+                                <TeamsView />
+                              </RoleGate>
+                            }
+                          />
+                          {/* Employee Routes */}
+                          <Route path="me" element={<MeView />} />
+                          <Route path="bragbook" element={<BragbookView />} />
+                          <Route path="docs" element={<DocsView />} />
+                          <Route path="docs/:docId" element={<DocDetail />} />
+                          {/* Calendar/Journal Routes */}
+                          <Route path="calendar" element={<CalendarView />} />
+                          <Route path="recaps" element={<RecapsView />} />
+                          <Route path="recaps/:recapId" element={<RecapDetail />} />
+                          {/* Focused Sessions Routes */}
+                          <Route path="monitoring" element={<MonitoringView />} />
+                          <Route path="monitoring/:sessionId" element={<SessionDetail />} />
+                          <Route path="agent" element={<AgentView />} />
+                          <Route path="agent/:chatId" element={<AgentView />} />
+                          <Route path="profile" element={<UserProfilePage />} />
+                        </Route>
+                      </Routes>
+                    </RecapsProvider>
+                  </DevFlagsProvider>
+                  <Toaster />
+                </VariantWrapper>
+              </UserProvider>
+            </UpdateProvider>
+          </TooltipProvider>
+        </HashRouter>
+        {import.meta.env.DEV && <ReactQueryDevtoolsWrapper />}
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
+}
+
+// Lazily load ReactQueryDevtools only in development to keep it out of the production bundle.
+function ReactQueryDevtoolsWrapper() {
+  const [Devtools, setDevtools] = React.useState<React.ComponentType<{
+    initialIsOpen: boolean;
+  }> | null>(null);
+
+  React.useEffect(() => {
+    import("@tanstack/react-query-devtools").then((mod) => {
+      setDevtools(() => mod.ReactQueryDevtools);
+    });
+  }, []);
+
+  if (!Devtools) return null;
+  return <Devtools initialIsOpen={false} />;
 }
 
 export default App;

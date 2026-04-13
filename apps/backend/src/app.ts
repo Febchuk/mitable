@@ -11,6 +11,8 @@ import { requestLoggerMiddleware } from "./domains/shared-infra/middleware/reque
 import { errorHandler } from "./domains/shared-infra/middleware/errorHandler.js";
 import { setupSentryErrorHandler } from "./domains/shared-infra/lib/sentry.js";
 import { mcpRouter } from "./domains/shared-infra/mcp/transport.js";
+import { pool } from "./db/client.js";
+import { socketService } from "./domains/shared-infra/services/socket.service.js";
 
 export const app = express();
 
@@ -118,7 +120,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health check - Enhanced with environment info
+// Health check - Shallow liveness probe (always returns 200 if process is alive)
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -127,6 +129,30 @@ app.get("/health", (_req, res) => {
     environment: config.nodeEnv,
     version: "0.1.0",
   });
+});
+
+// Readiness probe - Verifies DB connectivity and WebSocket initialization (503 if not ready)
+app.get("/ready", async (_req, res) => {
+  const checks = { db: false, ws: false };
+
+  try {
+    const client = await pool.connect();
+    await client.query("SELECT 1");
+    client.release();
+    checks.db = true;
+  } catch {
+    // db check failed — checks.db stays false
+  }
+
+  checks.ws = socketService.isInitialized();
+
+  const allReady = checks.db && checks.ws;
+
+  if (allReady) {
+    res.json({ status: "ready", checks });
+  } else {
+    res.status(503).json({ status: "not_ready", checks });
+  }
 });
 
 // MCP endpoint — no rate limiter (API key auth handles access control)
