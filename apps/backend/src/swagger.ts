@@ -6,7 +6,7 @@ const swaggerDefinition = {
     title: "Mitable API",
     version: "1.0.0",
     description:
-      "AI-powered onboarding assistant API - provides contextual help, roadmap management, expert nudges, and conversation history for employee onboarding.",
+      "Mitable API - Work context capture and time insights platform. Surfaces how employees spend their time, enables AI-assisted update drafting, and gives management visibility into team activity.",
     contact: {
       name: "Mitable Team",
       url: "https://mitable.app",
@@ -229,156 +229,6 @@ const swaggerDefinition = {
           },
         },
       },
-      RoadmapTask: {
-        type: "object",
-        properties: {
-          id: {
-            type: "string",
-            format: "uuid",
-          },
-          title: {
-            type: "string",
-          },
-          description: {
-            type: "string",
-            nullable: true,
-          },
-          timeEstimate: {
-            type: "string",
-            nullable: true,
-            description: "Estimated time to complete (e.g., '2 hours')",
-          },
-          completed: {
-            type: "boolean",
-          },
-          completedAt: {
-            type: "string",
-            format: "date-time",
-            nullable: true,
-          },
-          week: {
-            type: "integer",
-            description: "Week number in roadmap",
-          },
-          orderIndex: {
-            type: "integer",
-            description: "Sort order within week",
-          },
-        },
-      },
-      Nudge: {
-        type: "object",
-        properties: {
-          id: {
-            type: "string",
-            format: "uuid",
-          },
-          userId: {
-            type: "string",
-            format: "uuid",
-          },
-          expertId: {
-            type: "string",
-            format: "uuid",
-          },
-          expertName: {
-            type: "string",
-          },
-          expertRole: {
-            type: "string",
-          },
-          expertAvatar: {
-            type: "string",
-            nullable: true,
-          },
-          description: {
-            type: "string",
-          },
-          context: {
-            type: "string",
-            nullable: true,
-          },
-          matchScore: {
-            type: "string",
-            description: "Match confidence score (0-1)",
-          },
-          matchReasons: {
-            type: "array",
-            items: { type: "string" },
-          },
-          status: {
-            type: "string",
-            enum: ["waiting", "accepted", "declined", "resolved"],
-          },
-          deliveryChannel: {
-            type: "string",
-            enum: ["in_app", "slack", "email"],
-          },
-          timestamp: {
-            type: "string",
-            format: "date-time",
-          },
-          acceptedAt: {
-            type: "string",
-            format: "date-time",
-            nullable: true,
-          },
-          resolvedAt: {
-            type: "string",
-            format: "date-time",
-            nullable: true,
-          },
-          online: {
-            type: "boolean",
-          },
-        },
-      },
-      Template: {
-        type: "object",
-        properties: {
-          id: {
-            type: "string",
-            format: "uuid",
-          },
-          organizationId: {
-            type: "string",
-            format: "uuid",
-          },
-          title: {
-            type: "string",
-          },
-          description: {
-            type: "string",
-            nullable: true,
-          },
-          icon: {
-            type: "string",
-            nullable: true,
-            description: "Emoji icon for template",
-          },
-          roleTags: {
-            type: "array",
-            items: { type: "string" },
-            description: "Role tags (e.g., 'Software Engineer', 'Designer')",
-          },
-          totalWeeks: {
-            type: "integer",
-            description: "Duration of onboarding in weeks",
-          },
-          usedCount: {
-            type: "integer",
-            description: "Number of times template has been assigned",
-          },
-          createdAt: {
-            type: "string",
-            format: "date-time",
-          },
-          updatedAt: {
-            type: "string",
-            format: "date-time",
-          },
-        },
-      },
     },
     responses: {
       BadRequest: {
@@ -486,8 +336,8 @@ const swaggerDefinition = {
 
 const options: swaggerJsdoc.Options = {
   definition: swaggerDefinition,
-  // Look for JSDoc comments in route files
-  apis: ["./src/routes/**/*.ts", "./src/routes.ts", "./src/app.ts"],
+  // Look for JSDoc comments in domain route files and top-level route barrel
+  apis: ["./src/domains/*/routes/**/*.ts", "./src/routes.ts", "./src/app.ts"],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
