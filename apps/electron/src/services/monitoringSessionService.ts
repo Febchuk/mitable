@@ -665,8 +665,15 @@ class MonitoringSessionService {
         const closedWindows = await windowDetectionService.checkForClosedWindows();
         if (closedWindows.length > 0) {
           logger.info(` Removed ${closedWindows.length} closed windows from watch list`);
-          // Broadcast update so watch pill reflects accurate count
+          // Broadcast updates so watch pill reflects accurate count
           this.broadcastSessionUpdate();
+          // Also send WATCH_WINDOWS_UPDATED so pill/dropdown UIs update their window list
+          const selectedWindows = windowDetectionService.getSelectedWindows();
+          BrowserWindow.getAllWindows().forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send(IPC_CHANNELS.WATCH_WINDOWS_UPDATED, selectedWindows);
+            }
+          });
         }
       }
     }, 10000);
