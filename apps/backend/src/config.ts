@@ -279,7 +279,11 @@ export function validateConfig() {
 
   // SENTRY_DSN, SUPABASE_SERVICE_ROLE_KEY, and Stripe keys are required in production only
   if (config.nodeEnv === "production") {
-    const productionRequired = ["SUPABASE_SERVICE_ROLE_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
+    const productionRequired = [
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+    ];
     for (const key of productionRequired) {
       if (!process.env[key]) {
         missing.push({ key, value: "" });
