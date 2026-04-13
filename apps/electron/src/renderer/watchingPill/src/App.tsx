@@ -250,105 +250,107 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-    <div
-      className="h-full w-full flex items-start justify-center px-1.5 pt-1 app-drag"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Vertical Pill Container */}
-      <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-full p-2 transition-all duration-300 ease-in-out">
-        {/* Top: Mitable Logo with status indicator — always visible */}
-        <button
-          onClick={handleLogoClick}
-          className="relative w-7 h-7 flex items-center justify-center app-no-drag cursor-pointer group"
-          aria-label="Open Mitable console"
-          title="Open Console"
-        >
-          <img
-            src={LogoIcon}
-            alt="Mitable"
-            className={`h-5 w-auto transition-all duration-150 group-hover:scale-110 group-hover:brightness-125 ${isPaused ? "opacity-40" : "opacity-100"}`}
-          />
-
-          {/* Recording indicator - red dot */}
-          {isActive && (
-            <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-          )}
-
-          {/* Paused indicator - amber dot */}
-          {isPaused && (
-            <div className="absolute top-0 right-0 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-          )}
-        </button>
-
-        {/* Expandable section — visible on hover */}
-        <div
-          className={`flex flex-col items-center gap-1.5 transition-all duration-300 ease-in-out ${
-            isExpanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
-          }`}
-          style={{ clipPath: isExpanded ? "inset(0 -10px 0 -10px)" : "inset(0 -10px 100% -10px)" }}
-        >
-          {/* Divider */}
-          <div className="w-5 h-px bg-white/10" />
-
-          {/* Eye Button - opens window selector dropdown */}
+      <div
+        className="h-full w-full flex items-start justify-center px-1.5 pt-1 app-drag"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Vertical Pill Container */}
+        <div className="flex flex-col items-center bg-[#1A1A1A]/95 backdrop-blur-lg rounded-full p-2 transition-all duration-300 ease-in-out">
+          {/* Top: Mitable Logo with status indicator — always visible */}
           <button
-            onClick={handleEyeClick}
-            className={`relative w-7 h-7 flex items-center justify-center rounded-full transition-all app-no-drag ${
-              eyeDropdownOpen
-                ? "bg-primary/30 text-white"
-                : selectedWindows.length > 0
-                  ? "bg-primary/20 text-white hover:bg-primary/30 active:bg-primary/40 active:scale-95"
-                  : "hover:bg-white/10 active:bg-white/20 active:scale-95 text-white/70"
-            }`}
-            aria-label="Select windows to watch"
+            onClick={handleLogoClick}
+            className="relative w-7 h-7 flex items-center justify-center app-no-drag cursor-pointer group"
+            aria-label="Open Mitable console"
+            title="Open Console"
           >
-            {selectedWindows.length > 0 ? (
-              <>
-                <Eye size={13} />
-                <span className="absolute -top-0.5 right-0 min-w-[12px] h-[12px] bg-primary rounded-full text-[7px] text-white flex items-center justify-center font-medium leading-none">
-                  {selectedWindows.length}
-                </span>
-              </>
-            ) : (
-              <EyeOff size={13} />
-            )}
-          </button>
+            <img
+              src={LogoIcon}
+              alt="Mitable"
+              className={`h-5 w-auto transition-all duration-150 group-hover:scale-110 group-hover:brightness-125 ${isPaused ? "opacity-40" : "opacity-100"}`}
+            />
 
-          {/* Microphone Button - Audio Recording Toggle */}
-          <button
-            onClick={handleMicClick}
-            className={`relative w-7 h-7 flex items-center justify-center rounded-full transition-all app-no-drag ${
-              audioRecordingEnabled
-                ? "bg-red-500/30 text-white hover:bg-red-500/40 active:bg-red-500/50 active:scale-95"
-                : "hover:bg-white/10 active:bg-white/20 active:scale-95 text-white/70"
-            }`}
-            aria-label={audioRecordingEnabled ? "Stop audio recording" : "Start audio recording"}
-          >
-            {audioRecordingEnabled ? <Mic size={13} /> : <MicOff size={13} />}
-
-            {/* Recording indicator - pulsing red dot */}
-            {audioRecordingActive && (
+            {/* Recording indicator - red dot */}
+            {isActive && (
               <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             )}
+
+            {/* Paused indicator - amber dot */}
+            {isPaused && (
+              <div className="absolute top-0 right-0 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+            )}
           </button>
 
-          {/* Divider */}
-          <div className="w-5 h-px bg-white/10" />
-
-          {/* Menu Button */}
-          <button
-            onClick={handleMenuClick}
-            className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors app-no-drag ${
-              menuDropdownOpen ? "bg-white/10" : "hover:bg-white/10"
+          {/* Expandable section — visible on hover */}
+          <div
+            className={`flex flex-col items-center gap-1.5 transition-all duration-300 ease-in-out ${
+              isExpanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
             }`}
-            aria-label="Open menu"
+            style={{
+              clipPath: isExpanded ? "inset(0 -10px 0 -10px)" : "inset(0 -10px 100% -10px)",
+            }}
           >
-            <MoreVertical size={13} className="text-white/70" />
-          </button>
+            {/* Divider */}
+            <div className="w-5 h-px bg-white/10" />
+
+            {/* Eye Button - opens window selector dropdown */}
+            <button
+              onClick={handleEyeClick}
+              className={`relative w-7 h-7 flex items-center justify-center rounded-full transition-all app-no-drag ${
+                eyeDropdownOpen
+                  ? "bg-primary/30 text-white"
+                  : selectedWindows.length > 0
+                    ? "bg-primary/20 text-white hover:bg-primary/30 active:bg-primary/40 active:scale-95"
+                    : "hover:bg-white/10 active:bg-white/20 active:scale-95 text-white/70"
+              }`}
+              aria-label="Select windows to watch"
+            >
+              {selectedWindows.length > 0 ? (
+                <>
+                  <Eye size={13} />
+                  <span className="absolute -top-0.5 right-0 min-w-[12px] h-[12px] bg-primary rounded-full text-[7px] text-white flex items-center justify-center font-medium leading-none">
+                    {selectedWindows.length}
+                  </span>
+                </>
+              ) : (
+                <EyeOff size={13} />
+              )}
+            </button>
+
+            {/* Microphone Button - Audio Recording Toggle */}
+            <button
+              onClick={handleMicClick}
+              className={`relative w-7 h-7 flex items-center justify-center rounded-full transition-all app-no-drag ${
+                audioRecordingEnabled
+                  ? "bg-red-500/30 text-white hover:bg-red-500/40 active:bg-red-500/50 active:scale-95"
+                  : "hover:bg-white/10 active:bg-white/20 active:scale-95 text-white/70"
+              }`}
+              aria-label={audioRecordingEnabled ? "Stop audio recording" : "Start audio recording"}
+            >
+              {audioRecordingEnabled ? <Mic size={13} /> : <MicOff size={13} />}
+
+              {/* Recording indicator - pulsing red dot */}
+              {audioRecordingActive && (
+                <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              )}
+            </button>
+
+            {/* Divider */}
+            <div className="w-5 h-px bg-white/10" />
+
+            {/* Menu Button */}
+            <button
+              onClick={handleMenuClick}
+              className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors app-no-drag ${
+                menuDropdownOpen ? "bg-white/10" : "hover:bg-white/10"
+              }`}
+              aria-label="Open menu"
+            >
+              <MoreVertical size={13} className="text-white/70" />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
     </ErrorBoundary>
   );
 }
