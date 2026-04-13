@@ -708,6 +708,62 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     rendererLogs: string;
     error?: string;
   }> => ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_GET_LOGS),
+
+  // On-Device AI
+  onDeviceGetStatus: (): Promise<{
+    isSetUp: boolean;
+    serverStatus: string;
+    installedAssets: Array<{ id: string; version: string; filePath: string; sizeBytes: number }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_STATUS),
+
+  onDeviceGetPlatform: (): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_PLATFORM),
+
+  onDeviceGetDownloadSummary: (): Promise<{
+    assets: Array<{ id: string; label: string; description: string; sizeBytes: number }>;
+    totalBytes: number;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_DOWNLOAD_SUMMARY),
+
+  onDeviceDownloadAsset: (assetId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ASSET, assetId),
+
+  onDeviceDownloadAll: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ALL),
+
+  onDeviceRemoveAll: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL),
+
+  onDeviceStartServer: (): Promise<{ success: boolean; port?: number; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_START_SERVER),
+
+  onDeviceStopServer: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_STOP_SERVER),
+
+  onDeviceServerStatus: (): Promise<{
+    status: string;
+    port: number;
+    baseUrl: string | null;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS),
+
+  onDeviceDownloadProgress: (
+    callback: (progress: {
+      assetId: string;
+      label: string;
+      phase: string;
+      bytesDownloaded: number;
+      totalBytes: number;
+      percent: number;
+      error?: string;
+    }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
+    return () =>
+      ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
+  },
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

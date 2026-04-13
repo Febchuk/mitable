@@ -160,6 +160,18 @@ export const IPC_CHANNELS = {
   FEEDBACK_GET_LOGS: "feedback:get-logs",
   /** Renderer console lines batched to main for persistence (renderer.log on disk). */
   FEEDBACK_APPEND_RENDERER_LOG: "feedback:append-renderer-log",
+
+  // On-Device AI
+  ON_DEVICE_GET_STATUS: "on-device:get-status",
+  ON_DEVICE_GET_PLATFORM: "on-device:get-platform",
+  ON_DEVICE_GET_DOWNLOAD_SUMMARY: "on-device:get-download-summary",
+  ON_DEVICE_DOWNLOAD_ASSET: "on-device:download-asset",
+  ON_DEVICE_DOWNLOAD_ALL: "on-device:download-all",
+  ON_DEVICE_REMOVE_ALL: "on-device:remove-all",
+  ON_DEVICE_START_SERVER: "on-device:start-server",
+  ON_DEVICE_STOP_SERVER: "on-device:stop-server",
+  ON_DEVICE_SERVER_STATUS: "on-device:server-status",
+  ON_DEVICE_DOWNLOAD_PROGRESS: "on-device:download-progress",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

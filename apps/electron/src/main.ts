@@ -3161,6 +3161,14 @@ app.whenReady().then(async () => {
   setupIPC();
   registerGlobalShortcuts();
 
+  // Initialize on-device AI model manager (non-blocking)
+  import("./services/on-device")
+    .then(({ modelManager, localDb }) =>
+      modelManager.initialize().then(() => localDb.initialize())
+    )
+    .then(() => consoleLogger.info("On-device AI module initialized"))
+    .catch((err) => consoleLogger.warn("On-device AI init skipped:", String(err)));
+
   // Start Browser Bridge WebSocket server for Chrome Extension
   browserBridgeService.start().catch((err) => {
     consoleLogger.error("Failed to start BrowserBridgeService:", err);
@@ -3295,6 +3303,119 @@ app.whenReady().then(async () => {
       return { success: true, logs: mainTail, rendererLogs };
     } catch (err) {
       return { success: false, logs: "", rendererLogs: "", error: String(err) };
+    }
+  });
+
+  // ── On-Device AI IPC handlers ──────────────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
+    try {
+      const { modelManager, llamaServerService } = await import("./services/on-device");
+      return {
+        isSetUp: modelManager.isFullySetUp(),
+        serverStatus: llamaServerService.getStatus(),
+        installedAssets: modelManager.getInstalledAssets(),
+      };
+    } catch (err) {
+      return { isSetUp: false, serverStatus: "stopped", installedAssets: [], error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_PLATFORM, async () => {
+    try {
+      const { modelManager } = await import("./services/on-device");
+      return await modelManager.detectPlatform();
+    } catch (err) {
+      return { error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_DOWNLOAD_SUMMARY, async () => {
+    try {
+      const { modelManager } = await import("./services/on-device");
+      const summary = modelManager.getDownloadSummary();
+      return {
+        assets: summary.assets.map((a) => ({
+          id: a.id,
+          label: a.label,
+          description: a.description,
+          sizeBytes: a.sizeBytes,
+        })),
+        totalBytes: summary.totalBytes,
+      };
+    } catch (err) {
+      return { assets: [], totalBytes: 0, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ASSET, async (_event, assetId: string) => {
+    try {
+      const { modelManager } = await import("./services/on-device");
+      await modelManager.downloadAsset(assetId as any, (progress) => {
+        if (consoleWindow && !consoleWindow.isDestroyed()) {
+          consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, progress);
+        }
+      });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ALL, async () => {
+    try {
+      const { modelManager } = await import("./services/on-device");
+      await modelManager.downloadAll((progress) => {
+        if (consoleWindow && !consoleWindow.isDestroyed()) {
+          consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, progress);
+        }
+      });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL, async () => {
+    try {
+      const { modelManager, llamaServerService } = await import("./services/on-device");
+      await llamaServerService.stop();
+      await modelManager.removeAll();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_START_SERVER, async () => {
+    try {
+      const { llamaServerService } = await import("./services/on-device");
+      await llamaServerService.start();
+      return { success: true, port: llamaServerService.getPort() };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_STOP_SERVER, async () => {
+    try {
+      const { llamaServerService } = await import("./services/on-device");
+      await llamaServerService.stop();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS, async () => {
+    try {
+      const { llamaServerService } = await import("./services/on-device");
+      return {
+        status: llamaServerService.getStatus(),
+        port: llamaServerService.getPort(),
+        baseUrl: llamaServerService.isRunning() ? llamaServerService.getBaseUrl() : null,
+      };
+    } catch (err) {
+      return { status: "stopped", port: 0, baseUrl: null, error: String(err) };
     }
   });
 

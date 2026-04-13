@@ -316,6 +316,42 @@ interface ConsoleAPI {
     rendererLogs: string;
     error?: string;
   }>;
+
+  // On-Device AI
+  onDeviceGetStatus: () => Promise<{
+    isSetUp: boolean;
+    serverStatus: string;
+    installedAssets: Array<{ id: string; version: string; filePath: string; sizeBytes: number }>;
+    error?: string;
+  }>;
+  onDeviceGetPlatform: () => Promise<string>;
+  onDeviceGetDownloadSummary: () => Promise<{
+    assets: Array<{ id: string; label: string; description: string; sizeBytes: number }>;
+    totalBytes: number;
+    error?: string;
+  }>;
+  onDeviceDownloadAsset: (assetId: string) => Promise<{ success: boolean; error?: string }>;
+  onDeviceDownloadAll: () => Promise<{ success: boolean; error?: string }>;
+  onDeviceRemoveAll: () => Promise<{ success: boolean; error?: string }>;
+  onDeviceStartServer: () => Promise<{ success: boolean; port?: number; error?: string }>;
+  onDeviceStopServer: () => Promise<{ success: boolean; error?: string }>;
+  onDeviceServerStatus: () => Promise<{
+    status: string;
+    port: number;
+    baseUrl: string | null;
+    error?: string;
+  }>;
+  onDeviceDownloadProgress: (
+    callback: (progress: {
+      assetId: string;
+      label: string;
+      phase: string;
+      bytesDownloaded: number;
+      totalBytes: number;
+      percent: number;
+      error?: string;
+    }) => void
+  ) => () => void;
 }
 
 declare global {

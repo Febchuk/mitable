@@ -48,6 +48,7 @@ import React, { useEffect, useRef } from "react";
 import { useTheme } from "./hooks/useTheme";
 import TeamsView from "./components/views/admin/TeamsView";
 import OrgSetupView from "./components/views/admin/OrgSetupView";
+import OnDeviceAIView from "./components/views/employee/OnDeviceAIView";
 
 // Applies stored theme class to <html> on mount and syncs across windows
 function ThemeInitializer() {
@@ -361,6 +362,7 @@ function App() {
                           <Route path="agent" element={<AgentView />} />
                           <Route path="agent/:chatId" element={<AgentView />} />
                           <Route path="profile" element={<UserProfilePage />} />
+                          <Route path="on-device-ai" element={<OnDeviceAIView />} />
                         </Route>
                       </Routes>
                     </RecapsProvider>

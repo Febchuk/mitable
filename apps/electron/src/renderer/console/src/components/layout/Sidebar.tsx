@@ -1,4 +1,4 @@
-import { Settings, LogOut, Building2, CircleHelp } from "lucide-react";
+import { Settings, LogOut, Building2, CircleHelp, HardDrive } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
@@ -118,6 +118,37 @@ export default function Sidebar() {
           gap: 2,
         }}
       >
+        <button
+          type="button"
+          onClick={() => navigate("/on-device-ai")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 11,
+            padding: "8px 12px",
+            borderRadius: 6,
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            background: "none",
+            border: "none",
+            textAlign: "left",
+            width: "100%",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "none";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }}
+        >
+          <HardDrive size={16} strokeWidth={1.6} />
+          <span>On-Device AI</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setFeedbackOpen(true)}

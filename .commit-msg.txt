@@ -1,0 +1,10 @@
+feat(on-device): add local AI inference pipeline with llama-server integration
+
+- modelManager: detect GPU (CUDA/Metal/CPU), download llama-server binary + SmolVLM2 vision model + Phi-3.5 text model from HuggingFace/GitHub
+- llamaServerService: manage llama-server subprocess on localhost with OpenAI-compatible API
+- localDb: SQLite storage for captures, classifications, and storyteller output (data never leaves device)
+- localInferenceService: batch pipeline (20 frames) through Sensor -> Classifier -> Storyteller
+- monitoringSessionService: route frames to local inference when server is running, cloud fallback
+- OnDeviceAIView: VS Code extension-style settings page for download management and server control
+- IPC channels + preload bridge for renderer communication
+- Sidebar nav link to On-Device AI settings

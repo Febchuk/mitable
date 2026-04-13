@@ -91,6 +91,19 @@ class MonitoringSessionService {
   }
 
   /**
+   * Check whether the on-device inference server is running.
+   * If so, frames will be routed to the local pipeline instead of the cloud.
+   */
+  private async shouldUseLocalInference(): Promise<boolean> {
+    try {
+      const { llamaServerService } = await import("./on-device");
+      return llamaServerService.isRunning();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Start a new monitoring session
    * @param config - Session config including sessionId from backend
    *
@@ -218,6 +231,16 @@ class MonitoringSessionService {
 
       // Start capture loop
       this.startCaptureLoop();
+
+      // Start local inference service if on-device AI is available
+      this.shouldUseLocalInference().then((useLocal) => {
+        if (useLocal) {
+          import("./on-device").then(({ localInferenceService }) => {
+            localInferenceService.start(sessionId);
+            logger.info("On-device inference pipeline started for session", sessionId);
+          });
+        }
+      });
 
       // Broadcast session started
       this.broadcastSessionUpdate();
@@ -369,6 +392,20 @@ class MonitoringSessionService {
     const sessionId = this.activeSession.id;
 
     try {
+      // Flush remaining frames through the local inference pipeline and
+      // run the storyteller before tearing down the session.
+      try {
+        const { localInferenceService, llamaServerService } = await import("./on-device");
+        if (llamaServerService.isRunning()) {
+          logger.info("Flushing local inference buffer and generating story...");
+          await localInferenceService.flushRemaining();
+          await localInferenceService.generateStory(sessionId);
+          localInferenceService.stop();
+        }
+      } catch {
+        // on-device module not available or not running — continue normally
+      }
+
       // End checkpoint tracking (removes checkpoint file)
       await checkpointService.endSession();
 
@@ -935,21 +972,59 @@ class MonitoringSessionService {
         }
       }
 
-      // Trigger async frame analysis (don't block capture loop)
-      this.analyzeFrameAsync(
-        this.activeSession.id,
-        frameMetadata.frameId,
-        base64Data,
-        previousFrame?.imageData || null,
-        windowInfo,
-        {
-          sequenceNumber: frameMetadata.sequenceNumber,
-          captureTrigger: trigger,
-          capturedAt: new Date(frameMetadata.timestamp).getTime(),
-        },
-        intervalEvidence,
-        browserContext
-      );
+      // Route to on-device inference if the local server is running,
+      // otherwise fall back to the cloud pipeline.
+      const useLocalInference = await this.shouldUseLocalInference();
+
+      if (useLocalInference) {
+        try {
+          const { localInferenceService } = await import("./on-device");
+          await localInferenceService.addFrame({
+            frameId: frameMetadata.frameId,
+            sessionId: this.activeSession.id,
+            sequenceNumber: frameMetadata.sequenceNumber,
+            capturedAt: new Date(frameMetadata.timestamp).getTime(),
+            imageBase64: base64Data,
+            previousImageBase64: previousFrame?.imageData || null,
+            windowId: screenshot.windowId,
+            appName: screenshot.appName ?? "",
+            windowTitle: screenshot.windowTitle ?? "",
+            intervalEvidence,
+            browserContext,
+          });
+        } catch (err) {
+          logger.warn("Local inference failed, falling back to cloud:", String(err));
+          this.analyzeFrameAsync(
+            this.activeSession.id,
+            frameMetadata.frameId,
+            base64Data,
+            previousFrame?.imageData || null,
+            windowInfo,
+            {
+              sequenceNumber: frameMetadata.sequenceNumber,
+              captureTrigger: trigger,
+              capturedAt: new Date(frameMetadata.timestamp).getTime(),
+            },
+            intervalEvidence,
+            browserContext
+          );
+        }
+      } else {
+        this.analyzeFrameAsync(
+          this.activeSession.id,
+          frameMetadata.frameId,
+          base64Data,
+          previousFrame?.imageData || null,
+          windowInfo,
+          {
+            sequenceNumber: frameMetadata.sequenceNumber,
+            captureTrigger: trigger,
+            capturedAt: new Date(frameMetadata.timestamp).getTime(),
+          },
+          intervalEvidence,
+          browserContext
+        );
+      }
     } catch (error) {
       logger.error(" Error saving capture:", error);
     }
