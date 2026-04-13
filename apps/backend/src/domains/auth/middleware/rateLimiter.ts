@@ -4,10 +4,16 @@ import rateLimit from "express-rate-limit";
  * Rate Limiting Middleware
  *
  * Implements tiered rate limiting to prevent API abuse and DDoS attacks.
- * Uses in-memory store by default (works for single-instance deployments).
  *
- * For multi-instance production deployments, consider using Redis store:
- * https://github.com/express-rate-limit/rate-limit-redis
+ * LIMITATION: Rate limiting uses the default in-memory store.
+ *
+ * Implications:
+ * - Rate limit counters reset on every server restart/deploy
+ * - Not shared across multiple instances (if scaling horizontally)
+ * - Sufficient for single-instance Railway deployment
+ *
+ * TODO: Migrate to Redis store (rate-limit-redis) when scaling to
+ * multiple backend instances. See: https://www.npmjs.com/package/rate-limit-redis
  */
 
 /**

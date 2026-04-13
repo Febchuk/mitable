@@ -42,8 +42,26 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-    title: "Mitable — Performance, measured.",
-    description: "Knowing if your team is spending their time on the right things is the hardest part of management. Mitable makes it simple.",
+    metadataBase: new URL("https://mitable.ai"),
+    title: {
+        default: "Mitable — Understand How Your Team Works",
+        template: "%s | Mitable",
+    },
+    description:
+        "Mitable passively captures work context to help individuals understand their time, draft updates, and give management visibility into how their team works.",
+    openGraph: {
+        title: "Mitable — Understand How Your Team Works",
+        description: "Passively capture work context. Understand your time. Share updates effortlessly.",
+        url: "https://mitable.ai",
+        siteName: "Mitable",
+        type: "website",
+        locale: "en_US",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "Mitable — Understand How Your Team Works",
+        description: "Passively capture work context. Understand your time. Share updates effortlessly.",
+    },
 };
 
 export const viewport: Viewport = {

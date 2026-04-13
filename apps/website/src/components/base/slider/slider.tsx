@@ -33,7 +33,16 @@ export const Slider = ({ labelPosition = "default", minValue = 0, maxValue = 100
         <AriaSlider {...rest} {...{ minValue, maxValue }} formatOptions={formatOptions ?? defaultFormatOptions}>
             <AriaLabel />
             <AriaSliderTrack className="relative h-6 w-full">
-                {({ state: { values, getThumbValue, getThumbPercent, getFormattedValue } }) => {
+                {({
+                    state: { values, getThumbValue, getThumbPercent, getFormattedValue },
+                }: {
+                    state: {
+                        values: number[];
+                        getThumbValue: (index: number) => number;
+                        getThumbPercent: (index: number) => number;
+                        getFormattedValue: (index: number) => string;
+                    };
+                }) => {
                     const left = values.length === 1 ? 0 : getThumbPercent(0);
                     const width = values.length === 1 ? getThumbPercent(0) : getThumbPercent(1) - left;
 
@@ -47,12 +56,13 @@ export const Slider = ({ labelPosition = "default", minValue = 0, maxValue = 100
                                     width: `${width * 100}%`,
                                 }}
                             />
-                            {values.map((_, index) => {
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            {values.map((_: any, index: number) => {
                                 return (
                                     <AriaSliderThumb
                                         key={index}
                                         index={index}
-                                        className={({ isFocusVisible, isDragging }) =>
+                                        className={({ isFocusVisible, isDragging }: { isFocusVisible: boolean; isDragging: boolean }) =>
                                             cx(
                                                 "top-1/2 box-border size-6 cursor-grab rounded-full bg-slider-handle-bg shadow-md ring-2 ring-slider-handle-border ring-inset",
                                                 isFocusVisible && "outline-2 outline-offset-2 outline-focus-ring",

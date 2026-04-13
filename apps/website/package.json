@@ -7,8 +7,8 @@
         "build": "next build",
         "start": "next start",
         "start:railway": "node .next/standalone/apps/website/server.js",
-        "typecheck": "tsc --noEmit || exit 0",
-        "lint": "next lint || true"
+        "typecheck": "tsc --noEmit",
+        "lint": "next lint"
     },
     "dependencies": {
         "@mitable/shared": "*",

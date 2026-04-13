@@ -47,10 +47,10 @@ export const LandingFooter = () => (
                         fontSize: 13,
                         transition: "color 0.2s",
                     }}
-                    onMouseEnter={(e) => {
+                    onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
                         e.currentTarget.style.color = "var(--l-text-secondary, #A09A8E)";
                     }}
-                    onMouseLeave={(e) => {
+                    onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
                         e.currentTarget.style.color = "var(--l-text-muted, #706B60)";
                     }}
                 >

@@ -15,7 +15,8 @@ export const DateInput = (props: DateInputProps) => {
                 typeof props.className === "string" && props.className,
             )}
         >
-            {(segment) => (
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {(segment: any) => (
                 <AriaDateSegment
                     segment={segment}
                     className={cx(
