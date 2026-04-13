@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import { LandingFooter } from "@/components/landing";
 import { LandingNav } from "@/components/landing/landing-nav";
@@ -180,16 +180,7 @@ function CheckoutContent() {
                         margin: "0 auto 24px",
                     }}
                 >
-                    <svg
-                        width="32"
-                        height="32"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#DC5050"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    >
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#DC5050" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="15" y1="9" x2="9" y2="15" />
                         <line x1="9" y1="9" x2="15" y2="15" />

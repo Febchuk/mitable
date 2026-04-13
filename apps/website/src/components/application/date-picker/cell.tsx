@@ -40,7 +40,21 @@ export const CalendarCell = ({ date, isHighlighted, ...props }: CalendarCellProp
         <AriaCalendarCell
             {...props}
             date={date}
-            className={({ isDisabled, isFocusVisible, isSelectionStart, isSelectionEnd, isSelected, isOutsideMonth }: { isDisabled: boolean; isFocusVisible: boolean; isSelectionStart: boolean; isSelectionEnd: boolean; isSelected: boolean; isOutsideMonth: boolean }) => {
+            className={({
+                isDisabled,
+                isFocusVisible,
+                isSelectionStart,
+                isSelectionEnd,
+                isSelected,
+                isOutsideMonth,
+            }: {
+                isDisabled: boolean;
+                isFocusVisible: boolean;
+                isSelectionStart: boolean;
+                isSelectionEnd: boolean;
+                isSelected: boolean;
+                isOutsideMonth: boolean;
+            }) => {
                 const isRoundedLeft = isSelectionStart || dayOfWeek === 0;
                 const isRoundedRight = isSelectionEnd || dayOfWeek === 6;
 
@@ -70,7 +84,21 @@ export const CalendarCell = ({ date, isHighlighted, ...props }: CalendarCellProp
                 );
             }}
         >
-            {({ isDisabled, isFocusVisible, isSelectionStart, isSelectionEnd, isSelected, formattedDate }: { isDisabled: boolean; isFocusVisible: boolean; isSelectionStart: boolean; isSelectionEnd: boolean; isSelected: boolean; formattedDate: string }) => {
+            {({
+                isDisabled,
+                isFocusVisible,
+                isSelectionStart,
+                isSelectionEnd,
+                isSelected,
+                formattedDate,
+            }: {
+                isDisabled: boolean;
+                isFocusVisible: boolean;
+                isSelectionStart: boolean;
+                isSelectionEnd: boolean;
+                isSelected: boolean;
+                formattedDate: string;
+            }) => {
                 const markedAsSelected = isSelectionStart || isSelectionEnd || (isSelected && !isDisabled && !isRangeCalendar);
 
                 return (

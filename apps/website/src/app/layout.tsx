@@ -47,7 +47,8 @@ export const metadata: Metadata = {
         default: "Mitable — Understand How Your Team Works",
         template: "%s | Mitable",
     },
-    description: "Mitable passively captures work context to help individuals understand their time, draft updates, and give management visibility into how their team works.",
+    description:
+        "Mitable passively captures work context to help individuals understand their time, draft updates, and give management visibility into how their team works.",
     openGraph: {
         title: "Mitable — Understand How Your Team Works",
         description: "Passively capture work context. Understand your time. Share updates effortlessly.",

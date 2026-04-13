@@ -33,7 +33,16 @@ export const Slider = ({ labelPosition = "default", minValue = 0, maxValue = 100
         <AriaSlider {...rest} {...{ minValue, maxValue }} formatOptions={formatOptions ?? defaultFormatOptions}>
             <AriaLabel />
             <AriaSliderTrack className="relative h-6 w-full">
-                {({ state: { values, getThumbValue, getThumbPercent, getFormattedValue } }: { state: { values: number[]; getThumbValue: (index: number) => number; getThumbPercent: (index: number) => number; getFormattedValue: (index: number) => string } }) => {
+                {({
+                    state: { values, getThumbValue, getThumbPercent, getFormattedValue },
+                }: {
+                    state: {
+                        values: number[];
+                        getThumbValue: (index: number) => number;
+                        getThumbPercent: (index: number) => number;
+                        getFormattedValue: (index: number) => string;
+                    };
+                }) => {
                     const left = values.length === 1 ? 0 : getThumbPercent(0);
                     const width = values.length === 1 ? getThumbPercent(0) : getThumbPercent(1) - left;
 

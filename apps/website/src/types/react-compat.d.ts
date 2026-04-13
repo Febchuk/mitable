@@ -18,7 +18,7 @@ declare module "@untitledui/icons" {
 
     // Catch-all: any named export from @untitledui/icons is an icon component
     const icon: React.FC<IconProps>;
-    export { icon as default };
+    export default icon;
 
     // Export every possible icon name as an FC<IconProps>
     export const AlertCircle: React.FC<IconProps>;
