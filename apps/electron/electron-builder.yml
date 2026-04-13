@@ -62,9 +62,10 @@ win:
       arch:
         - x64
   icon: build/icon.ico
-  # Disable code signing for dev builds (enable for production)
-  sign: null
-  certificateSubjectName: null
+  # Windows code signing: set CSC_LINK and CSC_KEY_PASSWORD env vars in CI
+  # CSC_LINK: path to .pfx certificate file (or base64-encoded)
+  # CSC_KEY_PASSWORD: certificate password
+  # When these env vars are not set, electron-builder skips signing automatically
 
 # NSIS Installer Configuration
 nsis:
@@ -94,6 +95,7 @@ files:
   - "node_modules/msgpackr-extract/**/*"
   - "node_modules/electron-log/**/*"
   - "node_modules/keytar/**/*"
+  - "node_modules/uiohook-napi/**/*"
   - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
   # Exclude everything else
   - "!src"
@@ -109,6 +111,7 @@ asarUnpack:
   - "node_modules/active-win/**/*"
   - "node_modules/msgpackr-extract/**/*"
   - "node_modules/keytar/**/*"
+  - "node_modules/uiohook-napi/**/*"
   - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
 
 # Build artifact configuration
