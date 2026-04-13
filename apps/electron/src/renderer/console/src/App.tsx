@@ -1,7 +1,7 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./lib/queryClient";
+import { ErrorBoundary } from "../../components/common/ErrorBoundary";
 import { installConsoleCaptureForFeedback } from "../../lib/feedback-log-buffer";
 import { createLogger } from "../../lib/logger";
 
@@ -44,7 +44,7 @@ import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
 import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
 import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
 import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEditor";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { useTheme } from "./hooks/useTheme";
 import TeamsView from "./components/views/admin/TeamsView";
 import OrgSetupView from "./components/views/admin/OrgSetupView";
@@ -265,6 +265,7 @@ function App() {
   }, []);
 
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <HashRouter>
         <TooltipProvider>
@@ -370,9 +371,26 @@ function App() {
           </UpdateProvider>
         </TooltipProvider>
       </HashRouter>
-      <ReactQueryDevtools initialIsOpen={false} />
+      {import.meta.env.DEV && (
+        <ReactQueryDevtoolsWrapper />
+      )}
     </QueryClientProvider>
+    </ErrorBoundary>
   );
+}
+
+// Lazily load ReactQueryDevtools only in development to keep it out of the production bundle.
+function ReactQueryDevtoolsWrapper() {
+  const [Devtools, setDevtools] = React.useState<React.ComponentType<{ initialIsOpen: boolean }> | null>(null);
+
+  React.useEffect(() => {
+    import("@tanstack/react-query-devtools").then((mod) => {
+      setDevtools(() => mod.ReactQueryDevtools);
+    });
+  }, []);
+
+  if (!Devtools) return null;
+  return <Devtools initialIsOpen={false} />;
 }
 
 export default App;

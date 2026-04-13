@@ -3,6 +3,7 @@ import { MoreVertical, Eye, EyeOff, Mic, MicOff } from "lucide-react";
 import LogoIcon from "@/assets/logo-icon.svg";
 import type { MonitoringSessionState, SelectedWindowInfo } from "@mitable/shared";
 import { createLogger } from "../../lib/logger";
+import { ErrorBoundary } from "../../components/common/ErrorBoundary";
 
 const logger = createLogger("WatchingPill");
 
@@ -248,6 +249,7 @@ export default function App() {
   };
 
   return (
+    <ErrorBoundary>
     <div
       className="h-full w-full flex items-start justify-center px-1.5 pt-1 app-drag"
       onMouseEnter={handleMouseEnter}
@@ -347,5 +349,6 @@ export default function App() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
