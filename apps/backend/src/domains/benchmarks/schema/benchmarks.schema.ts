@@ -8,6 +8,7 @@ import {
   boolean,
   date,
   timestamp,
+  jsonb,
   index,
   unique,
 } from "drizzle-orm/pg-core";
@@ -50,6 +51,26 @@ export const benchmarks = pgTable(
 );
 
 /**
+ * Scoring Rubric
+ *
+ * A frozen rubric generated at parameter creation/edit time. Each level
+ * describes concrete, observable criteria for that score, so the LLM
+ * evaluates against fixed criteria rather than inventing them each time.
+ */
+export interface ScoreLevel {
+  score: number;
+  label: string;
+  criteria: string;
+}
+
+export interface ScoringRubric {
+  levels: ScoreLevel[];
+  relevantMetrics: string[];
+  scoringGuidance: string;
+  generatedAt: string;
+}
+
+/**
  * Benchmark Parameters
  *
  * The axes/dimensions by which a benchmark is scored when the metric type
@@ -66,6 +87,7 @@ export const benchmarkParameters = pgTable(
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
     importance: integer("importance").notNull().default(3),
+    scoringRubric: jsonb("scoring_rubric").$type<ScoringRubric>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({

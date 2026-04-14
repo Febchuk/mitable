@@ -12,6 +12,7 @@
  *   - POST /admin/benchmarks/:id/unassign         → Remove a user from a benchmark
  *   - PATCH /admin/benchmarks/:id/assignments/:userId → Update per-user assignment
  *   - GET  /admin/benchmarks/:benchmarkId/person/:userId → Person-level benchmark detail
+ *   - POST /admin/benchmarks/backfill-rubrics          → Backfill scoring rubrics for existing parameters
  */
 
 import { Router } from "express";
@@ -56,6 +57,26 @@ router.post("/generate-parameters", async (req, res) => {
     res
       .status(500)
       .json({ error: "Internal Server Error", message: "Failed to generate benchmark parameters" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /backfill-rubrics — Generate scoring rubrics for existing parameters
+// Must be registered BEFORE /:id to avoid being captured as a benchmark ID.
+// ---------------------------------------------------------------------------
+
+router.post("/backfill-rubrics", async (req, res) => {
+  if (!req.organizationId) {
+    res.status(403).json({ error: "Forbidden", message: "Organization context required" });
+    return;
+  }
+
+  try {
+    const count = await benchmarkService.backfillScoringRubrics(req.organizationId);
+    res.json({ message: `Backfilled scoring rubrics for ${count} parameters`, count });
+  } catch (error) {
+    logger.error({ err: error }, "Error backfilling scoring rubrics");
+    res.status(500).json({ error: "Internal Server Error", message: "Failed to backfill rubrics" });
   }
 });
 

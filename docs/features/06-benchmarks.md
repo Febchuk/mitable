@@ -106,45 +106,49 @@ flowchart TB
    - Insert `benchmark_accomplishments` (if any)
    - Insert `benchmark_parameter_scores` (per-parameter scores)
 
-### 3. AI Scoring
+### 3. AI Scoring (Deterministic via Stored Rubrics)
 
 **File**: `apps/backend/src/domains/benchmarks/services/benchmark-ai.service.ts`
 
 Uses **Gemini 2.5 Flash** for all AI operations:
 
-- `scoreParameters(params, activitySummary, sessionContext, dayContext)` — Score each parameter 1-5
+- `generateScoringRubric(paramName, description, benchmarkName)` — **One-time** at parameter creation/edit: generates a 5-level scoring rubric with concrete criteria per score level. Stored as `scoring_rubric` JSONB on `benchmark_parameters`.
+- `scoreParameters(params, activitySummary)` — Scores each parameter 1-5 by evaluating activity data against the **stored rubric** using temperature 0 + structured JSON output. This ensures near-identical scores when data hasn't changed.
 - `generateSuggestions(priorityParams)` — Improvement suggestions for lowest-scoring params
 - `detectAccomplishments(activitySummary)` — Find notable achievements
 - Every method has a **rule-based fallback** for when LLM is unavailable
 
+**Determinism strategy**: Scoring rubrics are frozen at parameter creation time. At scoring time, the LLM evaluates against the same rubric with temperature 0, so identical data produces near-identical scores. Parameters without rubrics (legacy) fall back to deterministic rule-based scoring.
+
 ## Data Stores
 
-| Table                        | Purpose                                                    |
-| ---------------------------- | ---------------------------------------------------------- |
-| `benchmarks`                 | Benchmark definitions (name, frequency, isActive, orgId)   |
-| `benchmark_parameters`       | Parameters to score (name, description, importance weight) |
-| `benchmark_assignments`      | User-benchmark assignments with current scores             |
-| `benchmark_snapshots`        | Historical score snapshots for trend analysis              |
-| `benchmark_suggestions`      | AI-generated improvement suggestions                       |
-| `benchmark_accomplishments`  | Detected achievements                                      |
-| `benchmark_parameter_scores` | Per-parameter scores for each scoring period               |
-| `user_daily_activities`      | Input data source for scoring                              |
-| `activity_blocks`            | Input data source for detailed activity context            |
+| Table                        | Purpose                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `benchmarks`                 | Benchmark definitions (name, frequency, isActive, orgId)                  |
+| `benchmark_parameters`       | Parameters to score (name, description, importance, scoring_rubric JSONB) |
+| `benchmark_assignments`      | User-benchmark assignments with current scores                            |
+| `benchmark_snapshots`        | Historical score snapshots for trend analysis                             |
+| `benchmark_suggestions`      | AI-generated improvement suggestions                                      |
+| `benchmark_accomplishments`  | Detected achievements                                                     |
+| `benchmark_parameter_scores` | Per-parameter scores for each scoring period                              |
+| `user_daily_activities`      | Input data source for scoring                                             |
+| `activity_blocks`            | Input data source for detailed activity context                           |
 
 ## AI Models
 
-| Model            | Purpose                                                        |
-| ---------------- | -------------------------------------------------------------- |
-| Gemini 2.5 Flash | Score parameters, generate suggestions, detect accomplishments |
+| Model            | Purpose                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Gemini 2.5 Flash | Generate rubrics (temp 0.4), score parameters against rubrics (temp 0), generate suggestions, detect accomplishments |
 
 ## API Routes
 
-| Route                           | File                         | Purpose                         |
-| ------------------------------- | ---------------------------- | ------------------------------- |
-| `GET /api/benchmarks/my`        | `routes/my-benchmarks.ts`    | Employee's own benchmark scores |
-| `GET /api/admin/benchmarks`     | `routes/admin-benchmarks.ts` | Admin benchmark management      |
-| `POST /api/admin/benchmarks`    | `routes/admin-benchmarks.ts` | Create benchmark                |
-| `PUT /api/admin/benchmarks/:id` | `routes/admin-benchmarks.ts` | Update benchmark                |
+| Route                                         | File                         | Purpose                                          |
+| --------------------------------------------- | ---------------------------- | ------------------------------------------------ |
+| `GET /api/benchmarks/my`                      | `routes/my-benchmarks.ts`    | Employee's own benchmark scores                  |
+| `GET /api/admin/benchmarks`                   | `routes/admin-benchmarks.ts` | Admin benchmark management                       |
+| `POST /api/admin/benchmarks`                  | `routes/admin-benchmarks.ts` | Create benchmark                                 |
+| `PUT /api/admin/benchmarks/:id`               | `routes/admin-benchmarks.ts` | Update benchmark                                 |
+| `POST /api/admin/benchmarks/backfill-rubrics` | `routes/admin-benchmarks.ts` | Backfill scoring rubrics for existing parameters |
 
 ## Key Files
 
