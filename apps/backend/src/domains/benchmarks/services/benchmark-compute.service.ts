@@ -450,12 +450,13 @@ async function computeScores(benchmarkId: string, organizationId: string): Promi
         // AI-scored weighted parameters
         try {
           const { benchmarkAIService } = await import("./benchmark-ai.service.js");
-          // Map to AI service's BenchmarkParameter shape (description: string, not null)
+          // Map to AI service's BenchmarkParameter shape, including scoringRubric for deterministic scoring
           const aiParams = parameters.map((p) => ({
             id: p.id,
             name: p.name,
             description: p.description ?? "",
             importance: p.importance,
+            scoringRubric: p.scoringRubric ?? undefined,
           }));
           const scores: Array<{ parameterId: string; score: number; reasoning: string }> =
             await benchmarkAIService.scoreParameters(aiParams, periodSummary);

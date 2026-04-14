@@ -382,6 +382,38 @@ export const benchmarkService = {
           importance: p.importance,
         }))
       );
+
+      // Generate scoring rubrics for each parameter (async, non-blocking on failure)
+      try {
+        const { benchmarkAIService } = await import("./benchmark-ai.service.js");
+        const inserted = await db
+          .select()
+          .from(benchmarkParameters)
+          .where(eq(benchmarkParameters.benchmarkId, newBm.id));
+
+        await Promise.all(
+          inserted.map(async (p) => {
+            const rubric = await benchmarkAIService.generateScoringRubric(
+              p.name,
+              p.description ?? "",
+              newBm.name
+            );
+            await db
+              .update(benchmarkParameters)
+              .set({ scoringRubric: rubric })
+              .where(eq(benchmarkParameters.id, p.id));
+          })
+        );
+        logger.info(
+          { benchmarkId: newBm.id, paramCount: inserted.length },
+          "Generated scoring rubrics for new benchmark parameters"
+        );
+      } catch (err) {
+        logger.warn(
+          { err, benchmarkId: newBm.id },
+          "Failed to generate scoring rubrics — parameters will use rule-based fallback"
+        );
+      }
     }
 
     return toBenchmarkWithAggregates(newBm, {
@@ -464,6 +496,38 @@ export const benchmarkService = {
           importance: p.importance,
         }))
       );
+
+      // Generate scoring rubrics for the new parameters
+      try {
+        const { benchmarkAIService } = await import("./benchmark-ai.service.js");
+        const inserted = await db
+          .select()
+          .from(benchmarkParameters)
+          .where(eq(benchmarkParameters.benchmarkId, benchmarkId));
+
+        await Promise.all(
+          inserted.map(async (p) => {
+            const rubric = await benchmarkAIService.generateScoringRubric(
+              p.name,
+              p.description ?? "",
+              benchmark.name
+            );
+            await db
+              .update(benchmarkParameters)
+              .set({ scoringRubric: rubric })
+              .where(eq(benchmarkParameters.id, p.id));
+          })
+        );
+        logger.info(
+          { benchmarkId, paramCount: inserted.length },
+          "Regenerated scoring rubrics after parameter update"
+        );
+      } catch (err) {
+        logger.warn(
+          { err, benchmarkId },
+          "Failed to generate scoring rubrics on update — parameters will use rule-based fallback"
+        );
+      }
     }
   },
 
@@ -772,5 +836,56 @@ export const benchmarkService = {
       value: s.value,
       target: s.target,
     }));
+  },
+
+  /**
+   * Backfill scoring rubrics for all parameters in an organization's benchmarks
+   * that don't have one yet. Returns the count of parameters backfilled.
+   */
+  async backfillScoringRubrics(organizationId: string): Promise<number> {
+    const { benchmarkAIService } = await import("./benchmark-ai.service.js");
+
+    // Find all benchmarks for this org
+    const orgBenchmarks = await db
+      .select({ id: benchmarks.id, name: benchmarks.name })
+      .from(benchmarks)
+      .where(eq(benchmarks.organizationId, organizationId));
+
+    let backfilled = 0;
+
+    for (const bm of orgBenchmarks) {
+      const params = await db
+        .select()
+        .from(benchmarkParameters)
+        .where(eq(benchmarkParameters.benchmarkId, bm.id));
+
+      const needsRubric = params.filter((p) => !p.scoringRubric);
+      if (needsRubric.length === 0) continue;
+
+      await Promise.all(
+        needsRubric.map(async (p) => {
+          try {
+            const rubric = await benchmarkAIService.generateScoringRubric(
+              p.name,
+              p.description ?? "",
+              bm.name
+            );
+            await db
+              .update(benchmarkParameters)
+              .set({ scoringRubric: rubric })
+              .where(eq(benchmarkParameters.id, p.id));
+            backfilled++;
+          } catch (err) {
+            logger.warn(
+              { err, parameterId: p.id, paramName: p.name },
+              "Failed to backfill rubric for parameter"
+            );
+          }
+        })
+      );
+    }
+
+    logger.info({ organizationId, backfilled }, "Backfilled scoring rubrics");
+    return backfilled;
   },
 };

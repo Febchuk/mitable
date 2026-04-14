@@ -10,8 +10,11 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { z } from "zod";
 import { config } from "../../../config.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
+import { toGeminiSchema } from "../../../utils/gemini-schema.js";
+import type { ScoringRubric, ScoreLevel } from "../schema/benchmarks.schema.js";
 
 const logger = createLogger({ context: "benchmark-ai" });
 
@@ -19,11 +22,14 @@ const logger = createLogger({ context: "benchmark-ai" });
 // Types
 // ---------------------------------------------------------------------------
 
+export type { ScoringRubric, ScoreLevel };
+
 export interface BenchmarkParameter {
   id: string;
   name: string;
   description: string;
   importance: number;
+  scoringRubric?: ScoringRubric | null;
 }
 
 export interface PeriodActivitySummary {
@@ -189,6 +195,45 @@ function getModel() {
   });
 }
 
+// Zod schema for structured scoring output
+const ScoringResponseSchema = z.object({
+  scores: z.array(
+    z.object({
+      parameterId: z.string(),
+      score: z.number(),
+      reasoning: z.string(),
+    })
+  ),
+});
+
+/**
+ * Dedicated scoring model: temperature 0 + structured JSON output.
+ * Used only for scoreParameters() to maximise determinism.
+ */
+function getScoringModel() {
+  return getGenAI().getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: "application/json",
+      responseSchema: toGeminiSchema(ScoringResponseSchema) as any,
+    },
+  });
+}
+
+// Zod schema for rubric generation output
+const RubricResponseSchema = z.object({
+  levels: z.array(
+    z.object({
+      score: z.number(),
+      label: z.string(),
+      criteria: z.string(),
+    })
+  ),
+  relevantMetrics: z.array(z.string()),
+  scoringGuidance: z.string(),
+});
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -240,60 +285,164 @@ Return JSON only: { "parameters": [{ "name": "...", "description": "..." }] }`;
   },
 
   /**
+   * Generate a scoring rubric for a benchmark parameter.
+   * Called once at parameter creation/edit time — the result is stored in the DB
+   * and reused at every scoring run for deterministic evaluation.
+   */
+  async generateScoringRubric(
+    paramName: string,
+    paramDescription: string,
+    benchmarkName: string
+  ): Promise<ScoringRubric> {
+    try {
+      const model = getGenAI().getGenerativeModel({
+        model: "gemini-2.5-flash",
+        generationConfig: {
+          temperature: 0.4,
+          responseMimeType: "application/json",
+          responseSchema: toGeminiSchema(RubricResponseSchema) as any,
+        },
+      });
+
+      const prompt = `You are creating a scoring rubric for a benchmark parameter used to evaluate employee work performance.
+
+Benchmark: "${benchmarkName}"
+Parameter: "${paramName}"
+Description: "${paramDescription}"
+
+Available activity metrics the scoring system can observe for each employee over a period:
+- totalWorkMinutes: Total minutes spent working
+- totalMeetingMinutes: Minutes in meetings
+- deepFocusMinutes: Minutes in uninterrupted focus blocks (>25 min)
+- collaborationMinutes: Minutes in collaborative activities
+- avgWorkPercentage: Average percentage of time spent working (0-100)
+- onTaskRate: Fraction of time on-task (0.0-1.0)
+- uniqueAppsUsed: List of unique applications used
+- categoryBreakdown: App categories mapped to minutes spent
+- accomplishmentCount: Number of accomplishments detected
+- longestFocusBlockMinutes: Longest single uninterrupted focus block
+- contextSwitchCount: Number of context switches between tasks
+- daysActive: Number of days with recorded activity
+- Session-level data: session names, summaries, task breakdowns, key activities, accomplishments
+
+Create a rubric with exactly 5 score levels (1.0 through 5.0). Each level must describe concrete, observable criteria that a scorer can verify against the activity data above. Use specific numeric thresholds where quantitative metrics apply (e.g., "averaging over 120 minutes/day of deep focus"). For qualitative aspects, describe observable patterns in session data (e.g., "session summaries show cross-team coordination").
+
+Also identify which activity metrics from the list above are most relevant to this parameter, and provide brief scoring guidance on how to weigh quantitative vs qualitative signals.`;
+
+      logger.info({ paramName, benchmarkName }, "Generating scoring rubric via LLM");
+
+      const result = await model.generateContent(prompt);
+      const parsed = JSON.parse(result.response.text()) as {
+        levels: ScoreLevel[];
+        relevantMetrics: string[];
+        scoringGuidance: string;
+      };
+
+      if (!parsed.levels || parsed.levels.length !== 5) {
+        throw new Error(`Expected 5 rubric levels, got ${parsed.levels?.length ?? 0}`);
+      }
+
+      return {
+        levels: parsed.levels,
+        relevantMetrics: parsed.relevantMetrics ?? [],
+        scoringGuidance: parsed.scoringGuidance ?? "",
+        generatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      logger.warn({ error, paramName }, "LLM rubric generation failed, using fallback");
+      return generateRubricFallback(paramName, paramDescription);
+    }
+  },
+
+  /**
    * Score each benchmark parameter against a period's activity summary.
-   * Falls back to rule-based heuristics when the LLM is unavailable.
+   * Uses stored rubrics (temperature 0 + structured output) for determinism.
+   * Falls back to rule-based heuristics for legacy parameters without rubrics.
    */
   async scoreParameters(
     parameters: BenchmarkParameter[],
     periodSummary: PeriodActivitySummary
   ): Promise<ParameterScore[]> {
-    try {
-      const model = getModel();
-      const prompt = `You are scoring a team member's work performance. Here is their activity data for the period:
+    // Split parameters into those with stored rubrics and legacy ones without
+    const withRubric = parameters.filter((p) => p.scoringRubric);
+    const withoutRubric = parameters.filter((p) => !p.scoringRubric);
 
+    const results: ParameterScore[] = [];
+
+    // Score parameters with rubrics using temperature 0 + structured output
+    if (withRubric.length > 0) {
+      try {
+        const model = getScoringModel();
+
+        const rubricBlock = withRubric
+          .map((p) => {
+            const rubric = p.scoringRubric!;
+            const levels = rubric.levels
+              .map((l) => `  ${l.score} (${l.label}): ${l.criteria}`)
+              .join("\n");
+            return `Parameter: ${p.name} (ID: ${p.id})
+Description: ${p.description}
+Scoring rubric:
+${levels}
+Guidance: ${rubric.scoringGuidance}`;
+          })
+          .join("\n\n---\n\n");
+
+        const prompt = `Score this employee's work performance using the rubrics below.
+Evaluate the activity data against each parameter's rubric criteria strictly.
+Assign the score that best matches the observed data. Use decimal scores (e.g., 3.4)
+when performance falls between two levels. Do not deviate from the rubric thresholds.
+
+Activity data for the period:
 ${JSON.stringify(periodSummary, null, 2)}
 
-Score each parameter on a scale of 1.0 to 5.0 (decimals allowed, where 1=poor, 3=meets expectations, 5=exceptional):
+${rubricBlock}
 
-${parameters.map((p) => `- ${p.name} (ID: ${p.id}): ${p.description}`).join("\n")}
+For each parameter, return the score and a brief reasoning citing specific data points from the activity data.`;
 
-Consider the activity data carefully. Higher work minutes, better focus, more collaboration, and more accomplishments generally indicate higher scores.
+        logger.info(
+          { parameterCount: withRubric.length, daysActive: periodSummary.daysActive },
+          "Scoring benchmark parameters via LLM with stored rubrics (temperature 0)"
+        );
 
-Return JSON only: { "scores": [{ "parameterId": "...", "score": N, "reasoning": "brief explanation" }] }`;
-
-      logger.info(
-        { parameterCount: parameters.length, daysActive: periodSummary.daysActive },
-        "Scoring benchmark parameters via LLM"
-      );
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const parsed = parseLLMJson<{ scores: ParameterScore[] }>(text);
-
-      if (!parsed.scores || !Array.isArray(parsed.scores) || parsed.scores.length === 0) {
-        throw new Error("LLM returned empty or invalid scores array");
-      }
-
-      // Map scores back to actual parameter IDs by matching name or index.
-      // LLMs sometimes corrupt UUIDs, so we don't trust parameterId from the response.
-      const paramByName = new Map(parameters.map((p) => [p.name.toLowerCase(), p.id]));
-      return parsed.scores.map((s, i) => {
-        // Try to match by parameterId first, then by name, then by index
-        const matchedId =
-          parameters.find((p) => p.id === s.parameterId)?.id ??
-          paramByName.get((s as { name?: string }).name?.toLowerCase() ?? "") ??
-          parameters[i]?.id ??
-          s.parameterId;
-        return {
-          parameterId: matchedId,
-          score: Math.round(Math.min(5, Math.max(1, s.score)) * 10) / 10,
-          reasoning: s.reasoning,
+        const result = await model.generateContent(prompt);
+        const parsed = JSON.parse(result.response.text()) as {
+          scores: ParameterScore[];
         };
-      });
-    } catch (error) {
-      logger.warn({ error }, "LLM scoring failed, using rule-based fallback");
-      return scoreParametersFallback(parameters, periodSummary);
+
+        if (!parsed.scores || !Array.isArray(parsed.scores) || parsed.scores.length === 0) {
+          throw new Error("LLM returned empty or invalid scores array");
+        }
+
+        // Map scores back to actual parameter IDs
+        const paramByName = new Map(withRubric.map((p) => [p.name.toLowerCase(), p.id]));
+        for (let i = 0; i < parsed.scores.length; i++) {
+          const s = parsed.scores[i];
+          const matchedId =
+            withRubric.find((p) => p.id === s.parameterId)?.id ??
+            paramByName.get((s as { name?: string }).name?.toLowerCase() ?? "") ??
+            withRubric[i]?.id ??
+            s.parameterId;
+          results.push({
+            parameterId: matchedId,
+            score: Math.round(Math.min(5, Math.max(1, s.score)) * 10) / 10,
+            reasoning: s.reasoning,
+          });
+        }
+      } catch (error) {
+        logger.warn({ error }, "LLM rubric-based scoring failed, falling back to rule-based");
+        for (const p of withRubric) {
+          results.push(scoreParameterFallbackSingle(p, periodSummary));
+        }
+      }
     }
+
+    // Score legacy parameters without rubrics using deterministic rule-based fallback
+    for (const p of withoutRubric) {
+      results.push(scoreParameterFallbackSingle(p, periodSummary));
+    }
+
+    return results;
   },
 
   /**
@@ -486,40 +635,6 @@ function generateParametersFallback(description: string): BenchmarkParameter[] {
   }));
 }
 
-function scoreParametersFallback(
-  parameters: BenchmarkParameter[],
-  periodSummary: PeriodActivitySummary
-): ParameterScore[] {
-  return parameters.map((parameter) => {
-    let score = 3.0;
-    const name = parameter.name.toLowerCase();
-
-    if (name.includes("focus") || name.includes("deep work")) {
-      score = Math.min(
-        5,
-        Math.max(1, (periodSummary.deepFocusMinutes / (periodSummary.daysActive * 60)) * 5)
-      );
-    } else if (name.includes("communication") || name.includes("collaboration")) {
-      score = Math.min(
-        5,
-        Math.max(1, (periodSummary.collaborationMinutes / (periodSummary.daysActive * 30)) * 5)
-      );
-    } else if (name.includes("quality") || name.includes("reliability")) {
-      score = Math.min(5, Math.max(1, periodSummary.onTaskRate * 5));
-    } else if (name.includes("growth") || name.includes("adoption")) {
-      score = Math.min(5, Math.max(1, periodSummary.uniqueAppsUsed.length / 3));
-    } else {
-      score = Math.min(5, Math.max(1, periodSummary.avgWorkPercentage / 20));
-    }
-
-    return {
-      parameterId: parameter.id,
-      score: Math.round(score * 10) / 10,
-      reasoning: "Rule-based score",
-    };
-  });
-}
-
 function generateSuggestionsFallback(priorities: PriorityParam[]): Suggestion[] {
   const categories: Array<"scheduling" | "habits" | "encouragement"> = [
     "scheduling",
@@ -569,4 +684,92 @@ function detectAccomplishmentsFallback(
   // Cap at 4, preferring most recent
   accomplishments.sort((a, b) => b.date.localeCompare(a.date));
   return accomplishments.slice(0, 4);
+}
+
+/**
+ * Score a single parameter using rule-based heuristics (deterministic).
+ * Used for legacy parameters that don't have a stored rubric.
+ */
+function scoreParameterFallbackSingle(
+  parameter: BenchmarkParameter,
+  periodSummary: PeriodActivitySummary
+): ParameterScore {
+  let score = 3.0;
+  const name = parameter.name.toLowerCase();
+
+  if (name.includes("focus") || name.includes("deep work")) {
+    const perDay =
+      periodSummary.daysActive > 0 ? periodSummary.deepFocusMinutes / periodSummary.daysActive : 0;
+    score = Math.min(5, Math.max(1, (perDay / 60) * 5));
+  } else if (name.includes("communication") || name.includes("collaboration")) {
+    const perDay =
+      periodSummary.daysActive > 0
+        ? periodSummary.collaborationMinutes / periodSummary.daysActive
+        : 0;
+    score = Math.min(5, Math.max(1, (perDay / 30) * 5));
+  } else if (name.includes("quality") || name.includes("reliability")) {
+    score = Math.min(5, Math.max(1, periodSummary.onTaskRate * 5));
+  } else if (name.includes("growth") || name.includes("adoption")) {
+    score = Math.min(
+      5,
+      Math.max(
+        1,
+        (Array.isArray(periodSummary.uniqueAppsUsed) ? periodSummary.uniqueAppsUsed.length : 0) / 3
+      )
+    );
+  } else {
+    score = Math.min(5, Math.max(1, periodSummary.avgWorkPercentage / 20));
+  }
+
+  return {
+    parameterId: parameter.id,
+    score: Math.round(score * 10) / 10,
+    reasoning: "Rule-based score (no rubric available)",
+  };
+}
+
+/**
+ * Generate a fallback rubric when LLM is unavailable.
+ * Produces a generic rubric based on keyword matching against the parameter name.
+ */
+function generateRubricFallback(paramName: string, _paramDescription: string): ScoringRubric {
+  const name = paramName.toLowerCase();
+
+  let metricHint = "avgWorkPercentage";
+  let guidance = "Score based on overall work percentage as a general proxy.";
+
+  if (name.includes("focus") || name.includes("deep work")) {
+    metricHint = "deepFocusMinutes";
+    guidance = "Score primarily on deep focus minutes per active day.";
+  } else if (name.includes("communication") || name.includes("collaboration")) {
+    metricHint = "collaborationMinutes";
+    guidance = "Score primarily on collaboration minutes per active day.";
+  } else if (name.includes("quality") || name.includes("reliability")) {
+    metricHint = "onTaskRate";
+    guidance = "Score primarily on on-task rate (0-1 scale).";
+  } else if (name.includes("growth") || name.includes("adoption")) {
+    metricHint = "uniqueAppsUsed";
+    guidance = "Score based on breadth of tools and applications used.";
+  }
+
+  return {
+    levels: [
+      { score: 1.0, label: "Poor", criteria: `Very low ${metricHint} activity observed.` },
+      { score: 2.0, label: "Below Average", criteria: `Below-average ${metricHint} activity.` },
+      {
+        score: 3.0,
+        label: "Meets Expectations",
+        criteria: `Average ${metricHint} activity for the period.`,
+      },
+      { score: 4.0, label: "Strong", criteria: `Above-average ${metricHint} activity.` },
+      {
+        score: 5.0,
+        label: "Exceptional",
+        criteria: `Outstanding ${metricHint} activity, well above typical levels.`,
+      },
+    ],
+    relevantMetrics: [metricHint],
+    scoringGuidance: guidance,
+    generatedAt: new Date().toISOString(),
+  };
 }
