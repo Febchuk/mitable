@@ -198,7 +198,9 @@ class UpdateService {
   }
 
   /**
-   * Quit the app and install the downloaded update
+   * Quit the app and install the downloaded update.
+   * On Windows, main must call `prepareForQuitAndInstall()` first so the console
+   * window close handler does not hide-to-tray (which would block the installer).
    */
   quitAndInstall(): void {
     log.info("[UpdateService] Quitting and installing update...");

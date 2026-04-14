@@ -411,6 +411,24 @@ function createTrayIfSupported(): void {
   tray.on("click", () => showConsoleWindow());
 }
 
+/**
+ * Must run before `quitAndInstall()`. Otherwise on Windows the console `close`
+ * handler treats the quit as a normal hide-to-tray (preventDefault), the main
+ * process never exits, and Squirrel/electron-updater cannot replace the binary.
+ * Destroying the tray also releases the last UI anchor that can keep the app alive.
+ */
+function prepareForQuitAndInstall(): void {
+  isExplicitQuit = true;
+  if (tray && !tray.isDestroyed()) {
+    try {
+      tray.destroy();
+    } catch {
+      /* ignore */
+    }
+    tray = null;
+  }
+}
+
 function createWatchingPillWindow() {
   // Get screen dimensions for right-edge, vertically centered positioning
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -911,6 +929,7 @@ function handleNotificationAction(actionId: string) {
       break;
     case "install-update":
       // Quit and install the downloaded update
+      prepareForQuitAndInstall();
       updateService.quitAndInstall();
       break;
     case "view-active-session":
@@ -2694,6 +2713,7 @@ function setupUpdateHandlers() {
 
   ipcMain.handle("install-update", () => {
     updateLogger.info(" Install update requested");
+    prepareForQuitAndInstall();
     updateService.quitAndInstall();
     return { success: true };
   });
