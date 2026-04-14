@@ -298,6 +298,7 @@ class ModelManager {
     this.detectedPlatform = await this.detectPlatform();
     this.manifest = await this.loadManifest();
     await this.migrateFlatBinLayout();
+    await this.crossCopyCudaRuntimeDlls();
     await this.disableIfWindowsWithoutNvidia();
 
     logger.info("Initialized", {
@@ -565,6 +566,10 @@ class ModelManager {
       const isBinary = id === "llama-server" || id === "whisper-server";
       if (process.platform !== "win32" && isBinary) {
         await fs.chmod(destPath, 0o755);
+      }
+
+      if (process.platform === "win32" && isBinary) {
+        await this.crossCopyCudaRuntimeDlls();
       }
 
       progress.phase = "complete";
@@ -846,6 +851,46 @@ class ModelManager {
         await fs.unlink(tmpFile);
       } catch {
         // ignore cleanup failures
+      }
+    }
+  }
+
+  /**
+   * Windows CUDA builds: ggml-cuda.dll implicitly loads cublas64_12.dll etc.
+   * Windows resolves those from the DLL's own directory, NOT from PATH.
+   * The whisper-cublas zip bundles these runtime DLLs but the llama-cuda zip
+   * may not. Cross-copy between the two bin dirs so both servers can use CUDA.
+   */
+  private async crossCopyCudaRuntimeDlls(): Promise<void> {
+    if (process.platform !== "win32") return;
+    const cudaRuntimeDlls = [
+      "cublas64_12.dll",
+      "cublasLt64_12.dll",
+      "cudart64_12.dll",
+      "nvblas64_12.dll",
+      "nvrtc64_120_0.dll",
+      "nvrtc-builtins64_124.dll",
+    ];
+
+    const dirs = [this.llamaBinDir, this.whisperBinDir];
+    for (const src of dirs) {
+      for (const dst of dirs) {
+        if (src === dst) continue;
+        for (const dll of cudaRuntimeDlls) {
+          const srcPath = join(src, dll);
+          const dstPath = join(dst, dll);
+          try {
+            await fs.access(srcPath);
+            try {
+              await fs.access(dstPath);
+            } catch {
+              await fs.copyFile(srcPath, dstPath);
+              logger.info(`Copied CUDA runtime DLL ${dll} from ${src} → ${dst}`);
+            }
+          } catch {
+            /* source doesn't exist, skip */
+          }
+        }
       }
     }
   }

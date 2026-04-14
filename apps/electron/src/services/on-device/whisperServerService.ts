@@ -1,27 +1,29 @@
 /**
- * Whisper Server Service
+ * Whisper CLI Service
  *
- * Manages a local whisper-server subprocess (from whisper.cpp) that provides
- * an HTTP endpoint for on-device audio transcription.
- *
- * The server loads a Whisper GGML model and exposes /inference for WAV input.
+ * Transcribes audio by spawning whisper-cli.exe per chunk.
+ * The precompiled whisper-server.exe (v1.8.x) hangs after model loading
+ * on Windows and never binds to the HTTP port, so we use the CLI binary
+ * which works reliably. Model loads in ~400ms per invocation — acceptable
+ * for 10-second audio segments.
  *
  * Lifecycle:
- *   1. modelManager downloads the binary + model file
- *   2. whisperServerService.start() spawns the process on a free port
- *   3. localAudioService sends WAV buffers via POST /inference
- *   4. whisperServerService.stop() tears it down on toggle-off or app quit
+ *   1. modelManager downloads the binary zip + model file
+ *   2. whisperServerService.start() validates paths, marks ready
+ *   3. localAudioService calls transcribe(wavBuffer) per chunk
+ *   4. whisperServerService.stop() is a clean no-op
  */
 
-import { ChildProcess, spawn } from "child_process";
-import { dirname } from "path";
-import { createServer } from "net";
-import { request as httpRequest } from "http";
+import { execFile } from "child_process";
+import { join, dirname } from "path";
+import { writeFile, unlink, mkdir } from "fs/promises";
+import { randomUUID } from "crypto";
+import { app } from "electron";
 import { createLogger } from "../../lib/logger";
 import { modelManager } from "./modelManager";
 import { augmentPathWithCudaBins } from "./windowsCudaEnv";
 
-const logger = createLogger("WhisperServer");
+const logger = createLogger("WhisperCLI");
 
 type ServerStatus = "stopped" | "starting" | "running" | "error";
 
@@ -29,9 +31,6 @@ export interface WhisperServerConfig {
   host: string;
   threads: number;
   language: string;
-  /**
-   * When false, passes `--no-flash-attn`. If omitted, derived from GPU (Pascal off, RTX on).
-   */
   useFlashAttn?: boolean;
 }
 
@@ -42,24 +41,22 @@ const DEFAULT_CONFIG: WhisperServerConfig = {
 };
 
 class WhisperServerService {
-  private process: ChildProcess | null = null;
-  private port: number = 0;
   private status: ServerStatus = "stopped";
   private config: WhisperServerConfig = DEFAULT_CONFIG;
-  private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
-  private startupResolve: (() => void) | null = null;
-  private startupReject: ((err: Error) => void) | null = null;
+  private cliBin: string | null = null;
+  private modelPath: string | null = null;
+  private tmpDir: string = "";
 
   getStatus(): ServerStatus {
     return this.status;
   }
 
   getPort(): number {
-    return this.port;
+    return 0;
   }
 
   getBaseUrl(): string {
-    return `http://${this.config.host}:${this.port}`;
+    return "";
   }
 
   isRunning(): boolean {
@@ -68,266 +65,99 @@ class WhisperServerService {
 
   async start(overrides?: Partial<WhisperServerConfig>): Promise<void> {
     if (this.status === "running") {
-      logger.info("Already running on port", String(this.port));
+      logger.info("Whisper CLI mode already ready");
       return;
     }
 
     this.config = { ...DEFAULT_CONFIG, ...overrides };
-
-    const serverBin = modelManager.getWhisperServerPath();
-    const modelPath = modelManager.getWhisperModelPath();
-
-    if (!serverBin) throw new Error("whisper-server binary not installed");
-    if (!modelPath) throw new Error("Whisper model not installed");
-
-    this.port = await this.findFreePort();
     this.status = "starting";
 
-    const tuning = modelManager.getNvidiaInferenceTuning();
-    const useFlash =
-      this.config.useFlashAttn !== undefined
-        ? this.config.useFlashAttn
-        : tuning.whisperUseFlashAttn;
+    const serverPath = modelManager.getWhisperServerPath();
+    if (!serverPath) throw new Error("whisper binaries not installed");
 
-    // Boolean flags only — never pass the literal "false" as its own argv token.
-    const args = [
-      "--model", modelPath,
-      "--port", String(this.port),
-      "--host", this.config.host,
-      "--threads", String(this.config.threads),
-      "--language", this.config.language,
-      "--no-timestamps",
-    ];
-    if (!useFlash) {
-      args.push("--no-flash-attn");
-    }
+    const whisperDir = dirname(serverPath);
+    const cliPath = join(whisperDir, "Release", "whisper-cli.exe");
 
-    logger.info("Starting whisper-server", {
-      bin: serverBin,
-      port: this.port,
-      whisperFlashAttn: useFlash,
+    this.modelPath = modelManager.getWhisperModelPath();
+    if (!this.modelPath) throw new Error("Whisper model not installed");
+
+    this.cliBin = cliPath;
+    this.tmpDir = join(app.getPath("temp"), "mitable-whisper");
+    await mkdir(this.tmpDir, { recursive: true });
+
+    logger.info("Whisper CLI mode ready", {
+      bin: this.cliBin,
+      model: this.modelPath,
+      threads: this.config.threads,
     });
 
-    const binFolder = dirname(serverBin);
-
-    return new Promise<void>((resolve, reject) => {
-      this.startupResolve = resolve;
-      this.startupReject = reject;
-
-      this.process = spawn(serverBin, args, {
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
-        cwd: binFolder,
-        env: augmentPathWithCudaBins(process.env, modelManager.getServerBinDirs()),
-      });
-
-      this.process.stdout?.on("data", (data: Buffer) => {
-        const line = data.toString().trim();
-        if (line) logger.debug("[whisper-server stdout]", line);
-        if (line.includes("whisper server listening")) {
-          this.onReady();
-        }
-      });
-
-      this.process.stderr?.on("data", (data: Buffer) => {
-        const line = data.toString().trim();
-        if (line) logger.debug("[whisper-server stderr]", line);
-        if (line.includes("whisper server listening")) {
-          this.onReady();
-        }
-      });
-
-      // whisper-server prints its "listening" message to stdout via printf,
-      // which is fully buffered when piped. Poll the HTTP port as a fallback.
-      this.pollUntilReady();
-
-      this.process.on("error", (err) => {
-        logger.error("Failed to spawn whisper-server:", String(err));
-        this.status = "error";
-        this.startupReject?.(err);
-        this.startupReject = null;
-        this.startupResolve = null;
-      });
-
-      this.process.on("exit", (code) => {
-        logger.info("whisper-server exited with code", String(code));
-        this.status = "stopped";
-        this.stopHealthCheck();
-        if (this.startupReject) {
-          const hint =
-            code === 3221225781 || code === -1073741515
-              ? " (CUDA DLLs missing: remove Whisper Server in settings, download again so DLLs are copied next to the exe, or install the CUDA 12.x runtime.)"
-              : "";
-          this.startupReject(new Error(`whisper-server exited during startup (code ${code})${hint}`));
-          this.startupReject = null;
-          this.startupResolve = null;
-        }
-      });
-
-      setTimeout(() => {
-        if (this.status === "starting") {
-          logger.error("Startup timed out after 60s");
-          this.stop();
-          this.startupReject?.(new Error("whisper-server startup timed out"));
-          this.startupReject = null;
-          this.startupResolve = null;
-        }
-      }, 60_000);
-    });
+    this.status = "running";
   }
 
   async stop(): Promise<void> {
-    this.stopHealthCheck();
-    if (!this.process) return;
-
-    logger.info("Stopping whisper-server (pid:", String(this.process.pid) + ")");
-
-    return new Promise<void>((resolve) => {
-      const killTimeout = setTimeout(() => {
-        logger.warn("Force-killing whisper-server");
-        this.process?.kill("SIGKILL");
-        resolve();
-      }, 5000);
-
-      this.process!.on("exit", () => {
-        clearTimeout(killTimeout);
-        this.process = null;
-        this.status = "stopped";
-        resolve();
-      });
-
-      if (process.platform === "win32") {
-        this.process!.kill();
-      } else {
-        this.process!.kill("SIGTERM");
-      }
-    });
+    this.status = "stopped";
+    this.cliBin = null;
+    this.modelPath = null;
+    logger.info("Whisper CLI mode stopped");
   }
 
-  /**
-   * Transcribe a WAV buffer. Posts multipart form data to /inference.
-   * Returns the transcribed text.
-   */
   async transcribe(wavBuffer: Buffer): Promise<string> {
-    if (!this.isRunning()) throw new Error("whisper-server is not running");
+    if (!this.isRunning() || !this.cliBin || !this.modelPath) {
+      throw new Error("Whisper CLI is not ready");
+    }
 
-    const boundary = "----WhisperBoundary" + Date.now();
+    const wavFile = join(this.tmpDir, `chunk-${randomUUID()}.wav`);
 
-    const preamble = Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n` +
-      `Content-Type: application/octet-stream\r\n\r\n`,
-    );
-    const epilogue = Buffer.from(`\r\n--${boundary}--\r\n`);
-    const body = Buffer.concat([preamble, wavBuffer, epilogue]);
+    try {
+      await writeFile(wavFile, wavBuffer);
 
-    return new Promise<string>((resolve, reject) => {
-      const url = new URL(`${this.getBaseUrl()}/inference`);
-      const req = httpRequest(
-        {
-          hostname: url.hostname,
-          port: url.port,
-          path: url.pathname,
-          method: "POST",
-          headers: {
-            "Content-Type": `multipart/form-data; boundary=${boundary}`,
-            "Content-Length": body.length,
+      const tuning = modelManager.getNvidiaInferenceTuning();
+      const useFlash =
+        this.config.useFlashAttn !== undefined
+          ? this.config.useFlashAttn
+          : tuning.whisperUseFlashAttn;
+
+      const args = [
+        "--model", this.modelPath!,
+        "--file", wavFile,
+        "--threads", String(this.config.threads),
+        "--language", this.config.language,
+        "--no-timestamps",
+        "--no-prints",
+      ];
+      if (!useFlash) {
+        args.push("--no-flash-attn");
+      }
+
+      const text = await new Promise<string>((resolve, reject) => {
+        const binDir = dirname(this.cliBin!);
+        execFile(
+          this.cliBin!,
+          args,
+          {
+            cwd: binDir,
+            env: augmentPathWithCudaBins(process.env, modelManager.getServerBinDirs()),
+            timeout: 30_000,
+            maxBuffer: 1024 * 1024,
+            windowsHide: true,
           },
-        },
-        (res) => {
-          const chunks: Buffer[] = [];
-          res.on("data", (chunk: Buffer) => chunks.push(chunk));
-          res.on("end", () => {
-            const raw = Buffer.concat(chunks).toString("utf-8");
-            if (res.statusCode && res.statusCode >= 400) {
-              reject(new Error(`whisper-server error ${res.statusCode}: ${raw}`));
+          (err, stdout, stderr) => {
+            if (err) {
+              logger.error("whisper-cli failed:", String(err));
+              logger.debug("whisper-cli stderr:", stderr?.slice(0, 500));
+              reject(new Error(`whisper-cli error: ${err.message}`));
               return;
             }
-            try {
-              const result = JSON.parse(raw) as { text?: string };
-              resolve((result.text ?? "").trim());
-            } catch {
-              reject(new Error(`whisper-server returned invalid JSON: ${raw.slice(0, 200)}`));
-            }
-          });
-        },
-      );
-
-      req.on("error", (err) => reject(new Error(`whisper-server request failed: ${err.message}`)));
-      req.write(body);
-      req.end();
-    });
-  }
-
-  private onReady(): void {
-    if (this.status !== "starting") return;
-    this.status = "running";
-    logger.info("whisper-server ready on port", String(this.port));
-    this.startHealthCheck();
-    this.startupResolve?.();
-    this.startupResolve = null;
-    this.startupReject = null;
-  }
-
-  private startHealthCheck(): void {
-    this.healthCheckTimer = setInterval(async () => {
-      try {
-        const res = await fetch(`${this.getBaseUrl()}/`, {
-          signal: AbortSignal.timeout(3000),
-        });
-        if (!res.ok && this.status === "running") {
-          logger.warn("Health check failed:", String(res.status));
-        }
-      } catch {
-        if (this.status === "running") {
-          logger.warn("Health check unreachable — whisper-server may have crashed");
-          this.status = "error";
-        }
-      }
-    }, 30_000);
-  }
-
-  private stopHealthCheck(): void {
-    if (this.healthCheckTimer) {
-      clearInterval(this.healthCheckTimer);
-      this.healthCheckTimer = null;
-    }
-  }
-
-  private pollUntilReady(): void {
-    const interval = setInterval(async () => {
-      if (this.status !== "starting") {
-        clearInterval(interval);
-        return;
-      }
-      try {
-        const res = await fetch(`${this.getBaseUrl()}/`, {
-          signal: AbortSignal.timeout(1000),
-        });
-        if (res.ok || res.status < 500) {
-          clearInterval(interval);
-          this.onReady();
-        }
-      } catch {
-        // server not up yet
-      }
-    }, 1500);
-  }
-
-  private findFreePort(): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const server = createServer();
-      server.listen(0, "127.0.0.1", () => {
-        const addr = server.address();
-        if (typeof addr === "object" && addr) {
-          const port = addr.port;
-          server.close(() => resolve(port));
-        } else {
-          reject(new Error("Could not determine free port"));
-        }
+            const output = stdout.trim();
+            resolve(output);
+          },
+        );
       });
-      server.on("error", reject);
-    });
+
+      return text;
+    } finally {
+      unlink(wavFile).catch(() => {});
+    }
   }
 }
 

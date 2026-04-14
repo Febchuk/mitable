@@ -61,6 +61,7 @@ interface ActiveSession {
   lastCaptureHashByWindow: Map<string, string>; // Per-window deduplication
   consecutiveEmptyCaptures: number; // Track consecutive capture cycles with 0 captures
   lastSuccessfulCaptureAt: number; // Timestamp of last successful capture
+  localMode: boolean; // True when on-device AI is active — all inference stays local
 }
 
 // ===========================
@@ -98,7 +99,8 @@ class MonitoringSessionService {
     try {
       const { llamaServerService } = await import("./on-device");
       return llamaServerService.isRunning();
-    } catch {
+    } catch (err) {
+      logger.debug("On-device module not available:", String(err));
       return false;
     }
   }
@@ -193,6 +195,9 @@ class MonitoringSessionService {
 
       logger.info(` Session folder created: ${localPath}`);
 
+      // Determine local mode once at session start — persists for the entire session
+      const localMode = await this.shouldUseLocalInference();
+
       // Initialize active session
       const startedAt = Date.now();
       this.activeSession = {
@@ -205,6 +210,7 @@ class MonitoringSessionService {
         lastCaptureHashByWindow: new Map(),
         consecutiveEmptyCaptures: 0,
         lastSuccessfulCaptureAt: startedAt,
+        localMode,
       };
 
       // Start checkpoint tracking for crash recovery
@@ -232,15 +238,17 @@ class MonitoringSessionService {
       // Start capture loop
       this.startCaptureLoop();
 
-      // Start local inference service if on-device AI is available
-      this.shouldUseLocalInference().then((useLocal) => {
-        if (useLocal) {
-          import("./on-device").then(({ localInferenceService }) => {
-            localInferenceService.start(sessionId);
-            logger.info("On-device inference pipeline started for session", sessionId);
-          });
+      // Start local inference service if on-device AI is active for this session
+      if (localMode) {
+        try {
+          const { localInferenceService } = await import("./on-device");
+          localInferenceService.start(sessionId);
+          logger.info("On-device inference pipeline started for session", sessionId);
+        } catch (err) {
+          logger.error("Failed to start local inference pipeline:", String(err));
+          this.activeSession.localMode = false;
         }
-      });
+      }
 
       // Broadcast session started
       this.broadcastSessionUpdate();
@@ -358,7 +366,6 @@ class MonitoringSessionService {
       windowTitle?: string;
       screenshotHash?: string;
       imageData?: string;
-      // Analysis metadata
       deltaChanged?: boolean;
       deltaChangeType?: string;
       deltaChangeDescription?: string;
@@ -369,6 +376,8 @@ class MonitoringSessionService {
       importanceReason?: string;
     }>;
     error?: string;
+    localMode?: boolean;
+    storyGenerationFailed?: boolean;
   }> {
     if (!this.activeSession) {
       return { success: false, error: "No active session" };
@@ -390,27 +399,41 @@ class MonitoringSessionService {
     }
 
     const sessionId = this.activeSession.id;
+    const localMode = this.activeSession.localMode;
+    let storyGenerationFailed = false;
 
     try {
       // Flush remaining frames through the local inference pipeline and
       // run the storyteller before tearing down the session.
-      try {
-        const { localInferenceService, llamaServerService } = await import("./on-device");
-        if (llamaServerService.isRunning()) {
-          logger.info("Flushing local inference buffer and generating story...");
-          await localInferenceService.flushRemaining();
-          await localInferenceService.generateStory(sessionId);
-          localInferenceService.stop();
+      if (localMode) {
+        try {
+          const { localInferenceService, llamaServerService, textServerService, isParallelMode } = await import("./on-device");
+          if (!llamaServerService.isRunning()) {
+            logger.warn("Local mode session but vision server is not running at end — story generation skipped");
+            storyGenerationFailed = true;
+          } else if (isParallelMode() && textServerService.isRunning()) {
+            logger.info("Parallel mode: flushing buffer and generating story via text server...");
+            await localInferenceService.flushRemaining();
+            const story = await localInferenceService.generateStory(sessionId);
+            logger.info(`Local story generated: ${story.tasks.length} tasks, narrative length ${story.narrative.length}`);
+            localInferenceService.stop();
+          } else {
+            logger.info("Sequential mode: flushing sensor buffer, then swapping to text server...");
+            await localInferenceService.flushRemaining();
+            localInferenceService.stop();
+            const story = await localInferenceService.endSessionSequential(sessionId);
+            logger.info(`Local story generated (sequential): ${story.tasks.length} tasks, narrative length ${story.narrative.length}`);
+          }
+        } catch (err) {
+          logger.error("Local inference flush/story generation failed:", String(err));
+          storyGenerationFailed = true;
         }
-      } catch {
-        // on-device module not available or not running — continue normally
       }
 
       // End checkpoint tracking (removes checkpoint file)
       await checkpointService.endSession();
 
-      // End session in local storage (no Top-K selection needed — captures
-      // are already analyzed and stored on the backend during the session)
+      // End session in local storage
       const manifest = await localFrameStorage.loadManifest(sessionId);
       const captureCount = manifest?.totalFrameCount ?? 0;
       await localFrameStorage.endSession(sessionId, []);
@@ -425,6 +448,8 @@ class MonitoringSessionService {
       logger.info(` Session ended: ${sessionId}`, {
         totalCaptureCount: captureCount,
         duration,
+        localMode,
+        storyGenerationFailed,
       });
 
       // Cleanup session state
@@ -438,12 +463,13 @@ class MonitoringSessionService {
         10 * 60 * 1000
       );
 
-      return { success: true, sessionId, captureCount, captures: [] };
+      return { success: true, sessionId, captureCount, captures: [], localMode, storyGenerationFailed };
     } catch (error) {
       logger.error(" Failed to end session:", error);
       return {
         success: false,
         error: `Failed to end session: ${error instanceof Error ? error.message : "Unknown error"}`,
+        localMode,
       };
     }
   }
@@ -539,6 +565,7 @@ class MonitoringSessionService {
         lastCaptureHashByWindow: new Map(),
         consecutiveEmptyCaptures: 0,
         lastSuccessfulCaptureAt: Date.now(),
+        localMode: await this.shouldUseLocalInference(),
       };
 
       // Resume capture loop if session was active
@@ -972,11 +999,9 @@ class MonitoringSessionService {
         }
       }
 
-      // Route to on-device inference if the local server is running,
-      // otherwise fall back to the cloud pipeline.
-      const useLocalInference = await this.shouldUseLocalInference();
-
-      if (useLocalInference) {
+      // Route frames based on session-level localMode flag (set once at start).
+      // In local mode, frames NEVER leave the device — no cloud fallback.
+      if (this.activeSession.localMode) {
         try {
           const { localInferenceService } = await import("./on-device");
           await localInferenceService.addFrame({
@@ -993,21 +1018,7 @@ class MonitoringSessionService {
             browserContext,
           });
         } catch (err) {
-          logger.warn("Local inference failed, falling back to cloud:", String(err));
-          this.analyzeFrameAsync(
-            this.activeSession.id,
-            frameMetadata.frameId,
-            base64Data,
-            previousFrame?.imageData || null,
-            windowInfo,
-            {
-              sequenceNumber: frameMetadata.sequenceNumber,
-              captureTrigger: trigger,
-              capturedAt: new Date(frameMetadata.timestamp).getTime(),
-            },
-            intervalEvidence,
-            browserContext
-          );
+          logger.warn("Local inference addFrame failed (frame skipped, NOT sent to cloud):", String(err));
         }
       } else {
         this.analyzeFrameAsync(

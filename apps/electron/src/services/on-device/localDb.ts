@@ -146,6 +146,26 @@ CREATE INDEX IF NOT EXISTS idx_transcriptions_session ON transcriptions(session_
 CREATE INDEX IF NOT EXISTS idx_transcriptions_session_time ON transcriptions(session_id, start_time_ms);
 `;
 
+// better-sqlite3 SELECT * returns snake_case column names;
+// map them to the camelCase TypeScript interfaces expect.
+function snakeToCamel(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(row)) {
+    const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[camel] = val;
+  }
+  return out;
+}
+
+function mapRows<T>(rows: unknown[]): T[] {
+  return rows.map((r) => snakeToCamel(r as Record<string, unknown>) as T);
+}
+
+function mapRow<T>(row: unknown): T | null {
+  if (!row) return null;
+  return snakeToCamel(row as Record<string, unknown>) as T;
+}
+
 // ── Service ─────────────────────────────────────────────────────────────────
 
 class LocalDatabase {
@@ -193,31 +213,58 @@ class LocalDatabase {
     return db !== null;
   }
 
+  // ── WAL Checkpoint ──────────────────────────────────────────────────────
+
+  checkpoint(): void {
+    if (!db) {
+      logger.warn("checkpoint() called but DB is unavailable");
+      return;
+    }
+    try {
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      logger.info("WAL checkpoint complete");
+    } catch (err) {
+      logger.error("WAL checkpoint failed:", String(err));
+    }
+  }
+
   // ── Captures ────────────────────────────────────────────────────────────
 
   insertCapture(capture: Omit<LocalCapture, "createdAt">): void {
-    if (!db) return;
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO captures
-        (id, session_id, frame_id, sequence_number, captured_at, window_id,
-         app_name, window_title, sensor_output, delta_changed, change_type, user_action)
-      VALUES
-        (@id, @sessionId, @frameId, @sequenceNumber, @capturedAt, @windowId,
-         @appName, @windowTitle, @sensorOutput, @deltaChanged, @changeType, @userAction)
-    `);
-    stmt.run({
-      ...capture,
-      deltaChanged: capture.deltaChanged ? 1 : 0,
-    });
+    if (!db) {
+      logger.error("insertCapture: DB unavailable, dropping frame", capture.frameId);
+      return;
+    }
+    try {
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO captures
+          (id, session_id, frame_id, sequence_number, captured_at, window_id,
+           app_name, window_title, sensor_output, delta_changed, change_type, user_action)
+        VALUES
+          (@id, @sessionId, @frameId, @sequenceNumber, @capturedAt, @windowId,
+           @appName, @windowTitle, @sensorOutput, @deltaChanged, @changeType, @userAction)
+      `);
+      stmt.run({
+        ...capture,
+        deltaChanged: capture.deltaChanged ? 1 : 0,
+      });
+    } catch (err) {
+      logger.error("insertCapture failed:", String(err), { session: capture.sessionId, frame: capture.frameId });
+    }
   }
 
   getCapturesForSession(sessionId: string): LocalCapture[] {
-    if (!db) return [];
-    return db
-      .prepare(
-        `SELECT * FROM captures WHERE session_id = ? ORDER BY sequence_number ASC`
-      )
-      .all(sessionId) as LocalCapture[];
+    if (!db) {
+      logger.warn("getCapturesForSession: DB unavailable");
+      return [];
+    }
+    return mapRows<LocalCapture>(
+      db
+        .prepare(
+          `SELECT * FROM captures WHERE session_id = ? ORDER BY sequence_number ASC`
+        )
+        .all(sessionId)
+    );
   }
 
   getCaptureRange(
@@ -225,89 +272,151 @@ class LocalDatabase {
     startSeq: number,
     endSeq: number
   ): LocalCapture[] {
-    if (!db) return [];
-    return db
-      .prepare(
-        `SELECT * FROM captures
+    if (!db) {
+      logger.warn("getCaptureRange: DB unavailable");
+      return [];
+    }
+    return mapRows<LocalCapture>(
+      db
+        .prepare(
+          `SELECT * FROM captures
          WHERE session_id = ? AND sequence_number BETWEEN ? AND ?
          ORDER BY sequence_number ASC`
-      )
-      .all(sessionId, startSeq, endSeq) as LocalCapture[];
+        )
+        .all(sessionId, startSeq, endSeq)
+    );
+  }
+
+  getCaptureCount(sessionId: string): number {
+    if (!db) return 0;
+    const row = db
+      .prepare(`SELECT COUNT(*) as cnt FROM captures WHERE session_id = ?`)
+      .get(sessionId) as { cnt: number } | undefined;
+    return row?.cnt ?? 0;
   }
 
   // ── Classifications ─────────────────────────────────────────────────────
 
   insertClassification(classification: Omit<LocalClassification, "createdAt">): void {
-    if (!db) return;
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO classifications
-        (id, session_id, batch_index, start_sequence, end_sequence,
-         activity_description, activity_type, on_task, task_relevance,
-         importance_score, raw_output)
-      VALUES
-        (@id, @sessionId, @batchIndex, @startSequence, @endSequence,
-         @activityDescription, @activityType, @onTask, @taskRelevance,
-         @importanceScore, @rawOutput)
-    `);
-    stmt.run({
-      ...classification,
-      onTask: classification.onTask ? 1 : 0,
-    });
+    if (!db) {
+      logger.error("insertClassification: DB unavailable, dropping batch", String(classification.batchIndex));
+      return;
+    }
+    try {
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO classifications
+          (id, session_id, batch_index, start_sequence, end_sequence,
+           activity_description, activity_type, on_task, task_relevance,
+           importance_score, raw_output)
+        VALUES
+          (@id, @sessionId, @batchIndex, @startSequence, @endSequence,
+           @activityDescription, @activityType, @onTask, @taskRelevance,
+           @importanceScore, @rawOutput)
+      `);
+      stmt.run({
+        ...classification,
+        onTask: classification.onTask ? 1 : 0,
+      });
+    } catch (err) {
+      logger.error("insertClassification failed:", String(err), { session: classification.sessionId, batch: classification.batchIndex });
+    }
   }
 
   getClassificationsForSession(sessionId: string): LocalClassification[] {
-    if (!db) return [];
-    return db
-      .prepare(
-        `SELECT * FROM classifications WHERE session_id = ? ORDER BY batch_index ASC`
-      )
-      .all(sessionId) as LocalClassification[];
+    if (!db) {
+      logger.warn("getClassificationsForSession: DB unavailable");
+      return [];
+    }
+    return mapRows<LocalClassification>(
+      db
+        .prepare(
+          `SELECT * FROM classifications WHERE session_id = ? ORDER BY batch_index ASC`
+        )
+        .all(sessionId)
+    );
+  }
+
+  getClassificationCount(sessionId: string): number {
+    if (!db) return 0;
+    const row = db
+      .prepare(`SELECT COUNT(*) as cnt FROM classifications WHERE session_id = ?`)
+      .get(sessionId) as { cnt: number } | undefined;
+    return row?.cnt ?? 0;
   }
 
   // ── Stories ─────────────────────────────────────────────────────────────
 
   insertStory(story: Omit<LocalStory, "createdAt">): void {
-    if (!db) return;
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO stories
-        (id, session_id, narrative, tasks, time_breakdown, model_used)
-      VALUES
-        (@id, @sessionId, @narrative, @tasks, @timeBreakdown, @modelUsed)
-    `);
-    stmt.run(story);
+    if (!db) {
+      logger.error("insertStory: DB unavailable, dropping story for session", story.sessionId);
+      return;
+    }
+    try {
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO stories
+          (id, session_id, narrative, tasks, time_breakdown, model_used)
+        VALUES
+          (@id, @sessionId, @narrative, @tasks, @timeBreakdown, @modelUsed)
+      `);
+      stmt.run(story);
+    } catch (err) {
+      logger.error("insertStory failed:", String(err), { session: story.sessionId });
+    }
   }
 
   getStoryForSession(sessionId: string): LocalStory | null {
-    if (!db) return null;
-    return (
-      (db
-        .prepare(`SELECT * FROM stories WHERE session_id = ?`)
-        .get(sessionId) as LocalStory | undefined) ?? null
+    if (!db) {
+      logger.warn("getStoryForSession: DB unavailable");
+      return null;
+    }
+    return mapRow<LocalStory>(
+      db.prepare(`SELECT * FROM stories WHERE session_id = ?`).get(sessionId)
     );
+  }
+
+  getAllStories(): LocalStory[] {
+    if (!db) {
+      logger.warn("getAllStories: DB unavailable");
+      return [];
+    }
+    const rows = db.prepare(`SELECT * FROM stories ORDER BY created_at ASC`).all();
+    return rows.map((r) => mapRow<LocalStory>(r)!).filter(Boolean);
   }
 
   // ── Transcriptions ──────────────────────────────────────────────────────
 
   insertTranscription(transcription: Omit<LocalTranscription, "createdAt">): void {
-    if (!db) return;
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO transcriptions
-        (id, session_id, chunk_index, speaker_id, transcript,
-         start_time_ms, end_time_ms, confidence)
-      VALUES
-        (@id, @sessionId, @chunkIndex, @speakerId, @transcript,
-         @startTimeMs, @endTimeMs, @confidence)
-    `);
-    stmt.run(transcription);
+    if (!db) {
+      logger.error("insertTranscription: DB unavailable, dropping chunk", String(transcription.chunkIndex));
+      return;
+    }
+    try {
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO transcriptions
+          (id, session_id, chunk_index, speaker_id, transcript,
+           start_time_ms, end_time_ms, confidence)
+        VALUES
+          (@id, @sessionId, @chunkIndex, @speakerId, @transcript,
+           @startTimeMs, @endTimeMs, @confidence)
+      `);
+      stmt.run(transcription);
+    } catch (err) {
+      logger.error("insertTranscription failed:", String(err), { session: transcription.sessionId, chunk: transcription.chunkIndex });
+    }
   }
 
   getTranscriptionsForSession(sessionId: string): LocalTranscription[] {
-    if (!db) return [];
-    return db
-      .prepare(
-        `SELECT * FROM transcriptions WHERE session_id = ? ORDER BY start_time_ms ASC`
-      )
-      .all(sessionId) as LocalTranscription[];
+    if (!db) {
+      logger.warn("getTranscriptionsForSession: DB unavailable");
+      return [];
+    }
+    return mapRows<LocalTranscription>(
+      db
+        .prepare(
+          `SELECT * FROM transcriptions WHERE session_id = ? ORDER BY start_time_ms ASC`
+        )
+        .all(sessionId)
+    );
   }
 
   getTranscriptionRange(
@@ -315,29 +424,33 @@ class LocalDatabase {
     startMs: number,
     endMs: number
   ): LocalTranscription[] {
-    if (!db) return [];
-    return db
-      .prepare(
-        `SELECT * FROM transcriptions
+    if (!db) {
+      logger.warn("getTranscriptionRange: DB unavailable");
+      return [];
+    }
+    return mapRows<LocalTranscription>(
+      db
+        .prepare(
+          `SELECT * FROM transcriptions
          WHERE session_id = ? AND start_time_ms >= ? AND end_time_ms <= ?
          ORDER BY start_time_ms ASC`
-      )
-      .all(sessionId, startMs, endMs) as LocalTranscription[];
+        )
+        .all(sessionId, startMs, endMs)
+    );
   }
 
   // ── Queries for the Mitable agent ───────────────────────────────────────
 
-  /**
-   * Search local session data by keyword (for agent queries like
-   * "what was I doing at 2pm?"). Searches sensor output and classifications.
-   */
   searchSessions(query: string, limit = 20): Array<{
     sessionId: string;
     text: string;
     source: "capture" | "classification" | "story" | "transcription";
     timestamp: number;
   }> {
-    if (!db) return [];
+    if (!db) {
+      logger.warn("searchSessions: DB unavailable");
+      return [];
+    }
 
     const likeQuery = `%${query}%`;
     const results: Array<{
@@ -399,7 +512,7 @@ class LocalDatabase {
       results.push({
         sessionId: t.session_id,
         text: t.transcript,
-        source: "transcription" as any,
+        source: "transcription",
         timestamp: t.start_time_ms,
       });
     }
@@ -407,9 +520,6 @@ class LocalDatabase {
     return results.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
   }
 
-  /**
-   * Get total storage used by local DB in bytes.
-   */
   getDbSizeBytes(): number {
     try {
       const fs = require("fs");
@@ -422,6 +532,9 @@ class LocalDatabase {
 
   close(): void {
     if (db) {
+      try {
+        db.pragma("wal_checkpoint(TRUNCATE)");
+      } catch { /* best effort checkpoint before close */ }
       db.close();
       db = null;
       logger.info("Local database closed");

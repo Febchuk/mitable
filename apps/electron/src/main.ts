@@ -131,8 +131,8 @@ async function cleanupAudioRecording(sessionId?: string): Promise<void> {
     const { localAudioService } = await import("./services/on-device");
     await localAudioService.flushRemaining();
     localAudioService.stop();
-  } catch {
-    // on-device module not available
+  } catch (err) {
+    logger.debug("On-device audio cleanup skipped:", String(err));
   }
 
   audioWebSocketService.disconnect();
@@ -1414,11 +1414,12 @@ function setupIPC() {
                     ` On-device summary ready: ${exported.taskBreakdown.length} tasks`
                   );
                 }
-              } catch {
-                // on-device module not available
+              } catch (err) {
+                monitoringLogger.debug("On-device export skipped:", String(err));
               }
 
-              if (!onDeviceSummary && result.captures && result.captures.length > 0) {
+              // In local mode, NEVER upload raw captures to the cloud
+              if (!result.localMode && !onDeviceSummary && result.captures && result.captures.length > 0) {
                 monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
                 await authManager.authenticatedFetch(
                   `/api/monitoring/sessions/${result.sessionId}/captures`,
@@ -1429,7 +1430,7 @@ function setupIPC() {
                 );
               }
 
-              monitoringLogger.info(` Triggering backend summarization with defaults`);
+              monitoringLogger.info(` Triggering backend end-session (localMode: ${!!result.localMode})`);
               await authManager.authenticatedFetch(
                 `/api/monitoring/sessions/${result.sessionId}/end`,
                 {
@@ -1441,6 +1442,7 @@ function setupIPC() {
                       includeScreenshots: summaryDefaults.includeScreenshots,
                     },
                     autoRecap: autoRecapEnabled,
+                    localMode: !!result.localMode,
                     ...(onDeviceSummary ? { onDeviceSummary } : {}),
                   }),
                 }
@@ -2111,8 +2113,26 @@ function setupMonitoringSessionHandlers() {
       monitoringLogger.info("Finalizing session:", sessionId, "captures:", captures.length);
 
       try {
-        // Step 1: Upload captures to backend
-        if (captures.length > 0) {
+        // Check if on-device AI produced a local story for this session
+        let onDeviceSummary: import("./services/on-device/localInferenceService").OnDeviceSummary | undefined;
+        let isLocalSession = false;
+        try {
+          const { localInferenceService, localDb } = await import("./services/on-device");
+          const story = localDb.getStoryForSession(sessionId);
+          if (story) {
+            isLocalSession = true;
+            const exported = localInferenceService.exportResultsForBackend(sessionId, 0);
+            if (exported) {
+              onDeviceSummary = exported;
+              monitoringLogger.info(` On-device summary found for finalize: ${exported.taskBreakdown.length} tasks`);
+            }
+          }
+        } catch (err) {
+          monitoringLogger.debug("On-device finalize check skipped:", String(err));
+        }
+
+        // In local mode, NEVER upload raw captures to the cloud
+        if (!isLocalSession && captures.length > 0) {
           monitoringLogger.info(" Uploading", captures.length, "captures to backend");
           const uploadResponse = await authManager.authenticatedFetch(
             `/api/monitoring/sessions/${sessionId}/captures`,
@@ -2130,8 +2150,8 @@ function setupMonitoringSessionHandlers() {
           monitoringLogger.info(" Captures uploaded successfully");
         }
 
-        // Step 2: Call /end endpoint to trigger summarization
-        monitoringLogger.info(" Triggering summarization");
+        // Call /end endpoint
+        monitoringLogger.info(` Triggering end-session (localMode: ${isLocalSession})`);
         const autoRecapForFinalize = currentUserContext?.userId
           ? preferencesService.getUserAutoRecap(currentUserContext.userId)
           : true;
@@ -2139,7 +2159,11 @@ function setupMonitoringSessionHandlers() {
           `/api/monitoring/sessions/${sessionId}/end`,
           {
             method: "POST",
-            body: JSON.stringify({ autoRecap: autoRecapForFinalize }),
+            body: JSON.stringify({
+              autoRecap: autoRecapForFinalize,
+              localMode: isLocalSession,
+              ...(onDeviceSummary ? { onDeviceSummary } : {}),
+            }),
           }
         );
 
@@ -2174,6 +2198,55 @@ function setupMonitoringSessionHandlers() {
     }
 
     return { success: true };
+  });
+
+  // Re-sync local on-device stories to the cloud backend
+  ipcMain.handle(IPC_CHANNELS.MONITORING_RESYNC_LOCAL, async () => {
+    monitoringLogger.info("Resync: pushing local stories to cloud backend");
+    try {
+      const { localDb, localInferenceService } = await import("./services/on-device");
+      const stories = localDb.getAllStories();
+      if (stories.length === 0) {
+        return { success: true, synced: 0, message: "No local stories to sync" };
+      }
+
+      let synced = 0;
+      const errors: string[] = [];
+
+      for (const story of stories) {
+        try {
+          const exported = localInferenceService.exportResultsForBackend(story.sessionId, 0);
+          if (!exported) {
+            errors.push(`${story.sessionId.slice(0, 8)}: export failed`);
+            continue;
+          }
+
+          const resp = await authManager.authenticatedFetch(
+            `/api/monitoring/sessions/${story.sessionId}/on-device-summary`,
+            {
+              method: "PUT",
+              body: JSON.stringify({ onDeviceSummary: exported }),
+            }
+          );
+
+          if (resp.ok) {
+            synced++;
+            monitoringLogger.info(`Resync: uploaded ${story.sessionId.slice(0, 8)} (${exported.taskBreakdown.length} tasks)`);
+          } else {
+            const errText = await resp.text();
+            errors.push(`${story.sessionId.slice(0, 8)}: ${resp.status} ${errText.slice(0, 100)}`);
+          }
+        } catch (err) {
+          errors.push(`${story.sessionId.slice(0, 8)}: ${String(err).slice(0, 100)}`);
+        }
+      }
+
+      monitoringLogger.info(`Resync complete: ${synced}/${stories.length} synced`);
+      return { success: true, synced, total: stories.length, errors: errors.length > 0 ? errors : undefined };
+    } catch (err) {
+      monitoringLogger.error("Resync failed:", String(err));
+      return { success: false, error: String(err) };
+    }
   });
 
   // Passive monitoring IPC handlers
@@ -2370,8 +2443,8 @@ function setupMonitoringSessionHandlers() {
         monitoringLogger.info("✅ Local audio transcription started (on-device Whisper)");
         return { success: true, hasSystemAudio: false };
       }
-    } catch {
-      // on-device module not available, fall through to cloud path
+    } catch (err) {
+      monitoringLogger.debug("On-device audio start skipped:", String(err));
     }
 
     // Cloud path: connect WebSocket to backend for Deepgram
@@ -2484,8 +2557,8 @@ function setupMonitoringSessionHandlers() {
         monitoringLogger.info("✅ Local audio transcription stopped and flushed");
         return { success: true };
       }
-    } catch {
-      // on-device module not available, fall through to cloud path
+    } catch (err) {
+      monitoringLogger.debug("On-device audio stop skipped:", String(err));
     }
 
     // Cloud path: disconnect WebSocket
@@ -2741,11 +2814,12 @@ function setupMonitoringSessionHandlers() {
             ` On-device summary ready: ${exported.taskBreakdown.length} tasks, sending to backend`
           );
         }
-      } catch {
-        // on-device module not available — fall through to cloud path
+      } catch (err) {
+        monitoringLogger.debug("On-device export skipped (passive end):", String(err));
       }
 
-      if (!onDeviceSummary && result.captures && result.captures.length > 0) {
+      // In local mode, NEVER upload raw captures to the cloud
+      if (!result.localMode && !onDeviceSummary && result.captures && result.captures.length > 0) {
         monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
         await authManager.authenticatedFetch(
           `/api/monitoring/sessions/${result.sessionId}/captures`,
@@ -2756,11 +2830,12 @@ function setupMonitoringSessionHandlers() {
         );
       }
 
-      monitoringLogger.info(` Triggering backend summarization`);
+      monitoringLogger.info(` Triggering backend end-session (localMode: ${!!result.localMode})`);
       await authManager.authenticatedFetch(`/api/monitoring/sessions/${result.sessionId}/end`, {
         method: "POST",
         body: JSON.stringify({
           autoRecap,
+          localMode: !!result.localMode,
           ...(onDeviceSummary ? { onDeviceSummary } : {}),
         }),
       });
@@ -3142,8 +3217,8 @@ function registerGlobalShortcuts() {
           startPillCursorTracking();
         }
       }
-    } catch {
-      // Silently handle errors
+    } catch (err) {
+      logger.warn("Watching pill toggle error:", String(err));
     }
   });
 }
@@ -3408,7 +3483,7 @@ app.whenReady().then(async () => {
   // ── On-Device AI IPC handlers ──────────────────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
     try {
-      const { modelManager, llamaServerService, whisperServerService, localDb } = await import("./services/on-device");
+      const { modelManager, llamaServerService, textServerService, whisperServerService, isParallelMode, localDb } = await import("./services/on-device");
       const sqliteAvailable = localDb.isAvailable() || await localDb.tryOpen();
       const gpuOk = modelManager.canUseOnDeviceInference();
       const allowed = gpuOk && sqliteAvailable;
@@ -3420,7 +3495,9 @@ app.whenReady().then(async () => {
       return {
         isSetUp: modelManager.isFullySetUp(),
         serverStatus: llamaServerService.getStatus(),
+        textServerStatus: textServerService.getStatus(),
         whisperStatus: whisperServerService.getStatus(),
+        parallelMode: isParallelMode(),
         installedAssets: modelManager.getInstalledAssets(),
         enabled: modelManager.isEnabled(),
         windowsRequiresNvidia: modelManager.windowsRequiresNvidia(),
@@ -3511,8 +3588,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL, async () => {
     try {
-      const { modelManager, llamaServerService, whisperServerService } = await import("./services/on-device");
-      await Promise.all([llamaServerService.stop(), whisperServerService.stop()]);
+      const { modelManager, llamaServerService, textServerService, whisperServerService } = await import("./services/on-device");
+      await Promise.all([llamaServerService.stop(), textServerService.stop(), whisperServerService.stop()]);
       await modelManager.removeAll();
       return { success: true };
     } catch (err) {
@@ -3522,9 +3599,9 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, async (_event, assetId: string) => {
     try {
-      const { modelManager, llamaServerService, whisperServerService } = await import("./services/on-device");
-      if (llamaServerService.isRunning() || whisperServerService.isRunning()) {
-        await Promise.all([llamaServerService.stop(), whisperServerService.stop()]);
+      const { modelManager, llamaServerService, textServerService, whisperServerService } = await import("./services/on-device");
+      if (llamaServerService.isRunning() || textServerService.isRunning() || whisperServerService.isRunning()) {
+        await Promise.all([llamaServerService.stop(), textServerService.stop(), whisperServerService.stop()]);
         await modelManager.setEnabled(false);
       }
       await modelManager.removeAsset(assetId);
@@ -3541,7 +3618,9 @@ app.whenReady().then(async () => {
         startOnDeviceServersAtomic,
         stopOnDeviceServersBoth,
         llamaServerService,
+        textServerService,
         whisperServerService,
+        isParallelMode,
         localDb,
       } = await import("./services/on-device");
       if (!modelManager.canUseOnDeviceInference()) {
@@ -3567,7 +3646,9 @@ app.whenReady().then(async () => {
       return {
         success: true,
         llamaPort: llamaServerService.getPort(),
+        textServerPort: textServerService.getPort(),
         whisperPort: whisperServerService.getPort(),
+        parallelMode: isParallelMode(),
       };
     } catch (err) {
       return { success: false, error: String(err) };
@@ -3576,9 +3657,10 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_STOP_SERVER, async () => {
     try {
-      const { llamaServerService, whisperServerService, modelManager } = await import("./services/on-device");
+      const { llamaServerService, textServerService, whisperServerService, modelManager } = await import("./services/on-device");
       await Promise.all([
         llamaServerService.stop(),
+        textServerService.stop(),
         whisperServerService.stop(),
       ]);
       await modelManager.setEnabled(false);
@@ -3590,14 +3672,17 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS, async () => {
     try {
-      const { llamaServerService } = await import("./services/on-device");
+      const { llamaServerService, textServerService, isParallelMode } = await import("./services/on-device");
       return {
         status: llamaServerService.getStatus(),
         port: llamaServerService.getPort(),
         baseUrl: llamaServerService.isRunning() ? llamaServerService.getBaseUrl() : null,
+        textServerStatus: textServerService.getStatus(),
+        textServerPort: textServerService.getPort(),
+        parallelMode: isParallelMode(),
       };
     } catch (err) {
-      return { status: "stopped", port: 0, baseUrl: null, error: String(err) };
+      return { status: "stopped", port: 0, baseUrl: null, textServerStatus: "stopped", textServerPort: 0, parallelMode: false, error: String(err) };
     }
   });
 

@@ -17,7 +17,16 @@
 import { randomUUID } from "crypto";
 import { createLogger } from "../../lib/logger";
 import { llamaServerService } from "./llamaServerService";
+import { textServerService } from "./textServerService";
 import { localDb } from "./localDb";
+import { isParallelMode } from "./onDeviceServerLifecycle";
+import { runRLMLoop, type CompletionFn } from "./rlm/local-rlm-engine";
+import { ClassifierEnvironment, type SensorFrame } from "./rlm/classifier-rlm-environment";
+import { CLASSIFIER_TOOLS } from "./rlm/classifier-rlm-tools";
+import { getClassifierSystemPrompt, getClassifierUserPrompt } from "./rlm/classifier-rlm-prompts";
+import { StorytellerEnvironment } from "./rlm/storyteller-rlm-environment";
+import { STORYTELLER_TOOLS } from "./rlm/storyteller-rlm-tools";
+import { getStorytellerSystemPrompt, getStorytellerUserPrompt } from "./rlm/storyteller-rlm-prompts";
 import type { IntervalEvidence } from "../activityTracker";
 
 const logger = createLogger("LocalInference");
@@ -109,7 +118,7 @@ class LocalInferenceService {
    * Force-flush remaining frames (call on session end before storyteller).
    */
   async flushRemaining(): Promise<void> {
-    if (this.frameBuffer.length > 0) {
+    while (this.frameBuffer.length > 0) {
       await this.flushBatch();
     }
   }
@@ -151,24 +160,28 @@ class LocalInferenceService {
         });
       }
 
-      // Step 2: Classifier — stitch sensor outputs into activity narrative
-      const classifierResult = await this.runClassifier(batch, sensorResults);
+      // Step 2: Classifier — only runs in parallel mode (text server available)
+      if (isParallelMode() && textServerService.isRunning()) {
+        const classifierResult = await this.runClassifier(batch, sensorResults);
 
-      localDb.insertClassification({
-        id: randomUUID(),
-        sessionId: batch[0].sessionId,
-        batchIndex: batchIdx,
-        startSequence: batch[0].sequenceNumber,
-        endSequence: batch[batch.length - 1].sequenceNumber,
-        activityDescription: classifierResult.description,
-        activityType: classifierResult.activityType,
-        onTask: classifierResult.onTask,
-        taskRelevance: classifierResult.taskRelevance,
-        importanceScore: classifierResult.importanceScore,
-        rawOutput: classifierResult.rawOutput,
-      });
+        localDb.insertClassification({
+          id: randomUUID(),
+          sessionId: batch[0].sessionId,
+          batchIndex: batchIdx,
+          startSequence: batch[0].sequenceNumber,
+          endSequence: batch[batch.length - 1].sequenceNumber,
+          activityDescription: classifierResult.description,
+          activityType: classifierResult.activityType,
+          onTask: classifierResult.onTask,
+          taskRelevance: classifierResult.taskRelevance,
+          importanceScore: classifierResult.importanceScore,
+          rawOutput: classifierResult.rawOutput,
+        });
 
-      logger.info(`Batch ${batchIdx} complete:`, classifierResult.description.slice(0, 100));
+        logger.info(`Batch ${batchIdx} complete:`, classifierResult.description.slice(0, 100));
+      } else {
+        logger.info(`Batch ${batchIdx} sensor complete (${batch.length} frames stored, classification deferred)`);
+      }
     } catch (err) {
       logger.error(`Batch ${batchIdx} failed:`, String(err));
     } finally {
@@ -273,7 +286,7 @@ class LocalInferenceService {
     return "idle/watching";
   }
 
-  // ── Classifier layer (text) ───────────────────────────────────────────
+  // ── Classifier layer (RLM) ───────────────────────────────────────────
 
   private async runClassifier(
     batch: BufferedFrame[],
@@ -286,146 +299,229 @@ class LocalInferenceService {
     importanceScore: number;
     rawOutput: string;
   }> {
-    const timeline = sensorResults
-      .map((s, i) => {
-        const frame = batch[i];
-        const time = new Date(frame.capturedAt).toLocaleTimeString();
-        const action = s.userAction ? ` [${s.userAction}]` : "";
-        return `${time}${action}: ${s.description}`;
-      })
-      .join("\n");
+    const frames: SensorFrame[] = sensorResults.map((s, i) => ({
+      index: i,
+      time: new Date(batch[i].capturedAt).toLocaleTimeString(),
+      appName: batch[i].appName,
+      windowTitle: batch[i].windowTitle,
+      sensorOutput: s.description,
+      userAction: s.userAction,
+    }));
 
-    const prompt = `Analyze the following timeline of screen activity (${batch.length} frames captured over ~${Math.round((batch.length * 10) / 60)} minutes) and produce a concise summary.
+    const env = new ClassifierEnvironment({
+      frames,
+      sessionId: batch[0].sessionId,
+      batchIndex: this.batchIndex - 1,
+    });
 
-Timeline:
-${timeline}
+    const completionFn: CompletionFn = (msgs, opts) =>
+      textServerService.chatCompletion(msgs, opts);
 
-Respond in this exact JSON format:
-{
-  "description": "2-3 sentence summary of what the user was doing during this period",
-  "activityType": "coding|browsing|writing|communicating|designing|meeting|reading|other",
-  "onTask": true/false,
-  "taskRelevance": "brief note on how this relates to productive work",
-  "importanceScore": 0.0 to 1.0
-}`;
-
-    // For now, use the vision model's text capabilities for classification.
-    // This will be replaced with node-llama-cpp + a dedicated text model.
-    const response = await llamaServerService.chatCompletion(
-      [
-        {
-          role: "system",
-          content:
-            "You are a work activity classifier. Given a timeline of screen observations, summarize the activity period. Always respond with valid JSON matching the requested format.",
-        },
-        { role: "user", content: prompt },
-      ],
-      { temperature: 0.1, max_tokens: 512 }
+    const result = await runRLMLoop<ClassifierEnvironment, Record<string, unknown>>(
+      getClassifierSystemPrompt(),
+      getClassifierUserPrompt(frames.length, env.batchIndex),
+      CLASSIFIER_TOOLS,
+      env,
+      { maxIterations: 5, doneResultField: "classification", temperature: 0.1, completionFn }
     );
 
-    try {
-      const parsed = JSON.parse(response);
+    const classification = env.getClassification() ?? (result.result as Record<string, unknown> | null);
+
+    if (classification) {
       return {
-        description: parsed.description || "Activity recorded",
-        activityType: parsed.activityType || null,
-        onTask: parsed.onTask ?? true,
-        taskRelevance: parsed.taskRelevance || null,
-        importanceScore: parsed.importanceScore ?? 0.5,
-        rawOutput: response,
-      };
-    } catch {
-      logger.warn("Failed to parse classifier JSON, using raw response");
-      return {
-        description: response.slice(0, 500),
-        activityType: null,
-        onTask: true,
-        taskRelevance: null,
-        importanceScore: 0.5,
-        rawOutput: response,
+        description: String(classification.description || "Activity recorded"),
+        activityType: classification.activityType ? String(classification.activityType) : null,
+        onTask: Boolean(classification.onTask),
+        taskRelevance: classification.taskRelevance ? String(classification.taskRelevance) : null,
+        importanceScore: Number(classification.importanceScore) || 0.5,
+        rawOutput: JSON.stringify(result),
       };
     }
+
+    logger.warn("Classifier RLM produced no result, using fallback");
+    const fallbackDesc = sensorResults.map((s) => s.description).join(". ").slice(0, 500);
+    return {
+      description: fallbackDesc || "Activity recorded",
+      activityType: null,
+      onTask: true,
+      taskRelevance: null,
+      importanceScore: 0.5,
+      rawOutput: JSON.stringify(result),
+    };
   }
 
-  // ── Storyteller layer ─────────────────────────────────────────────────
+  // ── Storyteller layer (RLM) ───────────────────────────────────────────
 
   /**
    * Called at session end. Reads all classifications from local DB and
-   * generates the final session narrative + tasks.
+   * generates the final session narrative + tasks via the RLM loop.
    */
   async generateStory(sessionId: string): Promise<{
     narrative: string;
-    tasks: string[];
+    tasks: Array<{ description: string; minutes: number }>;
   }> {
     const classifications = localDb.getClassificationsForSession(sessionId);
     const transcriptions = localDb.getTranscriptionsForSession(sessionId);
 
     if (classifications.length === 0 && transcriptions.length === 0) {
-      return { narrative: "No activity was recorded during this session.", tasks: [] };
-    }
-
-    const timeline = classifications
-      .map((c) => `[Batch ${c.batchIndex}] ${c.activityDescription}`)
-      .join("\n\n");
-
-    const transcriptBlock =
-      transcriptions.length > 0
-        ? `\n\nAudio transcriptions from the session (spoken by the user or in meetings):\n${transcriptions
-            .map(
-              (t) =>
-                `[${new Date(t.startTimeMs).toISOString().slice(11, 19)} - ${new Date(t.endTimeMs).toISOString().slice(11, 19)}] ${t.transcript}`
-            )
-            .join("\n")}`
-        : "";
-
-    const prompt = `You are analyzing a complete work session. Below are the classified activity blocks from screen capture, and any audio transcriptions from the session. Use both to generate:
-1. A coherent narrative summary (3-5 paragraphs) of what the user accomplished
-2. A list of concrete tasks/accomplishments extracted from the session
-
-When audio transcriptions are available, integrate what was said with what was seen on screen. For example, if the user was in a video call and spoke about project deadlines, combine that with the visual context of the call.
-
-Activity blocks:
-${timeline}${transcriptBlock}
-
-Respond in this exact JSON format:
-{
-  "narrative": "Full session narrative...",
-  "tasks": ["Task 1 description", "Task 2 description", ...]
-}`;
-
-    const response = await llamaServerService.chatCompletion(
-      [
-        {
-          role: "system",
-          content:
-            "You are a professional work session analyst. Given classified activity blocks from a monitoring session, create a clear narrative of what was accomplished and extract specific tasks. Write in third person past tense.",
-        },
-        { role: "user", content: prompt },
-      ],
-      { temperature: 0.3, max_tokens: 2048 }
-    );
-
-    try {
-      const parsed = JSON.parse(response);
-      const narrative = parsed.narrative || "Session completed.";
-      const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
-
+      const narrative = "No activity was recorded during this session.";
       localDb.insertStory({
         id: randomUUID(),
         sessionId,
         narrative,
-        tasks: JSON.stringify(tasks),
+        tasks: "[]",
         timeBreakdown: null,
-        modelUsed: "local-smolvlm2+phi3",
+        modelUsed: "local-rlm-phi3.5",
       });
+      return { narrative, tasks: [] };
+    }
 
-      logger.info(`Story generated for session ${sessionId}: ${tasks.length} tasks extracted`);
-      return { narrative, tasks };
-    } catch {
-      logger.warn("Failed to parse storyteller JSON");
-      return {
-        narrative: response.slice(0, 2000),
-        tasks: [],
-      };
+    const completionFn: CompletionFn = (msgs, opts) =>
+      textServerService.chatCompletion(msgs, opts);
+
+    const env = new StorytellerEnvironment({
+      sessionId,
+      classifications,
+      transcriptions,
+      completionFn,
+    });
+
+    const result = await runRLMLoop<
+      StorytellerEnvironment,
+      { narrative: string; tasks: Array<{ description: string; minutes: number }> }
+    >(
+      getStorytellerSystemPrompt(),
+      getStorytellerUserPrompt(classifications.length),
+      STORYTELLER_TOOLS,
+      env,
+      {
+        maxIterations: 15,
+        doneResultField: "summary",
+        temperature: 0.3,
+        maxTokens: 2048,
+        completionFn,
+      }
+    );
+
+    const story = env.getFinalStory() ?? result.result;
+    const narrative = story?.narrative || "Session completed.";
+    const tasks = Array.isArray(story?.tasks) ? story.tasks : [];
+
+    localDb.insertStory({
+      id: randomUUID(),
+      sessionId,
+      narrative,
+      tasks: JSON.stringify(tasks),
+      timeBreakdown: null,
+      modelUsed: "local-rlm-phi3.5",
+    });
+
+    // Checkpoint after story is written to ensure data is flushed from WAL
+    localDb.checkpoint();
+
+    logger.info(
+      `Story generated for session ${sessionId}: ${tasks.length} tasks, ${result.iterations} RLM iterations`
+    );
+    return { narrative, tasks };
+  }
+
+  /**
+   * Sequential-mode session end: the text server was not available during the
+   * session so sensor data was collected without classification. This method
+   * stops the vision server, starts the text server, runs deferred
+   * classification over all stored captures, then runs the storyteller.
+   */
+  async endSessionSequential(sessionId: string): Promise<{
+    narrative: string;
+    tasks: string[];
+  }> {
+    logger.info("Sequential mode: swapping vision → text server for deferred classification");
+
+    await llamaServerService.stop();
+
+    const { startTextServerForSequentialMode } = await import("./onDeviceServerLifecycle");
+    await startTextServerForSequentialMode();
+
+    try {
+      await this.runDeferredClassification(sessionId);
+      return await this.generateStory(sessionId);
+    } finally {
+      await textServerService.stop();
+    }
+  }
+
+  /**
+   * Classify all unclassified captures for a session. Used in sequential mode
+   * at session end after the text server has been started.
+   * Reads sensor outputs from SQLite, groups into batches, and runs the
+   * classifier (no images needed — uses stored text descriptions).
+   */
+  private async runDeferredClassification(sessionId: string): Promise<void> {
+    const captures = localDb.getCapturesForSession(sessionId);
+    const existingClassifications = localDb.getClassificationsForSession(sessionId);
+    const classifiedSequences = new Set(
+      existingClassifications.flatMap((c) => {
+        const seqs: number[] = [];
+        for (let s = c.startSequence; s <= c.endSequence; s++) seqs.push(s);
+        return seqs;
+      })
+    );
+
+    const unclassified = captures.filter((c) => !classifiedSequences.has(c.sequenceNumber));
+    if (unclassified.length === 0) {
+      logger.info("Deferred classification: no unclassified captures found");
+      return;
+    }
+
+    logger.info(`Deferred classification: ${unclassified.length} captures to classify`);
+
+    for (let i = 0; i < unclassified.length; i += BATCH_SIZE) {
+      const batch = unclassified.slice(i, i + BATCH_SIZE);
+      const batchIdx = Math.floor(i / BATCH_SIZE) + existingClassifications.length;
+
+      const sensorResults: SensorResult[] = batch.map((c) => ({
+        frameId: c.frameId,
+        description: c.sensorOutput,
+        deltaChanged: c.deltaChanged,
+        changeType: c.changeType,
+        userAction: c.userAction,
+      }));
+
+      const pseudoFrames: BufferedFrame[] = batch.map((c) => ({
+        frameId: c.frameId,
+        sessionId: c.sessionId,
+        sequenceNumber: c.sequenceNumber,
+        capturedAt: c.capturedAt,
+        imageBase64: "",
+        previousImageBase64: null,
+        windowId: c.windowId,
+        appName: c.appName,
+        windowTitle: c.windowTitle,
+      }));
+
+      try {
+        const classifierResult = await this.runClassifier(pseudoFrames, sensorResults);
+
+        localDb.insertClassification({
+          id: randomUUID(),
+          sessionId,
+          batchIndex: batchIdx,
+          startSequence: batch[0].sequenceNumber,
+          endSequence: batch[batch.length - 1].sequenceNumber,
+          activityDescription: classifierResult.description,
+          activityType: classifierResult.activityType,
+          onTask: classifierResult.onTask,
+          taskRelevance: classifierResult.taskRelevance,
+          importanceScore: classifierResult.importanceScore,
+          rawOutput: classifierResult.rawOutput,
+        });
+
+        logger.info(
+          `Deferred batch ${batchIdx}: ${classifierResult.description.slice(0, 100)}`
+        );
+      } catch (err) {
+        logger.error(`Deferred classification batch ${batchIdx} failed:`, String(err));
+      }
     }
   }
 
@@ -441,24 +537,23 @@ Respond in this exact JSON format:
     const story = localDb.getStoryForSession(sessionId);
     if (!story) return null;
 
-    let rawTasks: string[] = [];
+    let parsedTasks: Array<{ description: string; minutes?: number } | string> = [];
     try {
-      rawTasks = JSON.parse(story.tasks);
-      if (!Array.isArray(rawTasks)) rawTasks = [];
+      parsedTasks = JSON.parse(story.tasks);
+      if (!Array.isArray(parsedTasks)) parsedTasks = [];
     } catch {
-      rawTasks = [];
+      parsedTasks = [];
     }
 
-    const minutesPerTask =
-      rawTasks.length > 0
-        ? Math.max(1, Math.round(activeDurationMs / 60_000 / rawTasks.length))
-        : 0;
-
-    const taskBreakdown = rawTasks.map((desc) => ({
-      shortTitle: desc.length > 40 ? desc.slice(0, 37) + "..." : desc,
-      description: desc,
-      minutes: minutesPerTask,
-    }));
+    const taskBreakdown = parsedTasks.map((t) => {
+      const desc = typeof t === "string" ? t : (t.description || "Task");
+      const minutes = typeof t === "object" && t.minutes ? t.minutes : 0;
+      return {
+        shortTitle: desc.length > 40 ? desc.slice(0, 37) + "..." : desc,
+        description: desc,
+        minutes: Math.max(1, minutes),
+      };
+    });
 
     let timeBreakdown: Record<string, number> | null = null;
     if (story.timeBreakdown) {

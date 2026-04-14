@@ -15,6 +15,9 @@ export type {
 export { llamaServerService } from "./llamaServerService";
 export type { LlamaServerConfig } from "./llamaServerService";
 
+export { textServerService } from "./textServerService";
+export type { TextServerConfig } from "./textServerService";
+
 export { whisperServerService } from "./whisperServerService";
 export type { WhisperServerConfig } from "./whisperServerService";
 
@@ -29,4 +32,6 @@ export { localAudioService } from "./localAudioService";
 export {
   startOnDeviceServersAtomic,
   stopOnDeviceServersBoth,
+  startTextServerForSequentialMode,
+  isParallelMode,
 } from "./onDeviceServerLifecycle";

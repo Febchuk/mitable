@@ -492,10 +492,9 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
         >
           <AlertCircle size={15} style={{ color: "#eab308", flexShrink: 0, marginTop: 2 }} />
           <div>
-            <p style={{ margin: "0 0 6px", fontWeight: 600 }}>NVIDIA GPU required on Windows</p>
+            <p style={{ margin: "0 0 6px", fontWeight: 600 }}>On-Device AI unavailable</p>
             <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              {onDeviceBlockReason} AMD GPUs do not use CUDA; a separate build would use Vulkan or
-              DirectML. This test path is NVIDIA + CUDA only.
+              {onDeviceBlockReason}
             </p>
           </div>
         </div>

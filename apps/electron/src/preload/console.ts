@@ -31,6 +31,7 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_RESUME: "monitoring-session-resume",
   MONITORING_SESSION_END: "monitoring-session-end",
   MONITORING_SESSION_RESET: "monitoring-session-reset",
+  MONITORING_RESYNC_LOCAL: "monitoring-resync-local",
   MONITORING_SESSION_STATUS: "monitoring-session-status",
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
@@ -259,6 +260,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   resetMonitoringSession: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESET),
+
+  resyncLocalStories: (): Promise<{ success: boolean; synced?: number; total?: number; errors?: string[]; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_RESYNC_LOCAL),
 
   getMonitoringSessionState: (): Promise<MonitoringSessionState | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STATUS),
