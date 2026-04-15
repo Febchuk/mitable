@@ -73,8 +73,7 @@ export default function SignupOrganizationPage() {
             : undefined,
       });
 
-      authService.saveTokens(response.session.access_token, response.session.refresh_token);
-
+      // Same ordering as LoginPage: user context in main before tokens so keychain persists.
       updateUser({
         id: response.profile.id,
         name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
@@ -84,6 +83,8 @@ export default function SignupOrganizationPage() {
         role: response.profile.role,
         organizationId: response.profile.organizationId || "",
       });
+
+      authService.saveTokens(response.session.access_token, response.session.refresh_token);
 
       trackEvent("console_signup_completed", { account_type: formData.accountType });
 

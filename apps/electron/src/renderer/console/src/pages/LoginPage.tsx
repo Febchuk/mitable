@@ -41,10 +41,9 @@ export default function LoginPage() {
     try {
       const response = await authService.login({ email, password });
 
-      // Save tokens
-      authService.saveTokens(response.session.access_token, response.session.refresh_token);
-
-      // Update user context (include hierarchy fields for view mode detection)
+      // Main process must receive USER_CONTEXT_SET before AUTH_SET_TOKENS so
+      // setTokens can persist the refresh token to the OS keychain (otherwise
+      // the next launch restores a stale token → refresh_token_not_found).
       const profile = response.profile as Record<string, any>;
       updateUser({
         id: profile.id,
@@ -60,6 +59,8 @@ export default function LoginPage() {
         department: profile.department ?? null,
         directReportCount: profile.directReportCount ?? 0,
       });
+
+      authService.saveTokens(response.session.access_token, response.session.refresh_token);
 
       trackEvent("console_login_completed");
 

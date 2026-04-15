@@ -1503,9 +1503,11 @@ function setupIPC() {
 
       // If tokens are already in memory but weren't persisted to keychain
       // (because user context wasn't available yet), persist now.
-      if (authTokens.refreshToken) {
+      const refreshTok = authTokens.refreshToken ?? authManager.getRefreshToken();
+      const accessTok = authTokens.accessToken ?? authManager.getAccessToken();
+      if (refreshTok && accessTok) {
         authManager
-          .setTokens(authTokens.accessToken!, authTokens.refreshToken, {
+          .setTokens(accessTok, refreshTok, {
             orgId: user.organizationId,
             userId: user.userId,
           })
