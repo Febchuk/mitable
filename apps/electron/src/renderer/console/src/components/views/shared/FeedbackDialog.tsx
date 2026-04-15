@@ -60,11 +60,13 @@ export default function FeedbackDialog({
       const endpoint = anonymousSource
         ? `${API_BASE_URL}/api/feedback/unauth`
         : `${API_BASE_URL}/api/feedback`;
+      // Anonymous feedback must not send a stale Bearer token (optionalAuth would
+      // still attach a dead session to the request).
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(!anonymousSource && token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           message: message.trim(),

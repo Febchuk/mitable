@@ -312,7 +312,7 @@ class StorytellerRLMService {
 
     const completion = await this.openai.chat.completions.create({
       messages: openaiMessages as any,
-      model: "gpt-5",
+      model: "gpt-5.4",
       max_completion_tokens: 8000,
     });
 

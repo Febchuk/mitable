@@ -433,14 +433,14 @@ Write the recap now (markdown only, no JSON wrapping):`;
     if (openai) {
       try {
         const completion = await openai.chat.completions.create({
-          model: "gpt-5",
+          model: "gpt-5.4",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.4,
           max_completion_tokens: 1000,
         });
         const content = completion.choices[0]?.message?.content?.trim();
         if (content) {
-          logger.info("Recap generated via OpenAI GPT-5 (fallback)");
+          logger.info("Recap generated via OpenAI GPT-5.4 (fallback)");
           return content;
         }
       } catch (error) {

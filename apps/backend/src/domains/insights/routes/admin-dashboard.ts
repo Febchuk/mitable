@@ -2119,7 +2119,7 @@ async function callDashboardLLM(
   if (oai) {
     try {
       const completion = await oai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-5.4",
         messages: [{ role: "system", content: systemPrompt }, ...messages],
         temperature: 0.7,
         max_completion_tokens: 1000,
@@ -2182,7 +2182,7 @@ async function callAskLLM(
   if (oai) {
     try {
       const completion = await oai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-5.4",
         messages: [{ role: "system", content: systemPrompt }, ...messages],
         temperature: 0.7,
         max_completion_tokens: 4000,

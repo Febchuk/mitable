@@ -99,7 +99,7 @@ async function callSummarizationLLM(
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        model: "gpt-5",
+        model: "gpt-5.4",
         max_completion_tokens: maxOutputTokens,
       });
       return completion.choices[0]?.message?.content || "Failed to generate summary";

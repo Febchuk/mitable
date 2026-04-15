@@ -361,7 +361,7 @@ class GranolaSyncService {
     // 2. Try GPT-5
     if (this.openai) {
       try {
-        return await this.classifyWithOpenAI(prompt, this.openai, "gpt-5");
+        return await this.classifyWithOpenAI(prompt, this.openai, "gpt-5.4");
       } catch (error) {
         logger.warn(
           { error: String(error), meetingId: meeting.id },
@@ -463,7 +463,7 @@ Respond ONLY with JSON:
   ): Promise<MeetingClassification> {
     const response = await client.chat.completions.create({
       model,
-      max_tokens: 200,
+      max_completion_tokens: 200,
       temperature: 0.2,
       messages: [
         {
@@ -540,15 +540,16 @@ Respond ONLY with JSON:
     const startTime = meeting.start_time
       ? new Date(meeting.start_time)
       : new Date(meeting.created_at || Date.now());
-    const DEFAULT_MEETING_MINUTES = 60;
     let endTime: Date;
     let durationMinutes: number;
     if (meeting.end_time) {
       endTime = new Date(meeting.end_time);
       durationMinutes = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000));
     } else {
-      durationMinutes = DEFAULT_MEETING_MINUTES;
-      endTime = new Date(startTime.getTime() + DEFAULT_MEETING_MINUTES * 60000);
+      // No end_time available from Granola MCP — store 0 rather than fabricating
+      // a duration. The materializer already excludes granola blocks from totals.
+      durationMinutes = 0;
+      endTime = new Date(startTime.getTime() + 60 * 60000);
     }
 
     const attendees = (meeting.attendees || []).map((a) => ({

@@ -411,6 +411,24 @@ function createTrayIfSupported(): void {
   tray.on("click", () => showConsoleWindow());
 }
 
+/**
+ * Must run before `quitAndInstall()`. Otherwise on Windows the console `close`
+ * handler treats the quit as a normal hide-to-tray (preventDefault), the main
+ * process never exits, and Squirrel/electron-updater cannot replace the binary.
+ * Destroying the tray also releases the last UI anchor that can keep the app alive.
+ */
+function prepareForQuitAndInstall(): void {
+  isExplicitQuit = true;
+  if (tray && !tray.isDestroyed()) {
+    try {
+      tray.destroy();
+    } catch {
+      /* ignore */
+    }
+    tray = null;
+  }
+}
+
 function createWatchingPillWindow() {
   // Get screen dimensions for right-edge, vertically centered positioning
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -911,6 +929,7 @@ function handleNotificationAction(actionId: string) {
       break;
     case "install-update":
       // Quit and install the downloaded update
+      prepareForQuitAndInstall();
       updateService.quitAndInstall();
       break;
     case "view-active-session":
@@ -1484,9 +1503,11 @@ function setupIPC() {
 
       // If tokens are already in memory but weren't persisted to keychain
       // (because user context wasn't available yet), persist now.
-      if (authTokens.refreshToken) {
+      const refreshTok = authTokens.refreshToken ?? authManager.getRefreshToken();
+      const accessTok = authTokens.accessToken ?? authManager.getAccessToken();
+      if (refreshTok && accessTok) {
         authManager
-          .setTokens(authTokens.accessToken!, authTokens.refreshToken, {
+          .setTokens(accessTok, refreshTok, {
             orgId: user.organizationId,
             userId: user.userId,
           })
@@ -2694,6 +2715,7 @@ function setupUpdateHandlers() {
 
   ipcMain.handle("install-update", () => {
     updateLogger.info(" Install update requested");
+    prepareForQuitAndInstall();
     updateService.quitAndInstall();
     return { success: true };
   });
@@ -3105,6 +3127,7 @@ app.whenReady().then(async () => {
   const connectSrc =
     " connect-src 'self'" +
     " https://*.mitable.ai https://*.supabase.co wss://*.supabase.co" +
+    " https://*.up.railway.app" +
     " https://*.posthog.com https://*.deepgram.com wss://*.deepgram.com" +
     " https://generativelanguage.googleapis.com https://api.openai.com" +
     " https://api.groq.com https://api.anthropic.com" +

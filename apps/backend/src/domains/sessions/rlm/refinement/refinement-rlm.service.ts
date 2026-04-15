@@ -360,7 +360,7 @@ ${prefsResult}`;
 
     const completion = await this.openai.chat.completions.create({
       messages: openaiMessages,
-      model: "gpt-5",
+      model: "gpt-5.4",
       max_completion_tokens: 4000,
     });
 
@@ -374,7 +374,7 @@ ${prefsResult}`;
         rawText
       )
     ) {
-      logger.warn("GPT-5 claimed edit without <summary> tags — nudging retry");
+      logger.warn("GPT-5.4 claimed edit without <summary> tags — nudging retry");
       const retryCompletion = await this.openai.chat.completions.create({
         messages: [
           ...openaiMessages,
@@ -385,7 +385,7 @@ ${prefsResult}`;
               "You said you made changes but didn't include the rewritten summary. Please output the COMPLETE updated summary inside <summary> tags so the changes can be applied.",
           },
         ],
-        model: "gpt-5",
+        model: "gpt-5.4",
         max_completion_tokens: 4000,
       });
       rawText = retryCompletion.choices[0]?.message?.content || rawText;
@@ -394,7 +394,7 @@ ${prefsResult}`;
 
     logger.info(
       { hasSuggestedEdit: !!parsed.suggestedEdit },
-      "Refinement RLM completed (GPT-5 fallback)"
+      "Refinement RLM completed (GPT-5.4 fallback)"
     );
 
     return { message: parsed.message, suggestedEdit: parsed.suggestedEdit, toolCallCount: 0 };

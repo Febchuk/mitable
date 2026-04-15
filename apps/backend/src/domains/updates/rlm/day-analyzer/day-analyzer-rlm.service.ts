@@ -105,7 +105,7 @@ class DayAnalyzerRLMService {
    */
   async analyzeDay(input: DayAnalyzerInput): Promise<DayAnalyzerResult> {
     const startTime = Date.now();
-    const modelUsed = this.anthropic ? "claude-sonnet-4-5-20250929" : "gpt-5";
+    const modelUsed = this.anthropic ? "claude-sonnet-4-5-20250929" : "gpt-5.4";
 
     logger.info(
       {
@@ -356,7 +356,7 @@ class DayAnalyzerRLMService {
 
     const completion = await this.openai.chat.completions.create({
       messages: openaiMessages as any,
-      model: "gpt-5",
+      model: "gpt-5.4",
       max_completion_tokens: 8000,
     });
 

@@ -4,6 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import Button from "../components/ui/Button";
 import { authService } from "../services/authService";
 import { useUser } from "../context/UserContext";
+import { useUpdate } from "../context/UpdateContext";
 import { trackEvent } from "@/lib/posthog";
 import AuthLogo from "../components/ui/AuthLogo";
 import HelpFeedbackButton from "../components/ui/HelpFeedbackButton";
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const navigate = useNavigate();
   const { updateUser } = useUser();
+  const { updateState, updateInfo, installUpdate } = useUpdate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,10 +43,9 @@ export default function LoginPage() {
     try {
       const response = await authService.login({ email, password });
 
-      // Save tokens
-      authService.saveTokens(response.session.access_token, response.session.refresh_token);
-
-      // Update user context (include hierarchy fields for view mode detection)
+      // Main process must receive USER_CONTEXT_SET before AUTH_SET_TOKENS so
+      // setTokens can persist the refresh token to the OS keychain (otherwise
+      // the next launch restores a stale token → refresh_token_not_found).
       const profile = response.profile as Record<string, any>;
       updateUser({
         id: profile.id,
@@ -60,6 +61,8 @@ export default function LoginPage() {
         department: profile.department ?? null,
         directReportCount: profile.directReportCount ?? 0,
       });
+
+      authService.saveTokens(response.session.access_token, response.session.refresh_token);
 
       trackEvent("console_login_completed");
 
@@ -82,6 +85,26 @@ export default function LoginPage() {
       className="flex min-h-screen items-center justify-center p-4"
       style={{ background: "var(--bg-base)" }}
     >
+      {updateState === "downloaded" && (
+        <div
+          className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2 text-sm"
+          style={{
+            background: "rgba(var(--mi-accent-rgb), 0.12)",
+            borderBottom: "1px solid rgba(var(--mi-accent-rgb), 0.25)",
+          }}
+        >
+          <span style={{ color: "var(--text-primary)" }}>
+            v{updateInfo?.version} is ready — restart to apply
+          </span>
+          <button
+            onClick={installUpdate}
+            className="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+            style={{ background: "var(--mi-accent)", color: "var(--bg-base)" }}
+          >
+            Install &amp; Restart
+          </button>
+        </div>
+      )}
       <div
         className="w-full max-w-md rounded-xl p-8 space-y-8"
         style={{
