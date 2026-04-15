@@ -3127,6 +3127,7 @@ app.whenReady().then(async () => {
   const connectSrc =
     " connect-src 'self'" +
     " https://*.mitable.ai https://*.supabase.co wss://*.supabase.co" +
+    " https://*.up.railway.app" +
     " https://*.posthog.com https://*.deepgram.com wss://*.deepgram.com" +
     " https://generativelanguage.googleapis.com https://api.openai.com" +
     " https://api.groq.com https://api.anthropic.com" +
