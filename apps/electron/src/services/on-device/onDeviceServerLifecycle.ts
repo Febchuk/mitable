@@ -1,11 +1,15 @@
 /**
  * Start / stop on-device AI servers as a coordinated group.
  *
- * Startup order:
+ * GPU servers (llama-server):
  *   1. Vision server (SmolVLM2) — required for sensor during session
  *   2. Text server (Phi-3.5) — best-effort; if VRAM is insufficient the
  *      startup fails gracefully and we fall back to sequential mode
- *   3. Whisper — audio transcription; if it fails, everything rolls back
+ *
+ * CPU tool (whisper-cli):
+ *   Whisper runs on CPU independently — no VRAM, no CUDA init. It is
+ *   started alongside the GPU servers but doesn't participate in the
+ *   atomic rollback because it can't cause VRAM issues.
  *
  * Parallel vs sequential mode:
  *   - Parallel: both vision + text servers running — classifier runs in
@@ -29,10 +33,10 @@ export function isParallelMode(): boolean {
 }
 
 export async function startOnDeviceServersAtomic(): Promise<void> {
-  // 1. Vision server (required — sensor needs it immediately)
+  // 1. Vision server on GPU (required — sensor needs it immediately)
   await llamaServerService.start();
 
-  // 2. Text server (best-effort for parallel mode)
+  // 2. Text server on GPU (best-effort for parallel mode)
   try {
     await textServerService.start();
     _parallelMode = true;
@@ -45,14 +49,12 @@ export async function startOnDeviceServersAtomic(): Promise<void> {
     );
   }
 
-  // 3. Whisper (required — if it fails, roll back everything)
+  // 3. Whisper CLI on CPU (independent — no VRAM, no rollback needed)
   try {
     await whisperServerService.start();
+    logger.info("Whisper CLI ready (CPU-only, no VRAM used)");
   } catch (err) {
-    logger.warn("Whisper failed after llama started; stopping all servers for clean state");
-    await Promise.allSettled([textServerService.stop(), llamaServerService.stop()]);
-    _parallelMode = false;
-    throw err;
+    logger.warn("Whisper CLI failed to initialize (audio transcription disabled):", String(err));
   }
 }
 

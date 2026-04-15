@@ -1398,7 +1398,9 @@ function setupIPC() {
                 : true;
 
               // Check for on-device story
-              let onDeviceSummary: import("./services/on-device/localInferenceService").OnDeviceSummary | undefined;
+              let onDeviceSummary:
+                | import("./services/on-device/localInferenceService").OnDeviceSummary
+                | undefined;
               try {
                 const { localInferenceService } = await import("./services/on-device");
                 const activeDurationMs = preEndState
@@ -1419,7 +1421,12 @@ function setupIPC() {
               }
 
               // In local mode, NEVER upload raw captures to the cloud
-              if (!result.localMode && !onDeviceSummary && result.captures && result.captures.length > 0) {
+              if (
+                !result.localMode &&
+                !onDeviceSummary &&
+                result.captures &&
+                result.captures.length > 0
+              ) {
                 monitoringLogger.info(` Uploading ${result.captures.length} captures to backend`);
                 await authManager.authenticatedFetch(
                   `/api/monitoring/sessions/${result.sessionId}/captures`,
@@ -1430,7 +1437,9 @@ function setupIPC() {
                 );
               }
 
-              monitoringLogger.info(` Triggering backend end-session (localMode: ${!!result.localMode})`);
+              monitoringLogger.info(
+                ` Triggering backend end-session (localMode: ${!!result.localMode})`
+              );
               await authManager.authenticatedFetch(
                 `/api/monitoring/sessions/${result.sessionId}/end`,
                 {
@@ -2114,7 +2123,9 @@ function setupMonitoringSessionHandlers() {
 
       try {
         // Check if on-device AI produced a local story for this session
-        let onDeviceSummary: import("./services/on-device/localInferenceService").OnDeviceSummary | undefined;
+        let onDeviceSummary:
+          | import("./services/on-device/localInferenceService").OnDeviceSummary
+          | undefined;
         let isLocalSession = false;
         try {
           const { localInferenceService, localDb } = await import("./services/on-device");
@@ -2124,7 +2135,9 @@ function setupMonitoringSessionHandlers() {
             const exported = localInferenceService.exportResultsForBackend(sessionId, 0);
             if (exported) {
               onDeviceSummary = exported;
-              monitoringLogger.info(` On-device summary found for finalize: ${exported.taskBreakdown.length} tasks`);
+              monitoringLogger.info(
+                ` On-device summary found for finalize: ${exported.taskBreakdown.length} tasks`
+              );
             }
           }
         } catch (err) {
@@ -2231,7 +2244,9 @@ function setupMonitoringSessionHandlers() {
 
           if (resp.ok) {
             synced++;
-            monitoringLogger.info(`Resync: uploaded ${story.sessionId.slice(0, 8)} (${exported.taskBreakdown.length} tasks)`);
+            monitoringLogger.info(
+              `Resync: uploaded ${story.sessionId.slice(0, 8)} (${exported.taskBreakdown.length} tasks)`
+            );
           } else {
             const errText = await resp.text();
             errors.push(`${story.sessionId.slice(0, 8)}: ${resp.status} ${errText.slice(0, 100)}`);
@@ -2242,7 +2257,12 @@ function setupMonitoringSessionHandlers() {
       }
 
       monitoringLogger.info(`Resync complete: ${synced}/${stories.length} synced`);
-      return { success: true, synced, total: stories.length, errors: errors.length > 0 ? errors : undefined };
+      return {
+        success: true,
+        synced,
+        total: stories.length,
+        errors: errors.length > 0 ? errors : undefined,
+      };
     } catch (err) {
       monitoringLogger.error("Resync failed:", String(err));
       return { success: false, error: String(err) };
@@ -2798,7 +2818,9 @@ function setupMonitoringSessionHandlers() {
         : true;
 
       // Check if on-device AI produced a local story for this session
-      let onDeviceSummary: import("./services/on-device/localInferenceService").OnDeviceSummary | undefined;
+      let onDeviceSummary:
+        | import("./services/on-device/localInferenceService").OnDeviceSummary
+        | undefined;
       try {
         const { localInferenceService } = await import("./services/on-device");
         const activeDurationMs = preEndState
@@ -3316,31 +3338,33 @@ app.whenReady().then(async () => {
 
   // Initialize on-device AI module and auto-start server if previously enabled
   import("./services/on-device")
-    .then(async ({ modelManager, localDb, startOnDeviceServersAtomic, stopOnDeviceServersBoth }) => {
-      await modelManager.initialize();
-      await localDb.initialize();
-      consoleLogger.info(
-        `On-device AI module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
-      );
-      if (
-        modelManager.canUseOnDeviceInference() &&
-        localDb.isAvailable() &&
-        modelManager.isEnabled() &&
-        modelManager.isFullySetUp()
-      ) {
-        consoleLogger.info("Auto-starting on-device servers (previously enabled)");
-        try {
-          await startOnDeviceServersAtomic();
-        } catch (err) {
-          await stopOnDeviceServersBoth();
-          consoleLogger.warn("On-device auto-start failed:", String(err));
-        }
-      } else if (!localDb.isAvailable() && modelManager.isEnabled()) {
-        consoleLogger.warn(
-          "On-device AI is enabled but SQLite is unavailable — run `npm run rebuild-native` in apps/electron"
+    .then(
+      async ({ modelManager, localDb, startOnDeviceServersAtomic, stopOnDeviceServersBoth }) => {
+        await modelManager.initialize();
+        await localDb.initialize();
+        consoleLogger.info(
+          `On-device AI module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
         );
+        if (
+          modelManager.canUseOnDeviceInference() &&
+          localDb.isAvailable() &&
+          modelManager.isEnabled() &&
+          modelManager.isFullySetUp()
+        ) {
+          consoleLogger.info("Auto-starting on-device servers (previously enabled)");
+          try {
+            await startOnDeviceServersAtomic();
+          } catch (err) {
+            await stopOnDeviceServersBoth();
+            consoleLogger.warn("On-device auto-start failed:", String(err));
+          }
+        } else if (!localDb.isAvailable() && modelManager.isEnabled()) {
+          consoleLogger.warn(
+            "On-device AI is enabled but SQLite is unavailable — run `npm run rebuild-native` in apps/electron"
+          );
+        }
       }
-    })
+    )
     .catch((err) => consoleLogger.warn("On-device AI init skipped:", String(err)));
 
   // Start Browser Bridge WebSocket server for Chrome Extension
@@ -3483,13 +3507,21 @@ app.whenReady().then(async () => {
   // ── On-Device AI IPC handlers ──────────────────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
     try {
-      const { modelManager, llamaServerService, textServerService, whisperServerService, isParallelMode, localDb } = await import("./services/on-device");
-      const sqliteAvailable = localDb.isAvailable() || await localDb.tryOpen();
+      const {
+        modelManager,
+        llamaServerService,
+        textServerService,
+        whisperServerService,
+        isParallelMode,
+        localDb,
+      } = await import("./services/on-device");
+      const sqliteAvailable = localDb.isAvailable() || (await localDb.tryOpen());
       const gpuOk = modelManager.canUseOnDeviceInference();
       const allowed = gpuOk && sqliteAvailable;
       let blockReason = modelManager.getOnDeviceBlockedReason();
       if (!sqliteAvailable) {
-        blockReason = (blockReason ? blockReason + " " : "") +
+        blockReason =
+          (blockReason ? blockReason + " " : "") +
           "Local SQLite database is unavailable — run `npm run rebuild-native` in apps/electron.";
       }
       return {
@@ -3588,8 +3620,13 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL, async () => {
     try {
-      const { modelManager, llamaServerService, textServerService, whisperServerService } = await import("./services/on-device");
-      await Promise.all([llamaServerService.stop(), textServerService.stop(), whisperServerService.stop()]);
+      const { modelManager, llamaServerService, textServerService, whisperServerService } =
+        await import("./services/on-device");
+      await Promise.all([
+        llamaServerService.stop(),
+        textServerService.stop(),
+        whisperServerService.stop(),
+      ]);
       await modelManager.removeAll();
       return { success: true };
     } catch (err) {
@@ -3599,9 +3636,18 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, async (_event, assetId: string) => {
     try {
-      const { modelManager, llamaServerService, textServerService, whisperServerService } = await import("./services/on-device");
-      if (llamaServerService.isRunning() || textServerService.isRunning() || whisperServerService.isRunning()) {
-        await Promise.all([llamaServerService.stop(), textServerService.stop(), whisperServerService.stop()]);
+      const { modelManager, llamaServerService, textServerService, whisperServerService } =
+        await import("./services/on-device");
+      if (
+        llamaServerService.isRunning() ||
+        textServerService.isRunning() ||
+        whisperServerService.isRunning()
+      ) {
+        await Promise.all([
+          llamaServerService.stop(),
+          textServerService.stop(),
+          whisperServerService.stop(),
+        ]);
         await modelManager.setEnabled(false);
       }
       await modelManager.removeAsset(assetId);
@@ -3626,14 +3672,17 @@ app.whenReady().then(async () => {
       if (!modelManager.canUseOnDeviceInference()) {
         return {
           success: false,
-          error: modelManager.getOnDeviceBlockedReason() ?? "On-device AI is not available on this system.",
+          error:
+            modelManager.getOnDeviceBlockedReason() ??
+            "On-device AI is not available on this system.",
         };
       }
-      const sqliteOk = localDb.isAvailable() || await localDb.tryOpen();
+      const sqliteOk = localDb.isAvailable() || (await localDb.tryOpen());
       if (!sqliteOk) {
         return {
           success: false,
-          error: "Local SQLite database is unavailable. Run `npm run rebuild-native` in apps/electron to recompile better-sqlite3 for Electron.",
+          error:
+            "Local SQLite database is unavailable. Run `npm run rebuild-native` in apps/electron to recompile better-sqlite3 for Electron.",
         };
       }
       try {
@@ -3657,7 +3706,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_STOP_SERVER, async () => {
     try {
-      const { llamaServerService, textServerService, whisperServerService, modelManager } = await import("./services/on-device");
+      const { llamaServerService, textServerService, whisperServerService, modelManager } =
+        await import("./services/on-device");
       await Promise.all([
         llamaServerService.stop(),
         textServerService.stop(),
@@ -3672,7 +3722,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS, async () => {
     try {
-      const { llamaServerService, textServerService, isParallelMode } = await import("./services/on-device");
+      const { llamaServerService, textServerService, isParallelMode } =
+        await import("./services/on-device");
       return {
         status: llamaServerService.getStatus(),
         port: llamaServerService.getPort(),
@@ -3682,7 +3733,15 @@ app.whenReady().then(async () => {
         parallelMode: isParallelMode(),
       };
     } catch (err) {
-      return { status: "stopped", port: 0, baseUrl: null, textServerStatus: "stopped", textServerPort: 0, parallelMode: false, error: String(err) };
+      return {
+        status: "stopped",
+        port: 0,
+        baseUrl: null,
+        textServerStatus: "stopped",
+        textServerPort: 0,
+        parallelMode: false,
+        error: String(err),
+      };
     }
   });
 

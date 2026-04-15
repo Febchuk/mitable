@@ -2,19 +2,20 @@
  * Local Audio Service
  *
  * Buffers incoming PCM16 stereo audio chunks from the WatchingPill renderer
- * and periodically transcribes them via the local whisper-server.
+ * and periodically transcribes them via whisper-cli running on CPU.
  *
  * Audio flow:
  *   WatchingPill AudioWorklet (PCM16 stereo, 16kHz)
  *     -> IPC "audio-chunk"
  *     -> localAudioService.addChunk(buffer)
- *     -> accumulate ~10s of audio
+ *     -> accumulate ~60s of audio
  *     -> convert stereo PCM16 -> mono WAV
- *     -> POST to whisper-server /inference
+ *     -> whisper-cli (CPU, no GPU) transcribes the chunk
  *     -> store transcript in localDb.transcriptions
  *
- * The Storyteller reads these transcriptions at session end to enrich
- * the session narrative with what was spoken.
+ * Whisper runs on CPU to avoid VRAM contention with llama-server (vision).
+ * 60s batches keep CLI invocations low while still providing near-real-time
+ * transcriptions during the session.
  */
 
 import { randomUUID } from "crypto";
@@ -24,7 +25,7 @@ import { localDb } from "./localDb";
 
 const logger = createLogger("LocalAudio");
 
-const FLUSH_INTERVAL_MS = 10_000;
+const FLUSH_INTERVAL_MS = 60_000;
 const SAMPLE_RATE = 16_000;
 const BYTES_PER_SAMPLE = 2;
 const CHANNELS = 2;
@@ -50,9 +51,7 @@ class LocalAudioService {
 
     this.flushTimer = setInterval(() => {
       if (this.pcmBufferBytes > 0 && !this.processing) {
-        this.flush().catch((err) =>
-          logger.error("Auto-flush failed:", String(err))
-        );
+        this.flush().catch((err) => logger.error("Auto-flush failed:", String(err)));
       }
     }, FLUSH_INTERVAL_MS);
 
@@ -110,11 +109,14 @@ class LocalAudioService {
     this.totalSamplesProcessed += samplesPerChannel;
 
     const startTimeMs = this.sessionStartMs + Math.round((startSample / SAMPLE_RATE) * 1000);
-    const endTimeMs = this.sessionStartMs + Math.round((this.totalSamplesProcessed / SAMPLE_RATE) * 1000);
+    const endTimeMs =
+      this.sessionStartMs + Math.round((this.totalSamplesProcessed / SAMPLE_RATE) * 1000);
 
     try {
       const monoWav = this.stereoToMonoWav(stereoPcm.subarray(0, alignedBytes), samplesPerChannel);
-      logger.debug(`WAV buffer: ${monoWav.length} bytes, ${samplesPerChannel} samples, ${Math.round(samplesPerChannel / SAMPLE_RATE)}s`);
+      logger.debug(
+        `WAV buffer: ${monoWav.length} bytes, ${samplesPerChannel} samples, ${Math.round(samplesPerChannel / SAMPLE_RATE)}s`
+      );
 
       const transcript = await whisperServerService.transcribe(monoWav);
 

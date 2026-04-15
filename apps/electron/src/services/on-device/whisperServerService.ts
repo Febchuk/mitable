@@ -1,16 +1,15 @@
 /**
- * Whisper CLI Service
+ * Whisper CLI Service (CPU-only)
  *
- * Transcribes audio by spawning whisper-cli.exe per chunk.
- * The precompiled whisper-server.exe (v1.8.x) hangs after model loading
- * on Windows and never binds to the HTTP port, so we use the CLI binary
- * which works reliably. Model loads in ~400ms per invocation — acceptable
- * for 10-second audio segments.
+ * Transcribes audio by spawning whisper-cli.exe per chunk on **CPU only**.
+ * GPU (CUDA) is reserved exclusively for llama-server (vision/text).
+ * Running whisper on CPU avoids VRAM contention and eliminates the
+ * Pascal-era CUDA crashes — whisper small on CPU handles 60s chunks fine.
  *
  * Lifecycle:
  *   1. modelManager downloads the binary zip + model file
  *   2. whisperServerService.start() validates paths, marks ready
- *   3. localAudioService calls transcribe(wavBuffer) per chunk
+ *   3. localAudioService calls transcribe(wavBuffer) per ~60s chunk
  *   4. whisperServerService.stop() is a clean no-op
  */
 
@@ -21,7 +20,6 @@ import { randomUUID } from "crypto";
 import { app } from "electron";
 import { createLogger } from "../../lib/logger";
 import { modelManager } from "./modelManager";
-import { augmentPathWithCudaBins } from "./windowsCudaEnv";
 
 const logger = createLogger("WhisperCLI");
 
@@ -31,7 +29,6 @@ export interface WhisperServerConfig {
   host: string;
   threads: number;
   language: string;
-  useFlashAttn?: boolean;
 }
 
 const DEFAULT_CONFIG: WhisperServerConfig = {
@@ -85,7 +82,7 @@ class WhisperServerService {
     this.tmpDir = join(app.getPath("temp"), "mitable-whisper");
     await mkdir(this.tmpDir, { recursive: true });
 
-    logger.info("Whisper CLI mode ready", {
+    logger.info("Whisper CLI ready (CPU-only mode)", {
       bin: this.cliBin,
       model: this.modelPath,
       threads: this.config.threads,
@@ -101,33 +98,35 @@ class WhisperServerService {
     logger.info("Whisper CLI mode stopped");
   }
 
+  /**
+   * Transcribe a WAV buffer using whisper-cli on CPU.
+   * Timeout scales with audio length: base 30s + 2s per second of audio.
+   */
   async transcribe(wavBuffer: Buffer): Promise<string> {
     if (!this.isRunning() || !this.cliBin || !this.modelPath) {
       throw new Error("Whisper CLI is not ready");
     }
 
     const wavFile = join(this.tmpDir, `chunk-${randomUUID()}.wav`);
+    const audioSeconds = Math.max(1, (wavBuffer.length - 44) / (16_000 * 2));
+    const timeoutMs = Math.max(30_000, Math.round(audioSeconds * 2_000) + 30_000);
 
     try {
       await writeFile(wavFile, wavBuffer);
 
-      const tuning = modelManager.getNvidiaInferenceTuning();
-      const useFlash =
-        this.config.useFlashAttn !== undefined
-          ? this.config.useFlashAttn
-          : tuning.whisperUseFlashAttn;
-
       const args = [
-        "--model", this.modelPath!,
-        "--file", wavFile,
-        "--threads", String(this.config.threads),
-        "--language", this.config.language,
+        "--model",
+        this.modelPath!,
+        "--file",
+        wavFile,
+        "--threads",
+        String(this.config.threads),
+        "--language",
+        this.config.language,
         "--no-timestamps",
         "--no-prints",
+        "--no-gpu",
       ];
-      if (!useFlash) {
-        args.push("--no-flash-attn");
-      }
 
       const text = await new Promise<string>((resolve, reject) => {
         const binDir = dirname(this.cliBin!);
@@ -136,9 +135,9 @@ class WhisperServerService {
           args,
           {
             cwd: binDir,
-            env: augmentPathWithCudaBins(process.env, modelManager.getServerBinDirs()),
-            timeout: 30_000,
-            maxBuffer: 1024 * 1024,
+            env: { ...process.env },
+            timeout: timeoutMs,
+            maxBuffer: 4 * 1024 * 1024,
             windowsHide: true,
           },
           (err, stdout, stderr) => {
@@ -148,9 +147,8 @@ class WhisperServerService {
               reject(new Error(`whisper-cli error: ${err.message}`));
               return;
             }
-            const output = stdout.trim();
-            resolve(output);
-          },
+            resolve(stdout.trim());
+          }
         );
       });
 

@@ -73,10 +73,8 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
   const [platform, setPlatform] = useState<string>("");
   const [isSetUp, setIsSetUp] = useState(false);
   const [serverStatus, setServerStatus] = useState("stopped");
-  const [whisperStatus, setWhisperStatus] = useState("stopped");
   const [installedAssets, setInstalledAssets] = useState<InstalledAsset[]>([]);
   const [missingAssets, setMissingAssets] = useState<AssetSummary[]>([]);
-  const [totalDownloadBytes, setTotalDownloadBytes] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -99,9 +97,8 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
   const [removingAssetId, setRemovingAssetId] = useState<string | null>(null);
 
   const hasActiveAssetDownload = activeDownloads.size > 0;
-  const isToggleBusy =
-    isDownloading || isStarting || isStopping || hasActiveAssetDownload;
-  const isEnabled = serverStatus === "running" && whisperStatus === "running";
+  const isToggleBusy = isDownloading || isStarting || isStopping || hasActiveAssetDownload;
+  const isEnabled = serverStatus === "running";
 
   const loadStatus = useCallback(async () => {
     if (!window.consoleAPI?.onDeviceGetStatus) return;
@@ -113,7 +110,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
       ]);
       setIsSetUp(status.isSetUp);
       setServerStatus(status.serverStatus);
-      setWhisperStatus(status.whisperStatus ?? "stopped");
+      // whisperStatus no longer drives UI — whisper is a CPU tool
       setInstalledAssets(status.installedAssets);
       setOnDeviceAllowed(status.onDeviceAllowed !== false);
       setOnDeviceBlockReason(status.onDeviceBlockReason ?? null);
@@ -121,7 +118,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
       setInferenceTuning(status.inferenceTuning ?? null);
       setPlatform(typeof platformResult === "string" ? platformResult : "unknown");
       setMissingAssets(summary.assets);
-      setTotalDownloadBytes(summary.totalBytes);
+      // totalBytes available in summary if needed for UI
     } catch (err) {
       setError(String(err));
     } finally {
@@ -300,9 +297,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
     if (isDownloading) return "Downloading components...";
     if (isStarting) return "Starting local AI servers...";
     if (isStopping) return "Stopping local AI servers...";
-    if (isEnabled) return "Vision + Audio inference servers active";
-    if (serverStatus === "running" && whisperStatus !== "running")
-      return "Vision server running, Whisper starting...";
+    if (isEnabled) return "Vision on GPU, audio transcription on CPU";
     return "Downloads components and starts local AI servers";
   };
 
@@ -393,7 +388,10 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Shield size={16} style={{ color: isEnabled ? "#22c55e" : "var(--text-secondary)", flexShrink: 0 }} />
+          <Shield
+            size={16}
+            style={{ color: isEnabled ? "#22c55e" : "var(--text-secondary)", flexShrink: 0 }}
+          />
           <div>
             <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
               Enable On-Device AI
@@ -555,9 +553,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
           {inferenceTuning.llamaContextSize != null && (
             <>
               {" · "}
-              <code style={{ fontSize: 11 }}>
-                --ctx-size {inferenceTuning.llamaContextSize}
-              </code>
+              <code style={{ fontSize: 11 }}>--ctx-size {inferenceTuning.llamaContextSize}</code>
             </>
           )}
           {" · "}
@@ -567,9 +563,8 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
             --fit {(inferenceTuning.llamaVramFit ?? true) ? "on" : "off"}
           </code>
           {" · "}
-          whisper flash-attn {inferenceTuning.whisperUseFlashAttn ? "on" : "off"}. Ollama uses a
-          different engine than our bundled llama.cpp; GTX 10xx still gets full GPU layers here with
-          safer flags (flash off, fit off, lower ctx when detected).
+          whisper: CPU-only (no VRAM used). Vision runs on GPU, audio transcription runs
+          independently on CPU in 60s batches.
         </p>
       )}
 
@@ -613,8 +608,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                   !onDeviceAllowed || isDownloading || isStarting || isStopping
                     ? "not-allowed"
                     : "pointer",
-                opacity:
-                  !onDeviceAllowed || isDownloading || isStarting || isStopping ? 0.5 : 1,
+                opacity: !onDeviceAllowed || isDownloading || isStarting || isStopping ? 0.5 : 1,
               }}
             >
               <Download size={13} />
@@ -642,10 +636,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                 borderBottom: "1px solid var(--border-subtle)",
               }}
             >
-              <CheckCircle2
-                size={16}
-                style={{ color: "#22c55e", flexShrink: 0 }}
-              />
+              <CheckCircle2 size={16} style={{ color: "#22c55e", flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p
                   style={{
@@ -704,8 +695,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                       hasActiveAssetDownload || removingAssetId !== null
                         ? "not-allowed"
                         : "pointer",
-                    opacity:
-                      hasActiveAssetDownload || removingAssetId !== null ? 0.35 : 1,
+                    opacity: hasActiveAssetDownload || removingAssetId !== null ? 0.35 : 1,
                   }}
                 >
                   <X size={14} strokeWidth={2.25} />
@@ -732,10 +722,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                 }}
               >
                 {justCompleted ? (
-                  <CheckCircle2
-                    size={16}
-                    style={{ color: "#22c55e", flexShrink: 0 }}
-                  />
+                  <CheckCircle2 size={16} style={{ color: "#22c55e", flexShrink: 0 }} />
                 ) : isActive ? (
                   <Loader2
                     size={16}
@@ -743,10 +730,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                     style={{ color: "#22c55e", flexShrink: 0 }}
                   />
                 ) : (
-                  <Circle
-                    size={16}
-                    style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
-                  />
+                  <Circle size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p
@@ -827,8 +811,11 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                         border: "1px solid var(--border-subtle)",
                         borderRadius: 6,
                         cursor:
-                          !onDeviceAllowed || isDownloading || isStarting || isStopping ? "not-allowed" : "pointer",
-                        opacity: !onDeviceAllowed || isDownloading || isStarting || isStopping ? 0.5 : 1,
+                          !onDeviceAllowed || isDownloading || isStarting || isStopping
+                            ? "not-allowed"
+                            : "pointer",
+                        opacity:
+                          !onDeviceAllowed || isDownloading || isStarting || isStopping ? 0.5 : 1,
                       }}
                     >
                       <Download size={14} />
@@ -844,11 +831,7 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
                       textAlign: "right" as const,
                     }}
                   >
-                    {justCompleted
-                      ? "Installed"
-                      : isActive
-                        ? ""
-                        : "Not installed"}
+                    {justCompleted ? "Installed" : isActive ? "" : "Not installed"}
                   </span>
                 </div>
               </div>
@@ -907,14 +890,15 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
         }}
       >
         <p style={{ margin: "0 0 4px" }}>
-          <strong>Models:</strong> SmolVLM2-2.2B (vision) + Phi-3.5 Mini 3.8B (text) + Whisper Small (audio)
+          <strong>Models:</strong> SmolVLM2-2.2B (vision) + Phi-3.5 Mini 3.8B (text) + Whisper Small
+          (audio)
         </p>
         <p style={{ margin: "0 0 4px" }}>
           <strong>Storage:</strong> ~4.6 GB total for all components
         </p>
         <p style={{ margin: 0 }}>
-          <strong>Requirements:</strong> 8 GB+ RAM. Windows: NVIDIA GPU with CUDA (bundled
-          llama.cpp / whisper.cpp CUDA 12.4 builds). AMD not supported in this build.
+          <strong>Requirements:</strong> 8 GB+ RAM. Windows: NVIDIA GPU with CUDA (bundled llama.cpp
+          / whisper.cpp CUDA 12.4 builds). AMD not supported in this build.
         </p>
       </div>
 
@@ -968,8 +952,8 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
               }}
             >
               Remove <strong style={{ color: "var(--text-primary)" }}>{removeConfirm.label}</strong>{" "}
-              from this device? You can download it again later. If On-Device AI is running, it will be
-              stopped automatically first.
+              from this device? You can download it again later. If On-Device AI is running, it will
+              be stopped automatically first.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
