@@ -7,7 +7,7 @@
 
 import { db } from "../../../db/client.js";
 import * as schema from "../../../db/schema/index.js";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, asc } from "drizzle-orm";
 
 const MAX_RANGE_DAYS = 31;
 
@@ -206,7 +206,48 @@ export class UserActivityQueryService {
           )
         )
         .limit(1);
-      return session ? { type: "session" as const, data: session } : null;
+
+      if (!session) return null;
+
+      // Include audio transcript for attribution verification.
+      // Speaker 0 = the user; Speaker/Participant N = other people.
+      const transcripts = await db
+        .select({
+          speakerId: schema.sessionTranscripts.speakerId,
+          transcript: schema.sessionTranscripts.transcript,
+          startTime: schema.sessionTranscripts.startTime,
+        })
+        .from(schema.sessionTranscripts)
+        .where(eq(schema.sessionTranscripts.sessionId, id))
+        .orderBy(asc(schema.sessionTranscripts.startTime))
+        .limit(50);
+
+      // Resolve user name for speaker mapping
+      const [user] = await db
+        .select({ firstName: schema.users.firstName, lastName: schema.users.lastName })
+        .from(schema.users)
+        .where(eq(schema.users.id, this.userId))
+        .limit(1);
+      const userName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "User";
+
+      const audioTranscript =
+        transcripts.length > 0
+          ? transcripts
+              .map((t) => {
+                const time = new Date(t.startTime).toLocaleTimeString();
+                const speaker = t.speakerId === 0 ? userName : `Participant ${t.speakerId}`;
+                return `[${time}] ${speaker}: ${t.transcript}`;
+              })
+              .join("\n")
+          : null;
+
+      return {
+        type: "session" as const,
+        data: {
+          ...session,
+          ...(audioTranscript ? { audioTranscript } : {}),
+        },
+      };
     }
 
     if (type === "document") {

@@ -20,6 +20,7 @@ import {
   sessionCaptures,
   sessionTranscripts,
   sessionSummaries,
+  users,
 } from "../../../db/schema";
 import { eq, and, isNotNull, asc, desc } from "drizzle-orm";
 import {
@@ -100,13 +101,24 @@ class MasterStoryService {
         },
       });
 
-      // Build full transcript text for storyteller
+      // Resolve the user's name for speaker attribution
+      const [sessionUser] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, options.userId))
+        .limit(1);
+      const userName =
+        [sessionUser?.firstName, sessionUser?.lastName].filter(Boolean).join(" ") || "User";
+
+      // Build full transcript text with resolved speaker names.
+      // Speaker 0 (mic channel) = the user; other speakers = numbered participants.
       const fullTranscriptText =
         transcripts.length > 0
           ? transcripts
               .map((t) => {
                 const time = new Date(t.startTime).toLocaleTimeString();
-                return `[${time}] Speaker ${t.speakerId}: ${t.transcript}`;
+                const speaker = t.speakerId === 0 ? userName : `Participant ${t.speakerId}`;
+                return `[${time}] ${speaker}: ${t.transcript}`;
               })
               .join("\n")
           : undefined;
@@ -115,6 +127,7 @@ class MasterStoryService {
         log.info("Audio transcripts available for storyteller", {
           transcriptCount: transcripts.length,
           totalCharacters: fullTranscriptText.length,
+          userName,
         });
       }
 
@@ -150,6 +163,7 @@ class MasterStoryService {
         timeline,
         fullTranscriptText,
         metadata,
+        userName,
       });
 
       log.info("Storyteller RLM completed", {

@@ -9,7 +9,7 @@
  */
 
 import { db } from "../../../db/client";
-import { monitoringSessions, sessionCaptures, sessionTranscripts } from "../../../db/schema";
+import { monitoringSessions, sessionCaptures, sessionTranscripts, users } from "../../../db/schema";
 import { eq, and, isNotNull, asc } from "drizzle-orm";
 import { storytellerRLMService } from "../rlm/storyteller/storyteller-rlm.service";
 import { createLogger } from "../../shared-infra/lib/logger.js";
@@ -92,6 +92,7 @@ class IntermediateSummaryService {
         intermediateSummaryEnabled: monitoringSessions.intermediateSummaryEnabled,
         intermediateSummaryStatus: monitoringSessions.intermediateSummaryStatus,
         startedAt: monitoringSessions.startedAt,
+        userId: monitoringSessions.userId,
       })
       .from(monitoringSessions)
       .where(eq(monitoringSessions.id, sessionId))
@@ -188,12 +189,23 @@ class IntermediateSummaryService {
         },
       });
 
+      // Resolve the user's name for speaker attribution
+      const [sessionUser] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1);
+      const userName =
+        [sessionUser?.firstName, sessionUser?.lastName].filter(Boolean).join(" ") || "User";
+
+      // Speaker 0 (mic channel) = the user; other speakers = numbered participants.
       const fullTranscriptText =
         transcripts.length > 0
           ? transcripts
               .map((t) => {
                 const time = new Date(t.startTime).toLocaleTimeString();
-                return `[${time}] Speaker ${t.speakerId}: ${t.transcript}`;
+                const speaker = t.speakerId === 0 ? userName : `Participant ${t.speakerId}`;
+                return `[${time}] ${speaker}: ${t.transcript}`;
               })
               .join("\n")
           : undefined;
@@ -223,6 +235,7 @@ class IntermediateSummaryService {
         timeline,
         fullTranscriptText,
         metadata,
+        userName,
       });
 
       const result: IntermediateSummaryResult = {

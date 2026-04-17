@@ -51,7 +51,8 @@ export class StorytellerEnvironment {
   constructor(
     public readonly timeline: Activity[],
     public readonly fullTranscriptText: string | undefined,
-    public readonly metadata: SessionMetadata
+    public readonly metadata: SessionMetadata,
+    public readonly userName?: string
   ) {}
 
   /**
