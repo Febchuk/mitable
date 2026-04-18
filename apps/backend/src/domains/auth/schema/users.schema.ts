@@ -62,6 +62,14 @@ export const users = pgTable("users", {
   firefliesApiKeyEncrypted: text("fireflies_api_key_encrypted"),
   firefliesLastSyncedAt: timestamp("fireflies_last_synced_at"),
 
+  // Slack user OAuth tokens (per-user event subscriptions, encrypted)
+  slackUserAccessTokenEncrypted: text("slack_user_access_token_encrypted"),
+  slackUserTokenExpiresAt: timestamp("slack_user_token_expires_at"),
+  slackUserId: varchar("slack_user_id", { length: 50 }),
+  slackTeamId: varchar("slack_team_id", { length: 50 }),
+  slackTeamName: varchar("slack_team_name", { length: 255 }),
+  slackUserDisplayName: varchar("slack_user_display_name", { length: 255 }),
+
   // Hierarchy fields
   managerId: uuid("manager_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
