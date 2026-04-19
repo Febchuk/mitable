@@ -20,6 +20,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      id-token: write
     steps:
       # anthropics/claude-code-action@beta
       - uses: anthropics/claude-code-action@28f83620103c48a57093dcc2837eec89e036bb9f
