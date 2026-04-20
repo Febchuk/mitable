@@ -23,10 +23,9 @@ export function getAgentQuerySystemPrompt(
     .join("\n");
 
   // Strip template-literal-dangerous chars and control characters to prevent prompt injection
-  // eslint-disable-next-line no-control-regex
   const safeName = userName
     .replace(/[`${}\\]/g, "")
-    .replace(/[\u0000-\u001f]/g, "")
+    .replace(/[\u0000-\u001f]/g, "") // eslint-disable-line no-control-regex
     .slice(0, 100);
 
   const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
