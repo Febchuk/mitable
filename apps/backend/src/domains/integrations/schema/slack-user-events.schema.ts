@@ -17,8 +17,8 @@ export const slackUserEvents = pgTable("slack_user_events", {
   channelName: varchar("channel_name", { length: 255 }),
   messageText: text("message_text").notNull(),
   slackTs: varchar("slack_ts", { length: 50 }).notNull(),
-  eventTimestamp: timestamp("event_timestamp").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  eventTimestamp: timestamp("event_timestamp", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const slackUserEventsRelations = relations(slackUserEvents, ({ one }) => ({

@@ -64,7 +64,7 @@ export const users = pgTable("users", {
 
   // Slack user OAuth tokens (per-user event subscriptions, encrypted)
   slackUserAccessTokenEncrypted: text("slack_user_access_token_encrypted"),
-  slackUserTokenExpiresAt: timestamp("slack_user_token_expires_at"),
+  slackUserTokenExpiresAt: timestamp("slack_user_token_expires_at", { withTimezone: true }),
   slackUserId: varchar("slack_user_id", { length: 50 }),
   slackTeamId: varchar("slack_team_id", { length: 50 }),
   slackTeamName: varchar("slack_team_name", { length: 255 }),

@@ -8,7 +8,7 @@ EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE users ADD COLUMN slack_user_token_expires_at TIMESTAMP;
+  ALTER TABLE users ADD COLUMN slack_user_token_expires_at TIMESTAMPTZ;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
@@ -46,9 +46,11 @@ CREATE TABLE IF NOT EXISTS slack_user_events (
   channel_name VARCHAR(255),
   message_text TEXT NOT NULL,
   slack_ts VARCHAR(50) NOT NULL,
-  event_timestamp TIMESTAMP NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  event_timestamp TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_slack_user_events_user ON slack_user_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_slack_user_events_event_id ON slack_user_events(slack_event_id);
+CREATE INDEX IF NOT EXISTS idx_slack_user_events_user_time ON slack_user_events(user_id, event_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_slack_user_events_sender ON slack_user_events(sender_slack_id);
