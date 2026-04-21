@@ -49,7 +49,8 @@ const GET_ACTIVITY_DETAIL: AgentQueryTool = {
   name: "get_activity_detail",
   description:
     "Drill into a specific activity item by ID. Returns full details: meeting transcripts " +
-    "for activity blocks, task breakdowns for sessions, or full content for documents.",
+    "for activity blocks, task breakdowns and speaker-attributed audio transcripts for sessions " +
+    "(use audioTranscript field to verify who said/did what), or full content for documents.",
   parameters: [
     {
       name: "id",

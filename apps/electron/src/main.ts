@@ -3122,7 +3122,7 @@ app.whenReady().then(async () => {
   // Content Security Policy — mitigates XSS in AI responses / markdown
   const isDev = !app.isPackaged;
   const scriptSrc = isDev
-    ? " script-src 'self' 'unsafe-eval' http://localhost:* ws://localhost:*;"
+    ? " script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:*;"
     : " script-src 'self';";
   const connectSrc =
     " connect-src 'self'" +

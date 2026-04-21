@@ -32,7 +32,7 @@ import {
   MousePointerClick,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
-import { SiLinear, SiGmail, SiNotion } from "react-icons/si";
+import { SiLinear, SiGmail, SiNotion, SiSlack } from "react-icons/si";
 import { FirefliesIcon } from "../../../components/icons/integrations";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { authService } from "../services/authService";
@@ -216,6 +216,14 @@ interface FirefliesStatus {
   lastSyncedAt: string | null;
 }
 
+interface SlackUserStatus {
+  connected: boolean;
+  expired: boolean;
+  slackUserId: string | null;
+  teamName: string | null;
+  displayName: string | null;
+}
+
 function formatPlanDisplay(
   data: { subscription: { tier: string }; isInternal: boolean } | undefined,
   isPending: boolean,
@@ -279,6 +287,11 @@ export default function UserProfilePage() {
   const [isFirefliesDisconnecting, setIsFirefliesDisconnecting] = useState(false);
   const [showFirefliesModal, setShowFirefliesModal] = useState(false);
   const [firefliesApiKey, setFirefliesApiKey] = useState("");
+
+  const [slackUserStatus, setSlackUserStatus] = useState<SlackUserStatus | null>(null);
+  const [isSlackUserLoading, setIsSlackUserLoading] = useState(true);
+  const [isSlackUserConnecting, setIsSlackUserConnecting] = useState(false);
+  const [isSlackUserDisconnecting, setIsSlackUserDisconnecting] = useState(false);
 
   // API Keys state
   const [apiKeys, setApiKeys] = useState<
@@ -370,6 +383,7 @@ export default function UserProfilePage() {
   const gmailPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const notionPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const granolaPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const slackUserPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup OAuth polling intervals on unmount
   useEffect(() => {
@@ -385,6 +399,9 @@ export default function UserProfilePage() {
       }
       if (granolaPollIntervalRef.current) {
         clearInterval(granolaPollIntervalRef.current);
+      }
+      if (slackUserPollIntervalRef.current) {
+        clearInterval(slackUserPollIntervalRef.current);
       }
     };
   }, []);
@@ -946,6 +963,7 @@ export default function UserProfilePage() {
     loadNotionStatus();
     loadGranolaStatus();
     loadFirefliesStatus();
+    loadSlackUserStatus();
     loadAppVersion();
     loadAudioPreferences();
     if (user?.id) {
@@ -1638,6 +1656,141 @@ export default function UserProfilePage() {
       });
     } finally {
       setIsFirefliesDisconnecting(false);
+    }
+  };
+
+  // ── Slack user handlers ──
+
+  const loadSlackUserStatus = async () => {
+    setIsSlackUserLoading(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSlackUserStatus(data);
+      }
+    } catch (error) {
+      logger.error("Error loading Slack user status:", error);
+    } finally {
+      setIsSlackUserLoading(false);
+    }
+  };
+
+  const handleConnectSlackUser = async () => {
+    setIsSlackUserConnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Not authenticated. Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/oauth/start`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start Slack OAuth");
+      }
+
+      const { authUrl } = await response.json();
+      window.open(authUrl, "_blank");
+
+      toast({
+        title: "Complete in Browser",
+        description: "Please complete the Slack authorization in your browser, then return here.",
+      });
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const token = authService.getAccessToken();
+          if (!token) return;
+
+          const resp = await fetch(`${API_BASE_URL}/api/integrations/slack/status`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            setSlackUserStatus(data);
+            if (data.connected) {
+              clearInterval(pollInterval);
+              slackUserPollIntervalRef.current = null;
+              toast({
+                title: "Slack Connected",
+                description: `Your Slack account${data.teamName ? ` (${data.teamName})` : ""} has been connected.`,
+              });
+            }
+          }
+        } catch (err) {
+          logger.error("Polling error:", err);
+        }
+      }, 2000);
+
+      slackUserPollIntervalRef.current = pollInterval;
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        slackUserPollIntervalRef.current = null;
+      }, 120000);
+    } catch (error) {
+      logger.error("Error connecting Slack:", error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to Slack. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSlackUserConnecting(false);
+    }
+  };
+
+  const handleDisconnectSlackUser = async () => {
+    setIsSlackUserDisconnecting(true);
+    try {
+      const token = authService.getAccessToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/integrations/slack/disconnect`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        setSlackUserStatus({
+          connected: false,
+          expired: false,
+          slackUserId: null,
+          teamName: null,
+          displayName: null,
+        });
+        toast({
+          title: "Slack Disconnected",
+          description: "Your Slack account has been disconnected.",
+        });
+      }
+    } catch (error) {
+      logger.error("Error disconnecting Slack:", error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Slack. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSlackUserDisconnecting(false);
     }
   };
 
@@ -3058,6 +3211,38 @@ export default function UserProfilePage() {
                 {/* Integration rows */}
                 {(
                   [
+                    {
+                      key: "slack",
+                      name: "Slack",
+                      description:
+                        slackUserStatus?.connected && slackUserStatus.teamName
+                          ? `Connected to ${slackUserStatus.teamName}`
+                          : "Capture DMs and @mentions",
+                      icon: (
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            background: "var(--bg-overlay)",
+                            border: "var(--border-subtle)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <SiSlack style={{ width: 18, height: 18, color: "#E01E5A" }} />
+                        </div>
+                      ),
+                      loading: isSlackUserLoading,
+                      connected: slackUserStatus?.connected ?? false,
+                      expired: slackUserStatus?.expired ?? false,
+                      connecting: isSlackUserConnecting,
+                      disconnecting: isSlackUserDisconnecting,
+                      onConnect: handleConnectSlackUser,
+                      onDisconnect: handleDisconnectSlackUser,
+                    },
                     {
                       key: "linear",
                       name: "Linear",

@@ -610,7 +610,9 @@ TIME ATTRIBUTION:
 - If no time breakdown is available, omit the duration parentheses
 
 RULES:
-- First person ("I"), casual tone (like a Slack update)
+- First person ("I"), casual tone (like a Slack update) — but ONLY for the user's own actions
+- If the master story attributes an action to someone else (e.g., "Participant 1 debugged X", "[Name] resolved Y", "the presenter discussed Z"), do NOT convert it to first person. Instead write "Participated in session where [Name] did X" or attribute it clearly.
+- NEVER present someone else's work, statements, or commitments as the user's accomplishments
 - 2-7 task bullets depending on session length
 - Each bullet = one task, with everything done for that task grouped under it
 - Customer/client names MUST appear in the task label when identifiable

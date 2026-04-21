@@ -27,6 +27,7 @@ export * from "../../domains/integrations/schema/github/github-repos.schema";
 export * from "../../domains/integrations/schema/github/github-commits.schema";
 export * from "../../domains/integrations/schema/github/github-pull-requests.schema";
 export * from "../../domains/integrations/schema/github/github-issues.schema";
+export * from "../../domains/integrations/schema/slack-user-events.schema";
 export * from "../../domains/benchmarks/schema/benchmarks.schema";
 export * from "../../domains/updates/schema/bragbook.schema";
 export * from "../../domains/auth/schema/teams.schema";

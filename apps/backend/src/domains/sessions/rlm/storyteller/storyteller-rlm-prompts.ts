@@ -11,7 +11,7 @@ import { STORYTELLER_TOOLS } from "./storyteller-tools";
  * Generate the system prompt for Storyteller RLM
  * Includes all available tools and their descriptions
  */
-export function getStorytellerSystemPrompt(): string {
+export function getStorytellerSystemPrompt(userName?: string): string {
   const toolDescriptions = STORYTELLER_TOOLS.map((tool) => {
     const params = tool.parameters
       .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"}`)
@@ -43,8 +43,14 @@ Example integration:
 
 Collaborative example:
 - Activity: "Observed [Collaborator] adjusting the database connection settings"
-- Audio: "[8:50] Speaker 1: Let me update the connection string. [8:51] Speaker 0: Yeah, that's been failing since yesterday"
+- Audio: "[8:50] Participant 1: Let me update the connection string. [8:51] ${userName || "User"}: Yeah, that's been failing since yesterday"
 - Enriched narrative: "[Collaborator] fixed the database connection configuration that had been failing since the prior day"
+
+USER IDENTITY:
+The user's name is "${userName || "User"}". In the audio transcripts:
+- Lines attributed to "${userName || "User"}" are the user's own speech — these are first-person actions.
+- Lines attributed to "Participant N" are OTHER people in the meeting — their actions, decisions, and statements should be attributed to THEM, not the user.
+- NEVER attribute a Participant's statements or commitments as the user's work.
 </role>
 
 <available_tools>

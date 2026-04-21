@@ -24,6 +24,7 @@ export interface StorytellerRLMInput {
   timeline: Activity[];
   fullTranscriptText?: string;
   metadata: SessionMetadata;
+  userName?: string;
 }
 
 export interface StorytellerRLMResult {
@@ -85,7 +86,8 @@ class StorytellerRLMService {
     const environment = new StorytellerEnvironment(
       input.timeline,
       input.fullTranscriptText,
-      input.metadata
+      input.metadata,
+      input.userName
     );
 
     // Scale max iterations based on timeline size:
@@ -101,7 +103,7 @@ class StorytellerRLMService {
     );
 
     // Build conversation — accumulated across iterations so LLM sees its own reasoning
-    const systemPrompt = getStorytellerSystemPrompt();
+    const systemPrompt = getStorytellerSystemPrompt(input.userName);
     const initialUserPrompt = getStorytellerUserPrompt("start", [], environment);
 
     // Claude uses separate system parameter; conversation only has user/assistant

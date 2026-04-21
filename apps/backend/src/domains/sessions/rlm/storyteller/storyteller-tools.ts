@@ -339,13 +339,14 @@ Summary:`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const attributionRule = `ATTRIBUTION: Activities starting with "Observed [Name]..." mean someone ELSE performed that action (e.g. on a shared screen or meeting). Preserve that attribution — write "Mark debugged X" NOT "I debugged X". For the user's own actions, write in first person ("I").`;
+        const userNameLabel = env.userName || "User";
+        const attributionRule = `ATTRIBUTION: The user is "${userNameLabel}". Activities starting with "Observed [Name]..." mean someone ELSE performed that action. In audio transcripts, lines from "${userNameLabel}" are the user's actions (write in first person "I"), and lines from "Participant N" are OTHER people's actions — attribute those to them, NOT the user. NEVER convert a Participant's statement or commitment into a first-person action.`;
 
         const systemPrompt = env.fullTranscriptText
           ? `You are a concise work summarizer with access to both visual activity logs and audio transcripts. Use the audio transcripts to understand the WHY behind actions. ${attributionRule} CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work.`
           : `You are a concise work summarizer. ${attributionRule} CRITICAL: Your summary MUST ONLY mention apps, websites, and actions that appear in the provided activity list. NEVER invent or substitute different apps, people, or tasks. If activities show casual browsing, say so — do NOT fabricate professional work.`;
 
-        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference the specific apps, websites, and actions listed above. Do NOT add information not present in the activities. Write the user's own actions in first person. For activities starting with "Observed [Name]...", attribute them to that person (e.g. "Mark configured X"), NOT to "I".`;
+        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference the specific apps, websites, and actions listed above. Do NOT add information not present in the activities. Write the user's ("${userNameLabel}") own actions in first person. For activities starting with "Observed [Name]..." or speech from "Participant N", attribute them to that person (e.g. "Participant 1 configured X"), NOT to "I".`;
 
         // Scale output tokens with chunk size
         const maxOutputTokens =
@@ -432,13 +433,14 @@ Final Summary:`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const mergeAttributionRule = `ATTRIBUTION: If chunk summaries mention someone else performing actions (e.g. "Mark debugged X"), preserve that attribution in the final narrative. Only the user's own actions should be in first person ("I"). Collaborative sessions should naturally weave both perspectives.`;
+        const mergeUserLabel = env.userName || "User";
+        const mergeAttributionRule = `ATTRIBUTION: The user is "${mergeUserLabel}". If chunk summaries mention someone else performing actions (e.g. "Participant 1 debugged X", "Mark resolved Y"), preserve that attribution in the final narrative. Only the user's own actions should be in first person ("I"). NEVER re-attribute another person's work to the user. Collaborative sessions should naturally weave both perspectives.`;
 
         const mergeSystemPrompt = env.fullTranscriptText
           ? `You are an expert editor who combines summaries into cohesive narratives. Preserve verbal context (intent, reasoning, decisions) in the final narrative. ${mergeAttributionRule} CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details.`
           : `You are an expert editor who combines summaries into cohesive narratives. ${mergeAttributionRule} CRITICAL: Only mention apps, websites, people, and actions that appear in the chunk summaries below. NEVER invent details.`;
 
-        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference apps, websites, and actions mentioned in the chunk summaries above. Do NOT add information not present. Write the user's own actions in first person. Preserve attribution for other people's actions (e.g. "Mark resolved X").`;
+        const userPrompt = `${prompt}\n\nIMPORTANT: Only reference apps, websites, and actions mentioned in the chunk summaries above. Do NOT add information not present. Write only "${mergeUserLabel}"'s own actions in first person. Preserve attribution for other people's actions — never collapse them into "I".`;
 
         const maxTokens = 1000;
         const finalSummary = await callSummarizationLLM(mergeSystemPrompt, userPrompt, maxTokens);

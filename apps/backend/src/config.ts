@@ -92,6 +92,7 @@ export const config = {
   slack: {
     clientId: (process.env.SLACK_CLIENT_ID || "").trim(),
     clientSecret: (process.env.SLACK_CLIENT_SECRET || "").trim(),
+    signingSecret: (process.env.SLACK_SIGNING_SECRET || "").trim(),
     redirectUri: (
       process.env.SLACK_REDIRECT_URI || `http://localhost:${PORT}/api/integrations/slack/callback`
     ).trim(),
