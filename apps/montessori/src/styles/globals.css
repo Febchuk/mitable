@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        /* backgrounds */
+        --bg-base: #1a1916;
+        --bg-raised: #211f1b;
+        --bg-overlay: #2a2824;
+        --bg-muted: #33312b;
+
+        /* text */
+        --text-primary: #ece8e0;
+        --text-secondary: #9b9689;
+        --text-tertiary: #6b665c;
+        --text-faint: #4a4640;
+
+        --ui-rgb: 236, 232, 224;
+
+        /* accent — teal blue */
+        --mi-accent: #82c0cc;
+        --mi-accent-rgb: 130, 192, 204;
+        --mi-accent-dark: #3a7a87;
+        --mi-accent-light: #b8dde4;
+        --mi-accent-bg: rgba(130, 192, 204, 0.12);
+        --mi-accent-border: rgba(130, 192, 204, 0.22);
+
+        /* status */
+        --status-success: #3a9b6b;
+        --status-success-rgb: 58, 155, 107;
+        --status-warning: #d4a27a;
+        --status-warning-rgb: 212, 162, 122;
+        --status-error: #e87474;
+        --status-error-rgb: 232, 116, 116;
+        --status-info: #4a9fd9;
+
+        /* borders */
+        --border-hairline: 0.5px solid rgba(var(--ui-rgb), 0.07);
+        --border-subtle: 0.5px solid rgba(var(--ui-rgb), 0.1);
+        --divider: rgba(var(--ui-rgb), 0.06);
+
+        /* typography */
+        --font-sans: "Inter", -apple-system, sans-serif;
+        --font-serif: "Newsreader", Georgia, serif;
+        --font-mono: "JetBrains Mono", monospace;
+
+        /* shadcn compatibility vars (dark default) */
+        --background: 0 0% 10%;
+        --foreground: 40 18% 90%;
+        --card: 36 8% 12%;
+        --card-foreground: 40 18% 90%;
+        --popover: 36 8% 15%;
+        --popover-foreground: 40 18% 90%;
+        --primary: 190 42% 66%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 36 8% 15%;
+        --secondary-foreground: 40 18% 90%;
+        --muted: 36 8% 18%;
+        --muted-foreground: 36 8% 55%;
+        --accent-foreground: 40 18% 90%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 36 8% 18%;
+        --input: 36 8% 18%;
+        --ring: 190 42% 66%;
+        --radius: 0.625rem;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+        box-sizing: border-box;
+    }
+
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: var(--bg-base);
+        color: var(--text-primary);
+    }
+}
+
+/* Typography system */
+@layer components {
+    .text-heading-1 {
+        @apply text-4xl font-bold;
+    }
+    .text-heading-2 {
+        @apply text-3xl font-bold;
+    }
+    .text-heading-3 {
+        @apply text-2xl font-semibold;
+    }
+    .text-heading-4 {
+        @apply text-xl font-semibold;
+    }
+    .text-body-lg {
+        @apply text-lg font-normal;
+    }
+    .text-body {
+        @apply text-base font-normal;
+    }
+    .text-body-sm {
+        @apply text-sm font-normal;
+    }
+    .text-button {
+        @apply text-sm font-semibold;
+    }
+    .text-caption {
+        @apply text-xs font-normal;
+    }
+    .text-label {
+        @apply text-sm font-medium;
+    }
+}
+
+/* Custom scrollbar */
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+    background: rgba(var(--ui-rgb), 0.15);
+    border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--ui-rgb), 0.25);
+}
+
+/* Disable text selection on the grid to keep drag-select clean */
+.mt-grid,
+.mt-grid * {
+    user-select: none;
+    -webkit-user-select: none;
+}
