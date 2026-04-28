@@ -17,6 +17,7 @@ import myBenchmarksRouter from "./domains/benchmarks/routes/my-benchmarks.js";
 import myBragbookRouter from "./domains/updates/routes/my-bragbook.js";
 import adminBenchmarksRouter from "./domains/benchmarks/routes/admin-benchmarks.js";
 import feedbackRouter from "./domains/auth/routes/feedback.js";
+import montessoriRouter from "./domains/montessori/routes/montessori.js";
 import { authLimiter } from "./domains/auth/middleware/rateLimiter.js";
 
 export const router = Router();
@@ -41,6 +42,7 @@ router.use("/my-activity", myActivityRouter);
 router.use("/my/benchmarks", myBenchmarksRouter);
 router.use("/my-bragbook", myBragbookRouter);
 router.use("/feedback", feedbackRouter);
+router.use("/montessori", montessoriRouter);
 
 // Protected routes - require authentication
 router.post("/help", requireAuth, (req, res) => {
