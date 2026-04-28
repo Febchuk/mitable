@@ -18,6 +18,7 @@ export * from "../../domains/sessions/schema/daily-activities.schema";
 export * from "../../domains/agent/schema/ask-threads.schema";
 export * from "../../domains/integrations/schema/graph-sync.schema";
 export * from "../../domains/auth/schema/api-keys.schema";
+export * from "../../domains/montessori/schema/montessori.schema";
 
 // Agent chat schemas
 export * from "../../domains/agent/schema/agent-chats.schema";
