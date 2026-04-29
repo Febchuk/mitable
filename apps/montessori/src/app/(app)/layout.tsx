@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/AuthContext";
 import { StoreProvider } from "@/lib/store";
+import { QueryProvider } from "@/lib/query/QueryProvider";
 import { AppShell } from "@/components/shell/AppShell";
 
 /**
@@ -70,8 +71,10 @@ export default function AppGroupLayout({ children }: { children: React.ReactNode
     }
 
     return (
-        <StoreProvider>
-            <AppShell>{children}</AppShell>
-        </StoreProvider>
+        <QueryProvider>
+            <StoreProvider>
+                <AppShell>{children}</AppShell>
+            </StoreProvider>
+        </QueryProvider>
     );
 }
