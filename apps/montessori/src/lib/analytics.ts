@@ -14,14 +14,13 @@ export function overallMasteryTone(
         if (!latestByTopic.has(obs.topicId)) latestByTopic.set(obs.topicId, obs.level);
     }
     const counts: Record<MasteryLevel, number> = {
-        "not-introduced": 0,
         introduced: 0,
         practising: 0,
         mastered: 0,
     };
     for (const topic of topicsForLevel) {
-        const lv = latestByTopic.get(topic.id) ?? "not-introduced";
-        counts[lv]++;
+        const lv = latestByTopic.get(topic.id);
+        if (lv) counts[lv]++;
     }
     const total = topicsForLevel.length;
     if (counts.mastered / total > 0.35) return "mastered";

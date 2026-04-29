@@ -639,7 +639,6 @@ function InlineLevelEditor({
             /→ .+/,
             `→ ${
                 {
-                    "not-introduced": "Not introduced",
                     introduced: "Introduced",
                     practising: "Practising",
                     mastered: "Mastered",
@@ -652,23 +651,21 @@ function InlineLevelEditor({
     return (
         <div className="space-y-2">
             <div className="flex flex-wrap gap-1">
-                {(["not-introduced", "introduced", "practising", "mastered"] as MasteryLevel[]).map(
-                    (lv) => (
-                        <button
-                            key={lv}
-                            type="button"
-                            onClick={() => setLevel(lv)}
-                            className={cn(
-                                "text-[11px] rounded-md border px-2 h-6",
-                                level === lv
-                                    ? "bg-accent-bg border-accent-border text-accent"
-                                    : "border-stroke-subtle text-ink-tertiary"
-                            )}
-                        >
-                            {lv === "not-introduced" ? "Not introduced" : lv[0]!.toUpperCase() + lv.slice(1)}
-                        </button>
-                    )
-                )}
+                {(["introduced", "practising", "mastered"] as MasteryLevel[]).map((lv) => (
+                    <button
+                        key={lv}
+                        type="button"
+                        onClick={() => setLevel(lv)}
+                        className={cn(
+                            "text-[11px] rounded-md border px-2 h-6",
+                            level === lv
+                                ? "bg-accent-bg border-accent-border text-accent"
+                                : "border-stroke-subtle text-ink-tertiary"
+                        )}
+                    >
+                        {lv[0]!.toUpperCase() + lv.slice(1)}
+                    </button>
+                ))}
             </div>
             <input
                 value={note}

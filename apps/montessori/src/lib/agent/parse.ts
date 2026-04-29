@@ -44,7 +44,6 @@ function detectLevel(input: string): MasteryLevel | null {
     if (/\bmastered\b|\bhas mastered\b|\bgot it\b/.test(lower)) return "mastered";
     if (/\bpractising\b|\bpracticing\b|\bworking on\b/.test(lower)) return "practising";
     if (/\bintroduced\b|\bshown\b|\bpresented\b/.test(lower)) return "introduced";
-    if (/\bnot introduced\b|\bnever introduced\b/.test(lower)) return "not-introduced";
     return null;
 }
 
@@ -312,7 +311,6 @@ export function parse(input: string, ctx: AgentContext): AgentMessage {
 
 function levelLabel(lv: MasteryLevel): string {
     return {
-        "not-introduced": "Not introduced",
         introduced: "Introduced",
         practising: "Practising",
         mastered: "Mastered",

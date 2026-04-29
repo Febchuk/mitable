@@ -9,13 +9,6 @@ export interface CellVisual {
 }
 
 export const MASTERY_VISUALS: Record<MasteryLevel, CellVisual> = {
-    "not-introduced": {
-        symbol: "",
-        bg: "rgba(var(--ui-rgb), 0.04)",
-        color: "var(--text-faint)",
-        borderColor: "rgba(var(--ui-rgb), 0.06)",
-        label: "Not introduced",
-    },
     introduced: {
         symbol: "I",
         bg: "rgba(var(--status-warning-rgb), 0.20)",
@@ -39,9 +32,17 @@ export const MASTERY_VISUALS: Record<MasteryLevel, CellVisual> = {
     },
 };
 
-export const MASTERY_ORDER: MasteryLevel[] = [
-    "not-introduced",
-    "introduced",
-    "practising",
-    "mastered",
-];
+// Visual used when a student has no recorded observation for a topic. Not
+// part of MASTERY_VISUALS because it isn't a MasteryLevel — it's the absence
+// of one.
+export const EMPTY_CELL_VISUAL: CellVisual = {
+    symbol: "",
+    bg: "rgba(var(--ui-rgb), 0.04)",
+    color: "var(--text-faint)",
+    borderColor: "rgba(var(--ui-rgb), 0.06)",
+    label: "Not introduced",
+};
+
+export function visualFor(level: MasteryLevel | null): CellVisual {
+    return level ? MASTERY_VISUALS[level] : EMPTY_CELL_VISUAL;
+}

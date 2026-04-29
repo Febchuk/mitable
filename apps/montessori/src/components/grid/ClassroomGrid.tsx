@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import type { Classroom, Domain, MasteryLevel, Student, Topic } from "@/types";
-import { MASTERY_VISUALS } from "@/components/grid/cell-visuals";
+import { MASTERY_VISUALS, visualFor } from "@/components/grid/cell-visuals";
 
 interface CellKey {
     studentId: string;
@@ -325,7 +325,7 @@ export function ClassroomGrid({
                                         cell.topicId
                                     );
                                     const selected = selection.has(keyOf(cell));
-                                    const visuals = MASTERY_VISUALS[level];
+                                    const visuals = visualFor(level);
                                     return (
                                         <button
                                             key={topic.id + student.id}

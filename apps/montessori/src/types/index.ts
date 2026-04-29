@@ -2,7 +2,10 @@ export type Role = "admin" | "teacher-primary" | "teacher-elementary";
 
 export type CurriculumLevel = "primary" | "elementary" | "both";
 
-export type MasteryLevel = "not-introduced" | "introduced" | "practising" | "mastered";
+// We never persist a "not-introduced" level — absence of an observation row
+// is the empty state. UI code that needs to render an empty cell uses
+// `MasteryLevel | null` and falls back to EMPTY_CELL_VISUAL.
+export type MasteryLevel = "introduced" | "practising" | "mastered";
 
 export type InputMethod = "text" | "voice" | "photo" | "grid" | "agent";
 

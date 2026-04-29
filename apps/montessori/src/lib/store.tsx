@@ -387,7 +387,7 @@ export function getLatestLevel(
     observations: Observation[],
     studentId: string,
     topicId: string
-): MasteryLevel {
+): MasteryLevel | null {
     const match = observations.find((o) => o.studentId === studentId && o.topicId === topicId);
-    return match?.level ?? "not-introduced";
+    return match?.level ?? null;
 }
