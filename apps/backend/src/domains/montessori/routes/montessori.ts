@@ -8,15 +8,18 @@ import { montessoriClassrooms } from "../schema/montessori.schema.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
 import { requireAuth } from "../../auth/middleware/auth.js";
 import readsRouter from "./reads.js";
+import writesRouter from "./writes.js";
 
 const logger = createLogger({ module: "MontessoriRoutes" });
 
 const router = Router();
 
 // All read endpoints (classrooms, students, curriculum, grid, attendance,
-// reports, agent threads/messages) live in ./reads.ts and mount under the
-// same /api/montessori prefix.
+// reports, agent threads/messages) live in ./reads.ts; mutations
+// (observations, attendance upsert, report status) live in ./writes.ts.
+// Both mount under the same /api/montessori prefix.
 router.use(readsRouter);
+router.use(writesRouter);
 
 /**
  * GET /api/montessori/health
