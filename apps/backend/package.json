@@ -120,7 +120,6 @@
     "@types/node": "^20.11.30",
     "@types/node-cron": "^3.0.11",
     "@types/pdf-parse": "^1.1.5",
-    "@types/pdfmake": "^0.3.2",
     "@types/pg": "^8.11.10",
     "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
