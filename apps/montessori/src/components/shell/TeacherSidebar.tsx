@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useCurrentTeacher, useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 const ITEMS = [
     { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -25,10 +25,15 @@ const ITEMS = [
 
 export function TeacherSidebar() {
     const pathname = usePathname() ?? "";
-    const teacher = useCurrentTeacher();
-    const { role } = useStore();
+    const { me } = useAuth();
+    const teacherName =
+        me?.user
+            ? [me.user.firstName, me.user.lastName].filter(Boolean).join(" ").trim() ||
+              me.user.email.split("@")[0]
+            : "Teacher";
+    const level = me?.assignedClassroom?.level ?? "primary";
     const label =
-        role === "teacher-primary" ? "Primary · ages 3–6" : "Elementary · ages 6–12";
+        level === "elementary" ? "Elementary · ages 6–12" : "Primary · ages 3–6";
 
     return (
         <aside
@@ -75,9 +80,7 @@ export function TeacherSidebar() {
                 })}
             </nav>
             <div className="p-3 border-t border-stroke-subtle text-[11px] text-ink-tertiary">
-                <div className="font-medium text-ink-secondary truncate">
-                    {teacher?.name ?? "Teacher"}
-                </div>
+                <div className="font-medium text-ink-secondary truncate">{teacherName}</div>
                 <div>{label}</div>
             </div>
         </aside>

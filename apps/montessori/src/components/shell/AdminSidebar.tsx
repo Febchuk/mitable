@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 const ITEMS = [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -27,11 +27,11 @@ const ITEMS = [
 
 export function AdminSidebar() {
     const pathname = usePathname() ?? "";
-    const { agentThreads } = useStore();
-    const pendingConfirmations = agentThreads
-        .filter((t) => t.role === "admin")
-        .flatMap((t) => t.messages)
-        .filter((m) => m.card?.kind === "confirmation" && m.card.status === "pending").length;
+    const { me } = useAuth();
+    // The pending-confirmations badge returns in Phase 2 once agent threads
+    // are real. For now there's nothing useful to count.
+    const pendingConfirmations = 0;
+    const orgName = me?.organization?.name ?? "School";
 
     return (
         <aside
@@ -76,8 +76,8 @@ export function AdminSidebar() {
                 })}
             </nav>
             <div className="p-3 border-t border-stroke-subtle text-[11px] text-ink-tertiary">
-                <div className="font-medium text-ink-secondary">The Learning Place</div>
-                <div>Prototype · frontend only</div>
+                <div className="font-medium text-ink-secondary truncate">{orgName}</div>
+                <div>Admin workspace</div>
             </div>
         </aside>
     );

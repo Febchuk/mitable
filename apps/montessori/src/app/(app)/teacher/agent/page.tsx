@@ -3,13 +3,14 @@
 import * as React from "react";
 
 import { AgentView } from "@/components/agent/AgentView";
-import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 export default function TeacherAgentPage() {
-    const { role } = useStore();
-    // Fall back to teacher-primary if the user flipped from admin mode
+    const { me } = useAuth();
+    // Pick the prompt set by the teacher's classroom level. Fall back to
+    // primary when nothing is assigned yet.
     const effectiveRole =
-        role === "teacher-elementary" ? "teacher-elementary" : "teacher-primary";
+        me?.assignedClassroom?.level === "elementary" ? "teacher-elementary" : "teacher-primary";
     return (
         <div className="h-full min-h-0">
             <AgentView role={effectiveRole} />
