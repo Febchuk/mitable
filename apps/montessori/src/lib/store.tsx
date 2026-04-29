@@ -29,6 +29,21 @@ import {
     initialTeachers,
     initialTopics,
 } from "@/lib/mock-data";
+import { useAuth, type MontessoriMe } from "@/lib/auth/AuthContext";
+
+function roleFromMe(me: MontessoriMe | null): Role {
+    if (!me) return "teacher-primary";
+    if (me.user.role === "admin") return "admin";
+    if (me.assignedClassroom?.level === "elementary") return "teacher-elementary";
+    return "teacher-primary";
+}
+
+function schoolFromMe(me: MontessoriMe | null): School {
+    if (me?.organization) {
+        return { id: me.organization.id, name: me.organization.name };
+    }
+    return initialSchool;
+}
 
 interface StoreState {
     sessionId: string;
@@ -46,8 +61,6 @@ interface StoreState {
 }
 
 interface StoreActions {
-    setRole: (role: Role) => void;
-
     // Observations / grid
     setObservation: (args: {
         studentId: string;
@@ -96,9 +109,13 @@ function makeId(prefix = "id"): string {
 export function StoreProvider({ children }: { children: React.ReactNode }) {
     // Seeded once per mount. Everything is in-memory, no persistence.
     const [sessionId] = React.useState(() => `sess_${Date.now()}`);
-    const [role, setRole] = React.useState<Role>("teacher-primary");
 
-    const school = initialSchool;
+    // Role + school are derived from the auth context. The Provider is
+    // mounted under the auth gate so `me` is non-null in normal use, but
+    // we fall back to safe defaults for the null window.
+    const { me } = useAuth();
+    const role = roleFromMe(me);
+    const school = schoolFromMe(me);
     const [teachers, setTeachers] = React.useState<Teacher[]>(initialTeachers);
     const [classrooms, setClassrooms] = React.useState<Classroom[]>(initialClassrooms);
     const [students] = React.useState<Student[]>(initialStudents);
@@ -285,7 +302,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         () => ({
             sessionId,
             role,
-            setRole,
             school,
             teachers,
             classrooms,

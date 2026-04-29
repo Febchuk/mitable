@@ -4,8 +4,8 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
-import { RoleSwitcher } from "@/components/shell/RoleSwitcher";
-import { useStore } from "@/lib/store";
+import { UserMenu } from "@/components/shell/UserMenu";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 function titleFromPath(pathname: string): string {
     const clean = pathname.replace(/^\//, "").split("?")[0]!;
@@ -29,7 +29,8 @@ function titleFromPath(pathname: string): string {
 
 export function TitleBar() {
     const pathname = usePathname() ?? "/";
-    const { school } = useStore();
+    const { me } = useAuth();
+    const schoolName = me?.organization?.name ?? "";
 
     return (
         <header
@@ -42,7 +43,7 @@ export function TitleBar() {
                 </div>
                 <div className="min-w-0">
                     <div className="text-xs text-ink-tertiary tracking-wide uppercase font-medium">
-                        {school.name}
+                        {schoolName}
                     </div>
                     <div className="text-sm font-semibold text-ink-primary truncate">
                         {titleFromPath(pathname)}
@@ -51,7 +52,7 @@ export function TitleBar() {
             </div>
 
             <div className="flex items-center gap-3">
-                <RoleSwitcher />
+                <UserMenu />
             </div>
         </header>
     );
