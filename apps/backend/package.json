@@ -16,6 +16,7 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
     "seed:montessori": "tsx src/scripts/seed-montessori.ts",
+    "teardown:montessori": "tsx src/scripts/drop-montessori.ts",
     "benchmarks:backfill": "tsx src/scripts/backfill-benchmarks.ts",
     "seed:production": "tsx src/db/seed-production.ts",
     "db:migrate-fts": "tsx src/scripts/run-fts-migration.ts",
