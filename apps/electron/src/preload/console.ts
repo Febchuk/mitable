@@ -261,8 +261,13 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   resetMonitoringSession: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESET),
 
-  resyncLocalStories: (): Promise<{ success: boolean; synced?: number; total?: number; errors?: string[]; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_RESYNC_LOCAL),
+  resyncLocalStories: (): Promise<{
+    success: boolean;
+    synced?: number;
+    total?: number;
+    errors?: string[];
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_RESYNC_LOCAL),
 
   getMonitoringSessionState: (): Promise<MonitoringSessionState | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STATUS),
@@ -729,7 +734,15 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   onDeviceGetStatus: (): Promise<{
     isSetUp: boolean;
     serverStatus: string;
-    installedAssets: Array<{ id: string; version: string; filePath: string; sizeBytes: number }>;
+    model: string | null;
+    tier: string | null;
+    gpuDescription: string;
+    vramMB: number;
+    hasNativeAudio: boolean;
+    enabled: boolean;
+    onDeviceAllowed: boolean;
+    onDeviceBlockReason: string | null;
+    sqliteAvailable: boolean;
     error?: string;
   }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_STATUS),
 
@@ -754,16 +767,20 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   onDeviceRemoveAsset: (assetId: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, assetId),
 
-  onDeviceStartServer: (): Promise<{ success: boolean; port?: number; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_START_SERVER),
+  onDeviceStartServer: (): Promise<{
+    success: boolean;
+    model?: string;
+    tier?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_START_SERVER),
 
   onDeviceStopServer: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_STOP_SERVER),
 
   onDeviceServerStatus: (): Promise<{
     status: string;
-    port: number;
-    baseUrl: string | null;
+    model: string | null;
+    tier: string | null;
     error?: string;
   }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS),
 
@@ -780,8 +797,7 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   ): (() => void) => {
     const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
     ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
-    return () =>
-      ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
   },
 });
 

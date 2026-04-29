@@ -3,7 +3,7 @@
  *
  * Shared iterative loop for on-device Recursive Language Model processing.
  * Mirrors the cloud RLM pattern: call LLM → parse JSON → execute tool → repeat.
- * Designed for small models (Phi-3.5) with GBNF grammar constraints.
+ * Works with Ollama's native JSON mode (format: "json") — no GBNF grammar needed.
  */
 
 import { createLogger } from "../../../lib/logger";
@@ -26,21 +26,20 @@ export interface RLMTool<TEnv = unknown> {
   execute: (params: Record<string, unknown>, env: TEnv) => Promise<unknown> | unknown;
 }
 
-/** Chat completion function signature — decoupled from textServerService so the
+/** Chat completion function signature — decoupled from ollamaService so the
  *  RLM engine can be used standalone (e.g. reprocess script). */
 export type CompletionFn = (
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-  options?: { temperature?: number; max_tokens?: number; grammar?: string }
+  options?: { temperature?: number; max_tokens?: number }
 ) => Promise<string>;
 
 export interface RLMConfig {
   maxIterations: number;
   temperature?: number;
   maxTokens?: number;
-  grammar?: string;
   /** Field on the done-response that holds the final result (e.g. "classification", "summary") */
   doneResultField: string;
-  /** LLM completion function — injected by caller */
+  /** LLM completion function — injected by caller (should return JSON) */
   completionFn: CompletionFn;
 }
 
@@ -111,7 +110,6 @@ export async function runRLMLoop<TEnv, TResult>(
       const raw = await config.completionFn(messages, {
         temperature: config.temperature ?? 0.1,
         max_tokens: config.maxTokens ?? 1024,
-        grammar: config.grammar ?? RLM_TOOL_CALL_GRAMMAR,
       });
 
       llmResponse = parseJsonResponse(raw);
@@ -169,9 +167,7 @@ export async function runRLMLoop<TEnv, TResult>(
   }
 
   // Fallback: try to extract a result from the last tool history entry
-  const lastDone = toolHistory.find(
-    (h) => h.tool === "classify" || h.tool === "build_story"
-  );
+  const lastDone = toolHistory.find((h) => h.tool === "classify" || h.tool === "build_story");
   if (lastDone?.result) {
     return {
       success: true,
@@ -199,14 +195,18 @@ function parseJsonResponse(raw: string): LLMToolCall {
   // Try direct parse first
   try {
     return JSON.parse(trimmed);
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // Strip markdown fences if present
   const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenceMatch) {
     try {
       return JSON.parse(fenceMatch[1].trim());
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   // Try to find first { ... } block
@@ -215,7 +215,9 @@ function parseJsonResponse(raw: string): LLMToolCall {
   if (braceStart !== -1 && braceEnd > braceStart) {
     try {
       return JSON.parse(trimmed.slice(braceStart, braceEnd + 1));
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   throw new Error(`Could not parse LLM response as JSON: ${trimmed.slice(0, 200)}`);

@@ -19,6 +19,7 @@ export default function App() {
   const [audioRecordingActive, setAudioRecordingActive] = useState(false);
   // Ref mirrors audioRecordingActive so closures always see the current value
   const audioRecordingActiveRef = useRef(false);
+  const audioToggleBusyRef = useRef(false);
 
   // Track which dropdown is open (for UI state only)
   const [eyeDropdownOpen, setEyeDropdownOpen] = useState(false);
@@ -74,8 +75,14 @@ export default function App() {
         (!state || (state.status !== "active" && state.status !== "paused"))
       ) {
         logger.info("🔇 Session ended, stopping audio capture");
-        const { audioCaptureService } = await import("./services/audioCapture");
-        await audioCaptureService.stopCapture();
+        try {
+          const { audioCaptureService } = await import("./services/audioCapture");
+          if (audioCaptureService.isCapturing()) {
+            await audioCaptureService.stopCapture();
+          }
+        } catch {
+          /* on-device path: no renderer capture to stop */
+        }
         await window.watchingPillAPI?.stopAudioRecording();
         setAudioRecordingEnabled(false);
         setAudioRecordingActive(false);
@@ -100,8 +107,14 @@ export default function App() {
     // Main process forces audio stop when session ends or pauses
     const unsubForceStopAudio = window.watchingPillAPI.onForceStopAudio(async () => {
       logger.info("\uD83D\uDD07 Force-stop audio received from main process");
-      const { audioCaptureService } = await import("./services/audioCapture");
-      await audioCaptureService.stopCapture();
+      try {
+        const { audioCaptureService } = await import("./services/audioCapture");
+        if (audioCaptureService.isCapturing()) {
+          await audioCaptureService.stopCapture();
+        }
+      } catch {
+        /* renderer capture may not be active (on-device path) */
+      }
       setAudioRecordingEnabled(false);
       setAudioRecordingActive(false);
       audioRecordingActiveRef.current = false;
@@ -117,14 +130,19 @@ export default function App() {
         return;
       }
 
-      const state = await window.watchingPillAPI?.getSessionState();
-      const { audioCaptureService } = await import("./services/audioCapture");
-      const captureResult = await audioCaptureService.startCapture(state?.id || "");
+      const isOnDevice = !!(result as any).onDevice;
 
-      if (!captureResult.success) {
-        logger.error("❌ Failed to restart audio capture after resume:", captureResult.error);
-        await window.watchingPillAPI?.stopAudioRecording();
-        return;
+      if (!isOnDevice) {
+        // Cloud mode: restart renderer-side capture
+        const state = await window.watchingPillAPI?.getSessionState();
+        const { audioCaptureService } = await import("./services/audioCapture");
+        const captureResult = await audioCaptureService.startCapture(state?.id || "");
+
+        if (!captureResult.success) {
+          logger.error("❌ Failed to restart audio capture after resume:", captureResult.error);
+          await window.watchingPillAPI?.stopAudioRecording();
+          return;
+        }
       }
 
       logger.info("✅ Audio recording restarted after resume");
@@ -203,48 +221,69 @@ export default function App() {
 
   // Microphone button toggles audio recording
   const handleMicClick = async () => {
-    const newState = !audioRecordingEnabled;
-    setAudioRecordingEnabled(newState);
+    if (audioToggleBusyRef.current) return;
+    audioToggleBusyRef.current = true;
 
-    if (newState) {
-      // Start audio recording
-      logger.info("🎤 Enabling audio recording");
+    try {
+      const newState = !audioRecordingEnabled;
+      setAudioRecordingEnabled(newState);
 
-      // Step 1: Connect WebSocket in main process
-      const result = await window.watchingPillAPI?.startAudioRecording();
+      if (newState) {
+        logger.info("🎤 Enabling audio recording");
 
-      if (!result?.success) {
-        logger.error("❌ Failed to start audio recording:", result?.error);
-        setAudioRecordingEnabled(false);
-        return;
-      }
+        const result = await window.watchingPillAPI?.startAudioRecording();
 
-      // Step 2: Start audio capture in renderer
-      const { audioCaptureService } = await import("./services/audioCapture");
-      const captureResult = await audioCaptureService.startCapture(sessionState?.id || "");
+        if (!result?.success) {
+          logger.error("❌ Failed to start audio recording:", result?.error);
+          setAudioRecordingEnabled(false);
+          return;
+        }
 
-      if (!captureResult.success) {
-        logger.error("❌ Failed to start audio capture:", captureResult.error);
+        // On-device mode: native capture runs in main process, no renderer work needed
+        const isOnDevice = !!(result as any).onDevice;
+
+        if (!isOnDevice) {
+          // Cloud mode: start renderer-side AudioWorklet capture -> IPC -> WebSocket
+          const { audioCaptureService } = await import("./services/audioCapture");
+          const captureResult = await audioCaptureService.startCapture(sessionState?.id || "");
+
+          if (!captureResult.success) {
+            logger.error("❌ Failed to start audio capture:", captureResult.error);
+            await window.watchingPillAPI?.stopAudioRecording();
+            setAudioRecordingEnabled(false);
+            return;
+          }
+
+          logger.info("✅ Audio recording started (cloud)", {
+            hasSystemAudio: captureResult.hasSystemAudio,
+          });
+        } else {
+          logger.info("✅ Audio recording started (on-device native)", {
+            hasSystemAudio: result.hasSystemAudio,
+          });
+        }
+
+        setAudioRecordingActive(true);
+        audioRecordingActiveRef.current = true;
+      } else {
+        logger.info("🔇 Disabling audio recording");
+
+        // Stop renderer capture if running (cloud path)
+        try {
+          const { audioCaptureService } = await import("./services/audioCapture");
+          if (audioCaptureService.isCapturing()) {
+            await audioCaptureService.stopCapture();
+          }
+        } catch {
+          /* on-device path: no renderer capture to stop */
+        }
+
         await window.watchingPillAPI?.stopAudioRecording();
-        setAudioRecordingEnabled(false);
-        return;
+        setAudioRecordingActive(false);
+        audioRecordingActiveRef.current = false;
       }
-
-      logger.info("✅ Audio recording started", { hasSystemAudio: captureResult.hasSystemAudio });
-      setAudioRecordingActive(true);
-      audioRecordingActiveRef.current = true;
-    } else {
-      // Stop audio recording
-      logger.info("🔇 Disabling audio recording");
-
-      // Stop renderer capture
-      const { audioCaptureService } = await import("./services/audioCapture");
-      await audioCaptureService.stopCapture();
-
-      // Stop main WebSocket
-      await window.watchingPillAPI?.stopAudioRecording();
-      setAudioRecordingActive(false);
-      audioRecordingActiveRef.current = false;
+    } finally {
+      audioToggleBusyRef.current = false;
     }
   };
 

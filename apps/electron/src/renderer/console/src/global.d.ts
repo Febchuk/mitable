@@ -317,28 +317,22 @@ interface ConsoleAPI {
     error?: string;
   }>;
 
-  // On-Device AI
+  // On-Device AI (Ollama + Gemma 4)
   onDeviceGetStatus: () => Promise<{
     isSetUp: boolean;
     serverStatus: string;
-    whisperStatus?: string;
-    installedAssets: Array<{ id: string; version: string; filePath: string; sizeBytes: number }>;
-    enabled?: boolean;
-    windowsRequiresNvidia?: boolean;
-    windowsNvidiaOk?: boolean;
-    onDeviceAllowed?: boolean;
-    onDeviceBlockReason?: string | null;
-    gpuDescription?: string;
-    inferenceTuning?: {
-      llamaFlashAttn: "off" | "auto" | "on";
-      whisperUseFlashAttn: boolean;
-      llamaGpuLayers: number;
-      llamaVramFit?: boolean;
-      llamaContextSize?: number;
-    };
+    model: string | null;
+    tier: string | null;
+    gpuDescription: string;
+    vramMB: number;
+    hasNativeAudio: boolean;
+    enabled: boolean;
+    onDeviceAllowed: boolean;
+    onDeviceBlockReason: string | null;
+    sqliteAvailable: boolean;
     error?: string;
   }>;
-  onDeviceGetPlatform: () => Promise<string>;
+  onDeviceGetPlatform: () => Promise<Record<string, unknown>>;
   onDeviceGetDownloadSummary: () => Promise<{
     assets: Array<{ id: string; label: string; description: string; sizeBytes: number }>;
     totalBytes: number;
@@ -348,12 +342,17 @@ interface ConsoleAPI {
   onDeviceDownloadAll: () => Promise<{ success: boolean; error?: string }>;
   onDeviceRemoveAll: () => Promise<{ success: boolean; error?: string }>;
   onDeviceRemoveAsset: (assetId: string) => Promise<{ success: boolean; error?: string }>;
-  onDeviceStartServer: () => Promise<{ success: boolean; port?: number; error?: string }>;
+  onDeviceStartServer: () => Promise<{
+    success: boolean;
+    model?: string;
+    tier?: string;
+    error?: string;
+  }>;
   onDeviceStopServer: () => Promise<{ success: boolean; error?: string }>;
   onDeviceServerStatus: () => Promise<{
     status: string;
-    port: number;
-    baseUrl: string | null;
+    model: string | null;
+    tier: string | null;
     error?: string;
   }>;
   onDeviceDownloadProgress: (

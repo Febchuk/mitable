@@ -16,17 +16,18 @@
 
 import { randomUUID } from "crypto";
 import { createLogger } from "../../lib/logger";
-import { llamaServerService } from "./llamaServerService";
-import { textServerService } from "./textServerService";
+import { ollamaService } from "./ollamaService";
 import { localDb } from "./localDb";
-import { isParallelMode } from "./onDeviceServerLifecycle";
 import { runRLMLoop, type CompletionFn } from "./rlm/local-rlm-engine";
 import { ClassifierEnvironment, type SensorFrame } from "./rlm/classifier-rlm-environment";
 import { CLASSIFIER_TOOLS } from "./rlm/classifier-rlm-tools";
 import { getClassifierSystemPrompt, getClassifierUserPrompt } from "./rlm/classifier-rlm-prompts";
 import { StorytellerEnvironment } from "./rlm/storyteller-rlm-environment";
 import { STORYTELLER_TOOLS } from "./rlm/storyteller-rlm-tools";
-import { getStorytellerSystemPrompt, getStorytellerUserPrompt } from "./rlm/storyteller-rlm-prompts";
+import {
+  getStorytellerSystemPrompt,
+  getStorytellerUserPrompt,
+} from "./rlm/storyteller-rlm-prompts";
 import type { IntervalEvidence } from "../activityTracker";
 
 const logger = createLogger("LocalInference");
@@ -79,9 +80,7 @@ class LocalInferenceService {
 
     this.flushTimer = setInterval(() => {
       if (this.frameBuffer.length > 0 && !this.processing) {
-        this.flushBatch().catch((err) =>
-          logger.error("Auto-flush failed:", String(err))
-        );
+        this.flushBatch().catch((err) => logger.error("Auto-flush failed:", String(err)));
       }
     }, BATCH_FLUSH_INTERVAL_MS);
 
@@ -95,6 +94,12 @@ class LocalInferenceService {
     }
     this.currentSessionId = null;
     logger.info("Stopped local inference");
+  }
+
+  clear(): void {
+    this.frameBuffer = [];
+    this.processing = false;
+    logger.info("Cleared inference buffer");
   }
 
   // ── Frame buffering ─────────────────────────────────────────────────────
@@ -118,7 +123,24 @@ class LocalInferenceService {
    * Force-flush remaining frames (call on session end before storyteller).
    */
   async flushRemaining(): Promise<void> {
+    const maxWaitMs = 60_000;
+    const pollMs = 500;
+    let waited = 0;
+
     while (this.frameBuffer.length > 0) {
+      if (this.processing) {
+        if (waited >= maxWaitMs) {
+          logger.warn(
+            `flushRemaining: timed out waiting for batch to finish (${maxWaitMs}ms), ${this.frameBuffer.length} frames dropped`
+          );
+          this.frameBuffer = [];
+          break;
+        }
+        await new Promise((r) => setTimeout(r, pollMs));
+        waited += pollMs;
+        continue;
+      }
+      waited = 0;
       await this.flushBatch();
     }
   }
@@ -160,28 +182,24 @@ class LocalInferenceService {
         });
       }
 
-      // Step 2: Classifier — only runs in parallel mode (text server available)
-      if (isParallelMode() && textServerService.isRunning()) {
-        const classifierResult = await this.runClassifier(batch, sensorResults);
+      // Step 2: Classifier — always runs (single Ollama model handles everything)
+      const classifierResult = await this.runClassifier(batch, sensorResults);
 
-        localDb.insertClassification({
-          id: randomUUID(),
-          sessionId: batch[0].sessionId,
-          batchIndex: batchIdx,
-          startSequence: batch[0].sequenceNumber,
-          endSequence: batch[batch.length - 1].sequenceNumber,
-          activityDescription: classifierResult.description,
-          activityType: classifierResult.activityType,
-          onTask: classifierResult.onTask,
-          taskRelevance: classifierResult.taskRelevance,
-          importanceScore: classifierResult.importanceScore,
-          rawOutput: classifierResult.rawOutput,
-        });
+      localDb.insertClassification({
+        id: randomUUID(),
+        sessionId: batch[0].sessionId,
+        batchIndex: batchIdx,
+        startSequence: batch[0].sequenceNumber,
+        endSequence: batch[batch.length - 1].sequenceNumber,
+        activityDescription: classifierResult.description,
+        activityType: classifierResult.activityType,
+        onTask: classifierResult.onTask,
+        taskRelevance: classifierResult.taskRelevance,
+        importanceScore: classifierResult.importanceScore,
+        rawOutput: classifierResult.rawOutput,
+      });
 
-        logger.info(`Batch ${batchIdx} complete:`, classifierResult.description.slice(0, 100));
-      } else {
-        logger.info(`Batch ${batchIdx} sensor complete (${batch.length} frames stored, classification deferred)`);
-      }
+      logger.info(`Batch ${batchIdx} complete:`, classifierResult.description.slice(0, 100));
     } catch (err) {
       logger.error(`Batch ${batchIdx} failed:`, String(err));
     } finally {
@@ -232,32 +250,29 @@ class LocalInferenceService {
       if (parts.length > 0) contextParts.push(`Activity: ${parts.join(", ")}`);
     }
 
-    const contextStr =
-      contextParts.length > 0 ? `\nContext:\n${contextParts.join("\n")}` : "";
+    const contextStr = contextParts.length > 0 ? `\nContext:\n${contextParts.join("\n")}` : "";
 
     const imageUrl = frame.imageBase64.startsWith("data:")
       ? frame.imageBase64
       : `data:image/png;base64,${frame.imageBase64}`;
 
-    const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
-      {
-        type: "image_url",
-        image_url: { url: imageUrl },
-      },
-      {
-        type: "text",
-        text: `Describe what the user is doing on their computer screen in 1-2 sentences. Focus on the specific application, content, and action.${contextStr}`,
-      },
-    ];
-
-    const response = await llamaServerService.chatCompletion(
+    const response = await ollamaService.chatCompletion(
       [
         {
           role: "system",
           content:
             "You are a screen activity classifier. Given a screenshot and optional context, describe what the user is doing in 1-2 concise sentences. Note the application, content type, and user action (reading, typing, browsing, coding, etc). If there is keyboard/mouse activity data, use it to infer intent.",
         },
-        { role: "user", content },
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: imageUrl } },
+            {
+              type: "text",
+              text: `Describe what the user is doing on their computer screen in 1-2 sentences. Focus on the specific application, content, and action.${contextStr}`,
+            },
+          ],
+        },
       ],
       { temperature: 0.1, max_tokens: 256 }
     );
@@ -315,7 +330,11 @@ class LocalInferenceService {
     });
 
     const completionFn: CompletionFn = (msgs, opts) =>
-      textServerService.chatCompletion(msgs, opts);
+      ollamaService.chatCompletion(msgs, {
+        temperature: opts?.temperature,
+        max_tokens: opts?.max_tokens,
+        format: "json",
+      });
 
     const result = await runRLMLoop<ClassifierEnvironment, Record<string, unknown>>(
       getClassifierSystemPrompt(),
@@ -325,7 +344,8 @@ class LocalInferenceService {
       { maxIterations: 5, doneResultField: "classification", temperature: 0.1, completionFn }
     );
 
-    const classification = env.getClassification() ?? (result.result as Record<string, unknown> | null);
+    const classification =
+      env.getClassification() ?? (result.result as Record<string, unknown> | null);
 
     if (classification) {
       return {
@@ -339,7 +359,10 @@ class LocalInferenceService {
     }
 
     logger.warn("Classifier RLM produced no result, using fallback");
-    const fallbackDesc = sensorResults.map((s) => s.description).join(". ").slice(0, 500);
+    const fallbackDesc = sensorResults
+      .map((s) => s.description)
+      .join(". ")
+      .slice(0, 500);
     return {
       description: fallbackDesc || "Activity recorded",
       activityType: null,
@@ -371,13 +394,17 @@ class LocalInferenceService {
         narrative,
         tasks: "[]",
         timeBreakdown: null,
-        modelUsed: "local-rlm-phi3.5",
+        modelUsed: ollamaService.getLoadedModel() ?? "gemma4",
       });
       return { narrative, tasks: [] };
     }
 
     const completionFn: CompletionFn = (msgs, opts) =>
-      textServerService.chatCompletion(msgs, opts);
+      ollamaService.chatCompletion(msgs, {
+        temperature: opts?.temperature,
+        max_tokens: opts?.max_tokens,
+        format: "json",
+      });
 
     const env = new StorytellerEnvironment({
       sessionId,
@@ -413,10 +440,9 @@ class LocalInferenceService {
       narrative,
       tasks: JSON.stringify(tasks),
       timeBreakdown: null,
-      modelUsed: "local-rlm-phi3.5",
+      modelUsed: ollamaService.getLoadedModel() ?? "gemma4",
     });
 
-    // Checkpoint after story is written to ensure data is flushed from WAL
     localDb.checkpoint();
 
     logger.info(
@@ -426,114 +452,11 @@ class LocalInferenceService {
   }
 
   /**
-   * Sequential-mode session end: the text server was not available during the
-   * session so sensor data was collected without classification. This method
-   * stops the vision server, starts the text server, runs deferred
-   * classification over all stored captures, then runs the storyteller.
-   */
-  async endSessionSequential(sessionId: string): Promise<{
-    narrative: string;
-    tasks: string[];
-  }> {
-    logger.info("Sequential mode: swapping vision → text server for deferred classification");
-
-    await llamaServerService.stop();
-
-    const { startTextServerForSequentialMode } = await import("./onDeviceServerLifecycle");
-    await startTextServerForSequentialMode();
-
-    try {
-      await this.runDeferredClassification(sessionId);
-      return await this.generateStory(sessionId);
-    } finally {
-      await textServerService.stop();
-    }
-  }
-
-  /**
-   * Classify all unclassified captures for a session. Used in sequential mode
-   * at session end after the text server has been started.
-   * Reads sensor outputs from SQLite, groups into batches, and runs the
-   * classifier (no images needed — uses stored text descriptions).
-   */
-  private async runDeferredClassification(sessionId: string): Promise<void> {
-    const captures = localDb.getCapturesForSession(sessionId);
-    const existingClassifications = localDb.getClassificationsForSession(sessionId);
-    const classifiedSequences = new Set(
-      existingClassifications.flatMap((c) => {
-        const seqs: number[] = [];
-        for (let s = c.startSequence; s <= c.endSequence; s++) seqs.push(s);
-        return seqs;
-      })
-    );
-
-    const unclassified = captures.filter((c) => !classifiedSequences.has(c.sequenceNumber));
-    if (unclassified.length === 0) {
-      logger.info("Deferred classification: no unclassified captures found");
-      return;
-    }
-
-    logger.info(`Deferred classification: ${unclassified.length} captures to classify`);
-
-    for (let i = 0; i < unclassified.length; i += BATCH_SIZE) {
-      const batch = unclassified.slice(i, i + BATCH_SIZE);
-      const batchIdx = Math.floor(i / BATCH_SIZE) + existingClassifications.length;
-
-      const sensorResults: SensorResult[] = batch.map((c) => ({
-        frameId: c.frameId,
-        description: c.sensorOutput,
-        deltaChanged: c.deltaChanged,
-        changeType: c.changeType,
-        userAction: c.userAction,
-      }));
-
-      const pseudoFrames: BufferedFrame[] = batch.map((c) => ({
-        frameId: c.frameId,
-        sessionId: c.sessionId,
-        sequenceNumber: c.sequenceNumber,
-        capturedAt: c.capturedAt,
-        imageBase64: "",
-        previousImageBase64: null,
-        windowId: c.windowId,
-        appName: c.appName,
-        windowTitle: c.windowTitle,
-      }));
-
-      try {
-        const classifierResult = await this.runClassifier(pseudoFrames, sensorResults);
-
-        localDb.insertClassification({
-          id: randomUUID(),
-          sessionId,
-          batchIndex: batchIdx,
-          startSequence: batch[0].sequenceNumber,
-          endSequence: batch[batch.length - 1].sequenceNumber,
-          activityDescription: classifierResult.description,
-          activityType: classifierResult.activityType,
-          onTask: classifierResult.onTask,
-          taskRelevance: classifierResult.taskRelevance,
-          importanceScore: classifierResult.importanceScore,
-          rawOutput: classifierResult.rawOutput,
-        });
-
-        logger.info(
-          `Deferred batch ${batchIdx}: ${classifierResult.description.slice(0, 100)}`
-        );
-      } catch (err) {
-        logger.error(`Deferred classification batch ${batchIdx} failed:`, String(err));
-      }
-    }
-  }
-
-  /**
    * Export the locally-generated story for a session in the format the cloud
    * backend expects. Only the narrative + task breakdown leave the device —
    * raw captures, classifications, and transcriptions stay in local SQLite.
    */
-  exportResultsForBackend(
-    sessionId: string,
-    activeDurationMs: number
-  ): OnDeviceSummary | null {
+  exportResultsForBackend(sessionId: string, _activeDurationMs: number): OnDeviceSummary | null {
     const story = localDb.getStoryForSession(sessionId);
     if (!story) return null;
 
@@ -546,7 +469,7 @@ class LocalInferenceService {
     }
 
     const taskBreakdown = parsedTasks.map((t) => {
-      const desc = typeof t === "string" ? t : (t.description || "Task");
+      const desc = typeof t === "string" ? t : t.description || "Task";
       const minutes = typeof t === "object" && t.minutes ? t.minutes : 0;
       return {
         shortTitle: desc.length > 40 ? desc.slice(0, 37) + "..." : desc,

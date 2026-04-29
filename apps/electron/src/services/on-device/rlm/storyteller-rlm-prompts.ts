@@ -23,7 +23,7 @@ ${toolCatalog}
 STEPS:
 1. Call get_session_stats — note the totalMinutes
 2. Call get_classifications(0, count) to read activity data
-3. If transcriptions exist, call get_transcriptions
+3. If transcriptions exist, call get_transcriptions — each transcript has a "speaker" field ("User" or "Remote participant") to distinguish who spoke
 4. Call build_story with narrative and tasks (each task needs description + minutes)
 
 WHAT IS A TASK:

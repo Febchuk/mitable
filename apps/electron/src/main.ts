@@ -126,11 +126,13 @@ let audioActiveBeforePause = false;
 async function cleanupAudioRecording(sessionId?: string): Promise<void> {
   audioCleanupDone = true;
 
-  // Flush and stop local audio service if running
+  // Flush and stop native audio capture if running
   try {
-    const { localAudioService } = await import("./services/on-device");
-    await localAudioService.flushRemaining();
-    localAudioService.stop();
+    const { localAudioService, nativeAudioCapture } = await import("./services/on-device");
+    if (nativeAudioCapture.isActive()) {
+      await localAudioService.flushRemaining();
+      await localAudioService.stop();
+    }
   } catch (err) {
     logger.debug("On-device audio cleanup skipped:", String(err));
   }
@@ -2002,12 +2004,32 @@ function setupMonitoringSessionHandlers() {
       });
     }
 
-    audioActiveBeforePause = audioWebSocketService.isConnected();
+    // Check both native (on-device) and cloud audio paths
+    let nativeAudioWasActive = false;
+    try {
+      const { nativeAudioCapture } = await import("./services/on-device");
+      nativeAudioWasActive = nativeAudioCapture.isActive();
+    } catch {
+      /* on-device module not available */
+    }
+
+    audioActiveBeforePause = audioWebSocketService.isConnected() || nativeAudioWasActive;
     const sessionState = monitoringSessionService.getSessionState();
 
     // Stop audio if it was running (non-blocking)
     if (audioActiveBeforePause) {
       monitoringLogger.info("🔇 Pausing audio recording");
+
+      // Stop native audio capture if active
+      if (nativeAudioWasActive) {
+        try {
+          const { localAudioService } = await import("./services/on-device");
+          await localAudioService.stop();
+        } catch (err) {
+          monitoringLogger.error("Failed to stop native audio on pause:", err);
+        }
+      }
+
       audioWebSocketService.disconnect();
       if (watchingPillWindow && !watchingPillWindow.isDestroyed()) {
         watchingPillWindow.webContents.send(IPC_CHANNELS.MONITORING_AUDIO_FORCE_STOP);
@@ -2455,16 +2477,19 @@ function setupMonitoringSessionHandlers() {
       };
     }
 
-    // On-device path: start local audio service instead of cloud WebSocket
+    // On-device path: start native audio capture in main process (no renderer needed)
     try {
-      const { whisperServerService, localAudioService } = await import("./services/on-device");
-      if (whisperServerService.isRunning()) {
-        localAudioService.start(sessionState.id);
-        monitoringLogger.info("✅ Local audio transcription started (on-device Whisper)");
-        return { success: true, hasSystemAudio: false };
+      const { ollamaService } = await import("./services/on-device/ollamaService");
+      const { localAudioService } = await import("./services/on-device");
+      if (ollamaService.isReady()) {
+        const result = await localAudioService.start(sessionState.id);
+        monitoringLogger.info(
+          `Native audio capture started (mic: ${result.micStarted}, system: ${result.systemStarted})`
+        );
+        return { success: true, hasSystemAudio: result.systemStarted, onDevice: true };
       }
     } catch (err) {
-      monitoringLogger.debug("On-device audio start skipped:", String(err));
+      monitoringLogger.error("On-device native audio start failed:", String(err));
     }
 
     // Cloud path: connect WebSocket to backend for Deepgram
@@ -2524,7 +2549,7 @@ function setupMonitoringSessionHandlers() {
     };
   });
 
-  // Handle audio chunks from renderer — route to local or cloud
+  // Handle audio chunks from renderer (cloud path only — on-device uses native capture)
   ipcMain.on("audio-chunk", (_event, audioBuffer: ArrayBuffer) => {
     try {
       if (audioCleanupDone) return;
@@ -2541,18 +2566,8 @@ function setupMonitoringSessionHandlers() {
         return;
       }
 
-      // On-device path: buffer locally for whisper transcription
-      import("./services/on-device")
-        .then(({ whisperServerService, localAudioService }) => {
-          if (whisperServerService.isRunning()) {
-            localAudioService.addChunk(Buffer.from(audioBuffer));
-          } else {
-            audioWebSocketService.sendAudioChunk(audioBuffer);
-          }
-        })
-        .catch(() => {
-          audioWebSocketService.sendAudioChunk(audioBuffer);
-        });
+      // Cloud path: forward to backend via WebSocket
+      audioWebSocketService.sendAudioChunk(audioBuffer);
     } catch (error) {
       monitoringLogger.error("❌ Error processing audio chunk:", error);
     }
@@ -2568,13 +2583,13 @@ function setupMonitoringSessionHandlers() {
 
     const sessionState = monitoringSessionService.getSessionState();
 
-    // On-device path: flush remaining audio and stop local service
+    // On-device path: flush remaining audio and stop native capture
     try {
-      const { whisperServerService, localAudioService } = await import("./services/on-device");
-      if (whisperServerService.isRunning()) {
+      const { localAudioService, nativeAudioCapture } = await import("./services/on-device");
+      if (nativeAudioCapture.isActive()) {
         await localAudioService.flushRemaining();
-        localAudioService.stop();
-        monitoringLogger.info("✅ Local audio transcription stopped and flushed");
+        await localAudioService.stop();
+        monitoringLogger.info("Native audio capture stopped and flushed");
         return { success: true };
       }
     } catch (err) {
@@ -3246,6 +3261,16 @@ function registerGlobalShortcuts() {
 }
 
 app.whenReady().then(async () => {
+  // Auto-grant media permissions (microphone, camera) for all renderer windows.
+  // Without this, getUserMedia is blocked by default in Electron.
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const allowed = ["media", "mediaKeySystem", "geolocation", "notifications"];
+    callback(allowed.includes(permission));
+  });
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    return permission === "media";
+  });
+
   // Enforce Single Instance Lock - scoped by packaged vs dev so both can run simultaneously
   const lockData = { mode: app.isPackaged ? "production" : "development" };
   const gotTheLock = app.requestSingleInstanceLock(lockData);
@@ -3336,35 +3361,56 @@ app.whenReady().then(async () => {
   setupIPC();
   registerGlobalShortcuts();
 
-  // Initialize on-device AI module and auto-start server if previously enabled
+  // Initialize on-device AI module and auto-start Ollama if previously enabled
   import("./services/on-device")
-    .then(
-      async ({ modelManager, localDb, startOnDeviceServersAtomic, stopOnDeviceServersBoth }) => {
-        await modelManager.initialize();
-        await localDb.initialize();
-        consoleLogger.info(
-          `On-device AI module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
-        );
-        if (
-          modelManager.canUseOnDeviceInference() &&
-          localDb.isAvailable() &&
-          modelManager.isEnabled() &&
-          modelManager.isFullySetUp()
-        ) {
-          consoleLogger.info("Auto-starting on-device servers (previously enabled)");
-          try {
-            await startOnDeviceServersAtomic();
-          } catch (err) {
-            await stopOnDeviceServersBoth();
-            consoleLogger.warn("On-device auto-start failed:", String(err));
-          }
-        } else if (!localDb.isAvailable() && modelManager.isEnabled()) {
-          consoleLogger.warn(
-            "On-device AI is enabled but SQLite is unavailable — run `npm run rebuild-native` in apps/electron"
+    .then(async ({ modelManager, localDb }) => {
+      await modelManager.initialize();
+      await localDb.initialize();
+      consoleLogger.info(
+        `On-device AI module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
+      );
+      if (localDb.isAvailable() && modelManager.isEnabled()) {
+        consoleLogger.info("Auto-starting Ollama (previously enabled)");
+        try {
+          const { initialize } = await import("./services/on-device/ollamaLifecycle");
+          let lastMilestone = -1;
+          let lastUiPercent = -1;
+          const profile = await initialize((info) => {
+            const p = info.percent ?? 0;
+            const milestone = p >= 100 ? 100 : p >= 75 ? 75 : p >= 50 ? 50 : p >= 25 ? 25 : 0;
+            if (info.phase !== "pulling" || milestone > lastMilestone) {
+              lastMilestone = milestone;
+              consoleLogger.info(
+                `[Ollama] ${info.phase}: ${info.message}${p > 0 ? ` (${p}%)` : ""}`
+              );
+            }
+            const shouldSendUi = info.phase !== "pulling" || p !== lastUiPercent;
+            if (shouldSendUi && consoleWindow && !consoleWindow.isDestroyed()) {
+              lastUiPercent = p;
+              consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, {
+                assetId: "ollama",
+                label: info.message,
+                phase: info.phase,
+                bytesDownloaded: 0,
+                totalBytes: 0,
+                percent: p,
+              });
+            }
+          });
+          consoleLogger.info(
+            `On-device AI ready — tier: ${profile.tier}, model: ${profile.recommendedModel}`
           );
+        } catch (err) {
+          const { shutdown } = await import("./services/on-device/ollamaLifecycle");
+          await shutdown();
+          consoleLogger.warn("On-device auto-start failed:", String(err));
         }
+      } else if (!localDb.isAvailable() && modelManager.isEnabled()) {
+        consoleLogger.warn(
+          "On-device AI is enabled but SQLite is unavailable — run `npm run rebuild-native` in apps/electron"
+        );
       }
-    )
+    })
     .catch((err) => consoleLogger.warn("On-device AI init skipped:", String(err)));
 
   // Start Browser Bridge WebSocket server for Chrome Extension
@@ -3507,57 +3553,44 @@ app.whenReady().then(async () => {
   // ── On-Device AI IPC handlers ──────────────────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
     try {
-      const {
-        modelManager,
-        llamaServerService,
-        textServerService,
-        whisperServerService,
-        isParallelMode,
-        localDb,
-      } = await import("./services/on-device");
+      const { modelManager, localDb } = await import("./services/on-device");
+      const { ollamaService } = await import("./services/on-device/ollamaService");
+      const { getHardwareProfile } = await import("./services/on-device/ollamaLifecycle");
+      const { detectHardware } = await import("./services/on-device/hardwareDetector");
       const sqliteAvailable = localDb.isAvailable() || (await localDb.tryOpen());
-      const gpuOk = modelManager.canUseOnDeviceInference();
-      const allowed = gpuOk && sqliteAvailable;
-      let blockReason = modelManager.getOnDeviceBlockedReason();
-      if (!sqliteAvailable) {
-        blockReason =
-          (blockReason ? blockReason + " " : "") +
-          "Local SQLite database is unavailable — run `npm run rebuild-native` in apps/electron.";
-      }
+
+      // Always detect hardware so specs display even before on-device is enabled
+      const profile = getHardwareProfile() ?? (await detectHardware());
+
       return {
-        isSetUp: modelManager.isFullySetUp(),
-        serverStatus: llamaServerService.getStatus(),
-        textServerStatus: textServerService.getStatus(),
-        whisperStatus: whisperServerService.getStatus(),
-        parallelMode: isParallelMode(),
-        installedAssets: modelManager.getInstalledAssets(),
+        isSetUp: ollamaService.isReady(),
+        serverStatus: ollamaService.getStatus(),
+        model: ollamaService.getLoadedModel(),
+        tier: profile.tier,
+        gpuDescription: profile.gpuName,
+        vramMB: profile.vramMB,
+        hasNativeAudio: profile.hasNativeAudio,
+        recommendedModel: profile.recommendedModel,
         enabled: modelManager.isEnabled(),
-        windowsRequiresNvidia: modelManager.windowsRequiresNvidia(),
-        windowsNvidiaOk: gpuOk,
-        onDeviceAllowed: allowed,
-        onDeviceBlockReason: blockReason,
-        gpuDescription: modelManager.getGpuDescription(),
-        inferenceTuning: modelManager.getNvidiaInferenceTuning(),
+        onDeviceAllowed: sqliteAvailable,
+        onDeviceBlockReason: sqliteAvailable
+          ? null
+          : "Local SQLite database is unavailable — run `npm run rebuild-native` in apps/electron.",
         sqliteAvailable,
       };
     } catch (err) {
       return {
         isSetUp: false,
         serverStatus: "stopped",
-        whisperStatus: "stopped",
-        installedAssets: [],
+        model: null,
+        tier: null,
+        gpuDescription: "",
+        vramMB: 0,
+        hasNativeAudio: false,
         enabled: false,
-        windowsRequiresNvidia: false,
-        windowsNvidiaOk: true,
         onDeviceAllowed: true,
         onDeviceBlockReason: null,
-        gpuDescription: "",
-        inferenceTuning: {
-          llamaFlashAttn: "auto" as const,
-          whisperUseFlashAttn: true,
-          llamaGpuLayers: -1,
-          llamaVramFit: true,
-        },
+        sqliteAvailable: false,
         error: String(err),
       };
     }
@@ -3565,8 +3598,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_PLATFORM, async () => {
     try {
-      const { modelManager } = await import("./services/on-device");
-      return await modelManager.detectPlatform();
+      const { detectHardware } = await import("./services/on-device/hardwareDetector");
+      return await detectHardware();
     } catch (err) {
       return { error: String(err) };
     }
@@ -3574,109 +3607,52 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_DOWNLOAD_SUMMARY, async () => {
     try {
-      const { modelManager } = await import("./services/on-device");
-      const summary = modelManager.getDownloadSummary();
+      const { getHardwareProfile } = await import("./services/on-device/ollamaLifecycle");
+      const profile = getHardwareProfile();
+      const model = profile?.recommendedModel ?? "gemma4:e4b";
       return {
-        assets: summary.assets.map((a) => ({
-          id: a.id,
-          label: a.label,
-          description: a.description,
-          sizeBytes: a.sizeBytes,
-        })),
-        totalBytes: summary.totalBytes,
+        assets: [
+          {
+            id: "ollama",
+            label: "Ollama + " + model,
+            description: "Local AI runtime",
+            sizeBytes: 0,
+          },
+        ],
+        totalBytes: 0,
       };
     } catch (err) {
       return { assets: [], totalBytes: 0, error: String(err) };
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ASSET, async (_event, assetId: string) => {
-    try {
-      const { modelManager } = await import("./services/on-device");
-      await modelManager.downloadAsset(assetId as any, (progress) => {
-        if (consoleWindow && !consoleWindow.isDestroyed()) {
-          consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, progress);
-        }
-      });
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ASSET, async () => {
+    return { success: false, error: "Use start-server to initialize Ollama" };
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ALL, async () => {
-    try {
-      const { modelManager } = await import("./services/on-device");
-      await modelManager.downloadAll((progress) => {
-        if (consoleWindow && !consoleWindow.isDestroyed()) {
-          consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, progress);
-        }
-      });
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+    return { success: false, error: "Use start-server to initialize Ollama" };
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL, async () => {
     try {
-      const { modelManager, llamaServerService, textServerService, whisperServerService } =
-        await import("./services/on-device");
-      await Promise.all([
-        llamaServerService.stop(),
-        textServerService.stop(),
-        whisperServerService.stop(),
-      ]);
-      await modelManager.removeAll();
+      const { shutdown } = await import("./services/on-device/ollamaLifecycle");
+      await shutdown();
+      const { modelManager } = await import("./services/on-device");
+      await modelManager.setEnabled(false);
       return { success: true };
     } catch (err) {
       return { success: false, error: String(err) };
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, async (_event, assetId: string) => {
-    try {
-      const { modelManager, llamaServerService, textServerService, whisperServerService } =
-        await import("./services/on-device");
-      if (
-        llamaServerService.isRunning() ||
-        textServerService.isRunning() ||
-        whisperServerService.isRunning()
-      ) {
-        await Promise.all([
-          llamaServerService.stop(),
-          textServerService.stop(),
-          whisperServerService.stop(),
-        ]);
-        await modelManager.setEnabled(false);
-      }
-      await modelManager.removeAsset(assetId);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, async () => {
+    return { success: false, error: "Individual asset removal not supported with Ollama" };
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_START_SERVER, async () => {
     try {
-      const {
-        modelManager,
-        startOnDeviceServersAtomic,
-        stopOnDeviceServersBoth,
-        llamaServerService,
-        textServerService,
-        whisperServerService,
-        isParallelMode,
-        localDb,
-      } = await import("./services/on-device");
-      if (!modelManager.canUseOnDeviceInference()) {
-        return {
-          success: false,
-          error:
-            modelManager.getOnDeviceBlockedReason() ??
-            "On-device AI is not available on this system.",
-        };
-      }
+      const { localDb, modelManager } = await import("./services/on-device");
       const sqliteOk = localDb.isAvailable() || (await localDb.tryOpen());
       if (!sqliteOk) {
         return {
@@ -3686,19 +3662,35 @@ app.whenReady().then(async () => {
         };
       }
       try {
-        await startOnDeviceServersAtomic();
+        const { initialize } = await import("./services/on-device/ollamaLifecycle");
+        let lastUiPercent = -1;
+        const profile = await initialize((info) => {
+          const p = info.percent ?? 0;
+          const shouldSend = info.phase !== "pulling" || p !== lastUiPercent;
+          if (!shouldSend) return;
+          lastUiPercent = p;
+          if (consoleWindow && !consoleWindow.isDestroyed()) {
+            consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, {
+              assetId: "ollama",
+              label: info.message,
+              phase: info.phase,
+              bytesDownloaded: 0,
+              totalBytes: 0,
+              percent: p,
+            });
+          }
+        });
+        await modelManager.setEnabled(true);
+        return {
+          success: true,
+          model: profile.recommendedModel,
+          tier: profile.tier,
+        };
       } catch (startErr) {
-        await stopOnDeviceServersBoth();
+        const { shutdown } = await import("./services/on-device/ollamaLifecycle");
+        await shutdown();
         return { success: false, error: String(startErr) };
       }
-      await modelManager.setEnabled(true);
-      return {
-        success: true,
-        llamaPort: llamaServerService.getPort(),
-        textServerPort: textServerService.getPort(),
-        whisperPort: whisperServerService.getPort(),
-        parallelMode: isParallelMode(),
-      };
     } catch (err) {
       return { success: false, error: String(err) };
     }
@@ -3706,13 +3698,9 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_STOP_SERVER, async () => {
     try {
-      const { llamaServerService, textServerService, whisperServerService, modelManager } =
-        await import("./services/on-device");
-      await Promise.all([
-        llamaServerService.stop(),
-        textServerService.stop(),
-        whisperServerService.stop(),
-      ]);
+      const { shutdown } = await import("./services/on-device/ollamaLifecycle");
+      const { modelManager } = await import("./services/on-device");
+      await shutdown();
       await modelManager.setEnabled(false);
       return { success: true };
     } catch (err) {
@@ -3722,15 +3710,13 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS, async () => {
     try {
-      const { llamaServerService, textServerService, isParallelMode } =
-        await import("./services/on-device");
+      const { ollamaService } = await import("./services/on-device/ollamaService");
+      const { getHardwareProfile } = await import("./services/on-device/ollamaLifecycle");
+      const profile = getHardwareProfile();
       return {
-        status: llamaServerService.getStatus(),
-        port: llamaServerService.getPort(),
-        baseUrl: llamaServerService.isRunning() ? llamaServerService.getBaseUrl() : null,
-        textServerStatus: textServerService.getStatus(),
-        textServerPort: textServerService.getPort(),
-        parallelMode: isParallelMode(),
+        status: ollamaService.getStatus(),
+        model: ollamaService.getLoadedModel(),
+        tier: profile?.tier ?? null,
       };
     } catch (err) {
       return {

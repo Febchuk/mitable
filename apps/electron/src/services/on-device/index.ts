@@ -1,37 +1,40 @@
 /**
  * On-Device Inference Module
  *
- * Barrel export for the local AI pipeline services.
+ * Barrel export for the Ollama-based local AI pipeline.
  */
 
 export { modelManager } from "./modelManager";
-export type {
-  AssetId,
-  DownloadProgress,
-  NvidiaInferenceTuning,
-  Platform,
-} from "./modelManager";
 
-export { llamaServerService } from "./llamaServerService";
-export type { LlamaServerConfig } from "./llamaServerService";
+export { ollamaService } from "./ollamaService";
+export type { ChatMessage, ContentPart, OllamaProgressCallback } from "./ollamaService";
 
-export { textServerService } from "./textServerService";
-export type { TextServerConfig } from "./textServerService";
+export { detectHardware } from "./hardwareDetector";
+export type { HardwareProfile, HardwareTier } from "./hardwareDetector";
+
+export {
+  initialize as initializeOllama,
+  shutdown as shutdownOllama,
+  getTier,
+  getCapabilities,
+  getHardwareProfile,
+} from "./ollamaLifecycle";
 
 export { whisperServerService } from "./whisperServerService";
-export type { WhisperServerConfig } from "./whisperServerService";
 
 export { localDb } from "./localDb";
-export type { LocalCapture, LocalClassification, LocalStory, LocalTranscription } from "./localDb";
+export type {
+  LocalCapture,
+  LocalClassification,
+  LocalStory,
+  LocalTranscription,
+  TranscriptionSource,
+} from "./localDb";
 
 export { localInferenceService } from "./localInferenceService";
 export type { BufferedFrame, OnDeviceSummary } from "./localInferenceService";
 
 export { localAudioService } from "./localAudioService";
 
-export {
-  startOnDeviceServersAtomic,
-  stopOnDeviceServersBoth,
-  startTextServerForSequentialMode,
-  isParallelMode,
-} from "./onDeviceServerLifecycle";
+export { nativeAudioCapture } from "./nativeAudioCapture";
+export type { NativeAudioChunk } from "./nativeAudioCapture";

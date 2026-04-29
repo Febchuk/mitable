@@ -21,6 +21,7 @@ const logger = createLogger("LocalDb");
 
 // better-sqlite3 is a native module — dynamic import so it doesn't crash
 // if not yet installed during development
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let Database: typeof import("better-sqlite3") | null = null;
 let db: import("better-sqlite3").Database | null = null;
 
@@ -67,6 +68,8 @@ export interface LocalStory {
   createdAt: number;
 }
 
+export type TranscriptionSource = "user" | "remote";
+
 export interface LocalTranscription {
   id: string;
   sessionId: string;
@@ -76,6 +79,7 @@ export interface LocalTranscription {
   startTimeMs: number;
   endTimeMs: number;
   confidence: number;
+  source: TranscriptionSource;
   createdAt: number;
 }
 
@@ -139,6 +143,7 @@ CREATE TABLE IF NOT EXISTS transcriptions (
   start_time_ms INTEGER NOT NULL,
   end_time_ms INTEGER NOT NULL,
   confidence REAL NOT NULL DEFAULT 0.0,
+  source TEXT NOT NULL DEFAULT 'user',
   created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
@@ -198,6 +203,13 @@ class LocalDatabase {
 
       db.exec(SCHEMA_SQL);
 
+      // Migrate: add source column to transcriptions if missing
+      const cols = db.pragma("table_info(transcriptions)") as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === "source")) {
+        db.exec(`ALTER TABLE transcriptions ADD COLUMN source TEXT NOT NULL DEFAULT 'user'`);
+        logger.info("Migrated transcriptions table: added source column");
+      }
+
       logger.info("Local database initialized at", this.dbPath);
       return true;
     } catch (err) {
@@ -249,7 +261,10 @@ class LocalDatabase {
         deltaChanged: capture.deltaChanged ? 1 : 0,
       });
     } catch (err) {
-      logger.error("insertCapture failed:", String(err), { session: capture.sessionId, frame: capture.frameId });
+      logger.error("insertCapture failed:", String(err), {
+        session: capture.sessionId,
+        frame: capture.frameId,
+      });
     }
   }
 
@@ -260,18 +275,12 @@ class LocalDatabase {
     }
     return mapRows<LocalCapture>(
       db
-        .prepare(
-          `SELECT * FROM captures WHERE session_id = ? ORDER BY sequence_number ASC`
-        )
+        .prepare(`SELECT * FROM captures WHERE session_id = ? ORDER BY sequence_number ASC`)
         .all(sessionId)
     );
   }
 
-  getCaptureRange(
-    sessionId: string,
-    startSeq: number,
-    endSeq: number
-  ): LocalCapture[] {
+  getCaptureRange(sessionId: string, startSeq: number, endSeq: number): LocalCapture[] {
     if (!db) {
       logger.warn("getCaptureRange: DB unavailable");
       return [];
@@ -299,7 +308,10 @@ class LocalDatabase {
 
   insertClassification(classification: Omit<LocalClassification, "createdAt">): void {
     if (!db) {
-      logger.error("insertClassification: DB unavailable, dropping batch", String(classification.batchIndex));
+      logger.error(
+        "insertClassification: DB unavailable, dropping batch",
+        String(classification.batchIndex)
+      );
       return;
     }
     try {
@@ -318,7 +330,10 @@ class LocalDatabase {
         onTask: classification.onTask ? 1 : 0,
       });
     } catch (err) {
-      logger.error("insertClassification failed:", String(err), { session: classification.sessionId, batch: classification.batchIndex });
+      logger.error("insertClassification failed:", String(err), {
+        session: classification.sessionId,
+        batch: classification.batchIndex,
+      });
     }
   }
 
@@ -329,9 +344,7 @@ class LocalDatabase {
     }
     return mapRows<LocalClassification>(
       db
-        .prepare(
-          `SELECT * FROM classifications WHERE session_id = ? ORDER BY batch_index ASC`
-        )
+        .prepare(`SELECT * FROM classifications WHERE session_id = ? ORDER BY batch_index ASC`)
         .all(sessionId)
     );
   }
@@ -387,21 +400,27 @@ class LocalDatabase {
 
   insertTranscription(transcription: Omit<LocalTranscription, "createdAt">): void {
     if (!db) {
-      logger.error("insertTranscription: DB unavailable, dropping chunk", String(transcription.chunkIndex));
+      logger.error(
+        "insertTranscription: DB unavailable, dropping chunk",
+        String(transcription.chunkIndex)
+      );
       return;
     }
     try {
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO transcriptions
           (id, session_id, chunk_index, speaker_id, transcript,
-           start_time_ms, end_time_ms, confidence)
+           start_time_ms, end_time_ms, confidence, source)
         VALUES
           (@id, @sessionId, @chunkIndex, @speakerId, @transcript,
-           @startTimeMs, @endTimeMs, @confidence)
+           @startTimeMs, @endTimeMs, @confidence, @source)
       `);
       stmt.run(transcription);
     } catch (err) {
-      logger.error("insertTranscription failed:", String(err), { session: transcription.sessionId, chunk: transcription.chunkIndex });
+      logger.error("insertTranscription failed:", String(err), {
+        session: transcription.sessionId,
+        chunk: transcription.chunkIndex,
+      });
     }
   }
 
@@ -412,18 +431,12 @@ class LocalDatabase {
     }
     return mapRows<LocalTranscription>(
       db
-        .prepare(
-          `SELECT * FROM transcriptions WHERE session_id = ? ORDER BY start_time_ms ASC`
-        )
+        .prepare(`SELECT * FROM transcriptions WHERE session_id = ? ORDER BY start_time_ms ASC`)
         .all(sessionId)
     );
   }
 
-  getTranscriptionRange(
-    sessionId: string,
-    startMs: number,
-    endMs: number
-  ): LocalTranscription[] {
+  getTranscriptionRange(sessionId: string, startMs: number, endMs: number): LocalTranscription[] {
     if (!db) {
       logger.warn("getTranscriptionRange: DB unavailable");
       return [];
@@ -441,7 +454,10 @@ class LocalDatabase {
 
   // ── Queries for the Mitable agent ───────────────────────────────────────
 
-  searchSessions(query: string, limit = 20): Array<{
+  searchSessions(
+    query: string,
+    limit = 20
+  ): Array<{
     sessionId: string;
     text: string;
     source: "capture" | "classification" | "story" | "transcription";
@@ -466,10 +482,10 @@ class LocalDatabase {
          FROM captures WHERE sensor_output LIKE ? LIMIT ?`
       )
       .all(likeQuery, limit) as Array<{
-        session_id: string;
-        sensor_output: string;
-        captured_at: number;
-      }>;
+      session_id: string;
+      sensor_output: string;
+      captured_at: number;
+    }>;
     for (const c of captures) {
       results.push({
         sessionId: c.session_id,
@@ -485,10 +501,10 @@ class LocalDatabase {
          FROM classifications WHERE activity_description LIKE ? LIMIT ?`
       )
       .all(likeQuery, limit) as Array<{
-        session_id: string;
-        activity_description: string;
-        created_at: number;
-      }>;
+      session_id: string;
+      activity_description: string;
+      created_at: number;
+    }>;
     for (const c of classifications) {
       results.push({
         sessionId: c.session_id,
@@ -504,10 +520,10 @@ class LocalDatabase {
          FROM transcriptions WHERE transcript LIKE ? LIMIT ?`
       )
       .all(likeQuery, limit) as Array<{
-        session_id: string;
-        transcript: string;
-        start_time_ms: number;
-      }>;
+      session_id: string;
+      transcript: string;
+      start_time_ms: number;
+    }>;
     for (const t of transcriptions) {
       results.push({
         sessionId: t.session_id,
@@ -522,6 +538,7 @@ class LocalDatabase {
 
   getDbSizeBytes(): number {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const fs = require("fs");
       const stats = fs.statSync(this.dbPath);
       return stats.size;
@@ -534,7 +551,9 @@ class LocalDatabase {
     if (db) {
       try {
         db.pragma("wal_checkpoint(TRUNCATE)");
-      } catch { /* best effort checkpoint before close */ }
+      } catch {
+        /* best effort checkpoint before close */
+      }
       db.close();
       db = null;
       logger.info("Local database closed");

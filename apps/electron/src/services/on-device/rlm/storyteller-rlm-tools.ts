@@ -13,8 +13,7 @@ const logger = createLogger("StorytellerTools");
 
 const GET_SESSION_STATS: RLMTool<StorytellerEnvironment> = {
   name: "get_session_stats",
-  description:
-    "Returns classification count, transcription count, total minutes, and time range.",
+  description: "Returns classification count, transcription count, total minutes, and time range.",
   parameters: [],
   execute: (_params, env) => {
     const cls = env.classifications;
@@ -28,9 +27,14 @@ const GET_SESSION_STATS: RLMTool<StorytellerEnvironment> = {
       timeRangeStr = `~${durationMin} minutes`;
     }
 
+    const userTransCount = trans.filter((t) => ((t as any).source ?? "user") === "user").length;
+    const remoteTransCount = trans.filter((t) => (t as any).source === "remote").length;
+
     return {
       classificationCount: cls.length,
       transcriptionCount: trans.length,
+      userTranscriptionCount: userTransCount,
+      remoteTranscriptionCount: remoteTransCount,
       totalMinutes: env.totalMinutes,
       duration: timeRangeStr,
       hasTranscriptions: trans.length > 0,
@@ -48,7 +52,10 @@ const GET_CLASSIFICATIONS: RLMTool<StorytellerEnvironment> = {
   ],
   execute: (params, env) => {
     const start = Math.max(0, Number(params.start) || 0);
-    const end = Math.min(env.classifications.length, Number(params.end) || env.classifications.length);
+    const end = Math.min(
+      env.classifications.length,
+      Number(params.end) || env.classifications.length
+    );
     return env.classifications.slice(start, end).map((c) => ({
       batchIndex: c.batchIndex,
       activityType: c.activityType,
@@ -61,8 +68,7 @@ const GET_CLASSIFICATIONS: RLMTool<StorytellerEnvironment> = {
 
 const GET_TRANSCRIPTIONS: RLMTool<StorytellerEnvironment> = {
   name: "get_transcriptions",
-  description:
-    "Returns audio transcripts for a time window (by millisecond range).",
+  description: "Returns audio transcripts for a time window (by millisecond range).",
   parameters: [
     { name: "startMs", type: "number", required: true, description: "Start time in ms" },
     { name: "endMs", type: "number", required: true, description: "End time in ms" },
@@ -78,6 +84,8 @@ const GET_TRANSCRIPTIONS: RLMTool<StorytellerEnvironment> = {
         t.endTimeMs <= endMs
     );
     return matching.map((t) => ({
+      source: (t as any).source ?? "user",
+      speaker: (t as any).source === "remote" ? "Remote participant" : "User",
       transcript: t.transcript,
       startMs: t.startTimeMs,
       endMs: t.endTimeMs,
@@ -91,11 +99,19 @@ const SUMMARIZE_CHUNK: RLMTool<StorytellerEnvironment> = {
     "Sub-LLM call: summarize a slice of classifications (+ overlapping transcriptions). Result is cached.",
   parameters: [
     { name: "start", type: "number", required: true, description: "Start classification index" },
-    { name: "end", type: "number", required: true, description: "End classification index (exclusive)" },
+    {
+      name: "end",
+      type: "number",
+      required: true,
+      description: "End classification index (exclusive)",
+    },
   ],
   execute: async (params, env) => {
     const start = Math.max(0, Number(params.start) || 0);
-    const end = Math.min(env.classifications.length, Number(params.end) || env.classifications.length);
+    const end = Math.min(
+      env.classifications.length,
+      Number(params.end) || env.classifications.length
+    );
 
     const cacheKey = `chunk_${start}_${end}`;
     const cached = env.getChunkSummary(cacheKey);
@@ -108,7 +124,7 @@ const SUMMARIZE_CHUNK: RLMTool<StorytellerEnvironment> = {
       .map((c) => `[Batch ${c.batchIndex}, ${c.activityType}] ${c.activityDescription}`)
       .join("\n");
 
-    // Find overlapping transcriptions
+    // Find overlapping transcriptions, grouped by speaker source
     const firstCreated = chunk[0].createdAt;
     const lastCreated = chunk[chunk.length - 1].createdAt;
     const overlapping = env.transcriptions.filter(
@@ -119,10 +135,20 @@ const SUMMARIZE_CHUNK: RLMTool<StorytellerEnvironment> = {
         t.endTimeMs <= lastCreated + 60_000
     );
 
-    const transcriptText =
-      overlapping.length > 0
-        ? `\n\nAudio context:\n${overlapping.map((t) => t.transcript).join("\n")}`
-        : "";
+    let transcriptText = "";
+    if (overlapping.length > 0) {
+      const userLines = overlapping
+        .filter((t) => ((t as any).source ?? "user") === "user")
+        .map((t) => t.transcript);
+      const remoteLines = overlapping
+        .filter((t) => (t as any).source === "remote")
+        .map((t) => t.transcript);
+
+      const parts: string[] = [];
+      if (userLines.length > 0) parts.push(`User said:\n${userLines.join("\n")}`);
+      if (remoteLines.length > 0) parts.push(`Remote participant said:\n${remoteLines.join("\n")}`);
+      transcriptText = `\n\nAudio context:\n${parts.join("\n\n")}`;
+    }
 
     try {
       const summary = await env.completionFn(
@@ -157,7 +183,12 @@ const BUILD_STORY: RLMTool<StorytellerEnvironment> = {
     "Final merge: produce narrative + tasks with time. Each task needs a description and minutes. Minutes must sum to totalMinutes from get_session_stats. Call this last.",
   parameters: [
     { name: "narrative", type: "string", required: true, description: "Full session narrative" },
-    { name: "tasks", type: "array", required: true, description: 'Array of {description, minutes} objects. Minutes must sum to totalMinutes.' },
+    {
+      name: "tasks",
+      type: "array",
+      required: true,
+      description: "Array of {description, minutes} objects. Minutes must sum to totalMinutes.",
+    },
   ],
   execute: (params, env) => {
     const narrative = String(params.narrative || "Session completed.");

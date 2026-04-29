@@ -97,8 +97,8 @@ class MonitoringSessionService {
    */
   private async shouldUseLocalInference(): Promise<boolean> {
     try {
-      const { llamaServerService } = await import("./on-device");
-      return llamaServerService.isRunning();
+      const { ollamaService } = await import("./on-device/ollamaService");
+      return ollamaService.isReady();
     } catch (err) {
       logger.debug("On-device module not available:", String(err));
       return false;
@@ -402,27 +402,57 @@ class MonitoringSessionService {
     const localMode = this.activeSession.localMode;
     let storyGenerationFailed = false;
 
+    const MIN_SESSION_DURATION_MS = 3 * 60 * 1000;
+    const activeDurationMs =
+      Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs;
+    const tooShort = activeDurationMs < MIN_SESSION_DURATION_MS;
+
+    if (tooShort) {
+      logger.info(
+        `Session too short (${Math.round(activeDurationMs / 1000)}s < ${MIN_SESSION_DURATION_MS / 1000}s) — skipping story generation, cleaning up`
+      );
+    }
+
     try {
-      // Flush remaining frames through the local inference pipeline and
-      // run the storyteller before tearing down the session.
       if (localMode) {
         try {
-          const { localInferenceService, llamaServerService, textServerService, isParallelMode } = await import("./on-device");
-          if (!llamaServerService.isRunning()) {
-            logger.warn("Local mode session but vision server is not running at end — story generation skipped");
-            storyGenerationFailed = true;
-          } else if (isParallelMode() && textServerService.isRunning()) {
-            logger.info("Parallel mode: flushing buffer and generating story via text server...");
-            await localInferenceService.flushRemaining();
-            const story = await localInferenceService.generateStory(sessionId);
-            logger.info(`Local story generated: ${story.tasks.length} tasks, narrative length ${story.narrative.length}`);
-            localInferenceService.stop();
+          const { localInferenceService } = await import("./on-device");
+          localInferenceService.stop();
+
+          if (tooShort) {
+            localInferenceService.clear();
+            logger.info("Cleared local inference buffer (short session)");
           } else {
-            logger.info("Sequential mode: flushing sensor buffer, then swapping to text server...");
-            await localInferenceService.flushRemaining();
-            localInferenceService.stop();
-            const story = await localInferenceService.endSessionSequential(sessionId);
-            logger.info(`Local story generated (sequential): ${story.tasks.length} tasks, narrative length ${story.narrative.length}`);
+            const { ollamaService } = await import("./on-device/ollamaService");
+            if (!ollamaService.isReady()) {
+              logger.warn(
+                "Local mode session but Ollama is not ready at end — story generation skipped"
+              );
+              storyGenerationFailed = true;
+            } else {
+              logger.info("Flushing buffer and generating story via Ollama...");
+
+              const timeoutMs = 120_000;
+              const flushAndGenerate = async () => {
+                await localInferenceService.flushRemaining();
+                logger.info("Buffer flushed, generating story...");
+                const story = await localInferenceService.generateStory(sessionId);
+                logger.info(
+                  `Local story generated: ${story.tasks.length} tasks, narrative length ${story.narrative.length}`
+                );
+              };
+
+              await Promise.race([
+                flushAndGenerate(),
+                new Promise<never>((_, reject) =>
+                  setTimeout(
+                    () =>
+                      reject(new Error(`Story generation timed out after ${timeoutMs / 1000}s`)),
+                    timeoutMs
+                  )
+                ),
+              ]);
+            }
           }
         } catch (err) {
           logger.error("Local inference flush/story generation failed:", String(err));
@@ -438,32 +468,44 @@ class MonitoringSessionService {
       const captureCount = manifest?.totalFrameCount ?? 0;
       await localFrameStorage.endSession(sessionId, []);
 
-      // Update internal state
-      this.activeSession.status = "ended";
+      // Update internal state (guard against concurrent endSession calls)
+      if (this.activeSession) {
+        this.activeSession.status = "ended";
+        this.broadcastSessionUpdate();
+      }
 
-      // Broadcast update immediately so renderer sees "ended"
-      this.broadcastSessionUpdate();
-
-      const duration = Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs;
       logger.info(` Session ended: ${sessionId}`, {
         totalCaptureCount: captureCount,
-        duration,
+        duration: activeDurationMs,
         localMode,
         storyGenerationFailed,
+        tooShort,
       });
 
       // Cleanup session state
       this.activeSession = null;
 
-      // Schedule cleanup of local frames after 10 minutes (allows for re-summarization)
-      setTimeout(
-        () => {
-          this.cleanupSessionFiles(sessionId);
-        },
-        10 * 60 * 1000
-      );
+      if (tooShort) {
+        this.cleanupSessionFiles(sessionId);
+        logger.info("Immediately cleaned up files for short session");
+      } else {
+        // Schedule cleanup of local frames after 10 minutes (allows for re-summarization)
+        setTimeout(
+          () => {
+            this.cleanupSessionFiles(sessionId);
+          },
+          10 * 60 * 1000
+        );
+      }
 
-      return { success: true, sessionId, captureCount, captures: [], localMode, storyGenerationFailed };
+      return {
+        success: true,
+        sessionId,
+        captureCount,
+        captures: [],
+        localMode,
+        storyGenerationFailed,
+      };
     } catch (error) {
       logger.error(" Failed to end session:", error);
       return {
@@ -1018,7 +1060,10 @@ class MonitoringSessionService {
             browserContext,
           });
         } catch (err) {
-          logger.warn("Local inference addFrame failed (frame skipped, NOT sent to cloud):", String(err));
+          logger.warn(
+            "Local inference addFrame failed (frame skipped, NOT sent to cloud):",
+            String(err)
+          );
         }
       } else {
         this.analyzeFrameAsync(
