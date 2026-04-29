@@ -9,6 +9,7 @@ import { createLogger } from "../../shared-infra/lib/logger.js";
 import { requireAuth } from "../../auth/middleware/auth.js";
 import agentRouter from "./agent.js";
 import readsRouter from "./reads.js";
+import templatesRouter from "./templates.js";
 import writesRouter from "./writes.js";
 
 const logger = createLogger({ module: "MontessoriRoutes" });
@@ -22,6 +23,7 @@ const router = Router();
 router.use(readsRouter);
 router.use(writesRouter);
 router.use(agentRouter);
+router.use(templatesRouter);
 
 /**
  * GET /api/montessori/health
