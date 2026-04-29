@@ -7,6 +7,7 @@ import { organizations } from "../../auth/schema/organizations.schema.js";
 import { montessoriClassrooms } from "../schema/montessori.schema.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
 import { requireAuth } from "../../auth/middleware/auth.js";
+import agentRouter from "./agent.js";
 import readsRouter from "./reads.js";
 import writesRouter from "./writes.js";
 
@@ -20,6 +21,7 @@ const router = Router();
 // Both mount under the same /api/montessori prefix.
 router.use(readsRouter);
 router.use(writesRouter);
+router.use(agentRouter);
 
 /**
  * GET /api/montessori/health
