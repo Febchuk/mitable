@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
-import { StoreProvider } from "@/lib/store";
-import { AppShell } from "@/components/shell/AppShell";
+import { AuthProvider } from "@/lib/auth/AuthContext";
 
 import "../styles/globals.css";
 
@@ -22,9 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 />
             </head>
             <body>
-                <StoreProvider>
-                    <AppShell>{children}</AppShell>
-                </StoreProvider>
+                <AuthProvider>{children}</AuthProvider>
             </body>
         </html>
     );
