@@ -154,16 +154,87 @@ export interface ConfirmCaptureResult {
 
 /**
  * Calls POST /api/montessori/agent/confirm. Applies the (possibly
- * edited) envelope in one DB transaction. Cache invalidations land
- * in 4.2; this hook just owns the mutation contract.
+ * edited) envelope in one DB transaction and invalidates every
+ * cache that could now be stale so the grid / attendance /
+ * reports views update in place when the teacher navigates back.
+ *
+ * Invalidation strategy:
+ *   - Walk the proposals to find affected studentIds, classroomIds,
+ *     and attendance dates.
+ *   - For grid + attendance we don't always have the classroomId on
+ *     the proposal (observation proposals only carry studentId), so
+ *     we invalidate the grid / attendance namespaces broadly. The
+ *     teacher only ever has one classroom open at a time, so the
+ *     extra refetch is cheap.
+ *   - Per-student histories are scoped: only the children we wrote
+ *     observations / attendance for need invalidating.
+ *   - Reports are invalidated for any classroom we drafted a report
+ *     in, plus the global "all reports" cache the admin view reads.
+ *   - The thread cache is bumped because /confirm appends a
+ *     confirmation-receipt message.
  */
 export function useConfirmCapture() {
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: async (input: ConfirmCaptureInput): Promise<ConfirmCaptureResult> => {
             return apiRequest<ConfirmCaptureResult>("/montessori/agent/confirm", {
                 method: "POST",
                 body: JSON.stringify(input),
             });
+        },
+        onSuccess: (_data, vars) => {
+            const proposals = vars.envelope.proposals;
+
+            const studentIdsWithObservations = new Set<string>();
+            const studentIdsWithAttendance = new Set<string>();
+            const reportClassroomIds = new Set<string>();
+            let touchedGrid = false;
+            let touchedAttendance = false;
+            let touchedReports = false;
+
+            for (const p of proposals) {
+                if (p.kind === "observation") {
+                    studentIdsWithObservations.add(p.studentId);
+                    touchedGrid = true;
+                } else if (p.kind === "attendance") {
+                    studentIdsWithAttendance.add(p.studentId);
+                    touchedAttendance = true;
+                } else if (p.kind === "report-draft") {
+                    reportClassroomIds.add(p.classroomId);
+                    touchedReports = true;
+                }
+            }
+
+            // Broad invalidation for grid / attendance — see the
+            // strategy comment above. The partial query key matches
+            // any classroom-scoped variant.
+            if (touchedGrid) {
+                qc.invalidateQueries({ queryKey: [...montessoriKeys.all, "grid"] });
+            }
+            if (touchedAttendance) {
+                qc.invalidateQueries({ queryKey: [...montessoriKeys.all, "attendance"] });
+            }
+
+            // Per-student histories.
+            for (const id of studentIdsWithObservations) {
+                qc.invalidateQueries({ queryKey: montessoriKeys.studentObservations(id) });
+            }
+            for (const id of studentIdsWithAttendance) {
+                qc.invalidateQueries({ queryKey: montessoriKeys.studentAttendance(id) });
+            }
+
+            // Reports: hit the global cache + each touched classroom.
+            if (touchedReports) {
+                qc.invalidateQueries({ queryKey: montessoriKeys.reports(null) });
+                for (const id of reportClassroomIds) {
+                    qc.invalidateQueries({ queryKey: montessoriKeys.reports(id) });
+                }
+            }
+
+            // The thread itself just got a confirmation-receipt
+            // message; the threads list timestamp is also fresh.
+            qc.invalidateQueries({ queryKey: montessoriKeys.thread(vars.threadId) });
+            qc.invalidateQueries({ queryKey: montessoriKeys.threads() });
         },
     });
 }
