@@ -3,20 +3,25 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 
-import { ClassroomGrid } from "@/components/grid/ClassroomGrid";
+import { ClassroomGrid, type SetObservationArgs } from "@/components/grid/ClassroomGrid";
 import { GridLegend } from "@/components/grid/GridLegend";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useGrid } from "@/lib/query/montessoriQueries";
-import { useStore } from "@/lib/store";
+import { useSetObservation } from "@/lib/query/montessoriMutations";
 
 export default function TeacherGridPage() {
     const { me } = useAuth();
     const classroomId = me?.assignedClassroom?.id ?? null;
     const grid = useGrid(classroomId);
 
-    // Writes still go through the in-memory store this commit. They become
-    // a real DB mutation in commit 1.3.
-    const { setObservation } = useStore();
+    const setObservationMutation = useSetObservation();
+    const setObservation = React.useCallback(
+        (args: SetObservationArgs) => {
+            if (!classroomId) return;
+            setObservationMutation.mutate({ ...args, classroomId });
+        },
+        [classroomId, setObservationMutation]
+    );
 
     if (!classroomId) {
         return (

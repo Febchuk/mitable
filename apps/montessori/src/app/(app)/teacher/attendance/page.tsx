@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useAttendance } from "@/lib/query/montessoriQueries";
-import { useStore } from "@/lib/store";
+import { useSaveAttendance } from "@/lib/query/montessoriMutations";
 import { cn } from "@/lib/utils";
 import type { AttendanceEntry } from "@/types";
 
@@ -20,9 +20,7 @@ export default function AttendancePage() {
     const classroomId = me?.assignedClassroom?.id ?? null;
     const today = todayISO();
     const attendanceSnapshot = useAttendance(classroomId, today);
-    // setAttendance still hits the in-memory store this commit. The
-    // mutation lands in commit 1.3.
-    const { setAttendance } = useStore();
+    const saveAttendance = useSaveAttendance();
 
     const classStudents = React.useMemo(
         () => attendanceSnapshot.data?.students ?? [],
@@ -61,8 +59,21 @@ export default function AttendancePage() {
     };
 
     const save = () => {
-        setAttendance(Object.values(draft));
-        setDirty(false);
+        if (!classroomId) return;
+        // The DB only accepts present/absent — we drop any "not-recorded"
+        // rows from the draft (they correspond to students with no entry
+        // and our default flips to "present", so this is rarely hit).
+        const entries = Object.values(draft)
+            .filter((e) => e.status === "present" || e.status === "absent")
+            .map((e) => ({
+                studentId: e.studentId,
+                status: e.status as "present" | "absent",
+                note: e.note ?? null,
+            }));
+        saveAttendance.mutate(
+            { classroomId, date: today, entries },
+            { onSuccess: () => setDirty(false) }
+        );
     };
 
     const applyVoiceMock = () => {
@@ -202,9 +213,17 @@ export default function AttendancePage() {
 
             <div className="flex items-center justify-between">
                 <div className="text-xs text-ink-tertiary">
-                    {dirty ? "You have unsaved changes." : "Register saved."}
+                    {saveAttendance.isPending
+                        ? "Saving…"
+                        : dirty
+                          ? "You have unsaved changes."
+                          : "Register saved."}
                 </div>
-                <Button variant="accent" onClick={save} disabled={!dirty}>
+                <Button
+                    variant="accent"
+                    onClick={save}
+                    disabled={!dirty || saveAttendance.isPending}
+                >
                     <Save className="h-3.5 w-3.5" />
                     Save register
                 </Button>

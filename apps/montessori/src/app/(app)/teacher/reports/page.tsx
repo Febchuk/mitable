@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ReportsTable } from "@/components/reports/ReportsTable";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useGrid, useReports } from "@/lib/query/montessoriQueries";
-import { useStore } from "@/lib/store";
+import { useUpdateReport } from "@/lib/query/montessoriMutations";
 import type { Report } from "@/types";
 
 export default function TeacherReportsPage() {
@@ -17,9 +17,7 @@ export default function TeacherReportsPage() {
 
     const reports = useReports(classroomId);
     const grid = useGrid(classroomId);
-    // updateReport stays on the in-memory store this commit; turns into a
-    // real PATCH /reports/:id mutation in 1.3.
-    const { updateReport } = useStore();
+    const updateReport = useUpdateReport();
 
     if (!classroomId) {
         return (
@@ -45,10 +43,12 @@ export default function TeacherReportsPage() {
                 <Button
                     size="sm"
                     variant="accent"
+                    disabled={updateReport.isPending}
                     onClick={() =>
-                        updateReport(r.id, {
+                        updateReport.mutate({
+                            id: r.id,
+                            classroomId: r.classroomId,
                             status: "approved",
-                            approvedAt: new Date().toISOString(),
                         })
                     }
                 >
@@ -59,10 +59,12 @@ export default function TeacherReportsPage() {
                 <Button
                     size="sm"
                     variant="secondary"
+                    disabled={updateReport.isPending}
                     onClick={() =>
-                        updateReport(r.id, {
+                        updateReport.mutate({
+                            id: r.id,
+                            classroomId: r.classroomId,
                             status: "sent",
-                            sentAt: new Date().toISOString(),
                         })
                     }
                 >

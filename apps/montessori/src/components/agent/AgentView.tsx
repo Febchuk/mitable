@@ -686,10 +686,12 @@ function InlineLevelEditor({
 }
 
 function GridPreviewCardView({ card }: { card: GridPreviewCard }) {
-    const { classrooms, students, domains, topics, observations, setObservation } = useStore();
+    const { classrooms, students, domains, topics, observations } = useStore();
     const student = students.find((s) => s.id === card.studentId);
     const classroom = classrooms.find((c) => c.id === student?.classroomId);
     if (!student || !classroom) return null;
+    // The card renders a readonly slice of the grid for visual context;
+    // the mini-grid never accepts edits so onSetObservation is a no-op.
     return (
         <div className="rounded-xl border border-stroke-subtle bg-canvas-raised overflow-hidden w-full max-w-[640px]">
             <div className="px-3 py-2 border-b border-stroke-subtle flex items-center justify-between">
@@ -704,7 +706,7 @@ function GridPreviewCardView({ card }: { card: GridPreviewCard }) {
                     domains={domains}
                     topics={topics}
                     observations={observations}
-                    onSetObservation={setObservation}
+                    onSetObservation={() => undefined}
                     filterStudentIds={[student.id]}
                     compact
                     hideToolbar

@@ -5,13 +5,14 @@ import { notFound, useParams } from "next/navigation";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 
-import { useStore } from "@/lib/store";
 import {
     useGrid,
     useStudent,
     useStudentAttendance,
     useStudentObservations,
 } from "@/lib/query/montessoriQueries";
+import { useSetObservation } from "@/lib/query/montessoriMutations";
+import type { SetObservationArgs } from "@/components/grid/ClassroomGrid";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClassroomGrid } from "@/components/grid/ClassroomGrid";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,15 @@ export default function StudentProfilePage() {
     // The grid component still wants the full classroom snapshot — we look
     // it up only once we know the student's classroomId.
     const grid = useGrid(student.data?.classroomId ?? null);
-    const { setObservation } = useStore();
+    const setObservationMutation = useSetObservation();
+    const setObservation = React.useCallback(
+        (args: SetObservationArgs) => {
+            const classroomId = student.data?.classroomId;
+            if (!classroomId) return;
+            setObservationMutation.mutate({ ...args, classroomId });
+        },
+        [student.data?.classroomId, setObservationMutation]
+    );
     const [showOriginal, setShowOriginal] = React.useState(false);
 
     if (student.isLoading) {
