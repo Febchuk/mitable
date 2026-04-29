@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Mitable for Montessori app icon. Warm-dark canvas with the
+       accent teal as the rounded badge; the "m" mark sits inside
+       in the same warm off-white as the in-app text-primary token.
+       Designed to read at 48px and survive Android maskable
+       cropping (most of the glyph is well inside the safe-zone
+       circle of radius ~205 around the centre). -->
+  <rect width="512" height="512" rx="112" fill="#82C0CC" />
+  <path
+    d="M120 360 V200 c0-30 22-52 52-52 c25 0 42 13 52 32 c10-19 27-32 52-32 c30 0 52 22 52 52 v160 h-44 V210 c0-13-9-22-22-22 c-13 0-22 9-22 22 v150 h-44 V210 c0-13-9-22-22-22 c-13 0-22 9-22 22 v150 z"
+    fill="#ECE8E0"
+  />
+</svg>

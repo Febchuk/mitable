@@ -1,0 +1,19 @@
+{
+  "name": "Mitable for Montessori",
+  "short_name": "Mitable",
+  "description": "AI-powered classroom record-keeping and reporting for Montessori schools.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1A1916",
+  "theme_color": "#1A1916",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}
