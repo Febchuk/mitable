@@ -2,38 +2,58 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { BookOpen, FileText, MessageCircle, School, Users } from "lucide-react";
+import { BookOpen, FileText, Loader2, MessageCircle, School, Users } from "lucide-react";
 
-import { useStore } from "@/lib/store";
-import { topicCoverageForClassroom } from "@/lib/analytics";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useClassrooms, useStudents, useTeachers } from "@/lib/query/montessoriQueries";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminDashboardPage() {
-    const { school, classrooms, students, teachers, topics, observations } = useStore();
+    const { me } = useAuth();
+    const classrooms = useClassrooms();
+    const students = useStudents();
+    const teachers = useTeachers();
+
+    if (
+        classrooms.isLoading ||
+        students.isLoading ||
+        teachers.isLoading ||
+        !classrooms.data ||
+        !students.data ||
+        !teachers.data
+    ) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
+
+    const studentCountByClassroom = new Map<string, number>();
+    for (const s of students.data) {
+        studentCountByClassroom.set(
+            s.classroomId,
+            (studentCountByClassroom.get(s.classroomId) ?? 0) + 1
+        );
+    }
 
     return (
         <div className="p-6 space-y-6 max-w-6xl">
             <header className="space-y-1">
                 <div className="text-xs text-ink-tertiary uppercase tracking-wider font-semibold">
-                    {school.name}
+                    {me?.organization?.name ?? "School"}
                 </div>
                 <h1 className="text-2xl font-semibold text-ink-primary">School overview</h1>
                 <p className="text-sm text-ink-secondary">
-                    {classrooms.length} classrooms · {students.length} students · {teachers.length}{" "}
-                    teachers
+                    {classrooms.data.length} classrooms · {students.data.length} students ·{" "}
+                    {teachers.data.length} teachers
                 </p>
             </header>
 
             <section className="grid md:grid-cols-2 gap-3">
-                {classrooms.map((c) => {
-                    const teacher = teachers.find((t) => t.id === c.teacherId);
-                    const classTopicIds = new Set(
-                        topics
-                            .filter((t) => t.level === c.level && t.active)
-                            .map((t) => t.id)
-                    );
-                    const coverage = topicCoverageForClassroom(classTopicIds, observations);
-                    const coveragePct = Math.round(coverage * 100);
+                {classrooms.data.map((c) => {
+                    const teacher = teachers.data.find((t) => t.id === c.teacherId);
+                    const studentCount = studentCountByClassroom.get(c.id) ?? 0;
                     return (
                         <Card key={c.id}>
                             <CardContent className="p-4">
@@ -46,24 +66,11 @@ export default function AdminDashboardPage() {
                                             {c.name}
                                         </div>
                                         <div className="text-sm text-ink-tertiary">
-                                            {teacher?.name ?? "Unassigned"} · {c.studentIds.length}{" "}
-                                            students · ages {c.ageRange}
+                                            {teacher?.name ?? "Unassigned"} · {studentCount}{" "}
+                                            students
+                                            {c.ageRange ? ` · ages ${c.ageRange}` : ""}
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-xs text-ink-tertiary">
-                                            Topic coverage
-                                        </div>
-                                        <div className="text-xl font-semibold text-accent">
-                                            {coveragePct}%
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="mt-3 h-1.5 rounded-full bg-canvas-muted overflow-hidden">
-                                    <div
-                                        className="h-full bg-accent"
-                                        style={{ width: `${coveragePct}%` }}
-                                    />
                                 </div>
                             </CardContent>
                         </Card>

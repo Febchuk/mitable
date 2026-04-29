@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronRight, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Plus, Search, Trash2 } from "lucide-react";
 
 import { useStore } from "@/lib/store";
+import { useCurriculum } from "@/lib/query/montessoriQueries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +20,12 @@ import {
 import type { CurriculumLevel } from "@/types";
 
 export default function CurriculumPage() {
+    const curriculum = useCurriculum();
+    const domains = curriculum.data?.domains ?? [];
+    const topics = curriculum.data?.topics ?? [];
+    // Mutations stay on the in-memory store this commit; they migrate to
+    // POST/PATCH/DELETE endpoints in 1.3.
     const {
-        domains,
-        topics,
         toggleDomainActive,
         toggleTopicActive,
         addDomain,
@@ -30,7 +34,12 @@ export default function CurriculumPage() {
         removeTopic,
     } = useStore();
 
-    const [expanded, setExpanded] = React.useState<Set<string>>(new Set(domains.map((d) => d.id)));
+    const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+    React.useEffect(() => {
+        if (curriculum.data) {
+            setExpanded(new Set(curriculum.data.domains.map((d) => d.id)));
+        }
+    }, [curriculum.data]);
     const [levelFilter, setLevelFilter] = React.useState<"all" | CurriculumLevel>("all");
     const [search, setSearch] = React.useState("");
     const [showAddDomain, setShowAddDomain] = React.useState(false);
@@ -74,6 +83,14 @@ export default function CurriculumPage() {
         setNewTopicName("");
         setNewTopicForDomain(null);
     };
+
+    if (curriculum.isLoading || !curriculum.data) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 space-y-4 max-w-5xl">

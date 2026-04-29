@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Plus } from "lucide-react";
+import { Loader2, Mail, Plus } from "lucide-react";
 
 import { useStore } from "@/lib/store";
+import { useClassrooms, useTeachers } from "@/lib/query/montessoriQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,12 +24,29 @@ import {
 } from "@/components/ui/select";
 
 export default function TeachersPage() {
-    const { teachers, classrooms, addTeacher, assignTeacherToClassroom } = useStore();
+    const teachersQuery = useTeachers();
+    const classroomsQuery = useClassrooms();
+    const teachers = teachersQuery.data ?? [];
+    const classrooms = classroomsQuery.data ?? [];
+    // Mutations stay on the in-memory store this commit.
+    const { addTeacher, assignTeacherToClassroom } = useStore();
+
+    const classroomsByTeacherId = React.useMemo(() => {
+        const m = new Map<string, typeof classrooms>();
+        for (const c of classrooms) {
+            if (!c.teacherId) continue;
+            const list = m.get(c.teacherId) ?? [];
+            list.push(c);
+            m.set(c.teacherId, list);
+        }
+        return m;
+    }, [classrooms]);
+
     const [open, setOpen] = React.useState(false);
     const [form, setForm] = React.useState<{ name: string; email: string; classroomId: string }>({
         name: "",
         email: "",
-        classroomId: classrooms[0]?.id ?? "",
+        classroomId: "",
     });
 
     const save = () => {
@@ -60,8 +78,13 @@ export default function TeachersPage() {
                     <span>Classrooms</span>
                     <span />
                 </div>
+                {teachersQuery.isLoading && (
+                    <div className="px-4 py-6 flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 text-ink-tertiary animate-spin" />
+                    </div>
+                )}
                 {teachers.map((t) => {
-                    const myClassrooms = classrooms.filter((c) => t.classroomIds.includes(c.id));
+                    const myClassrooms = classroomsByTeacherId.get(t.id) ?? [];
                     return (
                         <div
                             key={t.id}

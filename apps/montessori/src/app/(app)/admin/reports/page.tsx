@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { Loader2 } from "lucide-react";
 
-import { useStore } from "@/lib/store";
 import {
     Select,
     SelectContent,
@@ -11,11 +11,17 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { ReportsTable } from "@/components/reports/ReportsTable";
+import { useClassrooms, useReports, useStudents } from "@/lib/query/montessoriQueries";
 
 export default function AdminReportsPage() {
-    // Still on store data here; this page gets fully rewired to the
-    // /reports + /classrooms endpoints in commit 1.2d (admin pages).
-    const { reports, classrooms, students } = useStore();
+    const reportsQuery = useReports();
+    const classroomsQuery = useClassrooms();
+    const studentsQuery = useStudents();
+
+    const reports = reportsQuery.data ?? [];
+    const classrooms = classroomsQuery.data ?? [];
+    const students = studentsQuery.data ?? [];
+
     const [classroomFilter, setClassroomFilter] = React.useState("all");
     const [typeFilter, setTypeFilter] = React.useState("all");
     const [statusFilter, setStatusFilter] = React.useState("all");
@@ -26,6 +32,14 @@ export default function AdminReportsPage() {
             (typeFilter === "all" || r.type === typeFilter) &&
             (statusFilter === "all" || r.status === statusFilter)
     );
+
+    if (reportsQuery.isLoading || classroomsQuery.isLoading || studentsQuery.isLoading) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 space-y-4 max-w-6xl">
