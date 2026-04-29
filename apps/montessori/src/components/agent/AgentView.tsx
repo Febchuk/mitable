@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useInterpretCapture } from "@/lib/query/montessoriMutations";
 import { enqueueCapture } from "@/lib/offline/captureQueue";
 import { useOnlineStatus } from "@/lib/offline/useOnlineStatus";
+import { useDrainCaptureQueue } from "@/lib/offline/useDrainCaptureQueue";
 import type { ProposedUpdatesEnvelope } from "@/types/proposed-updates";
 import type { Role } from "@/types";
 
@@ -67,6 +68,49 @@ export function AgentView({ role: _role }: AgentViewProps) {
 
     const interpret = useInterpretCapture();
     const online = useOnlineStatus();
+
+    // When captures were saved while offline, drain them as soon as
+    // the agent surface is mounted and we have signal. Each drained
+    // capture surfaces as a paired (echoed user note → agent draft)
+    // turn so the teacher can review and approve like any other
+    // capture. We never auto-save the proposals.
+    useDrainCaptureQueue({
+        interpret: interpret.mutateAsync,
+        onItemInterpreted: ({ capture, result }) => {
+            setThreadId(result.threadId);
+            const echoText =
+                capture.text?.trim() ||
+                (capture.photo ? "(photo)" : capture.audio ? "(voice note)" : "");
+            const attachment = capture.photo
+                ? ({ kind: "photo" } as const)
+                : capture.audio
+                ? ({ kind: "audio" } as const)
+                : undefined;
+            const agentText = result.envelope.clarifyingQuestion
+                ? `${result.envelope.summary}\n\n${result.envelope.clarifyingQuestion}`
+                : result.envelope.summary;
+            setTurns((prev) => [
+                ...prev,
+                {
+                    id: `drained-system-${capture.id}`,
+                    role: "system",
+                    text: "Offline capture synced — review the draft below.",
+                },
+                {
+                    id: `drained-user-${capture.id}`,
+                    role: "user",
+                    text: echoText,
+                    attachment,
+                },
+                {
+                    id: result.messageId,
+                    role: "agent",
+                    text: agentText,
+                    envelope: result.envelope,
+                },
+            ]);
+        },
+    });
 
     // First-time tooltip — shown until the teacher dismisses it once.
     // Stored in localStorage so it doesn't reappear across sessions.
