@@ -9,21 +9,36 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
-import { useStore } from "@/lib/store";
-import type { Report } from "@/types";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useCurriculum } from "@/lib/query/montessoriQueries";
+import type { Classroom, Report, Student, Teacher } from "@/types";
 
 interface ReportPreviewModalProps {
     report: Report | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    students: Student[];
+    classrooms: Classroom[];
+    teachers?: Teacher[];
 }
 
-export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreviewModalProps) {
-    const { students, classrooms, school, domains, teachers } = useStore();
+export function ReportPreviewModal({
+    report,
+    open,
+    onOpenChange,
+    students,
+    classrooms,
+    teachers,
+}: ReportPreviewModalProps) {
+    const { me } = useAuth();
+    const curriculum = useCurriculum();
+    const domains = curriculum.data?.domains ?? [];
+
     if (!report) return null;
     const student = students.find((s) => s.id === report.studentId);
     const classroom = classrooms.find((c) => c.id === report.classroomId);
-    const teacher = teachers.find((t) => t.id === classroom?.teacherId);
+    const teacher = teachers?.find((t) => t.id === classroom?.teacherId);
+    const schoolName = me?.organization?.name ?? "School";
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,7 +49,7 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
                 >
                     <DialogHeader>
                         <div className="text-[10px] uppercase tracking-[0.2em] text-[#6B665C] font-semibold mb-1">
-                            {school.name} · {classroom?.name}
+                            {schoolName} · {classroom?.name}
                         </div>
                         <DialogTitle className="text-3xl font-serif text-[#1A1916]">
                             {student?.name} ·{" "}
@@ -76,7 +91,7 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
 
                     <div className="h-px bg-[#6B665C]/30 my-6" />
                     <div className="text-[11px] uppercase tracking-[0.2em] text-[#6B665C] text-center">
-                        Shared with families of {school.name}
+                        Shared with families of {schoolName}
                     </div>
                 </div>
             </DialogContent>

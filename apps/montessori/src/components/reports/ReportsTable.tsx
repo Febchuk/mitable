@@ -12,6 +12,7 @@ interface ReportsTableProps {
     reports: Report[];
     students: Student[];
     classrooms: Classroom[];
+    teachers?: Array<{ id: string; name: string; email: string; classroomIds: string[] }>;
     actions?: (report: Report) => React.ReactNode;
 }
 
@@ -25,7 +26,13 @@ function typeLabel(type: ReportType): string {
     return type === "end-of-term" ? "End of Term" : "Activity Update";
 }
 
-export function ReportsTable({ reports, students, classrooms, actions }: ReportsTableProps) {
+export function ReportsTable({
+    reports,
+    students,
+    classrooms,
+    teachers,
+    actions,
+}: ReportsTableProps) {
     const [previewOpen, setPreviewOpen] = React.useState(false);
     const [previewReport, setPreviewReport] = React.useState<Report | null>(null);
 
@@ -91,6 +98,9 @@ export function ReportsTable({ reports, students, classrooms, actions }: Reports
                 report={previewReport}
                 open={previewOpen}
                 onOpenChange={setPreviewOpen}
+                students={students}
+                classrooms={classrooms}
+                teachers={teachers}
             />
         </>
     );

@@ -1,14 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronRight, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Search } from "lucide-react";
 
-import { useStore } from "@/lib/store";
 import { useCurriculum } from "@/lib/query/montessoriQueries";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
     Select,
@@ -19,20 +16,16 @@ import {
 } from "@/components/ui/select";
 import type { CurriculumLevel } from "@/types";
 
+/**
+ * Read-only curriculum view. Editing (add/remove domains and topics,
+ * activate / deactivate) ships in a follow-up commit alongside the
+ * matching POST/PATCH/DELETE endpoints. The agent (Phase 2) is the
+ * other intended path for these edits.
+ */
 export default function CurriculumPage() {
     const curriculum = useCurriculum();
     const domains = curriculum.data?.domains ?? [];
     const topics = curriculum.data?.topics ?? [];
-    // Mutations stay on the in-memory store this commit; they migrate to
-    // POST/PATCH/DELETE endpoints in 1.3.
-    const {
-        toggleDomainActive,
-        toggleTopicActive,
-        addDomain,
-        removeDomain,
-        addTopic,
-        removeTopic,
-    } = useStore();
 
     const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
     React.useEffect(() => {
@@ -40,15 +33,9 @@ export default function CurriculumPage() {
             setExpanded(new Set(curriculum.data.domains.map((d) => d.id)));
         }
     }, [curriculum.data]);
+
     const [levelFilter, setLevelFilter] = React.useState<"all" | CurriculumLevel>("all");
     const [search, setSearch] = React.useState("");
-    const [showAddDomain, setShowAddDomain] = React.useState(false);
-    const [newDomain, setNewDomain] = React.useState<{ name: string; level: CurriculumLevel }>({
-        name: "",
-        level: "primary",
-    });
-    const [newTopicForDomain, setNewTopicForDomain] = React.useState<string | null>(null);
-    const [newTopicName, setNewTopicName] = React.useState("");
 
     const filteredDomains = domains.filter(
         (d) => levelFilter === "all" || d.level === levelFilter
@@ -63,27 +50,6 @@ export default function CurriculumPage() {
         });
     };
 
-    const addDomainSubmit = () => {
-        if (!newDomain.name.trim()) return;
-        addDomain({ name: newDomain.name.trim(), level: newDomain.level, colorHue: 200, active: true });
-        setNewDomain({ name: "", level: "primary" });
-        setShowAddDomain(false);
-    };
-
-    const addTopicSubmit = (domainId: string) => {
-        if (!newTopicName.trim()) return;
-        const domain = domains.find((d) => d.id === domainId);
-        if (!domain) return;
-        addTopic({
-            name: newTopicName.trim(),
-            domainId,
-            level: domain.level,
-            active: true,
-        });
-        setNewTopicName("");
-        setNewTopicForDomain(null);
-    };
-
     if (curriculum.isLoading || !curriculum.data) {
         return (
             <div className="h-full flex items-center justify-center">
@@ -94,59 +60,13 @@ export default function CurriculumPage() {
 
     return (
         <div className="p-6 space-y-4 max-w-5xl">
-            <header className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <h1 className="text-2xl font-semibold text-ink-primary">Curriculum</h1>
-                    <p className="text-sm text-ink-secondary">
-                        Domains and topics used across the school. Everything here can also be done
-                        through the admin agent.
-                    </p>
-                </div>
-                <Button variant="accent" onClick={() => setShowAddDomain((v) => !v)}>
-                    <Plus className="h-3.5 w-3.5" /> Add domain
-                </Button>
+            <header>
+                <h1 className="text-2xl font-semibold text-ink-primary">Curriculum</h1>
+                <p className="text-sm text-ink-secondary">
+                    Domains and topics used across the school. Editing ships in a follow-up
+                    alongside the agent rebuild.
+                </p>
             </header>
-
-            {showAddDomain && (
-                <div className="rounded-xl border border-stroke-subtle bg-canvas-raised p-4 flex items-end gap-3 flex-wrap">
-                    <div className="flex-1 min-w-[160px] space-y-1.5">
-                        <div className="text-xs uppercase tracking-wider text-ink-tertiary font-semibold">
-                            Domain name
-                        </div>
-                        <Input
-                            value={newDomain.name}
-                            placeholder="Social-Emotional Development"
-                            onChange={(e) => setNewDomain({ ...newDomain, name: e.target.value })}
-                        />
-                    </div>
-                    <div className="w-40 space-y-1.5">
-                        <div className="text-xs uppercase tracking-wider text-ink-tertiary font-semibold">
-                            Level
-                        </div>
-                        <Select
-                            value={newDomain.level}
-                            onValueChange={(v) =>
-                                setNewDomain({ ...newDomain, level: v as CurriculumLevel })
-                            }
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="primary">Primary</SelectItem>
-                                <SelectItem value="elementary">Elementary</SelectItem>
-                                <SelectItem value="both">Both</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <Button variant="accent" onClick={addDomainSubmit}>
-                        Add
-                    </Button>
-                    <Button variant="ghost" onClick={() => setShowAddDomain(false)}>
-                        Cancel
-                    </Button>
-                </div>
-            )}
 
             <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative">
@@ -184,10 +104,7 @@ export default function CurriculumPage() {
                                 !search || t.name.toLowerCase().includes(search.toLowerCase())
                         );
                     return (
-                        <div
-                            key={d.id}
-                            className={cn(idx > 0 && "border-t border-stroke-subtle")}
-                        >
+                        <div key={d.id} className={cn(idx > 0 && "border-t border-stroke-subtle")}>
                             <div className="flex items-center gap-2 px-4 py-3">
                                 <button
                                     type="button"
@@ -213,18 +130,7 @@ export default function CurriculumPage() {
                                 <span className="text-xs text-ink-tertiary">
                                     {d.topicIds.length} topics
                                 </span>
-                                <Switch
-                                    checked={d.active}
-                                    onCheckedChange={() => toggleDomainActive(d.id)}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => removeDomain(d.id)}
-                                    className="h-7 w-7 rounded-md hover:bg-canvas-overlay flex items-center justify-center text-ink-tertiary hover:text-status-error"
-                                    aria-label="Delete domain"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                {!d.active && <Badge variant="outline">Inactive</Badge>}
                             </div>
                             {isOpen && (
                                 <div className="pl-10 pr-4 pb-3 border-t border-stroke-subtle/50 bg-canvas-base/40">
@@ -239,58 +145,9 @@ export default function CurriculumPage() {
                                             <Badge variant="outline">
                                                 {t.level === "primary" ? "Primary" : "Elementary"}
                                             </Badge>
-                                            <Switch
-                                                checked={t.active}
-                                                onCheckedChange={() => toggleTopicActive(t.id)}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeTopic(t.id)}
-                                                className="h-7 w-7 rounded-md hover:bg-canvas-overlay flex items-center justify-center text-ink-tertiary hover:text-status-error"
-                                                aria-label="Delete topic"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
+                                            {!t.active && <Badge variant="outline">Inactive</Badge>}
                                         </div>
                                     ))}
-                                    {newTopicForDomain === d.id ? (
-                                        <div className="flex items-center gap-2 py-2">
-                                            <Input
-                                                autoFocus
-                                                value={newTopicName}
-                                                onChange={(e) => setNewTopicName(e.target.value)}
-                                                placeholder="New topic name"
-                                                className="h-8 text-xs"
-                                            />
-                                            <Button
-                                                size="sm"
-                                                variant="accent"
-                                                onClick={() => addTopicSubmit(d.id)}
-                                            >
-                                                Add
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    setNewTopicForDomain(null);
-                                                    setNewTopicName("");
-                                                }}
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="py-2">
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => setNewTopicForDomain(d.id)}
-                                            >
-                                                <Plus className="h-3.5 w-3.5" /> Add topic
-                                            </Button>
-                                        </div>
-                                    )}
                                 </div>
                             )}
                         </div>
