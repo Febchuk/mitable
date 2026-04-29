@@ -7,10 +7,16 @@ import { organizations } from "../../auth/schema/organizations.schema.js";
 import { montessoriClassrooms } from "../schema/montessori.schema.js";
 import { createLogger } from "../../shared-infra/lib/logger.js";
 import { requireAuth } from "../../auth/middleware/auth.js";
+import readsRouter from "./reads.js";
 
 const logger = createLogger({ module: "MontessoriRoutes" });
 
 const router = Router();
+
+// All read endpoints (classrooms, students, curriculum, grid, attendance,
+// reports, agent threads/messages) live in ./reads.ts and mount under the
+// same /api/montessori prefix.
+router.use(readsRouter);
 
 /**
  * GET /api/montessori/health
