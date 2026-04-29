@@ -11,6 +11,7 @@ import type { Role } from "@/types";
 
 import { AudioCapture } from "./AudioCapture";
 import { PhotoCapture } from "./PhotoCapture";
+import { ProposalReviewPanel } from "./ProposalReviewPanel";
 
 /**
  * AgentView — the chat-style capture surface for teachers.
@@ -43,8 +44,8 @@ interface ChatTurn {
     id: string;
     role: "user" | "agent";
     text: string;
-    /** Only set on agent turns. The proposal cards UI in 4.1 will read
-     *  the envelope from here. */
+    /** Only set on agent turns. The proposal cards read the editable
+     *  envelope from here. */
     envelope?: ProposedUpdatesEnvelope;
     attachment?: { kind: "photo" | "audio" };
 }
@@ -194,7 +195,11 @@ export function AgentView({ role: _role }: AgentViewProps) {
                 ) : (
                     <div className="max-w-2xl mx-auto space-y-4">
                         {turns.map((turn) => (
-                            <ChatBubble key={turn.id} turn={turn} />
+                            <ChatBubble
+                                key={turn.id}
+                                turn={turn}
+                                threadId={threadId}
+                            />
                         ))}
                         {interpret.isPending && <PendingBubble />}
                         {errorMessage && (
@@ -307,8 +312,29 @@ function EmptyState() {
     );
 }
 
-function ChatBubble({ turn }: { turn: ChatTurn }) {
+function ChatBubble({ turn, threadId }: { turn: ChatTurn; threadId: string | null }) {
     const isUser = turn.role === "user";
+
+    // Agent turns with proposals are wider so the editable cards have
+    // room to breathe. The bubble itself becomes a thin frame around
+    // the review panel rather than a chat bubble.
+    if (!isUser && turn.envelope && turn.envelope.proposals.length > 0 && threadId) {
+        return (
+            <div className="flex justify-start">
+                <div className="w-full max-w-2xl rounded-2xl border border-stroke-subtle bg-canvas-raised p-3 space-y-3">
+                    <div className="text-sm text-ink-primary whitespace-pre-wrap">
+                        {turn.text}
+                    </div>
+                    <ProposalReviewPanel
+                        threadId={threadId}
+                        sourceMessageId={turn.id}
+                        envelope={turn.envelope}
+                    />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className={"flex " + (isUser ? "justify-end" : "justify-start")}>
             <div
@@ -330,12 +356,6 @@ function ChatBubble({ turn }: { turn: ChatTurn }) {
                     </div>
                 )}
                 <div>{turn.text}</div>
-                {!isUser && turn.envelope && turn.envelope.proposals.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-stroke-subtle text-xs text-ink-secondary">
-                        {turn.envelope.proposals.length} proposal
-                        {turn.envelope.proposals.length === 1 ? "" : "s"} ready for review.
-                    </div>
-                )}
             </div>
         </div>
     );

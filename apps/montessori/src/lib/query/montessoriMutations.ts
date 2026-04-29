@@ -136,6 +136,38 @@ export function useInterpretCapture() {
     });
 }
 
+// ─── confirmCapture (agent /confirm) ─────────────────────────────────
+
+export interface ConfirmCaptureInput {
+    threadId: string;
+    sourceMessageId: string;
+    envelope: ProposedUpdatesEnvelope;
+}
+
+export interface ConfirmCaptureResult {
+    applied: {
+        observationIds: string[];
+        attendanceIds: string[];
+        reportIds: string[];
+    };
+}
+
+/**
+ * Calls POST /api/montessori/agent/confirm. Applies the (possibly
+ * edited) envelope in one DB transaction. Cache invalidations land
+ * in 4.2; this hook just owns the mutation contract.
+ */
+export function useConfirmCapture() {
+    return useMutation({
+        mutationFn: async (input: ConfirmCaptureInput): Promise<ConfirmCaptureResult> => {
+            return apiRequest<ConfirmCaptureResult>("/montessori/agent/confirm", {
+                method: "POST",
+                body: JSON.stringify(input),
+            });
+        },
+    });
+}
+
 // ─── updateReport ────────────────────────────────────────────────────
 
 export interface UpdateReportInput {
