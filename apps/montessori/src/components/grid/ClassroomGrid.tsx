@@ -4,7 +4,6 @@ import * as React from "react";
 import { Search, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { getLatestLevel, useStore } from "@/lib/store";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -13,7 +12,15 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import type { Classroom, Domain, MasteryLevel, Student, Topic } from "@/types";
+import type {
+    Classroom,
+    Domain,
+    InputMethod,
+    MasteryLevel,
+    Observation,
+    Student,
+    Topic,
+} from "@/types";
 import { MASTERY_VISUALS, visualFor } from "@/components/grid/cell-visuals";
 
 interface CellKey {
@@ -23,8 +30,40 @@ interface CellKey {
 
 const keyOf = (k: CellKey) => `${k.studentId}|${k.topicId}`;
 
+function latestLevelFor(
+    observations: Observation[],
+    studentId: string,
+    topicId: string
+): MasteryLevel | null {
+    const match = observations.find((o) => o.studentId === studentId && o.topicId === topicId);
+    return match?.level ?? null;
+}
+
+export interface SetObservationArgs {
+    studentId: string;
+    topicId: string;
+    level: MasteryLevel;
+    note?: string;
+    inputMethod?: InputMethod;
+    authorType?: "teacher" | "agent";
+}
+
 export interface ClassroomGridProps {
     classroom: Classroom;
+    /**
+     * The full data the grid renders. Callers pre-filter at the data
+     * layer (e.g. via useGrid()) and pass the level-relevant subset.
+     */
+    students: Student[];
+    domains: Domain[];
+    topics: Topic[];
+    observations: Observation[];
+    /**
+     * Persists a cell update. The grid never mutates state directly —
+     * callers wire this to their store / mutation of choice.
+     */
+    onSetObservation: (args: SetObservationArgs) => void;
+
     compact?: boolean; // smaller cells, no toolbar, readonly
     readonly?: boolean;
     filterStudentIds?: string[] | null;
@@ -35,13 +74,17 @@ export interface ClassroomGridProps {
 
 export function ClassroomGrid({
     classroom,
+    students,
+    domains,
+    topics,
+    observations,
+    onSetObservation,
     compact = false,
     readonly = false,
     filterStudentIds = null,
     hideToolbar = false,
     title,
 }: ClassroomGridProps) {
-    const { students, domains, topics, observations, setObservation } = useStore();
 
     // ── Filters / controls ──────────────────────────────────────
     const [studentFilter, setStudentFilter] = React.useState<string>("all");
@@ -128,7 +171,7 @@ export function ClassroomGrid({
 
     const applyLevel = (level: MasteryLevel) => {
         for (const cell of selectedCells) {
-            setObservation({
+            onSetObservation({
                 studentId: cell.studentId,
                 topicId: cell.topicId,
                 level,
@@ -319,7 +362,7 @@ export function ClassroomGrid({
                                         studentId: student.id,
                                         topicId: topic.id,
                                     };
-                                    const level = getLatestLevel(
+                                    const level = latestLevelFor(
                                         observations,
                                         cell.studentId,
                                         cell.topicId
@@ -361,6 +404,9 @@ export function ClassroomGrid({
                 <CellPopover
                     anchor={popoverAnchor}
                     cells={selectedCells}
+                    students={students}
+                    topics={topics}
+                    observations={observations}
                     note={popoverNote}
                     onNoteChange={setPopoverNote}
                     onApply={applyLevel}
@@ -374,14 +420,26 @@ export function ClassroomGrid({
 interface CellPopoverProps {
     anchor: { x: number; y: number };
     cells: CellKey[];
+    students: Student[];
+    topics: Topic[];
+    observations: Observation[];
     note: string;
     onNoteChange: (s: string) => void;
     onApply: (level: MasteryLevel) => void;
     onClose: () => void;
 }
 
-function CellPopover({ anchor, cells, note, onNoteChange, onApply, onClose }: CellPopoverProps) {
-    const { students, topics, observations } = useStore();
+function CellPopover({
+    anchor,
+    cells,
+    students,
+    topics,
+    observations,
+    note,
+    onNoteChange,
+    onApply,
+    onClose,
+}: CellPopoverProps) {
     const ref = React.useRef<HTMLDivElement>(null);
 
     const single = cells.length === 1 ? cells[0]! : null;

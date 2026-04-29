@@ -686,7 +686,7 @@ function InlineLevelEditor({
 }
 
 function GridPreviewCardView({ card }: { card: GridPreviewCard }) {
-    const { classrooms, students } = useStore();
+    const { classrooms, students, domains, topics, observations, setObservation } = useStore();
     const student = students.find((s) => s.id === card.studentId);
     const classroom = classrooms.find((c) => c.id === student?.classroomId);
     if (!student || !classroom) return null;
@@ -700,6 +700,11 @@ function GridPreviewCardView({ card }: { card: GridPreviewCard }) {
             <div className="h-[180px]">
                 <ClassroomGrid
                     classroom={classroom}
+                    students={students}
+                    domains={domains}
+                    topics={topics}
+                    observations={observations}
+                    onSetObservation={setObservation}
                     filterStudentIds={[student.id]}
                     compact
                     hideToolbar

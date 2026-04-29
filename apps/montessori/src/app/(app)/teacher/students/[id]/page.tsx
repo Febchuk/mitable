@@ -25,7 +25,8 @@ function dateRange(): string[] {
 
 export default function StudentProfilePage() {
     const params = useParams<{ id: string }>();
-    const { students, classrooms, observations, topics, domains, attendance } = useStore();
+    const { students, classrooms, observations, topics, domains, attendance, setObservation } =
+        useStore();
     const student = students.find((s) => s.id === params.id);
     const [showOriginal, setShowOriginal] = React.useState(false);
 
@@ -76,6 +77,11 @@ export default function StudentProfilePage() {
                         <div className="max-h-[340px]">
                             <ClassroomGrid
                                 classroom={classroom!}
+                                students={students}
+                                domains={domains}
+                                topics={topics}
+                                observations={observations}
+                                onSetObservation={setObservation}
                                 filterStudentIds={[student!.id]}
                                 compact
                                 hideToolbar
