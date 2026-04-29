@@ -2,19 +2,42 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, Send, Sparkles } from "lucide-react";
+import { CheckCircle2, Loader2, Send, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ReportsTable } from "@/components/reports/ReportsTable";
-import { useCurrentClassroom, useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useGrid, useReports } from "@/lib/query/montessoriQueries";
+import { useStore } from "@/lib/store";
 import type { Report } from "@/types";
 
 export default function TeacherReportsPage() {
-    const classroom = useCurrentClassroom();
-    const { reports, updateReport } = useStore();
-    if (!classroom) return null;
+    const { me } = useAuth();
+    const classroomId = me?.assignedClassroom?.id ?? null;
 
-    const classroomReports = reports.filter((r) => r.classroomId === classroom.id);
+    const reports = useReports(classroomId);
+    const grid = useGrid(classroomId);
+    // updateReport stays on the in-memory store this commit; turns into a
+    // real PATCH /reports/:id mutation in 1.3.
+    const { updateReport } = useStore();
+
+    if (!classroomId) {
+        return (
+            <div className="p-6 text-sm text-ink-secondary">
+                You don&apos;t have a classroom assigned yet. Ask an admin to assign you to one.
+            </div>
+        );
+    }
+    if (reports.isLoading || grid.isLoading || !reports.data || !grid.data) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
+
+    const classroom = grid.data.classroom;
+    const students = grid.data.students;
 
     const actions = (r: Report) => (
         <>
@@ -68,7 +91,12 @@ export default function TeacherReportsPage() {
                 </Link>
             </header>
 
-            <ReportsTable reports={classroomReports} actions={actions} />
+            <ReportsTable
+                reports={reports.data}
+                students={students}
+                classrooms={[classroom]}
+                actions={actions}
+            />
         </div>
     );
 }

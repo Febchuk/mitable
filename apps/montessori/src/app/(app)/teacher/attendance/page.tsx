@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Camera, Check, Mic, MessageSquareText, Save, X } from "lucide-react";
+import { Camera, Check, Loader2, Mic, MessageSquareText, Save, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCurrentClassroom, useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useAttendance } from "@/lib/query/montessoriQueries";
+import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import type { AttendanceEntry } from "@/types";
 
@@ -14,20 +16,29 @@ function todayISO(): string {
 }
 
 export default function AttendancePage() {
-    const classroom = useCurrentClassroom();
-    const { students, attendance, setAttendance } = useStore();
+    const { me } = useAuth();
+    const classroomId = me?.assignedClassroom?.id ?? null;
     const today = todayISO();
+    const attendanceSnapshot = useAttendance(classroomId, today);
+    // setAttendance still hits the in-memory store this commit. The
+    // mutation lands in commit 1.3.
+    const { setAttendance } = useStore();
 
     const classStudents = React.useMemo(
-        () => (classroom ? students.filter((s) => s.classroomId === classroom.id) : []),
-        [students, classroom]
+        () => attendanceSnapshot.data?.students ?? [],
+        [attendanceSnapshot.data]
+    );
+    const todayEntries = React.useMemo(
+        () => attendanceSnapshot.data?.entries ?? [],
+        [attendanceSnapshot.data]
     );
 
-    // Local draft state keyed by studentId
+    // Local draft state keyed by studentId. Each row defaults to "present"
+    // unless an entry already exists for today.
     const initialDraft = React.useMemo<Record<string, AttendanceEntry>>(() => {
         const map: Record<string, AttendanceEntry> = {};
         for (const s of classStudents) {
-            const existing = attendance.find((a) => a.studentId === s.id && a.date === today);
+            const existing = todayEntries.find((a) => a.studentId === s.id);
             map[s.id] = existing ?? {
                 id: `att_draft_${s.id}`,
                 studentId: s.id,
@@ -36,7 +47,7 @@ export default function AttendancePage() {
             };
         }
         return map;
-    }, [classStudents, attendance, today]);
+    }, [classStudents, todayEntries, today]);
 
     const [draft, setDraft] = React.useState<Record<string, AttendanceEntry>>(initialDraft);
     const [dirty, setDirty] = React.useState(false);
@@ -73,7 +84,21 @@ export default function AttendancePage() {
         setVoiceBanner(null);
     };
 
-    if (!classroom) return null;
+    if (!classroomId) {
+        return (
+            <div className="p-6 text-sm text-ink-secondary">
+                You don&apos;t have a classroom assigned yet. Ask an admin to assign you to one.
+            </div>
+        );
+    }
+    if (attendanceSnapshot.isLoading || !attendanceSnapshot.data) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
+    const classroomName = me?.assignedClassroom?.name ?? "Your classroom";
     const prettyToday = new Date().toLocaleDateString(undefined, {
         weekday: "long",
         month: "long",
@@ -85,7 +110,7 @@ export default function AttendancePage() {
         <div className="p-4 md:p-6 pb-24 md:pb-6 max-w-3xl space-y-4">
             <header className="space-y-1">
                 <div className="text-xs text-ink-tertiary uppercase tracking-wider font-semibold">
-                    {classroom.name} · Attendance register
+                    {classroomName} · Attendance register
                 </div>
                 <h1 className="text-2xl font-semibold text-ink-primary">{prettyToday}</h1>
             </header>

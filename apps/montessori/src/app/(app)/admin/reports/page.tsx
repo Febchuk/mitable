@@ -13,7 +13,9 @@ import {
 import { ReportsTable } from "@/components/reports/ReportsTable";
 
 export default function AdminReportsPage() {
-    const { reports, classrooms } = useStore();
+    // Still on store data here; this page gets fully rewired to the
+    // /reports + /classrooms endpoints in commit 1.2d (admin pages).
+    const { reports, classrooms, students } = useStore();
     const [classroomFilter, setClassroomFilter] = React.useState("all");
     const [typeFilter, setTypeFilter] = React.useState("all");
     const [statusFilter, setStatusFilter] = React.useState("all");
@@ -71,7 +73,7 @@ export default function AdminReportsPage() {
                 </Select>
             </div>
 
-            <ReportsTable reports={filtered} />
+            <ReportsTable reports={filtered} students={students} classrooms={classrooms} />
         </div>
     );
 }

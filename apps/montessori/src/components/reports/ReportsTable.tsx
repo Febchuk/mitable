@@ -5,12 +5,13 @@ import { FileText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useStore } from "@/lib/store";
-import type { Report, ReportStatus, ReportType } from "@/types";
+import type { Classroom, Report, ReportStatus, ReportType, Student } from "@/types";
 import { ReportPreviewModal } from "@/components/reports/ReportPreviewModal";
 
 interface ReportsTableProps {
     reports: Report[];
+    students: Student[];
+    classrooms: Classroom[];
     actions?: (report: Report) => React.ReactNode;
 }
 
@@ -24,8 +25,7 @@ function typeLabel(type: ReportType): string {
     return type === "end-of-term" ? "End of Term" : "Activity Update";
 }
 
-export function ReportsTable({ reports, actions }: ReportsTableProps) {
-    const { students, classrooms } = useStore();
+export function ReportsTable({ reports, students, classrooms, actions }: ReportsTableProps) {
     const [previewOpen, setPreviewOpen] = React.useState(false);
     const [previewReport, setPreviewReport] = React.useState<Report | null>(null);
 

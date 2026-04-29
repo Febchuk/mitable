@@ -2,10 +2,16 @@
 
 import * as React from "react";
 import { notFound, useParams } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 import { useStore } from "@/lib/store";
+import {
+    useGrid,
+    useStudent,
+    useStudentAttendance,
+    useStudentObservations,
+} from "@/lib/query/montessoriQueries";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClassroomGrid } from "@/components/grid/ClassroomGrid";
 import { Button } from "@/components/ui/button";
@@ -25,17 +31,38 @@ function dateRange(): string[] {
 
 export default function StudentProfilePage() {
     const params = useParams<{ id: string }>();
-    const { students, classrooms, observations, topics, domains, attendance, setObservation } =
-        useStore();
-    const student = students.find((s) => s.id === params.id);
+    const studentId = params.id;
+
+    const student = useStudent(studentId);
+    const observations = useStudentObservations(studentId);
+    const attendance = useStudentAttendance(studentId);
+    // The grid component still wants the full classroom snapshot — we look
+    // it up only once we know the student's classroomId.
+    const grid = useGrid(student.data?.classroomId ?? null);
+    const { setObservation } = useStore();
     const [showOriginal, setShowOriginal] = React.useState(false);
 
-    if (!student) notFound();
-    const classroom = classrooms.find((c) => c.id === student!.classroomId);
-    if (!classroom) notFound();
+    if (student.isLoading) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
+    if (student.error && (student.error as { status?: number }).status === 404) notFound();
+    if (!student.data) notFound();
 
-    const studentObs = observations.filter((o) => o.studentId === student!.id);
-    const studentAttendance = attendance.filter((a) => a.studentId === student!.id);
+    if (grid.isLoading || !grid.data) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
+
+    const studentObs = observations.data ?? [];
+    const studentAttendance = attendance.data ?? [];
+    const { classroom, students, domains, topics, observations: gridObs } = grid.data;
 
     const present = studentAttendance.filter((a) => a.status === "present").length;
     const absent = studentAttendance.filter((a) => a.status === "absent").length;
@@ -56,12 +83,12 @@ export default function StudentProfilePage() {
 
             <header className="flex items-start gap-4">
                 <span className="h-14 w-14 rounded-full bg-canvas-overlay border border-stroke-subtle flex items-center justify-center text-lg font-semibold text-ink-secondary">
-                    {student!.name.slice(0, 2).toUpperCase()}
+                    {student.data.name.slice(0, 2).toUpperCase()}
                 </span>
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-semibold text-ink-primary">{student!.name}</h1>
+                    <h1 className="text-2xl font-semibold text-ink-primary">{student.data.name}</h1>
                     <div className="text-sm text-ink-tertiary">
-                        Age {student!.age} · {classroom!.name}
+                        Age {student.data.age} · {classroom.name}
                     </div>
                 </div>
             </header>
@@ -76,13 +103,13 @@ export default function StudentProfilePage() {
                     <div className="border border-stroke-subtle rounded-xl overflow-hidden bg-canvas-raised">
                         <div className="max-h-[340px]">
                             <ClassroomGrid
-                                classroom={classroom!}
+                                classroom={classroom}
                                 students={students}
                                 domains={domains}
                                 topics={topics}
-                                observations={observations}
+                                observations={gridObs}
                                 onSetObservation={setObservation}
-                                filterStudentIds={[student!.id]}
+                                filterStudentIds={[student.data.id]}
                                 compact
                                 hideToolbar
                             />
@@ -134,16 +161,24 @@ export default function StudentProfilePage() {
                                             </span>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap text-[11px] text-ink-tertiary uppercase tracking-wider">
-                                                    <span>{new Date(obs.createdAt).toLocaleDateString()}</span>
+                                                    <span>
+                                                        {new Date(obs.createdAt).toLocaleDateString()}
+                                                    </span>
                                                     {domain && (
-                                                        <Badge variant="outline" className="normal-case tracking-normal">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="normal-case tracking-normal"
+                                                        >
                                                             {domain.name}
                                                         </Badge>
                                                     )}
                                                     <span>· {topic?.name}</span>
                                                     <span>· {visuals.label}</span>
                                                     {obs.authorType === "agent" && (
-                                                        <Badge variant="accent" className="normal-case tracking-normal">
+                                                        <Badge
+                                                            variant="accent"
+                                                            className="normal-case tracking-normal"
+                                                        >
                                                             via agent
                                                         </Badge>
                                                     )}
@@ -153,11 +188,13 @@ export default function StudentProfilePage() {
                                                         {obs.summary}
                                                     </div>
                                                 )}
-                                                {showOriginal && obs.note && obs.note !== obs.summary && (
-                                                    <div className="text-xs text-ink-tertiary italic mt-1">
-                                                        original: {obs.note}
-                                                    </div>
-                                                )}
+                                                {showOriginal &&
+                                                    obs.note &&
+                                                    obs.note !== obs.summary && (
+                                                        <div className="text-xs text-ink-tertiary italic mt-1">
+                                                            original: {obs.note}
+                                                        </div>
+                                                    )}
                                             </div>
                                         </li>
                                     );

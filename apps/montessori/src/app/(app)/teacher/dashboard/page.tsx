@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckSquare, FileText, Grid3x3, MessageCircle } from "lucide-react";
+import { CheckSquare, FileText, Grid3x3, Loader2, MessageCircle } from "lucide-react";
 
-import { useCurrentClassroom, useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useAttendance, useGrid } from "@/lib/query/montessoriQueries";
 import { Card, CardContent } from "@/components/ui/card";
 import {
     formatRelativeDate,
@@ -34,19 +35,44 @@ function prettyDate(): string {
 }
 
 export default function TeacherDashboardPage() {
-    const classroom = useCurrentClassroom();
-    const { students, topics, observations, attendance } = useStore();
-    if (!classroom) return null;
-
-    const classStudents = students.filter((s) => s.classroomId === classroom.id);
-    const levelTopics = topics.filter((t) => t.level === classroom.level && t.active);
+    const { me } = useAuth();
+    const classroomId = me?.assignedClassroom?.id ?? null;
     const today = todayISO();
-    const todayAttendance = attendance.filter(
-        (a) => a.date === today && classStudents.some((s) => s.id === a.studentId)
-    );
+    const grid = useGrid(classroomId);
+    const attendanceSnapshot = useAttendance(classroomId, today);
+
+    if (!classroomId) {
+        return (
+            <div className="p-6 text-sm text-ink-secondary">
+                You don&apos;t have a classroom assigned yet. Ask an admin to assign you to one.
+            </div>
+        );
+    }
+    if (grid.isLoading || !grid.data) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-ink-tertiary animate-spin" />
+            </div>
+        );
+    }
+    if (grid.error) {
+        return (
+            <div className="p-6 text-sm text-status-error">
+                Couldn&apos;t load your dashboard: {String((grid.error as Error).message)}
+            </div>
+        );
+    }
+
+    const { classroom, students: classStudents, topics, observations } = grid.data;
+    // Topics are already pre-filtered to active + level on the server, but
+    // overallMasteryTone() still wants the active list scoped further if the
+    // user adds curriculum filters in the future. Today we just pass through.
+    const levelTopics = topics;
+
+    const todayEntries = attendanceSnapshot.data?.entries ?? [];
     const presentCount =
-        todayAttendance.length > 0
-            ? todayAttendance.filter((a) => a.status === "present").length
+        todayEntries.length > 0
+            ? todayEntries.filter((a) => a.status === "present").length
             : classStudents.length;
     const totalCount = classStudents.length;
 
@@ -60,7 +86,8 @@ export default function TeacherDashboardPage() {
                     Good morning, {classroom.name.split(" ")[0]}.
                 </h1>
                 <p className="text-sm text-ink-secondary">
-                    {classroom.name} · {classStudents.length} students · ages {classroom.ageRange}
+                    {classroom.name} · {classStudents.length} students
+                    {classroom.ageRange ? ` · ages ${classroom.ageRange}` : ""}
                 </p>
             </header>
 
@@ -154,7 +181,9 @@ export default function TeacherDashboardPage() {
                                         }
                                     />
                                 </span>
-                                <span className="text-sm text-ink-primary font-medium">{link.label}</span>
+                                <span className="text-sm text-ink-primary font-medium">
+                                    {link.label}
+                                </span>
                             </Link>
                         );
                     })}
