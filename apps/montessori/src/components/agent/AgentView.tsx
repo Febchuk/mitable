@@ -6,6 +6,8 @@ import { Camera, Mic, Send, Image as ImageIcon, Sparkles, X } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useInterpretCapture } from "@/lib/query/montessoriMutations";
+import { enqueueCapture } from "@/lib/offline/captureQueue";
+import { useOnlineStatus } from "@/lib/offline/useOnlineStatus";
 import type { ProposedUpdatesEnvelope } from "@/types/proposed-updates";
 import type { Role } from "@/types";
 
@@ -42,7 +44,7 @@ interface PendingMedia {
 
 interface ChatTurn {
     id: string;
-    role: "user" | "agent";
+    role: "user" | "agent" | "system";
     text: string;
     /** Only set on agent turns. The proposal cards read the editable
      *  envelope from here. */
@@ -64,6 +66,7 @@ export function AgentView({ role: _role }: AgentViewProps) {
     const scrollerRef = React.useRef<HTMLDivElement>(null);
 
     const interpret = useInterpretCapture();
+    const online = useOnlineStatus();
 
     // First-time tooltip — shown until the teacher dismisses it once.
     // Stored in localStorage so it doesn't reappear across sessions.
@@ -146,6 +149,36 @@ export function AgentView({ role: _role }: AgentViewProps) {
         clearPhoto();
         clearAudio();
 
+        // Offline path: skip the request entirely and persist the
+        // capture so 6.3's drain can re-submit it on reconnect.
+        // We surface a system-style turn so the teacher knows the
+        // capture is safe and *will* turn into a draft later — never
+        // auto-saved.
+        if (!online) {
+            try {
+                await enqueueCapture({
+                    threadId: threadId ?? null,
+                    text: trimmed || null,
+                    photo: photoForUpload,
+                    audio: audioForUpload,
+                });
+                setTurns((prev) => [
+                    ...prev,
+                    {
+                        id: `offline-${Date.now()}`,
+                        role: "system",
+                        text: "You're offline. Saved on this device — we'll draft updates for you to review as soon as you're back online.",
+                    },
+                ]);
+            } catch (err) {
+                setErrorMessage(
+                    (err as Error)?.message ??
+                        "Couldn't save offline. Try again once you're back online."
+                );
+            }
+            return;
+        }
+
         try {
             const result = await interpret.mutateAsync({
                 threadId: threadId ?? undefined,
@@ -168,11 +201,41 @@ export function AgentView({ role: _role }: AgentViewProps) {
                 },
             ]);
         } catch (err) {
+            // Distinguish a network drop (TypeError from fetch) from a
+            // server-side failure. The former gets queued so the user
+            // doesn't lose work; the latter surfaces as an inline error
+            // so they know to fix their input.
+            const isNetworkError =
+                err instanceof TypeError ||
+                (typeof navigator !== "undefined" && !navigator.onLine);
+
+            if (isNetworkError) {
+                try {
+                    await enqueueCapture({
+                        threadId: threadId ?? null,
+                        text: trimmed || null,
+                        photo: photoForUpload,
+                        audio: audioForUpload,
+                    });
+                    setTurns((prev) => [
+                        ...prev,
+                        {
+                            id: `offline-${Date.now()}`,
+                            role: "system",
+                            text: "Network dropped before we could reach the agent. Saved on this device — we'll draft updates for you to review when the connection is back.",
+                        },
+                    ]);
+                    return;
+                } catch {
+                    // fall through to the visible error
+                }
+            }
+
             setErrorMessage(
                 (err as Error)?.message ?? "Couldn't reach the agent. Please try again."
             );
         }
-    }, [canSend, text, photo, audio, threadId, interpret, clearPhoto, clearAudio]);
+    }, [canSend, text, photo, audio, threadId, interpret, clearPhoto, clearAudio, online]);
 
     const handleKeyDown = React.useCallback(
         (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -314,6 +377,17 @@ function EmptyState() {
 
 function ChatBubble({ turn, threadId }: { turn: ChatTurn; threadId: string | null }) {
     const isUser = turn.role === "user";
+    const isSystem = turn.role === "system";
+
+    if (isSystem) {
+        return (
+            <div className="flex justify-center">
+                <div className="rounded-lg border border-stroke-subtle bg-canvas-overlay px-3 py-2 text-xs text-ink-secondary max-w-[90%] text-center">
+                    {turn.text}
+                </div>
+            </div>
+        );
+    }
 
     // Agent turns with proposals are wider so the editable cards have
     // room to breathe. The bubble itself becomes a thin frame around

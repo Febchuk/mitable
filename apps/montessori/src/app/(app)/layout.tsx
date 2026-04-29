@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { StoreProvider } from "@/lib/store";
 import { QueryProvider } from "@/lib/query/QueryProvider";
 import { AppShell } from "@/components/shell/AppShell";
+import { OfflinePill } from "@/components/system/OfflinePill";
 
 /**
  * Auth gate + app shell.
@@ -74,6 +75,7 @@ export default function AppGroupLayout({ children }: { children: React.ReactNode
         <QueryProvider>
             <StoreProvider>
                 <AppShell>{children}</AppShell>
+                <OfflinePill />
             </StoreProvider>
         </QueryProvider>
     );
