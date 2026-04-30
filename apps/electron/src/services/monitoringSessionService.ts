@@ -400,7 +400,6 @@ class MonitoringSessionService {
 
     const sessionId = this.activeSession.id;
     const localMode = this.activeSession.localMode;
-    let storyGenerationFailed = false;
 
     const MIN_SESSION_DURATION_MS = 3 * 60 * 1000;
     const activeDurationMs =
@@ -412,6 +411,50 @@ class MonitoringSessionService {
         `Session too short (${Math.round(activeDurationMs / 1000)}s < ${MIN_SESSION_DURATION_MS / 1000}s) — skipping story generation, cleaning up`
       );
     }
+
+    // Immediately transition to "summarizing" so the pill disappears and the
+    // console shows the summarizing state — don't block on AI work.
+    if (localMode && !tooShort) {
+      this.activeSession.status = "summarizing";
+      this.broadcastSessionUpdate();
+    }
+
+    // Grab manifest info before clearing activeSession
+    const manifest = await localFrameStorage.loadManifest(sessionId);
+    const captureCount = manifest?.totalFrameCount ?? 0;
+
+    // Release session state immediately so the UI is unblocked
+    this.activeSession = null;
+    if (!localMode || tooShort) {
+      this.broadcastSessionUpdate();
+    }
+
+    // Fire off AI work in the background — not blocking the return
+    this.finishSessionAsync(sessionId, localMode, tooShort, captureCount, activeDurationMs);
+
+    return {
+      success: true,
+      sessionId,
+      captureCount,
+      captures: [],
+      localMode,
+      storyGenerationFailed: false,
+    };
+  }
+
+  /**
+   * Background work after endSession returns: flush remaining frames,
+   * generate story, clean up checkpoint and files. Broadcasts "ended"
+   * when done so the console can display the result.
+   */
+  private async finishSessionAsync(
+    sessionId: string,
+    localMode: boolean,
+    tooShort: boolean,
+    captureCount: number,
+    activeDurationMs: number
+  ): Promise<void> {
+    let storyGenerationFailed = false;
 
     try {
       if (localMode) {
@@ -430,16 +473,13 @@ class MonitoringSessionService {
               );
               storyGenerationFailed = true;
             } else {
-              logger.info("Flushing buffer and generating story via Ollama...");
+              logger.info("Flushing buffer and generating summary via Ollama...");
 
-              const timeoutMs = 120_000;
+              const timeoutMs = 1_200_000;
               const flushAndGenerate = async () => {
                 await localInferenceService.flushRemaining();
-                logger.info("Buffer flushed, generating story...");
-                const story = await localInferenceService.generateStory(sessionId);
-                logger.info(
-                  `Local story generated: ${story.tasks.length} tasks, narrative length ${story.narrative.length}`
-                );
+                logger.info("Buffer flushed, generating summary...");
+                await localInferenceService.generateSummary(sessionId);
               };
 
               await Promise.race([
@@ -447,7 +487,7 @@ class MonitoringSessionService {
                 new Promise<never>((_, reject) =>
                   setTimeout(
                     () =>
-                      reject(new Error(`Story generation timed out after ${timeoutMs / 1000}s`)),
+                      reject(new Error(`Summary generation timed out after ${timeoutMs / 1000}s`)),
                     timeoutMs
                   )
                 ),
@@ -455,24 +495,47 @@ class MonitoringSessionService {
             }
           }
         } catch (err) {
-          logger.error("Local inference flush/story generation failed:", String(err));
+          logger.error("Local inference flush/summary generation failed:", String(err));
           storyGenerationFailed = true;
         }
       }
 
-      // End checkpoint tracking (removes checkpoint file)
-      await checkpointService.endSession();
+      // Deliver on-device summary to backend and export markdown
+      if (localMode && !storyGenerationFailed && !tooShort) {
+        try {
+          const { localInferenceService } = await import("./on-device");
 
-      // End session in local storage
-      const manifest = await localFrameStorage.loadManifest(sessionId);
-      const captureCount = manifest?.totalFrameCount ?? 0;
-      await localFrameStorage.endSession(sessionId, []);
+          const exported = localInferenceService.exportResultsForBackend(
+            sessionId,
+            activeDurationMs
+          );
+          if (exported) {
+            const resp = await authManager.authenticatedFetch(
+              `/api/monitoring/sessions/${sessionId}/on-device-summary`,
+              {
+                method: "PUT",
+                body: JSON.stringify({ onDeviceSummary: exported }),
+              }
+            );
+            if (resp.ok) {
+              logger.info("On-device summary delivered to backend");
+            } else {
+              logger.warn("Backend rejected on-device summary:", resp.status);
+            }
+          }
 
-      // Update internal state (guard against concurrent endSession calls)
-      if (this.activeSession) {
-        this.activeSession.status = "ended";
-        this.broadcastSessionUpdate();
+          // Auto-export rich markdown for AI assistants (Claude, etc.)
+          const mdPath = await localInferenceService.exportSessionMarkdown(sessionId);
+          if (mdPath) {
+            logger.info("Session markdown exported:", mdPath);
+          }
+        } catch (err) {
+          logger.warn("Failed to deliver/export session:", String(err));
+        }
       }
+
+      await checkpointService.endSession();
+      await localFrameStorage.endSession(sessionId, []);
 
       logger.info(` Session ended: ${sessionId}`, {
         totalCaptureCount: captureCount,
@@ -482,14 +545,17 @@ class MonitoringSessionService {
         tooShort,
       });
 
-      // Cleanup session state
-      this.activeSession = null;
+      // Broadcast final "ended" state (replaces "summarizing")
+      BrowserWindow.getAllWindows().forEach((window) => {
+        if (!window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.MONITORING_SESSION_UPDATE, null);
+        }
+      });
 
       if (tooShort) {
         this.cleanupSessionFiles(sessionId);
         logger.info("Immediately cleaned up files for short session");
       } else {
-        // Schedule cleanup of local frames after 10 minutes (allows for re-summarization)
         setTimeout(
           () => {
             this.cleanupSessionFiles(sessionId);
@@ -497,22 +563,13 @@ class MonitoringSessionService {
           10 * 60 * 1000
         );
       }
-
-      return {
-        success: true,
-        sessionId,
-        captureCount,
-        captures: [],
-        localMode,
-        storyGenerationFailed,
-      };
     } catch (error) {
-      logger.error(" Failed to end session:", error);
-      return {
-        success: false,
-        error: `Failed to end session: ${error instanceof Error ? error.message : "Unknown error"}`,
-        localMode,
-      };
+      logger.error("finishSessionAsync failed:", error);
+      BrowserWindow.getAllWindows().forEach((window) => {
+        if (!window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.MONITORING_SESSION_UPDATE, null);
+        }
+      });
     }
   }
 

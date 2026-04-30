@@ -142,6 +142,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "sherpa-onnx": "^1.12.37",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "tailwind-scrollbar-hide": "^4.0.0",

@@ -180,14 +180,14 @@ const SUMMARIZE_CHUNK: RLMTool<StorytellerEnvironment> = {
 const BUILD_STORY: RLMTool<StorytellerEnvironment> = {
   name: "build_story",
   description:
-    "Final merge: produce narrative + tasks with time. Each task needs a description and minutes. Minutes must sum to totalMinutes from get_session_stats. Call this last.",
+    "Final step: store the markdown session summary. Call this last after reading all data.",
   parameters: [
-    { name: "narrative", type: "string", required: true, description: "Full session narrative" },
+    { name: "narrative", type: "string", required: true, description: "Markdown session summary" },
     {
       name: "tasks",
       type: "array",
-      required: true,
-      description: "Array of {description, minutes} objects. Minutes must sum to totalMinutes.",
+      required: false,
+      description: "Optional array of {description, minutes} objects. Pass [] if not needed.",
     },
   ],
   execute: (params, env) => {
@@ -198,23 +198,8 @@ const BUILD_STORY: RLMTool<StorytellerEnvironment> = {
       minutes: Math.max(1, Number(t.minutes) || 1),
     }));
 
-    // Normalize minutes to sum to totalMinutes
-    const rawSum = tasks.reduce((s, t) => s + t.minutes, 0);
-    if (rawSum > 0 && rawSum !== env.totalMinutes) {
-      const scale = env.totalMinutes / rawSum;
-      let remaining = env.totalMinutes;
-      for (let i = 0; i < tasks.length; i++) {
-        if (i === tasks.length - 1) {
-          tasks[i].minutes = Math.max(1, remaining);
-        } else {
-          tasks[i].minutes = Math.max(1, Math.round(tasks[i].minutes * scale));
-          remaining -= tasks[i].minutes;
-        }
-      }
-    }
-
     env.setFinalStory({ narrative, tasks });
-    return { stored: true, narrative: narrative.slice(0, 100) + "...", taskCount: tasks.length };
+    return { stored: true, narrativeLength: narrative.length };
   },
 };
 

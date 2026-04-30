@@ -799,6 +799,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
   },
+
+  getBlockExportPath: (sessionId: string): Promise<string | null> =>
+    ipcRenderer.invoke("get-block-export-path", sessionId),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

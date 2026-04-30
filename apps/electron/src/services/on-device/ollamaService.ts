@@ -29,7 +29,7 @@ const OLLAMA_PORT = 11434;
 const OLLAMA_BASE = `http://${OLLAMA_HOST}:${OLLAMA_PORT}`;
 const HEALTH_POLL_MS = 30_000;
 const STARTUP_TIMEOUT_MS = 60_000;
-const IDLE_UNLOAD_MS = 10 * 60_000;
+const IDLE_UNLOAD_MS = 5 * 60_000;
 
 const OLLAMA_DOWNLOAD_URLS: Record<string, string> = {
   win32: "https://ollama.com/download/OllamaSetup.exe",

@@ -20,8 +20,6 @@ export {
   getHardwareProfile,
 } from "./ollamaLifecycle";
 
-export { whisperServerService } from "./whisperServerService";
-
 export { localDb } from "./localDb";
 export type {
   LocalCapture,
@@ -38,3 +36,6 @@ export { localAudioService } from "./localAudioService";
 
 export { nativeAudioCapture } from "./nativeAudioCapture";
 export type { NativeAudioChunk } from "./nativeAudioCapture";
+
+export { sherpaWhisperService } from "./sherpaWhisperService";
+export { whisperCliService } from "./whisperCliService";

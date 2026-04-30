@@ -48,8 +48,7 @@ export async function initialize(onProgress?: OllamaProgressCallback): Promise<H
   _hardwareProfile = await detectHardware();
   logger.info("Hardware tier:", _hardwareProfile.tier, "Model:", _hardwareProfile.recommendedModel);
 
-  // Constrained tier: reduce context to fit model in limited VRAM
-  const numCtx = _hardwareProfile.tier === "constrained" ? 2048 : 4096;
+  const numCtx = _hardwareProfile.tier === "constrained" ? 4096 : 32768;
   ollamaService.setNumCtx(numCtx);
   logger.info(`Context window set to ${numCtx} tokens`);
 

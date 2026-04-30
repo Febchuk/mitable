@@ -228,11 +228,13 @@ export default function CalendarView() {
     const blocks = selectedDayRaw.workBlocks.map((block) => {
       const isMeeting = block.source === "granola" || block.source === "fireflies";
       const hasTasks = block.taskBreakdown && block.taskBreakdown.length > 0;
+      const hasSummary = !!block.summary && block.summary.length > 40;
 
-      // Rule 1: "ready" without tasks on a work block → still summarizing
-      // Safety valve: accept "ready" without tasks if session ended >5 min ago (AI didn't generate tasks)
+      // Rule 1: "ready" without tasks or summary → still summarizing
+      // On-device sessions produce narrative summaries without tasks, so
+      // having a summary is sufficient to consider the block done.
       const endedRecently = block.endTime && Date.now() - block.endTime.getTime() < 5 * 60 * 1000;
-      if (!isMeeting && block.status === "ready" && !hasTasks && endedRecently) {
+      if (!isMeeting && block.status === "ready" && !hasTasks && !hasSummary && endedRecently) {
         return { ...block, status: "summarizing" as const };
       }
 

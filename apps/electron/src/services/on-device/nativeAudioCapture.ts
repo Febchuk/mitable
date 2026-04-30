@@ -33,6 +33,7 @@ class NativeAudioCapture extends EventEmitter {
   private micRecorder: any = null;
   private systemRecorder: any = null;
   private active = false;
+  private emitCount = 0;
 
   on<K extends keyof NativeAudioEvents>(event: K, listener: NativeAudioEvents[K]): this {
     return super.on(event, listener);
@@ -54,6 +55,7 @@ class NativeAudioCapture extends EventEmitter {
       logger.warn("start() called while already active");
       return { micStarted: true, systemStarted: !!this.systemRecorder };
     }
+    this.emitCount = 0;
 
     let nativeAudio: typeof import("native-audio-node");
     try {
@@ -81,6 +83,12 @@ class NativeAudioCapture extends EventEmitter {
       });
 
       this.micRecorder.on("data", (chunk: { data: Buffer }) => {
+        this.emitCount++;
+        if (this.emitCount === 1) {
+          logger.info(
+            `First mic data event: ${chunk.data?.length ?? 0}B, listeners=${this.listenerCount("data")}`
+          );
+        }
         this.emit("data", { source: "user", data: chunk.data });
       });
 
@@ -106,6 +114,9 @@ class NativeAudioCapture extends EventEmitter {
       });
 
       this.systemRecorder.on("data", (chunk: { data: Buffer }) => {
+        if (this.emitCount < 5) {
+          logger.info(`System audio data event: ${chunk.data?.length ?? 0}B`);
+        }
         this.emit("data", { source: "remote", data: chunk.data });
       });
 

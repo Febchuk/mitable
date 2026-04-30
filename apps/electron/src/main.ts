@@ -126,11 +126,10 @@ let audioActiveBeforePause = false;
 async function cleanupAudioRecording(sessionId?: string): Promise<void> {
   audioCleanupDone = true;
 
-  // Flush and stop native audio capture if running
+  // Stop native audio capture if running
   try {
     const { localAudioService, nativeAudioCapture } = await import("./services/on-device");
     if (nativeAudioCapture.isActive()) {
-      await localAudioService.flushRemaining();
       await localAudioService.stop();
     }
   } catch (err) {
@@ -2583,13 +2582,12 @@ function setupMonitoringSessionHandlers() {
 
     const sessionState = monitoringSessionService.getSessionState();
 
-    // On-device path: flush remaining audio and stop native capture
+    // On-device path: stop native capture (audio is drained by inference service on batch boundaries)
     try {
       const { localAudioService, nativeAudioCapture } = await import("./services/on-device");
       if (nativeAudioCapture.isActive()) {
-        await localAudioService.flushRemaining();
         await localAudioService.stop();
-        monitoringLogger.info("Native audio capture stopped and flushed");
+        monitoringLogger.info("Native audio capture stopped");
         return { success: true };
       }
     } catch (err) {
@@ -2895,6 +2893,25 @@ function setupMonitoringSessionHandlers() {
 function setupUpdateHandlers() {
   ipcMain.handle("get-app-version", () => {
     return app.getVersion();
+  });
+
+  ipcMain.handle("get-block-export-path", async (_event, sessionId: string) => {
+    try {
+      const { localInferenceService } = await import("./services/on-device");
+      const cached = localInferenceService.getExportPath(sessionId);
+      if (cached) {
+        const { promises: fs } = await import("fs");
+        try {
+          await fs.access(cached);
+          return cached;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
   });
 
   ipcMain.handle("check-for-updates", async () => {
@@ -4159,7 +4176,7 @@ app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", async () => {
   updateService.stopPeriodicChecks();
   stopNotificationTimer();
   // Ensure focus window tracker is stopped even if session state is corrupted
@@ -4168,6 +4185,14 @@ app.on("before-quit", () => {
   passiveMonitorService.forceReset();
   // Stop browser bridge WebSocket server
   browserBridgeService.stop();
+  // Shut down Whisper services
+  try {
+    const { whisperCliService, sherpaWhisperService } = await import("./services/on-device");
+    whisperCliService.shutdown();
+    sherpaWhisperService.shutdown();
+  } catch {
+    /* ignore */
+  }
 
   // Track app quit and flush PostHog events
   if (currentUserContext?.userId) {

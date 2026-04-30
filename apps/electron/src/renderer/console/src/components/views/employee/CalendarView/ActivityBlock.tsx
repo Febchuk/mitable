@@ -1,7 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { ChevronRight, Clock, TrendingUp, LayoutList, Trash2, Users, User } from "lucide-react";
+import {
+  ChevronRight,
+  Clock,
+  TrendingUp,
+  LayoutList,
+  Trash2,
+  Users,
+  User,
+  Sparkles,
+} from "lucide-react";
 import type { WorkBlock } from "./types";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
 
@@ -585,6 +594,9 @@ export default function ActivityBlock({
                 </>
               ) : null}
 
+              {/* AI export prompt — session blocks only */}
+              {!isMeeting && block.status === "ready" && <BlockExportPath block={block} />}
+
               {/* App breakdown section */}
               {block.appBreakdown && block.appBreakdown.length > 0 && (
                 <>
@@ -680,6 +692,94 @@ export default function ActivityBlock({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function BlockExportPath({ block }: { block: WorkBlock }) {
+  const [exportPath, setExportPath] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!block.id) return;
+    (window as any).consoleAPI
+      ?.getBlockExportPath?.(block.id)
+      .then((path: string | null) => setExportPath(path));
+  }, [block.id]);
+
+  if (!exportPath) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "rgba(255, 255, 255, 0.03)",
+        border: "1px solid rgba(255, 255, 255, 0.06)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          color: "#7C6F5B",
+          lineHeight: 1.4,
+          marginBottom: 6,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        <Sparkles size={12} style={{ flexShrink: 0 }} />
+        Copy and paste this block data to your favorite AI for reports, emails, and further
+        insights.
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          cursor: "pointer",
+        }}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(exportPath);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          } catch {
+            /* clipboard unavailable */
+          }
+        }}
+        title="Click to copy path"
+      >
+        <code
+          style={{
+            fontSize: 11,
+            color: "#9B9689",
+            background: "rgba(255, 255, 255, 0.04)",
+            padding: "4px 8px",
+            borderRadius: 4,
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontFamily: "monospace",
+          }}
+        >
+          {exportPath}
+        </code>
+        <span
+          style={{
+            fontSize: 10,
+            color: copied ? "#6B8F71" : "#7C6F5B",
+            flexShrink: 0,
+            minWidth: 40,
+            textAlign: "center",
+          }}
+        >
+          {copied ? "Copied!" : "Copy"}
+        </span>
+      </div>
     </div>
   );
 }

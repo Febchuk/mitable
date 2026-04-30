@@ -74,6 +74,9 @@ temp/
 # electron-vite temp compiled configs
 apps/electron/electron.vite.config.*.mjs
 
+# Whisper.cpp binaries and models (auto-downloaded)
+apps/electron/bin/
+
 # OCR/ML Models (auto-downloaded by tesseract.js)
 *.traineddata
 

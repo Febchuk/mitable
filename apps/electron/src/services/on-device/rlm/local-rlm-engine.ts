@@ -220,6 +220,30 @@ function parseJsonResponse(raw: string): LLMToolCall {
     }
   }
 
+  // Truncated JSON recovery: if the LLM ran out of tokens mid-response,
+  // try to salvage a build_story narrative from the incomplete JSON.
+  const narrativeMatch = trimmed.match(/"narrative"\s*:\s*"([\s\S]+)/);
+  if (narrativeMatch) {
+    let narrative = narrativeMatch[1];
+    // Strip trailing incomplete JSON artifacts
+    narrative = narrative.replace(/"\s*,?\s*"tasks"[\s\S]*$/, "");
+    narrative = narrative.replace(/"\s*}\s*}\s*$/, "");
+    narrative = narrative.replace(/"\s*$/, "");
+    // Unescape JSON string escapes
+    try {
+      narrative = JSON.parse(`"${narrative}"`);
+    } catch {
+      narrative = narrative.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    }
+    if (narrative.length > 20) {
+      logger.warn(`Recovered truncated narrative (${narrative.length} chars) from incomplete JSON`);
+      return {
+        tool: "build_story",
+        parameters: { narrative, tasks: [] },
+      };
+    }
+  }
+
   throw new Error(`Could not parse LLM response as JSON: ${trimmed.slice(0, 200)}`);
 }
 
