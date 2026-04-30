@@ -17,15 +17,11 @@ const logger = createLogger({ module: "MontessoriRoutes" });
 
 const router = Router();
 
-// All read endpoints (classrooms, students, curriculum, grid, attendance,
-// reports, agent threads/messages) live in ./reads.ts; mutations
-// (observations, attendance upsert, report status) live in ./writes.ts.
-// Both mount under the same /api/montessori prefix.
-router.use(readsRouter);
-router.use(writesRouter);
-router.use(agentRouter);
-router.use(templatesRouter);
-router.use(reportArtefactsRouter);
+/**
+ * Register /health and /me before sub-routers. Otherwise Express matches
+ * `readsRouter` first; that router runs requireAuth then has no /me route,
+ * and the request never reaches the handlers below — login breaks.
+ */
 
 /**
  * GET /api/montessori/health
@@ -126,5 +122,15 @@ router.get("/me", requireAuth, async (req: Request, res: Response): Promise<void
         res.status(500).json({ error: "internal_error" });
     }
 });
+
+// All read endpoints (classrooms, students, curriculum, grid, attendance,
+// reports, agent threads/messages) live in ./reads.ts; mutations
+// (observations, attendance upsert, report status) live in ./writes.ts.
+// Both mount under the same /api/montessori prefix.
+router.use(readsRouter);
+router.use(writesRouter);
+router.use(agentRouter);
+router.use(templatesRouter);
+router.use(reportArtefactsRouter);
 
 export default router;

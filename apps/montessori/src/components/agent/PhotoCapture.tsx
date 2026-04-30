@@ -45,6 +45,14 @@ export function PhotoCapture({ open, onOpenChange, onCapture }: PhotoCaptureProp
     const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
     const previewBlobRef = React.useRef<{ blob: Blob; mimeType: string } | null>(null);
+    // Mirror of previewUrl for cleanup paths that mustn't run on every
+    // preview change. The lifecycle effect below reads this ref so
+    // that snapping a frame doesn't re-trigger start() and bounce the
+    // dialog back to the live camera state.
+    const previewUrlRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        previewUrlRef.current = previewUrl;
+    }, [previewUrl]);
 
     const teardown = React.useCallback(() => {
         if (streamRef.current) {
@@ -106,7 +114,10 @@ export function PhotoCapture({ open, onOpenChange, onCapture }: PhotoCaptureProp
         }
     }, []);
 
-    // Open / close lifecycle.
+    // Open / close lifecycle. Intentionally does NOT depend on
+    // previewUrl — re-running this effect mid-session would restart
+    // the camera and clobber the review state the moment Capture
+    // creates a still preview.
     React.useEffect(() => {
         if (open) {
             void start();
@@ -114,8 +125,8 @@ export function PhotoCapture({ open, onOpenChange, onCapture }: PhotoCaptureProp
             teardown();
             setStatus("idle");
             setErrorMessage(null);
-            if (previewUrl) {
-                URL.revokeObjectURL(previewUrl);
+            if (previewUrlRef.current) {
+                URL.revokeObjectURL(previewUrlRef.current);
                 setPreviewUrl(null);
             }
             previewBlobRef.current = null;
@@ -123,7 +134,7 @@ export function PhotoCapture({ open, onOpenChange, onCapture }: PhotoCaptureProp
         return () => {
             teardown();
         };
-    }, [open, start, teardown, previewUrl]);
+    }, [open, start, teardown]);
 
     const snap = React.useCallback(async () => {
         const video = videoRef.current;

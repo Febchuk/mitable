@@ -175,23 +175,21 @@ export function AgentView({ role: _role }: AgentViewProps) {
         setErrorMessage(null);
 
         const trimmed = text.trim();
+        const localTurnId = `local-${Date.now()}`;
         const localUserTurn: ChatTurn = {
-            id: `local-${Date.now()}`,
+            id: localTurnId,
             role: "user",
             text: trimmed || (photo ? "(photo)" : audio ? "(voice note)" : ""),
             attachment: photo ? { kind: "photo" } : audio ? { kind: "audio" } : undefined,
         };
         setTurns((prev) => [...prev, localUserTurn]);
 
-        // Stash the media so we can release the chips immediately and
-        // the upload still has the bytes. Setting state to null here
-        // lets the user start composing a follow-up while interpret is
-        // in flight.
+        // Stash the exact Blob references for the request, but keep
+        // the composer state alive until the send succeeds. If the
+        // server rejects the capture, the teacher can retry without
+        // losing the photo/audio they just recorded.
         const photoForUpload = photo ? { blob: photo.blob, mimeType: photo.mimeType } : null;
         const audioForUpload = audio ? { blob: audio.blob, mimeType: audio.mimeType } : null;
-        setText("");
-        clearPhoto();
-        clearAudio();
 
         // Offline path: skip the request entirely and persist the
         // capture so 6.3's drain can re-submit it on reconnect.
@@ -214,7 +212,11 @@ export function AgentView({ role: _role }: AgentViewProps) {
                         text: "You're offline. Saved on this device — we'll draft updates for you to review as soon as you're back online.",
                     },
                 ]);
+                setText("");
+                clearPhoto();
+                clearAudio();
             } catch (err) {
+                setTurns((prev) => prev.filter((turn) => turn.id !== localTurnId));
                 setErrorMessage(
                     (err as Error)?.message ??
                         "Couldn't save offline. Try again once you're back online."
@@ -231,6 +233,9 @@ export function AgentView({ role: _role }: AgentViewProps) {
                 audio: audioForUpload,
             });
             setThreadId(result.threadId);
+            setText("");
+            clearPhoto();
+            clearAudio();
 
             const agentText = result.envelope.clarifyingQuestion
                 ? `${result.envelope.summary}\n\n${result.envelope.clarifyingQuestion}`
@@ -269,12 +274,16 @@ export function AgentView({ role: _role }: AgentViewProps) {
                             text: "Network dropped before we could reach the agent. Saved on this device — we'll draft updates for you to review when the connection is back.",
                         },
                     ]);
+                    setText("");
+                    clearPhoto();
+                    clearAudio();
                     return;
                 } catch {
                     // fall through to the visible error
                 }
             }
 
+            setTurns((prev) => prev.filter((turn) => turn.id !== localTurnId));
             setErrorMessage(
                 (err as Error)?.message ?? "Couldn't reach the agent. Please try again."
             );
@@ -309,9 +318,11 @@ export function AgentView({ role: _role }: AgentViewProps) {
                             />
                         ))}
                         {interpret.isPending && <PendingBubble />}
-                        {errorMessage && (
-                            <div className="text-sm text-status-error">{errorMessage}</div>
-                        )}
+                    </div>
+                )}
+                {errorMessage && (
+                    <div className="max-w-2xl mx-auto mt-4 text-sm text-status-error">
+                        {errorMessage}
                     </div>
                 )}
             </div>

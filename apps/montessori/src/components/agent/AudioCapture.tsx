@@ -55,6 +55,14 @@ export function AudioCapture({ open, onOpenChange, onCapture }: AudioCaptureProp
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
     const [isPlaying, setIsPlaying] = React.useState(false);
     const previewBlobRef = React.useRef<{ blob: Blob; mimeType: string } | null>(null);
+    // Mirror of previewUrl for cleanup paths that mustn't run on every
+    // preview change. The lifecycle effect below uses this ref so that
+    // creating a new preview URL after Stop doesn't re-trigger arm()
+    // and bounce the dialog back to the armed state.
+    const previewUrlRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        previewUrlRef.current = previewUrl;
+    }, [previewUrl]);
 
     const teardown = React.useCallback(() => {
         if (recorderRef.current && recorderRef.current.state !== "inactive") {
@@ -192,7 +200,10 @@ export function AudioCapture({ open, onOpenChange, onCapture }: AudioCaptureProp
         }
     }, []);
 
-    // Open / close lifecycle.
+    // Open / close lifecycle. Intentionally does NOT depend on
+    // previewUrl — re-running this effect mid-session would re-arm
+    // the recorder and clobber the review state the moment Stop
+    // creates a preview.
     React.useEffect(() => {
         if (open) {
             void arm();
@@ -202,8 +213,8 @@ export function AudioCapture({ open, onOpenChange, onCapture }: AudioCaptureProp
             setErrorMessage(null);
             setElapsedMs(0);
             setIsPlaying(false);
-            if (previewUrl) {
-                URL.revokeObjectURL(previewUrl);
+            if (previewUrlRef.current) {
+                URL.revokeObjectURL(previewUrlRef.current);
                 setPreviewUrl(null);
             }
             previewBlobRef.current = null;
@@ -211,7 +222,7 @@ export function AudioCapture({ open, onOpenChange, onCapture }: AudioCaptureProp
         return () => {
             teardown();
         };
-    }, [open, arm, teardown, previewUrl]);
+    }, [open, arm, teardown]);
 
     const retake = React.useCallback(() => {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
