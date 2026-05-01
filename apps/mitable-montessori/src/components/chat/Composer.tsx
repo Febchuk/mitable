@@ -4,14 +4,13 @@ import { useState } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { tokenizeText } from "@/lib/tokenize/tokenize";
-import {
-  describeDetokenized,
-  detokenizeToolCall,
-  type DetokenizedToolCall,
-} from "@/lib/tokenize/detokenize";
-import type { ParsedToolCall } from "@/lib/schemas/parsed-tool-call";
-import { getDb } from "@/lib/db/schema";
+import { parseAndStageProposals } from "@/lib/capture/parse-pipeline";
+import { captureSupported } from "@/lib/capture/engines";
+import { recordEvent } from "@/lib/telemetry/events";
+import type { CaptureMode } from "@/lib/capture/types";
+import type { DetokenizedToolCall } from "@/lib/tokenize/detokenize";
+import { CameraButton } from "@/components/chat/CameraButton";
+import { DictationButton } from "@/components/chat/DictationButton";
 
 export interface ComposerProps {
   threadId: string;
@@ -20,6 +19,7 @@ export interface ComposerProps {
 
 export interface ComposerEmit {
   message: string;
+  mode: CaptureMode;
   proposals: Array<{
     proposalId: string;
     call: DetokenizedToolCall;
@@ -34,64 +34,45 @@ export function Composer(props: ComposerProps & { onProposals: (e: ComposerEmit)
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!text.trim()) return;
+  async function runPipeline(rawText: string, mode: CaptureMode) {
     setBusy(true);
     setError(null);
     setDebug(null);
-    const raw = text.trim();
+    const t0 = performance.now();
+    if (mode === "text") recordEvent({ name: "capture_started", mode: "text" });
     try {
-      const tokenized = await tokenizeText(raw);
-      setDebug(`tokenized: ${tokenized.tokenizedText}`);
-      const todayIso = new Date().toISOString().slice(0, 10);
-      const res = await fetch("/api/v1/ai/parse-command", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          tokenizedText: tokenized.tokenizedText,
-          references: tokenized.references.map((r) => ({
-            token: r.token,
-            ref: r.id,
-            kind: r.kind,
-          })),
-          classroomId: props.classroomId,
-          todayIso,
-        }),
-        credentials: "include",
+      const result = await parseAndStageProposals({
+        threadId: props.threadId,
+        classroomId: props.classroomId,
+        rawText,
+        mode,
       });
-      if (!res.ok) {
-        throw new Error(`parse-command failed: ${res.status} ${await res.text()}`);
-      }
-      const json = (await res.json()) as { toolCalls: ParsedToolCall[] };
-      const db = getDb();
-      const now = new Date().toISOString();
-      const proposals = [];
-      for (const call of json.toolCalls ?? []) {
-        const detok = detokenizeToolCall(call, tokenized.references, props.classroomId);
-        if (!detok) continue;
-        const display = describeDetokenized(detok);
-        const proposalId = crypto.randomUUID();
-        await db.chatProposals.add({
-          id: proposalId,
-          threadId: props.threadId,
-          createdAt: now,
-          status: "proposed",
-          toolName: call.tool,
-          tokenizedPayload: call.args as Record<string, unknown>,
-          resolvedPayload: detok as unknown as Record<string, unknown>,
-          display,
-        });
-        proposals.push({ proposalId, call: detok, display, rawTranscript: raw });
-      }
-      props.onProposals({ message: raw, proposals });
+      setDebug(`tokenized: ${result.tokenizedText}`);
+      props.onProposals({ message: rawText, mode, proposals: result.proposals });
+      recordEvent({
+        name: "capture_completed",
+        mode,
+        proposalCount: result.proposals.length,
+        durationMs: performance.now() - t0,
+      });
       setText("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      recordEvent({ name: "command_parse_failed", category: classifyParseError(msg) });
     } finally {
       setBusy(false);
     }
   }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const raw = text.trim();
+    if (!raw) return;
+    await runPipeline(raw, "text");
+  }
+
+  const support = captureSupported();
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 border-t border-ink/10 p-3">
@@ -111,12 +92,36 @@ export function Composer(props: ComposerProps & { onProposals: (e: ComposerEmit)
         <p className="text-[11px] text-ink/40">
           {debug ?? "Tokenized client-side before any LLM call. ⌘/Ctrl+Enter to send."}
         </p>
-        <Button type="submit" size="sm" disabled={busy || !text.trim()}>
-          <Send className="h-4 w-4" />
-          {busy ? "Parsing…" : "Send"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {support.voice ? (
+            <DictationButton
+              disabled={busy}
+              onTranscript={(t) => void runPipeline(t, "voice")}
+              onError={(m) => setError(m)}
+            />
+          ) : null}
+          {support.photo ? (
+            <CameraButton
+              disabled={busy}
+              onText={(t) => void runPipeline(t, "photo")}
+              onError={(m) => setError(m)}
+            />
+          ) : null}
+          <Button type="submit" size="sm" disabled={busy || !text.trim()}>
+            <Send className="h-4 w-4" />
+            {busy ? "Parsing…" : "Send"}
+          </Button>
+        </div>
       </div>
       {error ? <p className="text-xs text-red-700">{error}</p> : null}
     </form>
   );
+}
+
+function classifyParseError(message: string): string {
+  if (/network|fetch|offline/i.test(message)) return "network";
+  if (/parse-command failed: 4/i.test(message)) return "client-error";
+  if (/parse-command failed: 5/i.test(message)) return "server-error";
+  if (/timeout/i.test(message)) return "timeout";
+  return "unknown";
 }

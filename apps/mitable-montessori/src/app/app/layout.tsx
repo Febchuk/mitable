@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppBootstrap } from "@/components/app/AppBootstrap";
 import { BottomNav } from "@/components/app/BottomNav";
 import { FloatingChat } from "@/components/chat/FloatingChat";
+import { ConnectionStatus } from "@/components/sync/ConnectionStatus";
 import { PendingBadge } from "@/components/sync/PendingBadge";
 import {
   getActiveClassroomForCurrentUser,
@@ -25,7 +26,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               {classroom?.code ? <span className="ml-2 text-ink/40">{classroom.code}</span> : null}
             </p>
           </div>
-          <PendingBadge />
+          <div className="flex items-center gap-2">
+            <ConnectionStatus />
+            <PendingBadge />
+          </div>
         </header>
         <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
       </div>
