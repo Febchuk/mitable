@@ -30,24 +30,27 @@ import RecapDetail from "./components/views/employee/RecapsView/RecapDetail";
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
 import DocDetail from "./components/views/employee/DocsView/DocDetail";
-import UserProfilePage from "./pages/UserProfilePage";
-import DashboardView from "./components/views/admin/DashboardView";
-import CustomerDetailView from "./components/views/admin/DashboardView/CustomerDetailView";
-import PeopleView from "./components/views/admin/PeopleView";
-import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
-import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
-import IntegrationsView from "./components/views/admin/IntegrationsView";
+import UserProfilePage from "./pages/settings";
+// DEPRECATED: Admin views hidden — moving to web app. Imports kept for migration reference.
+// import DashboardView from "./components/views/admin/DashboardView";
+// import CustomerDetailView from "./components/views/admin/DashboardView/CustomerDetailView";
+// import PeopleView from "./components/views/admin/PeopleView";
+// import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
+// import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
+// import IntegrationsView from "./components/views/admin/IntegrationsView";
 import AgentView from "./components/views/employee/AgentView";
 import MeView from "./components/views/employee/MeView";
 import BragbookView from "./components/views/employee/BragbookView";
 import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
 import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
-import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
-import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEditor";
+// DEPRECATED: Admin benchmark views hidden — moving to web app.
+// import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
+// import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEditor";
 import React, { useEffect, useRef } from "react";
 import { useTheme } from "./hooks/useTheme";
-import TeamsView from "./components/views/admin/TeamsView";
-import OrgSetupView from "./components/views/admin/OrgSetupView";
+// DEPRECATED: Admin views hidden — moving to web app.
+// import TeamsView from "./components/views/admin/TeamsView";
+// import OrgSetupView from "./components/views/admin/OrgSetupView";
 import OnDeviceAIView from "./components/views/employee/OnDeviceAIView";
 
 // Applies stored theme class to <html> on mount and syncs across windows
@@ -187,10 +190,8 @@ function MonitoringSessionHandler() {
   return null;
 }
 
-// Default route -- redirects based on user role
+// Default route — always calendar in local-first product
 function DefaultRoute() {
-  const { user } = useUser();
-  if (user?.role === "admin" || user?.isManager) return <Navigate to="/dashboard" replace />;
   return <Navigate to="/calendar" replace />;
 }
 
@@ -226,22 +227,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
-}
-
-function RoleGate({
-  requireAdmin,
-  requireManager,
-  children,
-}: {
-  requireAdmin?: boolean;
-  requireManager?: boolean;
-  children: React.ReactNode;
-}) {
-  const { user } = useUser();
-  const isAdmin = user?.role === "admin" || user?.originalRole === "admin";
-  if (requireAdmin && !isAdmin) return <Navigate to="/calendar" replace />;
-  if (requireManager && !isAdmin && !user?.isManager) return <Navigate to="/calendar" replace />;
   return <>{children}</>;
 }
 
@@ -295,61 +280,35 @@ function App() {
                           }
                         >
                           <Route index element={<DefaultRoute />} />
-                          {/* Admin Routes */}
-                          <Route path="dashboard" element={<DashboardView />} />
-                          <Route path="customer/:name" element={<CustomerDetailView />} />
-                          <Route path="people" element={<PeopleView />} />
-                          <Route path="people/new" element={<AddNewUser />} />
-                          <Route path="people/:id" element={<PersonDetail />} />
-                          <Route path="reports/:docId" element={<DocDetail />} />
-                          <Route path="benchmarks" element={<BenchmarksRouter />} />
+
+                          {/* ──────────────────────────────────────────────────
+                           * DEPRECATED: Admin/Team routes hidden — admin experience
+                           * moves to the web app. Routes redirect to /calendar.
+                           * Code kept for future web migration.
+                           * ────────────────────────────────────────────────── */}
+                          <Route path="dashboard" element={<Navigate to="/calendar" replace />} />
                           <Route
-                            path="benchmarks/new"
-                            element={
-                              <RoleGate requireManager>
-                                <BenchmarkEditor />
-                              </RoleGate>
-                            }
+                            path="customer/:name"
+                            element={<Navigate to="/calendar" replace />}
                           />
+                          <Route path="people" element={<Navigate to="/calendar" replace />} />
+                          <Route path="people/new" element={<Navigate to="/calendar" replace />} />
+                          <Route path="people/:id" element={<Navigate to="/calendar" replace />} />
                           <Route
-                            path="benchmarks/:id/edit"
-                            element={
-                              <RoleGate requireManager>
-                                <BenchmarkEditor />
-                              </RoleGate>
-                            }
+                            path="integrations"
+                            element={<Navigate to="/calendar" replace />}
                           />
-                          <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
-                          <Route
-                            path="benchmarks/:id/person/:userId"
-                            element={
-                              <RoleGate requireManager>
-                                <PersonBenchmarkView />
-                              </RoleGate>
-                            }
-                          />
-                          <Route path="integrations" element={<IntegrationsView />} />
-                          <Route
-                            path="org-setup"
-                            element={
-                              <RoleGate requireAdmin>
-                                <OrgSetupView />
-                              </RoleGate>
-                            }
-                          />
-                          <Route path="setup" element={<Navigate to="/org-setup" replace />} />
-                          <Route path="org-chart" element={<Navigate to="/org-setup" replace />} />
-                          <Route
-                            path="teams"
-                            element={
-                              <RoleGate requireAdmin>
-                                <TeamsView />
-                              </RoleGate>
-                            }
-                          />
+                          <Route path="org-setup" element={<Navigate to="/calendar" replace />} />
+                          <Route path="setup" element={<Navigate to="/calendar" replace />} />
+                          <Route path="org-chart" element={<Navigate to="/calendar" replace />} />
+                          <Route path="teams" element={<Navigate to="/calendar" replace />} />
+
                           {/* Employee Routes */}
                           <Route path="me" element={<MeView />} />
                           <Route path="bragbook" element={<BragbookView />} />
+                          <Route path="benchmarks" element={<BenchmarksRouter />} />
+                          <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
+                          <Route path="reports/:docId" element={<DocDetail />} />
                           <Route path="docs" element={<DocsView />} />
                           <Route path="docs/:docId" element={<DocDetail />} />
                           {/* Calendar/Journal Routes */}

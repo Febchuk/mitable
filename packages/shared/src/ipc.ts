@@ -56,6 +56,7 @@ export const IPC_CHANNELS = {
   MONITORING_SESSION_STATUS: "monitoring-session-status", // Get current session status
   MONITORING_SESSION_UPDATE: "monitoring-session-update", // Broadcast session state changes
   MONITORING_SESSION_RESET: "monitoring-session-reset", // Reset/clear session state (after external delete)
+  MONITORING_SESSION_DELETE: "monitoring-session-delete", // Delete a session and all its data locally
   MONITORING_RESYNC_LOCAL: "monitoring-resync-local", // Re-upload local stories to cloud backend
   MONITORING_CAPTURE_TAKEN: "monitoring-capture-taken", // Notify when capture is taken
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
@@ -175,6 +176,10 @@ export const IPC_CHANNELS = {
   ON_DEVICE_STOP_SERVER: "on-device:stop-server",
   ON_DEVICE_SERVER_STATUS: "on-device:server-status",
   ON_DEVICE_DOWNLOAD_PROGRESS: "on-device:download-progress",
+  ON_DEVICE_GET_SYSTEM_INFO: "on-device:get-system-info",
+  ON_DEVICE_SET_GPU_PREFERENCE: "on-device:set-gpu-preference",
+  ON_DEVICE_GET_GPU_PREFERENCE: "on-device:get-gpu-preference",
+  ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

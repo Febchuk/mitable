@@ -29,10 +29,9 @@ import initSqlJs, { type Database as SqlJsDatabase } from "sql.js";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const USER_DATA =
-  process.env.APPDATA
-    ? join(process.env.APPDATA, "@mitable", "electron")
-    : join(process.env.HOME ?? "~", ".config", "@mitable", "electron");
+const USER_DATA = process.env.APPDATA
+  ? join(process.env.APPDATA, "@mitable", "electron")
+  : join(process.env.HOME ?? "~", ".config", "@mitable", "electron");
 
 const ON_DEVICE_DIR = join(USER_DATA, "on-device");
 const DB_PATH = join(ON_DEVICE_DIR, "mitable-local.db");
@@ -153,7 +152,10 @@ function run(db: SqlJsDatabase, sql: string, params: unknown[] = []): void {
 
 // ── Manifest ────────────────────────────────────────────────────────────────
 
-interface ManifestAsset { id: string; filePath: string }
+interface ManifestAsset {
+  id: string;
+  filePath: string;
+}
 
 function readManifest(): { assets: ManifestAsset[] } {
   if (!existsSync(MANIFEST_PATH)) {
@@ -188,27 +190,42 @@ function findFreePort(): Promise<number> {
   });
 }
 
-async function startTextServer(serverBin: string, modelPath: string): Promise<{
+async function startTextServer(
+  serverBin: string,
+  modelPath: string
+): Promise<{
   proc: ChildProcess;
   completionUrl: string;
 }> {
   const port = await findFreePort();
   console.log(`Starting Phi-3.5 text server on port ${port}...`);
 
-  const proc = spawn(serverBin, [
-    "--model", modelPath,
-    "--port", String(port),
-    "--host", "127.0.0.1",
-    "--ctx-size", "8192",
-    "--n-gpu-layers", "-1",
-    "--parallel", "1",
-    "--flash-attn", "off",
-    "--fit", "off",
-  ], {
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-    cwd: dirname(serverBin),
-  });
+  const proc = spawn(
+    serverBin,
+    [
+      "--model",
+      modelPath,
+      "--port",
+      String(port),
+      "--host",
+      "127.0.0.1",
+      "--ctx-size",
+      "8192",
+      "--n-gpu-layers",
+      "-1",
+      "--parallel",
+      "1",
+      "--flash-attn",
+      "off",
+      "--fit",
+      "off",
+    ],
+    {
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+      cwd: dirname(serverBin),
+    }
+  );
 
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -227,8 +244,14 @@ async function startTextServer(serverBin: string, modelPath: string): Promise<{
 
     proc.stdout?.on("data", onData);
     proc.stderr?.on("data", onData);
-    proc.on("error", (err) => { clearTimeout(timeout); reject(err); });
-    proc.on("exit", (code) => { clearTimeout(timeout); reject(new Error(`Server exited during startup with code ${code}`)); });
+    proc.on("error", (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+    proc.on("exit", (code) => {
+      clearTimeout(timeout);
+      reject(new Error(`Server exited during startup with code ${code}`));
+    });
   });
 
   console.log(`Text server ready on port ${port}`);
@@ -285,7 +308,12 @@ digits      ::= [0-9]+
 ws          ::= [ \\t\\n\\r]*
 `.trim();
 
-interface RLMToolParam { name: string; type: string; required: boolean; description: string }
+interface RLMToolParam {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+}
 interface RLMTool<TEnv> {
   name: string;
   description: string;
@@ -294,22 +322,43 @@ interface RLMTool<TEnv> {
 }
 
 function buildToolCatalog<T>(tools: RLMTool<T>[]): string {
-  return tools.map((t) => {
-    const params = t.parameters
-      .map((p) => `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"} — ${p.description}`)
-      .join("\n    ");
-    return `- ${t.name}(${params || "no parameters"}): ${t.description}`;
-  }).join("\n");
+  return tools
+    .map((t) => {
+      const params = t.parameters
+        .map(
+          (p) =>
+            `${p.name}: ${p.type}${p.required ? " (required)" : " (optional)"} — ${p.description}`
+        )
+        .join("\n    ");
+      return `- ${t.name}(${params || "no parameters"}): ${t.description}`;
+    })
+    .join("\n");
 }
 
 function parseJsonResponse(raw: string): Record<string, unknown> {
   const trimmed = raw.trim();
-  try { return JSON.parse(trimmed); } catch { /* fall through */ }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    /* fall through */
+  }
   const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) { try { return JSON.parse(fenceMatch[1].trim()); } catch { /* */ } }
+  if (fenceMatch) {
+    try {
+      return JSON.parse(fenceMatch[1].trim());
+    } catch {
+      /* */
+    }
+  }
   const bs = trimmed.indexOf("{");
   const be = trimmed.lastIndexOf("}");
-  if (bs !== -1 && be > bs) { try { return JSON.parse(trimmed.slice(bs, be + 1)); } catch { /* */ } }
+  if (bs !== -1 && be > bs) {
+    try {
+      return JSON.parse(trimmed.slice(bs, be + 1));
+    } catch {
+      /* */
+    }
+  }
   throw new Error(`Could not parse LLM JSON: ${trimmed.slice(0, 200)}`);
 }
 
@@ -373,7 +422,10 @@ async function runRLMLoop<TEnv>(opts: {
         continue;
       }
       try {
-        const toolResult = await tool.execute(llmResp.parameters as Record<string, unknown>, opts.env);
+        const toolResult = await tool.execute(
+          llmResp.parameters as Record<string, unknown>,
+          opts.env
+        );
         toolHistory.push({ tool: tool.name, result: toolResult });
         messages.push({
           role: "user",
@@ -415,7 +467,14 @@ interface CaptureRow {
 }
 
 interface ClassifierEnv {
-  frames: Array<{ index: number; time: string; appName: string; windowTitle: string; sensorOutput: string; userAction: string | null }>;
+  frames: Array<{
+    index: number;
+    time: string;
+    appName: string;
+    windowTitle: string;
+    sensorOutput: string;
+    userAction: string | null;
+  }>;
   batchIndex: number;
   timeRange: { start: string; end: string };
   classification: Record<string, unknown> | null;
@@ -446,7 +505,12 @@ function getClassifierTools(): RLMTool<ClassifierEnv>[] {
       parameters: [],
       execute: (_p, env) => {
         const apps = new Set(env.frames.map((f) => f.appName).filter(Boolean));
-        return { frameCount: env.frames.length, timeRange: env.timeRange, uniqueApps: [...apps], batchIndex: env.batchIndex };
+        return {
+          frameCount: env.frames.length,
+          timeRange: env.timeRange,
+          uniqueApps: [...apps],
+          batchIndex: env.batchIndex,
+        };
       },
     },
     {
@@ -459,17 +523,43 @@ function getClassifierTools(): RLMTool<ClassifierEnv>[] {
       execute: (p, env) => {
         const s = Math.max(0, Number(p.start) || 0);
         const e = Math.min(env.frames.length, Number(p.end) || env.frames.length);
-        return env.frames.slice(s, e).map((f) => ({ index: f.index, time: f.time, app: f.appName, action: f.userAction, description: f.sensorOutput }));
+        return env.frames.slice(s, e).map((f) => ({
+          index: f.index,
+          time: f.time,
+          app: f.appName,
+          action: f.userAction,
+          description: f.sensorOutput,
+        }));
       },
     },
     {
       name: "classify",
       description: "Commit the final classification for this batch.",
       parameters: [
-        { name: "description", type: "string", required: true, description: "2-3 sentence summary" },
-        { name: "activityType", type: "string", required: true, description: "coding|browsing|writing|communicating|designing|meeting|reading|other" },
-        { name: "onTask", type: "boolean", required: true, description: "Whether user was on-task" },
-        { name: "taskRelevance", type: "string", required: false, description: "Productivity relevance" },
+        {
+          name: "description",
+          type: "string",
+          required: true,
+          description: "2-3 sentence summary",
+        },
+        {
+          name: "activityType",
+          type: "string",
+          required: true,
+          description: "coding|browsing|writing|communicating|designing|meeting|reading|other",
+        },
+        {
+          name: "onTask",
+          type: "boolean",
+          required: true,
+          description: "Whether user was on-task",
+        },
+        {
+          name: "taskRelevance",
+          type: "string",
+          required: false,
+          description: "Productivity relevance",
+        },
         { name: "importanceScore", type: "number", required: true, description: "0.0 to 1.0" },
       ],
       execute: (p, env) => {
@@ -525,7 +615,14 @@ async function classifyBatchRLM(
   completionFn: CompletionFn,
   batch: CaptureRow[],
   batchIdx: number
-): Promise<{ description: string; activityType: string | null; onTask: boolean; taskRelevance: string | null; importanceScore: number; rawOutput: string }> {
+): Promise<{
+  description: string;
+  activityType: string | null;
+  onTask: boolean;
+  taskRelevance: string | null;
+  importanceScore: number;
+  rawOutput: string;
+}> {
   const env = makeClassifierEnv(batch, batchIdx);
   const tools = getClassifierTools();
 
@@ -552,16 +649,40 @@ async function classifyBatchRLM(
     };
   }
 
-  const fallback = batch.map((c) => c.sensor_output).join(". ").slice(0, 500);
-  return { description: fallback || "Activity recorded", activityType: null, onTask: true, taskRelevance: null, importanceScore: 0.5, rawOutput: JSON.stringify(result) };
+  const fallback = batch
+    .map((c) => c.sensor_output)
+    .join(". ")
+    .slice(0, 500);
+  return {
+    description: fallback || "Activity recorded",
+    activityType: null,
+    onTask: true,
+    taskRelevance: null,
+    importanceScore: 0.5,
+    rawOutput: JSON.stringify(result),
+  };
 }
 
 // ── Storyteller RLM (standalone) ────────────────────────────────────────────
 
-interface ClassificationRow { batch_index: number; activity_description: string; activity_type: string | null; on_task: number; importance_score: number; created_at: number }
-interface TranscriptionRow { transcript: string; start_time_ms: number; end_time_ms: number }
+interface ClassificationRow {
+  batch_index: number;
+  activity_description: string;
+  activity_type: string | null;
+  on_task: number;
+  importance_score: number;
+  created_at: number;
+}
+interface TranscriptionRow {
+  transcript: string;
+  start_time_ms: number;
+  end_time_ms: number;
+}
 
-interface StoryTask { description: string; minutes: number }
+interface StoryTask {
+  description: string;
+  minutes: number;
+}
 
 interface StorytellerEnv {
   classifications: ClassificationRow[];
@@ -572,14 +693,25 @@ interface StorytellerEnv {
   completionFn: CompletionFn;
 }
 
-function makeStorytellerEnv(cls: ClassificationRow[], trans: TranscriptionRow[], completionFn: CompletionFn): StorytellerEnv {
+function makeStorytellerEnv(
+  cls: ClassificationRow[],
+  trans: TranscriptionRow[],
+  completionFn: CompletionFn
+): StorytellerEnv {
   let totalMinutes = 1;
   if (cls.length >= 2) {
     const first = cls[0].created_at;
     const last = cls[cls.length - 1].created_at;
     totalMinutes = Math.max(1, Math.round((last - first) / 60_000));
   }
-  return { classifications: cls, transcriptions: trans, chunkCache: new Map(), finalStory: null, totalMinutes, completionFn };
+  return {
+    classifications: cls,
+    transcriptions: trans,
+    chunkCache: new Map(),
+    finalStory: null,
+    totalMinutes,
+    completionFn,
+  };
 }
 
 function getStorytellerTools(): RLMTool<StorytellerEnv>[] {
@@ -595,7 +727,13 @@ function getStorytellerTools(): RLMTool<StorytellerEnv>[] {
           const last = env.classifications[env.classifications.length - 1].created_at;
           dur = `~${Math.round((last - first) / 60_000)} minutes`;
         }
-        return { classificationCount: env.classifications.length, transcriptionCount: env.transcriptions.length, totalMinutes: env.totalMinutes, duration: dur, hasTranscriptions: env.transcriptions.length > 0 };
+        return {
+          classificationCount: env.classifications.length,
+          transcriptionCount: env.transcriptions.length,
+          totalMinutes: env.totalMinutes,
+          duration: dur,
+          hasTranscriptions: env.transcriptions.length > 0,
+        };
       },
     },
     {
@@ -609,7 +747,11 @@ function getStorytellerTools(): RLMTool<StorytellerEnv>[] {
         const s = Math.max(0, Number(p.start) || 0);
         const e = Math.min(env.classifications.length, Number(p.end) || env.classifications.length);
         return env.classifications.slice(s, e).map((c) => ({
-          batchIndex: c.batch_index, activityType: c.activity_type, description: c.activity_description, onTask: !!c.on_task, importance: c.importance_score,
+          batchIndex: c.batch_index,
+          activityType: c.activity_type,
+          description: c.activity_description,
+          onTask: !!c.on_task,
+          importance: c.importance_score,
         }));
       },
     },
@@ -623,16 +765,36 @@ function getStorytellerTools(): RLMTool<StorytellerEnv>[] {
       execute: (p, env) => {
         const startMs = Number(p.startMs) || 0;
         const endMs = Number(p.endMs) || Infinity;
-        return env.transcriptions.filter((t) => Number.isFinite(t.start_time_ms) && t.start_time_ms >= startMs && t.end_time_ms <= endMs)
-          .map((t) => ({ transcript: t.transcript, startMs: t.start_time_ms, endMs: t.end_time_ms }));
+        return env.transcriptions
+          .filter(
+            (t) =>
+              Number.isFinite(t.start_time_ms) &&
+              t.start_time_ms >= startMs &&
+              t.end_time_ms <= endMs
+          )
+          .map((t) => ({
+            transcript: t.transcript,
+            startMs: t.start_time_ms,
+            endMs: t.end_time_ms,
+          }));
       },
     },
     {
       name: "summarize_chunk",
       description: "Sub-LLM call: summarize a slice of classifications. Cached.",
       parameters: [
-        { name: "start", type: "number", required: true, description: "Start classification index" },
-        { name: "end", type: "number", required: true, description: "End classification index (exclusive)" },
+        {
+          name: "start",
+          type: "number",
+          required: true,
+          description: "Start classification index",
+        },
+        {
+          name: "end",
+          type: "number",
+          required: true,
+          description: "End classification index (exclusive)",
+        },
       ],
       execute: async (p, env) => {
         const s = Math.max(0, Number(p.start) || 0);
@@ -644,11 +806,17 @@ function getStorytellerTools(): RLMTool<StorytellerEnv>[] {
         const chunk = env.classifications.slice(s, e);
         if (chunk.length === 0) return { summary: "No activity in this range.", fromCache: false };
 
-        const text = chunk.map((c) => `[Batch ${c.batch_index}, ${c.activity_type}] ${c.activity_description}`).join("\n");
+        const text = chunk
+          .map((c) => `[Batch ${c.batch_index}, ${c.activity_type}] ${c.activity_description}`)
+          .join("\n");
         try {
           const summary = await env.completionFn(
             [
-              { role: "system", content: "Summarize the following activity block in 2-3 sentences. Write in third person past tense." },
+              {
+                role: "system",
+                content:
+                  "Summarize the following activity block in 2-3 sentences. Write in third person past tense.",
+              },
               { role: "user", content: `Activity:\n${text}` },
             ],
             { temperature: 0.2, max_tokens: 256 }
@@ -664,10 +832,21 @@ function getStorytellerTools(): RLMTool<StorytellerEnv>[] {
     },
     {
       name: "build_story",
-      description: "Final merge: produce narrative + tasks with time. Each task needs description and minutes. Minutes must sum to totalMinutes. Call this last.",
+      description:
+        "Final merge: produce narrative + tasks with time. Each task needs description and minutes. Minutes must sum to totalMinutes. Call this last.",
       parameters: [
-        { name: "narrative", type: "string", required: true, description: "Full session narrative" },
-        { name: "tasks", type: "array", required: true, description: 'Array of {description, minutes} objects. Minutes must sum to totalMinutes.' },
+        {
+          name: "narrative",
+          type: "string",
+          required: true,
+          description: "Full session narrative",
+        },
+        {
+          name: "tasks",
+          type: "array",
+          required: true,
+          description: "Array of {description, minutes} objects. Minutes must sum to totalMinutes.",
+        },
       ],
       execute: (p, env) => {
         const narrative = String(p.narrative || "Session completed.");
@@ -691,7 +870,11 @@ function getStorytellerTools(): RLMTool<StorytellerEnv>[] {
           }
         }
         env.finalStory = { narrative, tasks };
-        return { stored: true, narrative: narrative.slice(0, 100) + "...", taskCount: tasks.length };
+        return {
+          stored: true,
+          narrative: narrative.slice(0, 100) + "...",
+          taskCount: tasks.length,
+        };
       },
     },
   ];
@@ -776,9 +959,13 @@ async function generateStoryRLM(
     maxTokens: 2048,
   });
 
-  const story = env.finalStory ?? (result.result as { narrative: string; tasks: StoryTask[] } | null);
+  const story =
+    env.finalStory ?? (result.result as { narrative: string; tasks: StoryTask[] } | null);
   const tasks: StoryTask[] = Array.isArray(story?.tasks)
-    ? story!.tasks.map((t: any) => ({ description: String(t.description || t), minutes: Number(t.minutes) || 1 }))
+    ? story!.tasks.map((t: any) => ({
+        description: String(t.description || t),
+        minutes: Number(t.minutes) || 1,
+      }))
     : [];
   return {
     narrative: story?.narrative || "Session completed.",
@@ -825,10 +1012,26 @@ function discoverSessions(db: SqlJsDatabase, filterSessionId?: string): SessionI
   );
 
   return sessions.map((s) => {
-    const classCount = queryOne<{ cnt: number }>(db, `SELECT COUNT(*) as cnt FROM classifications WHERE session_id = ?`, [s.session_id])?.cnt ?? 0;
-    const storyRow = queryOne<{ tasks: string }>(db, `SELECT tasks FROM stories WHERE session_id = ?`, [s.session_id]);
+    const classCount =
+      queryOne<{ cnt: number }>(
+        db,
+        `SELECT COUNT(*) as cnt FROM classifications WHERE session_id = ?`,
+        [s.session_id]
+      )?.cnt ?? 0;
+    const storyRow = queryOne<{ tasks: string }>(
+      db,
+      `SELECT tasks FROM stories WHERE session_id = ?`,
+      [s.session_id]
+    );
     let taskCount = 0;
-    if (storyRow?.tasks) { try { const arr = JSON.parse(storyRow.tasks); taskCount = Array.isArray(arr) ? arr.length : 0; } catch { /* */ } }
+    if (storyRow?.tasks) {
+      try {
+        const arr = JSON.parse(storyRow.tasks);
+        taskCount = Array.isArray(arr) ? arr.length : 0;
+      } catch {
+        /* */
+      }
+    }
     const badClassifications = classCount > 0 && classificationsAreBroken(db, s.session_id);
     // Detect tasks stored as plain strings (old format) — they lack per-task minutes
     let tasksLackMinutes = false;
@@ -838,11 +1041,17 @@ function discoverSessions(db: SqlJsDatabase, filterSessionId?: string): SessionI
         if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === "string") {
           tasksLackMinutes = true;
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     return {
-      session_id: s.session_id, capture_count: s.capture_count, classification_count: classCount,
-      has_story: !!storyRow, task_count: taskCount, bad_classifications: badClassifications,
+      session_id: s.session_id,
+      capture_count: s.capture_count,
+      classification_count: classCount,
+      has_story: !!storyRow,
+      task_count: taskCount,
+      bad_classifications: badClassifications,
       needs_reclassify: classCount === 0 || badClassifications,
       needs_story: !storyRow || taskCount === 0 || tasksLackMinutes,
     };
@@ -878,11 +1087,14 @@ async function main() {
     const status: string[] = [];
     if (s.bad_classifications) status.push("BAD CLASSIFICATIONS");
     if (s.needs_reclassify && !s.bad_classifications) status.push("needs classification");
-    if (s.needs_story && s.has_story && s.task_count > 0) status.push("tasks lack time attribution");
+    if (s.needs_story && s.has_story && s.task_count > 0)
+      status.push("tasks lack time attribution");
     if (s.needs_story && s.has_story && s.task_count === 0) status.push("has story but 0 tasks");
     if (s.needs_story && !s.has_story) status.push("no story");
     if (!s.needs_reclassify && !s.needs_story) status.push("OK");
-    console.log(`  ${s.session_id.slice(0, 8)}: ${s.capture_count} captures, ${s.classification_count} class, ${s.task_count} tasks — ${status.join(", ")}`);
+    console.log(
+      `  ${s.session_id.slice(0, 8)}: ${s.capture_count} captures, ${s.classification_count} class, ${s.task_count} tasks — ${status.join(", ")}`
+    );
   }
 
   if (sessionsToProcess.length === 0) {
@@ -892,13 +1104,18 @@ async function main() {
   }
 
   console.log(`\n${sessionsToProcess.length} session(s) need reprocessing.`);
-  if (dryRun) { console.log("\nDry run complete. Exiting."); db.close(); return; }
+  if (dryRun) {
+    console.log("\nDry run complete. Exiting.");
+    db.close();
+    return;
+  }
 
   const serverBin = getAssetPath(manifest, "llama-server");
   const textModel = getAssetPath(manifest, "text-model");
   const { proc, completionUrl } = await startTextServer(serverBin, textModel);
 
-  const completionFn: CompletionFn = (msgs, opts) => chatCompletion(completionUrl, msgs as any, opts);
+  const completionFn: CompletionFn = (msgs, opts) =>
+    chatCompletion(completionUrl, msgs as any, opts);
 
   try {
     for (const session of sessionsToProcess) {
@@ -912,20 +1129,39 @@ async function main() {
           run(db, `DELETE FROM classifications WHERE session_id = ?`, [sid]);
         }
 
-        const captures = queryAll<CaptureRow>(db, `SELECT * FROM captures WHERE session_id = ? ORDER BY sequence_number ASC`, [sid]);
+        const captures = queryAll<CaptureRow>(
+          db,
+          `SELECT * FROM captures WHERE session_id = ? ORDER BY sequence_number ASC`,
+          [sid]
+        );
         console.log(`  Classifying ${captures.length} captures via RLM...`);
 
         for (let i = 0; i < captures.length; i += BATCH_SIZE) {
           const batch = captures.slice(i, i + BATCH_SIZE);
           const batchIdx = Math.floor(i / BATCH_SIZE);
-          console.log(`  Batch ${batchIdx}: frames ${batch[0].sequence_number}-${batch[batch.length - 1].sequence_number}`);
+          console.log(
+            `  Batch ${batchIdx}: frames ${batch[0].sequence_number}-${batch[batch.length - 1].sequence_number}`
+          );
 
           const result = await classifyBatchRLM(completionFn, batch, batchIdx);
           console.log(`    -> ${result.description.slice(0, 80)}...`);
 
-          run(db,
+          run(
+            db,
             `INSERT OR REPLACE INTO classifications (id, session_id, batch_index, start_sequence, end_sequence, activity_description, activity_type, on_task, task_relevance, importance_score, raw_output) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [randomUUID(), sid, batchIdx, batch[0].sequence_number, batch[batch.length - 1].sequence_number, result.description, result.activityType, result.onTask ? 1 : 0, result.taskRelevance, result.importanceScore, result.rawOutput]
+            [
+              randomUUID(),
+              sid,
+              batchIdx,
+              batch[0].sequence_number,
+              batch[batch.length - 1].sequence_number,
+              result.description,
+              result.activityType,
+              result.onTask ? 1 : 0,
+              result.taskRelevance,
+              result.importanceScore,
+              result.rawOutput,
+            ]
           );
         }
         saveDb(db);
@@ -934,25 +1170,36 @@ async function main() {
       }
 
       // Step 2: Generate story via RLM
-      const classifications = queryAll<ClassificationRow>(db,
+      const classifications = queryAll<ClassificationRow>(
+        db,
         `SELECT batch_index, activity_description, activity_type, on_task, importance_score, created_at FROM classifications WHERE session_id = ? ORDER BY batch_index ASC`,
         [sid]
       );
-      const transcriptions = queryAll<TranscriptionRow>(db,
+      const transcriptions = queryAll<TranscriptionRow>(
+        db,
         `SELECT transcript, start_time_ms, end_time_ms FROM transcriptions WHERE session_id = ? ORDER BY start_time_ms ASC`,
         [sid]
       );
 
-      console.log(`  Generating story via RLM from ${classifications.length} classifications, ${transcriptions.length} transcriptions...`);
+      console.log(
+        `  Generating story via RLM from ${classifications.length} classifications, ${transcriptions.length} transcriptions...`
+      );
       const story = await generateStoryRLM(completionFn, classifications, transcriptions);
       console.log(`  -> Narrative: ${story.narrative.slice(0, 120)}...`);
       console.log(`  -> Tasks (${story.tasks.length}):`);
       story.tasks.forEach((t, i) => console.log(`     ${i + 1}. ${t.description} (${t.minutes}m)`));
 
       run(db, `DELETE FROM stories WHERE session_id = ?`, [sid]);
-      run(db,
+      run(
+        db,
         `INSERT INTO stories (id, session_id, narrative, tasks, time_breakdown, model_used) VALUES (?, ?, ?, ?, NULL, ?)`,
-        [randomUUID(), sid, story.narrative, JSON.stringify(story.tasks), "local-rlm-phi3.5-reprocessed"]
+        [
+          randomUUID(),
+          sid,
+          story.narrative,
+          JSON.stringify(story.tasks),
+          "local-rlm-phi3.5-reprocessed",
+        ]
       );
       saveDb(db);
       console.log(`  Story saved.`);

@@ -170,6 +170,14 @@ class MonitoringSessionService {
 
       logger.info(` Session folder created: ${localPath}`);
 
+      // Create the session timeline ledger (master clock for temporal alignment)
+      try {
+        const { sessionTimeline } = await import("./on-device/sessionTimeline");
+        sessionTimeline.create(sessionId, localPath, config.captureIntervalMs);
+      } catch (err) {
+        logger.warn("Failed to create session timeline:", String(err));
+      }
+
       // Determine local mode once at session start — persists for the entire session
       const localMode = await this.shouldUseLocalInference();
 
@@ -417,6 +425,14 @@ class MonitoringSessionService {
       }
     }
 
+    // End the session timeline (finalizes all clocks)
+    try {
+      const { sessionTimeline } = await import("./on-device/sessionTimeline");
+      sessionTimeline.endSession();
+    } catch {
+      /* timeline not critical */
+    }
+
     // Grab manifest info before clearing activeSession
     const manifest = await localFrameStorage.loadManifest(sessionId);
     const captureCount = manifest?.totalFrameCount ?? 0;
@@ -467,9 +483,17 @@ class MonitoringSessionService {
             const sessionDir = localFrameStorage.getSessionPath(sessionId);
             logger.info("Running deferred AI pipeline on all session data...");
 
+            const broadcastProgress = (progress: Record<string, unknown>) => {
+              BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                  win.webContents.send(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, progress);
+                }
+              });
+            };
+
             const timeoutMs = 1_200_000;
             await Promise.race([
-              localInferenceService.processAllAtEnd(sessionId, sessionDir),
+              localInferenceService.processAllAtEnd(sessionId, sessionDir, broadcastProgress),
               new Promise<never>((_, reject) =>
                 setTimeout(
                   () => reject(new Error(`processAllAtEnd timed out after ${timeoutMs / 1000}s`)),
@@ -524,7 +548,6 @@ class MonitoringSessionService {
           const { localDb: db } = await import("./on-device");
           const story = db.getStoryForSession(sessionId);
           db.updateMonitoringSessionStatus(sessionId, storyGenerationFailed ? "ended" : "ready", {
-            endedAt: Date.now(),
             finalSummary: story?.narrative ?? null,
           });
         } catch {
@@ -549,7 +572,13 @@ class MonitoringSessionService {
 
       if (tooShort) {
         this.cleanupSessionFiles(sessionId);
-        logger.info("Immediately cleaned up files for short session");
+        try {
+          const { localDb } = await import("./on-device");
+          localDb.deleteMonitoringSession(sessionId);
+        } catch {
+          /* best effort */
+        }
+        logger.info("Immediately cleaned up files and DB record for short session");
       } else {
         setTimeout(
           () => {
@@ -877,6 +906,9 @@ class MonitoringSessionService {
         this.activeSession.config.userId
       );
 
+      // Session may have ended while we were awaiting the capture
+      if (!this.activeSession || this.activeSession.status !== "active") return;
+
       if (!result.success) {
         logger.warn(" Capture failed:", result.error);
         this.activeSession.consecutiveEmptyCaptures++;
@@ -889,6 +921,7 @@ class MonitoringSessionService {
         // or other edge case), try screen capture as last resort.
         if (trackedWindowIds.length > 0) {
           const screenshot = await captureService.captureScreen();
+          if (!this.activeSession || this.activeSession.status !== "active") return;
           if (screenshot) {
             // Enrich generic "Screen" appName with actual frontmost tracked app
             const tracked = focusWindowTracker.getTrackedWindows();
@@ -1022,8 +1055,14 @@ class MonitoringSessionService {
         trigger,
       });
 
-      // Update capture count
+      // Update capture count and timeline
       this.activeSession.captureCount++;
+      try {
+        const { sessionTimeline } = await import("./on-device/sessionTimeline");
+        sessionTimeline.recordFrame(frameMetadata.sequenceNumber);
+      } catch {
+        /* timeline not critical for capture */
+      }
 
       // Update checkpoint
       await checkpointService.onFrameCaptured(frameMetadata.frameId, frameMetadata.timestamp);
@@ -1232,15 +1271,13 @@ class MonitoringSessionService {
   }
 
   /**
-   * Cleanup session files
+   * Session assets (PNGs, audio, timeline) persist in AppData permanently.
+   * cleanupOldSessions() in localFrameStorage handles TTL-based eviction
+   * for sessions older than 7 days with status "delivered".
    */
-  private async cleanupSessionFiles(sessionId: string): Promise<void> {
-    try {
-      await localFrameStorage.deleteSession(sessionId);
-      logger.info(` Cleaned up session: ${sessionId}`);
-    } catch (error) {
-      logger.error(" Error cleaning up session:", error);
-    }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async cleanupSessionFiles(_sessionId: string): Promise<void> {
+    // No-op: assets kept for crash resilience and AI pipeline re-processing
   }
 
   /**

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import {
@@ -14,6 +14,45 @@ import {
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
+
+function usePipelineProgress(sessionId: string | undefined, enabled: boolean) {
+  const [percent, setPercent] = useState(0);
+  const [label, setLabel] = useState("Preparing...");
+  const displayRef = useRef(0);
+  const [displayPercent, setDisplayPercent] = useState(0);
+  const animRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !sessionId || !window.consoleAPI?.onPipelineProgress) return;
+    const unsub = window.consoleAPI.onPipelineProgress((p) => {
+      if (p.sessionId !== sessionId) return;
+      setPercent(p.percent);
+      setLabel(p.label);
+    });
+    return () => unsub();
+  }, [sessionId, enabled]);
+
+  useEffect(() => {
+    const start = displayRef.current;
+    const diff = percent - start;
+    if (diff === 0) return;
+    const duration = 500;
+    const t0 = performance.now();
+    const animate = (now: number) => {
+      const t = Math.min((now - t0) / duration, 1);
+      const val = Math.round(start + diff * (1 - Math.pow(1 - t, 3)));
+      displayRef.current = val;
+      setDisplayPercent(val);
+      if (t < 1) animRef.current = requestAnimationFrame(animate);
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [percent]);
+
+  return { percent: displayPercent, label };
+}
 
 interface ActivityBlockProps {
   block: WorkBlock;
@@ -208,7 +247,13 @@ export default function ActivityBlock({
   defaultExpanded = false,
   onDelete,
 }: ActivityBlockProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const isSummarizing = block.status === "summarizing";
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded || isSummarizing);
+  const progress = usePipelineProgress(block.id, isSummarizing);
+
+  useEffect(() => {
+    if (isSummarizing) setIsExpanded(true);
+  }, [isSummarizing]);
 
   const isGranola = block.source === "granola";
   const isFireflies = block.source === "fireflies";
@@ -342,7 +387,7 @@ export default function ActivityBlock({
             >
               Active
             </span>
-          ) : block.status === "summarizing" ? (
+          ) : isSummarizing ? (
             <span
               style={{
                 padding: "3px 8px",
@@ -368,9 +413,7 @@ export default function ActivityBlock({
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{
-                  animation: "spin 1s linear infinite",
-                }}
+                style={{ animation: "spin 1s linear infinite" }}
               >
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
@@ -532,8 +575,67 @@ export default function ActivityBlock({
           {/* -- Regular work block body -- */}
           {!isMeeting && (
             <>
+              {/* Summarization progress bar */}
+              {isSummarizing && (
+                <div style={{ padding: "16px 0 8px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: "#818CF8", fontWeight: 500 }}>
+                      {progress.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-tertiary)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {progress.percent}%
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 6,
+                      borderRadius: 3,
+                      background: "rgba(99, 102, 241, 0.1)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${progress.percent}%`,
+                        borderRadius: 3,
+                        background: "linear-gradient(90deg, #6366f1, #818cf8)",
+                        transition: "width 0.6s cubic-bezier(0.33, 1, 0.68, 1)",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background:
+                            "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)",
+                          animation: "shimmer 2s ease-in-out infinite",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <style>{`@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }`}</style>
+                </div>
+              )}
+
               {/* Tasks section */}
-              {block.taskBreakdown && block.taskBreakdown.length > 0 ? (
+              {!isSummarizing && block.taskBreakdown && block.taskBreakdown.length > 0 ? (
                 <>
                   <div
                     style={{
@@ -565,7 +667,7 @@ export default function ActivityBlock({
                     );
                   })}
                 </>
-              ) : block.summary ? (
+              ) : !isSummarizing && block.summary ? (
                 <>
                   <div
                     style={{

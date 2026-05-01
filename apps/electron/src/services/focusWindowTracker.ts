@@ -157,6 +157,10 @@ class FocusWindowTracker {
   private lastActiveWindowId: string | null = null;
   private currentUserId: string | undefined = undefined;
 
+  // Window IDs the user manually removed via the eye dropdown this session.
+  // Prevents the focus poller from auto-re-adding them. Cleared on session stop.
+  private manuallyExcludedWindows: Set<string> = new Set();
+
   // Callback to notify when windows change
   private onWindowsChanged: ((windows: SelectedWindowInfo[]) => void) | null = null;
 
@@ -179,6 +183,7 @@ class FocusWindowTracker {
 
     this.isTracking = true;
     this.trackedWindows.clear();
+    this.manuallyExcludedWindows.clear();
     this.lastActiveWindowId = null;
     this.onWindowsChanged = onWindowsChanged || null;
     this.currentUserId = userId;
@@ -234,6 +239,7 @@ class FocusWindowTracker {
     }
 
     this.trackedWindows.clear();
+    this.manuallyExcludedWindows.clear();
     this.lastActiveWindowId = null;
     this.onWindowsChanged = null;
 
@@ -269,6 +275,39 @@ class FocusWindowTracker {
       if (this.lastActiveWindowId === windowId) {
         this.lastActiveWindowId = null;
       }
+    }
+  }
+
+  /**
+   * Manually exclude a window so the focus poller won't re-add it.
+   * Also removes from tracked windows and windowDetectionService.
+   * The exclusion persists until the session ends or reincludeWindow() is called.
+   */
+  excludeWindow(windowId: string): void {
+    this.manuallyExcludedWindows.add(windowId);
+    this.trackedWindows.delete(windowId);
+    windowDetectionService.removeWindow(windowId);
+
+    if (this.lastActiveWindowId === windowId) {
+      this.lastActiveWindowId = null;
+    }
+
+    logger.info(
+      `[FS-DEBUG] excludeWindow: ${windowId} (excluded set size: ${this.manuallyExcludedWindows.size})`
+    );
+    this.notifyWindowsChanged();
+  }
+
+  /**
+   * Remove a window from the manual exclusion set so it can be auto-tracked again.
+   * Called when the user manually re-adds a window from the eye dropdown.
+   */
+  reincludeWindow(windowId: string): void {
+    const removed = this.manuallyExcludedWindows.delete(windowId);
+    if (removed) {
+      logger.info(
+        `[FS-DEBUG] reincludeWindow: ${windowId} (excluded set size: ${this.manuallyExcludedWindows.size})`
+      );
     }
   }
 
@@ -604,6 +643,10 @@ end tell`;
    * Add a new window or refresh its TTL
    */
   private addOrRefreshWindow(window: Omit<TrackedWindow, "lastFocusedAt" | "expiresAt">): void {
+    if (this.manuallyExcludedWindows.has(window.windowId)) {
+      return;
+    }
+
     const now = Date.now();
     const existingWindow = this.trackedWindows.get(window.windowId);
 

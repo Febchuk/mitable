@@ -44,6 +44,7 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_RESUME: "monitoring-session-resume",
   MONITORING_SESSION_END: "monitoring-session-end",
   MONITORING_SESSION_RESET: "monitoring-session-reset",
+  MONITORING_SESSION_DELETE: "monitoring-session-delete",
   MONITORING_RESYNC_LOCAL: "monitoring-resync-local",
   MONITORING_SESSION_STATUS: "monitoring-session-status",
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
@@ -143,6 +144,10 @@ const IPC_CHANNELS = {
   ON_DEVICE_STOP_SERVER: "on-device:stop-server",
   ON_DEVICE_SERVER_STATUS: "on-device:server-status",
   ON_DEVICE_DOWNLOAD_PROGRESS: "on-device:download-progress",
+  ON_DEVICE_GET_SYSTEM_INFO: "on-device:get-system-info",
+  ON_DEVICE_SET_GPU_PREFERENCE: "on-device:set-gpu-preference",
+  ON_DEVICE_GET_GPU_PREFERENCE: "on-device:get-gpu-preference",
+  ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
   // Offline auth (main → renderer)
   AUTH_OFFLINE_USER: "auth-offline-user",
 } as const;
@@ -311,6 +316,9 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   resetMonitoringSession: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESET),
+
+  deleteMonitoringSession: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_DELETE, sessionId),
 
   resyncLocalStories: (): Promise<{
     success: boolean;
@@ -781,6 +789,26 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     error?: string;
   }> => ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_GET_LOGS),
 
+  analyzeLogsLocally: (args: {
+    message: string;
+    mainLogs: string;
+    rendererLogs: string;
+  }): Promise<{ success: boolean; analysis: string; error?: string }> =>
+    ipcRenderer.invoke("feedback:analyze-logs", args),
+
+  submitFeedback: (args: {
+    message: string;
+    logAnalysis: string;
+    ollamaDiagnostics: string;
+    mainLogs: string;
+    rendererLogs: string;
+    userName: string;
+    userEmail: string;
+    token: string | null;
+    apiBaseUrl: string;
+    isAnonymous: boolean;
+  }): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke("feedback:submit", args),
+
   // On-Device AI
   onDeviceGetStatus: (): Promise<{
     isSetUp: boolean;
@@ -799,6 +827,29 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   onDeviceGetPlatform: (): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_PLATFORM),
+
+  onDeviceGetSystemInfo: (): Promise<{
+    cpu: string;
+    ramMB: number;
+    os: string;
+    gpus: Array<{
+      name: string;
+      vramMB: number;
+      type: "dedicated" | "integrated";
+      vendor: "nvidia" | "amd" | "intel" | "apple" | "unknown";
+    }>;
+    platform: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_SYSTEM_INFO),
+
+  onDeviceGetGpuPreference: (userId: string): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_GPU_PREFERENCE, userId),
+
+  onDeviceSetGpuPreference: (
+    userId: string,
+    gpuName: string
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_SET_GPU_PREFERENCE, userId, gpuName),
 
   onDeviceGetDownloadSummary: (): Promise<{
     assets: Array<{ id: string; label: string; description: string; sizeBytes: number }>;
@@ -849,6 +900,21 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
     ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
+  },
+
+  onPipelineProgress: (
+    callback: (progress: {
+      sessionId: string;
+      step: string;
+      batchIndex?: number;
+      totalBatches?: number;
+      percent: number;
+      label: string;
+    }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, handler);
   },
 
   getBlockExportPath: (sessionId: string): Promise<string | null> =>

@@ -10,6 +10,8 @@ import { audioWebSocketService } from "../../services/audioWebSocketService";
 import { passiveMonitorService } from "../../services/passiveMonitorService";
 import { focusWindowTracker } from "../../services/focusWindowTracker";
 import { trackMainEvent } from "../../services/analyticsService";
+import { localDb } from "../../services/on-device/localDb";
+import { installedAppsService } from "../../services/installedAppsService";
 import { createWatchingPillWindow, showPillReliably, startPillCursorTracking } from "../windows";
 import { startSessionFromMain, endPassiveSessionFromMain } from "../session";
 import { startNotificationTimer } from "../notifications";
@@ -275,6 +277,41 @@ export function registerMonitoringSessionHandlers() {
     return { success: true };
   });
 
+  ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_DELETE, async (_event, sessionId: string) => {
+    monitoringLogger.info(`Deleting session ${sessionId} locally`);
+    try {
+      const { localDb } = await import("../../services/on-device");
+
+      // Delete the exported block .md file (lives in Documents/Mitable/blockdata/)
+      const exportPath = localDb.getExportPath(sessionId);
+      if (exportPath) {
+        try {
+          const fsPromises = await import("fs/promises");
+          await fsPromises.unlink(exportPath);
+          monitoringLogger.info(`Deleted block markdown: ${exportPath}`);
+        } catch {
+          monitoringLogger.warn("Could not delete block .md (may already be gone)");
+        }
+      }
+
+      // Delete all DB records (captures, classifications, stories, transcriptions, session)
+      localDb.deleteMonitoringSession(sessionId);
+
+      // Delete session folder (frames, thumbnails, audio PCM files)
+      try {
+        const { localFrameStorage } = await import("../../services/localFrameStorage");
+        await localFrameStorage.deleteSession(sessionId);
+      } catch {
+        monitoringLogger.warn("Could not clean up session files (non-fatal)");
+      }
+
+      return { success: true };
+    } catch (err) {
+      monitoringLogger.error("Delete session failed:", String(err));
+      return { success: false, error: String(err) };
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.MONITORING_RESYNC_LOCAL, async () => {
     if (!authManager.getAccessToken()) {
       return { success: false, error: "No auth token — backend unreachable" };
@@ -453,7 +490,8 @@ export function registerMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_GET_ALL_APPS, async (_, forceRefresh?: boolean) => {
     try {
       const allApps = await windowDetectionService.getAllBlockableApps(forceRefresh ?? false);
-      return { success: true, apps: allApps };
+      const withIcons = await installedAppsService.extractIcons(allApps);
+      return { success: true, apps: withIcons };
     } catch (error) {
       ipcLogger.error("Error getting all blockable apps:", error);
       return { success: false, apps: [], error: (error as Error).message };
@@ -464,7 +502,8 @@ export function registerMonitoringSessionHandlers() {
     try {
       await windowDetectionService.refreshInstalledApps();
       const allApps = await windowDetectionService.getAllBlockableApps(false);
-      return { success: true, apps: allApps };
+      const withIcons = await installedAppsService.extractIcons(allApps);
+      return { success: true, apps: withIcons };
     } catch (error) {
       ipcLogger.error("Error refreshing installed apps:", error);
       return { success: false, apps: [], error: (error as Error).message };
@@ -711,14 +750,38 @@ export function registerMonitoringSessionHandlers() {
 
   ipcMain.handle(
     IPC_CHANNELS.AUDIO_PREFERENCES_SET,
-    (
+    async (
       _,
       prefs: {
         microphoneDeviceId?: string | null;
         systemAudioEnabled?: boolean;
       }
     ) => {
-      return preferencesService.setAudioPreferences(prefs);
+      const oldPrefs = preferencesService.getAudioPreferences();
+      const result = preferencesService.setAudioPreferences(prefs);
+
+      // If mic preference changed while recording, hot-swap the microphone
+      if (
+        prefs.microphoneDeviceId !== undefined &&
+        prefs.microphoneDeviceId !== oldPrefs.microphoneDeviceId
+      ) {
+        try {
+          const { localAudioService } = await import("../../services/on-device");
+          if (localAudioService.isActive()) {
+            monitoringLogger.info(
+              `Mic preference changed mid-session: "${oldPrefs.microphoneDeviceId ?? "default"}" → "${prefs.microphoneDeviceId ?? "default"}"`
+            );
+            const switchResult = await localAudioService.switchMicrophone(prefs.microphoneDeviceId);
+            if (!switchResult.success) {
+              monitoringLogger.error("Mid-session mic switch failed");
+            }
+          }
+        } catch (err) {
+          monitoringLogger.error("Error during mid-session mic switch:", err);
+        }
+      }
+
+      return result;
     }
   );
 
@@ -739,15 +802,16 @@ export function registerMonitoringSessionHandlers() {
     return { success: true };
   });
 
-  // Pill display mode preference
+  // Pill display mode preference — persisted to local SQLite
   ipcMain.handle(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, (_, userId: string) => {
-    return preferencesService.getUserPillDisplayMode(userId);
+    const stored = localDb.getUserPreference(userId, "pillDisplayMode");
+    return (stored === "expanded" ? "expanded" : "compact") as "compact" | "expanded";
   });
 
   ipcMain.handle(
     IPC_CHANNELS.PILL_DISPLAY_MODE_SET,
     (_, userId: string, mode: "compact" | "expanded") => {
-      preferencesService.setUserPillDisplayMode(userId, mode);
+      localDb.setUserPreference(userId, "pillDisplayMode", mode);
       const allWindows = BrowserWindow.getAllWindows();
       for (const win of allWindows) {
         if (!win.isDestroyed()) {

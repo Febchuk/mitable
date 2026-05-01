@@ -2,6 +2,7 @@ import { app, BrowserWindow, screen } from "electron";
 import { join } from "path";
 import { ctx } from "../context";
 import { watchingPillLogger, watchModeLogger } from "../loggers";
+import { createWatchingPillEyeDropdown, createWatchingPillMenuDropdown } from "./pill-dropdowns";
 
 export function createWatchingPillWindow() {
   // Get screen dimensions for right-edge, vertically centered positioning
@@ -48,6 +49,16 @@ export function createWatchingPillWindow() {
   } else {
     ctx.watchingPillWindow.loadFile(join(__dirname, "../renderer/watchingPill/index.html"));
   }
+
+  // Pre-warm dropdown windows so first click is instant (no cold BrowserWindow creation)
+  ctx.watchingPillWindow.webContents.once("did-finish-load", () => {
+    if (!ctx.watchingPillEyeDropdown || ctx.watchingPillEyeDropdown.isDestroyed()) {
+      createWatchingPillEyeDropdown();
+    }
+    if (!ctx.watchingPillMenuDropdown || ctx.watchingPillMenuDropdown.isDestroyed()) {
+      createWatchingPillMenuDropdown();
+    }
+  });
 
   ctx.watchingPillWindow.on("closed", () => {
     // Close dropdowns explicitly (no longer auto-closed without parent)

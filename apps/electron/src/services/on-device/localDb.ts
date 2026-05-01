@@ -83,6 +83,16 @@ export interface LocalTranscription {
   createdAt: number;
 }
 
+export interface LocalFeedback {
+  id: string;
+  message: string;
+  logAnalysis: string;
+  userName: string;
+  userEmail: string;
+  emailSent: boolean;
+  createdAt: number;
+}
+
 // ── Phase 2 types: Supabase mirror ──────────────────────────────────────────
 
 export interface LocalOrganization {
@@ -291,6 +301,26 @@ CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_org ON monitoring_sessions(or
 CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_user ON monitoring_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_status ON monitoring_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_started ON monitoring_sessions(started_at);
+
+CREATE TABLE IF NOT EXISTS feedback (
+  id TEXT PRIMARY KEY,
+  message TEXT NOT NULL,
+  log_analysis TEXT NOT NULL DEFAULT '',
+  user_name TEXT NOT NULL DEFAULT '',
+  user_email TEXT NOT NULL DEFAULT '',
+  email_sent INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at);
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+  user_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  PRIMARY KEY (user_id, key)
+);
 `;
 
 // better-sqlite3 SELECT * returns snake_case column names;
@@ -771,6 +801,19 @@ class LocalDatabase {
     return row?.export_path ?? null;
   }
 
+  deleteMonitoringSession(id: string): void {
+    if (!db) return;
+    try {
+      db.prepare(`DELETE FROM captures WHERE session_id = ?`).run(id);
+      db.prepare(`DELETE FROM classifications WHERE session_id = ?`).run(id);
+      db.prepare(`DELETE FROM stories WHERE session_id = ?`).run(id);
+      db.prepare(`DELETE FROM transcriptions WHERE session_id = ?`).run(id);
+      db.prepare(`DELETE FROM monitoring_sessions WHERE id = ?`).run(id);
+    } catch (err) {
+      logger.error("deleteMonitoringSession failed:", String(err));
+    }
+  }
+
   getMonitoringSession(id: string): LocalMonitoringSession | null {
     if (!db) return null;
     return mapRow<LocalMonitoringSession>(
@@ -989,6 +1032,70 @@ class LocalDatabase {
       db.close();
       db = null;
       logger.info("Local database closed");
+    }
+  }
+
+  // ── Feedback ──────────────────────────────────────────────────────────────
+
+  insertFeedback(feedback: Omit<LocalFeedback, "createdAt">): void {
+    if (!db) {
+      logger.error("insertFeedback: DB unavailable");
+      return;
+    }
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO feedback (id, message, log_analysis, user_name, user_email, email_sent)
+        VALUES (@id, @message, @logAnalysis, @userName, @userEmail, @emailSent)
+      `);
+      stmt.run({
+        ...feedback,
+        emailSent: feedback.emailSent ? 1 : 0,
+      });
+    } catch (err) {
+      logger.error("insertFeedback failed:", String(err));
+    }
+  }
+
+  markFeedbackEmailSent(id: string): void {
+    if (!db) return;
+    try {
+      db.prepare("UPDATE feedback SET email_sent = 1 WHERE id = ?").run(id);
+    } catch (err) {
+      logger.error("markFeedbackEmailSent failed:", String(err));
+    }
+  }
+
+  // ── User Preferences (key-value) ────────────────────────────────────────
+
+  getUserPreference(userId: string, key: string): string | null {
+    if (!db) {
+      logger.warn("getUserPreference: DB unavailable");
+      return null;
+    }
+    try {
+      const row = db
+        .prepare("SELECT value FROM user_preferences WHERE user_id = ? AND key = ?")
+        .get(userId, key) as { value: string } | undefined;
+      return row?.value ?? null;
+    } catch (err) {
+      logger.error(`getUserPreference(${key}) failed:`, String(err));
+      return null;
+    }
+  }
+
+  setUserPreference(userId: string, key: string, value: string): void {
+    if (!db) {
+      logger.warn("setUserPreference: DB unavailable");
+      return;
+    }
+    try {
+      db.prepare(
+        `INSERT INTO user_preferences (user_id, key, value, updated_at)
+         VALUES (?, ?, ?, unixepoch('now') * 1000)
+         ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+      ).run(userId, key, value);
+    } catch (err) {
+      logger.error(`setUserPreference(${key}) failed:`, String(err));
     }
   }
 }

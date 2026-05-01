@@ -159,6 +159,44 @@ export function registerOnDeviceHandlers() {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_SYSTEM_INFO, async () => {
+    try {
+      const { detectFullSystem } = await import("../../services/on-device/hardwareDetector");
+      return await detectFullSystem();
+    } catch (err) {
+      return {
+        cpu: "Unknown",
+        ramMB: 0,
+        os: "Unknown",
+        gpus: [],
+        platform: process.platform,
+        error: String(err),
+      };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_GPU_PREFERENCE, async (_, userId: string) => {
+    try {
+      const { localDb } = await import("../../services/on-device");
+      return localDb.getUserPreference(userId, "preferredGpu");
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.ON_DEVICE_SET_GPU_PREFERENCE,
+    async (_, userId: string, gpuName: string) => {
+      try {
+        const { localDb } = await import("../../services/on-device");
+        localDb.setUserPreference(userId, "preferredGpu", gpuName);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    }
+  );
+
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS, async () => {
     try {
       const { ollamaService } = await import("../../services/on-device/ollamaService");

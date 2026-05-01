@@ -20,7 +20,6 @@ import {
   type CalendarDateRange,
 } from "../../../../hooks/queries/calendar";
 import { useStartSession } from "../../../../hooks/useStartSession";
-import { deleteSession } from "../../../../services/monitoringService";
 import { monitoringKeys } from "../../../../hooks/queries/monitoring";
 import type { MonitoringSessionState } from "@mitable/shared";
 import { authService } from "../../../../services/authService";
@@ -355,7 +354,10 @@ export default function CalendarView() {
           await window.consoleAPI?.endMonitoringSession();
         }
 
-        await deleteSession(blockId);
+        const result = await window.consoleAPI?.deleteMonitoringSession(blockId);
+        if (result && !result.success) {
+          console.error("[CalendarView] deleteSession failed:", result.error);
+        }
         queryClient.invalidateQueries({ queryKey: calendarKeys.days() });
         queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
       } catch (err) {

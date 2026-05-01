@@ -114,6 +114,7 @@ interface ConsoleAPI {
     error?: string;
   }>;
   resetMonitoringSession: () => Promise<{ success: boolean }>;
+  deleteMonitoringSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
   getMonitoringSessionState: () => Promise<MonitoringSessionState | null>;
   onMonitoringSessionUpdate: (
     callback: (state: MonitoringSessionState | null) => void
@@ -389,6 +390,34 @@ interface ConsoleAPI {
       totalBytes: number;
       percent: number;
       error?: string;
+    }) => void
+  ) => () => void;
+  onDeviceGetSystemInfo: () => Promise<{
+    cpu: string;
+    ramMB: number;
+    os: string;
+    gpus: Array<{
+      name: string;
+      vramMB: number;
+      type: "dedicated" | "integrated";
+      vendor: "nvidia" | "amd" | "intel" | "apple" | "unknown";
+    }>;
+    platform: string;
+    error?: string;
+  }>;
+  onDeviceGetGpuPreference: (userId: string) => Promise<string | null>;
+  onDeviceSetGpuPreference: (
+    userId: string,
+    gpuName: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  onPipelineProgress: (
+    callback: (progress: {
+      sessionId: string;
+      step: string;
+      batchIndex?: number;
+      totalBatches?: number;
+      percent: number;
+      label: string;
     }) => void
   ) => () => void;
 

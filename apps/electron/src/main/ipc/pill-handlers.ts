@@ -5,6 +5,9 @@ import { ctx } from "../context";
 import { monitoringLogger, watchingPillLogger } from "../loggers";
 import { windowDetectionService } from "../../services/windowDetectionService";
 import { monitoringSessionService } from "../../services/monitoringSessionService";
+import { focusWindowTracker } from "../../services/focusWindowTracker";
+import { preferencesService } from "../../services/preferencesService";
+import { isBlockedByPolicy, getCapturePolicy } from "../../services/capturePolicy";
 import { preferencesService } from "../../services/preferencesService";
 import { authManager } from "../../services/authManager";
 import {
@@ -80,7 +83,26 @@ export function registerPillHandlers() {
 
         let availableWindows: WatchableWindow[] = [];
         try {
-          availableWindows = await windowDetectionService.getAllVisibleWindows();
+          const allWindows = await windowDetectionService.getAllVisibleWindows();
+
+          // Filter out windows on the user's custom block list
+          const userId = ctx.currentUserContext?.userId;
+          if (userId) {
+            const policy = getCapturePolicy();
+            availableWindows = allWindows.filter((w) => {
+              if (w.isBlocked) return false;
+              const userBlocked = isBlockedByPolicy(
+                w.windowTitle,
+                w.appName,
+                policy,
+                undefined,
+                userId
+              );
+              return !userBlocked.blocked;
+            });
+          } else {
+            availableWindows = allWindows.filter((w) => !w.isBlocked);
+          }
         } catch (error) {
           watchingPillLogger.error(" Failed to get visible windows:", error);
         }
@@ -185,6 +207,7 @@ export function registerPillHandlers() {
             appName: string;
             windowTitle: string;
           };
+          focusWindowTracker.reincludeWindow(payload.windowId);
           windowDetectionService.addWindow({
             windowId: payload.windowId,
             appName: payload.appName,
@@ -207,7 +230,7 @@ export function registerPillHandlers() {
         }
         case "unselect-window": {
           const windowId = action.payload as string;
-          windowDetectionService.removeWindow(windowId);
+          focusWindowTracker.excludeWindow(windowId);
           const selectedWindows = windowDetectionService.getSelectedWindows();
           if (ctx.watchingPillWindow && !ctx.watchingPillWindow.isDestroyed()) {
             ctx.watchingPillWindow.webContents.send(
@@ -290,6 +313,21 @@ export function registerPillHandlers() {
 
             if (ctx.watchingPillWindow && !ctx.watchingPillWindow.isDestroyed()) {
               ctx.watchingPillWindow.hide();
+            }
+
+            // Bring console to front so user sees summarization progress
+            if (result.localMode) {
+              if (!ctx.consoleWindow || ctx.consoleWindow.isDestroyed()) {
+                createConsoleWindow();
+              }
+              if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
+                if (ctx.consoleWindow.isMinimized()) ctx.consoleWindow.restore();
+                ctx.consoleWindow.show();
+                ctx.consoleWindow.focus();
+                if (process.platform === "darwin") {
+                  app.focus({ steal: true });
+                }
+              }
             }
 
             return result;

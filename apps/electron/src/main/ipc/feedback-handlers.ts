@@ -2,6 +2,9 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "@mitable/shared";
 import { dirname, join } from "path";
 import electronLogMain from "electron-log/main";
+import { createLogger } from "../../lib/logger";
+
+const feedbackLogger = createLogger("FeedbackAnalysis");
 
 const FEEDBACK_MAIN_LOG_TAIL_LINES = 10_000;
 const FEEDBACK_RENDERER_LOG_TAIL_LINES = 10_000;
@@ -119,4 +122,240 @@ export function registerFeedbackHandlers() {
       return { success: false, logs: "", rendererLogs: "", error: String(err) };
     }
   });
+
+  // ── Local log analysis via Ollama ───────────────────────────────────────
+  ipcMain.handle(
+    "feedback:analyze-logs",
+    async (
+      _event,
+      args: { message: string; mainLogs: string; rendererLogs: string }
+    ): Promise<{
+      success: boolean;
+      analysis: string;
+      diagnostics: string;
+      error?: string;
+    }> => {
+      const { message, mainLogs, rendererLogs } = args;
+      const diag: string[] = [];
+
+      if (!message?.trim()) {
+        return { success: false, analysis: "", diagnostics: "", error: "No feedback message" };
+      }
+
+      const hasLogs = (mainLogs?.trim().length ?? 0) > 0 || (rendererLogs?.trim().length ?? 0) > 0;
+      if (!hasLogs) {
+        return { success: true, analysis: "", diagnostics: "No logs to analyze" };
+      }
+
+      try {
+        const { ollamaService } = await import("../../services/on-device/ollamaService");
+        const { getCapabilities } = await import("../../services/on-device/ollamaLifecycle");
+
+        const wasReady = ollamaService.isReady();
+        diag.push(`ollama_was_ready: ${wasReady}`);
+
+        let modelToUse: string | null = null;
+
+        if (wasReady) {
+          modelToUse = ollamaService.getLoadedModel();
+          diag.push(`loaded_model: ${modelToUse}`);
+        } else {
+          feedbackLogger.info("Ollama not ready — starting for feedback analysis...");
+          diag.push("action: launching ollama for feedback analysis");
+          try {
+            const { initialize } = await import("../../services/on-device/ollamaLifecycle");
+            await initialize();
+            diag.push("ollama_launch: success");
+          } catch (launchErr) {
+            diag.push(`ollama_launch: FAILED — ${String(launchErr)}`);
+            return {
+              success: false,
+              analysis: "",
+              diagnostics: diag.join("\n"),
+              error: `Ollama launch failed: ${String(launchErr)}`,
+            };
+          }
+          const caps = getCapabilities();
+          modelToUse = caps?.model ?? null;
+          diag.push(`model_after_init: ${modelToUse ?? "none"}`);
+          diag.push(`tier: ${caps?.tier ?? "unknown"}`);
+        }
+
+        if (!modelToUse) {
+          diag.push("result: no model available after init");
+          return {
+            success: false,
+            analysis: "",
+            diagnostics: diag.join("\n"),
+            error: "No model available",
+          };
+        }
+
+        const MAX_LOG_LINES = 500;
+        const trimLog = (log: string) => {
+          if (!log?.trim()) return "";
+          const lines = log.split("\n");
+          if (lines.length <= MAX_LOG_LINES) return log;
+          return (
+            `...[showing last ${MAX_LOG_LINES} of ${lines.length} lines]\n` +
+            lines.slice(-MAX_LOG_LINES).join("\n")
+          );
+        };
+
+        const mainTrimmed = trimLog(mainLogs);
+        const rendererTrimmed = trimLog(rendererLogs);
+
+        let logBundle = "";
+        if (mainTrimmed) logBundle += `=== Main Process Logs ===\n${mainTrimmed}\n\n`;
+        if (rendererTrimmed) logBundle += `=== Renderer Logs ===\n${rendererTrimmed}\n\n`;
+
+        diag.push(`log_bundle_chars: ${logBundle.length}`);
+        feedbackLogger.info(`Analyzing feedback logs (${logBundle.length} chars)...`);
+
+        let analysis: string;
+        try {
+          analysis = await ollamaService.chatCompletion(
+            [
+              {
+                role: "system",
+                content:
+                  "You are a log analysis assistant for Mitable, an Electron desktop app. " +
+                  "A user submitted feedback about an issue. You have their main process and renderer logs. " +
+                  "Find errors, warnings, stack traces, and failed HTTP requests related to their feedback. " +
+                  "Write a short report (under 50 lines) with timestamps and relevant log snippets. " +
+                  "If nothing relevant is found, say so in one line. Plain text only.",
+              },
+              {
+                role: "user",
+                content: `User feedback: "${message.trim()}"\n\n${logBundle}\n\nAnalyze the logs above and report findings related to the user's feedback.`,
+              },
+            ],
+            { temperature: 0.1, max_tokens: 1000 }
+          );
+          diag.push("analysis: success");
+        } catch (inferErr) {
+          diag.push(`analysis: FAILED — ${String(inferErr)}`);
+          return {
+            success: false,
+            analysis: "",
+            diagnostics: diag.join("\n"),
+            error: `Inference failed: ${String(inferErr)}`,
+          };
+        }
+
+        feedbackLogger.info("Feedback log analysis complete");
+
+        if (!wasReady) {
+          feedbackLogger.info("Unloading model (was not loaded before feedback analysis)");
+          await ollamaService.forceUnloadModel();
+          diag.push("model_unloaded: true");
+        }
+
+        return { success: true, analysis: analysis.trim(), diagnostics: diag.join("\n") };
+      } catch (err) {
+        diag.push(`unexpected_error: ${String(err)}`);
+        feedbackLogger.error("Feedback log analysis failed:", String(err));
+        return {
+          success: false,
+          analysis: "",
+          diagnostics: diag.join("\n"),
+          error: String(err),
+        };
+      }
+    }
+  );
+
+  // ── Submit feedback: persist locally + fire-and-forget email ────────────
+  ipcMain.handle(
+    "feedback:submit",
+    async (
+      _event,
+      args: {
+        message: string;
+        logAnalysis: string;
+        ollamaDiagnostics: string;
+        mainLogs: string;
+        rendererLogs: string;
+        userName: string;
+        userEmail: string;
+        token: string | null;
+        apiBaseUrl: string;
+        isAnonymous: boolean;
+      }
+    ): Promise<{ success: boolean; error?: string }> => {
+      const {
+        message,
+        logAnalysis,
+        ollamaDiagnostics,
+        mainLogs,
+        rendererLogs,
+        userName,
+        userEmail,
+        token,
+        apiBaseUrl,
+        isAnonymous,
+      } = args;
+
+      const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      // 1. Persist to local SQLite (always succeeds if DB is up)
+      try {
+        const { localDb } = await import("../../services/on-device/localDb");
+        localDb.insertFeedback({
+          id: feedbackId,
+          message: message.trim(),
+          logAnalysis,
+          userName,
+          userEmail,
+          emailSent: false,
+        });
+        feedbackLogger.info(`Feedback saved locally: ${feedbackId}`);
+      } catch (err) {
+        feedbackLogger.error("Failed to persist feedback locally:", String(err));
+      }
+
+      // 2. Fire-and-forget: send to backend for email relay (non-blocking)
+      (async () => {
+        try {
+          const endpoint = isAnonymous
+            ? `${apiBaseUrl}/api/feedback/unauth`
+            : `${apiBaseUrl}/api/feedback`;
+
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(!isAnonymous && token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              message: message.trim(),
+              mainLogs,
+              rendererLogs,
+              logAnalysis,
+              ollamaDiagnostics,
+              userName,
+              userEmail,
+            }),
+            signal: AbortSignal.timeout(15_000),
+          });
+
+          if (res.ok) {
+            feedbackLogger.info(`Feedback email relay succeeded for ${feedbackId}`);
+            try {
+              const { localDb } = await import("../../services/on-device/localDb");
+              localDb.markFeedbackEmailSent(feedbackId);
+            } catch {
+              /* best-effort DB update */
+            }
+          } else {
+            feedbackLogger.warn(`Feedback email relay failed (${res.status}) for ${feedbackId}`);
+          }
+        } catch (err) {
+          feedbackLogger.warn(`Feedback email relay unreachable for ${feedbackId}:`, String(err));
+        }
+      })();
+
+      return { success: true };
+    }
+  );
 }

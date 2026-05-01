@@ -2,13 +2,13 @@
  * Ollama Service
  *
  * Manages the Ollama subprocess and provides an OpenAI-compatible chat
- * completion API backed by a local Gemma 4 model. Replaces the old
- * llamaServerService + textServerService with a single unified service.
+ * completion API backed by a single local model per hardware tier:
+ *   integrated  → qwen3-vl:4b  |  constrained → gemma4:e2b  |  capable → gemma4:e4b
  *
  * Responsibilities:
  *   1. Ensure Ollama is installed (download if needed)
  *   2. Spawn `ollama serve` and wait for readiness
- *   3. Pull the appropriate Gemma 4 model
+ *   3. Pull the tier-appropriate model
  *   4. Expose chatCompletion() for vision, text, and audio inference
  *   5. Serialize multimodal requests via mutex (VRAM safety)
  *   6. Idle-unload model after inactivity, kill on shutdown

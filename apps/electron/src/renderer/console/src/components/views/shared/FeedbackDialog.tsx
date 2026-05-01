@@ -51,33 +51,47 @@ export default function FeedbackDialog({
         mainLogs = `(client logs unavailable: ${String(e)})`;
       }
 
+      // Run log analysis locally via Ollama (best-effort)
+      let logAnalysis = "";
+      let ollamaDiagnostics = "";
+      try {
+        const analysisResult = await window.consoleAPI?.analyzeLogsLocally({
+          message: message.trim(),
+          mainLogs,
+          rendererLogs,
+        });
+        if (analysisResult?.success && analysisResult.analysis) {
+          logAnalysis = analysisResult.analysis;
+        }
+        if (analysisResult?.diagnostics) {
+          ollamaDiagnostics = analysisResult.diagnostics;
+        }
+      } catch {
+        ollamaDiagnostics = "analyzeLogsLocally IPC call threw";
+      }
+
       const token = authService.getAccessToken();
       const fromLoginOrRegister = anonymousSource ? ANONYMOUS_SOURCE_LABEL[anonymousSource] : null;
       const resolvedUserName = fromLoginOrRegister
         ? fromLoginOrRegister
         : user?.name || user?.firstName || "Unknown";
       const resolvedUserEmail = fromLoginOrRegister ? "unauthenticated" : user?.email || "unknown";
-      const endpoint = anonymousSource
-        ? `${API_BASE_URL}/api/feedback/unauth`
-        : `${API_BASE_URL}/api/feedback`;
-      // Anonymous feedback must not send a stale Bearer token (optionalAuth would
-      // still attach a dead session to the request).
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(!anonymousSource && token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          message: message.trim(),
-          mainLogs,
-          rendererLogs,
-          userName: resolvedUserName,
-          userEmail: resolvedUserEmail,
-        }),
+
+      // Persist locally + fire-and-forget email via main process
+      const result = await window.consoleAPI?.submitFeedback({
+        message: message.trim(),
+        logAnalysis,
+        ollamaDiagnostics,
+        mainLogs,
+        rendererLogs,
+        userName: resolvedUserName,
+        userEmail: resolvedUserEmail,
+        token: token ?? null,
+        apiBaseUrl: API_BASE_URL,
+        isAnonymous: !!anonymousSource,
       });
 
-      if (!res.ok) throw new Error("Failed to send");
+      if (!result?.success) throw new Error(result?.error || "Failed to save");
       setStatus("sent");
       setTimeout(() => {
         onOpenChange(false);

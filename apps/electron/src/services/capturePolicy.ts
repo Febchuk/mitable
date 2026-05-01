@@ -45,12 +45,20 @@ function loadPolicyFromEnv(): CapturePolicy {
  */
 const defaultDenyList: CapturePolicy = {
   appsDeny: [
+    /^@?mitable/i,
+    /^electron$/i,
     /messages/i,
     /1password|lastpass|bitwarden|okta/i,
     /bank|financial|payroll|paystub|tax/i,
     /epic|cerner|ehr|hipaa|mychart/i,
   ],
 };
+
+/**
+ * Patterns that identify Mitable's own apps.
+ * Used by the UI to hide these from the user-facing blocked list.
+ */
+export const MITABLE_APP_PATTERNS = [/^@?mitable/i, /^electron$/i];
 
 /**
  * Get the active capture policy (ENV overrides defaults)

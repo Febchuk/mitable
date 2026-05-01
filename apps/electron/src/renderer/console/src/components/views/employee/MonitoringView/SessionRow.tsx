@@ -1,4 +1,6 @@
 /**
+ * @deprecated SessionRow — replaced by CalendarView ActivityBlock. Set up for deletion.
+ *
  * SessionRow
  *
  * Horizontal session item for the timeline list.

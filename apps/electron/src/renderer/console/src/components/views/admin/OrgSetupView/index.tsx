@@ -1,3 +1,7 @@
+/**
+ * @deprecated Admin/Team views no longer in use in the desktop app.
+ * Admin experience moves to the web app. Scheduled for migration.
+ */
 import { useState } from "react";
 import { Settings, Shield, Network } from "lucide-react";
 import SetupView from "../SetupView";

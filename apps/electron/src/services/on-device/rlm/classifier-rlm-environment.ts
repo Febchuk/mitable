@@ -22,11 +22,7 @@ export class ClassifierEnvironment {
 
   private classification: Record<string, unknown> | null = null;
 
-  constructor(opts: {
-    frames: SensorFrame[];
-    sessionId: string;
-    batchIndex: number;
-  }) {
+  constructor(opts: { frames: SensorFrame[]; sessionId: string; batchIndex: number }) {
     this.frames = opts.frames;
     this.sessionId = opts.sessionId;
     this.batchIndex = opts.batchIndex;

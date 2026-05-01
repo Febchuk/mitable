@@ -47,14 +47,38 @@ const GET_FRAMES: RLMTool<ClassifierEnvironment> = {
 
 const CLASSIFY: RLMTool<ClassifierEnvironment> = {
   name: "classify",
-  description:
-    "Commit the final classification for this batch. Call when you have enough context.",
+  description: "Commit the final classification for this batch. Call when you have enough context.",
   parameters: [
-    { name: "description", type: "string", required: true, description: "2-3 sentence summary of activity" },
-    { name: "activityType", type: "string", required: true, description: "coding|browsing|writing|communicating|designing|meeting|reading|other" },
-    { name: "onTask", type: "boolean", required: true, description: "Whether user was productively on-task" },
-    { name: "taskRelevance", type: "string", required: false, description: "Brief note on productivity relevance" },
-    { name: "importanceScore", type: "number", required: true, description: "0.0 to 1.0 importance" },
+    {
+      name: "description",
+      type: "string",
+      required: true,
+      description: "2-3 sentence summary of activity",
+    },
+    {
+      name: "activityType",
+      type: "string",
+      required: true,
+      description: "coding|browsing|writing|communicating|designing|meeting|reading|other",
+    },
+    {
+      name: "onTask",
+      type: "boolean",
+      required: true,
+      description: "Whether user was productively on-task",
+    },
+    {
+      name: "taskRelevance",
+      type: "string",
+      required: false,
+      description: "Brief note on productivity relevance",
+    },
+    {
+      name: "importanceScore",
+      type: "number",
+      required: true,
+      description: "0.0 to 1.0 importance",
+    },
   ],
   execute: (params, env) => {
     const result = {

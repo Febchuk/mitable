@@ -9,15 +9,19 @@
  *   - {sessionDir}/audio_user.pcm   — microphone input
  *   - {sessionDir}/audio_remote.pcm — system audio loopback
  *
- * Streaming transcription runs every 30s during recording via whisper-cli
- * (CPU-only, no GPU contention). By session end the transcript is mostly
- * complete, eliminating the long post-session transcription wait.
+ * Each flush records an AudioSegmentMeta in the session timeline.
+ * Streaming transcription runs every 30s and produces timestamped
+ * TranscriptSegments (offsetMs relative to session start) that are
+ * persisted to the timeline for crash-safe, chronologically aligned output.
  */
 
 import { createLogger } from "../../lib/logger";
 import { nativeAudioCapture, type NativeAudioChunk } from "./nativeAudioCapture";
 import { existsSync, appendFileSync, readFileSync, unlinkSync, mkdirSync, statSync } from "fs";
 import { join } from "path";
+import { sessionTimeline } from "./sessionTimeline";
+import type { TranscriptSegment } from "./sessionTimeline";
+import { preferencesService } from "../preferencesService";
 
 const logger = createLogger("LocalAudio");
 
@@ -27,6 +31,10 @@ const FLUSH_INTERVAL_MS = 15_000;
 const FLUSH_SIZE_THRESHOLD = 5 * 1024 * 1024; // 5 MB
 const TRANSCRIBE_INTERVAL_MS = 30_000;
 
+const MIC_ENERGY_GATE_THRESHOLD = 800;
+const ENERGY_WINDOW_SECS = 5;
+const ENERGY_WINDOW_BYTES = ENERGY_WINDOW_SECS * SAMPLE_RATE * BYTES_PER_SAMPLE;
+
 type AudioSource = "user" | "remote";
 
 interface SourceBuffer {
@@ -34,9 +42,10 @@ interface SourceBuffer {
   totalBytes: number;
 }
 
-interface StreamingTranscript {
+interface SourceState {
   bytesTranscribed: number;
-  text: string;
+  bytesFlushed: number;
+  segmentIndex: number;
 }
 
 class LocalAudioService {
@@ -51,9 +60,9 @@ class LocalAudioService {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private transcribeTimer: ReturnType<typeof setInterval> | null = null;
   private transcribing = false;
-  private streamTranscripts: Record<AudioSource, StreamingTranscript> = {
-    user: { bytesTranscribed: 0, text: "" },
-    remote: { bytesTranscribed: 0, text: "" },
+  private sourceState: Record<AudioSource, SourceState> = {
+    user: { bytesTranscribed: 0, bytesFlushed: 0, segmentIndex: 0 },
+    remote: { bytesTranscribed: 0, bytesFlushed: 0, segmentIndex: 0 },
   };
 
   private onAudioData = (chunk: NativeAudioChunk) => {
@@ -81,18 +90,22 @@ class LocalAudioService {
     this.active = true;
     this.sessionDir = sessionDir;
 
+    this.sourceState = {
+      user: { bytesTranscribed: 0, bytesFlushed: 0, segmentIndex: 0 },
+      remote: { bytesTranscribed: 0, bytesFlushed: 0, segmentIndex: 0 },
+    };
+
     nativeAudioCapture.on("data", this.onAudioData);
-    const result = await nativeAudioCapture.start();
+
+    const audioPrefs = preferencesService.getAudioPreferences();
+    const result = await nativeAudioCapture.start(audioPrefs.microphoneDeviceId);
+
+    sessionTimeline.recordAudioStart();
 
     this.flushTimer = setInterval(() => {
       this.flushToDisk("user");
       this.flushToDisk("remote");
     }, FLUSH_INTERVAL_MS);
-
-    this.streamTranscripts = {
-      user: { bytesTranscribed: 0, text: "" },
-      remote: { bytesTranscribed: 0, text: "" },
-    };
 
     this.transcribeTimer = setInterval(() => {
       this.transcribeNewAudio().catch((err) =>
@@ -124,22 +137,56 @@ class LocalAudioService {
     this.flushToDisk("user");
     this.flushToDisk("remote");
 
-    // Final transcription pass on any remaining audio
+    // Wait for any in-progress transcription tick to finish
+    const maxWait = 120_000;
+    const start = Date.now();
+    while (this.transcribing && Date.now() - start < maxWait) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // Final transcription pass on ALL remaining audio
+    this.transcribing = false;
     await this.transcribeNewAudio();
 
+    sessionTimeline.recordAudioEnd();
+
     this.active = false;
-    logger.info("Stopped audio capture (final flush done)");
+    logger.info("Stopped audio capture (final flush + transcription done)");
   }
 
   isActive(): boolean {
     return this.active;
   }
 
+  /**
+   * Hot-swap the microphone during an active session.
+   * Flushes current audio to disk before switching so the gap is minimal.
+   */
+  async switchMicrophone(
+    deviceId?: string | null
+  ): Promise<{ success: boolean; deviceName?: string }> {
+    if (!this.active) {
+      logger.warn("switchMicrophone() called while not active");
+      return { success: false };
+    }
+
+    this.flushToDisk("user");
+
+    const result = await nativeAudioCapture.switchMicrophone(deviceId);
+
+    if (result.success) {
+      sessionTimeline.recordMicSwitch(deviceId ?? null, result.deviceName ?? "System Default");
+      logger.info(`Microphone switched to: ${result.deviceName ?? "System Default"}`);
+    }
+
+    return result;
+  }
+
   clear(): void {
     this.resetBuffers();
-    this.streamTranscripts = {
-      user: { bytesTranscribed: 0, text: "" },
-      remote: { bytesTranscribed: 0, text: "" },
+    this.sourceState = {
+      user: { bytesTranscribed: 0, bytesFlushed: 0, segmentIndex: 0 },
+      remote: { bytesTranscribed: 0, bytesFlushed: 0, segmentIndex: 0 },
     };
     if (this.sessionDir) {
       for (const source of ["user", "remote"] as const) {
@@ -176,18 +223,17 @@ class LocalAudioService {
   }
 
   /**
-   * Returns transcripts accumulated during recording.
+   * Returns timestamped transcript segments accumulated during recording.
+   * Each segment has offsetMs relative to session start for timeline alignment.
    * Call after stop() for complete results.
    */
-  getAccumulatedTranscripts(): Record<AudioSource, string> {
-    return {
-      user: this.streamTranscripts.user.text,
-      remote: this.streamTranscripts.remote.text,
-    };
+  getAccumulatedTranscripts(): TranscriptSegment[] {
+    return sessionTimeline.getAllTranscriptSegments();
   }
 
   /**
    * Transcribe any new audio that has been flushed to disk since the last pass.
+   * Produces timestamped TranscriptSegments aligned to session start.
    * Uses whisper-cli (non-blocking, CPU-only, no GPU contention during recording).
    */
   private async transcribeNewAudio(): Promise<void> {
@@ -201,42 +247,111 @@ class LocalAudioService {
         if (!ok) return;
       }
 
-      for (const source of ["user", "remote"] as const) {
+      const audioStartOffsetMs = sessionTimeline.get()?.audioStartOffsetMs ?? 0;
+
+      const transcribeSource = async (source: AudioSource) => {
         const filePath = this.audioFilePath(source);
-        if (!existsSync(filePath)) continue;
+        if (!existsSync(filePath)) return null;
 
         const fileSize = statSync(filePath).size;
-        const already = this.streamTranscripts[source].bytesTranscribed;
+        const already = this.sourceState[source].bytesTranscribed;
         const newBytes = fileSize - already;
 
-        // Need at least 2 seconds of audio to be worth transcribing
         const minBytes = SAMPLE_RATE * BYTES_PER_SAMPLE * 2;
-        if (newBytes < minBytes) continue;
+        if (newBytes < minBytes) return null;
 
         const fullPcm = readFileSync(filePath);
         const newPcm = fullPcm.subarray(already, fileSize);
 
-        // Align to sample boundary
         const aligned = Math.floor(newPcm.length / BYTES_PER_SAMPLE) * BYTES_PER_SAMPLE;
-        const chunk = newPcm.subarray(0, aligned);
+        let chunk: Buffer = Buffer.from(newPcm.subarray(0, aligned));
+
+        // For mic audio, apply energy gating to filter out speaker bleed
+        if (source === "user") {
+          const gated = this.energyGateMicAudio(Buffer.from(chunk));
+          if (gated.length === 0) {
+            this.sourceState[source].bytesTranscribed = already + aligned;
+            logger.info("Energy gate: all windows below threshold, skipping user transcription");
+            return null;
+          }
+          chunk = gated;
+        }
+
+        const startByteSec = already / (SAMPLE_RATE * BYTES_PER_SAMPLE);
+        const endByteSec = (already + aligned) / (SAMPLE_RATE * BYTES_PER_SAMPLE);
+        const startOffsetMs = audioStartOffsetMs + startByteSec * 1000;
+        const endOffsetMs = audioStartOffsetMs + endByteSec * 1000;
 
         const durationSec = Math.round(aligned / (SAMPLE_RATE * BYTES_PER_SAMPLE));
         logger.info(
-          `Streaming transcription [${source}]: ${durationSec}s new audio (${(aligned / 1024).toFixed(0)} KB)`
+          `Streaming transcription [${source}]: ${durationSec}s new audio ` +
+            `(offset ${(startOffsetMs / 1000).toFixed(1)}s-${(endOffsetMs / 1000).toFixed(1)}s)`
         );
 
-        const text = await whisperCliService.transcribeChunked(Buffer.from(chunk), 25);
+        const text = await whisperCliService.transcribeChunked(Buffer.from(chunk), 45);
+        this.sourceState[source].bytesTranscribed = already + aligned;
+
         if (text.length > 0) {
-          this.streamTranscripts[source].text +=
-            (this.streamTranscripts[source].text ? " " : "") + text;
+          const segment: TranscriptSegment = {
+            startOffsetMs,
+            endOffsetMs,
+            text,
+            source,
+          };
+          sessionTimeline.addTranscriptSegment(segment);
+          logger.info(`Transcript segment added [${source}]: "${text.slice(0, 80)}..."`);
         }
-        this.streamTranscripts[source].bytesTranscribed = fileSize;
-      }
+      };
+
+      await Promise.all([transcribeSource("user"), transcribeSource("remote")]);
     } catch (err) {
       logger.debug("Streaming transcription error:", String(err));
     } finally {
       this.transcribing = false;
     }
+  }
+
+  /**
+   * Split mic PCM into 5s windows and discard windows below the energy
+   * threshold (speaker bleed). Returns only the windows where the user
+   * is actually speaking, stitched back into a contiguous buffer.
+   */
+  private energyGateMicAudio(pcm: Buffer): Buffer {
+    const totalWindows = Math.ceil(pcm.length / ENERGY_WINDOW_BYTES);
+    const kept: Buffer[] = [];
+    let skipped = 0;
+
+    for (let i = 0; i < totalWindows; i++) {
+      const start = i * ENERGY_WINDOW_BYTES;
+      const end = Math.min(start + ENERGY_WINDOW_BYTES, pcm.length);
+      const window = pcm.subarray(start, end);
+      const rms = LocalAudioService.computeRMS(window);
+
+      if (rms >= MIC_ENERGY_GATE_THRESHOLD) {
+        kept.push(Buffer.from(window));
+      } else {
+        skipped++;
+      }
+    }
+
+    logger.info(
+      `Energy gate: ${totalWindows} windows, ${kept.length} passed, ` +
+        `${skipped} skipped (threshold=${MIC_ENERGY_GATE_THRESHOLD})`
+    );
+
+    if (kept.length === 0) return Buffer.alloc(0);
+    return Buffer.concat(kept);
+  }
+
+  private static computeRMS(pcm: Buffer): number {
+    const samples = pcm.length / BYTES_PER_SAMPLE;
+    if (samples === 0) return 0;
+    let sumSq = 0;
+    for (let i = 0; i < pcm.length; i += BYTES_PER_SAMPLE) {
+      const sample = pcm.readInt16LE(i);
+      sumSq += sample * sample;
+    }
+    return Math.sqrt(sumSq / samples);
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
@@ -252,7 +367,24 @@ class LocalAudioService {
       const dir = this.sessionDir;
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
+      const byteOffset = this.sourceState[source].bytesFlushed;
       appendFileSync(filePath, pcm);
+
+      const audioStartOffsetMs = sessionTimeline.get()?.audioStartOffsetMs ?? 0;
+      const startSec = byteOffset / (SAMPLE_RATE * BYTES_PER_SAMPLE);
+      const endSec = (byteOffset + pcm.length) / (SAMPLE_RATE * BYTES_PER_SAMPLE);
+
+      sessionTimeline.recordAudioSegment({
+        index: this.sourceState[source].segmentIndex++,
+        startOffsetMs: audioStartOffsetMs + startSec * 1000,
+        endOffsetMs: audioStartOffsetMs + endSec * 1000,
+        byteOffset,
+        byteLength: pcm.length,
+        source,
+        transcribed: false,
+      });
+
+      this.sourceState[source].bytesFlushed += pcm.length;
       logger.debug(`Flushed ${source} audio: ${pcm.length}B → ${filePath}`);
     } catch (err) {
       logger.error(`Failed to flush ${source} audio to disk:`, String(err));

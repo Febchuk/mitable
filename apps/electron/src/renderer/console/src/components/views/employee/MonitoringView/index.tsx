@@ -1,4 +1,6 @@
 /**
+ * @deprecated MonitoringView — replaced by CalendarView. Set up for deletion.
+ *
  * MonitoringView
  *
  * Main view for session monitoring functionality.

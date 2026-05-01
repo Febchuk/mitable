@@ -62,8 +62,18 @@ async function main() {
   console.log(`DB rewritten (${data.length} bytes)`);
 
   // Remove WAL and SHM
-  try { unlinkSync(WAL_PATH); console.log("WAL removed"); } catch { /* */ }
-  try { unlinkSync(SHM_PATH); console.log("SHM removed"); } catch { /* */ }
+  try {
+    unlinkSync(WAL_PATH);
+    console.log("WAL removed");
+  } catch {
+    /* */
+  }
+  try {
+    unlinkSync(SHM_PATH);
+    console.log("SHM removed");
+  } catch {
+    /* */
+  }
 
   console.log("\nDone. Note: any data that was ONLY in the WAL (not yet checkpointed");
   console.log("to the main DB) is lost. The app should checkpoint on close to prevent this.");

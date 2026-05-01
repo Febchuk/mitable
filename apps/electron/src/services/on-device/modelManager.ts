@@ -19,7 +19,7 @@ import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("ModelManager");
 
-// ── Whisper asset (only needed for "capable" tier) ──────────────────────────
+// ── Whisper asset (needed for constrained/capable tiers) ────────────────────
 
 const WHISPER_BIN_URL: Record<string, string> = {
   win32:

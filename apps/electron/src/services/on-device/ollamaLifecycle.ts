@@ -2,15 +2,12 @@
  * Ollama Lifecycle
  *
  * Coordinated startup/shutdown of the Ollama-based on-device AI pipeline.
- * Replaces the old multi-server lifecycle (vision + text + whisper) with a
- * single Ollama instance serving one Gemma 4 model.
+ * One Ollama instance serves a single model chosen by hardware tier:
+ *   integrated  → qwen3-vl:4b   (2.5 GB, GUI-native vision)
+ *   constrained → gemma4:e2b    (7.2 GB)
+ *   capable     → gemma4:e4b    (10 GB)
  *
- * Startup sequence:
- *   1. Detect hardware tier (constrained vs capable)
- *   2. Ensure Ollama is installed
- *   3. Start `ollama serve`
- *   4. Pull the appropriate Gemma 4 model
- *   5. Warmup request to load model into VRAM
+ * Startup: detect tier → install Ollama → start serve → pull model → warmup.
  */
 
 import { createLogger } from "../../lib/logger";
@@ -48,9 +45,9 @@ export async function initialize(onProgress?: OllamaProgressCallback): Promise<H
   _hardwareProfile = await detectHardware();
   logger.info("Hardware tier:", _hardwareProfile.tier, "Model:", _hardwareProfile.recommendedModel);
 
-  const numCtx = _hardwareProfile.tier === "constrained" ? 4096 : 32768;
+  const numCtx = 32768;
   ollamaService.setNumCtx(numCtx);
-  logger.info(`Context window set to ${numCtx} tokens`);
+  logger.info(`Context window set to ${numCtx} tokens (all tiers have 2GB+ headroom)`);
 
   await ollamaService.ensureInstalled();
   await ollamaService.startServe();

@@ -2,13 +2,7 @@ import { join } from "path";
 import { readFileSync } from "fs";
 import initSqlJs from "sql.js";
 
-const DB_PATH = join(
-  process.env.APPDATA!,
-  "@mitable",
-  "electron",
-  "on-device",
-  "mitable-local.db"
-);
+const DB_PATH = join(process.env.APPDATA!, "@mitable", "electron", "on-device", "mitable-local.db");
 
 async function main() {
   const SQL = await initSqlJs();
@@ -22,13 +16,10 @@ async function main() {
   const allSessions = new Map<string, Record<string, number>>();
 
   for (const table of tables) {
-    const stmt = db.prepare(
-      `SELECT session_id, COUNT(*) as cnt FROM ${table} GROUP BY session_id`
-    );
+    const stmt = db.prepare(`SELECT session_id, COUNT(*) as cnt FROM ${table} GROUP BY session_id`);
     while (stmt.step()) {
       const row = stmt.getAsObject() as { session_id: string; cnt: number };
-      if (!allSessions.has(row.session_id))
-        allSessions.set(row.session_id, {});
+      if (!allSessions.has(row.session_id)) allSessions.set(row.session_id, {});
       allSessions.get(row.session_id)![table] = row.cnt;
     }
     stmt.free();
@@ -61,12 +52,12 @@ async function main() {
         let taskCount = 0;
         try {
           taskCount = JSON.parse(story.tasks).length;
-        } catch {}
+        } catch {
+          /* malformed JSON */
+        }
         console.log(`  story tasks:      ${taskCount}`);
         console.log(`  story model:      ${story.model_used}`);
-        console.log(
-          `  narrative:        ${String(story.narrative).slice(0, 120)}...`
-        );
+        console.log(`  narrative:        ${String(story.narrative).slice(0, 120)}...`);
       }
       s2.free();
     }
@@ -79,16 +70,11 @@ async function main() {
       const samples: string[] = [];
       while (s3.step())
         samples.push(
-          String(
-            (s3.getAsObject() as { activity_description: string })
-              .activity_description
-          )
+          String((s3.getAsObject() as { activity_description: string }).activity_description)
         );
       s3.free();
       const hasBroken = samples.some((d) => d.includes("<think>"));
-      console.log(
-        `  class quality:    ${hasBroken ? "BROKEN (<think>)" : "OK"}`
-      );
+      console.log(`  class quality:    ${hasBroken ? "BROKEN (<think>)" : "OK"}`);
       console.log(`  sample:           ${samples[0]?.slice(0, 100)}`);
     }
 

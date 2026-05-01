@@ -30,6 +30,7 @@ export interface BlockableApp {
   source: "detected" | "installed" | "both"; // How the app was discovered
   bundleId?: string; // macOS bundle identifier (if from installed apps)
   path?: string; // Install path (if from installed apps)
+  iconDataUrl?: string; // Base64 data URL of the app icon
 }
 
 const logger = createLogger("WindowDetection");

@@ -1,3 +1,11 @@
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
 import { useState, useEffect, useRef } from "react";
 import { useIntegrations, useSyncIntegration } from "@/console/src/hooks/queries/admin";
 import IntegrationCard from "./components/IntegrationCard";

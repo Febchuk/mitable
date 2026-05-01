@@ -34,6 +34,14 @@ export type { BufferedFrame, OnDeviceSummary } from "./localInferenceService";
 
 export { localAudioService } from "./localAudioService";
 
+export { sessionTimeline } from "./sessionTimeline";
+export type {
+  SessionTimelineData,
+  TranscriptSegment,
+  AudioSegmentMeta,
+  FrameTimestamp,
+} from "./sessionTimeline";
+
 export { nativeAudioCapture } from "./nativeAudioCapture";
 export type { NativeAudioChunk } from "./nativeAudioCapture";
 

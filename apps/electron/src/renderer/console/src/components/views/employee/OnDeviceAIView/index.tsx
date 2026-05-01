@@ -166,7 +166,8 @@ export default function OnDeviceAIView({ embedded = false }: OnDeviceAIViewProps
   const getTierLabel = () => {
     if (!tier) return null;
     if (tier === "capable") return "Capable (E4B)";
-    return "Constrained (E2B)";
+    if (tier === "constrained") return "Constrained (E2B)";
+    return "Integrated (Qwen3-VL)";
   };
 
   if (isLoading) {

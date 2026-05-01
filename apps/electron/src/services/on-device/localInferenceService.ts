@@ -2,29 +2,37 @@
  * Local Inference Service — Deferred Processing
  *
  * During a session, the app is a lightweight screen/audio recorder.
- * Zero GPU usage, zero Ollama calls. Frames are already persisted to
- * disk by localFrameStorage; audio is flushed to disk by localAudioService.
+ * Zero GPU usage, zero Ollama calls. Frames are persisted to disk by
+ * localFrameStorage; audio is flushed by localAudioService with timestamped
+ * transcript segments accumulated via the session timeline ledger.
  *
  * All AI processing happens at session end via processAllAtEnd():
  *
- *   1. Load Ollama model into VRAM
- *   2. Sensor  — paired-frame vision (N, N+1) with activity delta
- *   3. Transcribe — all accumulated audio via Whisper CLI / sherpa-onnx
- *   4. Classify — text-only batches combining sensor + transcript
- *   5. RLM Storyteller — generate final markdown summary
- *   6. Export markdown for AI assistants
- *   7. Unload model from VRAM immediately
+ *   1. Load timeline.json (session clock, frame offsets, transcript segments)
+ *   2. Create .md file with header
+ *   3. Load Ollama model into VRAM
+ *   4. For each batch of 20 frames (loaded lazily from disk):
+ *      a. Sensor — 5x 4-frame consecutive vision calls with metadata
+ *      b. Match transcript segments by offsetMs overlap
+ *      c. Classify — descriptions + matched transcripts
+ *      d. Append batch section to .md immediately
+ *      e. RLM storyteller iteration
+ *   5. Write final summary to .md
+ *   6. Unload model from VRAM
  *
  * All outputs stored in local SQLite. Only final summaries leave the device.
  */
 
 import { randomUUID } from "crypto";
+import { promises as fs } from "fs";
+import { join } from "path";
 import { createLogger } from "../../lib/logger";
 import { ollamaService } from "./ollamaService";
 import { localDb } from "./localDb";
 import { localAudioService } from "./localAudioService";
 import { whisperCliService } from "./whisperCliService";
 import { sherpaWhisperService } from "./sherpaWhisperService";
+import { sessionTimeline, type TranscriptSegment } from "./sessionTimeline";
 import { runRLMLoop, type CompletionFn } from "./rlm/local-rlm-engine";
 import { StorytellerEnvironment } from "./rlm/storyteller-rlm-environment";
 import { STORYTELLER_TOOLS } from "./rlm/storyteller-rlm-tools";
@@ -37,6 +45,7 @@ import type { IntervalEvidence } from "../activityTracker";
 const logger = createLogger("LocalInference");
 
 const BATCH_SIZE = 20;
+const SENSOR_GROUP_SIZE = 4;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +54,7 @@ export interface BufferedFrame {
   sessionId: string;
   sequenceNumber: number;
   capturedAt: number;
+  offsetMs: number;
   imageBase64: string;
   previousImageBase64: string | null;
   windowId: string;
@@ -56,7 +66,11 @@ export interface BufferedFrame {
 
 interface SensorResult {
   description: string;
-  userAction: string | null;
+  frameDescriptions: Array<{
+    sequenceNumber: number;
+    description: string;
+    userAction: string | null;
+  }>;
 }
 
 // ── Service ─────────────────────────────────────────────────────────────────
@@ -97,15 +111,38 @@ class LocalInferenceService {
 
   /**
    * Run the full AI pipeline on all captured data after the session ends.
-   * This is the only time Ollama/GPU is used.
+   * Streams results to the .md file as each batch completes.
    *
-   * Steps: load model → sensor → transcribe → classify → RLM → export → unload
+   * Steps: timeline → .md header → load model → per-batch (sensor + classify + append .md + RLM) → summary → unload
    */
-  async processAllAtEnd(sessionId: string, sessionDir: string): Promise<void> {
+  async processAllAtEnd(
+    sessionId: string,
+    sessionDir: string,
+    onProgress?: (progress: {
+      sessionId: string;
+      step: string;
+      batchIndex?: number;
+      totalBatches?: number;
+      percent: number;
+      label: string;
+    }) => void
+  ): Promise<void> {
     const t0 = Date.now();
     logger.info(`processAllAtEnd starting for session ${sessionId}`);
 
-    // Load all frames from disk via localFrameStorage
+    const emit = (
+      step: string,
+      percent: number,
+      label: string,
+      extra?: { batchIndex?: number; totalBatches?: number }
+    ) => {
+      onProgress?.({ sessionId, step, percent, label, ...extra });
+    };
+
+    emit("loading_manifest", 2, "Loading session data...");
+
+    // ── Step 1: Load timeline and frame manifest ───────────────────────
+    const timeline = sessionTimeline.load(sessionDir) ?? sessionTimeline.get();
     const { localFrameStorage } = await import("../localFrameStorage");
     const manifest = await localFrameStorage.loadManifest(sessionId);
     if (!manifest || manifest.frames.length === 0) {
@@ -113,60 +150,118 @@ class LocalInferenceService {
       return;
     }
 
-    logger.info(`Found ${manifest.frames.length} frames on disk`);
+    const sessionStartMs = timeline?.sessionStartMs ?? new Date(manifest.startedAt).getTime();
+    const allFrameMeta = manifest.frames;
+    logger.info(`Found ${allFrameMeta.length} frames on disk`);
 
-    // Build BufferedFrame objects from manifest + disk images
-    const allFrames: BufferedFrame[] = [];
-    for (const frameMeta of manifest.frames) {
-      const imageBase64 = await localFrameStorage.getFrameAsDataUrl(sessionId, frameMeta.filename);
-      if (!imageBase64) {
-        logger.warn(`Skipping frame ${frameMeta.sequenceNumber} — image not found on disk`);
-        continue;
-      }
-
-      allFrames.push({
-        frameId: frameMeta.frameId,
-        sessionId,
-        sequenceNumber: frameMeta.sequenceNumber,
-        capturedAt: new Date(frameMeta.timestamp).getTime(),
-        imageBase64,
-        previousImageBase64: null,
-        windowId: frameMeta.windowSourceId,
-        appName: frameMeta.appName,
-        windowTitle: frameMeta.windowTitle,
-      });
+    // ── Step 2: Create .md file with clean header ──────────────────────
+    const mdPath = await this.initMarkdownFile(sessionId, sessionStartMs, allFrameMeta);
+    if (!mdPath) {
+      logger.error("Failed to create markdown file — continuing without streaming writes");
     }
 
-    logger.info(`Loaded ${allFrames.length} frames into memory for processing`);
-
-    if (allFrames.length === 0) return;
-
-    // ── Step 1: Load Ollama model ──────────────────────────────────────
+    // ── Step 3: Load Ollama model ──────────────────────────────────────
+    emit("loading_model", 5, "Loading AI model...");
     logger.info("Loading Ollama model for end-of-session processing...");
     if (!ollamaService.isReady()) {
       const { initialize } = await import("./ollamaLifecycle");
       await initialize();
     }
+    emit("loading_model", 10, "AI model ready");
+
+    // Get transcript segments from timeline (accumulated during recording)
+    const allTranscripts = localAudioService.getAccumulatedTranscripts();
+    const hasStreamedAudio = allTranscripts.length > 0;
+
+    emit("transcribing", 12, "Processing audio transcripts...");
+
+    if (hasStreamedAudio) {
+      logger.info(`Using ${allTranscripts.length} streaming transcript segments`);
+      for (let i = 0; i < allTranscripts.length; i++) {
+        const seg = allTranscripts[i];
+        localDb.insertTranscription({
+          id: randomUUID(),
+          sessionId,
+          chunkIndex: i,
+          speakerId: seg.source === "user" ? 0 : 1,
+          transcript: seg.text,
+          startTimeMs: Math.round(seg.startOffsetMs),
+          endTimeMs: Math.round(seg.endOffsetMs),
+          confidence: 0.9,
+          source: seg.source,
+        });
+      }
+    } else {
+      logger.info("No streaming transcripts — will transcribe from disk as fallback");
+      const audioData = localAudioService.readAllAudio(sessionDir);
+      if (audioData.user.durationSec > 0 || audioData.remote.durationSec > 0) {
+        await this.transcribeAllAudio(audioData, sessionId);
+      }
+    }
+
+    emit("transcribing", 18, "Audio processing complete");
 
     try {
-      // ── Step 2: Sensor — process all frames in batches ─────────────
-      logger.info("Running paired sensor on all frames...");
+      // ── Step 4: Process frames in batches ────────────────────────────
+      const totalBatches = Math.ceil(allFrameMeta.length / BATCH_SIZE);
       let batchIndex = 0;
 
-      for (let offset = 0; offset < allFrames.length; offset += BATCH_SIZE) {
-        const batch = allFrames.slice(offset, offset + BATCH_SIZE);
+      for (let offset = 0; offset < allFrameMeta.length; offset += BATCH_SIZE) {
+        const batchMeta = allFrameMeta.slice(offset, offset + BATCH_SIZE);
         const batchIdx = batchIndex++;
 
+        const batchPercent = 20 + Math.round((batchIdx / totalBatches) * 60);
+        emit(
+          "processing_batch",
+          batchPercent,
+          `Analyzing frames (${batchIdx + 1} of ${totalBatches})...`,
+          {
+            batchIndex: batchIdx,
+            totalBatches,
+          }
+        );
+
+        // Lazy-load only this batch's images from disk
+        const batch: BufferedFrame[] = [];
+        for (const frameMeta of batchMeta) {
+          const imageBase64 = await localFrameStorage.getFrameAsDataUrl(
+            sessionId,
+            frameMeta.filename
+          );
+          if (!imageBase64) {
+            logger.warn(`Skipping frame ${frameMeta.sequenceNumber} — image not found`);
+            continue;
+          }
+          const capturedAt = new Date(frameMeta.timestamp).getTime();
+          batch.push({
+            frameId: frameMeta.frameId,
+            sessionId,
+            sequenceNumber: frameMeta.sequenceNumber,
+            capturedAt,
+            offsetMs: capturedAt - sessionStartMs,
+            imageBase64,
+            previousImageBase64: null,
+            windowId: frameMeta.windowSourceId,
+            appName: frameMeta.appName,
+            windowTitle: frameMeta.windowTitle,
+          });
+        }
+
+        if (batch.length === 0) continue;
+
         logger.info(
-          `Sensor batch ${batchIdx}: ${batch.length} frames ` +
+          `Batch ${batchIdx}: ${batch.length} frames ` +
             `(seq ${batch[0].sequenceNumber}-${batch[batch.length - 1].sequenceNumber})`
         );
 
-        const sensorResults = await this.runPairedSensor(batch);
-        const sensorByFrame = this.buildSensorLookup(batch, sensorResults);
+        // 4a. Sensor — 4-frame consecutive vision calls
+        const sensorResults = await this.runConsecutiveSensor(batch);
 
+        // Store captures in SQLite
         for (const frame of batch) {
-          const action = this.inferAction(frame.intervalEvidence);
+          const frameDesc = sensorResults
+            .flatMap((s) => s.frameDescriptions)
+            .find((fd) => fd.sequenceNumber === frame.sequenceNumber);
           localDb.insertCapture({
             id: randomUUID(),
             sessionId: frame.sessionId,
@@ -176,8 +271,7 @@ class LocalInferenceService {
             windowId: frame.windowId,
             appName: frame.appName,
             windowTitle: frame.windowTitle,
-            sensorOutput:
-              sensorByFrame.get(frame.sequenceNumber) ?? `[${frame.appName}] ${frame.windowTitle}`,
+            sensorOutput: frameDesc?.description ?? `[${frame.appName}] ${frame.windowTitle}`,
             deltaChanged:
               (frame.intervalEvidence?.keyboardEventCount ?? 0) > 0 ||
               (frame.intervalEvidence?.mouseClickCount ?? 0) > 0,
@@ -186,12 +280,28 @@ class LocalInferenceService {
               (frame.intervalEvidence?.mouseClickCount ?? 0) > 0
                 ? "user_interaction"
                 : "passive_view",
-            userAction: action,
+            userAction: frameDesc?.userAction ?? this.inferAction(frame.intervalEvidence),
           });
         }
 
-        // ── Step 3: Classify batch ───────────────────────────────────
-        const chunkNarrative = await this.classifyBatch(batch, sensorResults, "");
+        // 4b. Match transcript segments by time overlap
+        const batchStartOffset = batch[0].offsetMs;
+        const batchEndOffset = batch[batch.length - 1].offsetMs;
+        const matchedTranscripts = hasStreamedAudio
+          ? allTranscripts.filter(
+              (seg) => seg.endOffsetMs > batchStartOffset && seg.startOffsetMs < batchEndOffset
+            )
+          : [];
+
+        const transcriptText = matchedTranscripts
+          .map((seg) => {
+            const speaker = seg.source === "user" ? "User" : "Remote";
+            return `${speaker}: ${seg.text}`;
+          })
+          .join("\n");
+
+        // 4c. Classify batch with sensor + transcript
+        const chunkNarrative = await this.classifyBatch(batch, sensorResults, transcriptText);
         localDb.insertClassification({
           id: randomUUID(),
           sessionId,
@@ -206,129 +316,67 @@ class LocalInferenceService {
           rawOutput: "",
         });
 
+        // 4d. Append batch section to .md immediately
+        if (mdPath) {
+          await this.appendBatchToMarkdown(
+            mdPath,
+            batchIdx,
+            batch,
+            sensorResults,
+            matchedTranscripts,
+            chunkNarrative,
+            sessionStartMs
+          );
+        }
+
         logger.info(`Batch ${batchIdx} complete: ${chunkNarrative.slice(0, 120)}`);
       }
 
-      // ── Step 4: Use streaming transcripts (built during recording) ───
-      const streamedTranscripts = localAudioService.getAccumulatedTranscripts();
-      const hasStreamedAudio =
-        streamedTranscripts.user.length > 0 || streamedTranscripts.remote.length > 0;
-
-      if (hasStreamedAudio) {
-        logger.info(
-          `Using streaming transcripts: user=${streamedTranscripts.user.length} chars, ` +
-            `remote=${streamedTranscripts.remote.length} chars`
-        );
-        for (const source of ["user", "remote"] as const) {
-          const text = streamedTranscripts[source];
-          if (text.length === 0) continue;
-          localDb.insertTranscription({
-            id: randomUUID(),
-            sessionId,
-            source,
-            text,
-            durationSec: 0,
-            engine: "whisper-cli-streaming",
-          });
-          logger.info(`[${source}] streaming transcript: ${text.slice(0, 100)}...`);
-        }
-      } else {
-        // Fallback: transcribe all audio from disk (if streaming didn't run)
-        logger.info("No streaming transcripts — transcribing from disk...");
-        const audioData = localAudioService.readAllAudio(sessionDir);
-        const hasAudio = audioData.user.durationSec > 0 || audioData.remote.durationSec > 0;
-        if (hasAudio) {
-          await this.transcribeAllAudio(audioData, sessionId);
-        } else {
-          logger.info("No audio data found for this session");
-        }
-      }
-
-      // ── Step 5: Inject transcripts into classifications ──────────────
-      // Re-read classifications to update the last batch with the full transcript
-      const transcriptions = localDb.getTranscriptionsForSession(sessionId);
-      if (transcriptions.length > 0) {
-        const transcriptText = transcriptions
-          .map((t) => {
-            const speaker = t.source === "user" ? "User" : "Remote";
-            return `${speaker}: ${t.transcript}`;
-          })
-          .join("\n");
-
-        // Re-classify the last batch with the transcript context
-        const lastBatchFrames = allFrames.slice(Math.max(0, allFrames.length - BATCH_SIZE));
-        if (lastBatchFrames.length > 0) {
-          const lastSensor = await this.runPairedSensor(lastBatchFrames);
-          const enrichedNarrative = await this.classifyBatch(
-            lastBatchFrames,
-            lastSensor,
-            transcriptText
-          );
-
-          const classifications = localDb.getClassificationsForSession(sessionId);
-          if (classifications.length > 0) {
-            const lastClass = classifications[classifications.length - 1];
-            localDb.updateClassificationDescription(lastClass.id, enrichedNarrative);
-            logger.info("Enriched last classification with audio transcript");
-          }
-        }
-      }
-
-      // ── Step 6: RLM Storyteller ──────────────────────────────────────
+      // ── Step 5: RLM Storyteller ──────────────────────────────────────
+      emit("generating_summary", 85, "Writing summary...");
       logger.info("Generating session summary via RLM storyteller...");
-      await this.generateSummary(sessionId);
+      const lastFrameTs = new Date(allFrameMeta[allFrameMeta.length - 1].timestamp).getTime();
+      const realDurationMin = Math.max(1, Math.round((lastFrameTs - sessionStartMs) / 60_000));
+      await this.generateSummary(sessionId, realDurationMin);
 
-      // ── Step 7: Export markdown ────────────────────────────────────────
-      const mdPath = await this.exportSessionMarkdown(sessionId);
+      // ── Step 6: Prepend summary to .md ────────────────────────────────
+      emit("exporting", 95, "Finalizing...");
       if (mdPath) {
-        logger.info("Session markdown exported:", mdPath);
+        await this.prependSummaryToMarkdown(mdPath, sessionId);
       }
     } finally {
-      // ── Step 8: Unload model immediately ─────────────────────────────
       logger.info("Unloading Ollama model from VRAM...");
       await ollamaService.forceUnloadModel();
     }
 
+    emit("complete", 100, "Done");
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     logger.info(`processAllAtEnd completed in ${elapsed}s`);
   }
 
-  // ── Step 1: Paired-frame sensor ─────────────────────────────────────────
+  // ── Sensor: 4-frame consecutive vision calls ────────────────────────────
   //
-  // Group by windowId, then pair consecutive frames from the SAME window
-  // so the sensor sees temporal deltas (same app, 10s apart) not cross-window.
+  // Process frames in groups of 4 consecutive screenshots. The model receives
+  // all 4 images + per-frame metadata (app, title, URL, activity events).
+  // No window grouping — chronological order preserved, context switches visible.
 
-  private async runPairedSensor(batch: BufferedFrame[]): Promise<SensorResult[]> {
-    const byWindow = new Map<string, BufferedFrame[]>();
-    for (const frame of batch) {
-      const key = frame.windowId || frame.appName;
-      if (!byWindow.has(key)) byWindow.set(key, []);
-      byWindow.get(key)!.push(frame);
-    }
-
-    const pairs: Array<{ frameA: BufferedFrame; frameB: BufferedFrame | null }> = [];
-    for (const [, frames] of byWindow) {
-      frames.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
-      for (let i = 0; i < frames.length; i += 2) {
-        pairs.push({
-          frameA: frames[i],
-          frameB: i + 1 < frames.length ? frames[i + 1] : null,
-        });
-      }
-    }
-
-    pairs.sort((a, b) => a.frameA.capturedAt - b.frameA.capturedAt);
-
+  private async runConsecutiveSensor(batch: BufferedFrame[]): Promise<SensorResult[]> {
     const results: SensorResult[] = [];
-    for (const { frameA, frameB } of pairs) {
+
+    for (let i = 0; i < batch.length; i += SENSOR_GROUP_SIZE) {
+      const group = batch.slice(i, i + SENSOR_GROUP_SIZE);
       try {
-        const result = await this.analyzeFramePair(frameA, frameB);
+        const result = await this.analyzeFrameGroup(group);
         results.push(result);
       } catch (err) {
-        logger.warn(`Sensor pair failed (seq ${frameA.sequenceNumber}):`, String(err));
+        logger.warn(`Sensor group failed (seq ${group[0].sequenceNumber}):`, String(err));
         results.push({
-          description: `[${frameA.appName}] ${frameA.windowTitle}`,
-          userAction: this.inferAction(frameA.intervalEvidence),
+          description: group.map((f) => `[${f.appName}] ${f.windowTitle}`).join("; "),
+          frameDescriptions: group.map((f) => ({
+            sequenceNumber: f.sequenceNumber,
+            description: `[${f.appName}] ${f.windowTitle}`,
+            userAction: this.inferAction(f.intervalEvidence),
+          })),
         });
       }
     }
@@ -336,130 +384,101 @@ class LocalInferenceService {
     return results;
   }
 
-  private buildSensorLookup(
-    batch: BufferedFrame[],
-    sensorResults: SensorResult[]
-  ): Map<number, string> {
-    const lookup = new Map<number, string>();
+  private async analyzeFrameGroup(frames: BufferedFrame[]): Promise<SensorResult> {
+    const sessionStartMs = sessionTimeline.getSessionStartMs();
 
-    const byWindow = new Map<string, BufferedFrame[]>();
-    for (const frame of batch) {
-      const key = frame.windowId || frame.appName;
-      if (!byWindow.has(key)) byWindow.set(key, []);
-      byWindow.get(key)!.push(frame);
-    }
-
-    const pairs: { frameA: BufferedFrame; frameB: BufferedFrame | null }[] = [];
-    for (const [, frames] of byWindow) {
-      frames.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
-      for (let i = 0; i < frames.length; i += 2) {
-        pairs.push({
-          frameA: frames[i],
-          frameB: i + 1 < frames.length ? frames[i + 1] : null,
-        });
-      }
-    }
-    pairs.sort((a, b) => a.frameA.capturedAt - b.frameA.capturedAt);
-
-    for (let i = 0; i < pairs.length && i < sensorResults.length; i++) {
-      const desc = sensorResults[i].description;
-      lookup.set(pairs[i].frameA.sequenceNumber, desc);
-      if (pairs[i].frameB) {
-        lookup.set(pairs[i].frameB!.sequenceNumber, desc);
-      }
-    }
-
-    return lookup;
-  }
-
-  private async analyzeFramePair(
-    frameA: BufferedFrame,
-    frameB: BufferedFrame | null
-  ): Promise<SensorResult> {
-    const activityParts: string[] = [];
-    for (const frame of [frameA, frameB].filter(Boolean) as BufferedFrame[]) {
-      const ev = frame.intervalEvidence;
-      if (!ev) continue;
-      const parts: string[] = [];
-      if (ev.keyboardEventCount > 0) parts.push(`${ev.keyboardEventCount} keystrokes`);
-      if (ev.mouseClickCount > 0) parts.push(`${ev.mouseClickCount} clicks`);
-      if (ev.mouseScrollCount > 0) parts.push(`${ev.mouseScrollCount} scrolls`);
-      if (ev.copyCount > 0) parts.push(`${ev.copyCount} copies`);
-      if (ev.pasteCount > 0) parts.push(`${ev.pasteCount} pastes`);
-      if (parts.length > 0) activityParts.push(parts.join(", "));
-    }
-
-    const contextLines: string[] = [];
-    contextLines.push(`App: ${frameA.appName}`);
-    if (frameA.windowTitle) contextLines.push(`Window: ${frameA.windowTitle}`);
-    if (frameB && frameB.appName !== frameA.appName) {
-      contextLines.push(`Then switched to: ${frameB.appName} — ${frameB.windowTitle}`);
-    }
-    if (frameA.browserContext) {
-      contextLines.push(`URL: ${frameA.browserContext.activeTabUrl}`);
-    }
-    if (activityParts.length > 0) {
-      contextLines.push(`Activity between frames: ${activityParts.join("; ")}`);
-    }
-
-    const contextStr = contextLines.join("\n");
-
+    const frameContexts: string[] = [];
     const imageContents: Array<{ type: "image_url"; image_url: { url: string } }> = [];
 
-    imageContents.push({
-      type: "image_url",
-      image_url: { url: this.ensureDataUrl(frameA.imageBase64) },
-    });
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      const offsetSec = ((frame.capturedAt - sessionStartMs) / 1000).toFixed(0);
+      const lines: string[] = [];
 
-    if (frameB) {
+      lines.push(`Frame ${i + 1} (${offsetSec}s into session):`);
+      lines.push(`  App: ${frame.appName} | Title: ${frame.windowTitle}`);
+      if (frame.browserContext) {
+        lines.push(`  URL: ${frame.browserContext.activeTabUrl}`);
+      }
+
+      const ev = frame.intervalEvidence;
+      if (ev) {
+        const parts: string[] = [];
+        if (ev.keyboardEventCount > 0) parts.push(`${ev.keyboardEventCount} keystrokes`);
+        if (ev.mouseClickCount > 0) parts.push(`${ev.mouseClickCount} clicks`);
+        if (ev.mouseScrollCount > 0) parts.push(`${ev.mouseScrollCount} scrolls`);
+        if (ev.copyCount > 0) parts.push(`${ev.copyCount} copies`);
+        if (ev.pasteCount > 0) parts.push(`${ev.pasteCount} pastes`);
+        if (parts.length > 0) lines.push(`  Activity: ${parts.join(", ")}`);
+      }
+
+      frameContexts.push(lines.join("\n"));
       imageContents.push({
         type: "image_url",
-        image_url: { url: this.ensureDataUrl(frameB.imageBase64) },
+        image_url: { url: this.ensureDataUrl(frame.imageBase64) },
       });
     }
 
-    const imageCount = imageContents.length;
-    const promptText =
-      imageCount === 1
-        ? `What content is on screen? 1-2 sentences max.\n${contextStr}`
-        : `Same app, ~10s apart. What content is visible and what changed? 1-2 sentences max.\n${contextStr}`;
+    const metadataStr = frameContexts.join("\n\n");
+    const promptText = `${frames.length} consecutive screenshots (~10s apart). Describe what's visible on each screen and what the user is doing. Note any app switches.\n\n${metadataStr}`;
 
     const response = await ollamaService.chatCompletion(
       [
         {
           role: "system",
           content:
-            "You read screen content in 1-2 plain sentences. No markdown, no headers, no bullet points. Be specific: name the video title, file name, URL, function, chat contact, email subject — whatever is visible. Example good output: 'YouTube video \"How GPS Works\" at 4:32, showing satellite orbit diagram.' Example bad output: '### Screenshot Analysis\\nThe user is viewing...' — NEVER do this. Just plain sentences describing what you see.",
+            "You describe screen activity across consecutive screenshots in plain sentences. " +
+            "Be specific: name files, URLs, video titles, code functions, chat contacts — whatever is visible. " +
+            "Note app switches when the metadata changes between frames. " +
+            "Write one sentence per frame, prefixed with the frame number. " +
+            "Example: 'Frame 1: VS Code editing localInferenceService.ts, function processAllAtEnd visible. " +
+            "Frame 2: Same file, scrolled down to the sensor method. " +
+            "Frame 3: Switched to Chrome, Stack Overflow page about streaming file writes. " +
+            "Frame 4: Same SO page, scrolling through accepted answer.' " +
+            "No markdown formatting, no headers, no bullets.",
         },
         {
           role: "user",
           content: [...imageContents, { type: "text", text: promptText }],
         },
       ],
-      { temperature: 0.1, max_tokens: 100 }
+      { temperature: 0.1, max_tokens: 200 }
     );
 
-    let description = response.trim();
+    let fullDescription = response.trim();
 
-    const lower = description.toLowerCase();
+    // Detect hallucination
+    const lower = fullDescription.toLowerCase();
     const isHallucination =
       (lower.includes("provide") &&
         (lower.includes("screenshot") || lower.includes("image") || lower.includes("frame"))) ||
       (lower.includes("awaiting") && lower.includes("input")) ||
-      (lower.includes("need") && lower.includes("screenshot")) ||
       lower.includes("no visual content") ||
-      lower.includes("no content visible") ||
-      lower.includes("no images were provided") ||
-      (lower.startsWith("(") && lower.includes("waiting"));
+      lower.includes("no images were provided");
 
     if (isHallucination) {
-      description = `${frameA.appName}: ${frameA.windowTitle}`;
+      fullDescription = frames
+        .map((f, i) => `Frame ${i + 1}: ${f.appName} — ${f.windowTitle}`)
+        .join(". ");
     }
 
-    return {
-      description,
-      userAction: this.inferAction(frameA.intervalEvidence),
-    };
+    // Parse per-frame descriptions from the response
+    const frameDescriptions = frames.map((frame, i) => {
+      const framePrefix = `frame ${i + 1}:`;
+      const lines = fullDescription.split(/(?=frame \d+:)/i);
+      const matchLine = lines.find((l) => l.toLowerCase().startsWith(framePrefix));
+      const desc = matchLine
+        ? matchLine.replace(/^frame \d+:\s*/i, "").trim()
+        : `[${frame.appName}] ${frame.windowTitle}`;
+
+      return {
+        sequenceNumber: frame.sequenceNumber,
+        description: desc,
+        userAction: this.inferAction(frame.intervalEvidence),
+      };
+    });
+
+    return { description: fullDescription, frameDescriptions };
   }
 
   private ensureDataUrl(base64: string): string {
@@ -548,10 +567,7 @@ class LocalInferenceService {
     sensorResults: SensorResult[],
     transcript: string
   ): Promise<string> {
-    const descriptionLines = sensorResults.map((s) => {
-      const action = s.userAction ? ` [${s.userAction}]` : "";
-      return `${action} ${s.description}`.trim();
-    });
+    const descriptionLines = sensorResults.map((s) => s.description);
 
     let prompt = `Screen observations from ${batch.length} frames:\n`;
     prompt += descriptionLines.join("\n");
@@ -577,7 +593,7 @@ class LocalInferenceService {
 
   // ── Session-end summary (RLM storyteller) ───────────────────────────────
 
-  async generateSummary(sessionId: string): Promise<string> {
+  async generateSummary(sessionId: string, totalMinutes?: number): Promise<string> {
     const classifications = localDb.getClassificationsForSession(sessionId);
     const transcriptions = localDb.getTranscriptionsForSession(sessionId);
 
@@ -606,6 +622,7 @@ class LocalInferenceService {
       classifications,
       transcriptions,
       completionFn,
+      totalMinutes,
     });
 
     const result = await runRLMLoop<StorytellerEnvironment, { narrative: string }>(
@@ -672,42 +689,21 @@ class LocalInferenceService {
     };
   }
 
-  // ── Markdown export for AI assistants ──────────────────────────────────
+  // ── Streaming Markdown — file grows as batches complete ──────────────────
 
-  async exportSessionMarkdown(sessionId: string): Promise<string | null> {
-    const captures = localDb.getCapturesForSession(sessionId);
-    const classifications = localDb.getClassificationsForSession(sessionId);
-    const transcriptions = localDb.getTranscriptionsForSession(sessionId);
-    const story = localDb.getStoryForSession(sessionId);
+  private currentMdPath: string | null = null;
+  private currentBlockNum = 0;
 
-    if (captures.length === 0 && classifications.length === 0) {
-      logger.warn("No data to export for session", sessionId);
-      return null;
-    }
-
-    const firstCapture = captures[0];
-    const lastCapture = captures[captures.length - 1];
-    const sessionDate = firstCapture ? new Date(firstCapture.capturedAt) : new Date();
-    const endDate = lastCapture ? new Date(lastCapture.capturedAt) : sessionDate;
-
-    const startTime = sessionDate.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    const endTime = endDate.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    const durationMin = Math.round((endDate.getTime() - sessionDate.getTime()) / 60_000);
-    const apps = [...new Set(captures.map((c) => c.appName).filter(Boolean))];
-
-    const monthName = sessionDate.toLocaleString("en-US", { month: "long" }).toLowerCase();
-    const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
-
+  private async initMarkdownFile(
+    sessionId: string,
+    sessionStartMs: number,
+    frameMeta: Array<{ timestamp: string; appName: string }>
+  ): Promise<string | null> {
     try {
       const { app: electronApp } = await import("electron");
-      const { promises: fs } = await import("fs");
-      const { join } = await import("path");
+      const sessionDate = new Date(sessionStartMs);
+      const monthName = sessionDate.toLocaleString("en-US", { month: "long" }).toLowerCase();
+      const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
 
       const docsDir = electronApp.getPath("documents");
       const dayDir = join(docsDir, "Mitable", "blockdata", dayFolder);
@@ -722,169 +718,203 @@ class LocalInferenceService {
             const match = f.match(/^block_(\d+)/);
             return match ? parseInt(match[1], 10) : 0;
           });
-        if (blockNums.length > 0) {
-          blockNum = Math.max(...blockNums) + 1;
-        }
+        if (blockNums.length > 0) blockNum = Math.max(...blockNums) + 1;
       } catch {
         /* fresh directory */
       }
 
-      const sections: string[] = [];
+      this.currentBlockNum = blockNum;
+      const apps = [...new Set(frameMeta.map((f) => f.appName).filter(Boolean))];
+      const startTime = sessionDate.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
 
       const header = [
         `# Mitable Block ${blockNum}`,
         ``,
         `- **Date:** ${sessionDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`,
-        `- **Time:** ${startTime} – ${endTime} (${durationMin} min)`,
-        `- **Frames captured:** ${captures.length}`,
+        `- **Started:** ${startTime}`,
+        `- **Frames captured:** ${frameMeta.length}`,
         `- **Applications used:** ${apps.join(", ") || "Unknown"}`,
         `- **Session:** ${sessionId}`,
         ``,
+        `---`,
+        ``,
+        `## Detailed Activity Log`,
+        ``,
       ].join("\n");
-      sections.push(header);
 
-      if (story && story.narrative.length > 30) {
-        sections.push(`## Summary\n\n${story.narrative}\n`);
-      }
+      const mdFilePath = join(dayDir, `block_${blockNum}.md`);
+      await fs.writeFile(mdFilePath, header, "utf-8");
 
-      sections.push(`---\n\n## Detailed Activity Log\n`);
+      this.currentMdPath = mdFilePath;
+      this.exportPaths.set(sessionId, mdFilePath);
+      localDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
 
-      for (const batch of classifications) {
-        const batchCaptures = captures.filter(
-          (c) => c.sequenceNumber >= batch.startSequence && c.sequenceNumber <= batch.endSequence
-        );
-        const batchStart = batchCaptures[0]
-          ? new Date(batchCaptures[0].capturedAt).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-          : "?";
-        const batchEnd =
-          batchCaptures.length > 0
-            ? new Date(batchCaptures[batchCaptures.length - 1].capturedAt).toLocaleTimeString(
-                "en-US",
-                { hour: "numeric", minute: "2-digit", second: "2-digit" }
-              )
-            : "?";
-
-        const batchLines: string[] = [];
-        batchLines.push(
-          `### Batch ${batch.batchIndex + 1} (${batchStart} – ${batchEnd}, ${batchCaptures.length} frames)\n`
-        );
-
-        if (batch.activityDescription) {
-          batchLines.push(`**Summary:** ${batch.activityDescription}\n`);
-        }
-
-        batchLines.push(`**Screen observations:**\n`);
-        let lastDescription = "";
-        for (const cap of batchCaptures) {
-          const description = cap.sensorOutput || cap.windowTitle;
-          const time = new Date(cap.capturedAt).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-          });
-          const action = cap.userAction ? ` [${cap.userAction}]` : "";
-
-          if (description === lastDescription) {
-            batchLines.push(`- **${time}** | ${cap.appName}${action}: *(continued)*`);
-          } else {
-            const text =
-              description.length > 250 ? description.slice(0, 250).trimEnd() + "…" : description;
-            batchLines.push(`- **${time}** | ${cap.appName}${action}: ${text}`);
-          }
-          lastDescription = description;
-        }
-        batchLines.push(``);
-
-        const batchTranscripts = transcriptions.filter((t) => t.chunkIndex === batch.batchIndex);
-        if (batchTranscripts.length > 0) {
-          batchLines.push(`**Audio transcript:**\n`);
-          for (const t of batchTranscripts) {
-            const speaker = t.source === "user" ? "User" : "Remote";
-            batchLines.push(`> ${speaker}: ${t.transcript}`);
-          }
-          batchLines.push(``);
-        }
-
-        sections.push(batchLines.join("\n"));
-      }
-
-      const classifiedMax =
-        classifications.length > 0 ? Math.max(...classifications.map((c) => c.endSequence)) : -1;
-      const uncovered = captures.filter((c) => c.sequenceNumber > classifiedMax);
-      if (uncovered.length > 0) {
-        const tailLines: string[] = [];
-        tailLines.push(`### Remaining observations (${uncovered.length} frames)\n`);
-        let lastDesc = "";
-        for (const cap of uncovered) {
-          const time = new Date(cap.capturedAt).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-          });
-          const description = cap.sensorOutput || cap.windowTitle;
-          if (description === lastDesc) {
-            tailLines.push(`- **${time}** | ${cap.appName}: *(continued)*`);
-          } else {
-            const text =
-              description.length > 250 ? description.slice(0, 250).trimEnd() + "…" : description;
-            tailLines.push(`- **${time}** | ${cap.appName}: ${text}`);
-          }
-          lastDesc = description;
-        }
-        tailLines.push(``);
-        sections.push(tailLines.join("\n"));
-      }
-
-      sections.push(
-        `---\n\n*Exported by Mitable. Paste this file into any AI assistant to generate reports, summaries, or analysis from your work session.*\n`
-      );
-
-      const MAX_BYTES = 8 * 1024 * 1024;
-      const files: Array<{ name: string; content: string }> = [];
-      let currentContent = "";
-      let partNum = 1;
-
-      for (const section of sections) {
-        const wouldBe = Buffer.byteLength(currentContent + section, "utf-8");
-        if (wouldBe > MAX_BYTES && currentContent.length > 0) {
-          const name =
-            partNum === 1 ? `block_${blockNum}.md` : `block_${blockNum}_part_${partNum}.md`;
-          files.push({ name, content: currentContent });
-          partNum++;
-          currentContent = section;
-        } else {
-          currentContent += section;
-        }
-      }
-      if (currentContent.length > 0) {
-        const name =
-          partNum === 1 ? `block_${blockNum}.md` : `block_${blockNum}_part_${partNum}.md`;
-        files.push({ name, content: currentContent });
-      }
-
-      const writtenPaths: string[] = [];
-      for (const file of files) {
-        const filepath = join(dayDir, file.name);
-        await fs.writeFile(filepath, file.content, "utf-8");
-        writtenPaths.push(filepath);
-      }
-
-      const totalSize = files.reduce((sum, f) => sum + Buffer.byteLength(f.content, "utf-8"), 0);
-      logger.info(
-        `Block ${blockNum} exported to ${dayDir} (${files.length} file(s), ${Math.round(totalSize / 1024)} KB)`
-      );
-
-      this.exportPaths.set(sessionId, writtenPaths[0]);
-      localDb.updateMonitoringSessionExportPath(sessionId, writtenPaths[0]);
-      return writtenPaths[0];
+      logger.info(`Streaming .md created: ${mdFilePath}`);
+      return mdFilePath;
     } catch (err) {
-      logger.error("Failed to export session markdown:", String(err));
+      logger.error("Failed to init markdown file:", String(err));
       return null;
     }
+  }
+
+  private async appendBatchToMarkdown(
+    mdPath: string,
+    batchIdx: number,
+    batch: BufferedFrame[],
+    sensorResults: SensorResult[],
+    transcripts: TranscriptSegment[],
+    classifierSummary: string,
+    sessionStartMs: number
+  ): Promise<void> {
+    try {
+      const batchStart = new Date(batch[0].capturedAt).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      const batchEnd = new Date(batch[batch.length - 1].capturedAt).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      const lines: string[] = [];
+      lines.push(`### ${batchStart} – ${batchEnd} (${batch.length} frames)\n`);
+
+      if (classifierSummary) {
+        lines.push(`**Summary:** ${classifierSummary}\n`);
+      }
+
+      // Build chronological events: frame descriptions + transcript segments
+      interface TimeEvent {
+        offsetMs: number;
+        wallClock: string;
+        type: "frame" | "transcript";
+        content: string;
+      }
+
+      const events: TimeEvent[] = [];
+
+      // Add frame descriptions
+      const allFrameDescs = sensorResults.flatMap((s) => s.frameDescriptions);
+      for (const frame of batch) {
+        const fd = allFrameDescs.find((d) => d.sequenceNumber === frame.sequenceNumber);
+        const desc = fd?.description ?? `[${frame.appName}] ${frame.windowTitle}`;
+        const action = fd?.userAction ? ` [${fd.userAction}]` : "";
+        const wallClock = new Date(frame.capturedAt).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        events.push({
+          offsetMs: frame.offsetMs,
+          wallClock,
+          type: "frame",
+          content: `- **${wallClock}** | ${frame.appName}${action}: ${desc.length > 250 ? desc.slice(0, 250) + "…" : desc}`,
+        });
+      }
+
+      // Add transcript segments
+      for (const seg of transcripts) {
+        const wallStart = new Date(sessionStartMs + seg.startOffsetMs).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const wallEnd = new Date(sessionStartMs + seg.endOffsetMs).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const speaker = seg.source === "user" ? "User" : "Remote";
+        events.push({
+          offsetMs: seg.startOffsetMs,
+          wallClock: wallStart,
+          type: "transcript",
+          content: `> **Audio (${wallStart} – ${wallEnd}):** ${speaker}: ${seg.text}`,
+        });
+      }
+
+      // Sort by offsetMs for chronological order
+      events.sort((a, b) => a.offsetMs - b.offsetMs);
+
+      for (const ev of events) {
+        lines.push(ev.content);
+      }
+
+      lines.push(`\n`);
+
+      await fs.appendFile(mdPath, lines.join("\n"), "utf-8");
+    } catch (err) {
+      logger.error("Failed to append batch to .md:", String(err));
+    }
+  }
+
+  private async prependSummaryToMarkdown(mdPath: string, sessionId: string): Promise<void> {
+    try {
+      const story = localDb.getStoryForSession(sessionId);
+      if (!story || story.narrative.length <= 30) return;
+
+      const existing = await fs.readFile(mdPath, "utf-8");
+
+      // Insert summary after the header, before "## Detailed Activity Log"
+      const insertPoint = existing.indexOf("## Detailed Activity Log");
+      if (insertPoint === -1) {
+        await fs.appendFile(mdPath, `\n## Summary\n\n${story.narrative}\n`, "utf-8");
+        return;
+      }
+
+      const before = existing.slice(0, insertPoint);
+      const after = existing.slice(insertPoint);
+      const withSummary = `${before}## Summary\n\n${story.narrative}\n\n${after}`;
+
+      // Also update the header with final time range
+      const captures = localDb.getCapturesForSession(sessionId);
+      if (captures.length > 0) {
+        const endTime = new Date(captures[captures.length - 1].capturedAt).toLocaleTimeString(
+          "en-US",
+          {
+            hour: "numeric",
+            minute: "2-digit",
+          }
+        );
+        const startTime = new Date(captures[0].capturedAt).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        });
+        const durationMin = Math.round(
+          (captures[captures.length - 1].capturedAt - captures[0].capturedAt) / 60_000
+        );
+        const updatedContent = withSummary.replace(
+          /- \*\*Started:\*\* .+/,
+          `- **Time:** ${startTime} – ${endTime} (${durationMin} min)`
+        );
+
+        await fs.writeFile(mdPath, updatedContent, "utf-8");
+      } else {
+        await fs.writeFile(mdPath, withSummary, "utf-8");
+      }
+
+      // Append footer
+      await fs.appendFile(
+        mdPath,
+        `---\n\n*Exported by Mitable. Paste this file into any AI assistant to generate reports, summaries, or analysis from your work session.*\n`,
+        "utf-8"
+      );
+
+      logger.info("Summary prepended to .md");
+    } catch (err) {
+      logger.error("Failed to prepend summary to .md:", String(err));
+    }
+  }
+
+  // Legacy export method kept for backward compatibility
+  async exportSessionMarkdown(sessionId: string): Promise<string | null> {
+    return this.exportPaths.get(sessionId) ?? null;
   }
 }
 
