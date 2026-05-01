@@ -67,7 +67,7 @@ interface OutboundCommand {
   approved_at: string;
 }
 
-async function drainOnce(): Promise<number> {
+export async function drainOnce(): Promise<number> {
   const db = getDb();
   // Dexie cannot index null directly; filter post-fetch instead.
   const all = await db.commands.where("status").equals("approved").toArray();
