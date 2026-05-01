@@ -1,0 +1,12 @@
+:root {
+  --canvas: #faf6ee;
+  --ink: #2b2622;
+  --terracotta: #c46a4f;
+  --sage: #7a9b7a;
+  --butter: #e8c56a;
+  --dusty-blue: #6b8aa6;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
