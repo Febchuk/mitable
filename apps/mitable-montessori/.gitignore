@@ -22,3 +22,7 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase CLI metadata
+supabase/.temp/
+supabase/.branches/

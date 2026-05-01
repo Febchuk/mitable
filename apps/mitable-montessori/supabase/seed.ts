@@ -3,7 +3,7 @@
  * one classroom, the default Montessori curriculum (5 topics, ~30 subtopics),
  * 10 students, and 1–2 guardians per student.
  *
- * Usage: npm run supabase:seed --workspace=@mitable/montessori
+ * Usage: npm run supabase:seed --workspace=@mitable/mitable-montessori
  *
  * Reads NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY from .env.local.
  * Uses the service role to bypass RLS (creates auth.users + public.users rows).

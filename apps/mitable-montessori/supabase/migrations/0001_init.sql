@@ -1,14 +1,14 @@
 -- Mitable Montessori — initial schema
 -- 17 tables: tenancy, roster, curriculum, command log, projections, reports, audit.
 
-create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
 
 -- =============================================================================
 -- 1. Organizational
 -- =============================================================================
 
 create table schools (
-  id          uuid primary key default uuid_generate_v4(),
+  id          uuid primary key default gen_random_uuid(),
   name        text not null,
   timezone    text not null,
   status      text not null default 'active' check (status in ('active', 'inactive')),
@@ -42,7 +42,7 @@ create table users (
 -- =============================================================================
 
 create table curricula (
-  id                  uuid primary key default uuid_generate_v4(),
+  id                  uuid primary key default gen_random_uuid(),
   school_id           uuid not null references schools(id),
   name                text not null,
   framework           text not null default 'Montessori',
@@ -54,7 +54,7 @@ create table curricula (
 );
 
 create table curriculum_topics (
-  id             uuid primary key default uuid_generate_v4(),
+  id             uuid primary key default gen_random_uuid(),
   curriculum_id  uuid not null references curricula(id),
   name           text not null,
   sort_order     int  not null default 0,
@@ -63,7 +63,7 @@ create table curriculum_topics (
 );
 
 create table curriculum_subtopics (
-  id          uuid primary key default uuid_generate_v4(),
+  id          uuid primary key default gen_random_uuid(),
   topic_id    uuid not null references curriculum_topics(id),
   name        text not null,
   sort_order  int  not null default 0,
@@ -77,7 +77,7 @@ create table curriculum_subtopics (
 -- =============================================================================
 
 create table classrooms (
-  id             uuid primary key default uuid_generate_v4(),
+  id             uuid primary key default gen_random_uuid(),
   school_id      uuid not null references schools(id),
   curriculum_id  uuid references curricula(id),
   name           text not null,
@@ -88,7 +88,7 @@ create table classrooms (
 );
 
 create table classroom_teacher_assignments (
-  id               uuid primary key default uuid_generate_v4(),
+  id               uuid primary key default gen_random_uuid(),
   classroom_id     uuid not null references classrooms(id),
   teacher_user_id  uuid not null references users(id),
   classroom_role   text check (classroom_role in ('lead', 'support', 'assistant')),
@@ -106,7 +106,7 @@ create unique index classroom_teacher_active_unique
 -- =============================================================================
 
 create table students (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   school_id       uuid not null references schools(id),
   first_name      text not null,
   last_name       text not null,
@@ -120,7 +120,7 @@ create table students (
 );
 
 create table student_classroom_enrollments (
-  id            uuid primary key default uuid_generate_v4(),
+  id            uuid primary key default gen_random_uuid(),
   student_id    uuid not null references students(id),
   classroom_id  uuid not null references classrooms(id),
   start_date    date not null,
@@ -134,7 +134,7 @@ create unique index student_active_primary_enrollment_unique
   where end_date is null and is_primary = true;
 
 create table guardians (
-  id                       uuid primary key default uuid_generate_v4(),
+  id                       uuid primary key default gen_random_uuid(),
   school_id                uuid not null references schools(id),
   first_name               text not null,
   last_name                text not null,
@@ -146,7 +146,7 @@ create table guardians (
 );
 
 create table student_guardians (
-  id                  uuid primary key default uuid_generate_v4(),
+  id                  uuid primary key default gen_random_uuid(),
   student_id          uuid not null references students(id),
   guardian_id         uuid not null references guardians(id),
   relationship        text check (relationship in ('mother', 'father', 'guardian', 'other')),
@@ -160,7 +160,7 @@ create table student_guardians (
 -- =============================================================================
 
 create table commands (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   client_id       text not null unique,
   school_id       uuid not null references schools(id),
   user_id         uuid not null references users(id),
@@ -182,7 +182,7 @@ create index commands_user_created_idx   on commands (user_id, created_at desc);
 -- =============================================================================
 
 create table attendance_records (
-  id                 uuid primary key default uuid_generate_v4(),
+  id                 uuid primary key default gen_random_uuid(),
   student_id         uuid not null references students(id),
   classroom_id       uuid not null references classrooms(id),
   attendance_date    date not null,
@@ -196,7 +196,7 @@ create table attendance_records (
 );
 
 create table student_progress (
-  id                     uuid primary key default uuid_generate_v4(),
+  id                     uuid primary key default gen_random_uuid(),
   student_id             uuid not null references students(id),
   classroom_id           uuid not null references classrooms(id),
   curriculum_subtopic_id uuid not null references curriculum_subtopics(id),
@@ -209,7 +209,7 @@ create table student_progress (
 );
 
 create table student_progress_history (
-  id                     uuid primary key default uuid_generate_v4(),
+  id                     uuid primary key default gen_random_uuid(),
   student_progress_id    uuid references student_progress(id),
   student_id             uuid not null references students(id),
   curriculum_subtopic_id uuid not null references curriculum_subtopics(id),
@@ -225,7 +225,7 @@ create table student_progress_history (
 -- =============================================================================
 
 create table reports (
-  id                   uuid primary key default uuid_generate_v4(),
+  id                   uuid primary key default gen_random_uuid(),
   student_id           uuid not null references students(id),
   classroom_id         uuid not null references classrooms(id),
   report_type          text not null check (report_type in ('daily', 'major')),
@@ -246,7 +246,7 @@ create table reports (
 );
 
 create table report_review_actions (
-  id                uuid primary key default uuid_generate_v4(),
+  id                uuid primary key default gen_random_uuid(),
   report_id         uuid not null references reports(id),
   action_by_user_id uuid not null references users(id),
   action_type       text not null
@@ -257,7 +257,7 @@ create table report_review_actions (
 );
 
 create table report_recipients (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   report_id       uuid not null references reports(id),
   guardian_id     uuid not null references guardians(id),
   email_snapshot  text,
@@ -272,7 +272,7 @@ create table report_recipients (
 -- =============================================================================
 
 create table audit_log (
-  id           uuid primary key default uuid_generate_v4(),
+  id           uuid primary key default gen_random_uuid(),
   actor_id     uuid references users(id),
   actor_role   text check (actor_role in ('admin', 'teacher', 'system')),
   action       text not null,

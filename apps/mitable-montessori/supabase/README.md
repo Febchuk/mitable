@@ -30,7 +30,7 @@ In Supabase Studio: **Authentication → Hooks → Custom Access Token Hook**, s
 ## 5. Seed the database
 
 ```bash
-npm run supabase:seed --workspace=@mitable/montessori
+npm run supabase:seed --workspace=@mitable/mitable-montessori
 ```
 
 This creates:
