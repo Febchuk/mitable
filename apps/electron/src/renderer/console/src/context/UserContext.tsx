@@ -169,12 +169,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     setIsAuthenticated(true);
 
-    // Share user context with main process for cross-window access (WatchingPill, etc.)
+    // Share user context with main process for cross-window access + local SQLite cache
     if (window.consoleAPI?.setCurrentUser) {
       window.consoleAPI.setCurrentUser({
         userId: response.profile.id,
         organizationId: response.profile.organizationId || "",
         role: dbRole,
+        email: response.profile.email || undefined,
+        firstName: response.profile.firstName || undefined,
+        lastName: response.profile.lastName || undefined,
+        avatarUrl: response.profile.avatarUrl || undefined,
+        organizationName: response.organization?.name,
       });
     }
   };
@@ -184,41 +189,48 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const loadUser = async () => {
       const token = authService.getAccessToken();
 
+      // In Electron, the main process pushes offline identity via IPC —
+      // don't eagerly hit the backend if the consoleAPI is available.
+      const isElectron = !!window.consoleAPI;
+
       if (!token) {
-        // No token in localStorage — wait briefly for main process to push
-        // restored tokens from OS keychain before giving up
+        if (isElectron) {
+          logger.info("No local token — waiting for main process identity (IPC)");
+          setTimeout(() => {
+            setIsLoading((prev) => {
+              if (!authService.getAccessToken()) return false;
+              return prev;
+            });
+          }, 3000);
+          return;
+        }
         logger.info("No local token, waiting for keychain restore…");
         setTimeout(() => {
-          // If still not authenticated after delay, stop loading
           setIsLoading((prev) => {
-            // Only clear loading if we haven't been authenticated by the restore listener
-            if (!authService.getAccessToken()) {
-              return false;
-            }
+            if (!authService.getAccessToken()) return false;
             return prev;
           });
         }, 2500);
         return;
       }
 
+      // If running in Electron local-only, attempt hydration but don't
+      // retry/refresh on network errors — the offline listener handles it.
       try {
         await hydrateUser(token);
 
-        // Broadcast token to main process for cross-window sharing (Agent pill, etc.)
         const refreshToken = authService.getRefreshToken();
         if (refreshToken) {
           authService.saveTokens(token, refreshToken);
         }
       } catch (error) {
-        logger.error("Failed to load user:", error);
-
-        // Network error (backend not up yet) — keep tokens and wait for restore
         if (isNetworkError(error)) {
-          logger.info("Backend unreachable, preserving tokens for later restore");
+          logger.info("Backend unreachable, waiting for offline identity");
           return;
         }
 
-        // Token might be expired, try to refresh
+        logger.error("Failed to load user:", error);
+
         const refreshToken = authService.getRefreshToken();
         if (refreshToken) {
           try {
@@ -272,6 +284,43 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe?.();
   }, []);
 
+  // Listen for offline user identity from main process (cached in local SQLite)
+  // This handles the case where the backend is unreachable but we have a cached user.
+  useEffect(() => {
+    if (!window.consoleAPI?.onOfflineUser) return;
+
+    const unsubscribe = window.consoleAPI.onOfflineUser((offlineUser) => {
+      logger.info("Received offline user identity from main process");
+
+      const fullName = `${offlineUser.firstName || ""} ${offlineUser.lastName || ""}`.trim();
+      const newUser: User = {
+        id: offlineUser.id,
+        name: fullName || offlineUser.email,
+        firstName: offlineUser.firstName || "",
+        email: offlineUser.email || undefined,
+        avatarUrl: offlineUser.avatarUrl || undefined,
+        currentWeek: 1,
+        role: (offlineUser.role as User["role"]) || "employee",
+        organizationId: offlineUser.organizationId || "",
+      };
+      setUser(newUser);
+      setIsAuthenticated(true);
+      setIsLoading(false);
+
+      if (offlineUser.organizationName) {
+        setOrganization({
+          id: offlineUser.organizationId,
+          name: offlineUser.organizationName,
+          settings: {},
+        });
+      }
+
+      logger.info("User hydrated from offline cache");
+    });
+
+    return () => unsubscribe?.();
+  }, []);
+
   // Background token refresh - keeps sessions alive for long-running usage
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -305,12 +354,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
     setIsAuthenticated(true);
 
-    // Share user context with main process (triggers keychain persist for refresh token)
+    // Share user context with main process (triggers keychain persist + local SQLite cache)
     if (window.consoleAPI?.setCurrentUser) {
       window.consoleAPI.setCurrentUser({
         userId: newUser.id,
         organizationId: newUser.organizationId || "",
         role: newUser.originalRole || newUser.role || "employee",
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.name?.split(" ").slice(1).join(" ") || undefined,
+        avatarUrl: newUser.avatarUrl,
+        organizationName: organization?.name,
       });
     }
   };

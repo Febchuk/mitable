@@ -57,8 +57,33 @@ interface ConsoleAPI {
     callback: (tokens: { accessToken: string; refreshToken: string }) => void
   ) => (() => void) | undefined;
 
+  // Offline user - main process pushes cached profile when backend is unreachable
+  onOfflineUser: (
+    callback: (user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+      organizationId: string;
+      organizationName: string;
+      avatarUrl: string | null;
+    }) => void
+  ) => (() => void) | undefined;
+
   // User context - share userId/orgId with main process for cross-window access
-  setCurrentUser: (user: { userId: string; organizationId: string; role?: string }) => void;
+  setCurrentUser: (user: {
+    userId: string;
+    organizationId: string;
+    role?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+    jobTitle?: string;
+    organizationName?: string;
+    organizationDomain?: string;
+  }) => void;
 
   // Monitoring session management
   startMonitoringSession: (config: {
@@ -366,6 +391,11 @@ interface ConsoleAPI {
       error?: string;
     }) => void
   ) => () => void;
+
+  // Local-first data access
+  getBlockExportPath: (sessionId: string) => Promise<string | null>;
+  getLocalCalendarDays: (startMs: number, endMs: number) => Promise<unknown[]>;
+  getLocalSessionDetail: (sessionId: string) => Promise<unknown>;
 }
 
 declare global {

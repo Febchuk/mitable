@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   AUTH_SESSION_RESTORED: "auth-session-restored", // Main → Renderer: push tokens restored from keychain on startup
+  AUTH_OFFLINE_USER: "auth-offline-user", // Main → Renderer: push cached user profile for offline mode
 
   // User context (cross-window user info sharing)
   USER_CONTEXT_SET: "user-context-set",

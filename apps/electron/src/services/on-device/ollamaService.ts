@@ -83,6 +83,12 @@ class OllamaService {
     return this.status === "ready";
   }
 
+  async isInstalled(): Promise<boolean> {
+    if (this.ollamaBin) return true;
+    const bin = await this.findOllamaBinary();
+    return bin !== null;
+  }
+
   getLoadedModel(): string | null {
     return this.loadedModel;
   }
@@ -495,6 +501,11 @@ class OllamaService {
     } catch (err) {
       logger.warn("Failed to unload model:", String(err));
     }
+  }
+
+  async forceUnloadModel(): Promise<void> {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    await this.unloadModel();
   }
 
   // ── Health check ──────────────────────────────────────────────────────

@@ -66,94 +66,95 @@ export function initCronJobs(): void {
     })
   );
 
-  // ──────────────────────────────────────────────
-  // Granola Sync: Every 15 minutes (at :10, :25, :40, :55)
-  // Fetches Granola meetings for integrated users, classifies with
-  // Claude Haiku, and upserts activity_blocks + daily stats.
-  // ──────────────────────────────────────────────
-  let isGranolaSyncRunning = false;
+  // Integration syncs (Granola, Graph, Fireflies) are production-only —
+  // they hit external APIs and produce noisy logs that obscure local dev output.
+  const isDev = config.nodeEnv === "development";
 
-  scheduledTasks.push(
-    cron.schedule("10,25,40,55 * * * *", async () => {
-      if (isGranolaSyncRunning) {
-        logger.warn("Granola sync still running — skipping");
-        return;
-      }
+  if (!isDev) {
+    // ──────────────────────────────────────────────
+    // Granola Sync: Every 15 minutes (at :10, :25, :40, :55)
+    // ──────────────────────────────────────────────
+    let isGranolaSyncRunning = false;
 
-      isGranolaSyncRunning = true;
-      try {
-        await runGranolaSyncJob();
-      } catch (error) {
-        logger.error({ error: String(error) }, "Granola sync job failed");
-      } finally {
-        isGranolaSyncRunning = false;
-      }
-    })
-  );
-
-  // ──────────────────────────────────────────────
-  // Graph Sync: Nightly at 02:15
-  // Extracts recent activity and refreshes graph intelligence views.
-  // ──────────────────────────────────────────────
-  if (config.graph.enabled) {
     scheduledTasks.push(
-      cron.schedule("15 2 * * *", async () => {
-        if (isGraphSyncRunning) {
-          logger.warn("Graph sync still running — skipping");
+      cron.schedule("10,25,40,55 * * * *", async () => {
+        if (isGranolaSyncRunning) {
+          logger.warn("Granola sync still running — skipping");
           return;
         }
 
-        isGraphSyncRunning = true;
+        isGranolaSyncRunning = true;
         try {
-          await runGraphSyncJob();
+          await runGranolaSyncJob();
         } catch (error) {
-          logger.error({ error: String(error) }, "Graph sync job failed");
+          logger.error({ error: String(error) }, "Granola sync job failed");
         } finally {
-          isGraphSyncRunning = false;
+          isGranolaSyncRunning = false;
         }
       })
     );
-    logger.info("Graph sync scheduled — daily at 02:15");
-  } else {
-    logger.info("Graph sync disabled (GRAPH_ENABLED=false)");
-  }
 
-  // ──────────────────────────────────────────────
-  // Fireflies Sync: Every 15 minutes (at :12, :27, :42, :57)
-  // Fetches recent transcripts for connected users, classifies
-  // with Haiku, and upserts activity_blocks (blockType: "fireflies").
-  // ──────────────────────────────────────────────
-  let isFirefliesSyncRunning = false;
-  scheduledTasks.push(
-    cron.schedule("12,27,42,57 * * * *", async () => {
-      if (isFirefliesSyncRunning) {
-        logger.warn("Fireflies sync still running — skipping");
-        return;
-      }
+    // ──────────────────────────────────────────────
+    // Graph Sync: Nightly at 02:15
+    // ──────────────────────────────────────────────
+    if (config.graph.enabled) {
+      scheduledTasks.push(
+        cron.schedule("15 2 * * *", async () => {
+          if (isGraphSyncRunning) {
+            logger.warn("Graph sync still running — skipping");
+            return;
+          }
 
-      isFirefliesSyncRunning = true;
+          isGraphSyncRunning = true;
+          try {
+            await runGraphSyncJob();
+          } catch (error) {
+            logger.error({ error: String(error) }, "Graph sync job failed");
+          } finally {
+            isGraphSyncRunning = false;
+          }
+        })
+      );
+      logger.info("Graph sync scheduled — daily at 02:15");
+    }
 
-      try {
-        const result = await runFirefliesSyncJob();
-        if (result.usersProcessed > 0 || result.usersFailed > 0) {
-          logger.info(
-            {
-              processed: result.usersProcessed,
-              skipped: result.usersSkipped,
-              failed: result.usersFailed,
-              meetings: result.totalMeetings,
-              timeMs: result.totalTimeMs,
-            },
-            "Fireflies sync completed"
-          );
+    // ──────────────────────────────────────────────
+    // Fireflies Sync: Every 15 minutes (at :12, :27, :42, :57)
+    // ──────────────────────────────────────────────
+    let isFirefliesSyncRunning = false;
+    scheduledTasks.push(
+      cron.schedule("12,27,42,57 * * * *", async () => {
+        if (isFirefliesSyncRunning) {
+          logger.warn("Fireflies sync still running — skipping");
+          return;
         }
-      } catch (error) {
-        logger.error({ error: String(error) }, "Fireflies sync job failed");
-      } finally {
-        isFirefliesSyncRunning = false;
-      }
-    })
-  );
+
+        isFirefliesSyncRunning = true;
+
+        try {
+          const result = await runFirefliesSyncJob();
+          if (result.usersProcessed > 0 || result.usersFailed > 0) {
+            logger.info(
+              {
+                processed: result.usersProcessed,
+                skipped: result.usersSkipped,
+                failed: result.usersFailed,
+                meetings: result.totalMeetings,
+                timeMs: result.totalTimeMs,
+              },
+              "Fireflies sync completed"
+            );
+          }
+        } catch (error) {
+          logger.error({ error: String(error) }, "Fireflies sync job failed");
+        } finally {
+          isFirefliesSyncRunning = false;
+        }
+      })
+    );
+  } else {
+    logger.info("Skipping integration sync crons in development (Granola, Fireflies, Graph)");
+  }
 
   // ──────────────────────────────────────────────
   // Benchmark Score Computation

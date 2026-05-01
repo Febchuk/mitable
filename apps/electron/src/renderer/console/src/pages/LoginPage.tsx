@@ -51,6 +51,7 @@ export default function LoginPage() {
         id: profile.id,
         name: `${profile.firstName || ""} ${profile.lastName || ""}`.trim(),
         firstName: profile.firstName || "",
+        email: profile.email || email,
         avatarUrl: profile.avatarUrl || undefined,
         currentWeek: profile.currentWeek || 1,
         role: profile.role,

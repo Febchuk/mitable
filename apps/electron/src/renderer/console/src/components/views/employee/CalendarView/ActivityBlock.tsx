@@ -9,7 +9,8 @@ import {
   Trash2,
   Users,
   User,
-  Sparkles,
+  Clipboard,
+  Check,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
@@ -709,76 +710,98 @@ function BlockExportPath({ block }: { block: WorkBlock }) {
 
   if (!exportPath) return null;
 
+  const handleCopy = async () => {
+    if (copied) return;
+    try {
+      await (window as any).consoleAPI?.copyFileToClipboard?.(exportPath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
   return (
     <div
+      onClick={handleCopy}
+      title={copied ? "Copied to clipboard" : "Copy block data to clipboard"}
       style={{
-        marginTop: 10,
-        padding: "10px 12px",
-        borderRadius: 8,
-        background: "rgba(255, 255, 255, 0.03)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        marginTop: 12,
+        padding: "10px 14px",
+        borderRadius: 10,
+        background: copied ? "rgba(107, 143, 113, 0.08)" : "rgba(255, 255, 255, 0.025)",
+        border: copied
+          ? "1px solid rgba(107, 143, 113, 0.2)"
+          : "1px solid rgba(255, 255, 255, 0.06)",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
       }}
     >
       <div
         style={{
-          fontSize: 11,
-          color: "#7C6F5B",
-          lineHeight: 1.4,
-          marginBottom: 6,
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background: copied ? "rgba(107, 143, 113, 0.15)" : "rgba(255, 255, 255, 0.04)",
           display: "flex",
           alignItems: "center",
-          gap: 6,
+          justifyContent: "center",
+          flexShrink: 0,
+          transition: "all 0.2s ease",
         }}
       >
-        <Sparkles size={12} style={{ flexShrink: 0 }} />
-        Copy and paste this block data to your favorite AI for reports, emails, and further
-        insights.
+        {copied ? (
+          <Check size={16} color="#6B8F71" strokeWidth={2.5} />
+        ) : (
+          <Clipboard size={15} color="#7C6F5B" />
+        )}
       </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          cursor: "pointer",
-        }}
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(exportPath);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          } catch {
-            /* clipboard unavailable */
-          }
-        }}
-        title="Click to copy path"
-      >
-        <code
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
           style={{
-            fontSize: 11,
-            color: "#9B9689",
-            background: "rgba(255, 255, 255, 0.04)",
-            padding: "4px 8px",
-            borderRadius: 4,
-            flex: 1,
+            fontSize: 12,
+            fontWeight: 500,
+            color: copied ? "#6B8F71" : "#B0A48E",
+            lineHeight: 1.3,
+            marginBottom: 2,
+            transition: "color 0.2s ease",
+          }}
+        >
+          {copied ? "Copied to clipboard" : "Copy block data"}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            color: "#665C4D",
+            lineHeight: 1.3,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            fontFamily: "monospace",
           }}
         >
-          {exportPath}
-        </code>
-        <span
-          style={{
-            fontSize: 10,
-            color: copied ? "#6B8F71" : "#7C6F5B",
-            flexShrink: 0,
-            minWidth: 40,
-            textAlign: "center",
-          }}
-        >
-          {copied ? "Copied!" : "Copy"}
-        </span>
+          {copied
+            ? "Paste into ChatGPT, Claude, Notion, or anywhere else"
+            : "Paste into your favorite AI for reports, emails, and insights"}
+        </div>
+      </div>
+
+      <div
+        style={{
+          fontSize: 11,
+          color: copied ? "#6B8F71" : "#7C6F5B",
+          fontWeight: 500,
+          flexShrink: 0,
+          padding: "4px 10px",
+          borderRadius: 6,
+          background: copied ? "rgba(107, 143, 113, 0.12)" : "rgba(255, 255, 255, 0.04)",
+          transition: "all 0.2s ease",
+        }}
+      >
+        {copied ? "Done" : "Copy"}
       </div>
     </div>
   );

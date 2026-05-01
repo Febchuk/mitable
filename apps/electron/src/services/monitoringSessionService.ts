@@ -98,7 +98,12 @@ class MonitoringSessionService {
   private async shouldUseLocalInference(): Promise<boolean> {
     try {
       const { ollamaService } = await import("./on-device/ollamaService");
-      return ollamaService.isReady();
+      // In deferred-inference mode Ollama isn't loaded until session end,
+      // so checking isReady() would always return false. Instead, check
+      // whether the Ollama binary exists on this machine — that's enough
+      // to know we *can* run local inference later.
+      if (ollamaService.isReady()) return true;
+      return await ollamaService.isInstalled();
     } catch (err) {
       logger.debug("On-device module not available:", String(err));
       return false;
@@ -121,42 +126,12 @@ class MonitoringSessionService {
       };
     }
 
-    // Wait for auth token with timeout (handles IPC sync delay from Console renderer)
-    // The Console window syncs tokens via IPC before calling this method,
-    // but we add a wait here to handle any race conditions
-    const maxWaitMs = 5000;
-    const pollIntervalMs = 100;
-    const startTime = Date.now();
-
-    logger.info("[MonitoringSessionService] Waiting for auth token...", {
-      hasTokenNow: !!authManager.getAccessToken(),
-    });
-
-    while (!authManager.getAccessToken() && Date.now() - startTime < maxWaitMs) {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-    }
-
-    const waitedMs = Date.now() - startTime;
-    const hasToken = !!authManager.getAccessToken();
-
-    logger.info("[MonitoringSessionService] Auth wait completed", {
-      waitedMs,
-      hasToken,
-      timedOut: !hasToken && waitedMs >= maxWaitMs,
-    });
-
-    // Require authentication before starting session (prevents 401 errors on analyze-frame)
-    if (!authManager.getAccessToken()) {
-      return {
-        sessionId: "",
-        error: "Authentication required. Please log in before starting a monitoring session.",
-      };
-    }
+    logger.info("[MonitoringSessionService] Starting session (local-first, no auth gate)");
 
     if (!config.sessionId) {
       return {
         sessionId: "",
-        error: "Session ID from backend is required",
+        error: "Session ID is required",
       };
     }
 
@@ -241,9 +216,22 @@ class MonitoringSessionService {
       // Start local inference service if on-device AI is active for this session
       if (localMode) {
         try {
-          const { localInferenceService } = await import("./on-device");
+          const { localInferenceService, localDb } = await import("./on-device");
           localInferenceService.start(sessionId);
-          logger.info("On-device inference pipeline started for session", sessionId);
+
+          // Write session row to local SQLite (mirrors Supabase monitoring_sessions)
+          localDb.insertMonitoringSession({
+            id: sessionId,
+            organizationId: config.organizationId,
+            userId: config.userId,
+            name: config.name,
+            sessionGoal: config.sessionGoal,
+            captureIntervalMs: config.captureIntervalMs,
+            selectedWindows: JSON.stringify(initialWindows),
+            startedAt,
+          });
+
+          logger.info("On-device session started for session", sessionId);
         } catch (err) {
           logger.error("Failed to start local inference pipeline:", String(err));
           this.activeSession.localMode = false;
@@ -417,6 +405,16 @@ class MonitoringSessionService {
     if (localMode && !tooShort) {
       this.activeSession.status = "summarizing";
       this.broadcastSessionUpdate();
+
+      try {
+        const { localDb } = await import("./on-device");
+        localDb.updateMonitoringSessionStatus(sessionId, "summarizing", {
+          endedAt: Date.now(),
+          totalPausedMs: this.activeSession.totalPausedMs,
+        });
+      } catch {
+        /* best effort */
+      }
     }
 
     // Grab manifest info before clearing activeSession
@@ -443,9 +441,9 @@ class MonitoringSessionService {
   }
 
   /**
-   * Background work after endSession returns: flush remaining frames,
-   * generate story, clean up checkpoint and files. Broadcasts "ended"
-   * when done so the console can display the result.
+   * Background work after endSession returns: run the full AI pipeline
+   * (sensor, transcribe, classify, summarize, export) on all captured data.
+   * Broadcasts "ended" when done so the console can display the result.
    */
   private async finishSessionAsync(
     sessionId: string,
@@ -464,78 +462,75 @@ class MonitoringSessionService {
 
           if (tooShort) {
             localInferenceService.clear();
-            logger.info("Cleared local inference buffer (short session)");
+            logger.info("Cleared local inference state (short session)");
           } else {
-            const { ollamaService } = await import("./on-device/ollamaService");
-            if (!ollamaService.isReady()) {
-              logger.warn(
-                "Local mode session but Ollama is not ready at end — story generation skipped"
-              );
-              storyGenerationFailed = true;
-            } else {
-              logger.info("Flushing buffer and generating summary via Ollama...");
+            const sessionDir = localFrameStorage.getSessionPath(sessionId);
+            logger.info("Running deferred AI pipeline on all session data...");
 
-              const timeoutMs = 1_200_000;
-              const flushAndGenerate = async () => {
-                await localInferenceService.flushRemaining();
-                logger.info("Buffer flushed, generating summary...");
-                await localInferenceService.generateSummary(sessionId);
-              };
-
-              await Promise.race([
-                flushAndGenerate(),
-                new Promise<never>((_, reject) =>
-                  setTimeout(
-                    () =>
-                      reject(new Error(`Summary generation timed out after ${timeoutMs / 1000}s`)),
-                    timeoutMs
-                  )
-                ),
-              ]);
-            }
+            const timeoutMs = 1_200_000;
+            await Promise.race([
+              localInferenceService.processAllAtEnd(sessionId, sessionDir),
+              new Promise<never>((_, reject) =>
+                setTimeout(
+                  () => reject(new Error(`processAllAtEnd timed out after ${timeoutMs / 1000}s`)),
+                  timeoutMs
+                )
+              ),
+            ]);
           }
         } catch (err) {
-          logger.error("Local inference flush/summary generation failed:", String(err));
+          logger.error("Deferred AI pipeline failed:", String(err));
           storyGenerationFailed = true;
         }
       }
 
-      // Deliver on-device summary to backend and export markdown
+      // Deliver on-device summary to backend (cloud mode only in future)
       if (localMode && !storyGenerationFailed && !tooShort) {
         try {
           const { localInferenceService } = await import("./on-device");
-
           const exported = localInferenceService.exportResultsForBackend(
             sessionId,
             activeDurationMs
           );
           if (exported) {
-            const resp = await authManager.authenticatedFetch(
-              `/api/monitoring/sessions/${sessionId}/on-device-summary`,
-              {
-                method: "PUT",
-                body: JSON.stringify({ onDeviceSummary: exported }),
+            try {
+              const resp = await authManager.authenticatedFetch(
+                `/api/monitoring/sessions/${sessionId}/on-device-summary`,
+                {
+                  method: "PUT",
+                  body: JSON.stringify({ onDeviceSummary: exported }),
+                }
+              );
+              if (resp.ok) {
+                logger.info("On-device summary delivered to backend");
+              } else {
+                logger.warn("Backend rejected on-device summary:", resp.status);
               }
-            );
-            if (resp.ok) {
-              logger.info("On-device summary delivered to backend");
-            } else {
-              logger.warn("Backend rejected on-device summary:", resp.status);
+            } catch {
+              logger.debug("Backend delivery skipped (offline or local-only)");
             }
           }
-
-          // Auto-export rich markdown for AI assistants (Claude, etc.)
-          const mdPath = await localInferenceService.exportSessionMarkdown(sessionId);
-          if (mdPath) {
-            logger.info("Session markdown exported:", mdPath);
-          }
         } catch (err) {
-          logger.warn("Failed to deliver/export session:", String(err));
+          logger.warn("Failed to deliver session:", String(err));
         }
       }
 
       await checkpointService.endSession();
       await localFrameStorage.endSession(sessionId, []);
+
+      // Mark session as "ready" in local SQLite
+      if (localMode) {
+        try {
+          const { localDb: db } = await import("./on-device");
+          const story = db.getStoryForSession(sessionId);
+          db.updateMonitoringSessionStatus(sessionId, storyGenerationFailed ? "ended" : "ready", {
+            endedAt: Date.now(),
+            finalSummary: story?.narrative ?? null,
+          });
+        } catch {
+          /* best effort */
+        }
+      }
 
       logger.info(` Session ended: ${sessionId}`, {
         totalCaptureCount: captureCount,
@@ -1098,30 +1093,11 @@ class MonitoringSessionService {
         }
       }
 
-      // Route frames based on session-level localMode flag (set once at start).
-      // In local mode, frames NEVER leave the device — no cloud fallback.
+      // In local mode, frames are already saved to disk by localFrameStorage.
+      // All AI inference is deferred to session end — no mid-session GPU usage.
+      // Only cloud mode sends frames to the backend for real-time analysis.
       if (this.activeSession.localMode) {
-        try {
-          const { localInferenceService } = await import("./on-device");
-          await localInferenceService.addFrame({
-            frameId: frameMetadata.frameId,
-            sessionId: this.activeSession.id,
-            sequenceNumber: frameMetadata.sequenceNumber,
-            capturedAt: new Date(frameMetadata.timestamp).getTime(),
-            imageBase64: base64Data,
-            previousImageBase64: previousFrame?.imageData || null,
-            windowId: screenshot.windowId,
-            appName: screenshot.appName ?? "",
-            windowTitle: screenshot.windowTitle ?? "",
-            intervalEvidence,
-            browserContext,
-          });
-        } catch (err) {
-          logger.warn(
-            "Local inference addFrame failed (frame skipped, NOT sent to cloud):",
-            String(err)
-          );
-        }
+        // No-op: frames persisted on disk, processing happens at session end
       } else {
         this.analyzeFrameAsync(
           this.activeSession.id,

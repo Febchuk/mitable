@@ -16,6 +16,19 @@ const logger = {
 
 logger.info(" Preload script starting...");
 
+// Buffer for offline user event — main process may push before React mounts
+type OfflineUserPayload = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  organizationId: string;
+  organizationName: string;
+  avatarUrl: string | null;
+};
+let pendingOfflineUser: OfflineUserPayload | null = null;
+
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -130,7 +143,15 @@ const IPC_CHANNELS = {
   ON_DEVICE_STOP_SERVER: "on-device:stop-server",
   ON_DEVICE_SERVER_STATUS: "on-device:server-status",
   ON_DEVICE_DOWNLOAD_PROGRESS: "on-device:download-progress",
+  // Offline auth (main → renderer)
+  AUTH_OFFLINE_USER: "auth-offline-user",
 } as const;
+
+// Buffer offline user events that arrive before React mounts its listener
+ipcRenderer.on(IPC_CHANNELS.AUTH_OFFLINE_USER, (_event, user: OfflineUserPayload) => {
+  logger.info(" Buffered offline user event (React not mounted yet)");
+  pendingOfflineUser = user;
+});
 
 contextBridge.exposeInMainWorld("consoleAPI", {
   // PDF Export
@@ -219,9 +240,39 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.AUTH_SESSION_RESTORED, handler);
   },
 
+  // Offline user - main process pushes cached user profile when backend is unreachable.
+  // Replays any buffered event that arrived before React mounted its listener.
+  onOfflineUser: (callback: (user: OfflineUserPayload) => void): (() => void) => {
+    // Replay buffered event that arrived before this listener was attached
+    if (pendingOfflineUser) {
+      logger.info(" Replaying buffered offline user to React listener");
+      const buffered = pendingOfflineUser;
+      pendingOfflineUser = null;
+      queueMicrotask(() => callback(buffered));
+    }
+
+    const handler = (_event: IpcRendererEvent, user: OfflineUserPayload) => {
+      logger.info("Offline user identity received from main process");
+      pendingOfflineUser = null;
+      callback(user);
+    };
+    ipcRenderer.on(IPC_CHANNELS.AUTH_OFFLINE_USER, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AUTH_OFFLINE_USER, handler);
+  },
+
   // User context - Share userId/orgId with main process for cross-window access
-  setCurrentUser: (user: { userId: string; organizationId: string; role?: string }) =>
-    ipcRenderer.send(IPC_CHANNELS.USER_CONTEXT_SET, user),
+  setCurrentUser: (user: {
+    userId: string;
+    organizationId: string;
+    role?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+    jobTitle?: string;
+    organizationName?: string;
+    organizationDomain?: string;
+  }) => ipcRenderer.send(IPC_CHANNELS.USER_CONTEXT_SET, user),
 
   // Monitoring session management
   startMonitoringSession: (config: {
@@ -802,6 +853,21 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   getBlockExportPath: (sessionId: string): Promise<string | null> =>
     ipcRenderer.invoke("get-block-export-path", sessionId),
+
+  getBlockExportContent: (sessionId: string): Promise<{ content: string; path: string } | null> =>
+    ipcRenderer.invoke("get-block-export-content", sessionId),
+
+  copyToClipboard: (text: string): Promise<void> => ipcRenderer.invoke("copy-to-clipboard", text),
+
+  copyFileToClipboard: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke("copy-file-to-clipboard", filePath),
+
+  // Local-first data access
+  getLocalCalendarDays: (startMs: number, endMs: number): Promise<unknown[]> =>
+    ipcRenderer.invoke("get-local-calendar-days", startMs, endMs),
+
+  getLocalSessionDetail: (sessionId: string): Promise<unknown> =>
+    ipcRenderer.invoke("get-local-session-detail", sessionId),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

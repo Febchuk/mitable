@@ -83,6 +83,64 @@ export interface LocalTranscription {
   createdAt: number;
 }
 
+// ── Phase 2 types: Supabase mirror ──────────────────────────────────────────
+
+export interface LocalOrganization {
+  id: string;
+  name: string;
+  domain: string | null;
+  settings: string;
+  isInternal: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LocalUser {
+  id: string;
+  organizationId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  avatarUrl: string | null;
+  currentWeek: number | null;
+  startDate: string | null;
+  status: string | null;
+  jobTitle: string | null;
+  managerId: string | null;
+  teamId: string | null;
+  department: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LocalMonitoringSession {
+  id: string;
+  organizationId: string;
+  userId: string;
+  name: string | null;
+  sessionGoal: string | null;
+  sessionType: string;
+  status: string;
+  captureIntervalMs: number;
+  selectedWindows: string;
+  startedAt: number;
+  pausedAt: number | null;
+  totalPausedMs: number;
+  endedAt: number | null;
+  audioRecordingStartedAt: number | null;
+  audioRecordingTotalMs: number;
+  finalSummary: string | null;
+  keyActivities: string | null;
+  accomplishments: string | null;
+  blockers: string | null;
+  timeBreakdown: string | null;
+  taskBreakdown: string | null;
+  exportPath: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ── Initialization ──────────────────────────────────────────────────────────
 
 const SCHEMA_SQL = `
@@ -149,6 +207,90 @@ CREATE TABLE IF NOT EXISTS transcriptions (
 
 CREATE INDEX IF NOT EXISTS idx_transcriptions_session ON transcriptions(session_id);
 CREATE INDEX IF NOT EXISTS idx_transcriptions_session_time ON transcriptions(session_id, start_time_ms);
+
+-- Phase 2: Mirror Supabase schema for local-first storage + cloud migration
+
+CREATE TABLE IF NOT EXISTS organizations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  domain TEXT,
+  settings TEXT DEFAULT '{}',
+  is_internal INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  first_name TEXT,
+  last_name TEXT,
+  role TEXT NOT NULL DEFAULT 'member',
+  avatar_url TEXT,
+  current_week INTEGER DEFAULT 1,
+  start_date TEXT,
+  status TEXT DEFAULT 'active',
+  job_title TEXT,
+  regular_tasks TEXT DEFAULT '[]',
+  regular_apps TEXT DEFAULT '[]',
+  additional_context TEXT,
+  manager_id TEXT,
+  team_id TEXT,
+  department TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_org ON users(organization_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+CREATE TABLE IF NOT EXISTS monitoring_sessions (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  name TEXT,
+  session_goal TEXT,
+  session_type TEXT NOT NULL DEFAULT 'focused',
+  status TEXT NOT NULL DEFAULT 'active',
+  capture_interval_ms INTEGER NOT NULL DEFAULT 30000,
+  selected_windows TEXT NOT NULL DEFAULT '[]',
+  started_at INTEGER NOT NULL,
+  paused_at INTEGER,
+  total_paused_ms INTEGER NOT NULL DEFAULT 0,
+  ended_at INTEGER,
+  audio_recording_started_at INTEGER,
+  audio_recording_total_ms INTEGER NOT NULL DEFAULT 0,
+  final_summary TEXT,
+  key_activities TEXT DEFAULT '[]',
+  accomplishments TEXT DEFAULT '[]',
+  blockers TEXT DEFAULT '[]',
+  time_breakdown TEXT,
+  task_breakdown TEXT,
+  export_path TEXT,
+  -- Cloud-only columns kept nullable for migration parity
+  ingestion_status TEXT DEFAULT 'pending',
+  delivery_status TEXT,
+  delivery_channel TEXT,
+  delivery_target TEXT,
+  delivered_at INTEGER,
+  delivery_error TEXT,
+  slack_message_ts TEXT,
+  intermediate_summary TEXT,
+  intermediate_summary_status TEXT,
+  summarization_progress TEXT,
+  raw_activity_summary TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_org ON monitoring_sessions(organization_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_user ON monitoring_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_status ON monitoring_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_monitoring_sessions_started ON monitoring_sessions(started_at);
 `;
 
 // better-sqlite3 SELECT * returns snake_case column names;
@@ -208,6 +350,13 @@ class LocalDatabase {
       if (!cols.some((c) => c.name === "source")) {
         db.exec(`ALTER TABLE transcriptions ADD COLUMN source TEXT NOT NULL DEFAULT 'user'`);
         logger.info("Migrated transcriptions table: added source column");
+      }
+
+      // Migrate: add export_path column to monitoring_sessions if missing
+      const msCols = db.pragma("table_info(monitoring_sessions)") as Array<{ name: string }>;
+      if (!msCols.some((c) => c.name === "export_path")) {
+        db.exec(`ALTER TABLE monitoring_sessions ADD COLUMN export_path TEXT`);
+        logger.info("Migrated monitoring_sessions table: added export_path column");
       }
 
       logger.info("Local database initialized at", this.dbPath);
@@ -357,6 +506,18 @@ class LocalDatabase {
     return row?.cnt ?? 0;
   }
 
+  updateClassificationDescription(id: string, description: string): void {
+    if (!db) return;
+    try {
+      db.prepare(`UPDATE classifications SET activity_description = ? WHERE id = ?`).run(
+        description,
+        id
+      );
+    } catch (err) {
+      logger.error("updateClassificationDescription failed:", String(err));
+    }
+  }
+
   // ── Stories ─────────────────────────────────────────────────────────────
 
   insertStory(story: Omit<LocalStory, "createdAt">): void {
@@ -449,6 +610,277 @@ class LocalDatabase {
          ORDER BY start_time_ms ASC`
         )
         .all(sessionId, startMs, endMs)
+    );
+  }
+
+  // ── Organizations ──────────────────────────────────────────────────────
+
+  upsertOrganization(org: Pick<LocalOrganization, "id" | "name" | "domain" | "settings">): void {
+    if (!db) return;
+    try {
+      db.prepare(
+        `
+        INSERT INTO organizations (id, name, domain, settings, updated_at)
+        VALUES (@id, @name, @domain, @settings, unixepoch('now') * 1000)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name, domain = excluded.domain,
+          settings = excluded.settings, updated_at = unixepoch('now') * 1000
+      `
+      ).run(org);
+    } catch (err) {
+      logger.error("upsertOrganization failed:", String(err));
+    }
+  }
+
+  getOrganization(id: string): LocalOrganization | null {
+    if (!db) return null;
+    return mapRow<LocalOrganization>(
+      db.prepare(`SELECT * FROM organizations WHERE id = ?`).get(id)
+    );
+  }
+
+  // ── Users ─────────────────────────────────────────────────────────────
+
+  upsertUser(
+    user: Pick<
+      LocalUser,
+      | "id"
+      | "organizationId"
+      | "email"
+      | "firstName"
+      | "lastName"
+      | "role"
+      | "avatarUrl"
+      | "status"
+      | "jobTitle"
+    >
+  ): void {
+    if (!db) return;
+    try {
+      db.prepare(
+        `
+        INSERT INTO users (id, organization_id, email, first_name, last_name, role, avatar_url, status, job_title, updated_at)
+        VALUES (@id, @organizationId, @email, @firstName, @lastName, @role, @avatarUrl, @status, @jobTitle, unixepoch('now') * 1000)
+        ON CONFLICT(id) DO UPDATE SET
+          email = excluded.email, first_name = excluded.first_name,
+          last_name = excluded.last_name, role = excluded.role,
+          avatar_url = excluded.avatar_url, status = excluded.status,
+          job_title = excluded.job_title, updated_at = unixepoch('now') * 1000
+      `
+      ).run(user);
+    } catch (err) {
+      logger.error("upsertUser failed:", String(err));
+    }
+  }
+
+  getUser(id: string): LocalUser | null {
+    if (!db) return null;
+    return mapRow<LocalUser>(db.prepare(`SELECT * FROM users WHERE id = ?`).get(id));
+  }
+
+  // ── Monitoring Sessions ────────────────────────────────────────────────
+
+  insertMonitoringSession(session: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    name?: string;
+    sessionGoal?: string;
+    sessionType?: string;
+    status?: string;
+    captureIntervalMs?: number;
+    selectedWindows?: string;
+    startedAt: number;
+  }): void {
+    if (!db) return;
+    try {
+      db.prepare(
+        `
+        INSERT OR REPLACE INTO monitoring_sessions
+          (id, organization_id, user_id, name, session_goal,
+           session_type, status, capture_interval_ms, selected_windows, started_at)
+        VALUES
+          (@id, @organizationId, @userId, @name, @sessionGoal,
+           @sessionType, @status, @captureIntervalMs, @selectedWindows, @startedAt)
+      `
+      ).run({
+        id: session.id,
+        organizationId: session.organizationId,
+        userId: session.userId,
+        name: session.name ?? null,
+        sessionGoal: session.sessionGoal ?? null,
+        sessionType: session.sessionType ?? "focused",
+        status: session.status ?? "active",
+        captureIntervalMs: session.captureIntervalMs ?? 30000,
+        selectedWindows: session.selectedWindows ?? "[]",
+        startedAt: session.startedAt,
+      });
+    } catch (err) {
+      logger.error("insertMonitoringSession failed:", String(err));
+    }
+  }
+
+  updateMonitoringSessionStatus(
+    id: string,
+    status: string,
+    extra?: { endedAt?: number; finalSummary?: string; pausedAt?: number; totalPausedMs?: number }
+  ): void {
+    if (!db) return;
+    try {
+      const sets = ["status = ?", "updated_at = unixepoch('now') * 1000"];
+      const params: unknown[] = [status];
+
+      if (extra?.endedAt !== undefined) {
+        sets.push("ended_at = ?");
+        params.push(extra.endedAt);
+      }
+      if (extra?.finalSummary !== undefined) {
+        sets.push("final_summary = ?");
+        params.push(extra.finalSummary);
+      }
+      if (extra?.pausedAt !== undefined) {
+        sets.push("paused_at = ?");
+        params.push(extra.pausedAt);
+      }
+      if (extra?.totalPausedMs !== undefined) {
+        sets.push("total_paused_ms = ?");
+        params.push(extra.totalPausedMs);
+      }
+
+      params.push(id);
+      db.prepare(`UPDATE monitoring_sessions SET ${sets.join(", ")} WHERE id = ?`).run(...params);
+    } catch (err) {
+      logger.error("updateMonitoringSessionStatus failed:", String(err));
+    }
+  }
+
+  updateMonitoringSessionExportPath(id: string, exportPath: string): void {
+    if (!db) return;
+    try {
+      db.prepare(`UPDATE monitoring_sessions SET export_path = ? WHERE id = ?`).run(exportPath, id);
+    } catch (err) {
+      logger.error("updateMonitoringSessionExportPath failed:", String(err));
+    }
+  }
+
+  getExportPath(sessionId: string): string | null {
+    if (!db) return null;
+    const row = db
+      .prepare(`SELECT export_path FROM monitoring_sessions WHERE id = ?`)
+      .get(sessionId) as { export_path: string | null } | undefined;
+    return row?.export_path ?? null;
+  }
+
+  getMonitoringSession(id: string): LocalMonitoringSession | null {
+    if (!db) return null;
+    return mapRow<LocalMonitoringSession>(
+      db.prepare(`SELECT * FROM monitoring_sessions WHERE id = ?`).get(id)
+    );
+  }
+
+  getMonitoringSessionsByDateRange(
+    userId: string,
+    startMs: number,
+    endMs: number
+  ): LocalMonitoringSession[] {
+    if (!db) return [];
+    return mapRows<LocalMonitoringSession>(
+      db
+        .prepare(
+          `
+        SELECT * FROM monitoring_sessions
+        WHERE user_id = ? AND started_at >= ? AND started_at < ?
+        ORDER BY started_at ASC
+      `
+        )
+        .all(userId, startMs, endMs)
+    );
+  }
+
+  getAllSessionsByDateRange(startMs: number, endMs: number): LocalMonitoringSession[] {
+    if (!db) return [];
+
+    // Primary: sessions stored in the monitoring_sessions table
+    const tracked = mapRows<LocalMonitoringSession>(
+      db
+        .prepare(
+          `
+        SELECT * FROM monitoring_sessions
+        WHERE started_at >= ? AND started_at < ?
+        ORDER BY started_at ASC
+      `
+        )
+        .all(startMs, endMs)
+    );
+
+    // Fallback: reconstruct from captures table for legacy sessions
+    // (created before monitoring_sessions was added)
+    const trackedIds = new Set(tracked.map((s) => s.id));
+    const legacy = db
+      .prepare(
+        `
+        SELECT session_id,
+               MIN(captured_at) as first_capture,
+               MAX(captured_at) as last_capture
+        FROM captures
+        WHERE captured_at >= ? AND captured_at < ?
+        GROUP BY session_id
+        ORDER BY first_capture ASC
+        `
+      )
+      .all(startMs, endMs) as Array<{
+      session_id: string;
+      first_capture: number;
+      last_capture: number;
+    }>;
+
+    for (const row of legacy) {
+      if (trackedIds.has(row.session_id)) continue;
+      const story = this.getStoryForSession(row.session_id);
+      tracked.push({
+        id: row.session_id,
+        userId: "",
+        organizationId: "",
+        name: null,
+        sessionGoal: null,
+        sessionType: "monitoring",
+        status: story ? "ready" : "ended",
+        captureIntervalMs: 10000,
+        selectedWindows: "[]",
+        startedAt: row.first_capture,
+        pausedAt: null,
+        totalPausedMs: 0,
+        endedAt: row.last_capture,
+        audioRecordingStartedAt: null,
+        audioRecordingTotalMs: 0,
+        finalSummary: story?.narrative ?? null,
+        keyActivities: null,
+        accomplishments: null,
+        blockers: null,
+        timeBreakdown: null,
+        taskBreakdown: null,
+        exportPath: null,
+        createdAt: row.first_capture,
+        updatedAt: row.last_capture,
+      });
+    }
+
+    tracked.sort((a, b) => a.startedAt - b.startedAt);
+    return tracked;
+  }
+
+  getAllMonitoringSessionsForUser(userId: string): LocalMonitoringSession[] {
+    if (!db) return [];
+    return mapRows<LocalMonitoringSession>(
+      db
+        .prepare(
+          `
+        SELECT * FROM monitoring_sessions
+        WHERE user_id = ?
+        ORDER BY started_at DESC
+      `
+        )
+        .all(userId)
     );
   }
 
