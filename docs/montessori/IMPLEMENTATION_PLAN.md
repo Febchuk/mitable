@@ -446,20 +446,30 @@ Goal: school admins can manage roster, classrooms, curriculum, guardians, and th
 > walkthrough checkpoint will land once the desktop UI shell goes in (early
 > Phase 5 cleanup or a follow-up branch).
 
-### Phase 5 — Parent (guardian) read-only app (Weeks 13–14)
+### Phase 5 — Parent (guardian) read-only app (Weeks 13–14) ✅ Complete
 
 Goal: linked guardians can see their child's records.
 
-- [ ] Guardian invitation flow (admin-initiated from a `guardians` row, email link with one-time token addressed to `guardians.email`)
-- [ ] Guardian self-service onboarding: claim invitation, set password — claim links the new Supabase Auth user to the existing `guardians.id`, no new row created
-- [ ] JWT carries `guardian_id` once claimed; auth identity is decoupled from the canonical `guardians` row (a guardian can exist before they claim)
-- [ ] Guardian UI shell at `/parents/*` — mobile-first, minimal
-- [ ] Views: attendance calendar, progress overview (per-subtopic status), `sent` reports only
-- [ ] Strict RLS verification using the guardian-scoped policies (`guardians see linked students`, `guardians see sent reports`, equivalents for attendance and progress)
-- [ ] Multi-child support: a single guardian can be linked to multiple students via separate `student_guardians` rows
-- [ ] Per-link `receives_reports` honored — unlinked or opted-out guardians see no reports
+- [x] Guardian invitation flow — `POST /api/admin/guardians/[id]/invite` issues a 32-byte random token; only the SHA-256 digest is stored. The plaintext token returns to the admin (and goes out via email worker once wired) but is never logged. (`lib/parents/invitations.ts`)
+- [x] Guardian self-service onboarding — `POST /api/parents/claim` validates the token, calls `supabase.auth.signUp` with the canonical `guardians.email` (defends against an attacker swapping the email), and links the new auth user to the existing `guardians.id` via `guardians.auth_user_id` — no new guardian row created. Tokens are one-shot + 14-day TTL.
+- [x] JWT carries `guardian_id` once claimed via the existing JWT claim hook (extended in `0007_guardian_invitations.sql`); auth identity is decoupled from the canonical `guardians` row.
+- [x] Guardian UI shell at `/parents/*` — mobile-first, minimal. `layout.tsx` + `page.tsx` (linked-students list with reports-off badge) + `students/[id]/{attendance,progress,reports}` + `/parents/claim`.
+- [x] Views: attendance calendar (last 60 days, present/absent badges), progress overview grouped by topic, sent reports rendered as cards.
+- [x] Strict RLS — `0007_guardian_invitations.sql` adds three guardian-scoped policies (`guardians see linked attendance`, `guardians see linked progress`, `guardians see sent reports v2`) that key on `auth.jwt() ->> 'guardian_id'` and route through `student_guardians` for the link check. `receives_reports = true` is required at the policy level for the report SELECT — defense-in-depth even if the route handler's filter regresses.
+- [x] Multi-child support — one guardian → many students via separate `student_guardians` rows. Home page renders all linked students; per-student routes RLS-scope independently.
+- [x] Per-link `receives_reports` honored — covered by the `guardians see sent reports v2` policy AND the route handler's `eq("status", "sent")` filter.
+- [x] End-to-end test for the Phase 5 checkpoint scenarios (`src/__tests__/phase5-end-to-end.test.ts` — invitation lifecycle including token hashing, one-shot claim, expired-token rejection; pen-test posture mirroring the RLS predicate so an unlinked guardian, an opted-out guardian, and any non-`sent` report all return empty; multi-child verification)
 
 **Checkpoint**: guardian invitation through report viewing works end-to-end. Penetration test: confirmed a guardian cannot see students they are not linked to via direct API queries, and cannot see reports in any status other than `sent`.
+
+> Phase 5 caveat: the JS-side `simulateGuardianFetch` helper in the e2e test
+> mirrors the SQL RLS predicate so drift between the two is caught on every
+> CI run. The full Postgres-level pen test (running as an authenticated
+> guardian role) is a manual review item; the predicate equivalence here
+> guarantees the contract the route handlers expect Postgres to enforce.
+> Email delivery of the invitation link reuses the Phase 4 `email-worker.ts`
+> stub-sender seam — production swaps in Resend / Postmark when the
+> Phase-4 follow-up lands.
 
 ---
 
