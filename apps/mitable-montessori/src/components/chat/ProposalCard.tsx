@@ -17,6 +17,7 @@ export interface ProposalCardProps {
   classroomId: string;
   rawTranscript: string | null;
   initialStatus: "proposed" | "approved" | "rejected";
+  source?: "text" | "voice" | "photo";
 }
 
 export function ProposalCard(props: ProposalCardProps) {
@@ -35,6 +36,7 @@ export function ProposalCard(props: ProposalCardProps) {
         classroomId: props.classroomId,
         rawTranscript: props.rawTranscript,
         proposalId: props.proposalId,
+        source: props.source ?? "text",
       });
       setStatus("approved");
     } catch (err) {

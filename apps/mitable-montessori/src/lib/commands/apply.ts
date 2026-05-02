@@ -11,6 +11,8 @@ export interface ApplyContext {
   classroomId: string;
   rawTranscript: string | null;
   proposalId: string;
+  /** Capture mode the command came from. Defaults to "text" for backward compat. */
+  source?: "text" | "voice" | "photo";
 }
 
 export interface ApplyResult {
@@ -52,7 +54,7 @@ export async function applyApprovedToolCall(
       schoolId: ctx.schoolId,
       userId: ctx.userId,
       classroomId: ctx.classroomId,
-      source: "text",
+      source: ctx.source ?? "text",
       rawTranscript: ctx.rawTranscript,
       commandType: "attendance",
       payload,
@@ -89,7 +91,7 @@ export async function applyApprovedToolCall(
       schoolId: ctx.schoolId,
       userId: ctx.userId,
       classroomId: ctx.classroomId,
-      source: "text",
+      source: ctx.source ?? "text",
       rawTranscript: ctx.rawTranscript,
       commandType: "progress",
       payload,
@@ -125,7 +127,7 @@ export async function applyApprovedToolCall(
       schoolId: ctx.schoolId,
       userId: ctx.userId,
       classroomId: ctx.classroomId,
-      source: "text",
+      source: ctx.source ?? "text",
       rawTranscript: ctx.rawTranscript,
       commandType: "note",
       payload,

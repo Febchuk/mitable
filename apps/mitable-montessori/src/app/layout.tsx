@@ -24,6 +24,12 @@ export const metadata: Metadata = {
     template: "%s | Mitable Montessori",
   },
   description: "Privacy-first classroom record-keeping for Montessori schools.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Mitable",
+  },
 };
 
 export const viewport: Viewport = {

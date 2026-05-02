@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getDb } from "@/lib/db/schema";
 import type { DetokenizedToolCall } from "@/lib/tokenize/detokenize";
 import type { ChatProposalRow } from "@/lib/db/types";
+import type { CaptureMode } from "@/lib/capture/types";
 import { ProposalCard } from "@/components/chat/ProposalCard";
 import { Composer } from "@/components/chat/Composer";
 
@@ -34,7 +35,13 @@ export function ChatThread(props: ChatThreadProps) {
     ) ?? [];
 
   const [userMessages, setUserMessages] = useState<
-    Array<{ id: string; text: string; createdAt: string; rawTranscript: string }>
+    Array<{
+      id: string;
+      text: string;
+      createdAt: string;
+      rawTranscript: string;
+      mode: CaptureMode;
+    }>
   >([]);
 
   // Merge user messages and proposals chronologically.
@@ -54,13 +61,20 @@ export function ChatThread(props: ChatThreadProps) {
     })),
   ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  // Map proposalId → its raw transcript for the apply context.
+  // Map proposalId → its raw transcript + capture mode for apply context.
   const transcriptByProposalId = new Map<string, string>();
-  // We assume the most-recent user message before each proposal owns it.
+  const modeByProposalId = new Map<string, CaptureMode>();
   let lastTranscript = "";
+  let lastMode: CaptureMode = "text";
   for (const e of entries) {
-    if (e.kind === "user-message") lastTranscript = e.rawTranscript ?? "";
-    else if (e.proposal) transcriptByProposalId.set(e.proposal.id, lastTranscript);
+    if (e.kind === "user-message") {
+      lastTranscript = e.rawTranscript ?? "";
+      const m = userMessages.find((u) => u.id === e.id)?.mode;
+      if (m) lastMode = m;
+    } else if (e.proposal) {
+      transcriptByProposalId.set(e.proposal.id, lastTranscript);
+      modeByProposalId.set(e.proposal.id, lastMode);
+    }
   }
 
   useEffect(() => {
@@ -99,6 +113,7 @@ export function ChatThread(props: ChatThreadProps) {
                   classroomId={props.classroomId}
                   rawTranscript={transcriptByProposalId.get(e.proposal.id) ?? null}
                   initialStatus={e.proposal.status}
+                  source={modeByProposalId.get(e.proposal.id) ?? "text"}
                 />
               );
             })}
@@ -109,13 +124,15 @@ export function ChatThread(props: ChatThreadProps) {
         threadId={props.threadId}
         classroomId={props.classroomId}
         onProposals={(emit) => {
+          const prefix = emit.mode === "voice" ? "🎤 " : emit.mode === "photo" ? "📷 " : "";
           setUserMessages((prev) => [
             ...prev,
             {
               id: crypto.randomUUID(),
-              text: emit.message,
+              text: prefix + emit.message,
               createdAt: new Date().toISOString(),
               rawTranscript: emit.message,
+              mode: emit.mode,
             },
           ]);
         }}

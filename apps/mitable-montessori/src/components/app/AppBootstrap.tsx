@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { pullSync } from "@/lib/sync/pull";
 import { startSyncWorker } from "@/lib/sync/worker";
 import { invalidateRosterIndex } from "@/lib/tokenize/roster-index";
+import { registerServiceWorker } from "@/lib/pwa/register";
 
 export function AppBootstrap() {
   useEffect(() => {
@@ -14,6 +15,7 @@ export function AppBootstrap() {
         if (cancelled) return;
         invalidateRosterIndex();
         startSyncWorker();
+        registerServiceWorker();
       } catch (err) {
         console.error("App bootstrap failed", err);
       }
