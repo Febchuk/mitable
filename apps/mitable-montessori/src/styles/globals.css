@@ -2,22 +2,271 @@
 
 @theme {
   --color-canvas: #faf6ee;
-  --color-ink: #2b2622;
+  --color-surface: #fffbf3;
+  --color-muted: #f2ede0;
+  --color-ink: #2a2723;
+  --color-ink-secondary: #5c544a;
+  --color-ink-muted: #9c9285;
+  --color-border: #e0d8c8;
+  --color-border-strong: #b89880;
   --color-terracotta: #c46a4f;
+  --color-terracotta-soft: #f4ddd2;
+  --color-terracotta-deep: #a24a3d;
   --color-sage: #7a9b7a;
+  --color-sage-soft: #dde7da;
+  --color-sage-deep: #3f5c40;
   --color-butter: #e8c56a;
+  --color-butter-soft: #f6e8b8;
+  --color-butter-deep: #7a5c0f;
   --color-dusty-blue: #6b8aa6;
+  --color-dusty-blue-soft: #d2dce5;
+  --color-clay: #b89880;
+  --color-clay-soft: #e5d8c8;
 
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-caveat), ui-serif, serif;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 html,
 body {
+  margin: 0;
   background-color: var(--color-canvas);
   color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+@layer utilities {
+  .font-display {
+    font-weight: 500;
+  }
+
+  /* Mobile-only: drop the divider line under a card header AND collapse
+     the vertical gap between header and body. Used on the Today page so
+     the Primrose Room "Attendance open" header sits flush with the
+     "14 of 18 children present" body on small screens. */
+  @media (max-width: 1023.98px) {
+    .card-header-borderless-mobile {
+      border-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
+    .card-body-tight-mobile {
+      padding-top: 6px !important;
+    }
+  }
+}
+
+.font-numeric {
+  font-variant-numeric: tabular-nums;
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.label-cap {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.scroll-quiet::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-quiet::-webkit-scrollbar-thumb {
+  background: var(--color-clay-soft);
+  border-radius: 999px;
+}
+.scroll-quiet::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.18;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.05;
+  }
+}
+@keyframes dotpulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+@keyframes wave-bar {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes slide-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes slide-down {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop-in {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, -8px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(122, 155, 122, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(122, 155, 122, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(122, 155, 122, 0);
+  }
+}
+@keyframes mic-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(196, 106, 79, 0.5),
+      0 6px 14px rgba(196, 106, 79, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 12px rgba(196, 106, 79, 0),
+      0 6px 14px rgba(196, 106, 79, 0.3);
+  }
+}
+
+.anim-slide-up {
+  animation: slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.anim-fade-in {
+  animation: fade-in 200ms ease both;
+}
+.anim-pop-in {
+  animation: pop-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.tap {
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    opacity 120ms ease,
+    box-shadow 160ms ease;
+}
+.tap:active {
+  transform: scale(0.97);
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-sage);
+  box-shadow: 0 0 0 0 rgba(122, 155, 122, 0.6);
+  animation: pulse-dot 1.8s infinite;
+  display: inline-block;
+}
+
+.mic-recording {
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+textarea,
+input {
+  font-family: inherit;
+}
+textarea:focus,
+input:focus {
+  outline: none;
 }

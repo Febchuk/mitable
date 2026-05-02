@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { AppBootstrap } from "@/components/app/AppBootstrap";
-import { BottomNav } from "@/components/app/BottomNav";
-import { FloatingChat } from "@/components/chat/FloatingChat";
-import { ConnectionStatus } from "@/components/sync/ConnectionStatus";
-import { PendingBadge } from "@/components/sync/PendingBadge";
+import { UserMenu } from "@/components/app/UserMenu";
+import { MontessoriBottomNav } from "@/components/montessori/bottom-nav";
+import { ChatDock } from "@/components/montessori/chat-dock";
+import { InstallBanner } from "@/components/montessori/install-banner";
+import { MobileTopRight } from "@/components/montessori/mobile-controls";
+import { ToastHost } from "@/components/montessori/primitives";
+import { MontessoriSidebar } from "@/components/montessori/sidebar";
+import { MontessoriProvider } from "@/components/montessori/store";
 import {
   getActiveClassroomForCurrentUser,
   getCurrentUserContext,
@@ -13,30 +17,45 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await getCurrentUserContext();
   if (!ctx) redirect("/login");
   const classroom = await getActiveClassroomForCurrentUser();
+  const classroomName = classroom?.name ?? "Primrose Room";
 
   return (
-    <div className="flex min-h-screen flex-col sm:flex-row">
-      <BottomNav />
-      <div className="flex-1 pb-20 sm:pb-0">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-ink/10 bg-canvas/80 px-4 py-3 backdrop-blur">
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-ink/40">Classroom</p>
-            <p className="text-sm font-semibold">
-              {classroom?.name ?? "No active classroom"}
-              {classroom?.code ? <span className="ml-2 text-ink/40">{classroom.code}</span> : null}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <ConnectionStatus />
-            <PendingBadge />
-          </div>
-        </header>
-        <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
+    <MontessoriProvider>
+      <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
+        <MontessoriSidebar
+          classroomName={classroomName}
+          userEmail={ctx.email}
+          userMenuSlot={<UserMenu email={ctx.email} />}
+        />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            minWidth: 0,
+            position: "relative",
+          }}
+        >
+          <main
+            className="scroll-quiet"
+            style={{
+              flex: 1,
+              position: "relative",
+              paddingBottom: 96,
+            }}
+          >
+            <MobileTopRight>
+              <UserMenu email={ctx.email} />
+            </MobileTopRight>
+            {children}
+          </main>
+        </div>
       </div>
+      <MontessoriBottomNav />
+      <ChatDock />
+      <ToastHost />
+      <InstallBanner />
       <AppBootstrap />
-      {classroom ? (
-        <FloatingChat classroomId={classroom.id} schoolId={ctx.schoolId} userId={ctx.userId} />
-      ) : null}
-    </div>
+    </MontessoriProvider>
   );
 }
