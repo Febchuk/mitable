@@ -2,7 +2,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 export interface AuditLogParams {
   actor_id: string | null;
-  actor_role: "admin" | "teacher" | "system";
+  actor_role: "admin" | "teacher" | "system" | "guardian";
   action: string;
   target_table?: string;
   target_id?: string;

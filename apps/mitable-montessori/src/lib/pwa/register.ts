@@ -21,7 +21,26 @@ export function registerServiceWorker() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   const allow =
     process.env.NODE_ENV === "production" || new URLSearchParams(window.location.search).has("sw");
-  if (!allow) return;
+
+  if (!allow) {
+    // Dev mode: proactively evict any service worker + cache left over from a
+    // previous production build or `?sw=1` test. Without this, stale SWs keep
+    // intercepting requests for `_next/static/chunks/...` and serving the
+    // wrong MIME type, which surfaces as the "Refused to execute script"
+    // errors in the console.
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+      .then(() => {
+        if (typeof caches === "undefined") return;
+        return caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+      })
+      .catch(() => {
+        // Non-fatal — leftover SW just won't get cleared this session.
+      });
+    return;
+  }
+
   navigator.serviceWorker.register("/sw.js").catch((err) => {
     console.warn("Service worker registration failed", err);
   });

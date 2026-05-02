@@ -166,7 +166,21 @@ function defaultWorkerFactory(): WorkerLike {
   if (typeof Worker === "undefined") {
     throw new Error("Web Workers unavailable in this environment");
   }
-  return new Worker(new URL("./capture.worker.ts", import.meta.url), {
-    type: "module",
-  }) as unknown as WorkerLike;
+  // Capture worker is opt-in. The worker file dynamic-imports
+  // @xenova/transformers + tesseract.js, which aren't installed by default.
+  // The new URL(...) pattern below is statically scanned by webpack to
+  // discover + bundle a worker — anything that imports `worker-host.ts`
+  // would otherwise pull `capture.worker.ts` (and its deps) into the build
+  // graph. We isolate it to its own module so users can lazy-load only when
+  // NEXT_PUBLIC_ENABLE_CAPTURE_WORKER=1.
+  if (process.env.NEXT_PUBLIC_ENABLE_CAPTURE_WORKER !== "1") {
+    throw new Error(
+      "Capture worker disabled. Install @xenova/transformers + tesseract.js, set NEXT_PUBLIC_ENABLE_CAPTURE_WORKER=1, and rebuild."
+    );
+  }
+  // Dynamic import of the worker spawner — webpack only follows this branch
+  // when the flag flips at build time.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const mod = require("./worker-spawner") as typeof import("./worker-spawner");
+  return mod.spawnWorker();
 }

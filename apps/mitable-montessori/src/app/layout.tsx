@@ -44,16 +44,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={cn(
-          dmSans.variable,
-          caveat.variable,
-          "min-h-screen bg-canvas font-sans text-ink antialiased"
-        )}
-      >
-        {children}
-      </body>
+    <html lang="en" className={cn(dmSans.variable, caveat.variable)} suppressHydrationWarning>
+      <body className="min-h-screen bg-canvas font-sans text-ink antialiased">{children}</body>
     </html>
   );
 }

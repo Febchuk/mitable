@@ -44,6 +44,9 @@ export class MontessoriDb extends Dexie {
 
   constructor() {
     super("mitable-montessori");
+
+    // v1 — original Phase 1 schema. Some teachers' browsers still hold a v1 DB
+    // from before the `date` / `studentId` indices were added on attendanceProj.
     this.version(1).stores({
       roster: "id, nameHash, schoolId",
       enrollments: "id, studentId, classroomId, isPrimary",
@@ -60,6 +63,13 @@ export class MontessoriDb extends Dexie {
       reports: "id, studentId, status",
       chatProposals: "id, threadId, status, createdAt",
       syncMeta: "key",
+    });
+
+    // v2 — adds `date` + `studentId` indices to attendanceProj so the Today
+    // page can do `where("date").equals(today).count()` without a SchemaError.
+    // Dexie auto-rebuilds the indices on upgrade.
+    this.version(2).stores({
+      attendanceProj: "[studentId+date], date, studentId",
     });
   }
 }

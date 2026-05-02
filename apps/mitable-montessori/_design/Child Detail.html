@@ -1,0 +1,2968 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mitable Montessori — Child Detail · Ada Chen</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Caveat:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+
+    <style>
+      :root {
+        /* Warm — verbatim from globals.css */
+        --color-canvas: #faf6ee;
+        --color-surface: #fffbf3;
+        --color-muted: #f2ede0;
+        --color-ink: #2a2723;
+        --color-ink-secondary: #5c544a;
+        --color-ink-muted: #9c9285;
+        --color-border: #e0d8c8;
+        --color-border-strong: #b89880;
+        --color-terracotta: #c46a4f;
+        --color-terracotta-soft: #f4ddd2;
+        --color-terracotta-deep: #a24a3d;
+        --color-sage: #7a9b7a;
+        --color-sage-soft: #dde7da;
+        --color-sage-deep: #3f5c40;
+        --color-butter: #e8c56a;
+        --color-butter-soft: #f6e8b8;
+        --color-butter-deep: #7a5c0f;
+        --color-dusty-blue: #6b8aa6;
+        --color-dusty-blue-soft: #d2dce5;
+        --color-clay: #b89880;
+        --color-clay-soft: #e5d8c8;
+
+        --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+        --font-display: "Caveat", ui-serif, serif;
+      }
+
+      /* Quiet variant — same structure, lower-saturation siblings.
+         All values pulled toward neutrals; preserves hue identity for legibility. */
+      [data-variant="quiet"] {
+        --color-canvas: #f6f3ec;
+        --color-surface: #fbf8f1;
+        --color-muted: #ece7da;
+        --color-border: #d9d2c2;
+        --color-terracotta: #b8755f;
+        --color-terracotta-soft: #ecdbd1;
+        --color-terracotta-deep: #8e574a;
+        --color-sage: #8a9e8a;
+        --color-sage-soft: #dee5db;
+        --color-sage-deep: #4f6850;
+        --color-butter: #d9bd78;
+        --color-butter-soft: #ece1bf;
+        --color-butter-deep: #7a6627;
+        --color-dusty-blue: #7e93a6;
+        --color-dusty-blue-soft: #d4dbe2;
+        --color-clay: #b09783;
+        --color-clay-soft: #e0d6c8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--color-canvas);
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      /* paper-feel noise wash, identical recipe to globals.css */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      }
+
+      .label-cap {
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .font-display {
+        font-family: var(--font-display);
+        font-weight: 500;
+      }
+      .font-numeric {
+        font-variant-numeric: tabular-nums;
+      }
+
+      button {
+        font-family: inherit;
+        cursor: pointer;
+      }
+
+      .tap {
+        transition:
+          transform 120ms ease,
+          background 120ms ease,
+          opacity 120ms ease,
+          box-shadow 160ms ease,
+          border-color 120ms ease;
+      }
+      .tap:active {
+        transform: scale(0.97);
+      }
+
+      .scroll-quiet::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .scroll-quiet::-webkit-scrollbar-thumb {
+        background: var(--color-clay-soft);
+        border-radius: 999px;
+      }
+      .scroll-quiet::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      @keyframes slide-up {
+        from {
+          transform: translateY(8px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes pulse-ring {
+        0% {
+          box-shadow: 0 0 0 0 rgba(122, 155, 122, 0.5);
+        }
+        70% {
+          box-shadow: 0 0 0 8px rgba(122, 155, 122, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(122, 155, 122, 0);
+        }
+      }
+      .anim-slide-up {
+        animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+      .anim-fade-in {
+        animation: fade-in 180ms ease both;
+      }
+      .pulse-ring {
+        animation: pulse-ring 2.2s infinite;
+      }
+
+      /* shell — the entire page lives inside a tab pane */
+      .shell {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+        backdrop-filter: saturate(140%) blur(8px);
+        border-bottom: 1px solid var(--color-border);
+      }
+      .topbar-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 10px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--color-ink);
+      }
+      .brand-mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: var(--color-ink);
+        color: var(--color-surface);
+        display: grid;
+        place-items: center;
+        font-family: var(--font-display);
+        font-size: 18px;
+        line-height: 1;
+        padding-bottom: 2px;
+      }
+
+      .tabs {
+        display: inline-flex;
+        gap: 0;
+        background: var(--color-muted);
+        padding: 3px;
+        border-radius: 999px;
+      }
+      .tab {
+        font-size: 12px;
+        font-weight: 500;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--color-ink-secondary);
+        border: 0;
+      }
+      .tab[data-active="true"] {
+        background: var(--color-surface);
+        color: var(--color-ink);
+        box-shadow: 0 1px 2px rgba(42, 39, 35, 0.06);
+      }
+
+      .variant-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11.5px;
+        color: var(--color-ink-secondary);
+      }
+      .variant-toggle .label-cap {
+        color: var(--color-ink-muted);
+      }
+      .variant-pills {
+        display: inline-flex;
+        background: var(--color-muted);
+        border-radius: 999px;
+        padding: 3px;
+      }
+      .variant-pill {
+        font-size: 11px;
+        font-weight: 500;
+        padding: 5px 11px;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--color-ink-secondary);
+        border: 0;
+      }
+      .variant-pill[data-active="true"] {
+        background: var(--color-surface);
+        color: var(--color-ink);
+        box-shadow: 0 1px 2px rgba(42, 39, 35, 0.06);
+      }
+
+      /* ---------- viewport frames ---------- */
+      .viewport-web,
+      .viewport-mobile {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .viewport-web .frame {
+        background: var(--color-canvas);
+        border: 1px solid var(--color-border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .viewport-mobile {
+        display: flex;
+        justify-content: center;
+      }
+      .phone {
+        width: 390px;
+        height: 844px;
+        background: var(--color-canvas);
+        border: 8px solid #1c1a17;
+        border-radius: 44px;
+        box-shadow:
+          0 30px 80px rgba(42, 39, 35, 0.18),
+          0 8px 24px rgba(42, 39, 35, 0.08);
+        overflow: hidden;
+        position: relative;
+      }
+      .phone-content {
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      .phone-notch {
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 110px;
+        height: 28px;
+        background: #1c1a17;
+        border-radius: 999px;
+        z-index: 60;
+      }
+
+      /* ---------- card primitives ---------- */
+      .card {
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 14px;
+      }
+      .card-pad-lg {
+        padding: 22px 24px;
+      }
+      .card-pad-md {
+        padding: 18px 20px;
+      }
+      .card-pad-sm {
+        padding: 14px 16px;
+      }
+
+      /* ---------- spider ---------- */
+      .spider-card {
+        position: relative;
+      }
+      .spider-axis-label {
+        font-size: 11.5px;
+        font-weight: 500;
+        fill: var(--color-ink-secondary);
+        font-family: var(--font-sans);
+      }
+      .spider-axis-label-active {
+        fill: var(--color-ink);
+        font-weight: 600;
+      }
+      .spider-popover {
+        position: absolute;
+        z-index: 30;
+        background: var(--color-ink);
+        color: var(--color-surface);
+        padding: 12px 14px;
+        border-radius: 12px;
+        font-size: 12.5px;
+        line-height: 1.45;
+        box-shadow:
+          0 18px 40px rgba(42, 39, 35, 0.22),
+          0 6px 14px rgba(42, 39, 35, 0.12);
+        max-width: 240px;
+        pointer-events: none;
+      }
+      .spider-popover .label-cap {
+        color: rgba(255, 251, 243, 0.55);
+        margin-bottom: 4px;
+        display: block;
+      }
+      .spider-popover-arrow {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        background: var(--color-ink);
+        transform: rotate(45deg);
+      }
+
+      .spider-legend {
+        display: inline-flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .legend-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        color: var(--color-ink-secondary);
+      }
+      .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+      }
+
+      /* ---------- timeline ---------- */
+      .timeline-rail {
+        position: relative;
+      }
+      .timeline-rail::before {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 12px;
+        bottom: 12px;
+        width: 1px;
+        background: var(--color-border);
+      }
+      .timeline-row {
+        display: grid;
+        grid-template-columns: 24px 1fr auto;
+        gap: 14px;
+        align-items: flex-start;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--color-border);
+      }
+      .timeline-row:last-child {
+        border-bottom: 0;
+      }
+      .timeline-dot-wrap {
+        position: relative;
+        height: 22px;
+        width: 24px;
+        display: grid;
+        place-items: center;
+      }
+      .timeline-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        border: 2px solid var(--color-surface);
+        box-shadow: 0 0 0 1px var(--color-border);
+        z-index: 1;
+        position: relative;
+      }
+
+      /* ---------- step diagram ---------- */
+      .step-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        border: 1.5px solid var(--color-border);
+        background: var(--color-surface);
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--color-ink-muted);
+        white-space: nowrap;
+        transition:
+          background 200ms ease,
+          color 200ms ease,
+          border-color 200ms ease,
+          transform 200ms ease;
+      }
+      .step-pill[data-state="filled-i"] {
+        background: var(--color-terracotta-soft);
+        color: var(--color-terracotta-deep);
+        border-color: var(--color-terracotta);
+      }
+      .step-pill[data-state="filled-p"] {
+        background: var(--color-butter-soft);
+        color: var(--color-butter-deep);
+        border-color: var(--color-butter);
+      }
+      .step-pill[data-state="filled-m"] {
+        background: var(--color-sage-soft);
+        color: var(--color-sage-deep);
+        border-color: var(--color-sage);
+      }
+      .step-pill[data-current="true"] {
+        transform: scale(1.06);
+      }
+      .step-pill[data-current="true"][data-state="filled-m"] {
+        animation: pulse-ring 2.4s infinite;
+      }
+
+      .step-track {
+        flex: 1;
+        height: 2px;
+        background: var(--color-border);
+        border-radius: 999px;
+        position: relative;
+      }
+      .step-track[data-filled="true"] {
+        background: linear-gradient(
+          90deg,
+          var(--color-terracotta) 0%,
+          var(--color-butter) 50%,
+          var(--color-border) 50%
+        );
+      }
+      .step-track[data-filled="full"] {
+        background: linear-gradient(
+          90deg,
+          var(--color-terracotta) 0%,
+          var(--color-butter) 50%,
+          var(--color-sage) 100%
+        );
+      }
+      .step-date {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        color: var(--color-ink-muted);
+        white-space: nowrap;
+      }
+
+      /* ---------- subtopic chip strip ---------- */
+      .subtopic-strip {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 4px 0 8px;
+        scroll-snap-type: x proximity;
+      }
+      .subtopic-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 13px;
+        border-radius: 999px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--color-ink-secondary);
+        white-space: nowrap;
+        scroll-snap-align: start;
+        flex-shrink: 0;
+      }
+      .subtopic-chip[data-active="true"] {
+        background: var(--color-ink);
+        color: var(--color-surface);
+        border-color: var(--color-ink);
+      }
+      .subtopic-chip-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+      }
+
+      /* ---------- filter chips on timeline ---------- */
+      .filter-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+      }
+      .filter-chip {
+        font-size: 12px;
+        font-weight: 500;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--color-surface);
+        color: var(--color-ink-secondary);
+        border: 1px solid var(--color-border);
+      }
+      .filter-chip[data-active="true"] {
+        background: var(--color-ink);
+        color: var(--color-surface);
+        border-color: var(--color-ink);
+      }
+
+      /* ---------- bottom sheet (mobile) ---------- */
+      .sheet-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(42, 39, 35, 0.32);
+        z-index: 70;
+        animation: fade-in 160ms ease both;
+      }
+      .sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--color-surface);
+        border-top-left-radius: 22px;
+        border-top-right-radius: 22px;
+        padding: 18px 20px 28px;
+        box-shadow: 0 -10px 30px rgba(42, 39, 35, 0.22);
+        animation: slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        z-index: 71;
+      }
+      .sheet-grip {
+        width: 36px;
+        height: 4px;
+        background: var(--color-border-strong);
+        border-radius: 999px;
+        margin: 0 auto 14px;
+        opacity: 0.55;
+      }
+
+      .ghost-btn {
+        background: transparent;
+        border: 1px solid var(--color-border);
+        color: var(--color-ink);
+        padding: 7px 12px;
+        border-radius: 10px;
+        font-size: 12.5px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ghost-btn:hover {
+        background: var(--color-muted);
+      }
+      .primary-btn {
+        background: var(--color-ink);
+        color: var(--color-surface);
+        border: 1px solid var(--color-ink);
+        padding: 7px 12px;
+        border-radius: 10px;
+        font-size: 12.5px;
+        font-weight: 500;
+      }
+
+      /* ---------- helpers ---------- */
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        color: var(--color-ink-muted);
+      }
+      .meta-row > span {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .meta-row .dot-sep {
+        width: 3px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--color-border-strong);
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="env,react">
+/* ---------------------------------------------------------------- */
+/*  Data — Ada Chen, 14 timeline entries, real subtopics             */
+/* ---------------------------------------------------------------- */
+
+const AREAS = {
+  Sensorial: { tone: "var(--color-clay)", soft: "var(--color-clay-soft)" },
+  Math: { tone: "var(--color-butter)", soft: "var(--color-butter-soft)" },
+  Language: { tone: "var(--color-terracotta)", soft: "var(--color-terracotta-soft)" },
+  "Practical Life": { tone: "var(--color-sage)", soft: "var(--color-sage-soft)" },
+  Cultural: { tone: "var(--color-dusty-blue)", soft: "var(--color-dusty-blue-soft)" },
+};
+
+// Whole-child levels — clay (Emerging) → butter (Practicing) → blue (Deepening) → sage (Leading)
+const LEVELS = ["Emerging", "Practicing", "Deepening", "Leading"];
+const LEVEL_TONES = {
+  Emerging: { tone: "var(--color-terracotta)", soft: "var(--color-terracotta-soft)", deep: "var(--color-terracotta-deep)" },
+  Practicing: { tone: "var(--color-butter)", soft: "var(--color-butter-soft)", deep: "var(--color-butter-deep)" },
+  Deepening: { tone: "var(--color-dusty-blue)", soft: "var(--color-dusty-blue-soft)", deep: "#33526E" },
+  Leading: { tone: "var(--color-sage)", soft: "var(--color-sage-soft)", deep: "var(--color-sage-deep)" },
+};
+
+const AXES = [
+  {
+    key: "concentration",
+    label: "Concentration",
+    level: "Practicing",
+    updated: "Apr 28",
+    descriptors: {
+      Emerging: "Brief, needs adult to redirect.",
+      Practicing: "Sustained on familiar work; some resets after distraction.",
+      Deepening: "Holds focus through full work cycle, resists interruption.",
+      Leading: "Returns to a chosen work over days; protects own focus.",
+    },
+  },
+  {
+    key: "material-progression",
+    label: "Material Progression",
+    level: "Practicing",
+    updated: "Apr 26",
+    descriptors: {
+      Emerging: "Repeats first presentation; new materials feel uncertain.",
+      Practicing: "Moves through familiar shelf at her own pace.",
+      Deepening: "Builds on prior work; seeks logical next step.",
+      Leading: "Bridges areas — uses Sensorial to inform Math choices.",
+    },
+  },
+  {
+    key: "self-correction",
+    label: "Self-Correction",
+    level: "Leading",
+    updated: "Apr 30",
+    descriptors: {
+      Emerging: "Notices error only when adult points it out.",
+      Practicing: "Catches obvious mismatches; sometimes asks for help.",
+      Deepening: "Finds and fixes error in same work cycle.",
+      Leading: "Uses material's own control of error fluently; explains it.",
+    },
+  },
+  {
+    key: "independence",
+    label: "Independence",
+    level: "Deepening",
+    updated: "Apr 24",
+    descriptors: {
+      Emerging: "Looks to adult for each step.",
+      Practicing: "Sets up familiar work; returns it to the shelf.",
+      Deepening: "Chooses, completes, and restores work without prompting.",
+      Leading: "Helps a younger child set up their own work.",
+    },
+  },
+  {
+    key: "choice-quality",
+    label: "Choice Quality",
+    level: "Practicing",
+    updated: "Apr 22",
+    descriptors: {
+      Emerging: "Chooses by proximity or peer; abandons quickly.",
+      Practicing: "Picks work she knows well; occasional stretch choice.",
+      Deepening: "Chooses with intent — names goal before starting.",
+      Leading: "Plans a work cycle across multiple materials.",
+    },
+  },
+  {
+    key: "error-resilience",
+    label: "Error Resilience",
+    level: "Emerging",
+    updated: "Apr 18",
+    descriptors: {
+      Emerging: "Frustrated by mistakes; may abandon the work.",
+      Practicing: "Tries again with encouragement.",
+      Deepening: "Retries unprompted; treats error as information.",
+      Leading: "Welcomes hard work; chooses materials at the edge of skill.",
+    },
+  },
+  {
+    key: "motivation",
+    label: "Motivation",
+    level: "Deepening",
+    updated: "Apr 27",
+    descriptors: {
+      Emerging: "Works when adult invites; rarely initiates.",
+      Practicing: "Initiates work she enjoys; flat on stretch tasks.",
+      Deepening: "Initiates broadly; curious about new presentations.",
+      Leading: "Articulates own goals; pursues work across days.",
+    },
+  },
+];
+
+const SUBTOPICS = [
+  { name: "Pink tower",        area: "Sensorial",       state: "p", introduced: "Mar 2",  practicing: "Mar 18", mastered: null },
+  { name: "Brown stair",       area: "Sensorial",       state: "p", introduced: "Mar 6",  practicing: "Apr 2",  mastered: null },
+  { name: "Red rods",          area: "Sensorial",       state: "i", introduced: "Apr 12", practicing: null,     mastered: null },
+  { name: "Knobless cylinders",area: "Sensorial",       state: "m", introduced: "Feb 14", practicing: "Mar 1",  mastered: "Apr 8" },
+  { name: "Teen board",        area: "Math",            state: "p", introduced: "Mar 21", practicing: "Apr 14", mastered: null },
+  { name: "Number rods",       area: "Math",            state: "i", introduced: "Apr 16", practicing: null,     mastered: null },
+  { name: "Sandpaper letters", area: "Language",        state: "p", introduced: "Feb 28", practicing: "Mar 22", mastered: null },
+  { name: "Movable alphabet",  area: "Language",        state: "i", introduced: "Apr 19", practicing: null,     mastered: null },
+  { name: "Pouring",           area: "Practical Life",  state: "m", introduced: "Jan 18", practicing: "Feb 4",  mastered: "Mar 3" },
+  { name: "Dressing frame",    area: "Practical Life",  state: "p", introduced: "Mar 8",  practicing: "Apr 6",  mastered: null },
+  { name: "Map of Africa",     area: "Cultural",        state: "i", introduced: "Apr 21", practicing: null,     mastered: null },
+  { name: "Land/water/air",    area: "Cultural",        state: "p", introduced: "Mar 12", practicing: "Apr 9",  mastered: null },
+];
+
+// 14 timeline entries — Mar 18 → Apr 30
+// MOCK: the `axes` field on each entry is a prototype-only mapping. Real
+// observations don't yet link to whole-child assessment axes; once that data
+// model exists, drop these literals and resolve via the join table instead.
+const TIMELINE = [
+  { id: "t01", date: "Apr 30", abs: "Apr 30, 2026", rel: "today",      area: "Sensorial",      material: "Pink tower",        comment: "Built it correctly on first try — third return this week.", transition: null,                                              axes: ["concentration", "self-correction"] },
+  { id: "t02", date: "Apr 28", abs: "Apr 28, 2026", rel: "2 days ago", area: "Math",           material: "Teen board",        comment: "Sequenced 11 through 16 unprompted.",                       transition: null,                                              axes: ["motivation", "material-progression"] },
+  { id: "t03", date: "Apr 26", abs: "Apr 26, 2026", rel: "4 days ago", area: "Sensorial",      material: "Brown stair",       comment: "Paired with pink tower — noticed the missing dimension.",   transition: null,                                              axes: ["self-correction", "material-progression"] },
+  { id: "t04", date: "Apr 24", abs: "Apr 24, 2026", rel: "6 days ago", area: "Practical Life", material: "Dressing frame",    comment: "Buttoned top to bottom; did not ask for help.",            transition: null,                                              axes: ["independence"] },
+  { id: "t05", date: "Apr 21", abs: "Apr 21, 2026", rel: "9 days ago", area: "Cultural",       material: "Map of Africa",     comment: "First presentation. Held the puzzle map for a long time.", transition: { area: "Cultural", to: "Introduced" },           axes: ["concentration", "motivation"] },
+  { id: "t06", date: "Apr 19", abs: "Apr 19, 2026", rel: "11 days ago",area: "Language",       material: "Movable alphabet",  comment: "First presentation — picked out 'cat' on her own.",         transition: { area: "Language", to: "Introduced" },           axes: ["choice-quality", "motivation"] },
+  { id: "t07", date: "Apr 16", abs: "Apr 16, 2026", rel: "2 weeks ago",area: "Math",           material: "Number rods",       comment: "First presentation. Counted to 7 confidently.",            transition: { area: "Math", to: "Introduced" },               axes: ["material-progression"] },
+  { id: "t08", date: "Apr 14", abs: "Apr 14, 2026", rel: "2 weeks ago",area: "Math",           material: "Teen board",        comment: "Built 11 through 14 with quantity beads.",                  transition: { area: "Math", to: "Practicing" },               axes: ["material-progression", "concentration"] },
+  { id: "t09", date: "Apr 12", abs: "Apr 12, 2026", rel: "3 weeks ago",area: "Sensorial",      material: "Red rods",          comment: "First presentation; ordered them by length.",              transition: { area: "Sensorial", to: "Introduced" },          axes: ["choice-quality"] },
+  { id: "t10", date: "Apr 09", abs: "Apr 9, 2026",  rel: "3 weeks ago",area: "Cultural",       material: "Land/water/air",    comment: "Sorted the small objects without prompting.",              transition: { area: "Cultural", to: "Practicing" },           axes: ["independence", "self-correction"] },
+  { id: "t11", date: "Apr 08", abs: "Apr 8, 2026",  rel: "3 weeks ago",area: "Sensorial",      material: "Knobless cylinders",comment: "Completed all four boxes blindfolded.",                    transition: { area: "Sensorial", to: "Mastered" },            axes: ["self-correction", "concentration", "error-resilience"] },
+  { id: "t12", date: "Apr 02", abs: "Apr 2, 2026",  rel: "4 weeks ago",area: "Sensorial",      material: "Brown stair",       comment: "Returned to it three times this week.",                    transition: { area: "Sensorial", to: "Practicing" },          axes: ["motivation"] },
+  { id: "t13", date: "Mar 22", abs: "Mar 22, 2026", rel: "5 weeks ago",area: "Language",       material: "Sandpaper letters", comment: "Traced 'a', 'm', 's' with strong tactile interest.",       transition: { area: "Language", to: "Practicing" },           axes: ["concentration"] },
+  { id: "t14", date: "Mar 18", abs: "Mar 18, 2026", rel: "6 weeks ago",area: "Sensorial",      material: "Pink tower",        comment: "Built tower independently — two tries, both correct.",     transition: { area: "Sensorial", to: "Practicing" },          axes: ["self-correction", "independence"] },
+];
+
+const FILTERS = ["All", "This week", "This month", "Sensorial", "Math", "Language", "Practical Life", "Cultural"];
+
+const stateMeta = {
+  i: { label: "Introduced", tone: "var(--color-terracotta)", soft: "var(--color-terracotta-soft)", deep: "var(--color-terracotta-deep)" },
+  p: { label: "Practicing", tone: "var(--color-butter)",     soft: "var(--color-butter-soft)",     deep: "var(--color-butter-deep)" },
+  m: { label: "Mastered",   tone: "var(--color-sage)",       soft: "var(--color-sage-soft)",       deep: "var(--color-sage-deep)" },
+};
+
+/* ---------------------------------------------------------------- */
+/*  Spider                                                           */
+/* ---------------------------------------------------------------- */
+
+function Spider({ axes, size = 360, onAxisHover, hoveredKey, mobile }) {
+  const cx = size / 2;
+  const cy = size / 2;
+  // leave generous room for axis labels — Material Progression / Self-Correction
+  // are long; they need horizontal breathing room
+  const labelPad = mobile ? 64 : 92;
+  const r = (size / 2) - labelPad;
+  const rings = 4;
+
+  const angleFor = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / axes.length;
+
+  const polygonPoints = axes
+    .map((a, i) => {
+      const lvlIdx = LEVELS.indexOf(a.level) + 1; // 1..4
+      const radius = (r * lvlIdx) / rings;
+      const ang = angleFor(i);
+      return [cx + radius * Math.cos(ang), cy + radius * Math.sin(ang)];
+    });
+
+  const polyStr = polygonPoints.map((p) => p.join(",")).join(" ");
+
+  // ring polygons
+  const ringPolys = [];
+  for (let lvl = 1; lvl <= rings; lvl++) {
+    const pts = axes
+      .map((_, i) => {
+        const ang = angleFor(i);
+        const radius = (r * lvl) / rings;
+        return `${cx + radius * Math.cos(ang)},${cy + radius * Math.sin(ang)}`;
+      })
+      .join(" ");
+    ringPolys.push(pts);
+  }
+
+  return (
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      width="100%"
+      height="100%"
+      style={{ display: "block", overflow: "visible" }}
+      role="img"
+      aria-label="7-axis whole-child assessment spider chart"
+    >
+      {/* concentric rings — neutral, no rainbow */}
+      {ringPolys.map((pts, i) => (
+        <polygon
+          key={i}
+          points={pts}
+          fill="none"
+          stroke="var(--color-border)"
+          strokeWidth={i === ringPolys.length - 1 ? 1.2 : 1}
+          strokeDasharray={i === ringPolys.length - 1 ? "none" : "2 4"}
+          opacity={i === ringPolys.length - 1 ? 0.85 : 0.55}
+        />
+      ))}
+
+      {/* axis spokes */}
+      {axes.map((a, i) => {
+        const ang = angleFor(i);
+        return (
+          <line
+            key={a.key}
+            x1={cx}
+            y1={cy}
+            x2={cx + r * Math.cos(ang)}
+            y2={cy + r * Math.sin(ang)}
+            stroke="var(--color-border)"
+            strokeWidth={1}
+            opacity={0.7}
+          />
+        );
+      })}
+
+      {/* filled polygon */}
+      <polygon
+        points={polyStr}
+        fill="var(--color-sage)"
+        fillOpacity={0.18}
+        stroke="var(--color-sage-deep)"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+
+      {/* vertices */}
+      {polygonPoints.map(([x, y], i) => {
+        const isHovered = hoveredKey === axes[i].key;
+        return (
+          <circle
+            key={i}
+            cx={x}
+            cy={y}
+            r={isHovered ? 5.5 : 3.5}
+            fill="var(--color-surface)"
+            stroke="var(--color-sage-deep)"
+            strokeWidth={1.6}
+            style={{ transition: "r 160ms ease" }}
+          />
+        );
+      })}
+
+      {/* axis labels + hover hit areas */}
+      {axes.map((a, i) => {
+        const ang = angleFor(i);
+        const lx = cx + (r + (mobile ? 16 : 24)) * Math.cos(ang);
+        const ly = cy + (r + (mobile ? 16 : 24)) * Math.sin(ang);
+        const isActive = hoveredKey === a.key;
+
+        // text-anchor based on x position
+        let anchor = "middle";
+        if (lx < cx - 8) anchor = "end";
+        else if (lx > cx + 8) anchor = "start";
+
+        // 2-line wrap for long axis labels — split on space first; if no space (e.g. "Self-Correction"),
+        // split on hyphen and re-add it to the first part so "Self-" / "Correction" reads naturally.
+        const spaceParts = a.label.split(" ");
+        let wrapParts = null;
+        if (spaceParts.length > 1 && a.label.length > 12) {
+          wrapParts = [spaceParts[0], spaceParts.slice(1).join(" ")];
+        } else if (a.label.includes("-") && a.label.length > 13) {
+          const idx = a.label.indexOf("-");
+          wrapParts = [a.label.slice(0, idx + 1), a.label.slice(idx + 1)];
+        }
+        const wrap = !!wrapParts;
+        const dy1 = wrap ? -5 : 4;
+
+        return (
+          <g
+            key={a.key}
+            style={{ cursor: "pointer" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAxisHover(a.key);
+            }}
+          >
+            {/* invisible hit slice from center to label */}
+            <line
+              x1={cx}
+              y1={cy}
+              x2={lx}
+              y2={ly}
+              stroke="transparent"
+              strokeWidth={mobile ? 32 : 44}
+            />
+            {wrap ? (
+              <text
+                x={lx}
+                y={ly}
+                textAnchor={anchor}
+                className={isActive ? "spider-axis-label spider-axis-label-active" : "spider-axis-label"}
+              >
+                <tspan x={lx} dy={dy1}>{wrapParts[0]}</tspan>
+                <tspan x={lx} dy="13">{wrapParts[1]}</tspan>
+              </text>
+            ) : (
+              <text
+                x={lx}
+                y={ly + 4}
+                textAnchor={anchor}
+                className={isActive ? "spider-axis-label spider-axis-label-active" : "spider-axis-label"}
+              >
+                {a.label}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function AxisDescriptorPopover({ axis, anchorRect, containerRect, mobile, onClose }) {
+  if (!axis) return null;
+  if (mobile) {
+    return (
+      <React.Fragment>
+        <div className="sheet-backdrop" onClick={onClose} />
+        <div className="sheet">
+          <div className="sheet-grip" />
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
+            {axis.label}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {LEVELS.map((lvl) => {
+              const isCurrent = lvl === axis.level;
+              return (
+                <div
+                  key={lvl}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "94px 1fr",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    background: isCurrent ? LEVEL_TONES[lvl].soft : "transparent",
+                    border: isCurrent ? `1px solid ${LEVEL_TONES[lvl].tone}` : "1px solid transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span
+                      className="legend-dot"
+                      style={{ background: LEVEL_TONES[lvl].tone, width: 9, height: 9 }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: isCurrent ? 600 : 500,
+                        color: isCurrent ? LEVEL_TONES[lvl].deep : "var(--color-ink-secondary)",
+                      }}
+                    >
+                      {lvl}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: isCurrent ? "var(--color-ink)" : "var(--color-ink-secondary)",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {axis.descriptors[lvl]}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 14, fontSize: 11.5, color: "var(--color-ink-muted)" }}>
+            Last updated {axis.updated}
+          </div>
+        </div>
+      </React.Fragment>
+    );
+  }
+
+  // Desktop popover
+  if (!anchorRect || !containerRect) return null;
+  const left = anchorRect.left - containerRect.left + anchorRect.width / 2;
+  const top = anchorRect.top - containerRect.top + anchorRect.height / 2;
+
+  return (
+    <div
+      className="spider-popover anim-fade-in"
+      style={{ left, top, transform: "translate(-50%, -120%)" }}
+    >
+      <span className="label-cap">{axis.label} · {axis.level}</span>
+      <div>{axis.descriptors[axis.level]}</div>
+      <div style={{ marginTop: 6, opacity: 0.55, fontSize: 11 }}>
+        Last updated {axis.updated}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Spider Card                                                      */
+/* ---------------------------------------------------------------- */
+
+function SpiderCard({ mobile, size, selectedAxis, onSelectAxis }) {
+  const handleAxisClick = (key) => {
+    // toggle: clicking the active axis deselects
+    if (onSelectAxis) onSelectAxis(key === selectedAxis ? null : key);
+  };
+
+  const finalSize = size || (mobile ? 340 : 460);
+
+  return (
+    <div className="spider-card">
+      <div style={{ width: "100%", aspectRatio: "1 / 1", position: "relative" }}>
+        <Spider
+          axes={AXES}
+          size={finalSize}
+          onAxisHover={handleAxisClick}
+          hoveredKey={selectedAxis}
+          mobile={mobile}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Whole-child summary (right rail / mobile strip)                  */
+/* ---------------------------------------------------------------- */
+
+function WholeChildSummary({ mobile }) {
+  const ranked = [...AXES].sort((a, b) => LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level));
+  const highest = ranked[0];
+  const growing = ranked[ranked.length - 1];
+
+  const StatBlock = ({ kind, axis }) => {
+    const t = LEVEL_TONES[axis.level];
+    return (
+      <div
+        style={{
+          padding: mobile ? "12px 14px" : "14px 16px",
+          borderRadius: 12,
+          background: t.soft,
+          border: `1px solid ${t.tone}`,
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        <div className="label-cap" style={{ color: t.deep, marginBottom: 6 }}>
+          {kind}
+        </div>
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            color: "var(--color-ink)",
+            lineHeight: 1.2,
+          }}
+        >
+          {axis.label}
+        </div>
+        <div style={{ marginTop: 4, fontSize: 12.5, color: t.deep, fontWeight: 500 }}>
+          {axis.level}
+        </div>
+      </div>
+    );
+  };
+
+  if (mobile) {
+    return (
+      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+        <StatBlock kind="Highest" axis={highest} />
+        <StatBlock kind="Growing edge" axis={growing} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ padding: 22, height: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+        At a glance
+      </div>
+      <StatBlock kind="Highest" axis={highest} />
+      <StatBlock kind="Growing edge" axis={growing} />
+
+      <div
+        style={{
+          marginTop: "auto",
+          borderTop: "1px solid var(--color-border)",
+          paddingTop: 14,
+        }}
+      >
+        <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
+          Latest note
+        </div>
+        <div
+          className="font-display"
+          style={{
+            fontSize: 19,
+            lineHeight: 1.35,
+            color: "var(--color-ink)",
+          }}
+        >
+          “She came back to the pink tower three days in a row — building something inside her head.”
+        </div>
+        <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--color-ink-muted)" }}>
+          Ms. Halima · Apr 30
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Timeline                                                         */
+/* ---------------------------------------------------------------- */
+
+const inLastWeek = (date) => /Apr (24|25|26|27|28|29|30)/.test(date);
+const inLastMonth = (date) => /Apr/.test(date);
+
+function Timeline({ mobile }) {
+  const [filter, setFilter] = React.useState("All");
+  const [openId, setOpenId] = React.useState(null);
+
+  const filtered = TIMELINE.filter((row) => {
+    if (filter === "All") return true;
+    if (filter === "This week") return inLastWeek(row.date);
+    if (filter === "This month") return inLastMonth(row.date);
+    return row.area === filter;
+  });
+
+  return (
+    <div className="card" style={{ padding: mobile ? 16 : 22 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: 14,
+          flexWrap: "wrap",
+          gap: 10,
+        }}
+      >
+        <div>
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+            Activity
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-ink)" }}>
+            What Ada has worked with
+          </div>
+          <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 2 }}>
+            {filtered.length} of {TIMELINE.length} entries · 6 weeks
+          </div>
+        </div>
+        <button type="button" className="ghost-btn tap">
+          + New observation
+        </button>
+      </div>
+
+      <div className="filter-row">
+        {FILTERS.map((f) => (
+          <button
+            key={f}
+            type="button"
+            className="filter-chip tap"
+            data-active={filter === f}
+            onClick={() => setFilter(f)}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {/* rows */}
+      {mobile ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+          {filtered.length === 0 && <EmptyState />}
+          {filtered.map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              className="tap"
+              onClick={() => setOpenId(openId === row.id ? null : row.id)}
+              style={{
+                width: "100%",
+                background: "var(--color-canvas)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 12,
+                padding: "12px 14px",
+                textAlign: "left",
+                display: "flex",
+                gap: 12,
+                alignItems: "flex-start",
+              }}
+            >
+              <span
+                className="legend-dot"
+                style={{
+                  width: 9,
+                  height: 9,
+                  background: AREAS[row.area].tone,
+                  marginTop: 6,
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, color: "var(--color-ink)" }}>
+                  Ada did <strong style={{ fontWeight: 600 }}>{row.material}</strong>
+                </div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: "var(--color-ink-secondary)",
+                    marginTop: 3,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {row.comment}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--color-ink-muted)",
+                    marginTop: 6,
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <span>{row.area}</span>
+                  <span className="dot-sep" />
+                  <span className="font-numeric">{row.date}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="timeline-rail" style={{ marginTop: 4 }}>
+          {filtered.length === 0 && <EmptyState />}
+          {filtered.map((row) => (
+            <div key={row.id} className="timeline-row">
+              <div className="timeline-dot-wrap">
+                <span
+                  className="timeline-dot"
+                  style={{ background: AREAS[row.area].tone }}
+                  title={row.area}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, color: "var(--color-ink)" }}>
+                  Ada did <strong style={{ fontWeight: 600 }}>{row.material}</strong>
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      fontSize: 11,
+                      color: "var(--color-ink-muted)",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {row.area}
+                  </span>
+                </div>
+                {row.comment && (
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: "var(--color-ink-secondary)",
+                      marginTop: 3,
+                      lineHeight: 1.45,
+                      maxWidth: 560,
+                    }}
+                  >
+                    {row.comment}
+                  </div>
+                )}
+                {row.transition && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      marginTop: 6,
+                      fontSize: 10.5,
+                      fontWeight: 500,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      color: stateMeta[row.transition.to.toLowerCase()[0]].deep,
+                      background: stateMeta[row.transition.to.toLowerCase()[0]].soft,
+                      border: `1px solid ${stateMeta[row.transition.to.toLowerCase()[0]].tone}`,
+                    }}
+                  >
+                    → {row.transition.to}
+                  </span>
+                )}
+              </div>
+              <div
+                title={row.abs}
+                className="font-numeric"
+                style={{
+                  fontSize: 12,
+                  color: "var(--color-ink-muted)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.rel}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div
+      style={{
+        padding: "36px 20px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "var(--color-ink-muted)",
+        fontSize: 13,
+        textAlign: "center",
+      }}
+    >
+      <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+        <circle cx="21" cy="21" r="18" stroke="var(--color-border-strong)" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
+        <path d="M14 22 C 17 19, 22 25, 28 20" stroke="var(--color-clay)" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+      </svg>
+      <div>No activity in this view.</div>
+      <div className="font-display" style={{ fontSize: 17, color: "var(--color-ink-secondary)" }}>
+        Try a different filter, or capture a new observation.
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Curriculum progress                                              */
+/* ---------------------------------------------------------------- */
+
+function CurriculumSection({ mobile }) {
+  const [activeIdx, setActiveIdx] = React.useState(0);
+  const sub = SUBTOPICS[activeIdx];
+  const meta = stateMeta[sub.state];
+
+  const subActivity = TIMELINE.filter((t) => t.material === sub.name);
+
+  // step diagram: which states are filled?
+  const stateOrder = ["i", "p", "m"];
+  const currentIdx = stateOrder.indexOf(sub.state);
+  const filled = (idx) => idx <= currentIdx;
+  const filledClass = (idx) =>
+    !filled(idx) ? "" : idx === 0 ? "filled-i" : idx === 1 ? "filled-p" : "filled-m";
+
+  const stepLabels = [
+    { key: "i", label: "Introduced", date: sub.introduced },
+    { key: "p", label: "Practicing", date: sub.practicing },
+    { key: "m", label: "Mastered", date: sub.mastered },
+  ];
+
+  return (
+    <div className="card" style={{ padding: mobile ? 16 : 22 }}>
+      <div style={{ marginBottom: 14 }}>
+        <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+          Curriculum
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-ink)" }}>
+          Subtopic mastery
+        </div>
+        <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 2 }}>
+          {SUBTOPICS.length} subtopics · Introduced → Practicing → Mastered
+        </div>
+      </div>
+
+      <div className="subtopic-strip scroll-quiet">
+        {SUBTOPICS.map((s, i) => (
+          <button
+            key={s.name}
+            type="button"
+            className="subtopic-chip tap"
+            data-active={i === activeIdx}
+            onClick={() => setActiveIdx(i)}
+          >
+            <span
+              className="subtopic-chip-dot"
+              style={{ background: stateMeta[s.state].tone }}
+            />
+            {s.name}
+          </button>
+        ))}
+      </div>
+
+      {/* selected subtopic detail */}
+      <div
+        key={activeIdx}
+        className="anim-slide-up"
+        style={{
+          marginTop: 18,
+          padding: mobile ? "16px" : "18px 20px",
+          background: "var(--color-canvas)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 12,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: mobile ? 18 : 22,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: "var(--color-ink)",
+                lineHeight: 1.15,
+              }}
+            >
+              {sub.name}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--color-ink-muted)",
+                marginTop: 4,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <span
+                className="legend-dot"
+                style={{ width: 7, height: 7, background: AREAS[sub.area].tone }}
+              />
+              {sub.area}
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: 11.5,
+              fontWeight: 500,
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: meta.soft,
+              color: meta.deep,
+              border: `1px solid ${meta.tone}`,
+            }}
+          >
+            Currently {meta.label}
+          </span>
+        </div>
+
+        {/* step diagram */}
+        {mobile ? (
+          <StepDiagramVertical labels={stepLabels} filledClass={filledClass} currentIdx={currentIdx} />
+        ) : (
+          <StepDiagramHorizontal labels={stepLabels} filledClass={filledClass} currentIdx={currentIdx} />
+        )}
+
+        {/* activities for this subtopic */}
+        <div style={{ marginTop: 24 }}>
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
+            Activities for {sub.name}
+          </div>
+          {subActivity.length === 0 && (
+            <div
+              style={{
+                fontSize: 12.5,
+                color: "var(--color-ink-muted)",
+                fontStyle: "italic",
+                padding: "10px 0",
+              }}
+            >
+              No observations yet for this subtopic.
+            </div>
+          )}
+          {subActivity.map((row, i) => (
+            <div
+              key={row.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: mobile ? "auto 1fr" : "70px 1fr auto",
+                gap: 12,
+                padding: "10px 0",
+                borderTop: i ? "1px solid var(--color-border)" : "0",
+                alignItems: "flex-start",
+              }}
+            >
+              <div
+                className="font-numeric"
+                style={{
+                  fontSize: 12,
+                  color: "var(--color-ink-muted)",
+                  minWidth: mobile ? 56 : "auto",
+                }}
+              >
+                {row.date}
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "var(--color-ink-secondary)",
+                  lineHeight: 1.45,
+                }}
+              >
+                {row.comment}
+                {row.transition && (
+                  <span
+                    style={{
+                      display: mobile ? "inline-block" : "inline-block",
+                      marginLeft: mobile ? 0 : 8,
+                      marginTop: mobile ? 6 : 0,
+                      fontSize: 10.5,
+                      fontWeight: 500,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      color: stateMeta[row.transition.to.toLowerCase()[0]].deep,
+                      background: stateMeta[row.transition.to.toLowerCase()[0]].soft,
+                      border: `1px solid ${stateMeta[row.transition.to.toLowerCase()[0]].tone}`,
+                    }}
+                  >
+                    → {row.transition.to}
+                  </span>
+                )}
+              </div>
+              {!mobile && (
+                <div
+                  className="font-numeric"
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--color-ink-muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {row.rel}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepDiagramHorizontal({ labels, filledClass, currentIdx }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {labels.map((l, i) => {
+          const isFilled = i <= currentIdx;
+          const stateAttr = isFilled ? `filled-${l.key}` : "";
+          return (
+            <React.Fragment key={l.key}>
+              <span
+                className="step-pill"
+                data-state={stateAttr}
+                data-current={i === currentIdx}
+              >
+                <span
+                  className="legend-dot"
+                  style={{
+                    background: isFilled ? stateMeta[l.key].tone : "var(--color-border-strong)",
+                    opacity: isFilled ? 1 : 0.5,
+                  }}
+                />
+                {l.label}
+              </span>
+              {i < labels.length - 1 && (
+                <div style={{ flex: 1, position: "relative", height: 24 }}>
+                  <div
+                    className="step-track"
+                    data-filled={
+                      i < currentIdx ? "full" : i === currentIdx ? "true" : "false"
+                    }
+                    style={{ position: "absolute", top: 11, left: 0, right: 0 }}
+                  />
+                  <span className="step-date">{labels[i + 1].date || "—"}</span>
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+      <div
+        style={{
+          marginTop: 28,
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 11,
+          color: "var(--color-ink-muted)",
+        }}
+      >
+        <span>Started {labels[0].date || "—"}</span>
+        <span>{currentIdx === 2 ? "Mastered" : `Next: ${labels[currentIdx + 1]?.label || "—"}`}</span>
+      </div>
+    </div>
+  );
+}
+
+function StepDiagramVertical({ labels, filledClass, currentIdx }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {labels.map((l, i) => {
+        const isFilled = i <= currentIdx;
+        const stateAttr = isFilled ? `filled-${l.key}` : "";
+        return (
+          <React.Fragment key={l.key}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span
+                className="step-pill"
+                data-state={stateAttr}
+                data-current={i === currentIdx}
+                style={{ minWidth: 134 }}
+              >
+                <span
+                  className="legend-dot"
+                  style={{
+                    background: isFilled ? stateMeta[l.key].tone : "var(--color-border-strong)",
+                    opacity: isFilled ? 1 : 0.5,
+                  }}
+                />
+                {l.label}
+              </span>
+              <span
+                className="font-numeric"
+                style={{ fontSize: 12, color: "var(--color-ink-muted)" }}
+              >
+                {l.date || "—"}
+              </span>
+            </div>
+            {i < labels.length - 1 && (
+              <div
+                style={{
+                  marginLeft: 18,
+                  height: 18,
+                  width: 2,
+                  background:
+                    i < currentIdx
+                      ? stateMeta[l.key].tone
+                      : "var(--color-border)",
+                  opacity: i < currentIdx ? 0.7 : 1,
+                }}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Page header                                                      */
+/* ---------------------------------------------------------------- */
+
+const ChevLeft = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path d="M15 18 L9 12 L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const Kebab = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="5" r="1.6" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+    <circle cx="12" cy="19" r="1.6" fill="currentColor" />
+  </svg>
+);
+
+function ChildPageHeader({ mobile }) {
+  return (
+    <div
+      style={{
+        padding: mobile ? "20px 16px 16px" : "26px 28px 18px",
+        borderBottom: "1px solid var(--color-border)",
+      }}
+    >
+      <a
+        href="#"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 12.5,
+          color: "var(--color-ink-muted)",
+          textDecoration: "none",
+          marginBottom: 12,
+        }}
+        onClick={(e) => e.preventDefault()}
+      >
+        <ChevLeft />
+        <span>All children</span>
+      </a>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", gap: mobile ? 12 : 18, alignItems: "flex-start" }}>
+          {/* Avatar */}
+          <div
+            style={{
+              width: mobile ? 56 : 72,
+              height: mobile ? 56 : 72,
+              borderRadius: 999,
+              background: "var(--color-clay-soft)",
+              color: "var(--color-terracotta-deep)",
+              display: "grid",
+              placeItems: "center",
+              fontSize: mobile ? 22 : 26,
+              fontWeight: 600,
+              letterSpacing: "0.02em",
+              flexShrink: 0,
+            }}
+          >
+            AC
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <h1
+              style={{
+                fontSize: mobile ? 22 : 26,
+                fontWeight: 600,
+                margin: 0,
+                color: "var(--color-ink)",
+                letterSpacing: "-0.01em",
+                lineHeight: 1.1,
+              }}
+            >
+              Ada Chen
+            </h1>
+            <div
+              className="font-display"
+              style={{
+                fontSize: mobile ? 22 : 26,
+                color: "var(--color-terracotta-deep)",
+                marginTop: 2,
+                lineHeight: 1.05,
+              }}
+            >
+              just Ada
+            </div>
+            <div
+              className="meta-row label-cap"
+              style={{ marginTop: mobile ? 10 : 12 }}
+            >
+              <span>4y 2m</span>
+              <span className="dot-sep" />
+              <span>Hummingbirds</span>
+              <span className="dot-sep" />
+              <span>Jane Chen</span>
+              {!mobile && (
+                <React.Fragment>
+                  <span className="dot-sep" />
+                  <span>Enrolled Sept 2024</span>
+                </React.Fragment>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {!mobile ? (
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button type="button" className="ghost-btn tap">+ New observation</button>
+            <button type="button" className="ghost-btn tap">Edit</button>
+            <button type="button" className="primary-btn tap">Generate report</button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="tap"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              border: "1px solid var(--color-border)",
+              background: "var(--color-surface)",
+              color: "var(--color-ink-secondary)",
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Kebab />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Section heading                                                   */
+/* ---------------------------------------------------------------- */
+
+function SectionHeading({ overline, title, accent, mobile }) {
+  return (
+    <div style={{ padding: mobile ? "20px 16px 6px" : "26px 28px 10px" }}>
+      <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+        {overline}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: mobile ? 18 : 20,
+            fontWeight: 600,
+            margin: 0,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {title}
+        </h2>
+        {accent && (
+          <span
+            className="font-display"
+            style={{ fontSize: 19, color: "var(--color-ink-muted)" }}
+          >
+            {accent}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  ViewToggle — Whole child / Curriculum                            */
+/* ---------------------------------------------------------------- */
+
+function ViewToggle({ value, onChange, mobile }) {
+  return (
+    <div
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 20,
+        background: "color-mix(in srgb, var(--color-canvas) 92%, transparent)",
+        backdropFilter: "saturate(140%) blur(8px)",
+        borderBottom: "1px solid var(--color-border)",
+        padding: mobile ? "10px 16px" : "12px 28px",
+        display: "flex",
+        justifyContent: mobile ? "stretch" : "flex-start",
+      }}
+    >
+      <div
+        role="tablist"
+        aria-label="Detail view"
+        style={{
+          display: "inline-flex",
+          gap: 0,
+          padding: 3,
+          background: "var(--color-muted)",
+          borderRadius: 999,
+          width: mobile ? "100%" : "auto",
+        }}
+      >
+        {[
+          { key: "whole", label: "Whole child" },
+          { key: "curriculum", label: "Curriculum" },
+          { key: "activity", label: "Activity" },
+        ].map((opt) => {
+          const active = value === opt.key;
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className="tap"
+              onClick={() => onChange(opt.key)}
+              style={{
+                flex: mobile ? 1 : "0 0 auto",
+                padding: mobile ? "8px 10px" : "7px 18px",
+                borderRadius: 999,
+                background: active ? "var(--color-surface)" : "transparent",
+                color: active ? "var(--color-ink)" : "var(--color-ink-secondary)",
+                border: 0,
+                fontSize: mobile ? 12.5 : 13,
+                fontWeight: 500,
+                boxShadow: active ? "0 1px 2px rgba(42,39,35,0.06)" : "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  SpiderModal — fullscreen spider + descriptors                    */
+/* ---------------------------------------------------------------- */
+
+const CloseIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+function SpiderModal({ open, onClose, mobile, selectedAxis, onSelectAxis }) {
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="anim-fade-in"
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "rgba(42, 39, 35, 0.42)",
+        zIndex: 80,
+        display: "flex",
+        alignItems: mobile ? "stretch" : "center",
+        justifyContent: "center",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="anim-slide-up"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--color-surface)",
+          borderRadius: mobile ? 0 : 18,
+          width: mobile ? "100%" : "min(720px, 92%)",
+          maxHeight: mobile ? "100%" : "92%",
+          overflow: "auto",
+          padding: mobile ? "20px 16px 28px" : "26px 28px",
+          boxShadow: "0 30px 80px rgba(42,39,35,0.28)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 16,
+            marginBottom: 8,
+          }}
+        >
+          <div>
+            <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+              Whole-child assessment
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "var(--color-ink)" }}>
+              Seven dimensions
+            </div>
+          </div>
+          <button
+            type="button"
+            className="tap"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              border: "1px solid var(--color-border)",
+              background: "var(--color-canvas)",
+              color: "var(--color-ink-secondary)",
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div style={{ marginTop: 4 }}>
+          <SpiderCard
+            mobile={mobile}
+            selectedAxis={selectedAxis}
+            onSelectAxis={onSelectAxis}
+          />
+        </div>
+
+        {selectedAxis && <AxisDescriptorInline axisKey={selectedAxis} />}
+      </div>
+    </div>
+  );
+}
+
+function AxisDescriptorInline({ axisKey }) {
+  const axis = AXES.find((a) => a.key === axisKey);
+  if (!axis) return null;
+  const t = LEVEL_TONES[axis.level];
+  return (
+    <div
+      key={axisKey}
+      className="anim-slide-up"
+      style={{
+        marginTop: 14,
+        padding: "12px 14px",
+        background: t.soft,
+        border: `1px solid ${t.tone}`,
+        borderRadius: 12,
+      }}
+    >
+      <div className="label-cap" style={{ color: t.deep, marginBottom: 4 }}>
+        {axis.label} · {axis.level}
+      </div>
+      <div style={{ fontSize: 13, color: "var(--color-ink)", lineHeight: 1.45 }}>
+        {axis.descriptors[axis.level]}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--color-ink-muted)", marginTop: 6 }}>
+        Last updated {axis.updated}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Recent observations / Activity feed                               */
+/* ---------------------------------------------------------------- */
+
+function RecentObservations({
+  mobile,
+  headerLabel = "Activity feed",
+  headerTitle = "What Ada has worked with",
+  initial = 5,
+  pageSize = 5,
+  source = TIMELINE,
+}) {
+  const [shown, setShown] = React.useState(initial);
+  // reset pagination when the source changes (e.g. axis filter flips)
+  React.useEffect(() => {
+    setShown(initial);
+  }, [source, initial]);
+  const rows = source.slice(0, shown);
+
+  return (
+    <div className="card" style={{ padding: mobile ? 16 : 22 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        <div>
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+            {headerLabel}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-ink)" }}>
+            {headerTitle}
+          </div>
+          {source !== TIMELINE && (
+            <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 2 }}>
+              {source.length} of {TIMELINE.length} entries
+            </div>
+          )}
+        </div>
+        <button type="button" className="ghost-btn tap">+ New observation</button>
+      </div>
+
+      <div style={mobile ? { display: "flex", flexDirection: "column", gap: 10 } : null}
+           className={mobile ? "" : "timeline-rail"}>
+        {rows.map((row) => (
+          mobile ? (
+            <div
+              key={row.id}
+              style={{
+                background: "var(--color-canvas)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 12,
+                padding: "12px 14px",
+                display: "flex",
+                gap: 12,
+                alignItems: "flex-start",
+              }}
+            >
+              <span
+                className="legend-dot"
+                style={{
+                  width: 9,
+                  height: 9,
+                  background: AREAS[row.area].tone,
+                  marginTop: 6,
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, color: "var(--color-ink)" }}>
+                  Ada did <strong style={{ fontWeight: 600 }}>{row.material}</strong>
+                </div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: "var(--color-ink-secondary)",
+                    marginTop: 3,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {row.comment}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--color-ink-muted)",
+                    marginTop: 6,
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <span>{row.area}</span>
+                  <span className="dot-sep" />
+                  <span className="font-numeric">{row.date}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div key={row.id} className="timeline-row">
+              <div className="timeline-dot-wrap">
+                <span
+                  className="timeline-dot"
+                  style={{ background: AREAS[row.area].tone }}
+                  title={row.area}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, color: "var(--color-ink)" }}>
+                  Ada did <strong style={{ fontWeight: 600 }}>{row.material}</strong>
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      fontSize: 11,
+                      color: "var(--color-ink-muted)",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {row.area}
+                  </span>
+                </div>
+                {row.comment && (
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: "var(--color-ink-secondary)",
+                      marginTop: 3,
+                      lineHeight: 1.45,
+                      maxWidth: 560,
+                    }}
+                  >
+                    {row.comment}
+                  </div>
+                )}
+                {row.transition && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      marginTop: 6,
+                      fontSize: 10.5,
+                      fontWeight: 500,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      color: stateMeta[row.transition.to.toLowerCase()[0]].deep,
+                      background: stateMeta[row.transition.to.toLowerCase()[0]].soft,
+                      border: `1px solid ${stateMeta[row.transition.to.toLowerCase()[0]].tone}`,
+                    }}
+                  >
+                    → {row.transition.to}
+                  </span>
+                )}
+              </div>
+              <div
+                title={row.abs}
+                className="font-numeric"
+                style={{
+                  fontSize: 12,
+                  color: "var(--color-ink-muted)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.rel}
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+
+      {shown < source.length && (
+        <button
+          type="button"
+          className="tap"
+          onClick={() => setShown((n) => Math.min(source.length, n + pageSize))}
+          style={{
+            marginTop: 14,
+            width: "100%",
+            padding: "10px 14px",
+            background: "var(--color-canvas)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--color-ink-secondary)",
+          }}
+        >
+          Load {Math.min(pageSize, source.length - shown)} more
+        </button>
+      )}
+      {shown > initial && shown >= source.length && source.length > initial && (
+        <button
+          type="button"
+          className="tap"
+          onClick={() => setShown(initial)}
+          style={{
+            marginTop: 14,
+            width: "100%",
+            padding: "10px 14px",
+            background: "transparent",
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--color-ink-muted)",
+          }}
+        >
+          Show fewer
+        </button>
+      )}
+      {source.length === 0 && (
+        <div
+          style={{
+            padding: "20px 0",
+            fontSize: 13,
+            color: "var(--color-ink-muted)",
+            fontStyle: "italic",
+            textAlign: "center",
+          }}
+        >
+          No observations match this axis yet.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Whole-child view — spider drives axis-filtered observations       */
+/* ---------------------------------------------------------------- */
+
+const ExpandIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path d="M4 9 V4 H9 M20 9 V4 H15 M4 15 V20 H9 M20 15 V20 H15"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+function SpiderHeroCard({ mobile, selectedAxis, onSelectAxis, onExpand }) {
+  return (
+    <div
+      className="card"
+      style={{
+        padding: mobile ? 16 : 22,
+        position: "relative",
+      }}
+    >
+      <button
+        type="button"
+        className="tap"
+        onClick={onExpand}
+        aria-label="Expand spider chart"
+        title="Expand"
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          width: 32,
+          height: 32,
+          borderRadius: 10,
+          border: "1px solid var(--color-border)",
+          background: "var(--color-canvas)",
+          color: "var(--color-ink-secondary)",
+          display: "grid",
+          placeItems: "center",
+          zIndex: 2,
+        }}
+      >
+        <ExpandIcon />
+      </button>
+
+      <div
+        style={{
+          width: "100%",
+          aspectRatio: "1 / 1",
+          maxWidth: mobile ? 280 : 400,
+          margin: "0 auto",
+        }}
+      >
+        <Spider
+          axes={AXES}
+          size={mobile ? 280 : 400}
+          onAxisHover={(key) => onSelectAxis(key === selectedAxis ? null : key)}
+          hoveredKey={selectedAxis}
+          mobile={mobile || false}
+        />
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 11,
+          color: "var(--color-ink-muted)",
+          fontStyle: "italic",
+          textAlign: "center",
+        }}
+      >
+        {selectedAxis ? "Tap the same axis again to clear" : "Tap an axis to filter observations below"}
+      </div>
+    </div>
+  );
+}
+
+function WholeChildView({ mobile }) {
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [selectedAxis, setSelectedAxis] = React.useState(null);
+
+  const filtered = selectedAxis
+    ? TIMELINE.filter((row) => Array.isArray(row.axes) && row.axes.includes(selectedAxis))
+    : TIMELINE;
+
+  const axis = AXES.find((a) => a.key === selectedAxis);
+  const headerTitle = axis ? `Observations · ${axis.label}` : "Across all dimensions";
+  const headerLabel = axis ? `${axis.level}` : "Whole-child observations";
+
+  return (
+    <React.Fragment>
+      <SectionHeading
+        overline="Whole-child assessment"
+        title="Seven dimensions"
+        accent={mobile ? "how Ada is becoming" : "how Ada is becoming herself"}
+        mobile={mobile}
+      />
+
+      <div style={{ padding: mobile ? "8px 16px 20px" : "10px 28px 24px" }}>
+        <SpiderHeroCard
+          mobile={mobile}
+          selectedAxis={selectedAxis}
+          onSelectAxis={setSelectedAxis}
+          onExpand={() => setModalOpen(true)}
+        />
+        {selectedAxis && axis && (
+          <AxisDescriptorInline axisKey={selectedAxis} />
+        )}
+      </div>
+
+      <SectionHeading
+        overline={axis ? "Filtered by axis" : "Activity"}
+        title={axis ? `Observations tied to ${axis.label}` : "Whole-child observations"}
+        mobile={mobile}
+      />
+      <div style={{ padding: mobile ? "8px 16px 36px" : "10px 28px 60px" }}>
+        <RecentObservations
+          mobile={mobile}
+          source={filtered}
+          headerLabel={axis ? `${axis.label} · ${axis.level}` : "All seven dimensions"}
+          headerTitle={axis ? `Observations tied to ${axis.label}` : "What Ada has worked with"}
+        />
+      </div>
+
+      <SpiderModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        mobile={mobile}
+        selectedAxis={selectedAxis}
+        onSelectAxis={setSelectedAxis}
+      />
+    </React.Fragment>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Curriculum view — area → subtopic → detail                        */
+/* ---------------------------------------------------------------- */
+
+const AREA_LIST = ["Sensorial", "Math", "Language", "Practical Life", "Cultural"];
+
+function areaProgress(area) {
+  const subs = SUBTOPICS.filter((s) => s.area === area);
+  const total = subs.length;
+  const mastered = subs.filter((s) => s.state === "m").length;
+  return { total, mastered, subs };
+}
+
+function TopicPicker({ value, onChange, mobile }) {
+  // mobile: single-row horizontal scroll-snap (matches subtopic-strip pattern)
+  // web: wrap allowed
+  const containerStyle = mobile
+    ? null
+    : { display: "flex", gap: 8, flexWrap: "wrap" };
+
+  const list = AREA_LIST.filter((area) => SUBTOPICS.some((s) => s.area === area));
+
+  const inner = list.map((area) => {
+    const active = value === area;
+    return (
+      <button
+        key={area}
+        type="button"
+        className={mobile ? "subtopic-chip tap" : "tap"}
+        data-active={mobile ? active : undefined}
+        onClick={() => onChange(area)}
+        style={
+          mobile
+            ? undefined
+            : {
+                padding: "9px 16px",
+                borderRadius: 999,
+                background: active ? "var(--color-ink)" : "var(--color-surface)",
+                color: active ? "var(--color-surface)" : "var(--color-ink)",
+                border: active ? "1px solid var(--color-ink)" : "1px solid var(--color-border)",
+                fontSize: 13,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+              }
+        }
+      >
+        {area}
+      </button>
+    );
+  });
+
+  if (mobile) {
+    return (
+      <div className="subtopic-strip scroll-quiet" style={{ paddingBottom: 4 }}>
+        {inner}
+      </div>
+    );
+  }
+  return <div style={containerStyle}>{inner}</div>;
+}
+
+function SubtopicPicker({ area, value, onChange, mobile }) {
+  const subs = SUBTOPICS.filter((s) => s.area === area);
+
+  const inner = subs.map((s) => {
+    const active = value === s.name;
+    return (
+      <button
+        key={s.name}
+        type="button"
+        className="subtopic-chip tap"
+        data-active={active}
+        onClick={() => onChange(s.name)}
+      >
+        {s.name}
+      </button>
+    );
+  });
+
+  if (mobile) {
+    return (
+      <div className="subtopic-strip scroll-quiet" style={{ paddingBottom: 4 }}>
+        {inner}
+      </div>
+    );
+  }
+  return <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{inner}</div>;
+}
+
+function SubtopicDetail({ subtopicName, mobile }) {
+  const sub = SUBTOPICS.find((s) => s.name === subtopicName);
+  const meta = stateMeta[sub.state];
+  const all = TIMELINE.filter((t) => t.material === sub.name);
+  const initial = 5;
+  const [shown, setShown] = React.useState(initial);
+  React.useEffect(() => { setShown(initial); }, [subtopicName]);
+  const rows = all.slice(0, shown);
+
+  const stateOrder = ["i", "p", "m"];
+  const currentIdx = stateOrder.indexOf(sub.state);
+  const stepLabels = [
+    { key: "i", label: "Introduced", date: sub.introduced },
+    { key: "p", label: "Practicing", date: sub.practicing },
+    { key: "m", label: "Mastered", date: sub.mastered },
+  ];
+
+  return (
+    <div
+      key={subtopicName}
+      className="anim-slide-up"
+      style={{
+        marginTop: 18,
+        padding: mobile ? "16px" : "18px 20px",
+        background: "var(--color-canvas)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: mobile ? 18 : 22,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: "var(--color-ink)",
+              lineHeight: 1.15,
+            }}
+          >
+            {sub.name}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--color-ink-muted)",
+              marginTop: 4,
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
+            <span
+              className="legend-dot"
+              style={{ width: 7, height: 7, background: AREAS[sub.area].tone }}
+            />
+            {sub.area}
+          </div>
+        </div>
+        <span
+          style={{
+            fontSize: 11.5,
+            fontWeight: 500,
+            padding: "4px 10px",
+            borderRadius: 999,
+            background: meta.soft,
+            color: meta.deep,
+            border: `1px solid ${meta.tone}`,
+          }}
+        >
+          Currently {meta.label}
+        </span>
+      </div>
+
+      {mobile ? (
+        <StepDiagramVertical labels={stepLabels} filledClass={() => ""} currentIdx={currentIdx} />
+      ) : (
+        <StepDiagramHorizontal labels={stepLabels} filledClass={() => ""} currentIdx={currentIdx} />
+      )}
+
+      <div style={{ marginTop: 24 }}>
+        <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
+          Activities for {sub.name}
+        </div>
+        {all.length === 0 && (
+          <div
+            style={{
+              fontSize: 12.5,
+              color: "var(--color-ink-muted)",
+              fontStyle: "italic",
+              padding: "10px 0",
+            }}
+          >
+            No observations yet for this subtopic.
+          </div>
+        )}
+        {rows.map((row, i) => (
+          <div
+            key={row.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: mobile ? "auto 1fr" : "70px 1fr auto",
+              gap: 12,
+              padding: "10px 0",
+              borderTop: i ? "1px solid var(--color-border)" : "0",
+              alignItems: "flex-start",
+            }}
+          >
+            <div
+              className="font-numeric"
+              style={{
+                fontSize: 12,
+                color: "var(--color-ink-muted)",
+                minWidth: mobile ? 56 : "auto",
+              }}
+            >
+              {row.date}
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--color-ink-secondary)",
+                lineHeight: 1.45,
+              }}
+            >
+              {row.comment}
+              {row.transition && (
+                <span
+                  style={{
+                    display: "inline-block",
+                    marginLeft: mobile ? 0 : 8,
+                    marginTop: mobile ? 6 : 0,
+                    fontSize: 10.5,
+                    fontWeight: 500,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    padding: "3px 8px",
+                    borderRadius: 999,
+                    color: stateMeta[row.transition.to.toLowerCase()[0]].deep,
+                    background: stateMeta[row.transition.to.toLowerCase()[0]].soft,
+                    border: `1px solid ${stateMeta[row.transition.to.toLowerCase()[0]].tone}`,
+                  }}
+                >
+                  → {row.transition.to}
+                </span>
+              )}
+            </div>
+            {!mobile && (
+              <div
+                className="font-numeric"
+                style={{
+                  fontSize: 11.5,
+                  color: "var(--color-ink-muted)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.rel}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {shown < all.length && (
+          <button
+            type="button"
+            className="tap"
+            onClick={() => setShown((n) => Math.min(all.length, n + initial))}
+            style={{
+              marginTop: 12,
+              width: "100%",
+              padding: "9px 14px",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 10,
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: "var(--color-ink-secondary)",
+            }}
+          >
+            Load {Math.min(initial, all.length - shown)} more
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CurriculumView({ mobile }) {
+  // Default area = the one that contains the most-recent activity (Sensorial in seed data)
+  const defaultArea = AREA_LIST.find((a) => SUBTOPICS.some((s) => s.area === a)) || "Sensorial";
+  const [area, setArea] = React.useState(defaultArea);
+
+  // when area changes, default-select the first subtopic of that area
+  const subsInArea = SUBTOPICS.filter((s) => s.area === area);
+  const [subtopic, setSubtopic] = React.useState(subsInArea[0]?.name || null);
+  React.useEffect(() => {
+    const firstInArea = SUBTOPICS.find((s) => s.area === area);
+    setSubtopic(firstInArea?.name || null);
+  }, [area]);
+
+  return (
+    <React.Fragment>
+      <SectionHeading
+        overline="Curriculum progress"
+        title="Subtopic mastery"
+        mobile={mobile}
+      />
+      <div style={{ padding: mobile ? "8px 16px 36px" : "10px 28px 60px" }}>
+        <div className="card" style={{ padding: mobile ? 16 : 22 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
+              Topics
+            </div>
+            <TopicPicker value={area} onChange={setArea} mobile={mobile} />
+          </div>
+
+          <div
+            style={{
+              borderTop: "1px solid var(--color-border)",
+              paddingTop: 14,
+            }}
+          >
+            <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
+              Subtopics
+            </div>
+            <SubtopicPicker
+              area={area}
+              value={subtopic}
+              onChange={setSubtopic}
+              mobile={mobile}
+            />
+          </div>
+
+          {subtopic && <SubtopicDetail subtopicName={subtopic} mobile={mobile} />}
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Activity view — full observations feed                            */
+/* ---------------------------------------------------------------- */
+
+function ActivityView({ mobile }) {
+  return (
+    <React.Fragment>
+      <SectionHeading
+        overline="Activity"
+        title="All observations"
+        accent={mobile ? null : "every material, every cycle"}
+        mobile={mobile}
+      />
+      <div style={{ padding: mobile ? "8px 16px 36px" : "10px 28px 60px" }}>
+        <RecentObservations
+          mobile={mobile}
+          source={TIMELINE}
+          headerLabel="Activity feed"
+          headerTitle="What Ada has worked with"
+          initial={5}
+          pageSize={5}
+        />
+      </div>
+    </React.Fragment>
+  );
+}
+
+function renderPage(pageView, mobile) {
+  if (pageView === "whole") return <WholeChildView mobile={mobile} />;
+  if (pageView === "activity") return <ActivityView mobile={mobile} />;
+  return <CurriculumView mobile={mobile} />;
+}
+
+/* ---------------------------------------------------------------- */
+/*  Web layout                                                        */
+/* ---------------------------------------------------------------- */
+
+function WebView({ pageView, onPageViewChange }) {
+  return (
+    <div style={{ background: "var(--color-canvas)", position: "relative" }}>
+      <ChildPageHeader mobile={false} />
+      <ViewToggle value={pageView} onChange={onPageViewChange} mobile={false} />
+      {renderPage(pageView, false)}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Mobile layout                                                     */
+/* ---------------------------------------------------------------- */
+
+function MobileView({ pageView, onPageViewChange }) {
+  return (
+    <div style={{ background: "var(--color-canvas)", paddingTop: 44, position: "relative" }}>
+      <ChildPageHeader mobile={true} />
+      <ViewToggle value={pageView} onChange={onPageViewChange} mobile={true} />
+      {renderPage(pageView, true)}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  App shell                                                        */
+/* ---------------------------------------------------------------- */
+
+function App() {
+  const [tab, setTab] = React.useState("web");
+  const [variant, setVariant] = React.useState("warm");
+  const [pageView, setPageView] = React.useState("curriculum");
+
+  return (
+    <div data-variant={variant} className="shell">
+      <div className="topbar">
+        <div className="topbar-inner">
+          <div className="brand">
+            <span className="brand-mark">m</span>
+            <span>Mitable Montessori</span>
+            <span
+              className="label-cap"
+              style={{ color: "var(--color-ink-muted)", marginLeft: 6 }}
+            >
+              · Child detail
+            </span>
+          </div>
+
+          <div className="tabs" role="tablist" aria-label="Viewport">
+            <button
+              type="button"
+              className="tab tap"
+              data-active={tab === "web"}
+              onClick={() => setTab("web")}
+              role="tab"
+              aria-selected={tab === "web"}
+            >
+              Web
+            </button>
+            <button
+              type="button"
+              className="tab tap"
+              data-active={tab === "mobile"}
+              onClick={() => setTab("mobile")}
+              role="tab"
+              aria-selected={tab === "mobile"}
+            >
+              Mobile
+            </button>
+          </div>
+
+          <div className="variant-toggle">
+            <span className="label-cap">Variant</span>
+            <div className="variant-pills">
+              <button
+                type="button"
+                className="variant-pill tap"
+                data-active={variant === "warm"}
+                onClick={() => setVariant("warm")}
+              >
+                Warm
+              </button>
+              <button
+                type="button"
+                className="variant-pill tap"
+                data-active={variant === "quiet"}
+                onClick={() => setVariant("quiet")}
+              >
+                Quiet
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {tab === "web" ? (
+        <div className="viewport-web">
+          <div className="frame">
+            <WebView pageView={pageView} onPageViewChange={setPageView} />
+          </div>
+        </div>
+      ) : (
+        <div className="viewport-mobile">
+          <div className="phone">
+            <div className="phone-notch" />
+            <div className="phone-content scroll-quiet">
+              <MobileView pageView={pageView} onPageViewChange={setPageView} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+    </script>
+  </body>
+</html>
