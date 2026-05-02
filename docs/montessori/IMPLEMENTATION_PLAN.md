@@ -379,20 +379,26 @@ Goal: the two ML capture modes, with deliberate UX around model loading.
 > tests use deterministic stubs; the manual accuracy gate runs as part of the
 > Phase 2 checkpoint review, not CI.
 
-### Phase 3 — Report drafting (Weeks 7–8)
+### Phase 3 — Report drafting (Weeks 7–8) ✅ Complete
 
 Goal: the second AI workflow, where Sonnet earns its slot.
 
-- [ ] `/api/draft-report` with the read + write tool surface; writes a `reports` row in `status = 'draft'`
-- [ ] Small agent loop: max 5 turns, hard stop with error
-- [ ] Token-only context — read tools return tokens, draft preserves tokens, client de-tokenizes
-- [ ] "Draft daily report" and "Draft major report" UIs on the student profile screen
-- [ ] Pending draft review: full text editing, approve/reject; teacher-owned daily reports may short-circuit `draft → approved`
-- [ ] Major reports advance through `submit_report_for_review`; admin acts on them in Phase 4 (queue UI lands then)
-- [ ] Every status transition writes a `report_review_actions` row
-- [ ] Token-preservation validator: regex check on draft output, regenerate-on-failure UX
+- [x] `/api/draft-report` with the read + write tool surface; writes a `reports` row in `status = 'draft'` (`src/app/api/v1/ai/draft-report/route.ts`)
+- [x] Small agent loop: max 5 turns, hard stop with error (`src/lib/reports/agent-loop.ts`, `MAX_AGENT_TURNS`, `AgentAbortError`)
+- [x] Token-only context — read tools return tokens, draft preserves tokens, client de-tokenizes (`SupabaseReportDataAdapter` + `IncrementalTokenizer` server-side; `detokenizeReportText` client-side)
+- [x] "Draft daily report" and "Draft major report" UIs (`ReportDraftButton.tsx`, embeddable from any student-context view; the formal student-profile screen lands in Phase 4)
+- [x] Pending draft review: full text editing, approve/reject; teacher-owned daily reports may short-circuit `draft → approved` (`ReportReview.tsx`, `/api/v1/reports/approve` honors short-circuit)
+- [x] Major reports advance through `submit_report_for_review` (`/api/v1/reports/submit`); admin acts on them in Phase 4 (queue UI lands then)
+- [x] Every status transition writes a `report_review_actions` row (`lib/reports/workflow.ts`)
+- [x] Token-preservation validator: regex check on draft output, regenerate-on-failure UX (`lib/reports/token-preservation.ts`, agent loop retries up to `MAX_REGENERATIONS = 2` then aborts cleanly)
+- [x] End-to-end test for the Phase 3 checkpoint scenario (`src/__tests__/phase3-end-to-end.test.ts` — agent convergence, regeneration on leak, hard cap on max turns, validator unit cases, and workflow state machine)
 
 **Checkpoint**: a teacher can generate a daily report for a student that reads naturally, references actual observations from the week's commands, and contains zero token leakage. Manual evaluation across 10 student weeks. Major-report submission lands in a `submitted_for_review` queue (admin acts on it in Phase 4).
+
+> The "reads naturally" half of the checkpoint is a manual eval — the agent
+> loop ships behind a `runReportAgent({ anthropic })` injection so production
+> uses Sonnet 4.6 and tests use a deterministic stub. The naturalness gate
+> runs as part of the Phase 3 review with real Sonnet calls, not CI.
 
 ### Phase 4 — Admin app (Weeks 9–12)
 
