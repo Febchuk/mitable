@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mitable Montessori — Teacher Platter v1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.5/babel.min.js"></script>
+<style>
+  :root {
+    --canvas: #FAF6EE;
+    --surface: #FFFBF3;
+    --muted: #F2EDE0;
+    --ink: #2A2723;
+    --ink-secondary: #5C544A;
+    --ink-muted: #9C9285;
+    --border: #E0D8C8;
+    --border-strong: #B89880;
+    --terracotta: #C46A4F;
+    --terracotta-soft: #F4DDD2;
+    --terracotta-deep: #A24A3D;
+    --sage: #7A9B7A;
+    --sage-soft: #DDE7DA;
+    --butter: #E8C56A;
+    --butter-soft: #F6E8B8;
+    --dusty-blue: #6B8AA6;
+    --dusty-blue-soft: #D2DCE5;
+    --clay: #B89880;
+    --clay-soft: #E5D8C8;
+  }
+  html, body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Subtle paper texture — barely visible, but felt. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .font-display { font-family: 'Caveat', cursive; font-weight: 500; }
+  .font-numeric { font-variant-numeric: tabular-nums; }
+  .label-cap { letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; font-weight: 500; }
+  .scroll-shadow {
+    background:
+      linear-gradient(var(--surface) 30%, rgba(255,251,243,0)),
+      linear-gradient(rgba(255,251,243,0), var(--surface) 70%) bottom,
+      radial-gradient(farthest-side at 50% 0, rgba(42,39,35,0.06), rgba(0,0,0,0)),
+      radial-gradient(farthest-side at 50% 100%, rgba(42,39,35,0.06), rgba(0,0,0,0)) bottom;
+    background-repeat: no-repeat;
+    background-size: 100% 30px, 100% 30px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll;
+  }
+  /* hide scrollbars inside iphone screens */
+  .ios-content::-webkit-scrollbar { display: none; }
+  .ios-content { scrollbar-width: none; }
+</style>
+</head>
+<body class="relative">
+
+<div id="root" class="relative z-10"></div>
+
+<script type="text/babel" data-presets="react">
+/* ============================================================
+   IosFrame — inlined from huashu-design assets/ios_frame.jsx
+   Adapted: cream screen background instead of #fff (no white).
+   ============================================================ */
+const iosFrameStyles = {
+  wrapper: {
+    display: 'inline-block',
+    padding: 12,
+    background: '#1a1a1a',
+    borderRadius: 60,
+    boxShadow: '0 0 0 2px #2a2723, 0 30px 80px rgba(42,39,35,0.18), 0 8px 20px rgba(42,39,35,0.08)',
+    position: 'relative',
+  },
+  screen: {
+    position: 'relative',
+    borderRadius: 48,
+    overflow: 'hidden',
+    background: 'var(--canvas)',
+  },
+  statusBar: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 54,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '0 32px', fontSize: 16, fontWeight: 600,
+    fontFamily: '-apple-system, "SF Pro Text", sans-serif', zIndex: 20, pointerEvents: 'none',
+  },
+  dynamicIsland: {
+    position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+    width: 124, height: 36, background: '#000', borderRadius: 999, zIndex: 30,
+  },
+  statusIcons: { display: 'flex', alignItems: 'center', gap: 6 },
+  signalIcon: { display: 'flex', alignItems: 'flex-end', gap: 2, height: 12 },
+  signalBar: { width: 3, background: 'currentColor', borderRadius: 1 },
+  batteryIcon: { width: 26, height: 12, border: '1.5px solid currentColor', borderRadius: 3, padding: 1, position: 'relative', opacity: 0.85 },
+  batteryCap: { position: 'absolute', top: 3, right: -3, width: 2, height: 6, background: 'currentColor', borderRadius: '0 1px 1px 0' },
+  content: { position: 'absolute', top: 54, left: 0, right: 0, bottom: 34, overflow: 'auto' },
+  homeIndicator: { position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', width: 140, height: 5, background: 'rgba(42,39,35,0.28)', borderRadius: 999, zIndex: 10 },
+};
+
+function IosFrame({ children, width = 393, height = 852, time = '9:41', battery = 86 }) {
+  return (
+    <div style={iosFrameStyles.wrapper}>
+      <div style={{ ...iosFrameStyles.screen, width, height }}>
+        <div style={{ ...iosFrameStyles.statusBar, color: 'var(--ink)' }}>
+          <span>{time}</span>
+          <div style={iosFrameStyles.statusIcons}>
+            <div style={iosFrameStyles.signalIcon}>
+              <div style={{ ...iosFrameStyles.signalBar, height: 4 }} />
+              <div style={{ ...iosFrameStyles.signalBar, height: 6 }} />
+              <div style={{ ...iosFrameStyles.signalBar, height: 9 }} />
+              <div style={{ ...iosFrameStyles.signalBar, height: 11 }} />
+            </div>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+              <path d="M8 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" />
+              <path d="M3 7.5a7 7 0 0110 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+              <path d="M1 4.5a11 11 0 0114 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7" />
+            </svg>
+            <div style={iosFrameStyles.batteryIcon}>
+              <div style={{ width: `${battery}%`, height: '100%', background: 'currentColor', borderRadius: 1, opacity: 0.9 }} />
+              <div style={iosFrameStyles.batteryCap} />
+            </div>
+          </div>
+        </div>
+        <div style={iosFrameStyles.dynamicIsland} />
+        <div className="ios-content" style={iosFrameStyles.content}>{children}</div>
+        <div style={iosFrameStyles.homeIndicator} />
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Hand-drawn marks — static SVGs.
+   Always in clay or terracotta. Used sparingly per brandbook.
+   ============================================================ */
+const HandUnderline = ({ color = 'var(--terracotta)', width = 120, style }) => (
+  <svg width={width} height="10" viewBox="0 0 120 10" style={{ display: 'block', ...style }}>
+    <path d="M2 6 C 22 2, 48 9, 72 4 S 110 7, 118 5"
+      fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+  </svg>
+);
+const HandCheck = ({ color = 'var(--sage)', size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path d="M3.5 12.5 C 6 14, 8 16.5, 10 19 C 13 13, 17 7.5, 22 4"
+      stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const HandArrow = ({ color = 'var(--clay)', size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path d="M3 12 C 8 11.5, 14 12.2, 20 12" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <path d="M15 7 C 18 9, 20 11, 21 12 C 19 13, 17 14.5, 15 17"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+  </svg>
+);
+const HandDivider = ({ color = 'var(--clay)', width = '100%' }) => (
+  <svg viewBox="0 0 200 8" preserveAspectRatio="none" style={{ width, height: 8, display: 'block' }}>
+    <path d="M2 5 C 50 2, 100 7, 150 3 S 198 5, 198 5"
+      stroke={color} strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.7" />
+  </svg>
+);
+
+/* Lucide-style icons (line, 1.5 stroke, rounded) — only the few we need. */
+const Icon = {
+  Mic: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>),
+  Plus: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>),
+  Home: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>),
+  Users: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M14.5 20c0-2 2-3.5 4.5-3.5"/></svg>),
+  Check: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>),
+  Inbox: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 13l3-8h12l3 8"/><path d="M3 13v6h18v-6"/><path d="M3 13h5l1 2h6l1-2h5"/></svg>),
+  Pencil: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4l5 5L9 20H4v-5z"/><path d="M14 5l5 5"/></svg>),
+  Chevron: (p) => (<svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>),
+  Search: (p) => (<svg viewBox="0 0 24 24" width={p.size||18} height={p.size||18} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.5-3.5"/></svg>),
+  Calendar: (p) => (<svg viewBox="0 0 24 24" width={p.size||18} height={p.size||18} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>),
+  Sparkle: (p) => (<svg viewBox="0 0 24 24" width={p.size||18} height={p.size||18} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v4M12 16v4M4 12h4M16 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></svg>),
+};
+
+/* ============================================================
+   Reusable mini-components within the iPhone screens
+   ============================================================ */
+function Avatar({ initials, tone = 'clay', size = 36 }) {
+  const tones = {
+    clay: { bg: 'var(--clay-soft)', fg: 'var(--terracotta-deep)' },
+    sage: { bg: 'var(--sage-soft)', fg: '#3F5C40' },
+    butter: { bg: 'var(--butter-soft)', fg: '#7A5C0F' },
+    blue: { bg: 'var(--dusty-blue-soft)', fg: '#33526E' },
+    terracotta: { bg: 'var(--terracotta-soft)', fg: 'var(--terracotta-deep)' },
+  };
+  const t = tones[tone];
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 999,
+      background: t.bg, color: t.fg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 600, fontSize: size * 0.36, letterSpacing: '0.02em', flexShrink: 0,
+    }}>{initials}</div>
+  );
+}
+
+function TabBar({ active }) {
+  const tabs = [
+    { id: 'today', label: 'Today', Icon: Icon.Home },
+    { id: 'roster', label: 'Roster', Icon: Icon.Users },
+    { id: 'capture', label: '', Icon: Icon.Mic, primary: true },
+    { id: 'pending', label: 'Review', Icon: Icon.Inbox, badge: 3 },
+    { id: 'reports', label: 'Reports', Icon: Icon.Pencil },
+  ];
+  return (
+    <div style={{
+      position: 'absolute', bottom: 0, left: 0, right: 0,
+      paddingTop: 8, paddingBottom: 26,
+      background: 'var(--surface)',
+      borderTop: '1px solid var(--border)',
+      display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)',
+      alignItems: 'center', gap: 4,
+    }}>
+      {tabs.map(t => {
+        const isActive = t.id === active;
+        if (t.primary) {
+          return (
+            <div key={t.id} style={{ display: 'flex', justifyContent: 'center', position: 'relative', top: -16 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 999,
+                background: 'var(--terracotta)', color: '#FFFBF3',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 18px rgba(196,106,79,0.35)',
+              }}>
+                <t.Icon size={24} />
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div key={t.id} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+            color: isActive ? 'var(--ink)' : 'var(--ink-muted)', position: 'relative',
+          }}>
+            <t.Icon size={22} />
+            <span style={{ fontSize: 11, fontWeight: 500 }}>{t.label}</span>
+            {t.badge && (
+              <div style={{
+                position: 'absolute', top: -2, right: 'calc(50% - 18px)',
+                background: 'var(--terracotta)', color: 'var(--surface)',
+                fontSize: 10, fontWeight: 600,
+                width: 16, height: 16, borderRadius: 999,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>{t.badge}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScreenHeader({ overline, title, action }) {
+  return (
+    <div style={{ padding: '12px 24px 16px' }}>
+      {overline && (
+        <div className="label-cap" style={{ color: 'var(--ink-muted)', marginBottom: 4 }}>{overline}</div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 600, lineHeight: 1.2, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{title}</h1>
+        {action}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 1 — Today
+   Role: functional baseline. Snapshot of the work cycle in progress.
+   ============================================================ */
+function ScreenToday() {
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 96 }}>
+      <ScreenHeader
+        overline="Tuesday · April 30"
+        title={<span>Good morning, <span className="font-display" style={{ fontSize: 34, color: 'var(--terracotta-deep)' }}>Anna</span></span>}
+      />
+      <div style={{ padding: '0 24px' }}>
+        <div style={{ color: 'var(--ink-secondary)', fontSize: 14, marginBottom: 20 }}>
+          Your work cycle starts in 22 minutes.
+        </div>
+
+        {/* Attendance card */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div className="label-cap" style={{ color: 'var(--ink-secondary)' }}>Primrose Room</div>
+            <span style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 500 }}>Attendance open</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span className="font-numeric" style={{ fontSize: 38, fontWeight: 600, color: 'var(--ink)' }}>14</span>
+            <span style={{ fontSize: 14, color: 'var(--ink-secondary)' }}>of 18 children present</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+            {['IM','EO','LS','RC','AT','MK','FN','AD','JR','PM','TW','VL','BC','OH'].map((i,k) => (
+              <Avatar key={k} initials={i} size={26} tone={['clay','sage','butter','blue'][k%4]} />
+            ))}
+            {['_','_','_','_'].map((_,k) => (
+              <div key={`a${k}`} style={{
+                width: 26, height: 26, borderRadius: 999,
+                border: '1.5px dashed var(--border-strong)', background: 'transparent', opacity: 0.5
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Pending review nudge */}
+        <div style={{
+          background: 'var(--terracotta-soft)', border: '1px solid #E8C0AE',
+          borderRadius: 16, padding: 16, marginBottom: 14,
+          display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)', marginBottom: 2 }}>
+              3 observations need a moment
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-secondary)' }}>
+              Drafted from yesterday afternoon's capture.
+            </div>
+          </div>
+          <Icon.Chevron size={18} />
+        </div>
+
+        {/* Recent commands */}
+        <div className="label-cap" style={{ color: 'var(--ink-muted)', margin: '20px 0 8px' }}>Recently captured</div>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+          {[
+            { who: 'Ada', what: 'returned to the binomial cube', when: '8:42a', tone: 'clay' },
+            { who: 'Levi', what: 'first presentation, sandpaper letters', when: '8:30a', tone: 'butter' },
+            { who: 'Mira', what: 'mastered teen board sequencing', when: '8:14a', tone: 'sage' },
+          ].map((r,i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 16px',
+              borderTop: i ? '1px solid var(--border)' : 'none',
+            }}>
+              <Avatar initials={r.who.slice(0,2).toUpperCase()} tone={r.tone} size={32} />
+              <div style={{ flex: 1, fontSize: 14, color: 'var(--ink)' }}>
+                <span style={{ fontWeight: 600 }}>{r.who}</span>{' '}
+                <span style={{ color: 'var(--ink-secondary)' }}>{r.what}</span>
+              </div>
+              <div className="font-numeric" style={{ fontSize: 12, color: 'var(--ink-muted)' }}>{r.when}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <TabBar active="today" />
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 2 — Quick-add: voice listening
+   Role: the brand's emotional hero. Cream paper, big breathing mic.
+   ============================================================ */
+function ScreenQuickAdd() {
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 24, position: 'relative' }}>
+      {/* Soft hand-drawn frame around the capture surface */}
+      <div style={{ padding: '20px 24px 0' }}>
+        <div className="label-cap" style={{ color: 'var(--ink-muted)' }}>Capture · Primrose Room</div>
+      </div>
+
+      <div style={{ padding: '12px 20px 0' }}>
+        <div style={{
+          background: 'var(--surface)', borderRadius: 24, padding: '32px 22px 26px',
+          border: '1px solid var(--border)',
+          position: 'relative', minHeight: 540,
+          boxShadow: '0 4px 12px rgba(42,39,35,0.05)',
+        }}>
+          {/* Hand-drawn corner marks */}
+          <svg style={{ position: 'absolute', top: -6, left: -6 }} width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <path d="M6 22 C 6 12, 12 6, 22 6" stroke="var(--clay)" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+          </svg>
+          <svg style={{ position: 'absolute', bottom: -6, right: -6 }} width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <path d="M22 38 C 32 38, 38 32, 38 22" stroke="var(--clay)" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+          </svg>
+
+          <div className="font-display" style={{ fontSize: 40, color: 'var(--ink)', textAlign: 'center', lineHeight: 1.05 }}>
+            I'm listening.
+          </div>
+          <div style={{ textAlign: 'center', color: 'var(--ink-secondary)', fontSize: 14, marginTop: 6 }}>
+            Speak as you observe. We'll sort it after.
+          </div>
+
+          {/* Live transcript area */}
+          <div style={{
+            marginTop: 28, padding: '16px 4px',
+            color: 'var(--ink)', fontSize: 17, lineHeight: 1.55,
+            minHeight: 180,
+          }}>
+            <span>Ada chose the pink tower for the third time this week. She built it correctly on the first try and </span>
+            <span style={{ color: 'var(--ink-secondary)' }}>spent about ten minutes refining </span>
+            <span style={{ color: 'var(--ink-muted)' }}>the placement of the smallest cube</span>
+            <span style={{
+              display: 'inline-block', width: 2, height: 18, marginLeft: 2,
+              background: 'var(--terracotta)', verticalAlign: 'middle',
+              animation: 'cursorblink 1s steps(2) infinite',
+            }} />
+          </div>
+
+          {/* Detected entities */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+            <span style={{ background: 'var(--clay-soft)', color: 'var(--terracotta-deep)', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 500 }}>Ada Okafor</span>
+            <span style={{ background: 'var(--sage-soft)', color: '#3F5C40', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 500 }}>Pink tower</span>
+            <span style={{ background: 'var(--butter-soft)', color: '#7A5C0F', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 500 }}>10 minutes</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Big breathing mic */}
+      <div style={{ position: 'absolute', bottom: 56, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'relative', width: 96, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            position: 'absolute', inset: -16, borderRadius: 999,
+            background: 'var(--terracotta)', opacity: 0.15,
+            animation: 'breathe 2.6s ease-in-out infinite',
+          }} />
+          <div style={{
+            position: 'absolute', inset: -4, borderRadius: 999,
+            background: 'var(--terracotta)', opacity: 0.25,
+            animation: 'breathe 2.6s ease-in-out infinite 0.4s',
+          }} />
+          <div style={{
+            width: 84, height: 84, borderRadius: 999,
+            background: 'var(--terracotta)', color: 'var(--surface)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 12px 28px rgba(196,106,79,0.35)', position: 'relative', zIndex: 1,
+          }}>
+            <Icon.Mic size={34} />
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-muted)', letterSpacing: '0.04em' }}>
+          Tap to pause · audio stays on this device
+        </div>
+      </div>
+      <style>{`
+        @keyframes breathe {
+          0%, 100% { transform: scale(1); opacity: 0.15; }
+          50% { transform: scale(1.18); opacity: 0.05; }
+        }
+        @keyframes cursorblink { 50% { opacity: 0; } }
+      `}</style>
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 3 — Pending review
+   Role: heart of the AI loop. Each card = one parsed tool call.
+   ============================================================ */
+function ScreenPending() {
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 96 }}>
+      <ScreenHeader
+        overline="Awaiting review"
+        title={<span>3 observations</span>}
+      />
+      <div style={{ padding: '0 24px', color: 'var(--ink-secondary)', fontSize: 14, marginBottom: 20 }}>
+        Drafted from your morning capture. Approve, edit, or set aside — we won't sync anything until you do.
+      </div>
+
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Card 1 — progress */}
+        <div style={{
+          background: 'var(--surface)', borderRadius: 16, padding: 16,
+          border: '1px solid var(--border)', borderLeft: '3px solid var(--sage)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <Avatar initials="AO" tone="clay" size={30} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Ada Okafor</div>
+              <div className="label-cap" style={{ color: 'var(--sage)' }}>Progress · Practicing</div>
+            </div>
+            <Icon.Sparkle size={16} />
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>
+            Sensorial → <span style={{ fontWeight: 600 }}>Pink tower</span> · third return this week, built correctly on first try.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ flex: 1, background: 'var(--terracotta)', color: 'var(--surface)', border: 0, borderRadius: 10, padding: '8px 0', fontSize: 13, fontWeight: 600 }}>Approve</button>
+            <button style={{ background: 'transparent', color: 'var(--ink-secondary)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 14px', fontSize: 13, fontWeight: 500 }}>Edit</button>
+          </div>
+        </div>
+
+        {/* Card 2 — presentation */}
+        <div style={{
+          background: 'var(--surface)', borderRadius: 16, padding: 16,
+          border: '1px solid var(--border)', borderLeft: '3px solid var(--butter)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <Avatar initials="LS" tone="butter" size={30} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Levi Schwartz</div>
+              <div className="label-cap" style={{ color: '#A8881F' }}>Presentation · Introduced</div>
+            </div>
+            <Icon.Sparkle size={16} />
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>
+            Language → <span style={{ fontWeight: 600 }}>Sandpaper letters</span> · first presentation, traced "m" and "s".
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ flex: 1, background: 'var(--terracotta)', color: 'var(--surface)', border: 0, borderRadius: 10, padding: '8px 0', fontSize: 13, fontWeight: 600 }}>Approve</button>
+            <button style={{ background: 'transparent', color: 'var(--ink-secondary)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 14px', fontSize: 13, fontWeight: 500 }}>Edit</button>
+          </div>
+        </div>
+
+        {/* Card 3 — note (private) */}
+        <div style={{
+          background: 'var(--surface)', borderRadius: 16, padding: 16,
+          border: '1px solid var(--border)', borderLeft: '3px solid var(--clay)',
+          opacity: 0.96,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <Avatar initials="MK" tone="sage" size={30} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Mira Khan</div>
+              <div className="label-cap" style={{ color: 'var(--clay)' }}>Private note · not shared with family</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.5, marginBottom: 10 }}>
+            Settling more easily after morning circle this week — worth a check-in with her family.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ flex: 1, background: 'var(--terracotta)', color: 'var(--surface)', border: 0, borderRadius: 10, padding: '8px 0', fontSize: 13, fontWeight: 600 }}>Approve</button>
+            <button style={{ background: 'transparent', color: 'var(--ink-secondary)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 14px', fontSize: 13, fontWeight: 500 }}>Edit</button>
+          </div>
+        </div>
+      </div>
+      <TabBar active="pending" />
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 4 — Roster
+   ============================================================ */
+function ScreenRoster() {
+  const children = [
+    { name: 'Ada Okafor',  age: '4y 7m', tone: 'clay',   recent: 'Pink tower · 8:42a' },
+    { name: 'Bea Chen',    age: '3y 11m', tone: 'sage',  recent: 'Number rods · yesterday' },
+    { name: 'Diego Ramos', age: '5y 2m',  tone: 'butter',recent: 'Map of Africa · yesterday' },
+    { name: 'Eli Okonkwo', age: '4y 1m',  tone: 'clay',  recent: 'Metal insets · 8:20a' },
+    { name: 'Iris Moreau', age: '3y 9m',  tone: 'blue',  recent: 'Pouring · this morning' },
+    { name: 'Kai Nakamura',age: '4y 4m',  tone: 'sage',  recent: 'Trinomial cube · yesterday' },
+    { name: 'Levi Schwartz',age:'3y 6m',  tone: 'butter',recent: 'Sandpaper letters · 8:30a' },
+    { name: 'Mira Khan',   age: '4y 9m',  tone: 'sage',  recent: 'Teen board · 8:14a' },
+    { name: 'Noor Habib',  age: '3y 8m',  tone: 'clay',  recent: 'Practical life · this week' },
+    { name: 'Ren Tanaka',  age: '4y 11m', tone: 'blue',  recent: 'Geometry cabinet · this week' },
+  ];
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 96 }}>
+      <ScreenHeader
+        overline="Primrose Room · 18 children"
+        title="Roster"
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-secondary)' }}>
+              <Icon.Search />
+            </button>
+          </div>
+        }
+      />
+      <div style={{ padding: '0 24px', display: 'flex', gap: 6, marginBottom: 14 }}>
+        {['All', 'Present today', 'Reports due'].map((t,i) => (
+          <span key={t} style={{
+            fontSize: 12, fontWeight: 500, padding: '6px 12px', borderRadius: 999,
+            background: i===0 ? 'var(--ink)' : 'var(--surface)',
+            color: i===0 ? 'var(--surface)' : 'var(--ink-secondary)',
+            border: i===0 ? '1px solid var(--ink)' : '1px solid var(--border)',
+          }}>{t}</span>
+        ))}
+      </div>
+
+      <div style={{ background: 'var(--surface)', margin: '0 16px', borderRadius: 16, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        {children.map((c,i) => (
+          <div key={c.name} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '14px 16px',
+            borderTop: i ? '1px solid var(--border)' : 'none',
+          }}>
+            <Avatar initials={c.name.split(' ').map(w=>w[0]).join('')} tone={c.tone} size={40} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{c.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.recent}</div>
+            </div>
+            <div className="font-numeric" style={{ fontSize: 12, color: 'var(--ink-muted)' }}>{c.age}</div>
+            <Icon.Chevron size={16} />
+          </div>
+        ))}
+      </div>
+      <TabBar active="roster" />
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 5 — Student profile (Ada)
+   Role: portfolio not CRM. Display font for child name.
+   ============================================================ */
+function ScreenStudent() {
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 96 }}>
+      <div style={{ padding: '12px 24px 4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-secondary)', fontSize: 13 }}>
+          <Icon.Chevron size={14} /> <span style={{ transform: 'rotate(180deg)', display: 'inline-block' }}></span>
+          <span>Roster</span>
+        </div>
+      </div>
+      <div style={{ padding: '8px 24px 0' }}>
+        <div className="font-display" style={{ fontSize: 44, color: 'var(--ink)', lineHeight: 1.05 }}>Ada Okafor</div>
+        <div style={{ marginTop: -2, marginLeft: 4 }}>
+          <HandUnderline width={130} color="var(--terracotta)" />
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 10, color: 'var(--ink-secondary)', fontSize: 13 }}>
+          <span>4 years 7 months</span>
+          <span>·</span>
+          <span>Primrose Room</span>
+          <span>·</span>
+          <span>since Sept 2024</span>
+        </div>
+      </div>
+
+      {/* Stat strip */}
+      <div style={{ padding: '20px 20px 0', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {[
+          { k: 'Observations', v: '47', sub: 'last 30 days' },
+          { k: 'Subtopics',    v: '23', sub: 'practiced' },
+          { k: 'Mastered',     v: '9',  sub: 'this term' },
+        ].map(s => (
+          <div key={s.k} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 12px 10px' }}>
+            <div className="label-cap" style={{ color: 'var(--ink-muted)' }}>{s.k}</div>
+            <div className="font-numeric" style={{ fontSize: 24, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>{s.v}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-secondary)' }}>{s.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent timeline */}
+      <div className="label-cap" style={{ color: 'var(--ink-muted)', margin: '20px 24px 8px' }}>Recent observations</div>
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {[
+          { date: 'Apr 30 · 8:42a', text: 'Returned to the binomial cube. Built it on the first try.', tone: 'sage' },
+          { date: 'Apr 29 · 10:12a', text: 'Worked alongside Iris on pouring — guiding without being asked.', tone: 'butter' },
+          { date: 'Apr 28 · 9:30a', text: 'First presentation: hundred board. Listened carefully; will revisit.', tone: 'clay' },
+        ].map((t,i) => (
+          <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+            <div className="label-cap" style={{ color: 'var(--ink-muted)', marginBottom: 4 }}>{t.date}</div>
+            <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.5 }}>{t.text}</div>
+          </div>
+        ))}
+      </div>
+      <TabBar active="roster" />
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 6 — Progress matrix
+   Role: dense, credible. Sage/butter/clay status dots.
+   ============================================================ */
+function ScreenProgress() {
+  const subtopics = [
+    { name: 'Pink tower' },
+    { name: 'Brown stair' },
+    { name: 'Red rods' },
+    { name: 'Cylinder blocks' },
+    { name: 'Binomial cube' },
+    { name: 'Trinomial cube' },
+    { name: 'Geometric solids' },
+  ];
+  const children = [
+    { initials: 'AO', tone: 'clay',   row: ['m','m','p','m','p','i','-'] },
+    { initials: 'BC', tone: 'sage',   row: ['m','p','p','i','-','-','-'] },
+    { initials: 'DR', tone: 'butter', row: ['m','m','m','m','p','p','i'] },
+    { initials: 'EO', tone: 'clay',   row: ['p','p','i','i','-','-','-'] },
+    { initials: 'IM', tone: 'blue',   row: ['p','i','-','-','-','-','-'] },
+    { initials: 'KN', tone: 'sage',   row: ['m','m','p','p','m','p','i'] },
+    { initials: 'LS', tone: 'butter', row: ['i','-','-','-','-','-','-'] },
+    { initials: 'MK', tone: 'sage',   row: ['m','m','m','m','p','p','-'] },
+  ];
+  const dotFor = (s) => {
+    const c = {
+      m: { bg: 'var(--sage)',     ring: 'var(--sage-soft)' },
+      p: { bg: 'var(--butter)',   ring: 'var(--butter-soft)' },
+      i: { bg: 'var(--clay)',     ring: 'var(--clay-soft)' },
+      '-': { bg: 'transparent',   ring: 'var(--border)' },
+    }[s];
+    return (
+      <div style={{
+        width: 20, height: 20, borderRadius: 999,
+        background: c.bg, border: `2px solid ${c.ring}`,
+      }} />
+    );
+  };
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 96 }}>
+      <ScreenHeader overline="Sensorial · last 30 days" title="Progress" />
+
+      {/* Legend */}
+      <div style={{ padding: '0 24px', display: 'flex', gap: 14, fontSize: 12, color: 'var(--ink-secondary)', marginBottom: 14 }}>
+        {[
+          { s: 'm', label: 'Mastered' },
+          { s: 'p', label: 'Practicing' },
+          { s: 'i', label: 'Introduced' },
+        ].map(l => (
+          <div key={l.s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {dotFor(l.s)} <span>{l.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Matrix */}
+      <div style={{ margin: '0 16px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ display: 'grid', gridTemplateColumns: '54px repeat(7, 1fr)', alignItems: 'end', padding: '10px 8px 8px', borderBottom: '1px solid var(--border)' }}>
+          <div />
+          {subtopics.map(s => (
+            <div key={s.name} style={{
+              fontSize: 10, color: 'var(--ink-secondary)',
+              writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+              padding: '0 0 6px', height: 96, lineHeight: 1.1, fontWeight: 500,
+            }}>{s.name}</div>
+          ))}
+        </div>
+        {/* Rows */}
+        {children.map((c,i) => (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: '54px repeat(7, 1fr)',
+            alignItems: 'center', padding: '8px 8px',
+            borderTop: i ? '1px solid var(--border)' : 'none',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <Avatar initials={c.initials} tone={c.tone} size={28} />
+            </div>
+            {c.row.map((s, j) => (
+              <div key={j} style={{ display: 'flex', justifyContent: 'center' }}>{dotFor(s)}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <TabBar active="roster" />
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 7 — Daily report draft
+   Role: AI-drafted narrative. "Take your time."
+   ============================================================ */
+function ScreenReport() {
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 96 }}>
+      <div style={{ padding: '12px 24px 0' }}>
+        <div className="label-cap" style={{ color: 'var(--ink-muted)' }}>Daily report · draft</div>
+        <div style={{ marginTop: 2, fontSize: 24, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+          Ada Okafor · April 30
+        </div>
+      </div>
+
+      {/* AI-drafted callout */}
+      <div style={{
+        margin: '14px 20px 0',
+        background: 'var(--butter-soft)', border: '1px solid #E8D695',
+        borderRadius: 12, padding: '10px 12px',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <Icon.Sparkle size={16} />
+        <div style={{ flex: 1, fontSize: 12, color: '#7A5C0F' }}>
+          Drafted by Mitable from today's observations. Take your time — review when you have a moment.
+        </div>
+      </div>
+
+      {/* Report body */}
+      <div style={{ margin: '14px 20px 0', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', padding: '20px 22px' }}>
+        <div style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--ink)' }}>
+          Today, Ada returned to the <span style={{ background: 'linear-gradient(transparent 60%, var(--butter-soft) 60%)', padding: '0 2px' }}>binomial cube</span> — a work
+          she has been drawn to all week. She built it correctly on her first attempt and then spent
+          nearly ten minutes refining the placement of the smallest cube, working alone and unhurried.
+        </div>
+        <div style={{ height: 14 }} />
+        <div style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--ink)' }}>
+          During the late part of the work cycle, she sat beside Iris at the pouring station and offered
+          quiet guidance — a kind of teaching that costs her nothing and gives Iris a great deal.
+        </div>
+        <div style={{ margin: '20px 0' }}>
+          <HandDivider />
+        </div>
+        <div className="label-cap" style={{ color: 'var(--ink-muted)' }}>Drawn from</div>
+        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {['Binomial cube · 8:42a','Pouring with Iris · 10:12a','Practical life · 11:04a'].map(t => (
+            <span key={t} style={{ background: 'var(--canvas)', color: 'var(--ink-secondary)', border: '1px solid var(--border)', fontSize: 11, borderRadius: 999, padding: '4px 10px' }}>{t}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom action bar */}
+      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 96, display: 'flex', gap: 10 }}>
+        <button style={{ flex: 1, background: 'var(--terracotta)', color: 'var(--surface)', border: 0, borderRadius: 12, padding: '14px 0', fontSize: 14, fontWeight: 600 }}>
+          Looks right · approve
+        </button>
+        <button style={{ background: 'var(--surface)', color: 'var(--ink-secondary)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 18px', fontSize: 14, fontWeight: 500 }}>
+          Edit
+        </button>
+      </div>
+      <TabBar active="reports" />
+    </div>
+  );
+}
+
+/* ============================================================
+   SCREEN 8 — Empty roster (illustration + Caveat title)
+   Role: the brand's "Nothing here yet" moment.
+   ============================================================ */
+function ScreenEmpty() {
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', paddingBottom: 96, display: 'flex', flexDirection: 'column' }}>
+      <ScreenHeader overline="Primrose Room" title="Roster" />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' }}>
+        {/* Spot illustration: classroom doorway with a guide silhouette, abstract */}
+        <svg width="220" height="180" viewBox="0 0 220 180" fill="none" style={{ marginBottom: 20 }}>
+          {/* doorway frame */}
+          <rect x="62" y="22" width="96" height="138" rx="6" stroke="var(--clay)" strokeWidth="1.6" fill="var(--surface)" />
+          <rect x="72" y="32" width="76" height="118" rx="3" stroke="var(--clay)" strokeWidth="1.2" fill="none" opacity="0.5" />
+          {/* sun coming through */}
+          <circle cx="110" cy="74" r="16" fill="var(--butter-soft)" opacity="0.8" />
+          <path d="M94 90 C 100 80, 120 80, 126 90 L 126 150 L 94 150 Z" fill="var(--butter-soft)" opacity="0.45" />
+          {/* doorway gleam */}
+          <path d="M68 28 L 152 28" stroke="var(--clay)" strokeWidth="0.8" opacity="0.4" />
+          {/* a small mat on the floor */}
+          <ellipse cx="110" cy="160" rx="60" ry="6" fill="var(--clay-soft)" opacity="0.6" />
+          {/* guide silhouette, partial */}
+          <path d="M44 138 C 44 124, 50 116, 58 116 C 66 116, 72 124, 72 138 L 72 168 L 44 168 Z" fill="var(--terracotta-soft)" />
+          <circle cx="58" cy="108" r="8" fill="var(--terracotta-soft)" />
+          {/* hand-drawn floor line */}
+          <path d="M14 168 C 60 165, 140 170, 206 167" stroke="var(--clay)" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        </svg>
+
+        <div className="font-display" style={{ fontSize: 36, color: 'var(--ink)', lineHeight: 1.1 }}>
+          Nothing here yet.
+        </div>
+        <div style={{ fontSize: 15, color: 'var(--ink-secondary)', maxWidth: 260, lineHeight: 1.55, marginTop: 8 }}>
+          Your roster will appear here once your school is set up.{' '}
+          <span style={{ color: 'var(--terracotta-deep)', fontWeight: 600, borderBottom: '1px solid var(--terracotta-deep)', paddingBottom: 1 }}>
+            Talk to your admin
+          </span>.
+        </div>
+      </div>
+      <TabBar active="roster" />
+    </div>
+  );
+}
+
+/* ============================================================
+   PLATTER LAYOUT
+   ============================================================ */
+const screens = [
+  { id: 'today',    label: 'Today',                  sub: '/app/today',                 Comp: ScreenToday },
+  { id: 'capture',  label: 'Quick capture · voice',  sub: '/app/quick-add',             Comp: ScreenQuickAdd },
+  { id: 'pending',  label: 'Pending review',         sub: '/app/pending',               Comp: ScreenPending },
+  { id: 'roster',   label: 'Roster',                 sub: '/app/roster',                Comp: ScreenRoster },
+  { id: 'student',  label: 'Child profile',          sub: '/app/roster/:studentId',     Comp: ScreenStudent },
+  { id: 'progress', label: 'Progress matrix',        sub: '/app/progress',              Comp: ScreenProgress },
+  { id: 'report',   label: 'Daily report · draft',   sub: '/app/reports/daily/:id/edit',Comp: ScreenReport },
+  { id: 'empty',    label: 'Empty roster',           sub: 'first-run state',            Comp: ScreenEmpty },
+];
+
+function App() {
+  return (
+    <div style={{ minHeight: '100vh' }}>
+      {/* Header */}
+      <div style={{ maxWidth: 1760, margin: '0 auto', padding: '64px 56px 24px' }}>
+        <div className="label-cap" style={{ color: 'var(--terracotta)', marginBottom: 8 }}>Mitable Montessori · Teacher app</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
+          <div>
+            <div className="font-display" style={{ fontSize: 72, lineHeight: 1, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+              The guide's surface.
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <HandUnderline width={260} color="var(--terracotta)" />
+            </div>
+            <div style={{ marginTop: 14, fontSize: 16, color: 'var(--ink-secondary)', maxWidth: 640, lineHeight: 1.55 }}>
+              Eight screens that show how the brand shows up where it matters most — capture, review, and the
+              moment a draft becomes ready. Calm by default. Playful when something is worth celebrating.
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ink-muted)', textAlign: 'right' }}>
+            <div>Platter v1 · {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            <div style={{ marginTop: 2 }}>iPhone 15 Pro · 393 × 852 · cream canvas</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section divider */}
+      <div style={{ maxWidth: 1760, margin: '0 auto', padding: '0 56px' }}>
+        <HandDivider color="var(--clay)" />
+      </div>
+
+      {/* Platter grid */}
+      <div style={{
+        maxWidth: 1760, margin: '0 auto',
+        padding: '40px 40px 80px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 56,
+        justifyItems: 'center',
+      }}>
+        {screens.map((s, i) => (
+          <div key={s.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ marginBottom: 14, textAlign: 'center', minHeight: 44 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.005em' }}>
+                <span style={{ color: 'var(--terracotta)', marginRight: 6, fontVariantNumeric: 'tabular-nums' }}>{String(i+1).padStart(2,'0')}</span>
+                {s.label}
+              </div>
+              <div className="font-numeric" style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2, fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>{s.sub}</div>
+            </div>
+            <IosFrame>
+              <s.Comp />
+            </IosFrame>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer note */}
+      <div style={{ maxWidth: 1760, margin: '0 auto', padding: '0 56px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 13, color: 'var(--ink-secondary)', maxWidth: 720, lineHeight: 1.6 }}>
+          <strong style={{ color: 'var(--ink)' }}>Brand notes.</strong>{' '}
+          Cream <span className="font-numeric">#FAF6EE</span> is the canvas — never pure white. Display
+          font (Caveat) is rare and earned: it appears on the daily greeting, the empty state, and on a
+          child's name. Hand-drawn marks live in moments that are worth slowing down for, never on dense
+          data UI. Terracotta is reserved for the action. Sage signals a state achieved.
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-muted)' }}>
+          Created by Huashu-Design
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

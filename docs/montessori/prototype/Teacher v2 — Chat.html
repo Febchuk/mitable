@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mitable Montessori — Teacher v2 (Chat) · Phone + Desktop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.5/babel.min.js"></script>
+<style>
+  :root {
+    --canvas: #FAF6EE;
+    --surface: #FFFBF3;
+    --muted: #F2EDE0;
+    --ink: #2A2723;
+    --ink-secondary: #5C544A;
+    --ink-muted: #9C9285;
+    --border: #E0D8C8;
+    --border-strong: #B89880;
+    --terracotta: #C46A4F;
+    --terracotta-soft: #F4DDD2;
+    --terracotta-deep: #A24A3D;
+    --sage: #7A9B7A;
+    --sage-soft: #DDE7DA;
+    --butter: #E8C56A;
+    --butter-soft: #F6E8B8;
+    --dusty-blue: #6B8AA6;
+    --dusty-blue-soft: #D2DCE5;
+    --clay: #B89880;
+    --clay-soft: #E5D8C8;
+  }
+  html, body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.035;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .font-display { font-family: 'Caveat', cursive; font-weight: 500; }
+  .font-numeric { font-variant-numeric: tabular-nums; }
+  .label-cap { letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; font-weight: 500; }
+  .ios-content::-webkit-scrollbar { display: none; }
+  .ios-content { scrollbar-width: none; }
+  /* invisible scrollbars inside chat panes too */
+  .scroll-quiet::-webkit-scrollbar { width: 6px; }
+  .scroll-quiet::-webkit-scrollbar-thumb { background: var(--clay-soft); border-radius: 999px; }
+  .scroll-quiet::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body class="relative">
+<div id="root" class="relative z-10"></div>
+
+<script type="text/babel" data-presets="react">
+
+/* ============================================================
+   Hand-drawn marks (clay/terracotta only, per brandbook)
+   ============================================================ */
+const HandUnderline = ({ color = 'var(--terracotta)', width = 120, style }) => (
+  <svg width={width} height="10" viewBox="0 0 120 10" style={{ display: 'block', ...style }}>
+    <path d="M2 6 C 22 2, 48 9, 72 4 S 110 7, 118 5"
+      fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+  </svg>
+);
+const HandCheck = ({ color = 'var(--sage)', size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path d="M3.5 12.5 C 6 14, 8 16.5, 10 19 C 13 13, 17 7.5, 22 4"
+      stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const HandDivider = ({ color = 'var(--clay)', width = '100%' }) => (
+  <svg viewBox="0 0 200 8" preserveAspectRatio="none" style={{ width, height: 8, display: 'block' }}>
+    <path d="M2 5 C 50 2, 100 7, 150 3 S 198 5, 198 5"
+      stroke={color} strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.7" />
+  </svg>
+);
+
+/* ============================================================
+   Lucide-style icons (1.5 stroke, rounded)
+   ============================================================ */
+const Icon = {
+  Mic: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>),
+  Camera: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="4"/></svg>),
+  Image: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.7"/><path d="M21 16l-5-5-9 9"/></svg>),
+  Send: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l15-8-6 18-3-7z"/></svg>),
+  Plus: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>),
+  Home: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>),
+  Users: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M14.5 20c0-2 2-3.5 4.5-3.5"/></svg>),
+  Book: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M4 17a3 3 0 0 1 3-3h11"/></svg>),
+  Grid: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>),
+  Calendar: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>),
+  Pencil: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4l5 5L9 20H4v-5z"/><path d="M14 5l5 5"/></svg>),
+  Settings: (p) => (<svg viewBox="0 0 24 24" width={p.size||20} height={p.size||20} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.7l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.7-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.7.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.7 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.7.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.7-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.7v.1a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>),
+  Sparkle: (p) => (<svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v4M12 16v4M4 12h4M16 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></svg>),
+  Lock: (p) => (<svg viewBox="0 0 24 24" width={p.size||14} height={p.size||14} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>),
+  Chevron: (p) => (<svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>),
+  X: (p) => (<svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>),
+  Search: (p) => (<svg viewBox="0 0 24 24" width={p.size||18} height={p.size||18} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.5-3.5"/></svg>),
+  Bell: (p) => (<svg viewBox="0 0 24 24" width={p.size||18} height={p.size||18} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2H4.5z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>),
+};
+
+/* ============================================================
+   Avatar
+   ============================================================ */
+function Avatar({ initials, tone = 'clay', size = 36 }) {
+  const tones = {
+    clay: { bg: 'var(--clay-soft)', fg: 'var(--terracotta-deep)' },
+    sage: { bg: 'var(--sage-soft)', fg: '#3F5C40' },
+    butter: { bg: 'var(--butter-soft)', fg: '#7A5C0F' },
+    blue: { bg: 'var(--dusty-blue-soft)', fg: '#33526E' },
+    terracotta: { bg: 'var(--terracotta-soft)', fg: 'var(--terracotta-deep)' },
+  };
+  const t = tones[tone];
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 999,
+      background: t.bg, color: t.fg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 600, fontSize: size * 0.36, letterSpacing: '0.02em', flexShrink: 0,
+    }}>{initials}</div>
+  );
+}
+
+/* ============================================================
+   Chat content — shared between phone and desktop
+   ============================================================ */
+
+/* Voice waveform bubble (user voice message) */
+function VoiceWave({ color = 'var(--surface)' }) {
+  const bars = [3, 6, 11, 8, 14, 18, 13, 9, 16, 12, 7, 14, 19, 11, 6, 4, 9, 13, 7, 4];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 22 }}>
+      {bars.map((h, i) => (
+        <div key={i} style={{
+          width: 2.5, height: h, background: color, opacity: 0.85,
+          borderRadius: 2,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+/* User voice message bubble (right-aligned, terracotta) */
+function UserVoiceBubble({ duration = '0:18' }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+      <div style={{
+        background: 'var(--terracotta)', color: 'var(--surface)',
+        borderRadius: '16px 16px 4px 16px', padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        maxWidth: '78%',
+      }}>
+        <button style={{
+          width: 28, height: 28, borderRadius: 999,
+          background: 'rgba(255,251,243,0.2)', border: 0,
+          color: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M3 2l7 4-7 4z"/></svg>
+        </button>
+        <VoiceWave />
+        <span className="font-numeric" style={{ fontSize: 12, opacity: 0.85 }}>{duration}</span>
+      </div>
+    </div>
+  );
+}
+
+/* User text bubble */
+function UserTextBubble({ children }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+      <div style={{
+        background: 'var(--terracotta)', color: 'var(--surface)',
+        borderRadius: '16px 16px 4px 16px', padding: '9px 14px',
+        fontSize: 14, lineHeight: 1.45, maxWidth: '78%',
+      }}>{children}</div>
+    </div>
+  );
+}
+
+/* Assistant intro line */
+function AssistantIntro({ children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 999, flexShrink: 0,
+        background: 'var(--clay-soft)', color: 'var(--terracotta-deep)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon.Sparkle size={14} />
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--ink-secondary)', lineHeight: 1.5, paddingTop: 5 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* Inline review card — the heart of the loop */
+function ReviewCard({ tone, accent, child, initials, avatarTone, label, body, status = 'pending' }) {
+  const isApproved = status === 'approved';
+  return (
+    <div style={{
+      background: 'var(--surface)', borderRadius: 14,
+      border: '1px solid var(--border)', borderLeft: `3px solid ${accent}`,
+      padding: 14, marginLeft: 38, marginBottom: 8,
+      opacity: isApproved ? 0.78 : 1,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <Avatar initials={initials} tone={avatarTone} size={28} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{child}</div>
+          <div className="label-cap" style={{ color: tone }}>{label}</div>
+        </div>
+        {isApproved && <HandCheck color="var(--sage)" size={18} />}
+      </div>
+      <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.5, marginBottom: isApproved ? 0 : 10 }}>
+        {body}
+      </div>
+      {!isApproved ? (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button style={{ flex: 1, background: 'var(--terracotta)', color: 'var(--surface)', border: 0, borderRadius: 9, padding: '7px 0', fontSize: 12.5, fontWeight: 600 }}>Approve</button>
+          <button style={{ background: 'transparent', color: 'var(--ink-secondary)', border: '1px solid var(--border)', borderRadius: 9, padding: '7px 12px', fontSize: 12.5, fontWeight: 500 }}>Edit</button>
+          <button style={{ background: 'transparent', color: 'var(--ink-muted)', border: '1px solid var(--border)', borderRadius: 9, padding: '7px 10px', fontSize: 12.5, fontWeight: 500 }}>Set aside</button>
+        </div>
+      ) : (
+        <div style={{ marginTop: 4, fontSize: 11.5, color: 'var(--sage)' }}>
+          Approved · synced to Ada's record
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Chat thread body — shared content */
+function ChatThread() {
+  return (
+    <>
+      {/* Day divider */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0 12px' }}>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        <div className="label-cap" style={{ color: 'var(--ink-muted)' }}>This morning · 8:42</div>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+      </div>
+
+      {/* Approved card from earlier — collapsed feel */}
+      <AssistantIntro>You captured one observation earlier.</AssistantIntro>
+      <ReviewCard
+        tone="var(--sage)" accent="var(--sage)"
+        child="Mira Khan" initials="MK" avatarTone="sage"
+        label="Progress · Mastered"
+        body="Math → Teen board sequencing · independently completed 11 to 19."
+        status="approved"
+      />
+
+      {/* New voice message */}
+      <div style={{ height: 14 }} />
+      <UserVoiceBubble duration="0:18" />
+      {/* Tokenized transcript shown below the bubble (skill brand: surfacing tokens visibly is part of the privacy story) */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <div style={{ maxWidth: '78%', fontSize: 12, color: 'var(--ink-muted)', textAlign: 'right', fontStyle: 'italic', lineHeight: 1.45 }}>
+          "Ada chose the pink tower for the third time this week.<br />Built it correctly — first try."
+        </div>
+      </div>
+
+      {/* Assistant proposal with two cards */}
+      <AssistantIntro>
+        Two things to record from that. Both stay here until you approve.
+      </AssistantIntro>
+
+      <ReviewCard
+        tone="var(--butter)" accent="var(--butter)"
+        child="Ada Okafor" initials="AO" avatarTone="clay"
+        label="Progress · Practicing"
+        body={<>Sensorial → <span style={{fontWeight: 600}}>Pink tower</span> · third return this week, built correctly on first try.</>}
+      />
+
+      <ReviewCard
+        tone="var(--clay)" accent="var(--clay)"
+        child="Ada Okafor" initials="AO" avatarTone="clay"
+        label="Private note · not shared with family"
+        body="Drawn to the pink tower repeatedly — worth surfacing in next family conference."
+      />
+
+      {/* Latest user message — image attached */}
+      <div style={{ height: 12 }} />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+        <div style={{ maxWidth: '78%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <div style={{
+            width: 180, height: 120, borderRadius: 14,
+            background: 'linear-gradient(135deg, var(--clay-soft) 0%, var(--butter-soft) 60%, var(--sage-soft) 100%)',
+            border: '1px solid var(--border)', position: 'relative', overflow: 'hidden',
+          }}>
+            {/* abstract photo placeholder — paper shapes suggest a child's work */}
+            <div style={{ position: 'absolute', left: 24, bottom: 18, width: 18, height: 18, background: 'var(--terracotta-soft)', borderRadius: 3 }} />
+            <div style={{ position: 'absolute', left: 38, bottom: 18, width: 28, height: 28, background: 'var(--clay-soft)', borderRadius: 3, border: '1px solid var(--clay)' }} />
+            <div style={{ position: 'absolute', left: 60, bottom: 18, width: 40, height: 40, background: 'var(--terracotta-soft)', borderRadius: 3, border: '1px solid var(--clay)' }} />
+            <div style={{ position: 'absolute', left: 94, bottom: 18, width: 56, height: 56, background: 'var(--clay-soft)', borderRadius: 3, border: '1px solid var(--clay)' }} />
+            <div style={{ position: 'absolute', top: 8, right: 10, fontSize: 10, color: 'var(--ink-secondary)', background: 'rgba(255,251,243,0.85)', borderRadius: 6, padding: '2px 6px' }}>
+              <Icon.Lock size={10} /> on-device
+            </div>
+          </div>
+          <div style={{ background: 'var(--terracotta)', color: 'var(--surface)', borderRadius: '16px 16px 4px 16px', padding: '8px 12px', fontSize: 13, lineHeight: 1.4 }}>
+            Levi's first sandpaper letters too.
+          </div>
+        </div>
+      </div>
+
+      {/* Assistant typing — soft pulse */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, marginBottom: 4 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 999, flexShrink: 0,
+          background: 'var(--clay-soft)', color: 'var(--terracotta-deep)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon.Sparkle size={14} />
+        </div>
+        <div style={{ display: 'flex', gap: 4, paddingTop: 4 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width: 6, height: 6, borderRadius: 999, background: 'var(--clay)',
+              animation: `dotpulse 1.2s ease-in-out ${i*0.18}s infinite`,
+            }} />
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-muted)' }}>Reading the photo · stays on this device</div>
+      </div>
+      <style>{`
+        @keyframes dotpulse {
+          0%, 100% { opacity: 0.3; transform: translateY(0); }
+          50% { opacity: 1; transform: translateY(-2px); }
+        }
+        @keyframes breathe {
+          0%, 100% { transform: scale(1); opacity: 0.18; }
+          50% { transform: scale(1.22); opacity: 0.04; }
+        }
+      `}</style>
+    </>
+  );
+}
+
+/* Chat composer — text + mic + camera + send */
+function ChatComposer({ compact = false }) {
+  return (
+    <div style={{
+      borderTop: '1px solid var(--border)',
+      background: 'var(--surface)',
+      padding: compact ? '10px 14px 14px' : '14px 18px 18px',
+    }}>
+      {/* attachment row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <button style={attachBtn}><Icon.Camera size={16} /><span>Photo</span></button>
+        <button style={attachBtn}><Icon.Image size={16} /><span>Library</span></button>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--ink-muted)' }}>
+          <Icon.Lock size={11} /> audio & photos stay on device
+        </div>
+      </div>
+      {/* input row */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', gap: 10,
+        background: 'var(--canvas)', borderRadius: 14,
+        border: '1px solid var(--border)', padding: '8px 10px 8px 14px',
+      }}>
+        <div style={{
+          flex: 1, fontSize: 14, color: 'var(--ink-muted)',
+          padding: '6px 0', minHeight: 22, lineHeight: 1.5,
+        }}>
+          Tell me what you saw…
+        </div>
+        <button style={{
+          width: 36, height: 36, borderRadius: 999,
+          background: 'transparent', color: 'var(--ink-secondary)',
+          border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon.Mic size={18} />
+        </button>
+        <button style={{
+          width: 36, height: 36, borderRadius: 999,
+          background: 'var(--terracotta)', color: 'var(--surface)', border: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 6px 14px rgba(196,106,79,0.3)',
+        }}>
+          <Icon.Send size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const attachBtn = {
+  display: 'flex', alignItems: 'center', gap: 6,
+  background: 'var(--canvas)', color: 'var(--ink-secondary)',
+  border: '1px solid var(--border)', borderRadius: 999,
+  padding: '5px 11px', fontSize: 12, fontWeight: 500,
+};
+
+/* ============================================================
+   PHONE SHELL — chat-driven Today
+   ============================================================ */
+const iosFrameStyles = {
+  wrapper: { display: 'inline-block', padding: 12, background: '#1a1a1a', borderRadius: 60, boxShadow: '0 0 0 2px #2a2723, 0 30px 80px rgba(42,39,35,0.18), 0 8px 20px rgba(42,39,35,0.08)', position: 'relative' },
+  screen: { position: 'relative', borderRadius: 48, overflow: 'hidden', background: 'var(--canvas)' },
+  statusBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', fontSize: 16, fontWeight: 600, fontFamily: '-apple-system, "SF Pro Text", sans-serif', zIndex: 20, pointerEvents: 'none' },
+  dynamicIsland: { position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', width: 124, height: 36, background: '#000', borderRadius: 999, zIndex: 30 },
+  statusIcons: { display: 'flex', alignItems: 'center', gap: 6 },
+  signalIcon: { display: 'flex', alignItems: 'flex-end', gap: 2, height: 12 },
+  signalBar: { width: 3, background: 'currentColor', borderRadius: 1 },
+  batteryIcon: { width: 26, height: 12, border: '1.5px solid currentColor', borderRadius: 3, padding: 1, position: 'relative', opacity: 0.85 },
+  batteryCap: { position: 'absolute', top: 3, right: -3, width: 2, height: 6, background: 'currentColor', borderRadius: '0 1px 1px 0' },
+  content: { position: 'absolute', top: 54, left: 0, right: 0, bottom: 34, overflow: 'auto' },
+  homeIndicator: { position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', width: 140, height: 5, background: 'rgba(42,39,35,0.28)', borderRadius: 999, zIndex: 10 },
+};
+
+function IosFrame({ children, time = '9:41', battery = 86 }) {
+  return (
+    <div style={iosFrameStyles.wrapper}>
+      <div style={{ ...iosFrameStyles.screen, width: 393, height: 852 }}>
+        <div style={{ ...iosFrameStyles.statusBar, color: 'var(--ink)' }}>
+          <span>{time}</span>
+          <div style={iosFrameStyles.statusIcons}>
+            <div style={iosFrameStyles.signalIcon}>
+              <div style={{ ...iosFrameStyles.signalBar, height: 4 }} />
+              <div style={{ ...iosFrameStyles.signalBar, height: 6 }} />
+              <div style={{ ...iosFrameStyles.signalBar, height: 9 }} />
+              <div style={{ ...iosFrameStyles.signalBar, height: 11 }} />
+            </div>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+              <path d="M8 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" />
+              <path d="M3 7.5a7 7 0 0110 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+              <path d="M1 4.5a11 11 0 0114 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7" />
+            </svg>
+            <div style={iosFrameStyles.batteryIcon}>
+              <div style={{ width: `${battery}%`, height: '100%', background: 'currentColor', borderRadius: 1, opacity: 0.9 }} />
+              <div style={iosFrameStyles.batteryCap} />
+            </div>
+          </div>
+        </div>
+        <div style={iosFrameStyles.dynamicIsland} />
+        <div className="ios-content" style={iosFrameStyles.content}>{children}</div>
+        <div style={iosFrameStyles.homeIndicator} />
+      </div>
+    </div>
+  );
+}
+
+function PhoneTeacherChat() {
+  return (
+    <div style={{ background: 'var(--canvas)', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Compact header — chat is the primary surface, Today is implicit */}
+      <div style={{
+        padding: '12px 20px 10px', borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 12,
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 999,
+          background: 'var(--clay-soft)', color: 'var(--terracotta-deep)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <Icon.Sparkle size={16} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Mitable</div>
+          <div style={{ fontSize: 11, color: 'var(--sage)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--sage)' }} />
+            <span>Primrose Room · work cycle in progress</span>
+          </div>
+        </div>
+        <button style={{ width: 32, height: 32, borderRadius: 999, background: 'var(--canvas)', border: '1px solid var(--border)', color: 'var(--ink-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon.X size={14} />
+        </button>
+      </div>
+
+      {/* Day strip showing what's happening below */}
+      <div style={{ background: 'var(--canvas)', padding: '10px 20px 6px', display: 'flex', gap: 6, overflowX: 'auto' }}>
+        <span style={chip(true)}>Today</span>
+        <span style={chip(false)}>Roster</span>
+        <span style={chip(false)}>Progress</span>
+        <span style={chip(false)}>Reports</span>
+      </div>
+
+      {/* Chat thread */}
+      <div className="scroll-quiet" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 16px' }}>
+        <ChatThread />
+      </div>
+
+      {/* Composer */}
+      <ChatComposer compact />
+    </div>
+  );
+}
+
+const chip = (active) => ({
+  fontSize: 12, fontWeight: 500,
+  padding: '6px 12px', borderRadius: 999,
+  background: active ? 'var(--ink)' : 'var(--surface)',
+  color: active ? 'var(--surface)' : 'var(--ink-secondary)',
+  border: active ? '1px solid var(--ink)' : '1px solid var(--border)',
+  flexShrink: 0,
+});
+
+/* ============================================================
+   DESKTOP SHELL — full teacher app + floating chat
+   ============================================================ */
+function DesktopTeacherApp() {
+  return (
+    <div style={{
+      width: 1440, height: 900,
+      borderRadius: 14, overflow: 'hidden',
+      background: 'var(--canvas)',
+      boxShadow: '0 30px 80px rgba(42,39,35,0.18), 0 12px 28px rgba(42,39,35,0.10)',
+      border: '1px solid var(--border)',
+      display: 'flex', flexDirection: 'column',
+      position: 'relative',
+    }}>
+      {/* Browser chrome */}
+      <div style={{
+        background: 'var(--muted)', borderBottom: '1px solid var(--border)',
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ width: 12, height: 12, borderRadius: 999, background: '#E5867A' }} />
+          <div style={{ width: 12, height: 12, borderRadius: 999, background: '#E8C56A' }} />
+          <div style={{ width: 12, height: 12, borderRadius: 999, background: '#7A9B7A' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 14 }}>
+          <button style={{ background: 'transparent', border: 0, color: 'var(--ink-muted)', display: 'flex' }}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+          </button>
+          <button style={{ background: 'transparent', border: 0, color: 'var(--ink-muted)', display: 'flex' }}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+        <div style={{
+          flex: 1, background: 'var(--surface)', borderRadius: 999, padding: '5px 14px',
+          fontSize: 12, color: 'var(--ink-secondary)', display: 'flex', alignItems: 'center', gap: 8,
+          border: '1px solid var(--border)',
+        }}>
+          <Icon.Lock size={12} />
+          <span style={{ color: 'var(--ink-muted)' }}>app.mitable.school</span>
+          <span style={{ color: 'var(--ink)' }}>/app/today</span>
+        </div>
+      </div>
+
+      {/* App body: sidebar + main */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Sidebar */}
+        <div style={{
+          width: 240, background: 'var(--muted)', borderRight: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', padding: '20px 14px',
+        }}>
+          {/* Brand */}
+          <div style={{ padding: '0 8px 22px', borderBottom: '1px solid var(--border)', marginBottom: 14 }}>
+            <div className="font-display" style={{ fontSize: 30, color: 'var(--ink)', lineHeight: 1, letterSpacing: '-0.01em' }}>Mitable</div>
+            <div className="label-cap" style={{ color: 'var(--ink-muted)', marginTop: 2 }}>Montessori</div>
+          </div>
+
+          {/* Classroom switcher */}
+          <div style={{
+            padding: '8px 10px', background: 'var(--surface)', borderRadius: 10,
+            border: '1px solid var(--border)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--terracotta-soft)', color: 'var(--terracotta-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600 }}>P</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Primrose Room</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>18 children</div>
+            </div>
+            <Icon.Chevron size={14} />
+          </div>
+
+          {/* Nav */}
+          {[
+            { Icon: Icon.Home, label: 'Today', sub: '/app/today', active: true },
+            { Icon: Icon.Users, label: 'Roster', sub: '/app/roster' },
+            { Icon: Icon.Book, label: 'Curriculum', sub: '/app/curriculum' },
+            { Icon: Icon.Grid, label: 'Progress', sub: '/app/progress' },
+            { Icon: Icon.Calendar, label: 'Attendance', sub: '/app/attendance' },
+            { Icon: Icon.Pencil, label: 'Reports', sub: '/app/reports', badge: 2 },
+          ].map(n => (
+            <div key={n.label} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 10px', borderRadius: 9, marginBottom: 2,
+              background: n.active ? 'var(--surface)' : 'transparent',
+              color: n.active ? 'var(--ink)' : 'var(--ink-secondary)',
+              border: n.active ? '1px solid var(--border)' : '1px solid transparent',
+              fontSize: 13, fontWeight: 500,
+            }}>
+              <n.Icon size={17} />
+              <span style={{ flex: 1 }}>{n.label}</span>
+              {n.badge && (
+                <span style={{ fontSize: 10, background: 'var(--terracotta)', color: 'var(--surface)', borderRadius: 999, padding: '1px 6px', fontWeight: 600 }}>{n.badge}</span>
+              )}
+            </div>
+          ))}
+
+          <div style={{ flex: 1 }} />
+
+          {/* Footer / profile */}
+          <div style={{
+            padding: 10, background: 'var(--surface)', borderRadius: 10,
+            border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <Avatar initials="AM" tone="terracotta" size={32} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Anna Maren</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>Lead guide</div>
+            </div>
+            <Icon.Settings size={15} />
+          </div>
+        </div>
+
+        {/* Main canvas */}
+        <div style={{ flex: 1, overflow: 'auto', position: 'relative' }} className="scroll-quiet">
+          {/* Top bar */}
+          <div style={{
+            padding: '24px 40px 16px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24,
+            borderBottom: '1px solid var(--border)',
+          }}>
+            <div>
+              <div className="label-cap" style={{ color: 'var(--ink-muted)', marginBottom: 4 }}>Tuesday · April 30</div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+                Good morning, <span className="font-display" style={{ fontSize: 38, color: 'var(--terracotta-deep)' }}>Anna</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--ink-secondary)', marginTop: 4 }}>The work cycle started 22 minutes ago.</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button style={iconBtn}><Icon.Search /></button>
+              <button style={iconBtn}><Icon.Bell /></button>
+              <button style={{ ...iconBtn, background: 'var(--terracotta)', color: 'var(--surface)', border: 0, gap: 6, padding: '0 14px', width: 'auto' }}>
+                <Icon.Plus size={16} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>New report</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Today body */}
+          <div style={{ padding: '24px 40px 60px', display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24 }}>
+            {/* Left column */}
+            <div>
+              {/* Attendance card */}
+              <div style={cardStyle}>
+                <div style={cardHeaderStyle}>
+                  <div className="label-cap" style={{ color: 'var(--ink-secondary)' }}>Attendance · Primrose Room</div>
+                  <span style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 500 }}>14 of 18 present</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 8, padding: '14px 18px 18px' }}>
+                  {[
+                    ['AO','clay'],['BC','sage'],['DR','butter'],['EO','clay'],['IM','blue'],['KN','sage'],['LS','butter'],['MK','sage'],['NH','clay'],
+                    ['RT','blue'],['SO','sage'],['TW','clay'],['VL','butter'],['BC','blue'],
+                  ].map(([i,t],k) => (
+                    <Avatar key={k} initials={i} tone={t} size={36} />
+                  ))}
+                  {[0,1,2,3].map(k => (
+                    <div key={`a${k}`} style={{
+                      width: 36, height: 36, borderRadius: 999,
+                      border: '1.5px dashed var(--border-strong)', opacity: 0.5,
+                    }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Recent commands */}
+              <div style={{ ...cardStyle, marginTop: 18 }}>
+                <div style={cardHeaderStyle}>
+                  <div className="label-cap" style={{ color: 'var(--ink-secondary)' }}>Captured today</div>
+                  <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>5 observations · 1 awaiting review</span>
+                </div>
+                {[
+                  { who: 'Mira Khan', what: 'mastered teen board sequencing', tag: 'Math · Mastered', when: '8:14a', tone: 'sage', accent: 'var(--sage)' },
+                  { who: 'Levi Schwartz', what: 'first presentation, sandpaper letters', tag: 'Language · Introduced', when: '8:30a', tone: 'butter', accent: 'var(--butter)' },
+                  { who: 'Ada Okafor', what: 'returned to the binomial cube', tag: 'Sensorial · Practicing', when: '8:42a', tone: 'clay', accent: 'var(--terracotta)', pending: true },
+                ].map((r,i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '14px 18px',
+                    borderTop: '1px solid var(--border)',
+                  }}>
+                    <Avatar initials={r.who.split(' ').map(w=>w[0]).join('')} tone={r.tone} size={32} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, color: 'var(--ink)' }}>
+                        <span style={{ fontWeight: 600 }}>{r.who}</span>{' '}
+                        <span style={{ color: 'var(--ink-secondary)' }}>{r.what}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-muted)', marginTop: 2 }}>{r.tag}</div>
+                    </div>
+                    {r.pending && (
+                      <span style={{ fontSize: 11, color: 'var(--terracotta)', background: 'var(--terracotta-soft)', borderRadius: 999, padding: '3px 8px', fontWeight: 500 }}>
+                        in chat ↗
+                      </span>
+                    )}
+                    <div className="font-numeric" style={{ fontSize: 12, color: 'var(--ink-muted)', minWidth: 40, textAlign: 'right' }}>{r.when}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right column — drafts + calm panel */}
+            <div>
+              <div style={cardStyle}>
+                <div style={cardHeaderStyle}>
+                  <div className="label-cap" style={{ color: 'var(--ink-secondary)' }}>Drafts</div>
+                  <span style={{ fontSize: 12, color: 'var(--ink-muted)' }}>2 daily reports</span>
+                </div>
+                {[
+                  { name: 'Ada Okafor', period: 'Apr 30', who: 'AO', tone: 'clay' },
+                  { name: 'Diego Ramos', period: 'Apr 30', who: 'DR', tone: 'butter' },
+                ].map((d,i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '14px 18px',
+                    borderTop: '1px solid var(--border)',
+                  }}>
+                    <Avatar initials={d.who} tone={d.tone} size={30} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{d.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>Daily report · {d.period}</div>
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--butter)', background: 'var(--butter-soft)', borderRadius: 999, padding: '3px 8px', fontWeight: 500, color: '#7A5C0F' }}>Drafted by Mitable</span>
+                    <Icon.Chevron size={14} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Quiet reminder */}
+              <div style={{
+                marginTop: 18, padding: 22,
+                background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)',
+                position: 'relative',
+              }}>
+                <div className="font-display" style={{ fontSize: 24, color: 'var(--ink)', lineHeight: 1.15 }}>
+                  Take your time.
+                </div>
+                <div style={{ marginTop: 4, marginBottom: 10 }}>
+                  <HandUnderline width={120} color="var(--terracotta)" />
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--ink-secondary)', lineHeight: 1.55 }}>
+                  Anything you want to record, just say it in the chat — by voice, photo, or note. We'll
+                  draft the rest, and nothing syncs until you approve it.
+                </div>
+              </div>
+
+              {/* Privacy badge row */}
+              <div style={{
+                marginTop: 16, padding: '12px 16px',
+                background: 'var(--canvas)', borderRadius: 12, border: '1px dashed var(--border-strong)',
+                display: 'flex', alignItems: 'center', gap: 10,
+                fontSize: 12, color: 'var(--ink-secondary)',
+              }}>
+                <Icon.Lock size={14} />
+                <span>Audio and photos never leave this device. Names are tokenized before any AI call.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating chat — bottom right */}
+      <div style={{
+        position: 'absolute', bottom: 22, right: 22,
+        width: 420, height: 640,
+        background: 'var(--canvas)', borderRadius: 18, overflow: 'hidden',
+        border: '1px solid var(--border)',
+        boxShadow: '0 28px 60px rgba(42,39,35,0.22), 0 8px 20px rgba(42,39,35,0.08)',
+        display: 'flex', flexDirection: 'column',
+        zIndex: 5,
+      }}>
+        {/* Chat header */}
+        <div style={{
+          padding: '12px 16px', borderBottom: '1px solid var(--border)',
+          background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 999,
+            background: 'var(--clay-soft)', color: 'var(--terracotta-deep)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Icon.Sparkle size={14} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Mitable</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-muted)' }}>Capture & review · Primrose Room</div>
+          </div>
+          <button style={iconMini}><Icon.X /></button>
+        </div>
+
+        {/* Chat thread */}
+        <div className="scroll-quiet" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+          <ChatThread />
+        </div>
+
+        {/* Composer */}
+        <ChatComposer />
+      </div>
+
+      {/* Subtle "open chat" pill animation indicator (closed state preview, decorative) */}
+    </div>
+  );
+}
+
+const cardStyle = {
+  background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden',
+};
+const cardHeaderStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  padding: '14px 18px',
+};
+const iconBtn = {
+  width: 38, height: 38, borderRadius: 10,
+  background: 'var(--surface)', color: 'var(--ink-secondary)',
+  border: '1px solid var(--border)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const iconMini = {
+  width: 28, height: 28, borderRadius: 999,
+  background: 'transparent', color: 'var(--ink-muted)',
+  border: '1px solid var(--border)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+
+/* ============================================================
+   PAGE
+   ============================================================ */
+function App() {
+  return (
+    <div style={{ minHeight: '100vh' }}>
+      {/* Header */}
+      <div style={{ maxWidth: 1680, margin: '0 auto', padding: '60px 56px 24px' }}>
+        <div className="label-cap" style={{ color: 'var(--terracotta)', marginBottom: 8 }}>
+          Mitable Montessori · Teacher v2 · chat-driven
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
+          <div style={{ maxWidth: 760 }}>
+            <div className="font-display" style={{ fontSize: 64, lineHeight: 1, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+              The chat is the workflow.
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <HandUnderline width={300} color="var(--terracotta)" />
+            </div>
+            <div style={{ marginTop: 14, fontSize: 16, color: 'var(--ink-secondary)', lineHeight: 1.55 }}>
+              The floating chat replaces quick-add and the pending-review screen. Teachers dictate, type,
+              or snap a photo from anywhere — Today, the roster, a child's profile. The assistant proposes
+              tool calls; each proposal renders as an inline review card in the thread, with approve and
+              edit right there. Nothing syncs until the guide says yes.
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ink-muted)', textAlign: 'right' }}>
+            <div>Two views · {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            <div style={{ marginTop: 2 }}>iPhone 15 Pro · Desktop 1440 × 900</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section divider */}
+      <div style={{ maxWidth: 1680, margin: '0 auto', padding: '0 56px' }}>
+        <HandDivider color="var(--clay)" />
+      </div>
+
+      {/* Phone view */}
+      <div style={{ maxWidth: 1680, margin: '0 auto', padding: '36px 56px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 22 }}>
+          <span style={{ color: 'var(--terracotta)', fontVariantNumeric: 'tabular-nums', fontSize: 14, fontWeight: 600, fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>01</span>
+          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.005em' }}>Phone — chat-first Today</div>
+          <span style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>/app/today</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 56, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <IosFrame>
+            <PhoneTeacherChat />
+          </IosFrame>
+          <div style={{ maxWidth: 360, paddingTop: 20, fontSize: 14, color: 'var(--ink-secondary)', lineHeight: 1.7 }}>
+            <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>What you're seeing</div>
+            On a phone, the chat <em>is</em> the daily-driver shell — the guide's hand is on it most of the day.
+            <ul style={{ marginTop: 14, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <li>Earlier observation about Mira sits at the top, approved and synced — sage check.</li>
+              <li>A new voice message (0:18) arrives mid-cycle; the tokenized transcript appears beneath it as italic gray.</li>
+              <li>The assistant proposes two cards from that single voice note: a <em>progress</em> card (visible to family) and a <em>private note</em> (not visible to family).</li>
+              <li>A photo of paper shapes follows — the badge says <em>on-device</em>; OCR runs in a Web Worker, the image never crosses the network.</li>
+              <li>Composer offers text, mic, photo, library — with a quiet line reminding the guide audio and photos stay on the device.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop view */}
+      <div style={{ maxWidth: 1680, margin: '0 auto', padding: '60px 56px 96px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 22 }}>
+          <span style={{ color: 'var(--terracotta)', fontVariantNumeric: 'tabular-nums', fontSize: 14, fontWeight: 600, fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>02</span>
+          <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.005em' }}>Desktop — full shell, chat docked</div>
+          <span style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>app.mitable.school/app/today</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <DesktopTeacherApp />
+        </div>
+        <div style={{ marginTop: 32, fontSize: 14, color: 'var(--ink-secondary)', lineHeight: 1.7, maxWidth: 920 }}>
+          <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>What changes on desktop</div>
+          The shell is the same product, but the guide is at the desk. A sidebar holds the explicit routes
+          — Today, Roster, Curriculum, Progress, Attendance, Reports — and the main canvas shows
+          today's classroom: attendance, captured-today, drafts. The floating chat is docked bottom-right,
+          expanded to ~420×640. It carries the same thread the guide left in on the phone, including the
+          two pending review cards and the photo. Recent commands on the canvas link back to the chat
+          via a subtle <em>in chat ↗</em> chip when something is still awaiting approval.
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ maxWidth: 1680, margin: '0 auto', padding: '0 56px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 13, color: 'var(--ink-secondary)', maxWidth: 720, lineHeight: 1.6 }}>
+          <strong style={{ color: 'var(--ink)' }}>Brand notes carried forward.</strong>{' '}
+          Cream <span className="font-numeric">#FAF6EE</span> canvas, never white. Caveat is reserved for
+          earned moments: the page hero, the daily greeting, the "Take your time" panel, the chat empty
+          state. Hand-drawn marks live only on emotional surfaces. Terracotta is the action; sage signals
+          the state achieved; butter signals AI-assisted. No emoji, no exclamations, no streaks.
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-muted)' }}>Created by Huashu-Design</div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

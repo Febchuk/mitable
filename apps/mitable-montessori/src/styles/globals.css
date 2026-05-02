@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #faf6ee;
+  --color-ink: #2b2622;
+  --color-terracotta: #c46a4f;
+  --color-sage: #7a9b7a;
+  --color-butter: #e8c56a;
+  --color-dusty-blue: #6b8aa6;
+
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-caveat), ui-serif, serif;
+}
+
+html,
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
