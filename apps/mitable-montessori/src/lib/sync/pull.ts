@@ -20,6 +20,7 @@ interface PullResponse {
       last_name: string;
       preferred_name: string | null;
       birth_date: string | null;
+      sex: string | null;
       nicknames: string[];
       notes: string | null;
     }>;
@@ -147,6 +148,7 @@ export async function pullSync() {
         lastName: s.last_name,
         preferredName: s.preferred_name,
         birthDate: s.birth_date,
+        sex: s.sex,
         nicknames: s.nicknames ?? [],
         notes: s.notes,
         nameHash: await rosterNameHash(s.first_name, s.last_name),

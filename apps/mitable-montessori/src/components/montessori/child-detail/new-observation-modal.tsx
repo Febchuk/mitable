@@ -214,21 +214,19 @@ function WholeChildForm({
   const selected = axes.find((a) => a.key === axisKey);
   const currentLevel: Level | null = selected?.level ?? null;
 
-  const [movesAxis, setMovesAxis] = React.useState(false);
-  const [toLevel, setToLevel] = React.useState<Level>(currentLevel ?? "Practicing");
+  // Level select is always visible, prepopulated with the axis's current level
+  // (or "Practicing" as a sensible mid-point for never-assessed axes). On
+  // submit: if level === currentLevel, treat it as a confirming note (both
+  // null); otherwise it's a transition (both set). No checkbox in the UI.
+  const [level, setLevel] = React.useState<Level>(currentLevel ?? "Practicing");
   const [note, setNote] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // When axis changes, reset the to-level default to one step above current.
+  // When the user picks a different axis, reset the level to that axis's
+  // current value so the form always reflects the chosen axis's state.
   React.useEffect(() => {
-    setMovesAxis(false);
-    if (currentLevel) {
-      const idx = LEVELS.indexOf(currentLevel);
-      setToLevel(LEVELS[Math.min(idx + 1, LEVELS.length - 1)]);
-    } else {
-      setToLevel("Emerging");
-    }
+    setLevel(currentLevel ?? "Practicing");
   }, [axisKey, currentLevel]);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -236,6 +234,14 @@ function WholeChildForm({
     if (!axisKey || note.trim().length === 0) return;
     setSaving(true);
     setError(null);
+    // Three cases the route handler accepts:
+    //   confirming note      → fromLevel === null, toLevel === null
+    //   initial assessment   → fromLevel === null, toLevel !== null
+    //   level transition     → fromLevel !== null, toLevel !== null
+    const isInitialAssessment = currentLevel === null;
+    const isTransition = currentLevel !== null && level !== currentLevel;
+    const fromLevel: Level | null = isTransition ? currentLevel : null;
+    const toLevel: Level | null = isInitialAssessment || isTransition ? level : null;
     try {
       const res = await fetch(`/api/v1/students/${studentId}/whole-child-observations`, {
         method: "POST",
@@ -243,8 +249,8 @@ function WholeChildForm({
         credentials: "include",
         body: JSON.stringify({
           axisKey,
-          fromLevel: movesAxis ? currentLevel : null,
-          toLevel: movesAxis ? toLevel : null,
+          fromLevel,
+          toLevel,
           note: note.trim(),
         }),
       });
@@ -294,44 +300,27 @@ function WholeChildForm({
         </select>
       </label>
 
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 13,
-          color: "var(--color-ink-secondary)",
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={movesAxis}
-          onChange={(e) => setMovesAxis(e.target.checked)}
-        />
-        This note moves the level
-        {currentLevel && (
-          <span style={{ color: "var(--color-ink-muted)" }}>(from {currentLevel})</span>
-        )}
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+          Level
+          {currentLevel && (
+            <span style={{ marginLeft: 8, color: "var(--color-ink-muted)", letterSpacing: 0 }}>
+              (currently {currentLevel})
+            </span>
+          )}
+        </span>
+        <select
+          value={level}
+          onChange={(e) => setLevel(e.target.value as Level)}
+          style={inputStyle}
+        >
+          {LEVELS.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
       </label>
-
-      {movesAxis && (
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-            New level
-          </span>
-          <select
-            value={toLevel}
-            onChange={(e) => setToLevel(e.target.value as Level)}
-            style={inputStyle}
-          >
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
 
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
@@ -394,34 +383,38 @@ function CurriculumForm({
   const router = useRouter();
   const firstSubtopicId = curriculum[0]?.subtopics[0]?.subtopicId ?? "";
   const [subtopicId, setSubtopicId] = React.useState<string>(firstSubtopicId);
-  const [movesState, setMovesState] = React.useState(false);
-  const [transitionToStatus, setTransitionToStatus] =
-    React.useState<(typeof TRANSITIONS)[number]["value"]>("practicing");
+  const [state, setState] = React.useState<(typeof TRANSITIONS)[number]["value"]>("introduced");
   const [comment, setComment] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Reset transition default to one step above current when subtopic changes.
-  React.useEffect(() => {
-    setMovesState(false);
-    let current: string | null = null;
-    for (const t of curriculum) {
-      const s = t.subtopics.find((sub) => sub.subtopicId === subtopicId);
-      if (s) {
-        current = s.status;
-        break;
+  // Look up the chosen subtopic's current status across the topic groups.
+  const currentStatus: "introduced" | "practicing" | "mastered" | "na" | null =
+    React.useMemo(() => {
+      for (const t of curriculum) {
+        const s = t.subtopics.find((sub) => sub.subtopicId === subtopicId);
+        if (s) return s.status;
       }
-    }
-    if (current === "introduced") setTransitionToStatus("practicing");
-    else if (current === "practicing") setTransitionToStatus("mastered");
-    else setTransitionToStatus("introduced");
-  }, [subtopicId, curriculum]);
+      return null;
+    }, [subtopicId, curriculum]);
+
+  // When the user picks a different subtopic, reset state to that subtopic's
+  // current value so the form always reflects the chosen subtopic's status.
+  React.useEffect(() => {
+    if (currentStatus === "introduced") setState("introduced");
+    else if (currentStatus === "practicing") setState("practicing");
+    else if (currentStatus === "mastered") setState("mastered");
+    else setState("introduced"); // never-recorded or "na"
+  }, [subtopicId, currentStatus]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subtopicId || comment.trim().length === 0) return;
     setSaving(true);
     setError(null);
+    // If chosen state matches current → comment-only event (no projection update).
+    // Otherwise → transition event that bumps student_progress.
+    const isTransition = currentStatus !== state;
     try {
       const res = await fetch(`/api/v1/students/${studentId}/curriculum-events`, {
         method: "POST",
@@ -430,7 +423,7 @@ function CurriculumForm({
         body: JSON.stringify({
           subtopicId,
           comment: comment.trim(),
-          transitionToStatus: movesState ? transitionToStatus : null,
+          transitionToStatus: isTransition ? state : null,
         }),
       });
       const body = await res.json().catch(() => ({}) as { error?: string; warning?: string });
@@ -499,43 +492,27 @@ function CurriculumForm({
         </select>
       </label>
 
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 13,
-          color: "var(--color-ink-secondary)",
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={movesState}
-          onChange={(e) => setMovesState(e.target.checked)}
-        />
-        This note moves the state
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+          State
+          {currentStatus && currentStatus !== "na" && (
+            <span style={{ marginLeft: 8, color: "var(--color-ink-muted)", letterSpacing: 0 }}>
+              (currently {currentStatus})
+            </span>
+          )}
+        </span>
+        <select
+          value={state}
+          onChange={(e) => setState(e.target.value as (typeof TRANSITIONS)[number]["value"])}
+          style={inputStyle}
+        >
+          {TRANSITIONS.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
       </label>
-
-      {movesState && (
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-            New state
-          </span>
-          <select
-            value={transitionToStatus}
-            onChange={(e) =>
-              setTransitionToStatus(e.target.value as (typeof TRANSITIONS)[number]["value"])
-            }
-            style={inputStyle}
-          >
-            {TRANSITIONS.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
 
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>

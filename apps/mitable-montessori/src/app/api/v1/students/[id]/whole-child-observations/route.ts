@@ -14,10 +14,21 @@ const Body = z
     note: z.string().min(1).max(2000),
   })
   .refine(
-    (b) =>
-      (b.fromLevel === null && b.toLevel === null) || (b.fromLevel !== null && b.toLevel !== null),
+    (b) => {
+      // Three legal shapes:
+      //   null + null         → confirming note (axis level unchanged)
+      //   null + <level>      → initial assessment (axis was never assessed)
+      //   <level> + <level>   → transition between two assessed levels
+      // The "<level> + null" shape (from set, to null) is rejected — it would
+      // mean "ended the assessment without replacing it", which has no UX.
+      if (b.fromLevel === null && b.toLevel === null) return true;
+      if (b.fromLevel === null && b.toLevel !== null) return true;
+      if (b.fromLevel !== null && b.toLevel !== null) return true;
+      return false;
+    },
     {
-      message: "fromLevel and toLevel must both be set, or both be null (confirming note).",
+      message:
+        "Allowed shapes: both null (confirming), only toLevel (initial assessment), or both set (transition).",
     }
   );
 

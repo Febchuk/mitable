@@ -100,17 +100,42 @@ const MONTESSORI_CURRICULUM = [
   },
 ];
 
-const STUDENTS: Array<{ first: string; last: string; nicknames?: string[]; pref?: string }> = [
-  { first: "Ada", last: "Okafor" },
-  { first: "Bilal", last: "Hassan", nicknames: ["Billy"] },
-  { first: "Camila", last: "Rivera", pref: "Cami" },
-  { first: "Daiyu", last: "Chen" },
-  { first: "Eitan", last: "Levi" },
-  { first: "Farida", last: "Ndiaye" },
-  { first: "Gus", last: "Hansen" },
-  { first: "Hina", last: "Shah" },
-  { first: "Idris", last: "Jallow" },
-  { first: "Lina", last: "Petrov" },
+const STUDENTS: Array<{
+  first: string;
+  last: string;
+  nicknames?: string[];
+  pref?: string;
+  sex: string;
+  notes?: string;
+}> = [
+  {
+    first: "Ada",
+    last: "Okafor",
+    sex: "Female",
+    notes:
+      "Allergies: peanuts (carries epi-pen, see fridge). Lactose intolerant — oat milk in cubby.",
+  },
+  {
+    first: "Bilal",
+    last: "Hassan",
+    nicknames: ["Billy"],
+    sex: "Male",
+    notes: "Allergies: bee stings. No dietary restrictions.",
+  },
+  {
+    first: "Camila",
+    last: "Rivera",
+    pref: "Cami",
+    sex: "Female",
+    notes: "No known allergies. Wears glasses for close work.",
+  },
+  { first: "Daiyu", last: "Chen", sex: "Female" },
+  { first: "Eitan", last: "Levi", sex: "Male" },
+  { first: "Farida", last: "Ndiaye", sex: "Female" },
+  { first: "Gus", last: "Hansen", sex: "Male" },
+  { first: "Hina", last: "Shah", sex: "Female" },
+  { first: "Idris", last: "Jallow", sex: "Male" },
+  { first: "Lina", last: "Petrov", sex: "Female" },
 ];
 
 async function ensureUser(email: string, role: "admin" | "teacher") {
@@ -406,6 +431,8 @@ async function main() {
       preferred_name: s.pref ?? null,
       nicknames: s.nicknames ?? [],
       birth_date: birthDate,
+      sex: s.sex,
+      notes: s.notes ?? null,
     });
     if (stErr) throw stErr;
 

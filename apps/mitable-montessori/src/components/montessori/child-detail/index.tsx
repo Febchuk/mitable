@@ -30,7 +30,7 @@ export function ChildDetail({
   activity,
 }: ChildDetailProps) {
   const mobile = useIsMobile();
-  const [pageView, setPageView] = React.useState<PageView>("whole");
+  const [pageView, setPageView] = React.useState<PageView>("activity");
   const [newObsOpen, setNewObsOpen] = React.useState(false);
 
   return (

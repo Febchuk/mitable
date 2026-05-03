@@ -18,6 +18,7 @@ export async function prepareEncryptedRoster(row: RosterRow): Promise<EncryptedP
       lastName: row.lastName,
       preferredName: row.preferredName ?? null,
       birthDate: row.birthDate ?? null,
+      sex: row.sex ?? null,
       nicknames: row.nicknames,
       notes: row.notes ?? null,
     })
@@ -39,6 +40,7 @@ export async function decryptRoster(row: EncryptedPiiRow): Promise<RosterRow> {
     lastName: decoded.lastName,
     preferredName: decoded.preferredName,
     birthDate: decoded.birthDate,
+    sex: decoded.sex ?? null,
     nicknames: decoded.nicknames ?? [],
     notes: decoded.notes,
     nameHash: row.nameHash,

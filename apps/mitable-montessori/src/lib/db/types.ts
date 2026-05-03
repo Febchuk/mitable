@@ -8,6 +8,8 @@ export interface RosterRow {
   lastName: string;
   preferredName?: string | null;
   birthDate?: string | null;
+  /** Free-text — see migration 0015. Renders in the Child Detail "i" tooltip. */
+  sex?: string | null;
   nicknames: string[];
   notes?: string | null;
   schoolId: string;

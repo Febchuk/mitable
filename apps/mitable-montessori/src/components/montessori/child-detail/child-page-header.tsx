@@ -124,6 +124,12 @@ function HeaderInfoTooltip({ profile, mobile }: { profile: StudentProfile; mobil
                 </span>
               </>
             )}
+            {profile.sex && (
+              <>
+                <span style={{ color: "var(--color-ink-muted)" }}>Sex</span>
+                <span>{profile.sex}</span>
+              </>
+            )}
             {profile.classroom && (
               <>
                 <span style={{ color: "var(--color-ink-muted)" }}>Classroom</span>
@@ -141,7 +147,7 @@ function HeaderInfoTooltip({ profile, mobile }: { profile: StudentProfile; mobil
             )}
             {profile.notes && (
               <>
-                <span style={{ color: "var(--color-ink-muted)" }}>Notes</span>
+                <span style={{ color: "var(--color-ink-muted)" }}>Allergies &amp; notes</span>
                 <span>{profile.notes}</span>
               </>
             )}

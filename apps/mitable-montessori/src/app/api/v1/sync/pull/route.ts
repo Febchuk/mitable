@@ -54,7 +54,9 @@ export async function GET() {
   ] = await Promise.all([
     supabase
       .from("students")
-      .select("id, school_id, first_name, last_name, preferred_name, birth_date, nicknames, notes")
+      .select(
+        "id, school_id, first_name, last_name, preferred_name, birth_date, sex, nicknames, notes"
+      )
       .is("archived_at", null),
     supabase
       .from("student_classroom_enrollments")

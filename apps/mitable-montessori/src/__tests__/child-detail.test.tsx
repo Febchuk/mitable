@@ -19,6 +19,7 @@ const profile: StudentProfile = {
   fullName: "Ada Chen",
   preferredName: null,
   birthDate: "2021-08-14",
+  sex: null,
   notes: null,
   classroom: { id: "c1", name: "Hummingbirds" },
   enrollmentStartDate: "2024-09-01",
@@ -72,7 +73,7 @@ describe("ChildDetail", () => {
     expect(screen.getByRole("tab", { name: "Activity" })).toBeTruthy();
   });
 
-  it("defaults to Whole child and switches when another tab is selected", () => {
+  it("defaults to Activity and switches when another tab is selected", () => {
     render(
       <ChildDetail
         profile={profile}
@@ -83,12 +84,12 @@ describe("ChildDetail", () => {
       />
     );
 
-    const wholeTab = screen.getByRole("tab", { name: "Whole child" });
-    expect(wholeTab.getAttribute("aria-selected")).toBe("true");
+    const activityTab = screen.getByRole("tab", { name: "Activity" });
+    expect(activityTab.getAttribute("aria-selected")).toBe("true");
 
-    const curriculumTab = screen.getByRole("tab", { name: "Curriculum" });
-    fireEvent.click(curriculumTab);
-    expect(curriculumTab.getAttribute("aria-selected")).toBe("true");
-    expect(wholeTab.getAttribute("aria-selected")).toBe("false");
+    const wholeTab = screen.getByRole("tab", { name: "Whole child" });
+    fireEvent.click(wholeTab);
+    expect(wholeTab.getAttribute("aria-selected")).toBe("true");
+    expect(activityTab.getAttribute("aria-selected")).toBe("false");
   });
 });
