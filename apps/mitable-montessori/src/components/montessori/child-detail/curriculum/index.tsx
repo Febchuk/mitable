@@ -1,20 +1,38 @@
 "use client";
 
 import * as React from "react";
-import {
-  AREAS,
-  SUBTOPICS,
-  TIMELINE,
-  stateMeta,
-  type AreaName,
-  type Subtopic,
-  type SubtopicState,
-} from "../mock-data";
+import { AREAS, stateMeta, type AreaName, type SubtopicState } from "../mock-data";
 import { SectionHeading } from "../section-heading";
-
-const AREA_LIST: AreaName[] = ["Sensorial", "Math", "Language", "Practical Life", "Cultural"];
+import type {
+  CurriculumByTopic,
+  CurriculumStatus,
+  SubtopicProgress,
+} from "@/lib/queries/curriculum";
 
 type StepLabel = { key: SubtopicState; label: string; date: string | null };
+
+const STATUS_TO_STATE: Record<CurriculumStatus, SubtopicState | null> = {
+  introduced: "i",
+  practicing: "p",
+  mastered: "m",
+  na: null,
+};
+
+const DEFAULT_AREA_TONE = { tone: "var(--color-clay)", soft: "var(--color-clay-soft)" };
+
+function areaToneFor(topicName: string) {
+  // Topic names from seed match the prototype's 5 areas; fall back gracefully.
+  return AREAS[topicName as AreaName] ?? DEFAULT_AREA_TONE;
+}
+
+function formatDate(iso: string | null): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return null;
+  }
+}
 
 function StepDiagramHorizontal({
   labels,
@@ -123,24 +141,25 @@ function StepDiagramVertical({ labels, currentIdx }: { labels: StepLabel[]; curr
 }
 
 function TopicPicker({
+  topics,
   value,
   onChange,
   mobile,
 }: {
-  value: AreaName;
-  onChange: (a: AreaName) => void;
+  topics: CurriculumByTopic[];
+  value: string;
+  onChange: (id: string) => void;
   mobile: boolean;
 }) {
-  const list = AREA_LIST.filter((area) => SUBTOPICS.some((s) => s.area === area));
-  const inner = list.map((area) => {
-    const active = value === area;
+  const inner = topics.map((t) => {
+    const active = value === t.topicId;
     return (
       <button
-        key={area}
+        key={t.topicId}
         type="button"
         className={mobile ? "subtopic-chip tap" : "tap"}
         data-active={mobile ? active : undefined}
-        onClick={() => onChange(area)}
+        onClick={() => onChange(t.topicId)}
         style={
           mobile
             ? undefined
@@ -156,7 +175,7 @@ function TopicPicker({
               }
         }
       >
-        {area}
+        {t.topicName}
       </button>
     );
   });
@@ -172,27 +191,34 @@ function TopicPicker({
 }
 
 function SubtopicPicker({
-  area,
+  subtopics,
   value,
   onChange,
   mobile,
 }: {
-  area: AreaName;
+  subtopics: SubtopicProgress[];
   value: string | null;
-  onChange: (name: string) => void;
+  onChange: (id: string) => void;
   mobile: boolean;
 }) {
-  const subs = SUBTOPICS.filter((s) => s.area === area);
-  const inner = subs.map((s) => {
-    const active = value === s.name;
+  const inner = subtopics.map((s) => {
+    const active = value === s.subtopicId;
+    const stateKey = STATUS_TO_STATE[s.status];
     return (
       <button
-        key={s.name}
+        key={s.subtopicId}
         type="button"
         className="subtopic-chip tap"
         data-active={active}
-        onClick={() => onChange(s.name)}
+        onClick={() => onChange(s.subtopicId)}
       >
+        {stateKey && (
+          <span
+            className="subtopic-chip-dot"
+            style={{ background: stateMeta[stateKey].tone }}
+            aria-hidden
+          />
+        )}
         {s.name}
       </button>
     );
@@ -207,29 +233,21 @@ function SubtopicPicker({
   return <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{inner}</div>;
 }
 
-function SubtopicDetail({ subtopicName, mobile }: { subtopicName: string; mobile: boolean }) {
-  const sub = SUBTOPICS.find((s) => s.name === subtopicName) as Subtopic | undefined;
-  const initial = 5;
-  const [shown, setShown] = React.useState(initial);
-  React.useEffect(() => {
-    setShown(initial);
-  }, [subtopicName]);
-
-  if (!sub) return null;
-
-  const all = TIMELINE.filter((t) => t.material === sub.name);
-  const rows = all.slice(0, shown);
+function SubtopicDetail({ sub, mobile }: { sub: SubtopicProgress; mobile: boolean }) {
+  const stateKey = STATUS_TO_STATE[sub.status];
+  const meta = stateKey ? stateMeta[stateKey] : null;
+  const tone = areaToneFor(sub.topicName);
   const stateOrder: SubtopicState[] = ["i", "p", "m"];
-  const currentIdx = stateOrder.indexOf(sub.state);
+  const currentIdx = stateKey ? stateOrder.indexOf(stateKey) : -1;
   const stepLabels: StepLabel[] = [
-    { key: "i", label: "Introduced", date: sub.introduced },
-    { key: "p", label: "Practicing", date: sub.practicing },
-    { key: "m", label: "Mastered", date: sub.mastered },
+    { key: "i", label: "Introduced", date: formatDate(sub.introducedAt) },
+    { key: "p", label: "Practicing", date: formatDate(sub.practicingAt) },
+    { key: "m", label: "Mastered", date: formatDate(sub.masteredAt) },
   ];
 
   return (
     <div
-      key={subtopicName}
+      key={sub.subtopicId}
       className="anim-slide-up"
       style={{
         marginTop: 18,
@@ -270,13 +288,25 @@ function SubtopicDetail({ subtopicName, mobile }: { subtopicName: string; mobile
               alignItems: "center",
             }}
           >
-            <span
-              className="legend-dot"
-              style={{ width: 7, height: 7, background: AREAS[sub.area].tone }}
-            />
-            {sub.area}
+            <span className="legend-dot" style={{ width: 7, height: 7, background: tone.tone }} />
+            {sub.topicName}
           </div>
         </div>
+        {meta && (
+          <span
+            style={{
+              fontSize: 11.5,
+              fontWeight: 500,
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: meta.soft,
+              color: meta.deep,
+              border: `1px solid ${meta.tone}`,
+            }}
+          >
+            Currently {meta.label}
+          </span>
+        )}
       </div>
 
       {mobile ? (
@@ -285,115 +315,22 @@ function SubtopicDetail({ subtopicName, mobile }: { subtopicName: string; mobile
         <StepDiagramHorizontal labels={stepLabels} currentIdx={currentIdx} />
       )}
 
-      <div style={{ marginTop: 24 }}>
-        <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
-          Activities for {sub.name}
+      {sub.comment && (
+        <div
+          style={{
+            marginTop: 18,
+            fontSize: 13,
+            color: "var(--color-ink-secondary)",
+            lineHeight: 1.45,
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            padding: "10px 12px",
+          }}
+        >
+          {sub.comment}
         </div>
-        {all.length === 0 && (
-          <div
-            style={{
-              fontSize: 12.5,
-              color: "var(--color-ink-muted)",
-              fontStyle: "italic",
-              padding: "10px 0",
-            }}
-          >
-            No observations yet for this subtopic.
-          </div>
-        )}
-        {rows.map((row, i) => {
-          const transitionKey = row.transition
-            ? (row.transition.to.toLowerCase()[0] as SubtopicState)
-            : null;
-          const transitionMeta = transitionKey ? stateMeta[transitionKey] : null;
-          return (
-            <div
-              key={row.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: mobile ? "auto 1fr" : "70px 1fr auto",
-                gap: 12,
-                padding: "10px 0",
-                borderTop: i ? "1px solid var(--color-border)" : "0",
-                alignItems: "flex-start",
-              }}
-            >
-              <div
-                className="font-numeric"
-                style={{
-                  fontSize: 12,
-                  color: "var(--color-ink-muted)",
-                  minWidth: mobile ? 56 : "auto",
-                }}
-              >
-                {row.date}
-              </div>
-              <div
-                style={{
-                  fontSize: 13,
-                  color: "var(--color-ink-secondary)",
-                  lineHeight: 1.45,
-                }}
-              >
-                {row.comment}
-                {row.transition && transitionMeta && (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      marginLeft: mobile ? 0 : 8,
-                      marginTop: mobile ? 6 : 0,
-                      fontSize: 10.5,
-                      fontWeight: 500,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                      padding: "3px 8px",
-                      borderRadius: 999,
-                      color: transitionMeta.deep,
-                      background: transitionMeta.soft,
-                      border: `1px solid ${transitionMeta.tone}`,
-                    }}
-                  >
-                    → {row.transition.to}
-                  </span>
-                )}
-              </div>
-              {!mobile && (
-                <div
-                  className="font-numeric"
-                  style={{
-                    fontSize: 11.5,
-                    color: "var(--color-ink-muted)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {row.rel}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {shown < all.length && (
-          <button
-            type="button"
-            className="tap"
-            onClick={() => setShown((n) => Math.min(all.length, n + initial))}
-            style={{
-              marginTop: 12,
-              width: "100%",
-              padding: "9px 14px",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 10,
-              fontSize: 12.5,
-              fontWeight: 500,
-              color: "var(--color-ink-secondary)",
-            }}
-          >
-            Load {Math.min(initial, all.length - shown)} more
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -405,17 +342,53 @@ const cardStyle: React.CSSProperties = {
   boxShadow: "0 1px 2px rgba(42,39,35,0.04)",
 };
 
-export function CurriculumView({ mobile }: { mobile: boolean }) {
-  const defaultArea = (AREA_LIST.find((a) => SUBTOPICS.some((s) => s.area === a)) ||
-    "Sensorial") as AreaName;
-  const [area, setArea] = React.useState<AreaName>(defaultArea);
-  const [subtopic, setSubtopic] = React.useState<string | null>(
-    SUBTOPICS.find((s) => s.area === defaultArea)?.name || null
+function EmptyState({ mobile }: { mobile: boolean }) {
+  return (
+    <div style={{ ...cardStyle, padding: mobile ? 24 : 36, textAlign: "center" }}>
+      <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 6 }}>
+        No curriculum progress yet
+      </div>
+      <div style={{ fontSize: 14, color: "var(--color-ink-secondary)", lineHeight: 1.5 }}>
+        Once you record progress on any subtopic, it will show up here organised by topic.
+      </div>
+    </div>
   );
+}
+
+export function CurriculumView({
+  mobile,
+  topics,
+}: {
+  mobile: boolean;
+  topics: CurriculumByTopic[];
+}) {
+  const defaultTopicId = topics[0]?.topicId ?? null;
+  const [topicId, setTopicId] = React.useState<string | null>(defaultTopicId);
+  const activeTopic = topics.find((t) => t.topicId === topicId) ?? topics[0] ?? null;
+  const [subtopicId, setSubtopicId] = React.useState<string | null>(
+    activeTopic?.subtopics[0]?.subtopicId ?? null
+  );
+  // Reset to the first subtopic when the user picks a different topic.
+  // Only depends on topicId by design — we don't want to reset whenever
+  // the subtopics array reference changes for unrelated reasons.
+  const activeTopicId = activeTopic?.topicId ?? null;
   React.useEffect(() => {
-    const firstInArea = SUBTOPICS.find((s) => s.area === area);
-    setSubtopic(firstInArea?.name || null);
-  }, [area]);
+    const topic = topics.find((t) => t.topicId === activeTopicId) ?? topics[0] ?? null;
+    setSubtopicId(topic?.subtopics[0]?.subtopicId ?? null);
+  }, [activeTopicId, topics]);
+
+  if (topics.length === 0) {
+    return (
+      <>
+        <SectionHeading overline="Curriculum progress" title="Subtopic mastery" mobile={mobile} />
+        <div style={{ padding: mobile ? "8px 16px 36px" : "10px 28px 60px" }}>
+          <EmptyState mobile={mobile} />
+        </div>
+      </>
+    );
+  }
+
+  const activeSubtopic = activeTopic?.subtopics.find((s) => s.subtopicId === subtopicId) ?? null;
 
   return (
     <>
@@ -429,20 +402,32 @@ export function CurriculumView({ mobile }: { mobile: boolean }) {
             >
               Topics
             </div>
-            <TopicPicker value={area} onChange={setArea} mobile={mobile} />
+            <TopicPicker
+              topics={topics}
+              value={topicId ?? defaultTopicId ?? ""}
+              onChange={setTopicId}
+              mobile={mobile}
+            />
           </div>
 
-          <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
-            <div
-              className="label-cap"
-              style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}
-            >
-              Subtopics
+          {activeTopic && (
+            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
+              <div
+                className="label-cap"
+                style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}
+              >
+                Subtopics
+              </div>
+              <SubtopicPicker
+                subtopics={activeTopic.subtopics}
+                value={subtopicId}
+                onChange={setSubtopicId}
+                mobile={mobile}
+              />
             </div>
-            <SubtopicPicker area={area} value={subtopic} onChange={setSubtopic} mobile={mobile} />
-          </div>
+          )}
 
-          {subtopic && <SubtopicDetail subtopicName={subtopic} mobile={mobile} />}
+          {activeSubtopic && <SubtopicDetail sub={activeSubtopic} mobile={mobile} />}
         </div>
       </div>
     </>

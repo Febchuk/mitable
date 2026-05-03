@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { ChildDetail } from "@/components/montessori/child-detail";
 import { createClient } from "@/utils/supabase/server";
+import { listCurriculumProgress } from "@/lib/queries/curriculum";
 import { getStudentProfile } from "@/lib/queries/student-profile";
 import { listAxesWithAssessment, listWholeChildObservations } from "@/lib/queries/whole-child";
 
@@ -17,10 +18,18 @@ export default async function ChildDetailPage({ params }: { params: Promise<{ id
   const profile = await getStudentProfile(id);
   if (!profile) notFound();
 
-  const [axes, observations] = await Promise.all([
+  const [axes, observations, curriculum] = await Promise.all([
     listAxesWithAssessment(id),
     listWholeChildObservations(id),
+    listCurriculumProgress(id),
   ]);
 
-  return <ChildDetail profile={profile} axes={axes} observations={observations} />;
+  return (
+    <ChildDetail
+      profile={profile}
+      axes={axes}
+      observations={observations}
+      curriculum={curriculum}
+    />
+  );
 }

@@ -197,6 +197,9 @@ async function main() {
   });
   if (currErr) throw currErr;
 
+  // Capture subtopic ids so we can seed student_progress later. Keyed by
+  // "TopicName / SubtopicName" for stable lookup.
+  const subtopicIds = new Map<string, string>();
   for (let i = 0; i < MONTESSORI_CURRICULUM.length; i++) {
     const topic = MONTESSORI_CURRICULUM[i];
     const topicId = randomUUID();
@@ -208,14 +211,18 @@ async function main() {
       is_active: true,
     });
     if (tErr) throw tErr;
-    const subRows = topic.subtopics.map((name, idx) => ({
-      id: randomUUID(),
-      topic_id: topicId,
-      name,
-      sort_order: idx,
-      is_active: true,
-      aliases: [] as string[],
-    }));
+    const subRows = topic.subtopics.map((name, idx) => {
+      const id = randomUUID();
+      subtopicIds.set(`${topic.name} / ${name}`, id);
+      return {
+        id,
+        topic_id: topicId,
+        name,
+        sort_order: idx,
+        is_active: true,
+        aliases: [] as string[],
+      };
+    });
     const { error: sErr } = await supabase.from("curriculum_subtopics").insert(subRows);
     if (sErr) throw sErr;
   }
@@ -240,8 +247,10 @@ async function main() {
   if (assignErr) throw assignErr;
 
   console.log("→ Creating 10 students + enrollments + guardians");
+  let demoStudentId: string | null = null;
   for (const s of STUDENTS) {
     const studentId = randomUUID();
+    if (s.first === "Ada") demoStudentId = studentId;
     const { error: stErr } = await supabase.from("students").insert({
       id: studentId,
       school_id: schoolId,
@@ -283,11 +292,265 @@ async function main() {
     }
   }
 
+  if (demoStudentId) {
+    await seedDemoChildData({
+      schoolId,
+      studentId: demoStudentId,
+      classroomId,
+      teacherUserId: teacherAuth.id,
+      subtopicIds,
+    });
+  }
+
   console.log("\n✓ Seed complete.\n");
   console.log(`  Admin:    ${ADMIN_EMAIL} / ${SHARED_PASSWORD}`);
   console.log(`  Teacher:  ${TEACHER_EMAIL} / ${SHARED_PASSWORD}`);
   console.log(`  School:   ${schoolId}`);
   console.log(`  Classroom (Cypress Room): ${classroomId}`);
+  if (demoStudentId) console.log(`  Demo student (Ada Okafor): ${demoStudentId}`);
+}
+
+/**
+ * Seeds the Whole-child + Curriculum data for the demo student so the Child
+ * Detail page renders with realistic content out of the box. Mirrors the shape
+ * of the prototype's mock data.
+ */
+async function seedDemoChildData({
+  schoolId,
+  studentId,
+  classroomId,
+  teacherUserId,
+  subtopicIds,
+}: {
+  schoolId: string;
+  studentId: string;
+  classroomId: string;
+  teacherUserId: string;
+  subtopicIds: Map<string, string>;
+}) {
+  console.log("→ Seeding whole-child assessments + observations for Ada");
+
+  // The 7 axes were inserted by migration 0012 for every school; look them up.
+  const { data: axisRows, error: axesErr } = await supabase
+    .from("axes")
+    .select("key")
+    .eq("school_id", schoolId);
+  if (axesErr) throw axesErr;
+  const axisKeys = new Set((axisRows ?? []).map((r) => r.key));
+
+  // Assessments — current level per axis. Mirrors the prototype's seed.
+  const assessments: Array<{ axis_key: string; level: string; daysAgo: number }> = [
+    { axis_key: "concentration", level: "Practicing", daysAgo: 5 },
+    { axis_key: "material-progression", level: "Practicing", daysAgo: 7 },
+    { axis_key: "self-correction", level: "Leading", daysAgo: 3 },
+    { axis_key: "independence", level: "Deepening", daysAgo: 9 },
+    { axis_key: "choice-quality", level: "Practicing", daysAgo: 11 },
+    { axis_key: "error-resilience", level: "Emerging", daysAgo: 15 },
+    { axis_key: "motivation", level: "Deepening", daysAgo: 6 },
+  ].filter((a) => axisKeys.has(a.axis_key));
+
+  for (const a of assessments) {
+    const assessedAt = daysAgoIso(a.daysAgo);
+    const { error } = await supabase.from("axis_assessments").insert({
+      student_id: studentId,
+      axis_key: a.axis_key,
+      level: a.level,
+      assessed_at: assessedAt,
+      author_user_id: teacherUserId,
+    });
+    if (error) throw error;
+  }
+
+  // Observations — teacher notes. Mix of level moves and confirming notes.
+  const observations: Array<{
+    axis_key: string;
+    from_level: string | null;
+    to_level: string | null;
+    note: string;
+    daysAgo: number;
+  }> = [
+    {
+      axis_key: "self-correction",
+      from_level: "Deepening",
+      to_level: "Leading",
+      note: "Caught her own missing-cube on the pink tower without prompt — explained the control of error to a younger child. Bumping to Leading.",
+      daysAgo: 3,
+    },
+    {
+      axis_key: "motivation",
+      from_level: "Practicing",
+      to_level: "Deepening",
+      note: "Sequenced 11–16 on her own initiative, asked to bring out the teen board the next day. Initiation is broadening past Sensorial.",
+      daysAgo: 6,
+    },
+    {
+      axis_key: "concentration",
+      from_level: null,
+      to_level: null,
+      note: "27-minute work cycle on knobless cylinders. No reset. Confirms Practicing — not yet Deepening (still resets after lunch transition).",
+      daysAgo: 7,
+    },
+    {
+      axis_key: "independence",
+      from_level: "Practicing",
+      to_level: "Deepening",
+      note: "Set up dressing frame, completed it, returned every piece, refilled the basket. No adult cue at any step.",
+      daysAgo: 9,
+    },
+    {
+      axis_key: "choice-quality",
+      from_level: null,
+      to_level: null,
+      note: "Picked map of Africa because 'Iris was working with it yesterday.' Choice still proximity-driven — staying at Practicing for now.",
+      daysAgo: 11,
+    },
+    {
+      axis_key: "error-resilience",
+      from_level: null,
+      to_level: null,
+      note: "Cried briefly when red rods didn't sequence — abandoned the work. Still at Emerging. Watch over the next two weeks.",
+      daysAgo: 15,
+    },
+    {
+      axis_key: "material-progression",
+      from_level: "Emerging",
+      to_level: "Practicing",
+      note: "Bridged Sensorial → Math intentionally — used pink tower experience to anchor teen board quantity work. First cross-area connection.",
+      daysAgo: 18,
+    },
+  ].filter((o) => axisKeys.has(o.axis_key));
+
+  for (const o of observations) {
+    const { error } = await supabase.from("whole_child_observations").insert({
+      student_id: studentId,
+      axis_key: o.axis_key,
+      from_level: o.from_level,
+      to_level: o.to_level,
+      note: o.note,
+      author_user_id: teacherUserId,
+      created_at: daysAgoIso(o.daysAgo),
+    });
+    if (error) throw error;
+  }
+
+  // Curriculum progress — mirrors SUBTOPICS in the prototype mock-data,
+  // mapped onto the actual subtopics we seeded above. Status order is
+  // introduced (i) → practicing (p) → mastered (m); we also write history
+  // so the SubtopicDetail step diagram has real dates.
+  const progressRows: Array<{
+    topicSlash: string;
+    status: "introduced" | "practicing" | "mastered";
+    introducedDaysAgo: number;
+    practicingDaysAgo?: number;
+    masteredDaysAgo?: number;
+  }> = [
+    {
+      topicSlash: "Sensorial / Pink Tower",
+      status: "practicing",
+      introducedDaysAgo: 60,
+      practicingDaysAgo: 44,
+    },
+    {
+      topicSlash: "Sensorial / Brown Stair",
+      status: "practicing",
+      introducedDaysAgo: 56,
+      practicingDaysAgo: 28,
+    },
+    { topicSlash: "Sensorial / Red Rods", status: "introduced", introducedDaysAgo: 18 },
+    {
+      topicSlash: "Sensorial / Sound Cylinders",
+      status: "mastered",
+      introducedDaysAgo: 76,
+      practicingDaysAgo: 60,
+      masteredDaysAgo: 22,
+    },
+    {
+      topicSlash: "Mathematics / Number Rods",
+      status: "practicing",
+      introducedDaysAgo: 41,
+      practicingDaysAgo: 16,
+    },
+    { topicSlash: "Mathematics / Spindle Box", status: "introduced", introducedDaysAgo: 14 },
+    {
+      topicSlash: "Language / Sandpaper Letters",
+      status: "practicing",
+      introducedDaysAgo: 62,
+      practicingDaysAgo: 38,
+    },
+    { topicSlash: "Language / Movable Alphabet", status: "introduced", introducedDaysAgo: 11 },
+    {
+      topicSlash: "Practical Life / Pouring (water)",
+      status: "mastered",
+      introducedDaysAgo: 100,
+      practicingDaysAgo: 84,
+      masteredDaysAgo: 60,
+    },
+    {
+      topicSlash: "Practical Life / Buttoning frame",
+      status: "practicing",
+      introducedDaysAgo: 54,
+      practicingDaysAgo: 24,
+    },
+    { topicSlash: "Cultural / Puzzle Map: World", status: "introduced", introducedDaysAgo: 9 },
+    {
+      topicSlash: "Cultural / Land & Water Forms",
+      status: "practicing",
+      introducedDaysAgo: 48,
+      practicingDaysAgo: 21,
+    },
+  ];
+
+  for (const p of progressRows) {
+    const subtopicId = subtopicIds.get(p.topicSlash);
+    if (!subtopicId) {
+      console.warn(`  (skip) no subtopic id for "${p.topicSlash}"`);
+      continue;
+    }
+    const updatedAt = daysAgoIso(p.masteredDaysAgo ?? p.practicingDaysAgo ?? p.introducedDaysAgo);
+    const { data: progress, error } = await supabase
+      .from("student_progress")
+      .insert({
+        student_id: studentId,
+        classroom_id: classroomId,
+        curriculum_subtopic_id: subtopicId,
+        status: p.status,
+        updated_by_user_id: teacherUserId,
+        updated_at: updatedAt,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    // History rows so the step diagram can show first-introduced/first-practicing/first-mastered dates.
+    const transitions: Array<{ prev: string | null; next: string; daysAgo: number }> = [
+      { prev: null, next: "introduced", daysAgo: p.introducedDaysAgo },
+    ];
+    if (p.practicingDaysAgo !== undefined)
+      transitions.push({ prev: "introduced", next: "practicing", daysAgo: p.practicingDaysAgo });
+    if (p.masteredDaysAgo !== undefined)
+      transitions.push({ prev: "practicing", next: "mastered", daysAgo: p.masteredDaysAgo });
+
+    for (const t of transitions) {
+      const { error: hErr } = await supabase.from("student_progress_history").insert({
+        student_progress_id: progress.id,
+        student_id: studentId,
+        curriculum_subtopic_id: subtopicId,
+        previous_status: t.prev,
+        new_status: t.next,
+        changed_by_user_id: teacherUserId,
+        changed_at: daysAgoIso(t.daysAgo),
+      });
+      if (hErr) throw hErr;
+    }
+  }
+
+  console.log(`  ✓ ${assessments.length} axis assessments`);
+  console.log(`  ✓ ${observations.length} whole-child observations`);
+  console.log(`  ✓ ${progressRows.length} curriculum progress rows`);
+}
+
+function daysAgoIso(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 main().catch((err) => {
