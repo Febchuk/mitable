@@ -17,6 +17,39 @@ export type Child = {
   recent: string;
 };
 
+export type ReportParagraph = {
+  id: string;
+  /** May contain <span class="rd-token">…</span> markup for student-name tokens. */
+  html: string;
+};
+
+export type ReportSection = {
+  id: string;
+  heading: string;
+  paragraphs: ReportParagraph[];
+  /** Visual-only suggested-addition card. Wired up later when the chat agent ships. */
+  ghostEdit?: { id: string; html: string; sourceLabel: string };
+};
+
+export type ReportSources = {
+  voiceNotes: number;
+  photos: number;
+  worksheets: number;
+};
+
+export type ReportDetail = {
+  title: string;
+  observer: string;
+  classroom: string;
+  /** Friendly label like "Friday, May 2". */
+  dayLabel: string;
+  /** Friendly label like "Saved 3 min ago". */
+  savedMeta: string;
+  sources: ReportSources;
+  visibleTo: string[];
+  sections: ReportSection[];
+};
+
 export type Report = {
   id: string;
   childId: string;
@@ -24,6 +57,8 @@ export type Report = {
   when: string;
   period: string;
   status: ReportStatus;
+  /** Rich content for the editor view. Optional so list-only reports keep working. */
+  detail?: ReportDetail;
 };
 
 export type DividerMessage = { id: string; type: "divider"; label: string };
@@ -266,9 +301,199 @@ export const INITIAL_PROGRESS: Record<string, ProgressMark[]> = {
   ren: ["m", "m", "p", "p", "i", "i", "-", "m", "p", "p", "i", "-"],
 };
 
+const TOK = (name: string) =>
+  `<span class="rd-token" title="Resolves to: ${name}">${name.split(" ")[0]}</span>`;
+
+const ADA_DETAIL: ReportDetail = {
+  title: "A steady Friday for Ada",
+  observer: "Ms. Lena",
+  classroom: "Sunflower classroom",
+  dayLabel: "Friday, May 2",
+  savedMeta: "Saved 3 min ago",
+  sources: { voiceNotes: 4, photos: 2, worksheets: 1 },
+  visibleTo: ["Ada's parents", "Lead teacher"],
+  sections: [
+    {
+      id: "morning",
+      heading: "Morning",
+      paragraphs: [
+        {
+          id: "morning-p1",
+          html: `${TOK(
+            "Ada Okafor"
+          )} arrived at 8:42 and selected the pink tower. She completed the sequence with no errors and returned the materials properly.`,
+        },
+      ],
+    },
+    {
+      id: "language",
+      heading: "Language",
+      paragraphs: [
+        {
+          id: "language-p1",
+          html: `In the language area, ${TOK(
+            "Ada Okafor"
+          )} worked with the sandpaper letters. She traced "S" multiple times and named two words that begin with the sound.`,
+        },
+      ],
+      ghostEdit: {
+        id: "language-ghost",
+        sourceLabel: "from 10:14 photo",
+        html: `${TOK(
+          "Mira Khan"
+        )} joined her briefly, watching her tracing pace before asking to take a turn — a small, unprompted moment of peer interest.`,
+      },
+    },
+    {
+      id: "afternoon",
+      heading: "Afternoon",
+      paragraphs: [
+        {
+          id: "afternoon-p1",
+          html: `After outdoor time, ${TOK(
+            "Ada Okafor"
+          )} chose the metal insets. Her grip on the colored pencil was relaxed, and she stayed with the work for nearly twenty minutes — longer than any focused activity earlier this week.`,
+        },
+      ],
+    },
+    {
+      id: "social",
+      heading: "Social & emotional",
+      paragraphs: [
+        {
+          id: "social-p1",
+          html: `During snack, ${TOK("Ada Okafor")} noticed ${TOK(
+            "Mira Khan"
+          )} couldn't open her container and quietly slid hers over to use as a model. No words — just observation and care.`,
+        },
+      ],
+    },
+  ],
+};
+
+const DIEGO_DETAIL: ReportDetail = {
+  title: "Diego's Friday — map work and quiet focus",
+  observer: "Ms. Lena",
+  classroom: "Sunflower classroom",
+  dayLabel: "Friday, May 2",
+  savedMeta: "Saved 12 min ago",
+  sources: { voiceNotes: 2, photos: 1, worksheets: 0 },
+  visibleTo: ["Diego's parents", "Lead teacher"],
+  sections: [
+    {
+      id: "morning",
+      heading: "Morning",
+      paragraphs: [
+        {
+          id: "morning-p1",
+          html: `${TOK(
+            "Diego Ramos"
+          )} returned to the map of Africa for a third day. He named four countries from memory before reaching for the control chart.`,
+        },
+      ],
+    },
+    {
+      id: "math",
+      heading: "Math",
+      paragraphs: [
+        {
+          id: "math-p1",
+          html: `${TOK(
+            "Diego Ramos"
+          )} worked through teen-board sequences from 11 to 19 with no prompts, then taught the layout to ${TOK(
+            "Bea Chen"
+          )} who joined him.`,
+        },
+      ],
+    },
+    {
+      id: "social",
+      heading: "Social & emotional",
+      paragraphs: [
+        {
+          id: "social-p1",
+          html: `Patient with a younger child at the practical-life shelf — waited his turn and modeled the pouring sequence rather than taking over.`,
+        },
+      ],
+    },
+  ],
+};
+
+const BEA_DETAIL: ReportDetail = {
+  title: "Bea — Spring 2026 progress",
+  observer: "Ms. Lena",
+  classroom: "Sunflower classroom",
+  dayLabel: "Spring 2026",
+  savedMeta: "Saved yesterday",
+  sources: { voiceNotes: 18, photos: 9, worksheets: 4 },
+  visibleTo: ["Bea's parent", "Lead teacher", "Head of school"],
+  sections: [
+    {
+      id: "overview",
+      heading: "Overview",
+      paragraphs: [
+        {
+          id: "overview-p1",
+          html: `${TOK(
+            "Bea Chen"
+          )} has settled into Sunflower's morning rhythm. Across the spring period her concentration in math doubled compared with winter, with number rods and the teen board emerging as anchor works.`,
+        },
+      ],
+    },
+    {
+      id: "math",
+      heading: "Math",
+      paragraphs: [
+        {
+          id: "math-p1",
+          html: `Number rods → sequenced 1 through 10 unprompted by mid-March. Teen board → presented in April; she now narrates the operation aloud while she works.`,
+        },
+      ],
+    },
+    {
+      id: "language",
+      heading: "Language",
+      paragraphs: [
+        {
+          id: "language-p1",
+          html: `Sandpaper letters fluent for vowels and most consonants. Begun pairing them with the small movable alphabet — first three-letter words appeared in late April.`,
+        },
+      ],
+    },
+    {
+      id: "social",
+      heading: "Social & emotional",
+      paragraphs: [
+        {
+          id: "social-p1",
+          html: `Most-asked-for collaborator at the practical-life shelf this term. ${TOK(
+            "Bea Chen"
+          )} consistently hands off materials gently and waits for verbal confirmation before joining a peer's work.`,
+        },
+      ],
+    },
+  ],
+};
+
 export const INITIAL_REPORTS: Report[] = [
-  { id: "r1", childId: "ada", kind: "Daily", when: "Apr 30", period: "today", status: "draft" },
-  { id: "r2", childId: "dgo", kind: "Daily", when: "Apr 30", period: "today", status: "draft" },
+  {
+    id: "r1",
+    childId: "ada",
+    kind: "Daily",
+    when: "Apr 30",
+    period: "today",
+    status: "draft",
+    detail: ADA_DETAIL,
+  },
+  {
+    id: "r2",
+    childId: "dgo",
+    kind: "Daily",
+    when: "Apr 30",
+    period: "today",
+    status: "draft",
+    detail: DIEGO_DETAIL,
+  },
   {
     id: "r3",
     childId: "mira",
@@ -284,6 +509,7 @@ export const INITIAL_REPORTS: Report[] = [
     when: "Spring 2026",
     period: "spring period",
     status: "draft",
+    detail: BEA_DETAIL,
   },
   { id: "r5", childId: "levi", kind: "Daily", when: "Apr 29", period: "yesterday", status: "sent" },
   { id: "r6", childId: "bea", kind: "Daily", when: "Apr 28", period: "2 days ago", status: "sent" },
@@ -423,6 +649,10 @@ export const SCRIPTED_REPLIES: ScriptedReply[] = [
 
 export function findChild(id: string): Child | undefined {
   return CHILDREN.find((c) => c.id === id);
+}
+
+export function findReport(id: string): Report | undefined {
+  return INITIAL_REPORTS.find((r) => r.id === id);
 }
 
 export function initialsFor(name: string): string {

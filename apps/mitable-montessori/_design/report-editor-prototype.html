@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mitable Montessori — Report Editor · Ana M.</title>
+
+    <!--
+      ASSUMPTIONS
+      - Lives in /app/reports/daily/:reportId/edit (teacher app, desktop-first)
+      - Reuses Montessori design tokens verbatim from globals.css
+      - Inspired by Notion AI / Lovable-style split: chat left, artifact right
+      - 3 variants togglable via top-right pills: V1 conversational, V2 editor-forward, V3 floating chat
+      - Real Ana M. content, not Lorem; tokens shown via [STUDENT_1] dotted-underline rendering
+    -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Caveat:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --color-canvas: #faf6ee;
+        --color-surface: #fffbf3;
+        --color-muted: #f2ede0;
+        --color-ink: #2a2723;
+        --color-ink-secondary: #5c544a;
+        --color-ink-muted: #9c9285;
+        --color-border: #e0d8c8;
+        --color-border-strong: #b89880;
+        --color-terracotta: #c46a4f;
+        --color-terracotta-soft: #f4ddd2;
+        --color-terracotta-deep: #a24a3d;
+        --color-sage: #7a9b7a;
+        --color-sage-soft: #dde7da;
+        --color-sage-deep: #3f5c40;
+        --color-butter: #e8c56a;
+        --color-butter-soft: #f6e8b8;
+        --color-butter-deep: #7a5c0f;
+        --color-dusty-blue: #6b8aa6;
+        --color-dusty-blue-soft: #d2dce5;
+        --color-clay: #b89880;
+        --color-clay-soft: #e5d8c8;
+
+        --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+        --font-display: "Caveat", ui-serif, serif;
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        background: var(--color-canvas);
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      body::before {
+        content: "";
+        position: fixed; inset: 0;
+        pointer-events: none; z-index: 0;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      }
+
+      button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+      input, textarea { font-family: inherit; color: inherit; }
+
+      .label-cap {
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--color-ink-muted);
+      }
+
+      .tap { transition: transform 120ms ease, background 140ms ease, opacity 140ms ease, box-shadow 180ms ease, border-color 140ms ease, color 140ms ease; }
+      .tap:active { transform: scale(0.98); }
+
+      .scroll-quiet::-webkit-scrollbar { width: 6px; height: 6px; }
+      .scroll-quiet::-webkit-scrollbar-thumb { background: var(--color-clay-soft); border-radius: 999px; }
+      .scroll-quiet::-webkit-scrollbar-track { background: transparent; }
+
+      @keyframes slide-up { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fade-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-4px); } }
+      @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(196, 106, 79, 0.5); } 70% { box-shadow: 0 0 0 10px rgba(196, 106, 79, 0); } 100% { box-shadow: 0 0 0 0 rgba(196, 106, 79, 0); } }
+      @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+      @keyframes typewriter-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+      @keyframes thinking-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-3px); opacity: 1; } }
+
+      .anim-slide-up { animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      .anim-fade-in { animation: fade-in 200ms ease both; }
+      .pulse-ring { animation: pulse-ring 2s infinite; }
+
+      /* ===== Topbar ===== */
+      .topbar {
+        position: sticky; top: 0; z-index: 50;
+        background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+        backdrop-filter: saturate(140%) blur(8px);
+        border-bottom: 1px solid var(--color-border);
+        height: 56px;
+        display: flex; align-items: center;
+      }
+      .topbar-inner {
+        width: 100%;
+        padding: 0 24px;
+        display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      }
+      .crumbs {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 13px; color: var(--color-ink-secondary);
+      }
+      .crumbs .back {
+        width: 28px; height: 28px; border-radius: 8px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: var(--color-ink-secondary);
+      }
+      .crumbs .back:hover { background: var(--color-muted); color: var(--color-ink); }
+      .crumbs .sep { color: var(--color-ink-muted); }
+      .crumbs .current { color: var(--color-ink); font-weight: 600; }
+
+      .header-right { display: flex; align-items: center; gap: 12px; }
+      .saved-meta { font-size: 12px; color: var(--color-ink-muted); }
+
+      .pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px; border-radius: 999px;
+        font-size: 11.5px; font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .pill.draft { background: var(--color-clay-soft); color: var(--color-terracotta-deep); }
+      .pill.submitted { background: var(--color-butter-soft); color: var(--color-butter-deep); }
+      .pill.approved { background: var(--color-sage-soft); color: var(--color-sage-deep); }
+      .pill .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+      .btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 7px 14px; border-radius: 8px;
+        font-size: 13px; font-weight: 500;
+        border: 1px solid transparent;
+      }
+      .btn-ghost { color: var(--color-ink-secondary); }
+      .btn-ghost:hover { background: var(--color-muted); color: var(--color-ink); }
+      .btn-secondary {
+        background: var(--color-surface);
+        border-color: var(--color-border);
+        color: var(--color-ink);
+      }
+      .btn-secondary:hover { border-color: var(--color-border-strong); }
+      .btn-primary {
+        background: var(--color-terracotta);
+        color: #fff;
+        font-weight: 600;
+      }
+      .btn-primary:hover { background: var(--color-terracotta-deep); }
+
+      /* ===== Variant toggle ===== */
+      .variant-toggle {
+        display: inline-flex; padding: 3px;
+        background: var(--color-muted);
+        border-radius: 10px;
+        border: 1px solid var(--color-border);
+      }
+      .variant-toggle button {
+        padding: 5px 11px;
+        font-size: 11.5px; font-weight: 600;
+        color: var(--color-ink-secondary);
+        border-radius: 7px;
+        letter-spacing: 0.02em;
+      }
+      .variant-toggle button.active {
+        background: var(--color-surface);
+        color: var(--color-ink);
+        box-shadow: 0 1px 2px rgba(43, 38, 34, 0.06);
+      }
+
+      /* ===== Layout ===== */
+      .workspace { position: relative; z-index: 1; }
+      .split {
+        display: grid;
+        height: calc(100vh - 56px);
+        transition: grid-template-columns 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      [data-variant="v1"] .split { grid-template-columns: 45fr 55fr; }
+      [data-variant="v2"] .split { grid-template-columns: 35fr 65fr; }
+      [data-variant="v3"] .split { grid-template-columns: 0fr 100fr; }
+      [data-variant="v3"][data-chat-open="true"] .split { grid-template-columns: 380px 1fr; }
+
+      .pane { overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+      .chat-pane {
+        background: var(--color-surface);
+        border-right: 1px solid var(--color-border);
+      }
+      [data-variant="v3"] .chat-pane { border-left: 1px solid var(--color-border); border-right: none; }
+      [data-variant="v3"]:not([data-chat-open="true"]) .chat-pane { border: none; }
+
+      /* ===== Chat pane ===== */
+      .chat-header {
+        padding: 16px 20px 12px;
+        border-bottom: 1px solid var(--color-border);
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .chat-title {
+        display: flex; align-items: center; gap: 8px;
+        font-weight: 600; font-size: 13px;
+      }
+      .ai-glyph {
+        width: 22px; height: 22px; border-radius: 999px;
+        background: var(--color-clay-soft);
+        display: inline-flex; align-items: center; justify-content: center;
+        color: var(--color-terracotta-deep);
+        font-size: 12px;
+      }
+      .chat-subtitle { font-size: 11.5px; color: var(--color-ink-muted); margin-top: 2px; }
+
+      .chat-scroll {
+        flex: 1; overflow-y: auto;
+        padding: 18px 20px 8px;
+      }
+
+      .msg { margin-bottom: 16px; animation: slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      .msg-ai { display: flex; gap: 10px; align-items: flex-start; }
+      .msg-ai .avatar {
+        width: 26px; height: 26px; border-radius: 999px; flex-shrink: 0;
+        background: var(--color-clay-soft);
+        color: var(--color-terracotta-deep);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px; font-weight: 600;
+      }
+      .msg-ai .body {
+        font-size: 13.5px; color: var(--color-ink-secondary);
+        line-height: 1.55; padding-top: 3px;
+        max-width: calc(100% - 36px);
+      }
+      .msg-user {
+        display: flex; justify-content: flex-end;
+      }
+      .msg-user .bubble {
+        background: var(--color-terracotta);
+        color: #fff;
+        padding: 9px 13px;
+        border-radius: 14px 14px 3px 14px;
+        font-size: 13.5px;
+        max-width: 78%;
+      }
+
+      /* Proposal card — the AI's suggested edit */
+      .proposal {
+        margin-top: 10px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .proposal-head {
+        padding: 9px 13px;
+        background: var(--color-clay-soft);
+        border-bottom: 1px solid var(--color-border);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .proposal-head .label-cap { font-size: 10px; color: var(--color-terracotta-deep); }
+      .proposal-head .target {
+        font-size: 11.5px; color: var(--color-ink-muted);
+        margin-left: auto;
+      }
+      .proposal-body { padding: 12px 13px; font-size: 13px; line-height: 1.55; }
+      .proposal-body .old {
+        color: var(--color-ink-muted);
+        text-decoration: line-through;
+        text-decoration-color: var(--color-clay);
+        margin-bottom: 8px;
+      }
+      .proposal-body .new {
+        color: var(--color-ink);
+        background: var(--color-canvas);
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border);
+      }
+      .proposal-actions {
+        display: flex; gap: 8px;
+        padding: 10px 13px;
+        border-top: 1px solid var(--color-border);
+        background: var(--color-canvas);
+      }
+      .proposal-actions .btn { padding: 5px 11px; font-size: 12.5px; }
+
+      /* Reply chips */
+      .reply-chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+      .reply-chip {
+        padding: 6px 11px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 999px;
+        font-size: 12.5px;
+        color: var(--color-ink-secondary);
+      }
+      .reply-chip:hover { border-color: var(--color-terracotta); color: var(--color-terracotta-deep); background: var(--color-terracotta-soft); }
+
+      /* Observation reference */
+      .obs-ref {
+        margin-top: 10px;
+        display: flex; gap: 10px;
+        padding: 10px;
+        background: var(--color-canvas);
+        border: 1px dashed var(--color-clay);
+        border-radius: 10px;
+      }
+      .obs-thumb {
+        width: 44px; height: 44px;
+        border-radius: 8px;
+        background: var(--color-clay-soft);
+        border: 1px solid var(--color-border);
+        flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+        color: var(--color-terracotta-deep);
+      }
+      .obs-meta { flex: 1; min-width: 0; }
+      .obs-meta .obs-when { font-size: 11px; color: var(--color-ink-muted); }
+      .obs-meta .obs-text { font-size: 12.5px; color: var(--color-ink); margin-top: 2px; line-height: 1.4; }
+      .obs-pull {
+        align-self: center;
+        padding: 5px 9px;
+        font-size: 11.5px; font-weight: 600;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 7px;
+        color: var(--color-ink-secondary);
+        flex-shrink: 0;
+      }
+      .obs-pull:hover { border-color: var(--color-sage); color: var(--color-sage-deep); }
+
+      /* Thinking indicator */
+      .thinking { display: inline-flex; gap: 4px; padding: 6px 0; }
+      .thinking span {
+        width: 6px; height: 6px; border-radius: 999px;
+        background: var(--color-terracotta);
+        animation: thinking-dot 1.2s infinite ease-in-out;
+      }
+      .thinking span:nth-child(2) { animation-delay: 0.15s; }
+      .thinking span:nth-child(3) { animation-delay: 0.3s; }
+
+      /* Composer */
+      .composer-wrap {
+        padding: 12px 16px 18px;
+        border-top: 1px solid var(--color-border);
+        background: var(--color-surface);
+      }
+      .composer {
+        display: flex; align-items: flex-end; gap: 8px;
+        background: var(--color-canvas);
+        border: 1px solid var(--color-border);
+        border-radius: 14px;
+        padding: 8px 8px 8px 14px;
+        transition: border-color 140ms ease, box-shadow 180ms ease;
+      }
+      .composer:focus-within {
+        border-color: var(--color-terracotta);
+        box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+      }
+      .composer textarea {
+        flex: 1;
+        border: none; outline: none;
+        background: transparent;
+        resize: none;
+        font-size: 13.5px; line-height: 1.5;
+        max-height: 120px; min-height: 22px;
+        padding: 4px 0;
+      }
+      .composer-actions { display: flex; gap: 4px; align-items: center; }
+      .icon-btn {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: var(--color-ink-secondary);
+      }
+      .icon-btn:hover { background: var(--color-muted); color: var(--color-ink); }
+      .icon-btn.primary {
+        background: var(--color-terracotta);
+        color: #fff;
+      }
+      .icon-btn.primary:hover { background: var(--color-terracotta-deep); }
+      .icon-btn.recording {
+        background: var(--color-terracotta);
+        color: #fff;
+        animation: pulse-ring 1.6s infinite;
+      }
+
+      .composer-hints {
+        display: flex; gap: 6px; margin-top: 8px;
+        font-size: 11.5px; color: var(--color-ink-muted);
+        align-items: center; flex-wrap: wrap;
+      }
+      .composer-hints .kbd {
+        display: inline-flex; align-items: center; padding: 1px 5px;
+        background: var(--color-muted); border: 1px solid var(--color-border);
+        border-radius: 4px; font-size: 10.5px; font-family: ui-monospace, monospace;
+        color: var(--color-ink-secondary);
+      }
+
+      /* ===== Report pane ===== */
+      .report-pane {
+        background: var(--color-canvas);
+        position: relative;
+      }
+      .report-scroll {
+        flex: 1; overflow-y: auto;
+        padding: 32px 0 80px;
+      }
+      .report-paper {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 0 56px;
+      }
+      .report-meta {
+        display: flex; align-items: center; gap: 10px;
+        margin-bottom: 14px;
+      }
+      .report-title-input {
+        width: 100%;
+        font-family: var(--font-sans);
+        font-size: 30px;
+        font-weight: 600;
+        color: var(--color-ink);
+        border: none; outline: none;
+        background: transparent;
+        line-height: 1.2;
+        margin-bottom: 6px;
+        padding: 4px 0;
+        letter-spacing: -0.015em;
+      }
+      .report-title-input:focus { outline: 2px solid var(--color-terracotta-soft); outline-offset: 2px; border-radius: 4px; }
+
+      .report-byline {
+        font-size: 13px; color: var(--color-ink-muted);
+        margin-bottom: 32px;
+        display: flex; align-items: center; gap: 10px;
+      }
+      .report-byline .dot-sep { width: 3px; height: 3px; border-radius: 999px; background: var(--color-ink-muted); }
+
+      /* Section / paragraph block */
+      .section { margin-bottom: 20px; position: relative; }
+      .section-heading {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-terracotta-deep);
+        margin-bottom: 6px;
+      }
+      .para-block {
+        position: relative;
+        padding: 8px 12px;
+        margin: 0 -12px;
+        border-radius: 8px;
+        transition: background 140ms ease;
+      }
+      .para-block:hover {
+        background: color-mix(in srgb, var(--color-clay-soft) 35%, transparent);
+      }
+      .para-block:hover .para-actions { opacity: 1; transform: translateX(0); }
+      .para-actions {
+        position: absolute;
+        right: 12px; top: 8px;
+        display: flex; gap: 4px;
+        opacity: 0; transform: translateX(4px);
+        transition: opacity 140ms ease, transform 140ms ease;
+      }
+      .para-action {
+        padding: 4px 8px;
+        font-size: 11px; font-weight: 500;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        color: var(--color-ink-secondary);
+        display: inline-flex; align-items: center; gap: 4px;
+      }
+      .para-action:hover { border-color: var(--color-terracotta); color: var(--color-terracotta-deep); }
+
+      .para-text {
+        font-size: 15px;
+        line-height: 1.7;
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        font-weight: 400;
+      }
+      .para-text[contenteditable="true"]:focus { outline: none; }
+
+      /* Token rendering */
+      .token {
+        text-decoration: underline dotted var(--color-clay);
+        text-underline-offset: 3px;
+        cursor: help;
+      }
+      .token:hover { color: var(--color-terracotta-deep); text-decoration-color: var(--color-terracotta); }
+
+      /* Pending edit (ghost text inline) */
+      .ghost-edit {
+        display: block;
+        margin-top: 10px;
+        padding: 11px 13px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-left: 2px solid var(--color-terracotta);
+        border-radius: 8px;
+        position: relative;
+      }
+      .ghost-edit-label {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 10px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--color-terracotta-deep);
+        margin-bottom: 6px;
+      }
+      .ghost-edit-text {
+        font-family: var(--font-sans);
+        font-size: 15px; line-height: 1.7;
+        color: var(--color-ink);
+      }
+      .ghost-edit-actions { display: flex; gap: 6px; margin-top: 10px; }
+      .ghost-btn {
+        padding: 5px 11px;
+        font-size: 12px; font-weight: 600;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        color: var(--color-ink-secondary);
+      }
+      .ghost-btn.accept { background: var(--color-terracotta); color: #fff; border-color: var(--color-terracotta); }
+      .ghost-btn.accept:hover { background: var(--color-terracotta-deep); border-color: var(--color-terracotta-deep); }
+      .ghost-btn:hover { border-color: var(--color-border-strong); }
+
+      /* Add-section affordance */
+      .add-section {
+        display: flex; align-items: center; gap: 8px;
+        margin-top: 24px;
+        padding: 8px 12px;
+        font-size: 12.5px; color: var(--color-ink-muted);
+        border: 1px dashed var(--color-border);
+        border-radius: 8px;
+        background: transparent;
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .add-section:hover { border-color: var(--color-clay); color: var(--color-terracotta-deep); background: color-mix(in srgb, var(--color-clay-soft) 30%, transparent); }
+
+      /* Footer */
+      .report-footer {
+        position: sticky; bottom: 0;
+        background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+        backdrop-filter: saturate(140%) blur(8px);
+        border-top: 1px solid var(--color-border);
+        padding: 12px 24px;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px;
+      }
+      .footer-left { font-size: 12px; color: var(--color-ink-muted); display: flex; align-items: center; gap: 10px; }
+      .footer-right { display: flex; gap: 8px; }
+
+      /* V3 floating chat trigger */
+      .chat-fab {
+        position: fixed;
+        bottom: 88px; right: 24px;
+        z-index: 60;
+        display: none;
+        align-items: center; gap: 8px;
+        padding: 9px 14px 9px 10px;
+        background: var(--color-surface);
+        color: var(--color-ink);
+        border: 1px solid var(--color-border);
+        border-radius: 999px;
+        font-size: 13px; font-weight: 500;
+      }
+      .chat-fab:hover { border-color: var(--color-border-strong); background: var(--color-canvas); }
+      .chat-fab .ai-glyph {
+        background: var(--color-clay-soft);
+        color: var(--color-terracotta-deep);
+      }
+      [data-variant="v3"]:not([data-chat-open="true"]) .chat-fab { display: inline-flex; }
+
+      /* Typewriter effect for streamed AI text */
+      .typing::after {
+        content: "▍";
+        color: var(--color-terracotta);
+        margin-left: 1px;
+        animation: typewriter-blink 1s infinite;
+      }
+
+      /* Toast */
+      .toast {
+        position: fixed; bottom: 24px; left: 50%;
+        transform: translate(-50%, 12px); opacity: 0;
+        background: var(--color-ink); color: var(--color-canvas);
+        padding: 10px 16px; border-radius: 10px;
+        font-size: 13px;
+        box-shadow: 0 4px 12px rgba(43, 38, 34, 0.12);
+        pointer-events: none;
+        transition: opacity 200ms ease, transform 200ms ease;
+        z-index: 200;
+      }
+      .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+      /* Variant 2 — tighter chat header */
+      [data-variant="v2"] .chat-pane { background: var(--color-canvas); }
+      [data-variant="v2"] .chat-header { padding: 12px 16px; }
+      [data-variant="v2"] .chat-scroll { padding: 14px 16px 6px; }
+      [data-variant="v2"] .composer-wrap { padding: 10px 14px 14px; }
+
+      /* Skip-fade for proposals */
+      .removing { animation: fade-out 220ms ease forwards; }
+    </style>
+  </head>
+
+  <body>
+    <div class="workspace" data-variant="v1" data-chat-open="false">
+
+      <!-- ============ TOPBAR ============ -->
+      <header class="topbar">
+        <div class="topbar-inner">
+          <div class="crumbs">
+            <button class="back tap" title="Back to reports">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+            <span>Reports</span>
+            <span class="sep">/</span>
+            <span>Daily</span>
+            <span class="sep">/</span>
+            <span class="current">Ana M. — May 2</span>
+            <span id="status-pill" class="pill draft" style="margin-left: 10px;">
+              <span class="dot"></span>Draft
+            </span>
+          </div>
+
+          <div class="header-right">
+            <span class="saved-meta" id="saved-meta">Saved 3 min ago</span>
+
+            <div class="variant-toggle" role="tablist" aria-label="Layout variant">
+              <button data-variant-btn="v1" class="active">V1 · Conversational</button>
+              <button data-variant-btn="v2">V2 · Editor-forward</button>
+              <button data-variant-btn="v3">V3 · Floating chat</button>
+            </div>
+
+            <button class="btn btn-secondary tap">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+              Save draft
+            </button>
+            <button class="btn btn-primary tap" id="submit-btn">
+              Submit for review
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ============ SPLIT LAYOUT ============ -->
+      <div class="split">
+
+        <!-- ====== CHAT PANE ====== -->
+        <aside class="pane chat-pane">
+          <div class="chat-header">
+            <div>
+              <div class="chat-title">
+                <span class="ai-glyph">✦</span>
+                <span>Editing assistant</span>
+              </div>
+              <div class="chat-subtitle">Discuss edits, pull from today's observations</div>
+            </div>
+            <button class="icon-btn tap" title="Conversation history">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </button>
+          </div>
+
+          <div class="chat-scroll scroll-quiet" id="chat-scroll">
+
+            <!-- AI greeting -->
+            <div class="msg msg-ai">
+              <div class="avatar">✦</div>
+              <div class="body">
+                I drafted Ana's day from 4 voice notes and 2 photos you captured. The morning paragraph is the one I'm least sure about — the audio was a bit rushed. Want to start there?
+              </div>
+            </div>
+
+            <!-- Teacher message -->
+            <div class="msg msg-user">
+              <div class="bubble">Yeah — the morning feels clinical. Make it warmer, like how I'd actually tell her parents.</div>
+            </div>
+
+            <!-- AI proposal card -->
+            <div class="msg msg-ai">
+              <div class="avatar">✦</div>
+              <div class="body">
+                Here's a warmer take. Same facts, more like how you'd say it at pickup:
+                <div class="proposal" data-proposal="morning">
+                  <div class="proposal-head">
+                    <span class="label-cap">Suggested rewrite</span>
+                    <span class="target">→ Morning paragraph</span>
+                  </div>
+                  <div class="proposal-body">
+                    <div class="old">Ana arrived at 8:42 and selected the pink tower. She completed the sequence with no errors and returned the materials properly.</div>
+                    <div class="new">Ana came in quietly this morning and headed straight for the pink tower — she's been drawn to it for two weeks now. She built it in one steady go, hands sure of where each cube belonged, and put everything back without being asked.</div>
+                  </div>
+                  <div class="proposal-actions">
+                    <button class="btn btn-primary tap" data-action="apply" data-target="morning">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      Apply edit
+                    </button>
+                    <button class="btn btn-ghost tap" data-action="skip">Skip</button>
+                    <button class="btn btn-ghost tap" data-action="refine" style="margin-left: auto;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-6.2-8.55"/><path d="M21 4v5h-5"/></svg>
+                      Try another
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Teacher message — clarifying intent -->
+            <div class="msg msg-user">
+              <div class="bubble">Also — should I mention Mateo? They worked together for a bit.</div>
+            </div>
+
+            <!-- AI clarifying response with chips -->
+            <div class="msg msg-ai">
+              <div class="avatar">✦</div>
+              <div class="body">
+                Good call. Two ways to handle it:
+                <div class="reply-chips">
+                  <button class="reply-chip tap">Keep focus on Ana, mention Mateo briefly</button>
+                  <button class="reply-chip tap">Drop Mateo — Ana's report</button>
+                  <button class="reply-chip tap">Add a sentence about their collaboration</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- AI surfacing an observation reference -->
+            <div class="msg msg-ai">
+              <div class="avatar">✦</div>
+              <div class="body">
+                I have a photo from 10:14 you didn't reference yet — Ana tracing the sandpaper letter "S" with Mateo watching. Want to pull it into the report?
+                <div class="obs-ref">
+                  <div class="obs-thumb">📷</div>
+                  <div class="obs-meta">
+                    <div class="obs-when">10:14 AM · Language area</div>
+                    <div class="obs-text">"Ana traced S three times slowly. Mateo asked if he could try."</div>
+                  </div>
+                  <button class="obs-pull tap" data-action="pull-obs">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline; vertical-align:-1px; margin-right:3px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Pull in
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Composer -->
+          <div class="composer-wrap">
+            <div class="composer">
+              <textarea id="composer-input" rows="1" placeholder="Ask or instruct… (e.g. 'add a sentence about her pencil grip')"></textarea>
+              <div class="composer-actions">
+                <button class="icon-btn tap" id="voice-btn" title="Voice input">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                </button>
+                <button class="icon-btn primary tap" id="send-btn" title="Send">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="composer-hints">
+              <span class="kbd">⌘ K</span><span>commands</span>
+              <span style="margin-left: 8px;" class="kbd">/</span><span>edit specific section</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- ====== REPORT PANE ====== -->
+        <main class="pane report-pane">
+          <div class="report-scroll scroll-quiet">
+            <article class="report-paper">
+
+              <div class="report-meta">
+                <span class="label-cap" style="color: var(--color-sage-deep);">Daily report</span>
+                <span style="color: var(--color-ink-muted);">·</span>
+                <span style="font-size: 12.5px; color: var(--color-ink-secondary);">Friday, May 2 · Sunflower classroom</span>
+              </div>
+
+              <input
+                class="report-title-input"
+                value="A steady Friday for Ana"
+                spellcheck="false"
+              />
+
+              <div class="report-byline">
+                <span>Observed by Ms. Lena</span>
+                <span class="dot-sep"></span>
+                <span>4 voice notes · 2 photos · 1 worksheet</span>
+              </div>
+
+              <!-- MORNING SECTION -->
+              <div class="section" data-section="morning">
+                <div class="section-heading">Morning</div>
+                <div class="para-block" data-para="morning">
+                  <div class="para-actions">
+                    <button class="para-action tap" data-action="discuss" data-section-id="morning">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      Discuss
+                    </button>
+                  </div>
+                  <p class="para-text" data-content="morning"><span class="token" title="Resolves to: Ana M.">Ana</span> arrived at 8:42 and selected the pink tower. She completed the sequence with no errors and returned the materials properly.</p>
+                </div>
+              </div>
+
+              <!-- LANGUAGE SECTION (with pending ghost edit) -->
+              <div class="section" data-section="language">
+                <div class="section-heading">Language</div>
+                <div class="para-block" data-para="language">
+                  <div class="para-actions">
+                    <button class="para-action tap" data-action="discuss" data-section-id="language">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      Discuss
+                    </button>
+                  </div>
+                  <p class="para-text">In the language area, <span class="token" title="Resolves to: Ana M.">Ana</span> worked with the sandpaper letters. She traced "S" multiple times and named two words that begin with the sound.</p>
+
+                  <!-- Pending ghost edit -->
+                  <div class="ghost-edit" id="ghost-language">
+                    <div class="ghost-edit-label">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                      Suggested addition · from 10:14 photo
+                    </div>
+                    <div class="ghost-edit-text">
+                      Mateo joined her briefly, watching her tracing pace before asking to take a turn — a small, unprompted moment of peer interest.
+                    </div>
+                    <div class="ghost-edit-actions">
+                      <button class="ghost-btn accept tap" data-action="accept-ghost" data-ghost="language">Accept</button>
+                      <button class="ghost-btn tap" data-action="reject-ghost" data-ghost="language">Reject</button>
+                      <button class="ghost-btn tap" data-action="edit-ghost" data-ghost="language" style="margin-left:auto;">Edit first</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AFTERNOON SECTION -->
+              <div class="section" data-section="afternoon">
+                <div class="section-heading">Afternoon</div>
+                <div class="para-block" data-para="afternoon">
+                  <div class="para-actions">
+                    <button class="para-action tap" data-action="discuss" data-section-id="afternoon">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      Discuss
+                    </button>
+                  </div>
+                  <p class="para-text">After outdoor time, <span class="token" title="Resolves to: Ana M.">Ana</span> chose the metal insets. Her grip on the colored pencil was relaxed, and she stayed with the work for nearly twenty minutes — longer than any focused activity earlier this week.</p>
+                </div>
+              </div>
+
+              <!-- SOCIAL SECTION -->
+              <div class="section" data-section="social">
+                <div class="section-heading">Social & emotional</div>
+                <div class="para-block" data-para="social">
+                  <div class="para-actions">
+                    <button class="para-action tap" data-action="discuss" data-section-id="social">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      Discuss
+                    </button>
+                  </div>
+                  <p class="para-text">During snack, <span class="token" title="Resolves to: Ana M.">Ana</span> noticed <span class="token" title="Resolves to: Mateo R.">Mateo</span> couldn't open his container and quietly slid hers over for him to use as a model. No words — just observation and care.</p>
+                </div>
+              </div>
+
+              <button class="add-section tap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add section
+              </button>
+
+            </article>
+          </div>
+
+          <div class="report-footer">
+            <div class="footer-left">
+              <span class="label-cap">Visible to</span>
+              <span>Ana's parents · Lead teacher</span>
+            </div>
+            <div class="footer-right">
+              <button class="btn btn-ghost tap">Reject draft</button>
+              <button class="btn btn-secondary tap">Save & close</button>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- V3 floating chat trigger -->
+      <button class="chat-fab tap" id="chat-fab">
+        <span class="ai-glyph">✦</span>
+        Ask the assistant
+      </button>
+
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <script>
+      (function () {
+        const root = document.querySelector(".workspace");
+        const toast = document.getElementById("toast");
+
+        function showToast(msg, ms = 1800) {
+          toast.textContent = msg;
+          toast.classList.add("show");
+          clearTimeout(showToast._t);
+          showToast._t = setTimeout(() => toast.classList.remove("show"), ms);
+        }
+
+        // ---- Variant toggle ----
+        document.querySelectorAll("[data-variant-btn]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const v = btn.getAttribute("data-variant-btn");
+            root.setAttribute("data-variant", v);
+            if (v === "v3") root.setAttribute("data-chat-open", "false");
+            document.querySelectorAll("[data-variant-btn]").forEach((b) =>
+              b.classList.toggle("active", b === btn)
+            );
+            showToast(
+              v === "v1" ? "Conversational layout" :
+              v === "v2" ? "Editor-forward layout" : "Floating chat layout"
+            );
+          });
+        });
+
+        // ---- V3 chat open/close ----
+        document.getElementById("chat-fab").addEventListener("click", () => {
+          root.setAttribute("data-chat-open", "true");
+        });
+
+        // ---- Apply proposal: swap morning paragraph with animation ----
+        document.querySelectorAll('[data-action="apply"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const target = btn.getAttribute("data-target");
+            const proposal = btn.closest(".proposal");
+            const newText = proposal.querySelector(".new").textContent.trim();
+            const para = document.querySelector(`[data-content="${target}"]`);
+
+            if (!para) return;
+            para.style.transition = "opacity 200ms ease";
+            para.style.opacity = "0";
+            setTimeout(() => {
+              // preserve the [STUDENT_1] token as Ana span
+              para.innerHTML = newText.replace(
+                /Ana(?![\w])/,
+                '<span class="token" title="Resolves to: Ana M.">Ana</span>'
+              );
+              para.style.opacity = "1";
+              // briefly highlight the swap
+              const block = para.closest(".para-block");
+              block.style.transition = "background 600ms ease";
+              block.style.background = "var(--color-clay-soft)";
+              setTimeout(() => (block.style.background = ""), 900);
+            }, 220);
+
+            // collapse the proposal card
+            const card = btn.closest(".proposal");
+            card.classList.add("removing");
+            setTimeout(() => {
+              card.style.display = "none";
+              const ack = document.createElement("div");
+              ack.className = "msg msg-ai";
+              ack.innerHTML =
+                '<div class="avatar">✦</div><div class="body">Applied. Want me to try another section, or are you happy with this one?</div>';
+              document.getElementById("chat-scroll").appendChild(ack);
+              ack.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }, 240);
+
+            showToast("Edit applied to morning paragraph");
+            updateSavedMeta();
+          });
+        });
+
+        // ---- Skip proposal ----
+        document.querySelectorAll('[data-action="skip"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const card = btn.closest(".proposal");
+            card.classList.add("removing");
+            setTimeout(() => {
+              card.style.display = "none";
+              const ack = document.createElement("div");
+              ack.className = "msg msg-user";
+              ack.innerHTML = '<div class="bubble">Skip — keep the original.</div>';
+              document.getElementById("chat-scroll").appendChild(ack);
+              ack.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }, 240);
+            showToast("Suggestion dismissed");
+          });
+        });
+
+        document.querySelectorAll('[data-action="refine"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            showToast("Asking for another version…");
+          });
+        });
+
+        // ---- Pull observation into report ----
+        document.querySelectorAll('[data-action="pull-obs"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const obsRef = btn.closest(".obs-ref");
+            obsRef.style.transition = "opacity 220ms ease";
+            obsRef.style.opacity = "0.5";
+            // scroll the language section into view and pulse the ghost
+            const ghost = document.getElementById("ghost-language");
+            if (ghost) {
+              ghost.scrollIntoView({ behavior: "smooth", block: "center" });
+              ghost.style.transition = "box-shadow 600ms ease";
+              ghost.style.boxShadow = "0 0 0 3px var(--color-terracotta-soft)";
+              setTimeout(() => (ghost.style.boxShadow = ""), 1200);
+            }
+            showToast("Already proposed in Language section ↑");
+          });
+        });
+
+        // ---- Accept / reject ghost edit ----
+        document.querySelectorAll('[data-action="accept-ghost"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const ghost = btn.closest(".ghost-edit");
+            const text = ghost.querySelector(".ghost-edit-text").textContent.trim();
+            const block = ghost.closest(".para-block");
+            const para = block.querySelector(".para-text");
+
+            // append to the paragraph as a follow-up sentence
+            const span = document.createElement("span");
+            span.style.opacity = "0";
+            span.style.transition = "opacity 300ms ease";
+            // insert the Mateo token
+            span.innerHTML = " " + text.replace(
+              /Mateo(?![\w])/,
+              '<span class="token" title="Resolves to: Mateo R.">Mateo</span>'
+            );
+            para.appendChild(span);
+            requestAnimationFrame(() => (span.style.opacity = "1"));
+
+            ghost.classList.add("removing");
+            setTimeout(() => ghost.remove(), 240);
+            showToast("Addition accepted");
+            updateSavedMeta();
+          });
+        });
+
+        document.querySelectorAll('[data-action="reject-ghost"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const ghost = btn.closest(".ghost-edit");
+            ghost.classList.add("removing");
+            setTimeout(() => ghost.remove(), 240);
+            showToast("Suggestion rejected");
+          });
+        });
+
+        document.querySelectorAll('[data-action="edit-ghost"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const ghost = btn.closest(".ghost-edit");
+            const textEl = ghost.querySelector(".ghost-edit-text");
+            textEl.setAttribute("contenteditable", "true");
+            textEl.focus();
+            // place caret at end
+            const range = document.createRange();
+            range.selectNodeContents(textEl);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            showToast("Edit then click Accept");
+          });
+        });
+
+        // ---- Discuss paragraph: pre-fill composer ----
+        document.querySelectorAll('[data-action="discuss"]').forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const sectionId = btn.getAttribute("data-section-id");
+            const sectionLabel = sectionId.charAt(0).toUpperCase() + sectionId.slice(1);
+            const ta = document.getElementById("composer-input");
+            ta.value = `About the ${sectionLabel.toLowerCase()} section: `;
+            ta.focus();
+            // ensure chat is open in v3
+            if (root.getAttribute("data-variant") === "v3") {
+              root.setAttribute("data-chat-open", "true");
+            }
+            // place caret at end
+            ta.setSelectionRange(ta.value.length, ta.value.length);
+          });
+        });
+
+        // ---- Voice button mock ----
+        const voiceBtn = document.getElementById("voice-btn");
+        voiceBtn.addEventListener("click", () => {
+          if (voiceBtn.classList.contains("recording")) {
+            voiceBtn.classList.remove("recording");
+            showToast("Recording stopped");
+            return;
+          }
+          voiceBtn.classList.add("recording");
+          showToast("Listening… (mock 2s)");
+          setTimeout(() => {
+            voiceBtn.classList.remove("recording");
+            const ta = document.getElementById("composer-input");
+            ta.value = "Add a sentence about her pencil grip in the metal insets work.";
+            ta.focus();
+          }, 2000);
+        });
+
+        // ---- Composer auto-grow + send ----
+        const ta = document.getElementById("composer-input");
+        ta.addEventListener("input", () => {
+          ta.style.height = "auto";
+          ta.style.height = Math.min(120, ta.scrollHeight) + "px";
+        });
+
+        function sendMessage() {
+          const text = ta.value.trim();
+          if (!text) return;
+          const userMsg = document.createElement("div");
+          userMsg.className = "msg msg-user";
+          userMsg.innerHTML = `<div class="bubble">${text.replace(/</g, "&lt;")}</div>`;
+          document.getElementById("chat-scroll").appendChild(userMsg);
+          ta.value = "";
+          ta.style.height = "auto";
+
+          // mock AI thinking → reply
+          const thinking = document.createElement("div");
+          thinking.className = "msg msg-ai";
+          thinking.innerHTML =
+            '<div class="avatar">✦</div><div class="body"><div class="thinking"><span></span><span></span><span></span></div></div>';
+          document.getElementById("chat-scroll").appendChild(thinking);
+          thinking.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+          setTimeout(() => {
+            thinking.querySelector(".body").innerHTML =
+              '<span class="typing">Looking at today\'s observations for that…</span>';
+            setTimeout(() => {
+              thinking.querySelector(".body").innerHTML =
+                "Got it — I'll surface a proposal in the Afternoon section once I cross-reference your voice notes from 1:30 PM. (Mock response in this prototype.)";
+              thinking.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }, 1100);
+          }, 700);
+        }
+
+        document.getElementById("send-btn").addEventListener("click", sendMessage);
+        ta.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+          }
+        });
+
+        // ---- Submit for review: animate status pill ----
+        document.getElementById("submit-btn").addEventListener("click", () => {
+          const pill = document.getElementById("status-pill");
+          pill.classList.remove("draft");
+          pill.classList.add("submitted");
+          pill.innerHTML = '<span class="dot"></span>Submitted for review';
+          showToast("Submitted to lead teacher", 2400);
+        });
+
+        // ---- Reply chips: insert into composer ----
+        document.querySelectorAll(".reply-chip").forEach((chip) => {
+          chip.addEventListener("click", () => {
+            ta.value = chip.textContent.trim();
+            ta.focus();
+            sendMessage();
+          });
+        });
+
+        // ---- Saved-meta freshener ----
+        function updateSavedMeta() {
+          document.getElementById("saved-meta").textContent = "Saved just now";
+          clearTimeout(updateSavedMeta._t);
+          updateSavedMeta._t = setTimeout(() => {
+            document.getElementById("saved-meta").textContent = "Saved 1 min ago";
+          }, 60000);
+        }
+
+        // ---- Click outside ghost-edit (when contenteditable) — collapse to non-edit ----
+        document.addEventListener("click", (e) => {
+          document.querySelectorAll('.ghost-edit-text[contenteditable="true"]').forEach((el) => {
+            if (!el.contains(e.target) && !e.target.closest(".ghost-edit")) {
+              el.removeAttribute("contenteditable");
+            }
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
