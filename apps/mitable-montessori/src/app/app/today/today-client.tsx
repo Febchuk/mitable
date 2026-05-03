@@ -1,44 +1,77 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowUpRight, ChevronRight } from "lucide-react";
-import { CHILDREN, findChild, initialsFor } from "@/components/montessori/data";
+import { initialsFor } from "@/components/montessori/data";
+import type { Tone } from "@/components/montessori/data";
 import { PageHeader, cardHeaderStyle, cardStyle } from "@/components/montessori/page-header";
-import { Avatar, HandCheck, HandUnderline } from "@/components/montessori/primitives";
-import { useMontessori } from "@/components/montessori/store";
+import { Avatar, HandUnderline } from "@/components/montessori/primitives";
+import type { CapturedTodayEntry, DraftReport, TodayAttendance } from "@/lib/queries/today";
 
-const TODAY_LABEL = "Tuesday · April 30";
+const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
 
-export default function TodayClient({ firstName }: { firstName: string | null }) {
-  const store = useMontessori();
-  const router = useRouter();
-  const presentKids = CHILDREN.filter((c) => c.present);
-  const observations = store.chat.filter((m) => m.type === "observation");
-  const captured = observations.slice(-4).reverse();
-  const drafts = store.reports.filter((r) => r.status === "draft");
+function toneFor(id: string): Tone {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return TONES[Math.abs(h) % TONES.length];
+}
 
-  const goChat = () => {
-    if (window.matchMedia("(min-width: 1024px)").matches) {
-      store.setWebChatMode("open");
-    } else {
-      router.push("/app/chat");
-    }
-  };
+function todayLabel(dateString: string): string {
+  try {
+    const d = new Date(dateString + "T00:00:00");
+    return d.toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return dateString;
+  }
+}
 
+function timeOfDay(): "morning" | "afternoon" | "evening" {
+  const h = new Date().getHours();
+  if (h < 12) return "morning";
+  if (h < 18) return "afternoon";
+  return "evening";
+}
+
+function shortTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+export default function TodayClient({
+  firstName,
+  attendance,
+  captured,
+  drafts,
+}: {
+  firstName: string | null;
+  attendance: TodayAttendance;
+  captured: CapturedTodayEntry[];
+  drafts: DraftReport[];
+}) {
   const greetingName = firstName?.trim() || "there";
+  const greeting = `Good ${timeOfDay()}`;
+  const dateLabel = todayLabel(attendance.date);
+
+  const presentStudents = attendance.students.filter((s) => s.status === "present");
+  const placeholderCount = Math.max(0, attendance.totalStudents - presentStudents.length);
 
   return (
     <div>
       {/* Mobile-only header — replaces the desktop "Today" PageHeader */}
-      <div
-        className="lg:hidden"
-        style={{
-          padding: "26px 22px 10px",
-        }}
-      >
+      <div className="lg:hidden" style={{ padding: "26px 22px 10px" }}>
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
-          {TODAY_LABEL}
+          {dateLabel}
         </div>
         <h1
           style={{
@@ -50,7 +83,7 @@ export default function TodayClient({ firstName }: { firstName: string | null })
             lineHeight: 1.1,
           }}
         >
-          Good morning,{" "}
+          {greeting},{" "}
           <span
             className="font-display"
             style={{
@@ -62,24 +95,31 @@ export default function TodayClient({ firstName }: { firstName: string | null })
             {greetingName}
           </span>
         </h1>
-        <div
-          style={{
-            marginTop: 14,
-            fontSize: 15,
-            color: "var(--color-ink-secondary)",
-            lineHeight: 1.45,
-          }}
-        >
-          The work cycle started 22 minutes ago.
-        </div>
+        {attendance.classroomName && (
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: 15,
+              color: "var(--color-ink-secondary)",
+              lineHeight: 1.45,
+            }}
+          >
+            {attendance.classroomName} · {attendance.totalStudents}{" "}
+            {attendance.totalStudents === 1 ? "child" : "children"} on the roster.
+          </div>
+        )}
       </div>
 
-      {/* Desktop header — hidden on mobile, where the block above takes its place */}
+      {/* Desktop header */}
       <div className="hidden lg:block">
         <PageHeader
-          overline={TODAY_LABEL}
+          overline={dateLabel}
           title="Today"
-          subtitle="Work cycle started 22 minutes ago."
+          subtitle={
+            attendance.classroomName
+              ? `${attendance.classroomName} · ${attendance.totalStudents} children on the roster.`
+              : "No active classroom yet."
+          }
         />
       </div>
 
@@ -88,21 +128,24 @@ export default function TodayClient({ firstName }: { firstName: string | null })
         style={{ padding: "16px 24px 60px" }}
       >
         <div>
-          <button
-            type="button"
+          {/* Attendance card */}
+          <Link
+            href="/app/attendance"
             className="tap"
-            onClick={() => router.push("/app/roster")}
             style={{
               width: "100%",
               textAlign: "left",
               ...cardStyle,
               padding: 0,
               cursor: "pointer",
+              display: "block",
+              color: "inherit",
+              textDecoration: "none",
             }}
           >
             <div className="card-header-borderless-mobile" style={cardHeaderStyle}>
               <div className="label-cap" style={{ color: "var(--color-ink-secondary)" }}>
-                Primrose Room
+                {attendance.classroomName ?? "No classroom"}
               </div>
               <span
                 style={{
@@ -122,19 +165,29 @@ export default function TodayClient({ firstName }: { firstName: string | null })
               <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                 <span
                   className="font-numeric"
-                  style={{ fontSize: 40, fontWeight: 600, color: "var(--color-ink)" }}
+                  style={{
+                    fontSize: 40,
+                    fontWeight: 600,
+                    color: "var(--color-ink)",
+                  }}
                 >
-                  {presentKids.length}
+                  {attendance.presentCount}
                 </span>
                 <span style={{ fontSize: 14, color: "var(--color-ink-secondary)" }}>
-                  of {CHILDREN.length} children present
+                  of {attendance.totalStudents}{" "}
+                  {attendance.totalStudents === 1 ? "child" : "children"} present
                 </span>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                {presentKids.map((c) => (
-                  <Avatar key={c.id} initials={initialsFor(c.name)} tone={c.tone} size={30} />
+                {presentStudents.map((s) => (
+                  <Avatar
+                    key={s.id}
+                    initials={initialsFor(s.preferredName || s.fullName)}
+                    tone={toneFor(s.id)}
+                    size={30}
+                  />
                 ))}
-                {Array.from({ length: CHILDREN.length - presentKids.length }).map((_, k) => (
+                {Array.from({ length: placeholderCount }).map((_, k) => (
                   <div
                     key={`a${k}`}
                     style={{
@@ -148,45 +201,7 @@ export default function TodayClient({ firstName }: { firstName: string | null })
                 ))}
               </div>
             </div>
-          </button>
-
-          {store.pendingObs > 0 && (
-            <button
-              type="button"
-              className="tap anim-fade-in"
-              onClick={goChat}
-              style={{
-                width: "100%",
-                textAlign: "left",
-                background: "var(--color-terracotta-soft)",
-                border: "1px solid #E8C0AE",
-                borderRadius: 16,
-                padding: 16,
-                marginTop: 14,
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontWeight: 600,
-                    fontSize: 15,
-                    color: "var(--color-ink)",
-                    marginBottom: 2,
-                  }}
-                >
-                  {store.pendingObs} observation{store.pendingObs > 1 ? "s" : ""} awaiting in chat
-                </div>
-                <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
-                  Tap chat below to review and approve.
-                </div>
-              </div>
-              <ChevronRight size={18} strokeWidth={1.5} />
-            </button>
-          )}
+          </Link>
 
           {/* Mobile-only: section label sits OUTSIDE the card */}
           <div
@@ -199,8 +214,8 @@ export default function TodayClient({ firstName }: { firstName: string | null })
             Captured today
           </div>
 
+          {/* Captured today card */}
           <div style={{ ...cardStyle, marginTop: 0 }} className="lg:!mt-[18px]">
-            {/* Desktop-only: in-card header with summary count */}
             <div
               className="hidden lg:flex"
               style={{
@@ -214,7 +229,7 @@ export default function TodayClient({ firstName }: { firstName: string | null })
                 Captured today
               </div>
               <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
-                {observations.length} observations · {store.pendingObs} awaiting in chat
+                {captured.length} {captured.length === 1 ? "entry" : "entries"}
               </span>
             </div>
             {captured.length === 0 && (
@@ -226,29 +241,26 @@ export default function TodayClient({ firstName }: { firstName: string | null })
                   textAlign: "center",
                 }}
               >
-                Nothing yet. Tap chat to capture an observation.
+                Nothing captured yet today.
               </div>
             )}
-            {captured.map((r, i) => {
-              if (r.type !== "observation") return null;
-              const child = findChild(r.childId);
-              const isPrivate = r.area === "Private note";
+            {captured.map((row, i) => {
+              const display = row.studentPreferredName || row.studentName;
               return (
-                <div
-                  key={r.id}
+                <Link
+                  key={`${row.kind}-${row.id}`}
+                  href={`/app/children/${row.studentId}`}
                   style={{
                     display: "flex",
                     alignItems: "flex-start",
                     gap: 12,
                     padding: "14px 18px",
                     borderTop: i ? "1px solid var(--color-border)" : "none",
+                    color: "inherit",
+                    textDecoration: "none",
                   }}
                 >
-                  <Avatar
-                    initials={child ? initialsFor(child.name) : "··"}
-                    tone={child ? child.tone : "clay"}
-                    size={32}
-                  />
+                  <Avatar initials={initialsFor(display)} tone={toneFor(row.studentId)} size={32} />
                   <div
                     style={{
                       flex: 1,
@@ -259,73 +271,26 @@ export default function TodayClient({ firstName }: { firstName: string | null })
                     }}
                   >
                     <div>
-                      <span style={{ fontWeight: 600 }}>{child ? child.name : ""}</span>{" "}
-                      <span style={{ color: "var(--color-ink-secondary)" }}>{r.body}</span>
+                      <span style={{ fontWeight: 600 }}>{display}</span>{" "}
+                      <span style={{ color: "var(--color-ink-secondary)" }}>{row.comment}</span>
                     </div>
-                    {(isPrivate || r.subtopic) && (
-                      <div
-                        style={{
-                          marginTop: 2,
-                          fontSize: 12,
-                          color: "var(--color-ink-muted)",
-                        }}
-                      >
-                        {isPrivate
-                          ? "Private note · not shared with family"
-                          : `${r.area} · ${r.level}`}
-                      </div>
-                    )}
+                    <div style={{ marginTop: 2, fontSize: 12, color: "var(--color-ink-muted)" }}>
+                      {row.kind === "curriculum" ? "Curriculum" : "Whole child"} ·{" "}
+                      {row.contextLabel} · {shortTime(row.createdAt)}
+                    </div>
                   </div>
-                  {r.status === "pending" ? (
-                    <>
-                      {/* Mobile: small "pending" pill */}
-                      <span
-                        className="lg:hidden"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          fontSize: 11,
-                          color: "var(--color-terracotta-deep)",
-                          background: "var(--color-terracotta-soft)",
-                          borderRadius: 999,
-                          padding: "3px 10px",
-                          fontWeight: 500,
-                          flexShrink: 0,
-                        }}
-                      >
-                        pending
-                      </span>
-                      {/* Desktop: "in chat ↗" link to open the chat dock */}
-                      <button
-                        type="button"
-                        className="tap hidden lg:inline-flex"
-                        onClick={goChat}
-                        style={{
-                          alignItems: "center",
-                          gap: 4,
-                          fontSize: 12,
-                          color: "var(--color-terracotta-deep)",
-                          background: "var(--color-terracotta-soft)",
-                          borderRadius: 8,
-                          padding: "4px 10px",
-                          fontWeight: 500,
-                          border: 0,
-                          flexShrink: 0,
-                        }}
-                      >
-                        in chat
-                        <ArrowUpRight size={12} strokeWidth={1.75} />
-                      </button>
-                    </>
-                  ) : (
-                    <HandCheck color="var(--color-sage)" size={14} />
-                  )}
-                </div>
+                  <ArrowUpRight
+                    size={14}
+                    strokeWidth={1.75}
+                    style={{ color: "var(--color-ink-muted)", flexShrink: 0, marginTop: 4 }}
+                  />
+                </Link>
               );
             })}
           </div>
         </div>
 
+        {/* Right rail: drafts + prompt card (desktop only) */}
         <div className="hidden lg:block">
           <div style={cardStyle}>
             <div style={cardHeaderStyle}>
@@ -333,7 +298,7 @@ export default function TodayClient({ firstName }: { firstName: string | null })
                 Drafts
               </div>
               <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
-                {drafts.length} daily reports
+                {drafts.length} {drafts.length === 1 ? "report" : "reports"}
               </span>
             </div>
             {drafts.length === 0 && (
@@ -348,49 +313,35 @@ export default function TodayClient({ firstName }: { firstName: string | null })
                 All caught up.
               </div>
             )}
-            {drafts.map((d) => {
-              const child = findChild(d.childId);
-              return (
-                <div
-                  key={d.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "14px 18px",
-                    borderTop: "1px solid var(--color-border)",
-                  }}
-                >
-                  <Avatar
-                    initials={child ? initialsFor(child.name) : "··"}
-                    tone={child ? child.tone : "clay"}
-                    size={28}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{child ? child.name : ""}</div>
-                    <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-                      Daily report · {d.when}
-                    </div>
+            {drafts.map((d) => (
+              <Link
+                key={d.id}
+                href={`/app/reports/${d.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "14px 18px",
+                  borderTop: "1px solid var(--color-border)",
+                  color: "inherit",
+                  textDecoration: "none",
+                }}
+              >
+                <Avatar
+                  initials={initialsFor(d.studentName)}
+                  tone={toneFor(d.studentId)}
+                  size={28}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{d.studentName}</div>
+                  <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
+                    {d.reportType === "daily" ? "Daily report" : "Major report"}
+                    {d.title ? ` · ${d.title}` : ""}
                   </div>
-                  <button
-                    type="button"
-                    className="tap"
-                    onClick={() => store.approveReport(d.id)}
-                    style={{
-                      background: "var(--color-terracotta)",
-                      color: "var(--color-surface)",
-                      border: 0,
-                      borderRadius: 8,
-                      padding: "5px 10px",
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Send
-                  </button>
                 </div>
-              );
-            })}
+                <ChevronRight size={14} strokeWidth={1.5} />
+              </Link>
+            ))}
           </div>
           <div
             style={{

@@ -1,0 +1,94 @@
+- generic [ref=e1]:
+    - generic [ref=e2]:
+        - complementary [ref=e3]:
+            - generic [ref=e4]:
+                - generic [ref=e5]: Mitable
+                - generic [ref=e6]: Montessori
+            - generic [ref=e7]:
+                - generic [ref=e8]: C
+                - generic [ref=e9]:
+                    - generic [ref=e10]: Cypress Room
+                    - generic [ref=e11]: 18 children
+                - img [ref=e12]
+            - navigation [ref=e14]:
+                - link "Today" [ref=e15] [cursor=pointer]:
+                    - /url: /app/today
+                    - img [ref=e16]
+                    - generic [ref=e18]: Today
+                - link "Roster" [ref=e19] [cursor=pointer]:
+                    - /url: /app/roster
+                    - img [ref=e20]
+                    - generic [ref=e25]: Roster
+                - link "Curriculum" [ref=e26] [cursor=pointer]:
+                    - /url: /app/curriculum
+                    - img [ref=e27]
+                    - generic [ref=e29]: Curriculum
+                - link "Progress" [ref=e30] [cursor=pointer]:
+                    - /url: /app/progress
+                    - img [ref=e31]
+                    - generic [ref=e33]: Progress
+                - link "Attendance" [ref=e34] [cursor=pointer]:
+                    - /url: /app/attendance
+                    - img [ref=e35]
+                    - generic [ref=e37]: Attendance
+                - link "Reports 4" [ref=e38] [cursor=pointer]:
+                    - /url: /app/reports
+                    - img [ref=e39]
+                    - generic [ref=e41]: Reports
+                    - generic [ref=e42]: "4"
+            - button "Online" [ref=e45] [cursor=pointer]:
+                - img [ref=e46]
+                - text: Online
+            - generic [ref=e50]:
+                - generic [ref=e51]: TE
+                - generic [ref=e52]:
+                    - generic [ref=e53]: teacher@example.school
+                    - generic [ref=e54]: Lead guide
+                - button "Account menu" [ref=e56] [cursor=pointer]:
+                    - generic [ref=e57]: T
+        - main [ref=e59]:
+            - generic [ref=e60]:
+                - button "Online" [ref=e61] [cursor=pointer]:
+                    - img [ref=e62]
+                    - text: Online
+                - button "Account menu" [ref=e67] [cursor=pointer]:
+                    - generic [ref=e68]: T
+            - generic [ref=e69]:
+                - generic [ref=e70]:
+                    - link "All children" [ref=e72] [cursor=pointer]:
+                        - /url: /app/roster
+                        - img [ref=e73]
+                        - generic [ref=e75]: All children
+                    - generic [ref=e76]:
+                        - generic [ref=e77]:
+                            - generic [ref=e78]: AO
+                            - generic [ref=e79]:
+                                - generic [ref=e80]:
+                                    - heading "Ada Okafor" [level=1] [ref=e81]
+                                    - button "About this view" [ref=e83] [cursor=pointer]:
+                                        - img [ref=e84]
+                                - generic [ref=e87]:
+                                    - generic [ref=e88]: 6y 4m
+                                    - generic [ref=e90]: Cypress Room
+                                    - generic [ref=e92]: Enrolled 2024-09-03
+                        - generic [ref=e94]:
+                            - button "+ New observation" [ref=e95] [cursor=pointer]
+                            - button "Edit" [ref=e96] [cursor=pointer]
+                            - button "Generate report" [ref=e97] [cursor=pointer]
+                - tablist "Detail view" [ref=e99]:
+                    - tab "Whole child" [ref=e100] [cursor=pointer]
+                    - tab "Curriculum" [active] [selected] [ref=e101] [cursor=pointer]
+                    - tab "Activity" [ref=e102] [cursor=pointer]
+                - generic [ref=e230]:
+                    - generic [ref=e231]: Curriculum progress
+                    - heading "Subtopic mastery" [level=2] [ref=e233]
+                - generic [ref=e235]:
+                    - generic [ref=e236]: No curriculum progress yet
+                    - generic [ref=e237]: Once you record progress on any subtopic, it will show up here organised by topic.
+    - button "Ask Mitable 2" [ref=e214] [cursor=pointer]:
+        - img [ref=e216]
+        - generic [ref=e218]: Ask Mitable
+        - generic [ref=e219]: "2"
+    - button "Open Next.js Dev Tools" [ref=e225] [cursor=pointer]:
+        - img [ref=e226]
+    - alert [ref=e229]

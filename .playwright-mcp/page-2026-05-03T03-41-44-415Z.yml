@@ -1,0 +1,167 @@
+- generic [active] [ref=e1]:
+    - generic [ref=e2]:
+        - complementary [ref=e3]:
+            - generic [ref=e4]:
+                - generic [ref=e5]: Mitable
+                - generic [ref=e6]: Montessori
+            - generic [ref=e7]:
+                - generic [ref=e8]: C
+                - generic [ref=e9]:
+                    - generic [ref=e10]: Cypress Room
+                    - generic [ref=e11]: 18 children
+                - img [ref=e12]
+            - navigation [ref=e14]:
+                - link "Today" [ref=e15] [cursor=pointer]:
+                    - /url: /app/today
+                    - img [ref=e16]
+                    - generic [ref=e18]: Today
+                - link "Roster" [ref=e19] [cursor=pointer]:
+                    - /url: /app/roster
+                    - img [ref=e20]
+                    - generic [ref=e25]: Roster
+                - link "Curriculum" [ref=e26] [cursor=pointer]:
+                    - /url: /app/curriculum
+                    - img [ref=e27]
+                    - generic [ref=e29]: Curriculum
+                - link "Progress" [ref=e30] [cursor=pointer]:
+                    - /url: /app/progress
+                    - img [ref=e31]
+                    - generic [ref=e33]: Progress
+                - link "Attendance" [ref=e34] [cursor=pointer]:
+                    - /url: /app/attendance
+                    - img [ref=e35]
+                    - generic [ref=e37]: Attendance
+                - link "Reports 4" [ref=e38] [cursor=pointer]:
+                    - /url: /app/reports
+                    - img [ref=e39]
+                    - generic [ref=e41]: Reports
+                    - generic [ref=e42]: "4"
+            - button "Online" [ref=e45] [cursor=pointer]:
+                - img [ref=e46]
+                - text: Online
+            - generic [ref=e50]:
+                - generic [ref=e51]: TE
+                - generic [ref=e52]:
+                    - generic [ref=e53]: teacher@example.school
+                    - generic [ref=e54]: Lead guide
+                - button "Account menu" [ref=e56] [cursor=pointer]:
+                    - generic [ref=e57]: T
+        - main [ref=e59]:
+            - generic [ref=e60]:
+                - button "Online" [ref=e61] [cursor=pointer]:
+                    - img [ref=e62]
+                    - text: Online
+                - button "Account menu" [ref=e67] [cursor=pointer]:
+                    - generic [ref=e68]: T
+            - generic [ref=e69]:
+                - generic [ref=e70]:
+                    - generic [ref=e71]: Cypress Room · 10 children
+                    - heading "Roster" [level=1] [ref=e74]
+                - generic [ref=e76]:
+                    - generic [ref=e77]:
+                        - generic [ref=e78]: Child
+                        - generic [ref=e79]: Age
+                        - generic [ref=e80]: Enrolled
+                        - generic [ref=e81]: Family
+                    - link "AO Ada Okafor 6y 4m Sep 2024 2 guardians" [ref=e83] [cursor=pointer]:
+                        - /url: /app/children/c397e1e2-42b9-4be4-944e-2fec1b0604d6
+                        - generic [ref=e84]:
+                            - generic [ref=e85]: AO
+                            - generic [ref=e86]: Ada Okafor
+                        - generic [ref=e87]: 6y 4m
+                        - generic [ref=e88]: Sep 2024
+                        - generic [ref=e89]: 2 guardians
+                        - img [ref=e90]
+                    - link "BH Bilal Hassan 4y 10m Sep 2024 1 guardian" [ref=e92] [cursor=pointer]:
+                        - /url: /app/children/a6411087-449d-4710-8385-99e02aa60336
+                        - generic [ref=e93]:
+                            - generic [ref=e94]: BH
+                            - generic [ref=e95]: Bilal Hassan
+                        - generic [ref=e96]: 4y 10m
+                        - generic [ref=e97]: Sep 2024
+                        - generic [ref=e98]: 1 guardian
+                        - img [ref=e99]
+                    - link "C Cami 3y 5m Sep 2024 2 guardians" [ref=e101] [cursor=pointer]:
+                        - /url: /app/children/144b4eca-8f9e-4ae2-b9d8-d10a110e1cd1
+                        - generic [ref=e102]:
+                            - generic [ref=e103]: C
+                            - generic [ref=e104]: Cami
+                        - generic [ref=e105]: 3y 5m
+                        - generic [ref=e106]: Sep 2024
+                        - generic [ref=e107]: 2 guardians
+                        - img [ref=e108]
+                    - link "DC Daiyu Chen 6y 0m Sep 2024 1 guardian" [ref=e110] [cursor=pointer]:
+                        - /url: /app/children/b8a9a854-7e60-48b8-8076-eb5e3a627d47
+                        - generic [ref=e111]:
+                            - generic [ref=e112]: DC
+                            - generic [ref=e113]: Daiyu Chen
+                        - generic [ref=e114]: 6y 0m
+                        - generic [ref=e115]: Sep 2024
+                        - generic [ref=e116]: 1 guardian
+                        - img [ref=e117]
+                    - link "EL Eitan Levi 4y 8m Sep 2024 2 guardians" [ref=e119] [cursor=pointer]:
+                        - /url: /app/children/0efc38e4-62ea-4bf2-8087-e5c31d9b1852
+                        - generic [ref=e120]:
+                            - generic [ref=e121]: EL
+                            - generic [ref=e122]: Eitan Levi
+                        - generic [ref=e123]: 4y 8m
+                        - generic [ref=e124]: Sep 2024
+                        - generic [ref=e125]: 2 guardians
+                        - img [ref=e126]
+                    - link "FN Farida Ndiaye 4y 2m Sep 2024 1 guardian" [ref=e128] [cursor=pointer]:
+                        - /url: /app/children/99e3440e-0edd-4d28-bbed-82b856682651
+                        - generic [ref=e129]:
+                            - generic [ref=e130]: FN
+                            - generic [ref=e131]: Farida Ndiaye
+                        - generic [ref=e132]: 4y 2m
+                        - generic [ref=e133]: Sep 2024
+                        - generic [ref=e134]: 1 guardian
+                        - img [ref=e135]
+                    - link "GH Gus Hansen 5y 9m Sep 2024 2 guardians" [ref=e137] [cursor=pointer]:
+                        - /url: /app/children/68476b6a-4281-4c03-83c8-73b4ef7bf321
+                        - generic [ref=e138]:
+                            - generic [ref=e139]: GH
+                            - generic [ref=e140]: Gus Hansen
+                        - generic [ref=e141]: 5y 9m
+                        - generic [ref=e142]: Sep 2024
+                        - generic [ref=e143]: 2 guardians
+                        - img [ref=e144]
+                    - link "HS Hina Shah 4y 4m Sep 2024 1 guardian" [ref=e146] [cursor=pointer]:
+                        - /url: /app/children/ba58795c-e06b-4b84-8c33-2b235d60bf96
+                        - generic [ref=e147]:
+                            - generic [ref=e148]: HS
+                            - generic [ref=e149]: Hina Shah
+                        - generic [ref=e150]: 4y 4m
+                        - generic [ref=e151]: Sep 2024
+                        - generic [ref=e152]: 1 guardian
+                        - img [ref=e153]
+                    - link "IJ Idris Jallow 4y 0m Sep 2024 2 guardians" [ref=e155] [cursor=pointer]:
+                        - /url: /app/children/bb93ffe4-eb22-430b-90c0-fb5b9c10d00f
+                        - generic [ref=e156]:
+                            - generic [ref=e157]: IJ
+                            - generic [ref=e158]: Idris Jallow
+                        - generic [ref=e159]: 4y 0m
+                        - generic [ref=e160]: Sep 2024
+                        - generic [ref=e161]: 2 guardians
+                        - img [ref=e162]
+                    - link "LP Lina Petrov 5y 6m Sep 2024 1 guardian" [ref=e164] [cursor=pointer]:
+                        - /url: /app/children/52808b58-a339-44b9-83e7-d081730a4d9d
+                        - generic [ref=e165]:
+                            - generic [ref=e166]: LP
+                            - generic [ref=e167]: Lina Petrov
+                        - generic [ref=e168]: 5y 6m
+                        - generic [ref=e169]: Sep 2024
+                        - generic [ref=e170]: 1 guardian
+                        - img [ref=e171]
+    - button "Ask Mitable 2" [ref=e173] [cursor=pointer]:
+        - img [ref=e175]
+        - generic [ref=e177]: Ask Mitable
+        - generic [ref=e178]: "2"
+    - generic [ref=e179]:
+        - img [ref=e181]
+        - generic [ref=e184]:
+            - generic [ref=e185]: Install Mitable
+            - generic [ref=e186]: Add to home screen for offline capture.
+        - button "Install" [ref=e187] [cursor=pointer]
+        - button [ref=e188] [cursor=pointer]:
+            - img [ref=e189]

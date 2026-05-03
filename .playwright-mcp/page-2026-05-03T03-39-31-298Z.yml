@@ -1,0 +1,266 @@
+- generic [active] [ref=e1]:
+    - generic [ref=e2]:
+        - complementary [ref=e3]:
+            - generic [ref=e4]:
+                - generic [ref=e5]: Mitable
+                - generic [ref=e6]: Montessori
+            - generic [ref=e7]:
+                - generic [ref=e8]: C
+                - generic [ref=e9]:
+                    - generic [ref=e10]: Cypress Room
+                    - generic [ref=e11]: 18 children
+                - img [ref=e12]
+            - navigation [ref=e14]:
+                - link "Today" [ref=e15] [cursor=pointer]:
+                    - /url: /app/today
+                    - img [ref=e16]
+                    - generic [ref=e18]: Today
+                - link "Roster" [ref=e19] [cursor=pointer]:
+                    - /url: /app/roster
+                    - img [ref=e20]
+                    - generic [ref=e25]: Roster
+                - link "Curriculum" [ref=e26] [cursor=pointer]:
+                    - /url: /app/curriculum
+                    - img [ref=e27]
+                    - generic [ref=e29]: Curriculum
+                - link "Progress" [ref=e30] [cursor=pointer]:
+                    - /url: /app/progress
+                    - img [ref=e31]
+                    - generic [ref=e33]: Progress
+                - link "Attendance" [ref=e34] [cursor=pointer]:
+                    - /url: /app/attendance
+                    - img [ref=e35]
+                    - generic [ref=e37]: Attendance
+                - link "Reports 4" [ref=e38] [cursor=pointer]:
+                    - /url: /app/reports
+                    - img [ref=e39]
+                    - generic [ref=e41]: Reports
+                    - generic [ref=e42]: "4"
+            - button "Online" [ref=e45] [cursor=pointer]:
+                - img [ref=e46]
+                - text: Online
+            - generic [ref=e50]:
+                - generic [ref=e51]: TE
+                - generic [ref=e52]:
+                    - generic [ref=e53]: teacher@example.school
+                    - generic [ref=e54]: Lead guide
+                - button "Account menu" [ref=e56] [cursor=pointer]:
+                    - generic [ref=e57]: T
+        - main [ref=e59]:
+            - generic [ref=e60]:
+                - button "Online" [ref=e61] [cursor=pointer]:
+                    - img [ref=e62]
+                    - text: Online
+                - button "Account menu" [ref=e67] [cursor=pointer]:
+                    - generic [ref=e68]: T
+            - generic [ref=e69]:
+                - generic [ref=e70]:
+                    - generic [ref=e71]: Primrose Room · 18 children
+                    - generic [ref=e72]:
+                        - heading "Roster" [level=1] [ref=e74]
+                        - button [ref=e76] [cursor=pointer]:
+                            - img [ref=e77]
+                - generic [ref=e81]:
+                    - button "All" [ref=e82] [cursor=pointer]
+                    - button "Present today" [ref=e83] [cursor=pointer]
+                    - button "Reports due this week" [ref=e84] [cursor=pointer]
+                    - button "New this term" [ref=e85] [cursor=pointer]
+                - generic [ref=e87]:
+                    - generic [ref=e88]:
+                        - generic [ref=e89]: Child
+                        - generic [ref=e90]: Age
+                        - generic [ref=e91]: Enrolled
+                        - generic [ref=e92]: Latest observation
+                        - generic [ref=e93]: Family
+                    - link "AO Ada Okafor 4y 7m Sept 2024 Pink tower · 8:42a 2 guardians" [ref=e95] [cursor=pointer]:
+                        - /url: /app/children/ada
+                        - generic [ref=e96]:
+                            - generic [ref=e97]: AO
+                            - generic [ref=e98]: Ada Okafor
+                        - generic [ref=e99]: 4y 7m
+                        - generic [ref=e100]: Sept 2024
+                        - generic [ref=e101]: Pink tower · 8:42a
+                        - generic [ref=e102]: 2 guardians
+                        - img [ref=e103]
+                    - link "BC Bea Chen 3y 11m Sept 2024 Number rods · yesterday 1 guardian" [ref=e105] [cursor=pointer]:
+                        - /url: /app/children/bea
+                        - generic [ref=e106]:
+                            - generic [ref=e107]: BC
+                            - generic [ref=e108]: Bea Chen
+                        - generic [ref=e109]: 3y 11m
+                        - generic [ref=e110]: Sept 2024
+                        - generic [ref=e111]: Number rods · yesterday
+                        - generic [ref=e112]: 1 guardian
+                        - img [ref=e113]
+                    - link "DR Diego Ramos 5y 2m Aug 2023 Map of Africa · yesterday 2 guardians" [ref=e115] [cursor=pointer]:
+                        - /url: /app/children/dgo
+                        - generic [ref=e116]:
+                            - generic [ref=e117]: DR
+                            - generic [ref=e118]: Diego Ramos
+                        - generic [ref=e119]: 5y 2m
+                        - generic [ref=e120]: Aug 2023
+                        - generic [ref=e121]: Map of Africa · yesterday
+                        - generic [ref=e122]: 2 guardians
+                        - img [ref=e123]
+                    - link "EO Eli Okonkwo 4y 1m Jan 2025 Metal insets · 8:20a 2 guardians" [ref=e125] [cursor=pointer]:
+                        - /url: /app/children/eli
+                        - generic [ref=e126]:
+                            - generic [ref=e127]: EO
+                            - generic [ref=e128]: Eli Okonkwo
+                        - generic [ref=e129]: 4y 1m
+                        - generic [ref=e130]: Jan 2025
+                        - generic [ref=e131]: Metal insets · 8:20a
+                        - generic [ref=e132]: 2 guardians
+                        - img [ref=e133]
+                    - link "IM Iris Moreau 3y 9m Sept 2024 Pouring · this morning 1 guardian" [ref=e135] [cursor=pointer]:
+                        - /url: /app/children/iris
+                        - generic [ref=e136]:
+                            - generic [ref=e137]: IM
+                            - generic [ref=e138]: Iris Moreau
+                        - generic [ref=e139]: 3y 9m
+                        - generic [ref=e140]: Sept 2024
+                        - generic [ref=e141]: Pouring · this morning
+                        - generic [ref=e142]: 1 guardian
+                        - img [ref=e143]
+                    - link "KN Kai Nakamura 4y 4m Sept 2024 Trinomial cube · yesterday 2 guardians" [ref=e145] [cursor=pointer]:
+                        - /url: /app/children/kai
+                        - generic [ref=e146]:
+                            - generic [ref=e147]: KN
+                            - generic [ref=e148]: Kai Nakamura
+                        - generic [ref=e149]: 4y 4m
+                        - generic [ref=e150]: Sept 2024
+                        - generic [ref=e151]: Trinomial cube · yesterday
+                        - generic [ref=e152]: 2 guardians
+                        - img [ref=e153]
+                    - link "LS Levi Schwartz 3y 6m Mar 2026 Sandpaper letters · 8:30a 1 guardian" [ref=e155] [cursor=pointer]:
+                        - /url: /app/children/levi
+                        - generic [ref=e156]:
+                            - generic [ref=e157]: LS
+                            - generic [ref=e158]: Levi Schwartz
+                        - generic [ref=e159]: 3y 6m
+                        - generic [ref=e160]: Mar 2026
+                        - generic [ref=e161]: Sandpaper letters · 8:30a
+                        - generic [ref=e162]: 1 guardian
+                        - img [ref=e163]
+                    - link "MK Mira Khan 4y 9m Sept 2024 Teen board · 8:14a 2 guardians" [ref=e165] [cursor=pointer]:
+                        - /url: /app/children/mira
+                        - generic [ref=e166]:
+                            - generic [ref=e167]: MK
+                            - generic [ref=e168]: Mira Khan
+                        - generic [ref=e169]: 4y 9m
+                        - generic [ref=e170]: Sept 2024
+                        - generic [ref=e171]: Teen board · 8:14a
+                        - generic [ref=e172]: 2 guardians
+                        - img [ref=e173]
+                    - link "NH Noor Habib 3y 8m Sept 2024 Practical life · this week 2 guardians" [ref=e175] [cursor=pointer]:
+                        - /url: /app/children/noor
+                        - generic [ref=e176]:
+                            - generic [ref=e177]: NH
+                            - generic [ref=e178]: Noor Habib
+                        - generic [ref=e179]: 3y 8m
+                        - generic [ref=e180]: Sept 2024
+                        - generic [ref=e181]: Practical life · this week
+                        - generic [ref=e182]: 2 guardians
+                        - img [ref=e183]
+                    - link "RT Ren Tanaka 4y 11m Sept 2023 Geometry cabinet · this week 1 guardian" [ref=e185] [cursor=pointer]:
+                        - /url: /app/children/ren
+                        - generic [ref=e186]:
+                            - generic [ref=e187]: RT
+                            - generic [ref=e188]: Ren Tanaka
+                        - generic [ref=e189]: 4y 11m
+                        - generic [ref=e190]: Sept 2023
+                        - generic [ref=e191]: Geometry cabinet · this week
+                        - generic [ref=e192]: 1 guardian
+                        - img [ref=e193]
+                    - link "PM Pia Marin 4y 0m Sept 2024 Botany puzzle · yesterday 2 guardians" [ref=e195] [cursor=pointer]:
+                        - /url: /app/children/pia
+                        - generic [ref=e196]:
+                            - generic [ref=e197]: PM
+                            - generic [ref=e198]: Pia Marin
+                        - generic [ref=e199]: 4y 0m
+                        - generic [ref=e200]: Sept 2024
+                        - generic [ref=e201]: Botany puzzle · yesterday
+                        - generic [ref=e202]: 2 guardians
+                        - img [ref=e203]
+                    - link "TW Tom Walsh 3y 7m Sept 2024 Dressing frame · this morning 1 guardian" [ref=e205] [cursor=pointer]:
+                        - /url: /app/children/tom
+                        - generic [ref=e206]:
+                            - generic [ref=e207]: TW
+                            - generic [ref=e208]: Tom Walsh
+                        - generic [ref=e209]: 3y 7m
+                        - generic [ref=e210]: Sept 2024
+                        - generic [ref=e211]: Dressing frame · this morning
+                        - generic [ref=e212]: 1 guardian
+                        - img [ref=e213]
+                    - link "FN Fin Nilsson 4y 6m Sept 2024 Knobless cylinders · yesterday 2 guardians" [ref=e215] [cursor=pointer]:
+                        - /url: /app/children/fin
+                        - generic [ref=e216]:
+                            - generic [ref=e217]: FN
+                            - generic [ref=e218]: Fin Nilsson
+                        - generic [ref=e219]: 4y 6m
+                        - generic [ref=e220]: Sept 2024
+                        - generic [ref=e221]: Knobless cylinders · yesterday
+                        - generic [ref=e222]: 2 guardians
+                        - img [ref=e223]
+                    - link "VL Val Lopez 3y 10m Sept 2024 Land/water/air · this week 2 guardians" [ref=e225] [cursor=pointer]:
+                        - /url: /app/children/val
+                        - generic [ref=e226]:
+                            - generic [ref=e227]: VL
+                            - generic [ref=e228]: Val Lopez
+                        - generic [ref=e229]: 3y 10m
+                        - generic [ref=e230]: Sept 2024
+                        - generic [ref=e231]: Land/water/air · this week
+                        - generic [ref=e232]: 2 guardians
+                        - img [ref=e233]
+                    - link "RC Rui Costa 4y 3m Sept 2024 Movable alphabet · Mon 2 guardians" [ref=e235] [cursor=pointer]:
+                        - /url: /app/children/rui
+                        - generic [ref=e236]:
+                            - generic [ref=e237]: RC
+                            - generic [ref=e238]: Rui Costa
+                        - generic [ref=e239]: 4y 3m
+                        - generic [ref=e240]: Sept 2024
+                        - generic [ref=e241]: Movable alphabet · Mon
+                        - generic [ref=e242]: 2 guardians
+                        - img [ref=e243]
+                    - link "JP Jen Park 4y 8m Sept 2024 Stamp game · last week 1 guardian" [ref=e245] [cursor=pointer]:
+                        - /url: /app/children/jen
+                        - generic [ref=e246]:
+                            - generic [ref=e247]: JP
+                            - generic [ref=e248]: Jen Park
+                        - generic [ref=e249]: 4y 8m
+                        - generic [ref=e250]: Sept 2024
+                        - generic [ref=e251]: Stamp game · last week
+                        - generic [ref=e252]: 1 guardian
+                        - img [ref=e253]
+                    - link "OH Oli Hassan 5y 0m Sept 2023 Continent map · last week 2 guardians" [ref=e255] [cursor=pointer]:
+                        - /url: /app/children/oli
+                        - generic [ref=e256]:
+                            - generic [ref=e257]: OH
+                            - generic [ref=e258]: Oli Hassan
+                        - generic [ref=e259]: 5y 0m
+                        - generic [ref=e260]: Sept 2023
+                        - generic [ref=e261]: Continent map · last week
+                        - generic [ref=e262]: 2 guardians
+                        - img [ref=e263]
+                    - link "SW Sam Wright 3y 5m Mar 2026 Spooning · this week 1 guardian" [ref=e265] [cursor=pointer]:
+                        - /url: /app/children/sam
+                        - generic [ref=e266]:
+                            - generic [ref=e267]: SW
+                            - generic [ref=e268]: Sam Wright
+                        - generic [ref=e269]: 3y 5m
+                        - generic [ref=e270]: Mar 2026
+                        - generic [ref=e271]: Spooning · this week
+                        - generic [ref=e272]: 1 guardian
+                        - img [ref=e273]
+    - button "Ask Mitable 2" [ref=e275] [cursor=pointer]:
+        - img [ref=e277]
+        - generic [ref=e279]: Ask Mitable
+        - generic [ref=e280]: "2"
+    - generic [ref=e281]:
+        - img [ref=e283]
+        - generic [ref=e286]:
+            - generic [ref=e287]: Install Mitable
+            - generic [ref=e288]: Add to home screen for offline capture.
+        - button "Install" [ref=e289] [cursor=pointer]
+        - button [ref=e290] [cursor=pointer]:
+            - img [ref=e291]

@@ -1,0 +1,177 @@
+- generic [ref=e1]:
+    - generic [ref=e2]:
+        - complementary [ref=e3]:
+            - generic [ref=e4]:
+                - generic [ref=e5]: Mitable
+                - generic [ref=e6]: Montessori
+            - generic [ref=e7]:
+                - generic [ref=e8]: C
+                - generic [ref=e9]:
+                    - generic [ref=e10]: Cypress Room
+                    - generic [ref=e11]: 18 children
+                - img [ref=e12]
+            - navigation [ref=e14]:
+                - link "Today" [ref=e15] [cursor=pointer]:
+                    - /url: /app/today
+                    - img [ref=e16]
+                    - generic [ref=e18]: Today
+                - link "Roster" [ref=e19] [cursor=pointer]:
+                    - /url: /app/roster
+                    - img [ref=e20]
+                    - generic [ref=e25]: Roster
+                - link "Curriculum" [ref=e26] [cursor=pointer]:
+                    - /url: /app/curriculum
+                    - img [ref=e27]
+                    - generic [ref=e29]: Curriculum
+                - link "Progress" [ref=e30] [cursor=pointer]:
+                    - /url: /app/progress
+                    - img [ref=e31]
+                    - generic [ref=e33]: Progress
+                - link "Attendance" [ref=e34] [cursor=pointer]:
+                    - /url: /app/attendance
+                    - img [ref=e35]
+                    - generic [ref=e37]: Attendance
+                - link "Reports 4" [ref=e38] [cursor=pointer]:
+                    - /url: /app/reports
+                    - img [ref=e39]
+                    - generic [ref=e41]: Reports
+                    - generic [ref=e42]: "4"
+            - button "Online" [ref=e45] [cursor=pointer]:
+                - img [ref=e46]
+                - text: Online
+            - generic [ref=e50]:
+                - generic [ref=e51]: TE
+                - generic [ref=e52]:
+                    - generic [ref=e53]: teacher@example.school
+                    - generic [ref=e54]: Lead guide
+                - button "Account menu" [ref=e56] [cursor=pointer]:
+                    - generic [ref=e57]: T
+        - main [ref=e59]:
+            - generic [ref=e60]:
+                - button "Online" [ref=e61] [cursor=pointer]:
+                    - img [ref=e62]
+                    - text: Online
+                - button "Account menu" [ref=e67] [cursor=pointer]:
+                    - generic [ref=e68]: T
+            - generic [ref=e69]:
+                - generic [ref=e70]:
+                    - link "All children" [ref=e72] [cursor=pointer]:
+                        - /url: /app/roster
+                        - img [ref=e73]
+                        - generic [ref=e75]: All children
+                    - generic [ref=e76]:
+                        - generic [ref=e77]:
+                            - generic [ref=e78]: AO
+                            - generic [ref=e79]:
+                                - generic [ref=e80]:
+                                    - heading "Ada Okafor" [level=1] [ref=e81]
+                                    - button "About this view" [ref=e83] [cursor=pointer]:
+                                        - img [ref=e84]
+                                - generic [ref=e87]:
+                                    - generic [ref=e88]: 6y 4m
+                                    - generic [ref=e90]: Cypress Room
+                                    - generic [ref=e92]: Enrolled 2024-09-03
+                        - generic [ref=e94]:
+                            - button "+ New observation" [ref=e95] [cursor=pointer]
+                            - button "Edit" [ref=e96] [cursor=pointer]
+                            - button "Generate report" [ref=e97] [cursor=pointer]
+                - tablist "Detail view" [ref=e99]:
+                    - tab "Whole child" [ref=e100] [cursor=pointer]
+                    - tab "Curriculum" [ref=e101] [cursor=pointer]
+                    - tab "Activity" [active] [selected] [ref=e102] [cursor=pointer]
+                - generic [ref=e238]:
+                    - generic [ref=e239]: Activity
+                    - generic [ref=e240]:
+                        - heading "All observations" [level=2] [ref=e241]
+                        - generic [ref=e242]: every material, every cycle
+                - generic [ref=e244]:
+                    - generic [ref=e245]:
+                        - generic [ref=e246]: Activity feed
+                        - generic [ref=e247]: Curriculum + whole-child events
+                        - generic [ref=e248]: 21 entries total
+                    - generic [ref=e249]:
+                        - generic [ref=e250]:
+                            - generic [ref=e251]:
+                                - generic [ref=e252]: Curriculum · Sensorial
+                                - generic "2026-05-03T03:32:11.16+00:00" [ref=e253]: today
+                            - generic [ref=e254]:
+                                - text: Worked on
+                                - strong [ref=e255]: Pink Tower
+                            - generic [ref=e256]: Built it correctly on first try — third return this week.
+                            - generic [ref=e258]: Jordan Teacher
+                        - generic [ref=e259]:
+                            - generic [ref=e260]:
+                                - generic [ref=e261]: Curriculum · Mathematics
+                                - generic "2026-05-01T03:32:11.346+00:00" [ref=e262]: 2 days ago
+                            - generic [ref=e263]:
+                                - text: Worked on
+                                - strong [ref=e264]: Number Rods
+                            - generic [ref=e265]: Sequenced 11 through 16 unprompted.
+                            - generic [ref=e267]: Jordan Teacher
+                        - generic [ref=e268]:
+                            - generic [ref=e269]:
+                                - generic [ref=e270]: Whole child · Self-Correction
+                                - generic "2026-04-30T03:32:05.801+00:00" [ref=e271]: 3 days ago
+                            - generic [ref=e272]: Caught her own missing-cube on the pink tower without prompt — explained the control of error to a younger child. Bumping to Leading.
+                            - generic [ref=e273]:
+                                - generic [ref=e274]:
+                                    - generic [ref=e275]: Deepening
+                                    - generic [ref=e276]: →
+                                    - generic [ref=e277]: Leading
+                                - generic [ref=e278]: Jordan Teacher
+                        - generic [ref=e279]:
+                            - generic [ref=e280]:
+                                - generic [ref=e281]: Curriculum · Sensorial
+                                - generic "2026-04-29T03:32:11.46+00:00" [ref=e282]: 4 days ago
+                            - generic [ref=e283]:
+                                - text: Worked on
+                                - strong [ref=e284]: Brown Stair
+                            - generic [ref=e285]: Paired with pink tower — noticed the missing dimension.
+                            - generic [ref=e287]: Jordan Teacher
+                        - generic [ref=e288]:
+                            - generic [ref=e289]:
+                                - generic [ref=e290]: Curriculum · Practical Life
+                                - generic "2026-04-27T03:32:11.563+00:00" [ref=e291]: 6 days ago
+                            - generic [ref=e292]:
+                                - text: Worked on
+                                - strong [ref=e293]: Buttoning frame
+                            - generic [ref=e294]: Buttoned top to bottom; did not ask for help.
+                            - generic [ref=e296]: Jordan Teacher
+                        - generic [ref=e297]:
+                            - generic [ref=e298]:
+                                - generic [ref=e299]: Whole child · Motivation
+                                - generic "2026-04-27T03:32:05.92+00:00" [ref=e300]: 6 days ago
+                            - generic [ref=e301]: Sequenced 11–16 on her own initiative, asked to bring out the teen board the next day. Initiation is broadening past Sensorial.
+                            - generic [ref=e302]:
+                                - generic [ref=e303]:
+                                    - generic [ref=e304]: Practicing
+                                    - generic [ref=e305]: →
+                                    - generic [ref=e306]: Deepening
+                                - generic [ref=e307]: Jordan Teacher
+                        - generic [ref=e308]:
+                            - generic [ref=e309]:
+                                - generic [ref=e310]: Whole child · Concentration
+                                - generic "2026-04-26T03:32:06.104+00:00" [ref=e311]: 1 weeks ago
+                            - generic [ref=e312]: 27-minute work cycle on knobless cylinders. No reset. Confirms Practicing — not yet Deepening (still resets after lunch transition).
+                            - generic [ref=e313]:
+                                - generic [ref=e314]: Confirms current
+                                - generic [ref=e315]: Jordan Teacher
+                        - generic [ref=e316]:
+                            - generic [ref=e317]:
+                                - generic [ref=e318]: Curriculum · Cultural
+                                - generic "2026-04-24T03:32:11.682+00:00" [ref=e319]: 1 weeks ago
+                            - generic [ref=e320]:
+                                - text: Worked on
+                                - strong [ref=e321]: "Puzzle Map: World"
+                            - generic [ref=e322]: First presentation. Held the puzzle map for a long time.
+                            - generic [ref=e323]:
+                                - generic [ref=e324]: → Introduced
+                                - generic [ref=e325]: Jordan Teacher
+                    - button "Load 8 more" [ref=e326] [cursor=pointer]
+    - button "Ask Mitable 2" [ref=e214] [cursor=pointer]:
+        - img [ref=e216]
+        - generic [ref=e218]: Ask Mitable
+        - generic [ref=e219]: "2"
+    - button "Open Next.js Dev Tools" [ref=e225] [cursor=pointer]:
+        - img [ref=e226]
+    - alert [ref=e229]

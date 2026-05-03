@@ -1,0 +1,1786 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mitable Montessori — Progress · bulk capture prototype</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Caveat:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+
+    <style>
+      :root {
+        /* verbatim from globals.css */
+        --color-canvas: #faf6ee;
+        --color-surface: #fffbf3;
+        --color-muted: #f2ede0;
+        --color-ink: #2a2723;
+        --color-ink-secondary: #5c544a;
+        --color-ink-muted: #9c9285;
+        --color-border: #e0d8c8;
+        --color-border-strong: #b89880;
+        --color-terracotta: #c46a4f;
+        --color-terracotta-soft: #f4ddd2;
+        --color-terracotta-deep: #a24a3d;
+        --color-sage: #7a9b7a;
+        --color-sage-soft: #dde7da;
+        --color-sage-deep: #3f5c40;
+        --color-butter: #e8c56a;
+        --color-butter-soft: #f6e8b8;
+        --color-butter-deep: #7a5c0f;
+        --color-dusty-blue: #6b8aa6;
+        --color-dusty-blue-soft: #d2dce5;
+        --color-clay: #b89880;
+        --color-clay-soft: #e5d8c8;
+
+        --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+        --font-display: "Caveat", ui-serif, serif;
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        background: var(--color-canvas);
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      body::before {
+        content: "";
+        position: fixed; inset: 0;
+        pointer-events: none; z-index: 0;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      }
+
+      .label-cap {
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .font-display { font-family: var(--font-display); font-weight: 500; }
+      .font-numeric { font-variant-numeric: tabular-nums; }
+
+      button { font-family: inherit; cursor: pointer; }
+
+      .tap {
+        transition:
+          transform 120ms ease,
+          background 120ms ease,
+          opacity 120ms ease,
+          box-shadow 160ms ease,
+          border-color 120ms ease;
+      }
+      .tap:active { transform: scale(0.97); }
+
+      .scroll-quiet::-webkit-scrollbar { width: 6px; height: 6px; }
+      .scroll-quiet::-webkit-scrollbar-thumb { background: var(--color-clay-soft); border-radius: 999px; }
+      .scroll-quiet::-webkit-scrollbar-track { background: transparent; }
+
+      @keyframes slide-up { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes pop-in { 0% { transform: scale(0.85); opacity: 0; } 70% { transform: scale(1.04); } 100% { transform: scale(1); opacity: 1; } }
+      @keyframes toast-in { from { transform: translate(-50%, -8px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+      @keyframes cell-flip { 0% { transform: scale(0.7); opacity: 0.4; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+
+      .anim-slide-up { animation: slide-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      .anim-fade-in { animation: fade-in 180ms ease both; }
+      .anim-pop-in { animation: pop-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      .anim-cell-flip { animation: cell-flip 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+      .shell { position: relative; z-index: 1; min-height: 100vh; }
+
+      /* ---------- topbar (verbatim from Child Detail.html) ---------- */
+      .topbar {
+        position: sticky; top: 0; z-index: 50;
+        background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+        backdrop-filter: saturate(140%) blur(8px);
+        border-bottom: 1px solid var(--color-border);
+      }
+      .topbar-inner {
+        max-width: 1280px; margin: 0 auto;
+        padding: 10px 24px;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 16px;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; color: var(--color-ink); }
+      .brand-mark {
+        width: 22px; height: 22px; border-radius: 6px;
+        background: var(--color-ink); color: var(--color-surface);
+        display: grid; place-items: center;
+        font-family: var(--font-display); font-size: 18px; line-height: 1; padding-bottom: 2px;
+      }
+      .tabs { display: inline-flex; gap: 0; background: var(--color-muted); padding: 3px; border-radius: 999px; }
+      .tab { font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 999px; background: transparent; color: var(--color-ink-secondary); border: 0; }
+      .tab[data-active="true"] { background: var(--color-surface); color: var(--color-ink); box-shadow: 0 1px 2px rgba(42, 39, 35, 0.06); }
+
+      .variant-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--color-ink-secondary); }
+      .variant-toggle .label-cap { color: var(--color-ink-muted); }
+      .variant-pills { display: inline-flex; background: var(--color-muted); border-radius: 999px; padding: 3px; }
+      .variant-pill { font-size: 11px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: transparent; color: var(--color-ink-secondary); border: 0; }
+      .variant-pill[data-active="true"] { background: var(--color-surface); color: var(--color-ink); box-shadow: 0 1px 2px rgba(42, 39, 35, 0.06); }
+
+      /* ---------- viewport frames ---------- */
+      .viewport-web, .viewport-mobile { max-width: 1280px; margin: 0 auto; padding: 24px; }
+      .viewport-web .frame { background: var(--color-canvas); border: 1px solid var(--color-border); border-radius: 16px; overflow: hidden; }
+      .viewport-mobile { display: flex; justify-content: center; }
+      .phone {
+        width: 390px; height: 844px;
+        background: var(--color-canvas);
+        border: 8px solid #1c1a17; border-radius: 44px;
+        box-shadow: 0 30px 80px rgba(42, 39, 35, 0.18), 0 8px 24px rgba(42, 39, 35, 0.08);
+        overflow: hidden; position: relative;
+      }
+      .phone-content { height: 100%; overflow-y: auto; overflow-x: hidden; }
+      .phone-notch { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 110px; height: 28px; background: #1c1a17; border-radius: 999px; z-index: 60; }
+
+      /* ---------- card primitives ---------- */
+      .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px; }
+
+      /* ---------- matrix cell (sheets-style: touching, hairline borders) ----------
+         All cells in sheet mode share borders with neighbors; we render the
+         right + bottom border on each cell, and the wrapper draws the top + left
+         outer edge. Selected = inset ink ring (status color preserved underneath). */
+      .cell {
+        width: 100%; height: 100%;
+        background: transparent;
+        position: relative;
+        cursor: pointer;
+        transition: background 240ms ease, box-shadow 120ms ease;
+        display: block;
+        border: 0;
+        padding: 0;
+        /* hairline interior gridlines */
+        box-shadow:
+          inset -1px 0 0 var(--color-border),
+          inset 0 -1px 0 var(--color-border);
+      }
+      .cell[data-state="m"] { background: var(--color-sage); }
+      .cell[data-state="p"] { background: var(--color-butter); }
+      .cell[data-state="i"] { background: var(--color-clay); }
+      .cell[data-state="-"] { background: var(--color-surface); }
+      .cell:hover:not([data-selected="true"]) {
+        box-shadow:
+          inset -1px 0 0 var(--color-border),
+          inset 0 -1px 0 var(--color-border),
+          inset 0 0 0 2px color-mix(in srgb, var(--color-ink) 35%, transparent);
+      }
+      /* Selected cells: every selected cell paints an ink ring on all four
+         sides. On sides that face another selected cell we draw 1px (so
+         neighbor's 1px + ours = 2px, matching the outer edges). On sides
+         that face unselected territory we draw 2px directly. The result
+         is a uniform 2px ink line all around any contiguous selection. */
+      .cell[data-selected="true"] {
+        z-index: 1;
+        --et: 1px;
+        --er: 1px;
+        --eb: 1px;
+        --el: 1px;
+        box-shadow:
+          inset 0 var(--et) 0 var(--color-ink),
+          inset calc(-1 * var(--er)) 0 0 var(--color-ink),
+          inset 0 calc(-1 * var(--eb)) 0 var(--color-ink),
+          inset var(--el) 0 0 var(--color-ink);
+      }
+      .cell[data-selected="true"][data-edge-t="true"] { --et: 2px; }
+      .cell[data-selected="true"][data-edge-r="true"] { --er: 2px; }
+      .cell[data-selected="true"][data-edge-b="true"] { --eb: 2px; }
+      .cell[data-selected="true"][data-edge-l="true"] { --el: 2px; }
+      .cell:focus-visible {
+        z-index: 2;
+        outline: 2px solid var(--color-ink);
+        outline-offset: -2px;
+      }
+
+      /* sheet-grid wrapper: draws top + left outer borders so the matrix
+         feels enclosed; rounded outer corners keep the warm card aesthetic.
+         Set overflow + max-height so sticky first-row / first-column cells
+         can pin against the wrapper's scroll viewport. */
+      .sheet-grid {
+        border-top: 1px solid var(--color-border);
+        border-left: 1px solid var(--color-border);
+        border-radius: 10px;
+        background: var(--color-surface);
+        overflow: auto;
+      }
+      /* Frozen first column (subtopic labels) and first row (child names).
+         z-index ladder: corner > row-header > col-header > regular cells. */
+      .sg-corner {
+        position: sticky;
+        top: 0; left: 0;
+        z-index: 5;
+      }
+      .sg-col-header {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+      }
+      .sg-row-header {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+      }
+
+      /* ---------- left labels (subtopic rows) ---------- */
+      .row-label {
+        text-align: right;
+        padding: 0 14px 0 0;
+        font-size: 12.5px;
+        color: var(--color-ink-secondary);
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 120ms ease, background 120ms ease;
+        border-radius: 6px;
+        line-height: 1.2;
+      }
+      .row-label:hover, .row-label[data-armed="true"] { color: var(--color-ink); }
+      .row-label[data-armed="true"] { background: var(--color-muted); }
+
+      /* ---------- top labels (children columns) ---------- */
+      .col-label {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-ink-secondary);
+        line-height: 1.1;
+        cursor: pointer;
+        padding-bottom: 4px;
+        max-height: 96px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        transition: color 120ms ease, background 120ms ease;
+        border-radius: 6px;
+      }
+      .col-label:hover, .col-label[data-armed="true"] { color: var(--color-ink); }
+      .col-label[data-armed="true"] { background: var(--color-muted); }
+      .col-label[data-absent="true"] { opacity: 0.4; }
+
+      /* ---------- bulk apply bar (web: floating bottom-center) ---------- */
+      @keyframes bar-in {
+        from { transform: translate(-50%, 12px); opacity: 0; }
+        to   { transform: translate(-50%, 0);    opacity: 1; }
+      }
+      .bulk-bar {
+        position: absolute;
+        left: 50%; bottom: 24px;
+        transform: translateX(-50%);
+        z-index: 40;
+        background: var(--color-ink);
+        color: var(--color-surface);
+        border-radius: 18px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        box-shadow: 0 24px 50px rgba(42, 39, 35, 0.28), 0 8px 16px rgba(42, 39, 35, 0.12);
+        animation: bar-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        width: min(720px, calc(100% - 48px));
+      }
+      .bulk-bar-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .bulk-bar .count {
+        font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+        white-space: nowrap;
+        padding-right: 12px;
+        border-right: 1px solid rgba(255,251,243,0.16);
+      }
+      .bulk-bar .picker { display: flex; gap: 6px; flex: 1; }
+      .status-btn {
+        font-size: 12px; font-weight: 500;
+        padding: 7px 11px; border-radius: 999px;
+        background: rgba(255,251,243,0.10);
+        color: rgba(255,251,243,0.92);
+        border: 1px solid transparent;
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      .status-btn:hover { background: rgba(255,251,243,0.18); }
+      .status-btn[data-state="m"] .swatch { background: var(--color-sage); }
+      .status-btn[data-state="p"] .swatch { background: var(--color-butter); }
+      .status-btn[data-state="i"] .swatch { background: var(--color-clay); }
+      .status-btn[data-state="-"] .swatch { background: transparent; border: 1px dashed rgba(255,251,243,0.5); }
+      .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+      .bulk-bar textarea {
+        background: rgba(255,251,243,0.08);
+        border: 1px solid rgba(255,251,243,0.14);
+        color: var(--color-surface);
+        font-family: var(--font-display);
+        font-size: 18px; font-weight: 500;
+        padding: 10px 12px;
+        border-radius: 10px;
+        resize: none;
+        flex: 1; width: 100%; min-height: 44px; max-height: 88px;
+        line-height: 1.3;
+      }
+      .bulk-bar textarea::placeholder { color: rgba(255,251,243,0.45); font-family: var(--font-display); }
+      .bulk-bar textarea:focus { outline: none; border-color: rgba(255,251,243,0.45); }
+
+      .bulk-bar .actions { display: flex; gap: 8px; align-items: center; }
+      .ghost-btn {
+        background: transparent;
+        border: 1px solid rgba(255,251,243,0.22);
+        color: rgba(255,251,243,0.92);
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12.5px; font-weight: 500;
+      }
+      .ghost-btn:hover { background: rgba(255,251,243,0.08); }
+      .primary-light {
+        background: var(--color-surface);
+        color: var(--color-ink);
+        border: 1px solid var(--color-surface);
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 12.5px; font-weight: 600;
+        white-space: nowrap;
+      }
+
+      /* ---------- mobile selection capsule (non-blocking, top-anchored) ----------
+         Sits above the home indicator, lets the matrix below stay draggable.
+         The full configure sheet only opens when the user taps Apply. */
+      .selection-capsule {
+        position: absolute;
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 65;
+        background: var(--color-ink);
+        color: rgba(255,251,243,0.92);
+        border-radius: 999px;
+        padding: 6px 6px 6px 12px;
+        display: flex; align-items: center; gap: 10px;
+        box-shadow: 0 14px 30px rgba(42, 39, 35, 0.32), 0 4px 10px rgba(42, 39, 35, 0.16);
+        font-size: 13px;
+        max-width: calc(100% - 32px);
+      }
+      .selection-capsule strong {
+        font-weight: 600;
+      }
+
+      /* ---------- mobile bottom sheet ---------- */
+      .sheet-backdrop {
+        position: absolute; inset: 0;
+        background: rgba(42, 39, 35, 0.32);
+        z-index: 70;
+        animation: fade-in 160ms ease both;
+      }
+      .sheet {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        background: var(--color-surface);
+        border-top-left-radius: 22px; border-top-right-radius: 22px;
+        padding: 14px 18px 24px;
+        box-shadow: 0 -10px 30px rgba(42, 39, 35, 0.22);
+        animation: slide-up 220ms cubic-bezier(0.2,0.8,0.2,1) both;
+        z-index: 71;
+        max-height: 80%;
+        overflow-y: auto;
+      }
+      .sheet-grip {
+        width: 36px; height: 4px;
+        background: var(--color-border-strong);
+        border-radius: 999px;
+        margin: 0 auto 12px;
+        opacity: 0.55;
+      }
+
+      /* ---------- popover (note details) ---------- */
+      .note-popover {
+        position: absolute;
+        z-index: 30;
+        background: var(--color-ink);
+        color: var(--color-surface);
+        padding: 12px 14px;
+        border-radius: 12px;
+        font-size: 12.5px;
+        line-height: 1.45;
+        box-shadow: 0 18px 40px rgba(42, 39, 35, 0.22), 0 6px 14px rgba(42, 39, 35, 0.12);
+        max-width: 240px;
+        animation: pop-in 200ms cubic-bezier(0.2,0.8,0.2,1) both;
+      }
+      .note-popover .label-cap { color: rgba(255, 251, 243, 0.55); margin-bottom: 4px; display: block; }
+      .note-popover .body { font-family: var(--font-display); font-size: 17px; line-height: 1.25; padding-top: 4px; }
+
+      /* ---------- legend ---------- */
+      .legend-row {
+        display: flex; gap: 18px; flex-wrap: wrap;
+        font-size: 12px; color: var(--color-ink-secondary);
+        align-items: center;
+      }
+      .legend-chip { display: inline-flex; align-items: center; gap: 7px; }
+      .legend-square {
+        width: 13px; height: 13px; border-radius: 4px;
+        border: 1px solid var(--color-border);
+      }
+      .legend-square[data-state="m"] { background: var(--color-sage); border-color: var(--color-sage); }
+      .legend-square[data-state="p"] { background: var(--color-butter); border-color: var(--color-butter); }
+      .legend-square[data-state="i"] { background: var(--color-clay); border-color: var(--color-clay); }
+      .legend-square[data-state="-"] { background: transparent; border: 1px dashed var(--color-border); }
+
+      /* ---------- toast host ---------- */
+      .toast-host {
+        position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+        z-index: 9999;
+        display: flex; flex-direction: column; gap: 10px;
+        pointer-events: none;
+      }
+      .toast {
+        background: var(--color-ink); color: var(--color-surface);
+        padding: 10px 14px 10px 12px; border-radius: 12px;
+        display: flex; align-items: center; gap: 10px;
+        box-shadow: 0 18px 40px rgba(42,39,35,0.25), 0 6px 14px rgba(42,39,35,0.12);
+        font-size: 13px; font-weight: 500;
+        animation: toast-in 200ms cubic-bezier(0.2,0.8,0.2,1) both;
+        max-width: 360px; pointer-events: auto;
+      }
+
+      /* ---------- side panel (V2) ---------- */
+      .side-panel {
+        background: var(--color-surface);
+        border-left: 1px solid var(--color-border);
+        height: 100%;
+        overflow-y: auto;
+      }
+
+      /* ---------- recent updates entry ---------- */
+      .ru-entry {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--color-border);
+        align-items: flex-start;
+      }
+      .ru-entry:last-child { border-bottom: 0; }
+
+      /* ---------- record-lesson CTA (V3) ---------- */
+      .record-cta {
+        background: var(--color-terracotta);
+        color: var(--color-surface);
+        border: 1.5px solid var(--color-terracotta);
+        padding: 12px 18px;
+        border-radius: 14px;
+        font-size: 13px; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 10px;
+        box-shadow: 0 6px 14px rgba(196, 106, 79, 0.25);
+      }
+      .record-cta:hover { background: var(--color-terracotta-deep); border-color: var(--color-terracotta-deep); }
+      .record-cta[data-armed="true"] {
+        background: var(--color-ink); border-color: var(--color-ink);
+        box-shadow: 0 6px 14px rgba(42, 39, 35, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="env,react">
+      /* ============================================================
+         ASSUMPTIONS & REASONING (Junior Designer pass · 2026-05-02)
+         ============================================================
+         What this is:
+           Bulk-capture explorer for the Progress page. Today's page is
+           read-only; this prototype tries the interaction of recording
+           lessons across many children at once.
+
+         Why squares not circles:
+           Larger tap targets, and rectangular cells read as a "grid of
+           slots" inviting batch action. Circles read as static status.
+
+         Why subtopics-as-rows (flipped from today's page):
+           Stable horizontal labels (no rotated text); rows scan as
+           "where is the whole class on Pink tower?", which is the
+           question a teacher asks when planning. 18 child columns
+           fit a ~1280px frame at 32px each.
+
+         Why one note per bulk action:
+           Matches teacher narration ("all four did Pink tower today").
+           Per-cell editing is friction we don't need.
+
+         Why the bulk note surfaces N times in recent updates:
+           Each child's record is the unit of family-facing truth. A
+           bulk action is an authoring shortcut, not a stored entity —
+           the four cells log four separate updates that happen to
+           share text.
+
+         Color tokens:
+           Unchanged. sage = mastered, butter = practicing, clay =
+           introduced, transparent dashed = not started.
+
+         Variants:
+           V1 Quiet grid — minimum chrome, matrix carries the page.
+           V2 Lesson planner — left filter rail + right recent-updates
+             panel; the planner who sits down for 10 minutes.
+           V3 Quick capture — big "Record lesson" CTA pre-stages
+             selection mode; subtopic-row-first; thumb-reachable sheet.
+
+         Open: cmd-Z undo, area filtering on V1/V3 (intentionally
+           dropped — V2 is the "I want filters" variant), and any
+           multi-day backdating UI. All deferred.
+         ============================================================ */
+
+      const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+      /* ---------- data (verbatim from data.ts) ---------- */
+      // Sensorial is the verbatim 12 from data.ts; the other three areas are
+      // plausible Montessori curriculum extensions for the prototype.
+      const SUBTOPICS_BY_TOPIC = {
+        "Sensorial": [
+          "Pink tower", "Brown stair", "Red rods", "Cylinder blocks",
+          "Binomial cube", "Trinomial cube", "Geometric solids",
+          "Smelling jars", "Sound cylinders", "Color tablets",
+          "Touch boards", "Thermic tablets",
+        ],
+        "Practical Life": [
+          "Pouring water", "Spooning", "Tweezers transfer", "Dressing frame",
+          "Folding cloths", "Polishing", "Washing hands", "Sweeping",
+          "Table setting", "Flower arranging", "Care of plants",
+        ],
+        "Language": [
+          "Sandpaper letters", "Movable alphabet", "Object boxes",
+          "Phonetic reading", "Puzzle words", "Reading folders",
+          "Function of words", "Reading classification", "Story sequencing",
+          "Picture stories",
+        ],
+        "Math": [
+          "Number rods", "Sandpaper numerals", "Spindle box",
+          "Cards & counters", "Teen board", "Ten board", "Hundred board",
+          "Golden bead intro", "Stamp game", "Bead chains",
+          "Multiplication board", "Division board",
+        ],
+      };
+      const TOPICS = Object.keys(SUBTOPICS_BY_TOPIC);
+      // Back-compat alias for any spot still referencing SUBTOPICS as a flat list.
+      const SUBTOPICS = SUBTOPICS_BY_TOPIC["Sensorial"];
+
+      // Short Montessori-flavored descriptions that appear in the row-label
+      // info popover. Voice matches the teacher copy in INITIAL_CHAT.
+      const SUBTOPIC_INFO = {
+        "Pink tower":         "Ten graduated pink cubes, smallest 1 cm, largest 10 cm. Builds visual discrimination of size and refines hand control as the child stacks the tower from largest to smallest.",
+        "Brown stair":        "Ten rectangular prisms, varying in two dimensions. Child arranges them by thickness, refining visual judgement of width and depth.",
+        "Red rods":           "Ten red rods graduated in length from 10 cm to 1 m. Prepares the child for the Number rods in math by isolating length as a single varying quantity.",
+        "Cylinder blocks":    "Four wooden blocks of cylinders varying in diameter, height, or both. Child matches each cylinder to its socket — a built-in control of error.",
+        "Binomial cube":      "Eight blocks representing (a+b)³. A sensorial preparation for algebra; child reassembles the cube using the color-coded pattern as a guide.",
+        "Trinomial cube":     "Twenty-seven blocks representing (a+b+c)³. Extension of the binomial cube; deepens spatial reasoning and pattern recognition.",
+        "Geometric solids":   "A set of ten three-dimensional forms (sphere, cube, cone, cylinder, etc.). Child names them and finds matches in the environment.",
+        "Smelling jars":      "Pairs of identical jars containing scents (clove, mint, lavender). Child matches pairs by smell; refines olfactory discrimination.",
+        "Sound cylinders":    "Two boxes of sealed cylinders each containing a different sound. Child matches and grades by loudness; a precursor to musical training.",
+        "Color tablets":      "Boxes of paired and graded color tablets. Child matches identical pairs, then grades shades from light to dark within a single hue.",
+        "Touch boards":       "Pairs of rough and smooth surfaces. Eyes closed, child traces with two fingers and discriminates texture — preparation for sandpaper letters.",
+        "Thermic tablets":    "Pairs of metal, wood, glass, and stone tablets. Child matches pairs by warmth; refines thermic sense.",
+
+        "Pouring water":      "Child pours from one pitcher into another, controlling speed and stopping cleanly. The first long-loved practical-life work — develops independence and concentration.",
+        "Spooning":           "Transferring dry goods (rice, beans) between bowls with a spoon. Builds the same wrist control needed later for writing.",
+        "Tweezers transfer":  "Picking up small objects (pom-poms, beads) with tweezers. Refines pincer grip and isolates the muscles used in handwriting.",
+        "Dressing frame":     "Wooden frames with cloth fastenings — buttons, snaps, zippers, ties. Child practices the motions in isolation before doing them on themselves.",
+        "Folding cloths":     "A set of cloths with stitched lines. Child folds along the lines to make precise, repeatable creases.",
+        "Polishing":          "Polishing a small metal object (or a leaf, or a mirror). A multi-step sequence that demands order and care of materials.",
+        "Washing hands":      "A complete sequence: pour water, soap, scrub, rinse, dry, return materials. Often a child's first long sequential work.",
+        "Sweeping":           "Child uses a child-sized broom to sweep a small marked square on the floor. Care of the environment.",
+        "Table setting":      "Setting a placemat with plate, fork, knife, spoon, glass in correct positions. A real contribution to the classroom community.",
+        "Flower arranging":   "Child arranges fresh flowers in a small vase. Encourages aesthetic sensitivity and care of life.",
+        "Care of plants":     "Watering and dusting leaves of classroom plants. A daily, real responsibility that connects the child to living things.",
+
+        "Sandpaper letters":  "Letters cut from sandpaper mounted on tablets. Child traces with two fingers while saying the sound — links the sound, the muscular memory, and the visual symbol.",
+        "Movable alphabet":   "A box of cut-out letters that the child arranges to spell words phonetically — long before they can write with a pencil.",
+        "Object boxes":       "Small boxes of miniature objects whose names share a phonetic feature (cat, mat, hat). Used for early sound analysis.",
+        "Phonetic reading":   "Reading short three-letter phonetic words off cards or labels. The first transition from word-building to true reading.",
+        "Puzzle words":       "Common sight words (the, was, said) introduced as 'puzzle words' — words that don't follow phonetic rules.",
+        "Reading folders":    "Sets of labeled cards organized by phonogram (sh, ch, th). Child reads through them and matches to objects or images.",
+        "Function of words":  "Symbol-based introduction to grammar — nouns are black pyramids, verbs red circles, etc. Child analyses sentences with the symbols.",
+        "Reading classification": "Reading short paragraphs and matching them to images. The first stage of reading for meaning rather than for decoding.",
+        "Story sequencing":   "Picture cards from a familiar story arranged in order. Develops narrative thinking and oral retelling.",
+        "Picture stories":    "Child writes a short story to accompany a picture they choose. Earliest creative writing.",
+
+        "Number rods":        "Ten rods like the red rods, but with alternating red and blue segments — each rod is now also a unit of count. Bridges the sensorial impression of length to the abstract idea of quantity.",
+        "Sandpaper numerals": "Numerals 0–9 cut from sandpaper. Child traces while saying the name — same multisensory technique as sandpaper letters.",
+        "Spindle box":        "Two boxes labeled 0–9. Child counts the right number of spindles into each compartment — meets zero as 'nothing' for the first time.",
+        "Cards & counters":   "Cards 1–10 paired with the corresponding number of counters laid out in pairs. Introduces odd vs even.",
+        "Teen board":         "Wooden board with a slot showing '10'; child slides a numeral 1–9 over the zero to read 11–19. First taste of place value.",
+        "Ten board":          "Pairs of boards: ten, twenty, thirty… ninety. Child reads, then composes ('twenty-three' = 23) using bead bars.",
+        "Hundred board":      "Square board with all 100 squares; child places numbered tiles 1–100 in order. Cements the linear sequence of numbers.",
+        "Golden bead intro":  "Single beads, ten-bars, hundred-squares, thousand-cubes — the decimal system made tangible. Child handles all four categories.",
+        "Stamp game":          "Color-coded stamps for units, tens, hundreds, thousands. Child performs all four operations with the stamps before paper computation.",
+        "Bead chains":        "Long chains of bead bars representing the squares and cubes of 1–10. Child counts the entire chain and labels each multiple.",
+        "Multiplication board": "A pegboard with numbered slots. Child reads a problem (e.g. 4×6) and lays out beads in rows.",
+        "Division board":     "Similar pegboard. Child distributes beads evenly into the divisor's slots and reads the quotient.",
+      };
+
+      const CHILDREN = [
+        { id: "ada", name: "Ada Okafor", age: "4y 7m", tone: "clay", present: true },
+        { id: "bea", name: "Bea Chen", age: "3y 11m", tone: "sage", present: true },
+        { id: "dgo", name: "Diego Ramos", age: "5y 2m", tone: "butter", present: true },
+        { id: "eli", name: "Eli Okonkwo", age: "4y 1m", tone: "clay", present: true },
+        { id: "iris", name: "Iris Moreau", age: "3y 9m", tone: "blue", present: true },
+        { id: "kai", name: "Kai Nakamura", age: "4y 4m", tone: "sage", present: true },
+        { id: "levi", name: "Levi Schwartz", age: "3y 6m", tone: "butter", present: true },
+        { id: "mira", name: "Mira Khan", age: "4y 9m", tone: "sage", present: true },
+        { id: "noor", name: "Noor Habib", age: "3y 8m", tone: "clay", present: true },
+        { id: "ren", name: "Ren Tanaka", age: "4y 11m", tone: "blue", present: true },
+        { id: "pia", name: "Pia Marin", age: "4y 0m", tone: "butter", present: true },
+        { id: "tom", name: "Tom Walsh", age: "3y 7m", tone: "clay", present: true },
+        { id: "fin", name: "Fin Nilsson", age: "4y 6m", tone: "sage", present: true },
+        { id: "val", name: "Val Lopez", age: "3y 10m", tone: "blue", present: true },
+        { id: "rui", name: "Rui Costa", age: "4y 3m", tone: "butter", present: false },
+        { id: "jen", name: "Jen Park", age: "4y 8m", tone: "sage", present: false },
+        { id: "oli", name: "Oli Hassan", age: "5y 0m", tone: "clay", present: false },
+        { id: "sam", name: "Sam Wright", age: "3y 5m", tone: "blue", present: false },
+      ];
+
+      // Per-topic progress marks. Sensorial is verbatim from data.ts;
+      // others are plausible mixes generated to feel like real classroom data.
+      // Each child's array length equals the topic's subtopic count.
+      const SEEDED_BY_TOPIC = {
+        "Sensorial": {
+          ada:  ["m","m","p","m","p","i","-","m","p","i","-","-"],
+          bea:  ["m","p","p","i","-","-","-","m","p","i","-","-"],
+          dgo:  ["m","m","m","m","p","p","i","m","m","p","i","-"],
+          eli:  ["p","p","i","i","-","-","-","p","i","-","-","-"],
+          iris: ["p","i","-","-","-","-","-","i","-","-","-","-"],
+          kai:  ["m","m","p","p","m","p","i","m","m","p","p","i"],
+          levi: ["i","-","-","-","-","-","-","i","-","-","-","-"],
+          mira: ["m","m","m","m","p","p","-","m","m","m","p","i"],
+          noor: ["p","i","-","-","-","-","-","p","i","-","-","-"],
+          ren:  ["m","m","p","p","i","i","-","m","p","p","i","-"],
+          pia:  ["m","p","p","i","i","-","-","m","p","i","-","-"],
+          tom:  ["i","i","-","-","-","-","-","p","-","-","-","-"],
+          fin:  ["m","m","m","p","p","i","i","m","m","p","i","-"],
+          val:  ["p","p","i","-","-","-","-","i","-","-","-","-"],
+          rui:  ["m","p","p","i","i","-","-","p","p","i","-","-"],
+          jen:  ["m","m","p","i","-","-","-","m","p","-","-","-"],
+          oli:  ["m","m","m","p","p","p","i","m","m","p","p","-"],
+          sam:  ["-","-","-","-","-","-","-","-","-","-","-","-"],
+        },
+        // 11 subtopics. Practical Life is usually further along for older
+        // kids and earlier for the youngest — that's the texture below.
+        "Practical Life": {
+          ada:  ["m","m","m","p","p","p","m","p","i","-","-"],
+          bea:  ["m","m","p","p","p","i","m","p","i","-","-"],
+          dgo:  ["m","m","m","m","m","p","m","p","p","i","i"],
+          eli:  ["m","p","p","i","p","i","p","i","-","-","-"],
+          iris: ["m","p","i","i","-","-","p","-","-","-","-"],
+          kai:  ["m","m","p","m","p","p","m","p","p","i","-"],
+          levi: ["p","i","-","-","i","-","p","-","-","-","-"],
+          mira: ["m","m","m","p","p","p","m","p","p","i","i"],
+          noor: ["m","p","i","i","-","-","p","i","-","-","-"],
+          ren:  ["m","m","p","p","p","i","m","p","i","i","-"],
+          pia:  ["m","p","p","p","p","i","p","p","i","-","-"],
+          tom:  ["p","p","i","i","-","-","p","-","-","-","-"],
+          fin:  ["m","m","m","p","p","p","m","p","p","i","-"],
+          val:  ["p","p","i","i","-","-","p","i","-","-","-"],
+          rui:  ["m","p","p","i","p","i","m","p","i","-","-"],
+          jen:  ["m","m","p","i","p","-","m","p","-","-","-"],
+          oli:  ["m","m","m","p","p","p","m","m","p","i","i"],
+          sam:  ["i","-","-","-","-","-","i","-","-","-","-"],
+        },
+        // 10 subtopics. Language has a steeper introduction curve.
+        "Language": {
+          ada:  ["m","p","p","p","i","-","-","-","-","-"],
+          bea:  ["m","m","p","p","i","i","-","-","-","-"],
+          dgo:  ["m","m","m","m","p","p","p","i","i","-"],
+          eli:  ["p","i","i","-","-","-","-","-","-","-"],
+          iris: ["p","-","-","-","-","-","-","-","-","-"],
+          kai:  ["m","m","p","p","p","i","i","-","-","-"],
+          levi: ["i","-","-","-","-","-","-","-","-","-"],
+          mira: ["m","m","m","p","p","p","i","i","-","-"],
+          noor: ["p","i","-","-","-","-","-","-","-","-"],
+          ren:  ["m","m","p","p","i","i","-","-","-","-"],
+          pia:  ["m","p","p","i","i","-","-","-","-","-"],
+          tom:  ["i","-","-","-","-","-","-","-","-","-"],
+          fin:  ["m","m","p","p","i","i","-","-","-","-"],
+          val:  ["p","i","-","-","-","-","-","-","-","-"],
+          rui:  ["m","p","p","i","i","-","-","-","-","-"],
+          jen:  ["m","p","i","i","-","-","-","-","-","-"],
+          oli:  ["m","m","m","p","p","i","i","i","-","-"],
+          sam:  ["-","-","-","-","-","-","-","-","-","-"],
+        },
+        // 12 subtopics. Math runs longest with later subtopics rare.
+        "Math": {
+          ada:  ["m","m","p","p","i","-","-","-","-","-","-","-"],
+          bea:  ["m","p","p","p","i","i","-","-","-","-","-","-"],
+          dgo:  ["m","m","m","m","p","p","p","i","i","i","-","-"],
+          eli:  ["p","p","i","i","-","-","-","-","-","-","-","-"],
+          iris: ["i","-","-","-","-","-","-","-","-","-","-","-"],
+          kai:  ["m","m","p","p","m","p","i","i","-","-","-","-"],
+          levi: ["-","-","-","-","-","-","-","-","-","-","-","-"],
+          mira: ["m","m","m","m","p","p","p","p","i","i","-","-"],
+          noor: ["p","i","-","-","-","-","-","-","-","-","-","-"],
+          ren:  ["m","m","p","p","p","i","i","-","-","-","-","-"],
+          pia:  ["m","p","p","i","i","-","-","-","-","-","-","-"],
+          tom:  ["i","-","-","-","-","-","-","-","-","-","-","-"],
+          fin:  ["m","m","p","p","p","i","i","-","-","-","-","-"],
+          val:  ["i","-","-","-","-","-","-","-","-","-","-","-"],
+          rui:  ["m","p","p","i","i","-","-","-","-","-","-","-"],
+          jen:  ["m","p","i","i","-","-","-","-","-","-","-","-"],
+          oli:  ["m","m","m","p","p","p","i","i","i","-","-","-"],
+          sam:  ["-","-","-","-","-","-","-","-","-","-","-","-"],
+        },
+      };
+
+      const STATUS_LABEL = { m: "Mastered", p: "Practicing", i: "Introduced", "-": "Not started" };
+      const STATUS_COLOR = {
+        m: "var(--color-sage)",
+        p: "var(--color-butter)",
+        i: "var(--color-clay)",
+        "-": "var(--color-border)",
+      };
+
+      const initialsFor = (name) => name.split(" ").map((w) => w[0]).join("");
+
+      /* ---------- toast bus ---------- */
+      const toastSubs = new Set();
+      const ToastBus = {
+        push(t) { toastSubs.forEach((fn) => fn(t)); },
+        subscribe(fn) { toastSubs.add(fn); return () => toastSubs.delete(fn); },
+      };
+      function ToastHost() {
+        const [toasts, setToasts] = useState([]);
+        useEffect(() => ToastBus.subscribe((t) => {
+          const id = Math.random().toString(36).slice(2);
+          setToasts((p) => [...p, { id, ...t }]);
+          window.setTimeout(() => setToasts((p) => p.filter((x) => x.id !== id)), t.duration ?? 2800);
+        }), []);
+        return (
+          <div className="toast-host">
+            {toasts.map((t) => <div key={t.id} className="toast">{t.message}</div>)}
+          </div>
+        );
+      }
+
+      /* ---------- inline primitives ---------- */
+      const TONE_MAP = {
+        clay:       { bg: "var(--color-clay-soft)",       fg: "var(--color-terracotta-deep)" },
+        sage:       { bg: "var(--color-sage-soft)",       fg: "var(--color-sage-deep)" },
+        butter:     { bg: "var(--color-butter-soft)",     fg: "var(--color-butter-deep)" },
+        blue:       { bg: "var(--color-dusty-blue-soft)", fg: "#33526E" },
+        terracotta: { bg: "var(--color-terracotta-soft)", fg: "var(--color-terracotta-deep)" },
+      };
+      function Avatar({ initials, tone = "clay", size = 26 }) {
+        const t = TONE_MAP[tone] ?? TONE_MAP.clay;
+        return (
+          <div style={{
+            width: size, height: size, borderRadius: 999,
+            background: t.bg, color: t.fg,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 600, fontSize: Math.max(10, size * 0.36),
+            letterSpacing: "0.02em", flexShrink: 0,
+          }}>{initials}</div>
+        );
+      }
+      const HandUnderline = ({ color = "var(--color-terracotta)", width = 120, style }) => (
+        <svg width={width} height={10} viewBox="0 0 120 10" style={{ display: "block", ...style }}>
+          <path d="M2 6 C 22 2, 48 9, 72 4 S 110 7, 118 5" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+        </svg>
+      );
+      const InfoIcon = ({ size = 13 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M12 11 V17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="12" cy="7.6" r="1.1" fill="currentColor" />
+        </svg>
+      );
+      const HandDivider = ({ color = "var(--color-clay)", width = "100%" }) => (
+        <svg viewBox="0 0 200 8" preserveAspectRatio="none" style={{ width, height: 8, display: "block" }}>
+          <path d="M2 5 C 50 2, 100 7, 150 3 S 198 5, 198 5" stroke={color} strokeWidth={1.4} fill="none" strokeLinecap="round" opacity={0.7} />
+        </svg>
+      );
+
+      const cardStyle = {
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 14,
+      };
+
+      /* ---------- PageHeader ---------- */
+      function PageHeader({ overline, title, subtitle, actions, compact }) {
+        return (
+          <div style={{ padding: compact ? "16px 20px 12px" : "22px 24px 14px", borderBottom: "1px solid var(--color-border)" }}>
+            {overline && <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 6 }}>{overline}</div>}
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+              <div>
+                <h1 style={{ fontSize: compact ? 20 : 26, fontWeight: 600, color: "var(--color-ink)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.15 }}>{title}</h1>
+                {subtitle && <div style={{ fontSize: 13, color: "var(--color-ink-secondary)", marginTop: 4 }}>{subtitle}</div>}
+              </div>
+              {actions && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{actions}</div>}
+            </div>
+          </div>
+        );
+      }
+
+      function FilterChips({ options, value, onChange }) {
+        return (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {options.map((t) => {
+              const isActive = value === t;
+              return (
+                <button key={t} type="button" className="tap" onClick={() => onChange(t)} style={{
+                  fontSize: 12, fontWeight: 500, padding: "6px 12px", borderRadius: 999,
+                  background: isActive ? "var(--color-ink)" : "var(--color-surface)",
+                  color: isActive ? "var(--color-surface)" : "var(--color-ink-secondary)",
+                  border: isActive ? "1px solid var(--color-ink)" : "1px solid var(--color-border)",
+                }}>{t}</button>
+              );
+            })}
+          </div>
+        );
+      }
+
+      /* ============================================================
+         Selection state (shared across variants)
+         ============================================================ */
+      function useProgressStore() {
+        // progress + notes are keyed by topic so switching topics shows
+        // the right grid without losing earlier captures.
+        const [progressByTopic, setProgressByTopic] = useState(SEEDED_BY_TOPIC);
+        const [notesByTopic, setNotesByTopic] = useState(() => {
+          const o = {}; for (const t of TOPICS) o[t] = {}; return o;
+        });
+        const [recentUpdates, setRecentUpdates] = useState([]);
+
+        const applyBulk = useCallback((topic, cells, status, noteText) => {
+          const when = "just now";
+          setProgressByTopic((prev) => {
+            const nextTopic = { ...(prev[topic] || {}) };
+            for (const k of cells) {
+              const [cid, idx] = k.split(":");
+              if (!nextTopic[cid]) continue;
+              nextTopic[cid] = nextTopic[cid].slice();
+              nextTopic[cid][parseInt(idx, 10)] = status;
+            }
+            return { ...prev, [topic]: nextTopic };
+          });
+          if (noteText && noteText.trim()) {
+            const trimmed = noteText.trim();
+            setNotesByTopic((prev) => {
+              const topicNotes = { ...(prev[topic] || {}) };
+              for (const k of cells) {
+                topicNotes[k] = [{ noteText: trimmed, when, status }, ...(topicNotes[k] || [])];
+              }
+              return { ...prev, [topic]: topicNotes };
+            });
+          }
+          // one log entry PER child so each kid's record carries its own row
+          const subs = SUBTOPICS_BY_TOPIC[topic] || [];
+          const newEntries = Array.from(cells).map((k) => {
+            const [cid, idx] = k.split(":");
+            return {
+              id: Math.random().toString(36).slice(2),
+              topic,
+              subtopicName: subs[parseInt(idx, 10)] || "",
+              childId: cid,
+              subtopicIdx: parseInt(idx, 10),
+              status,
+              noteText: noteText && noteText.trim() ? noteText.trim() : null,
+              when,
+            };
+          });
+          setRecentUpdates((prev) => [...newEntries, ...prev].slice(0, 60));
+        }, []);
+
+        return { progressByTopic, notesByTopic, recentUpdates, applyBulk };
+      }
+
+      function useSelection() {
+        // selected: Set of "childId:subtopicIdx"
+        const [selected, setSelected] = useState(() => new Set());
+        const [draftStatus, setDraftStatus] = useState(null); // "m"|"p"|"i"|"-"|null
+        const [draftNote, setDraftNote] = useState("");
+
+        const isSelected = useCallback((cid, idx) => selected.has(cid + ":" + idx), [selected]);
+        const toggle = useCallback((cid, idx, additive = true) => {
+          setSelected((prev) => {
+            const k = cid + ":" + idx;
+            const next = additive ? new Set(prev) : new Set();
+            if (additive && next.has(k)) next.delete(k); else next.add(k);
+            return next;
+          });
+        }, []);
+        const selectRow = useCallback((idx, presentChildren) => {
+          setSelected((prev) => {
+            const next = new Set(prev);
+            const allOn = presentChildren.every((c) => next.has(c.id + ":" + idx));
+            if (allOn) {
+              presentChildren.forEach((c) => next.delete(c.id + ":" + idx));
+            } else {
+              presentChildren.forEach((c) => next.add(c.id + ":" + idx));
+            }
+            return next;
+          });
+        }, []);
+        const selectColumn = useCallback((cid, subs) => {
+          const list = subs || SUBTOPICS;
+          setSelected((prev) => {
+            const next = new Set(prev);
+            const allOn = list.every((_, i) => next.has(cid + ":" + i));
+            if (allOn) {
+              list.forEach((_, i) => next.delete(cid + ":" + i));
+            } else {
+              list.forEach((_, i) => next.add(cid + ":" + i));
+            }
+            return next;
+          });
+        }, []);
+        const clear = useCallback(() => { setSelected(new Set()); setDraftStatus(null); setDraftNote(""); }, []);
+
+        useEffect(() => {
+          const onKey = (e) => { if (e.key === "Escape") clear(); };
+          window.addEventListener("keydown", onKey);
+          return () => window.removeEventListener("keydown", onKey);
+        }, [clear]);
+
+        return {
+          selected, isSelected, toggle, selectRow, selectColumn, clear,
+          draftStatus, setDraftStatus, draftNote, setDraftNote,
+          count: selected.size,
+        };
+      }
+
+      /* ============================================================
+         Cell + Matrix (subtopics as rows, children as columns)
+         ============================================================ */
+      function Cell({ cid, idx, state, selected, edgeT, edgeR, edgeB, edgeL, onPointerDown, onPointerEnter, mobile, ariaLabel }) {
+        return (
+          <button
+            type="button"
+            className={"cell tap" + (mobile ? " mobile" : "")}
+            data-state={state}
+            data-selected={selected ? "true" : "false"}
+            data-edge-t={edgeT ? "true" : "false"}
+            data-edge-r={edgeR ? "true" : "false"}
+            data-edge-b={edgeB ? "true" : "false"}
+            data-edge-l={edgeL ? "true" : "false"}
+            data-cid={cid}
+            data-idx={idx}
+            onPointerDown={onPointerDown}
+            onPointerEnter={onPointerEnter}
+            aria-label={ariaLabel}
+          />
+        );
+      }
+
+      function ProgressMatrix({ topic, progressByTopic, notesByTopic, sel, presentOnly, mobile, density }) {
+        const presentChildren = useMemo(
+          () => presentOnly ? CHILDREN.filter((c) => c.present) : CHILDREN,
+          [presentOnly]
+        );
+        const subs = SUBTOPICS_BY_TOPIC[topic] || SUBTOPICS;
+        const progress = progressByTopic[topic] || {};
+        const notesByCell = notesByTopic[topic] || {};
+        // longest subtopic name (used to size the frozen row-label column;
+        // we bump up airy/medium to fit "Multiplication board" + i-button)
+        const longestSub = useMemo(() => subs.reduce((a, b) => a.length > b.length ? a : b, ""), [subs]);
+        // density: "tight" 26 · "medium" 34 · "airy" 44 (web); mobile bumps everything up
+        const baseSize = density === "tight" ? 26 : density === "airy" ? 44 : 34;
+        const colSize = mobile ? Math.max(34, baseSize) : baseSize;
+        const rowH = colSize;
+        // bump label column so the longest subtopic + i-button fits;
+        // mobile keeps a tighter column and lets the name ellipsize.
+        const labelColW = mobile ? 116 : (density === "airy" ? 178 : density === "tight" ? 150 : 162);
+        const headerH = mobile ? 108 : (density === "airy" ? 110 : 96);
+
+        const draggingRef = useRef(false);
+
+        const handlePointerDown = (cid, idx) => {
+          draggingRef.current = true;
+          sel.toggle(cid, idx, true);
+        };
+        const handlePointerEnter = (cid, idx) => {
+          if (!draggingRef.current) return;
+          // drag: ensure cell is in selected set (don't toggle on enter — additive add)
+          if (!sel.isSelected(cid, idx)) sel.toggle(cid, idx, true);
+        };
+        useEffect(() => {
+          const up = () => { draggingRef.current = false; };
+          window.addEventListener("pointerup", up);
+          return () => window.removeEventListener("pointerup", up);
+        }, []);
+
+        // info popover for subtopic descriptions (i-button)
+        const [infoPopover, setInfoPopover] = useState(null); // { idx, top, left }
+        // close info popover whenever the topic changes
+        useEffect(() => { setInfoPopover(null); }, [topic]);
+        // close info popover on Escape
+        useEffect(() => {
+          const onKey = (e) => { if (e.key === "Escape") setInfoPopover(null); };
+          window.addEventListener("keydown", onKey);
+          return () => window.removeEventListener("keydown", onKey);
+        }, []);
+
+        const labelFontSize = mobile ? 12 : (density === "airy" ? 13.5 : density === "tight" ? 11.5 : 12.5);
+
+        return (
+          <div data-matrix-root style={{ position: "relative", padding: mobile ? "8px 12px 14px" : "10px 18px 18px" }}>
+            <div
+              className="scroll-quiet sheet-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: labelColW + "px repeat(" + presentChildren.length + ", " + colSize + "px)",
+                gridTemplateRows: headerH + "px repeat(" + subs.length + ", " + rowH + "px)",
+                width: "fit-content",
+                maxWidth: "100%",
+                // bounded so the first-row + first-column sticky cells pin
+                // against this scroller, not the page
+                maxHeight: mobile ? "60vh" : "calc(100vh - 280px)",
+              }}
+            >
+              {/* corner cell — pinned top + left */}
+              <div className="sg-corner" style={{
+                gridRow: "span 1",
+                height: headerH,
+                background: "var(--color-surface)",
+                boxShadow: "inset -1px 0 0 var(--color-border), inset 0 -1px 0 var(--color-border)",
+              }}></div>
+              {/* column headers (children) — pinned to top */}
+              {presentChildren.map((c) => {
+                const isHotCol = subs.every((_, i) => sel.isSelected(c.id, i));
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="tap sg-col-header"
+                    data-armed={isHotCol ? "true" : "false"}
+                    onClick={() => sel.selectColumn(c.id, subs)}
+                    aria-label={"Select all subtopics for " + c.name}
+                    style={{
+                      height: headerH,
+                      background: isHotCol ? "var(--color-muted)" : "var(--color-surface)",
+                      border: 0,
+                      padding: "0 0 6px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: 4,
+                      cursor: "pointer",
+                      boxShadow: "inset -1px 0 0 var(--color-border), inset 0 -1px 0 var(--color-border)",
+                      color: isHotCol ? "var(--color-ink)" : "var(--color-ink-secondary)",
+                      transition: "background 120ms ease, color 120ms ease",
+                    }}
+                  >
+                    <span style={{
+                      writingMode: "vertical-rl",
+                      transform: "rotate(180deg)",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      lineHeight: 1.1,
+                      maxHeight: headerH - 32,
+                      overflow: "hidden",
+                    }}>{c.name.split(" ")[0]}</span>
+                    <Avatar initials={initialsFor(c.name)} tone={c.tone} size={22} />
+                  </button>
+                );
+              })}
+
+              {/* rows */}
+              {subs.map((sub, idx) => {
+                const isHotRow = presentChildren.every((c) => sel.isSelected(c.id, idx));
+                return (
+                  <React.Fragment key={sub}>
+                    <div
+                      className="sg-row-header"
+                      data-armed={isHotRow ? "true" : "false"}
+                      style={{
+                        height: rowH,
+                        background: isHotRow ? "var(--color-muted)" : "var(--color-surface)",
+                        boxShadow: "inset -1px 0 0 var(--color-border), inset 0 -1px 0 var(--color-border)",
+                        transition: "background 120ms ease, color 120ms ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "0 8px 0 10px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="tap"
+                        onClick={(e) => {
+                          // info-button click bubbles here too; ignore it
+                          if (e.target.closest('[data-info-btn="true"]')) return;
+                          sel.selectRow(idx, presentChildren);
+                        }}
+                        aria-label={"Select all children for " + sub}
+                        style={{
+                          flex: 1, minWidth: 0,
+                          background: "transparent", border: 0,
+                          textAlign: "right",
+                          padding: 0,
+                          fontFamily: "inherit",
+                          fontSize: labelFontSize,
+                          fontWeight: isHotRow ? 600 : 500,
+                          color: isHotRow ? "var(--color-ink)" : "var(--color-ink-secondary)",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          lineHeight: 1.2,
+                        }}
+                      >{sub}</button>
+                      <button
+                        type="button"
+                        className="tap"
+                        data-info-btn="true"
+                        aria-label={"About " + sub}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const btnRect = e.currentTarget.getBoundingClientRect();
+                          const matrixCard = e.currentTarget.closest("[data-matrix-root]");
+                          const containerRect = matrixCard?.getBoundingClientRect();
+                          if (!containerRect) return;
+                          if (infoPopover && infoPopover.idx === idx) {
+                            setInfoPopover(null);
+                          } else {
+                            setInfoPopover({
+                              idx,
+                              top: btnRect.bottom - containerRect.top + 6,
+                              left: btnRect.left - containerRect.left - 8,
+                            });
+                          }
+                        }}
+                        style={{
+                          width: 18, height: 18,
+                          minWidth: 18,
+                          flexShrink: 0,
+                          borderRadius: 999,
+                          border: "1px solid var(--color-border)",
+                          background: (infoPopover && infoPopover.idx === idx) ? "var(--color-ink)" : "var(--color-surface)",
+                          color: (infoPopover && infoPopover.idx === idx) ? "var(--color-surface)" : "var(--color-ink-muted)",
+                          display: "grid",
+                          placeItems: "center",
+                          padding: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <InfoIcon size={11} />
+                      </button>
+                    </div>
+                    {presentChildren.map((c, ci) => {
+                      const k = c.id + ":" + idx;
+                      const state = (progress[c.id] || [])[idx] || "-";
+                      const isSel = sel.isSelected(c.id, idx);
+                      // edge = selected AND neighbor in that direction is NOT selected (or out of grid)
+                      const left  = ci > 0 ? presentChildren[ci - 1] : null;
+                      const right = ci < presentChildren.length - 1 ? presentChildren[ci + 1] : null;
+                      const edgeT = isSel && (idx === 0           || !sel.isSelected(c.id, idx - 1));
+                      const edgeB = isSel && (idx === subs.length - 1 || !sel.isSelected(c.id, idx + 1));
+                      const edgeL = isSel && (left === null        || !sel.isSelected(left.id, idx));
+                      const edgeR = isSel && (right === null       || !sel.isSelected(right.id, idx));
+                      return (
+                        <Cell
+                          key={k}
+                          cid={c.id}
+                          idx={idx}
+                          state={state}
+                          selected={isSel}
+                          edgeT={edgeT}
+                          edgeR={edgeR}
+                          edgeB={edgeB}
+                          edgeL={edgeL}
+                          mobile={mobile}
+                          ariaLabel={c.name + " — " + sub + ": " + STATUS_LABEL[state]}
+                          onPointerDown={() => handlePointerDown(c.id, idx)}
+                          onPointerEnter={() => handlePointerEnter(c.id, idx)}
+                        />
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+            {infoPopover && (() => {
+              const sub = subs[infoPopover.idx];
+              const desc = SUBTOPIC_INFO[sub] || "Description coming soon for this subtopic.";
+              return (
+                <div
+                  className="anim-fade-in"
+                  role="tooltip"
+                  style={{
+                    position: "absolute",
+                    top: infoPopover.top,
+                    left: Math.max(8, infoPopover.left),
+                    zIndex: 40,
+                    width: 300,
+                    maxWidth: "calc(100% - 16px)",
+                    background: "var(--color-surface)",
+                    color: "var(--color-ink)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 14,
+                    padding: "14px 16px",
+                    boxShadow: "0 18px 40px rgba(42,39,35,0.16), 0 6px 14px rgba(42,39,35,0.08)",
+                    fontSize: 12.5,
+                    lineHeight: 1.5,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                    <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>About this subtopic</div>
+                    <button
+                      type="button"
+                      className="tap"
+                      onClick={() => setInfoPopover(null)}
+                      aria-label="Close"
+                      style={{ background: "transparent", border: 0, color: "var(--color-ink-muted)", fontSize: 14, padding: 0, lineHeight: 1, cursor: "pointer" }}
+                    >✕</button>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-ink)", marginBottom: 4 }}>{sub}</div>
+                  <div style={{ color: "var(--color-ink-secondary)" }}>{desc}</div>
+                </div>
+              );
+            })()}
+          </div>
+        );
+      }
+
+      /* ============================================================
+         Bulk apply UI — desktop floating bar / mobile bottom sheet
+         ============================================================ */
+      function BulkBar({ sel, applyBulk, isMobile, dockBottom, topic, onCancel }) {
+        const count = sel.count;
+        if (count === 0) return null;
+        const onApply = () => {
+          if (!sel.draftStatus) return;
+          const cells = Array.from(sel.selected);
+          applyBulk(topic || "Sensorial", cells, sel.draftStatus, sel.draftNote);
+          ToastBus.push({
+            message:
+              count + " update" + (count === 1 ? "" : "s") + " saved" +
+              (sel.draftNote.trim()
+                ? " · note attached to " + count + " " + (count === 1 ? "child" : "children")
+                : ""),
+          });
+          sel.clear();
+        };
+        const handleCancel = () => {
+          if (onCancel) onCancel();
+          else sel.clear();
+        };
+
+        if (isMobile) {
+          return (
+            <React.Fragment>
+              <div className="sheet-backdrop" onClick={handleCancel} />
+              <div className="sheet">
+                <div className="sheet-grip" />
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div>
+                    <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>Bulk update · {topic}</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>
+                      {count} cell{count === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                  <button type="button" className="ghost-btn tap" style={{ background: "var(--color-muted)", border: "1px solid var(--color-border)", color: "var(--color-ink-secondary)" }} onClick={handleCancel}>Close</button>
+                </div>
+                <HandDivider />
+                <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+                  {["m","p","i","-"].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="tap"
+                      onClick={() => sel.setDraftStatus(s)}
+                      style={{
+                        flex: "1 1 calc(50% - 4px)",
+                        minWidth: 130,
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1px solid " + (sel.draftStatus === s ? "var(--color-ink)" : "var(--color-border)"),
+                        background: sel.draftStatus === s ? "var(--color-ink)" : "var(--color-surface)",
+                        color: sel.draftStatus === s ? "var(--color-surface)" : "var(--color-ink-secondary)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 12.5, fontWeight: 500,
+                      }}
+                    >
+                      <span style={{
+                        width: 13, height: 13, borderRadius: 4, display: "inline-block",
+                        background: s === "-" ? "transparent" : STATUS_COLOR[s],
+                        border: s === "-" ? "1px dashed currentColor" : "1px solid transparent",
+                      }} />
+                      {s === "-" ? "Clear" : STATUS_LABEL[s]}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 6 }}>Note (optional)</div>
+                  <textarea
+                    placeholder="First independent attempt…"
+                    value={sel.draftNote}
+                    onChange={(e) => sel.setDraftNote(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "var(--color-canvas)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      fontFamily: "var(--font-display)",
+                      fontSize: 19,
+                      color: "var(--color-ink)",
+                      minHeight: 56,
+                      resize: "none",
+                      lineHeight: 1.25,
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="tap"
+                  onClick={onApply}
+                  disabled={!sel.draftStatus}
+                  style={{
+                    marginTop: 14,
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: "1px solid var(--color-ink)",
+                    background: sel.draftStatus ? "var(--color-ink)" : "var(--color-muted)",
+                    color: sel.draftStatus ? "var(--color-surface)" : "var(--color-ink-muted)",
+                    fontSize: 14, fontWeight: 600,
+                  }}
+                >
+                  Apply to {count} cell{count === 1 ? "" : "s"}
+                </button>
+              </div>
+            </React.Fragment>
+          );
+        }
+
+        return (
+          <div className="bulk-bar" style={dockBottom ? { bottom: 24 } : null}>
+            <div className="bulk-bar-row">
+              <div className="count">{count} <span style={{ fontSize: 11.5, fontWeight: 500, opacity: 0.7, marginLeft: 4 }}>cell{count === 1 ? "" : "s"}</span></div>
+              <div className="picker">
+                {["m","p","i","-"].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="status-btn tap"
+                    data-state={s}
+                    onClick={() => sel.setDraftStatus(s)}
+                    style={{
+                      borderColor: sel.draftStatus === s ? "rgba(255,251,243,0.55)" : "transparent",
+                      background: sel.draftStatus === s ? "rgba(255,251,243,0.16)" : "rgba(255,251,243,0.08)",
+                    }}
+                  >
+                    <span className="swatch" />
+                    {s === "-" ? "Clear" : STATUS_LABEL[s]}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto" }}>
+                <button type="button" className="ghost-btn tap" onClick={() => sel.clear()}>Cancel</button>
+                <button type="button" className="primary-light tap" onClick={onApply} disabled={!sel.draftStatus} style={{ opacity: sel.draftStatus ? 1 : 0.5 }}>
+                  Apply to {count}
+                </button>
+              </div>
+            </div>
+            <div className="bulk-bar-row">
+              <textarea
+                placeholder="Add a note — applies to every selected cell…"
+                value={sel.draftNote}
+                onChange={(e) => sel.setDraftNote(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+        );
+      }
+
+      /* ============================================================
+         Recent updates panel (used by V2)
+         ============================================================ */
+      function RecentUpdates({ entries }) {
+        if (!entries.length) {
+          return (
+            <div style={{ padding: "18px 16px", color: "var(--color-ink-muted)", fontSize: 12.5 }}>
+              <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 6 }}>Today</div>
+              No updates yet. Select cells in the grid to record a lesson.
+            </div>
+          );
+        }
+        return (
+          <div>
+            <div style={{ padding: "16px 16px 8px" }}>
+              <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>Recent updates</div>
+            </div>
+            {entries.slice(0, 24).map((e) => {
+              const child = CHILDREN.find((c) => c.id === e.childId);
+              if (!child) return null;
+              return (
+                <div key={e.id} className="ru-entry">
+                  <Avatar initials={initialsFor(child.name)} tone={child.tone} size={26} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-ink)" }}>
+                      {child.name.split(" ")[0]}{" "}
+                      <span style={{ color: "var(--color-ink-muted)", fontWeight: 400 }}>·</span>{" "}
+                      <span style={{ color: "var(--color-ink-secondary)", fontWeight: 400 }}>{e.subtopicName || ""}</span>
+                      {e.topic && <span style={{ color: "var(--color-ink-muted)", fontWeight: 400, fontSize: 10.5, marginLeft: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{e.topic}</span>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 11.5, color: "var(--color-ink-muted)" }}>
+                      <span style={{
+                        width: 9, height: 9, borderRadius: 3,
+                        background: e.status === "-" ? "transparent" : STATUS_COLOR[e.status],
+                        border: e.status === "-" ? "1px dashed var(--color-border)" : "1px solid transparent",
+                        display: "inline-block",
+                      }}/>
+                      <span>{STATUS_LABEL[e.status]} · {e.when}</span>
+                    </div>
+                    {e.noteText && (
+                      <div className="font-display" style={{ marginTop: 6, fontSize: 17, color: "var(--color-ink)", lineHeight: 1.25 }}>
+                        "{e.noteText}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      /* ============================================================
+         Stat / legend strip — counts derived from real progress
+         ============================================================ */
+      function LegendStrip({ progress, presentOnly }) {
+        const counts = useMemo(() => {
+          const ids = (presentOnly ? CHILDREN.filter((c) => c.present) : CHILDREN).map((c) => c.id);
+          const all = ids.flatMap((cid) => progress[cid] || []);
+          return {
+            m: all.filter((s) => s === "m").length,
+            p: all.filter((s) => s === "p").length,
+            i: all.filter((s) => s === "i").length,
+            "-": all.filter((s) => s === "-").length,
+            total: all.length,
+          };
+        }, [progress, presentOnly]);
+        return (
+          <div className="legend-row">
+            {["m","p","i","-"].map((s) => (
+              <div key={s} className="legend-chip">
+                <span className="legend-square" data-state={s}></span>
+                <span style={{ fontWeight: 500, color: "var(--color-ink)" }}>{counts[s]}</span>
+                <span>{STATUS_LABEL[s]}</span>
+              </div>
+            ))}
+            <div style={{ marginLeft: "auto", color: "var(--color-ink-muted)", fontSize: 11.5 }}>
+              {counts.total} cells · {presentOnly ? "present today" : "all enrolled"}
+            </div>
+          </div>
+        );
+      }
+
+      /* ============================================================
+         WEB VIEW · V2 Lesson planner with three densities
+         (v2.1 tight · v2.2 medium · v2.3 airy)
+         ============================================================ */
+
+      const DENSITY_META = {
+        tight:  { label: "v2.1 · Tight",  caption: "Densest · entire classroom in one glance" },
+        medium: { label: "v2.2 · Medium", caption: "Balanced · the default planner read" },
+        airy:   { label: "v2.3 · Airy",   caption: "Spacious · easy to tap on a touchscreen" },
+      };
+
+      function V2Web({ store, sel, density }) {
+        const [topic, setTopic] = useState("Sensorial");
+        const [group, setGroup] = useState("All");
+        const presentCount = CHILDREN.filter((c) => c.present).length;
+        const meta = DENSITY_META[density];
+
+        // changing topic invalidates any in-progress selection (the row/column
+        // indices wouldn't make sense across topics with different subtopic counts)
+        const switchTopic = useCallback((t) => {
+          if (t === topic) return;
+          sel.clear();
+          setTopic(t);
+        }, [topic, sel]);
+
+        return (
+          <div style={{ position: "relative", minHeight: 720 }}>
+            <PageHeader
+              overline={"Lesson planner · Apr 30 · " + meta.label}
+              title="Progress"
+              subtitle={presentCount + " children present today · " + meta.caption}
+            />
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr 300px", minHeight: 640 }}>
+              {/* left filter rail — flex column so the Tip floats to the bottom */}
+              <div style={{
+                borderRight: "1px solid var(--color-border)",
+                padding: "16px 16px 24px",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: 0,
+              }}>
+                <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>Today's focus</div>
+                <div style={{ background: "var(--color-butter-soft)", borderRadius: 10, padding: "10px 12px", marginBottom: 16, border: "1px solid color-mix(in srgb, var(--color-butter) 40%, transparent)" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--color-butter-deep)" }}>{topic}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--color-ink-secondary)", marginTop: 2 }}>
+                    {(() => {
+                      const data = store.progressByTopic[topic] || {};
+                      const dueCount = CHILDREN.filter((c) => c.present).filter((c) => (data[c.id] || []).some((s) => s === "p" || s === "i")).length;
+                      return dueCount + " children with work in progress";
+                    })()}
+                  </div>
+                </div>
+
+                <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>Topic</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 18 }}>
+                  {TOPICS.map((t) => {
+                    const subCount = SUBTOPICS_BY_TOPIC[t].length;
+                    const isActive = topic === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        className="tap"
+                        onClick={() => switchTopic(t)}
+                        style={{
+                          textAlign: "left",
+                          padding: "7px 10px",
+                          borderRadius: 8,
+                          border: 0,
+                          background: isActive ? "var(--color-muted)" : "transparent",
+                          color: isActive ? "var(--color-ink)" : "var(--color-ink-secondary)",
+                          fontSize: 13, fontWeight: isActive ? 500 : 400,
+                          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+                        }}
+                      >
+                        <span>{t}</span>
+                        <span style={{ fontSize: 10.5, color: "var(--color-ink-muted)", fontWeight: 400 }}>{subCount}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>Group</div>
+                <FilterChips options={["All","Primary","Toddlers"]} value={group} onChange={setGroup} />
+
+                <div style={{
+                  marginTop: "auto",
+                  paddingTop: 14,
+                  borderTop: "1px solid var(--color-border)",
+                }}>
+                  <div className="font-display" style={{ fontSize: 19, color: "var(--color-ink-secondary)", lineHeight: 1.2 }}>
+                    Tip: tap a subtopic name to lock it in for everyone.
+                  </div>
+                </div>
+              </div>
+
+              {/* matrix — touching sheets-style grid, no legend */}
+              <div style={{ position: "relative", padding: "18px 16px 100px" }}>
+                <ProgressMatrix
+                  topic={topic}
+                  progressByTopic={store.progressByTopic}
+                  notesByTopic={store.notesByTopic}
+                  sel={sel}
+                  presentOnly={true}
+                  density={density}
+                />
+              </div>
+
+              {/* right recent-updates panel */}
+              <div className="side-panel scroll-quiet">
+                <RecentUpdates entries={store.recentUpdates} />
+              </div>
+            </div>
+            <BulkBar sel={sel} applyBulk={store.applyBulk} topic={topic} />
+          </div>
+        );
+      }
+
+      /* ============================================================
+         MOBILE VIEW · V2 Lesson planner · 3 densities (390px)
+         ============================================================ */
+
+      function V2Mobile({ store, sel, density }) {
+        const [topic, setTopic] = useState("Sensorial");
+        const [showLog, setShowLog] = useState(false);
+        // sheetOpen = the full configure sheet. While selecting (capsule
+        // visible) it stays closed so the matrix is fully draggable.
+        const [sheetOpen, setSheetOpen] = useState(false);
+        const meta = DENSITY_META[density];
+
+        const switchTopic = useCallback((t) => {
+          if (t === topic) return;
+          sel.clear();
+          setTopic(t);
+        }, [topic, sel]);
+
+        // close the sheet whenever selection clears
+        useEffect(() => {
+          if (sel.count === 0) setSheetOpen(false);
+        }, [sel.count]);
+
+        return (
+          <div style={{ paddingTop: 44, position: "relative", height: "100%" }}>
+            <div style={{ padding: "10px 16px 6px" }}>
+              <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>Lesson planner · {meta.label}</div>
+              <h1 style={{ fontSize: 22, fontWeight: 600, margin: "4px 0 6px", letterSpacing: "-0.01em" }}>Progress</h1>
+              <div style={{ background: "var(--color-butter-soft)", border: "1px solid color-mix(in srgb, var(--color-butter) 40%, transparent)", borderRadius: 10, padding: "8px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: "var(--color-butter-deep)" }}>Today's focus · {topic}</div>
+                  <div style={{ fontSize: 11, color: "var(--color-ink-secondary)" }}>{SUBTOPICS_BY_TOPIC[topic].length} subtopics in this topic</div>
+                </div>
+                <button type="button" className="tap" style={{ fontSize: 11, padding: "5px 9px", borderRadius: 8, background: "transparent", border: "1px solid var(--color-butter)", color: "var(--color-butter-deep)" }}>Plan</button>
+              </div>
+            </div>
+            <div style={{ padding: "8px 14px 4px", display: "flex", gap: 6, overflowX: "auto" }} className="scroll-quiet scroll-hidden">
+              <FilterChips options={TOPICS} value={topic} onChange={switchTopic} />
+            </div>
+            <div style={{ padding: "8px 12px 16px" }}>
+              <ProgressMatrix
+                topic={topic}
+                progressByTopic={store.progressByTopic}
+                notesByTopic={store.notesByTopic}
+                sel={sel}
+                presentOnly={true}
+                mobile={true}
+                density={density}
+              />
+            </div>
+            <button
+              type="button"
+              className="tap"
+              onClick={() => setShowLog((v) => !v)}
+              style={{
+                margin: "0 14px",
+                padding: "10px 14px",
+                width: "calc(100% - 28px)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: showLog ? "12px 12px 0 0" : 12,
+                borderBottom: showLog ? "none" : "1px solid var(--color-border)",
+                fontSize: 13, fontWeight: 500,
+                color: "var(--color-ink)",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}
+            >
+              <span>Recent updates {store.recentUpdates.length > 0 && <span style={{ color: "var(--color-ink-muted)", fontWeight: 400 }}>· {store.recentUpdates.length}</span>}</span>
+              <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{showLog ? "Hide" : "Show"}</span>
+            </button>
+            {showLog && (
+              <div style={{
+                ...cardStyle,
+                margin: "0 14px",
+                borderTopLeftRadius: 0,
+                borderTopRightRadius: 0,
+                borderTop: 0,
+                overflow: "hidden",
+              }}>
+                <RecentUpdates entries={store.recentUpdates} />
+              </div>
+            )}
+            {/* spacer so the floating capsule never overlaps the last log entry */}
+            <div style={{ height: 90 }} />
+
+
+            {/* Floating selection capsule — non-blocking; lets the matrix
+                stay draggable underneath. Tap to open the full sheet. */}
+            {sel.count > 0 && !sheetOpen && (
+              <div className="selection-capsule anim-pop-in">
+                <button type="button" className="tap" onClick={() => sel.clear()}
+                  style={{ background: "transparent", border: 0, color: "rgba(255,251,243,0.8)", fontSize: 11, padding: "0 4px" }}
+                  aria-label="Clear selection">✕</button>
+                <span><strong style={{ color: "var(--color-surface)" }}>{sel.count}</strong> cell{sel.count === 1 ? "" : "s"}</span>
+                <button type="button" className="tap"
+                  onClick={() => setSheetOpen(true)}
+                  style={{
+                    background: "var(--color-surface)", color: "var(--color-ink)",
+                    border: 0, padding: "6px 11px", borderRadius: 999,
+                    fontSize: 12, fontWeight: 600,
+                  }}>Apply</button>
+              </div>
+            )}
+            {sheetOpen && (
+              <BulkBar
+                sel={sel}
+                applyBulk={store.applyBulk}
+                topic={topic}
+                isMobile
+                onCancel={() => setSheetOpen(false)}
+              />
+            )}
+          </div>
+        );
+      }
+
+      /* ============================================================
+         App shell
+         ============================================================ */
+      function App() {
+        const [tab, setTab] = useState("web");
+        // density doubles as the variant id: tight = v2.1, medium = v2.2, airy = v2.3
+        const [variant, setVariant] = useState("medium");
+
+        // store + selection are shared across tabs so switching mid-edit
+        // doesn't lose state (matches how a designer would compare)
+        const store = useProgressStore();
+        const sel = useSelection();
+
+        return (
+          <div className="shell">
+            <div className="topbar">
+              <div className="topbar-inner">
+                <div className="brand">
+                  <span className="brand-mark">m</span>
+                  <span>Mitable Montessori</span>
+                  <span className="label-cap" style={{ color: "var(--color-ink-muted)", marginLeft: 6 }}>· Progress</span>
+                </div>
+
+                <div className="tabs" role="tablist" aria-label="Viewport">
+                  <button type="button" className="tab tap" data-active={tab === "web"} onClick={() => setTab("web")}>Web</button>
+                  <button type="button" className="tab tap" data-active={tab === "mobile"} onClick={() => setTab("mobile")}>Mobile</button>
+                </div>
+
+                <div className="variant-toggle">
+                  <span className="label-cap">Density</span>
+                  <div className="variant-pills">
+                    <button type="button" className="variant-pill tap" data-active={variant === "tight"}  onClick={() => setVariant("tight")}  title="v2.1 — Tightest grid">v2.1 · Tight</button>
+                    <button type="button" className="variant-pill tap" data-active={variant === "medium"} onClick={() => setVariant("medium")} title="v2.2 — Medium grid">v2.2 · Medium</button>
+                    <button type="button" className="variant-pill tap" data-active={variant === "airy"}   onClick={() => setVariant("airy")}   title="v2.3 — Airy grid">v2.3 · Airy</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {tab === "web" ? (
+              <div className="viewport-web">
+                <div className="frame">
+                  <V2Web store={store} sel={sel} density={variant} />
+                </div>
+              </div>
+            ) : (
+              <div className="viewport-mobile">
+                <div className="phone">
+                  <div className="phone-notch" />
+                  <div className="phone-content scroll-quiet">
+                    <V2Mobile store={store} sel={sel} density={variant} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <ToastHost />
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>

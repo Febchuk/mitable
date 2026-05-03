@@ -8,6 +8,8 @@ export interface RosterRow {
   lastName: string;
   preferredName?: string | null;
   birthDate?: string | null;
+  /** Free-text — see migration 0015. Renders in the Child Detail "i" tooltip. */
+  sex?: string | null;
   nicknames: string[];
   notes?: string | null;
   schoolId: string;
@@ -176,4 +178,56 @@ export interface ReportRow {
 export interface SyncMetaRow {
   key: string;
   value: string;
+}
+
+// Whole-child assessment data model (migration 0012).
+
+export type AxisLevel = "Emerging" | "Practicing" | "Deepening" | "Leading";
+
+export interface AxisRow {
+  id: string;
+  schoolId: string;
+  key: string;
+  label: string;
+  /** { Emerging: "...", Practicing: "...", Deepening: "...", Leading: "..." } */
+  descriptors: Record<AxisLevel, string>;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface AxisAssessmentRow {
+  id: string;
+  studentId: string;
+  axisKey: string;
+  level: AxisLevel;
+  assessedAt: string;
+  endedAt: string | null;
+  sourceObservationId: string | null;
+  authorUserId: string | null;
+}
+
+export interface WholeChildObservationRow {
+  id: string;
+  studentId: string;
+  axisKey: string;
+  fromLevel: AxisLevel | null;
+  toLevel: AxisLevel | null;
+  note: string;
+  /** Optional FK to commands(id) — the curriculum-side observation that prompted this note. */
+  sourceObservationId: string | null;
+  authorUserId: string;
+  createdAt: string;
+}
+
+export type CurriculumEventTransition = "introduced" | "practicing" | "mastered";
+
+export interface CurriculumEventRow {
+  id: string;
+  studentId: string;
+  subtopicId: string;
+  comment: string;
+  /** Set when this event also moved the subtopic state. */
+  transitionToStatus: CurriculumEventTransition | null;
+  authorUserId: string;
+  createdAt: string;
 }

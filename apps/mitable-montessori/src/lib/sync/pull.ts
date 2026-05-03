@@ -20,6 +20,7 @@ interface PullResponse {
       last_name: string;
       preferred_name: string | null;
       birth_date: string | null;
+      sex: string | null;
       nicknames: string[];
       notes: string | null;
     }>;
@@ -86,6 +87,45 @@ interface PullResponse {
       is_active: boolean;
       aliases: string[];
     }>;
+    axes: Array<{
+      id: string;
+      school_id: string;
+      key: string;
+      label: string;
+      descriptors: Record<string, string>;
+      sort_order: number;
+      is_active: boolean;
+    }>;
+    axis_assessments: Array<{
+      id: string;
+      student_id: string;
+      axis_key: string;
+      level: "Emerging" | "Practicing" | "Deepening" | "Leading";
+      assessed_at: string;
+      ended_at: string | null;
+      source_observation_id: string | null;
+      author_user_id: string | null;
+    }>;
+    whole_child_observations: Array<{
+      id: string;
+      student_id: string;
+      axis_key: string;
+      from_level: "Emerging" | "Practicing" | "Deepening" | "Leading" | null;
+      to_level: "Emerging" | "Practicing" | "Deepening" | "Leading" | null;
+      note: string;
+      source_observation_id: string | null;
+      author_user_id: string;
+      created_at: string;
+    }>;
+    curriculum_events: Array<{
+      id: string;
+      student_id: string;
+      subtopic_id: string;
+      comment: string;
+      transition_to_status: "introduced" | "practicing" | "mastered" | null;
+      author_user_id: string;
+      created_at: string;
+    }>;
   };
 }
 
@@ -108,6 +148,7 @@ export async function pullSync() {
         lastName: s.last_name,
         preferredName: s.preferred_name,
         birthDate: s.birth_date,
+        sex: s.sex,
         nicknames: s.nicknames ?? [],
         notes: s.notes,
         nameHash: await rosterNameHash(s.first_name, s.last_name),
@@ -142,6 +183,10 @@ export async function pullSync() {
       db.curricula,
       db.curriculumTopics,
       db.curriculumSubtopics,
+      db.axes,
+      db.axisAssessments,
+      db.wholeChildObservations,
+      db.curriculumEvents,
       db.syncMeta,
     ],
     async () => {
@@ -230,6 +275,64 @@ export async function pullSync() {
           sortOrder: s.sort_order,
           isActive: s.is_active,
           aliases: s.aliases ?? [],
+        }))
+      );
+
+      await db.axes.clear();
+      await db.axes.bulkPut(
+        body.data.axes.map((a) => ({
+          id: a.id,
+          schoolId: a.school_id,
+          key: a.key,
+          label: a.label,
+          descriptors: a.descriptors as Record<
+            "Emerging" | "Practicing" | "Deepening" | "Leading",
+            string
+          >,
+          sortOrder: a.sort_order,
+          isActive: a.is_active,
+        }))
+      );
+
+      await db.axisAssessments.clear();
+      await db.axisAssessments.bulkPut(
+        body.data.axis_assessments.map((a) => ({
+          id: a.id,
+          studentId: a.student_id,
+          axisKey: a.axis_key,
+          level: a.level,
+          assessedAt: a.assessed_at,
+          endedAt: a.ended_at,
+          sourceObservationId: a.source_observation_id,
+          authorUserId: a.author_user_id,
+        }))
+      );
+
+      await db.wholeChildObservations.clear();
+      await db.wholeChildObservations.bulkPut(
+        body.data.whole_child_observations.map((o) => ({
+          id: o.id,
+          studentId: o.student_id,
+          axisKey: o.axis_key,
+          fromLevel: o.from_level,
+          toLevel: o.to_level,
+          note: o.note,
+          sourceObservationId: o.source_observation_id,
+          authorUserId: o.author_user_id,
+          createdAt: o.created_at,
+        }))
+      );
+
+      await db.curriculumEvents.clear();
+      await db.curriculumEvents.bulkPut(
+        body.data.curriculum_events.map((e) => ({
+          id: e.id,
+          studentId: e.student_id,
+          subtopicId: e.subtopic_id,
+          comment: e.comment,
+          transitionToStatus: e.transition_to_status,
+          authorUserId: e.author_user_id,
+          createdAt: e.created_at,
         }))
       );
 

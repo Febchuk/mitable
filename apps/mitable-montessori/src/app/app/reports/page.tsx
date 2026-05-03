@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight, Plus, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { findChild, initialsFor, type ReportStatus } from "@/components/montessori/data";
 import { FilterChips, PageHeader, cardStyle } from "@/components/montessori/page-header";
+import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
 
@@ -57,27 +59,7 @@ export default function ReportsPage() {
         overline="My drafts + approved"
         title="Reports"
         subtitle={`${drafts} drafts · ${reviews} awaiting review · ${sent} sent`}
-        actions={
-          <button
-            type="button"
-            className="tap"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              border: 0,
-              background: "var(--color-terracotta)",
-              color: "var(--color-surface)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 10px rgba(196,106,79,0.25)",
-            }}
-            aria-label="New report"
-          >
-            <Plus size={18} strokeWidth={1.5} />
-          </button>
-        }
+        actions={<NewReportTrigger />}
       />
 
       <div style={{ padding: "16px 24px 0" }}>
@@ -109,14 +91,17 @@ export default function ReportsPage() {
             const child = findChild(r.childId);
             const tone = STATUS_TONE[r.status];
             return (
-              <div
+              <Link
                 key={r.id}
+                href={`/app/reports/${r.id}`}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 140px 24px",
                   alignItems: "center",
                   padding: "12px 20px",
                   borderTop: "1px solid var(--color-border)",
+                  textDecoration: "none",
+                  color: "inherit",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -164,7 +149,11 @@ export default function ReportsPage() {
                     <button
                       type="button"
                       className="tap"
-                      onClick={() => store.approveReport(r.id)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        store.approveReport(r.id);
+                      }}
                       style={{
                         background: "var(--color-terracotta)",
                         color: "var(--color-surface)",
@@ -180,7 +169,7 @@ export default function ReportsPage() {
                   ) : null}
                 </div>
                 <ChevronRight size={14} strokeWidth={1.5} />
-              </div>
+              </Link>
             );
           })}
         </div>
@@ -193,8 +182,9 @@ export default function ReportsPage() {
             const child = findChild(r.childId);
             const tone = STATUS_TONE[r.status];
             return (
-              <div
+              <Link
                 key={r.id}
+                href={`/app/reports/${r.id}`}
                 className="tap"
                 style={{
                   background: "var(--color-surface)",
@@ -204,6 +194,8 @@ export default function ReportsPage() {
                   display: "flex",
                   gap: 12,
                   alignItems: "flex-start",
+                  textDecoration: "none",
+                  color: "inherit",
                 }}
               >
                 <Avatar
@@ -253,7 +245,11 @@ export default function ReportsPage() {
                       <button
                         type="button"
                         className="tap"
-                        onClick={() => store.approveReport(r.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          store.approveReport(r.id);
+                        }}
                         style={{
                           flex: 1,
                           background: "var(--color-terracotta)",
@@ -267,8 +263,7 @@ export default function ReportsPage() {
                       >
                         Approve &amp; send
                       </button>
-                      <button
-                        type="button"
+                      <span
                         className="tap"
                         style={{
                           background: "transparent",
@@ -281,12 +276,12 @@ export default function ReportsPage() {
                         }}
                       >
                         Open
-                      </button>
+                      </span>
                     </div>
                   )}
                 </div>
                 <ChevronRight size={16} strokeWidth={1.5} />
-              </div>
+              </Link>
             );
           })}
         </div>

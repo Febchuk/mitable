@@ -1,0 +1,164 @@
+- generic [active] [ref=e1]:
+    - button "Open Next.js Dev Tools" [ref=e18] [cursor=pointer]:
+        - img [ref=e19]
+    - alert [ref=e12]
+    - generic [ref=e22]:
+        - complementary [ref=e23]:
+            - generic [ref=e24]:
+                - generic [ref=e25]: Mitable
+                - generic [ref=e26]: Montessori
+            - generic [ref=e27]:
+                - generic [ref=e28]: C
+                - generic [ref=e29]:
+                    - generic [ref=e30]: Cypress Room
+                    - generic [ref=e31]: 18 children
+                - img [ref=e32]
+            - navigation [ref=e34]:
+                - link "Today" [ref=e35] [cursor=pointer]:
+                    - /url: /app/today
+                    - img [ref=e36]
+                    - generic [ref=e38]: Today
+                - link "Roster" [ref=e39] [cursor=pointer]:
+                    - /url: /app/roster
+                    - img [ref=e40]
+                    - generic [ref=e45]: Roster
+                - link "Curriculum" [ref=e46] [cursor=pointer]:
+                    - /url: /app/curriculum
+                    - img [ref=e47]
+                    - generic [ref=e49]: Curriculum
+                - link "Progress" [ref=e50] [cursor=pointer]:
+                    - /url: /app/progress
+                    - img [ref=e51]
+                    - generic [ref=e53]: Progress
+                - link "Attendance" [ref=e54] [cursor=pointer]:
+                    - /url: /app/attendance
+                    - img [ref=e55]
+                    - generic [ref=e57]: Attendance
+                - link "Reports 4" [ref=e58] [cursor=pointer]:
+                    - /url: /app/reports
+                    - img [ref=e59]
+                    - generic [ref=e61]: Reports
+                    - generic [ref=e62]: "4"
+            - button "Online" [ref=e65] [cursor=pointer]:
+                - img [ref=e66]
+                - text: Online
+            - generic [ref=e70]:
+                - generic [ref=e71]: TE
+                - generic [ref=e72]:
+                    - generic [ref=e73]: teacher@example.school
+                    - generic [ref=e74]: Lead guide
+                - button "Account menu" [ref=e76] [cursor=pointer]:
+                    - generic [ref=e77]: T
+        - main [ref=e79]:
+            - generic [ref=e80]:
+                - button "Online" [ref=e81] [cursor=pointer]:
+                    - img [ref=e82]
+                    - text: Online
+                - button "Account menu" [ref=e87] [cursor=pointer]:
+                    - generic [ref=e88]: T
+            - generic [ref=e89]:
+                - generic [ref=e91]:
+                    - generic [ref=e92]: Tuesday · April 30
+                    - generic [ref=e94]:
+                        - heading "Today" [level=1] [ref=e95]
+                        - generic [ref=e96]: Work cycle started 22 minutes ago.
+                - generic [ref=e97]:
+                    - generic [ref=e98]:
+                        - button "Primrose Room Attendance open 14 of 18 children present AO BC DR EO IM KN LS MK NH RT PM TW FN VL" [ref=e99] [cursor=pointer]:
+                            - generic [ref=e100]:
+                                - generic [ref=e101]: Primrose Room
+                                - generic [ref=e102]: Attendance open
+                            - generic [ref=e104]:
+                                - generic [ref=e105]:
+                                    - generic [ref=e106]: "14"
+                                    - generic [ref=e107]: of 18 children present
+                                - generic [ref=e108]:
+                                    - generic [ref=e109]: AO
+                                    - generic [ref=e110]: BC
+                                    - generic [ref=e111]: DR
+                                    - generic [ref=e112]: EO
+                                    - generic [ref=e113]: IM
+                                    - generic [ref=e114]: KN
+                                    - generic [ref=e115]: LS
+                                    - generic [ref=e116]: MK
+                                    - generic [ref=e117]: NH
+                                    - generic [ref=e118]: RT
+                                    - generic [ref=e119]: PM
+                                    - generic [ref=e120]: TW
+                                    - generic [ref=e121]: FN
+                                    - generic [ref=e122]: VL
+                        - button "2 observations awaiting in chat Tap chat below to review and approve." [ref=e127] [cursor=pointer]:
+                            - generic [ref=e128]:
+                                - generic [ref=e129]: 2 observations awaiting in chat
+                                - generic [ref=e130]: Tap chat below to review and approve.
+                            - img [ref=e131]
+                        - generic [ref=e133]:
+                            - generic [ref=e134]:
+                                - generic [ref=e135]: Captured today
+                                - generic [ref=e136]: 3 observations · 2 awaiting in chat
+                            - generic [ref=e137]:
+                                - generic [ref=e138]: AO
+                                - generic [ref=e139]:
+                                    - generic [ref=e140]: Ada Okafor Drawn to the pink tower repeatedly — worth surfacing in next family conference.
+                                    - generic [ref=e141]: Private note · not shared with family
+                                - generic [ref=e142]: pending
+                                - button "in chat" [ref=e143] [cursor=pointer]:
+                                    - text: in chat
+                                    - img [ref=e144]
+                            - generic [ref=e147]:
+                                - generic [ref=e148]: AO
+                                - generic [ref=e149]:
+                                    - generic [ref=e150]: Ada Okafor Sensorial → Pink tower · third return this week, built correctly on first try.
+                                    - generic [ref=e151]: Sensorial · Practicing
+                                - generic [ref=e152]: pending
+                                - button "in chat" [ref=e153] [cursor=pointer]:
+                                    - text: in chat
+                                    - img [ref=e154]
+                            - generic [ref=e157]:
+                                - generic [ref=e158]: MK
+                                - generic [ref=e159]:
+                                    - generic [ref=e160]: Mira Khan Math → Teen board · independently completed 11 to 19.
+                                    - generic [ref=e161]: Math · Mastered
+                                - img [ref=e162]
+                    - generic [ref=e164]:
+                        - generic [ref=e165]:
+                            - generic [ref=e166]:
+                                - generic [ref=e167]: Drafts
+                                - generic [ref=e168]: 3 daily reports
+                            - generic [ref=e169]:
+                                - generic [ref=e170]: AO
+                                - generic [ref=e171]:
+                                    - generic [ref=e172]: Ada Okafor
+                                    - generic [ref=e173]: Daily report · Apr 30
+                                - button "Send" [ref=e174] [cursor=pointer]
+                            - generic [ref=e175]:
+                                - generic [ref=e176]: DR
+                                - generic [ref=e177]:
+                                    - generic [ref=e178]: Diego Ramos
+                                    - generic [ref=e179]: Daily report · Apr 30
+                                - button "Send" [ref=e180] [cursor=pointer]
+                            - generic [ref=e181]:
+                                - generic [ref=e182]: BC
+                                - generic [ref=e183]:
+                                    - generic [ref=e184]: Bea Chen
+                                    - generic [ref=e185]: Daily report · Spring 2026
+                                - button "Send" [ref=e186] [cursor=pointer]
+                        - generic [ref=e187]:
+                            - generic [ref=e188]: Take your time.
+                            - img [ref=e190]
+                            - generic [ref=e192]:
+                                - text: Tap
+                                - emphasis [ref=e193]: Ask Mitable
+                                - text: any time — by voice, photo, or note. Nothing syncs until you approve.
+    - button "Ask Mitable 2" [ref=e194] [cursor=pointer]:
+        - img [ref=e196]
+        - generic [ref=e198]: Ask Mitable
+        - generic [ref=e199]: "2"
+    - generic [ref=e200]:
+        - img [ref=e202]
+        - generic [ref=e205]:
+            - generic [ref=e206]: Install Mitable
+            - generic [ref=e207]: Add to home screen for offline capture.
+        - button "Install" [ref=e208] [cursor=pointer]
+        - button [ref=e209] [cursor=pointer]:
+            - img [ref=e210]

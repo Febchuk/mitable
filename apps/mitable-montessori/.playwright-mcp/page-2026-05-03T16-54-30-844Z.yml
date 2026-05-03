@@ -1,0 +1,226 @@
+- generic [active] [ref=e1]:
+    - generic [ref=e2]:
+        - complementary [ref=e3]:
+            - generic [ref=e4]:
+                - generic [ref=e5]: Mitable
+                - generic [ref=e6]: Montessori
+            - generic [ref=e7]:
+                - generic [ref=e8]: C
+                - generic [ref=e9]:
+                    - generic [ref=e10]: Cypress Room
+                    - generic [ref=e11]: 18 children
+                - img [ref=e12]
+            - navigation [ref=e14]:
+                - link "Today" [ref=e15] [cursor=pointer]:
+                    - /url: /app/today
+                    - img [ref=e16]
+                    - generic [ref=e18]: Today
+                - link "Roster" [ref=e19] [cursor=pointer]:
+                    - /url: /app/roster
+                    - img [ref=e20]
+                    - generic [ref=e25]: Roster
+                - link "Curriculum" [ref=e26] [cursor=pointer]:
+                    - /url: /app/curriculum
+                    - img [ref=e27]
+                    - generic [ref=e29]: Curriculum
+                - link "Progress" [ref=e30] [cursor=pointer]:
+                    - /url: /app/progress
+                    - img [ref=e31]
+                    - generic [ref=e33]: Progress
+                - link "Attendance" [ref=e34] [cursor=pointer]:
+                    - /url: /app/attendance
+                    - img [ref=e35]
+                    - generic [ref=e37]: Attendance
+                - link "Reports 4" [ref=e38] [cursor=pointer]:
+                    - /url: /app/reports
+                    - img [ref=e39]
+                    - generic [ref=e41]: Reports
+                    - generic [ref=e42]: "4"
+            - button "Online" [ref=e45] [cursor=pointer]:
+                - img [ref=e46]
+                - text: Online
+            - generic [ref=e50]:
+                - generic [ref=e51]: TE
+                - generic [ref=e52]:
+                    - generic [ref=e53]: teacher@example.school
+                    - generic [ref=e54]: Lead guide
+                - button "Account menu" [ref=e56] [cursor=pointer]:
+                    - generic [ref=e57]: T
+        - main [ref=e59]:
+            - generic [ref=e60]:
+                - button "Online" [ref=e61] [cursor=pointer]:
+                    - img [ref=e62]
+                    - text: Online
+                - button "Account menu" [ref=e67] [cursor=pointer]:
+                    - generic [ref=e68]: T
+            - generic [ref=e69]:
+                - generic [ref=e70]:
+                    - link "All reports" [ref=e72] [cursor=pointer]:
+                        - /url: /app/reports
+                        - img [ref=e73]
+                        - generic [ref=e75]: All reports
+                    - generic [ref=e76]:
+                        - generic [ref=e77]:
+                            - generic [ref=e78]: AO
+                            - generic [ref=e79]:
+                                - generic [ref=e80]:
+                                    - heading "Daily report — Ada" [level=1] [ref=e81]
+                                    - generic [ref=e82]: Draft
+                                - generic [ref=e84]:
+                                    - generic [ref=e85]: Daily
+                                    - generic [ref=e87]: Friday, May 2
+                                    - generic [ref=e89]: Sunflower classroom
+                                    - generic [ref=e91]: Saved 3 min ago
+                        - generic [ref=e92]:
+                            - button "Save draft" [ref=e93] [cursor=pointer]:
+                                - img [ref=e94]
+                                - text: Save draft
+                            - button "Submit for review" [ref=e97] [cursor=pointer]:
+                                - text: Submit for review
+                                - img [ref=e98]
+                - generic [ref=e101]:
+                    - complementary "Editing assistant" [ref=e102]:
+                        - generic [ref=e103]:
+                            - generic [ref=e104]:
+                                - generic [ref=e105]:
+                                    - img [ref=e107]
+                                    - generic [ref=e109]: Editing assistant
+                                - generic [ref=e110]: Discuss edits, pull from today’s observations
+                            - button "Conversation history (coming soon)" [ref=e111]:
+                                - img [ref=e112]
+                        - generic [ref=e115]:
+                            - generic [ref=e116]:
+                                - img [ref=e118]
+                                - generic [ref=e120]: I drafted Ada's day from 4 voice notes and 2 photos you captured. The morning paragraph is the one I'm least sure about — the audio was a bit rushed. Want to start there?
+                            - generic [ref=e122]: Yeah — the morning feels clinical. Make it warmer, like how I'd actually tell her parents.
+                            - generic [ref=e123]:
+                                - img [ref=e125]
+                                - generic [ref=e127]:
+                                    - text: "Here's a warmer take. Same facts, more like how you'd say it at pickup:"
+                                    - generic [ref=e128]:
+                                        - generic [ref=e129]:
+                                            - generic [ref=e130]: Suggested rewrite
+                                            - generic [ref=e131]: → Morning paragraph
+                                        - generic [ref=e132]:
+                                            - generic [ref=e133]: Ada arrived at 8:42 and selected the pink tower. She completed the sequence with no errors and returned the materials properly.
+                                            - generic [ref=e134]: Ada came in quietly this morning and headed straight for the pink tower — she's been drawn to it for two weeks now. She built it in one steady go, hands sure of where each cube belonged, and put everything back without being asked.
+                                        - generic [ref=e135]:
+                                            - button "Apply edit" [ref=e136] [cursor=pointer]:
+                                                - img [ref=e137]
+                                                - text: Apply edit
+                                            - button "Skip" [ref=e139] [cursor=pointer]
+                                            - button "Try another" [ref=e140] [cursor=pointer]:
+                                                - img [ref=e141]
+                                                - text: Try another
+                            - generic [ref=e145]: Also — should I mention Mateo? They worked together for a bit.
+                            - generic [ref=e146]:
+                                - img [ref=e148]
+                                - generic [ref=e150]:
+                                    - text: "Good call. Two ways to handle it:"
+                                    - generic [ref=e151]:
+                                        - button "Keep focus on Ada, mention Mateo briefly" [ref=e152]
+                                        - button "Drop Mateo — Ada's report" [ref=e153]
+                                        - button "Add a sentence about their collaboration" [ref=e154]
+                            - generic [ref=e155]:
+                                - img [ref=e157]
+                                - generic [ref=e159]:
+                                    - text: I have a photo from 10:14 you didn't reference yet — Ada tracing the sandpaper letter "S" with Mateo watching. Want to pull it into the report?
+                                    - generic [ref=e160]:
+                                        - generic [ref=e161]: 📷
+                                        - generic [ref=e162]:
+                                            - generic [ref=e163]: 10:14 AM · Language area
+                                            - generic [ref=e164]: '"Ada traced S three times slowly. Mateo asked if he could try."'
+                                        - button "Pull in" [ref=e165] [cursor=pointer]:
+                                            - img [ref=e166]
+                                            - text: Pull in
+                        - generic [ref=e167]:
+                            - generic [ref=e168]:
+                                - textbox "Message the editing assistant (coming soon)" [disabled] [ref=e169]:
+                                    - /placeholder: Chat assistant coming soon
+                                - generic [ref=e170]:
+                                    - button "Chat assistant is coming soon — try the editor on the right for now." [disabled] [ref=e171]:
+                                        - img [ref=e172]
+                                    - button "Chat assistant is coming soon — try the editor on the right for now." [disabled] [ref=e175]:
+                                        - img [ref=e176]
+                            - generic [ref=e179]:
+                                - generic [ref=e180]: ⌘ K
+                                - generic [ref=e181]: commands
+                                - generic [ref=e182]: /
+                                - generic [ref=e183]: edit specific section
+                    - main [ref=e184]:
+                        - article [ref=e186]:
+                            - textbox "Report title" [ref=e187]: A steady Friday for Ada
+                            - generic [ref=e188]:
+                                - generic [ref=e189]: Observed by Ms. Lena
+                                - generic [ref=e191]: 4 voice notes · 2 photos · 1 worksheet
+                            - generic [ref=e192]:
+                                - generic [ref=e193]:
+                                    - generic [ref=e194]: Morning
+                                    - button "Delete Morning section" [ref=e196] [cursor=pointer]:
+                                        - img [ref=e197]
+                                - generic [ref=e200]:
+                                    - button "Discuss" [ref=e202] [cursor=pointer]:
+                                        - img [ref=e203]
+                                        - text: Discuss
+                                    - textbox "Morning paragraph" [ref=e205]
+                            - generic [ref=e206]:
+                                - generic [ref=e207]:
+                                    - generic [ref=e208]: Language
+                                    - button "Delete Language section" [ref=e210] [cursor=pointer]:
+                                        - img [ref=e211]
+                                - generic [ref=e214]:
+                                    - button "Discuss" [ref=e216] [cursor=pointer]:
+                                        - img [ref=e217]
+                                        - text: Discuss
+                                    - textbox "Language paragraph" [ref=e219]
+                                - generic [ref=e220]:
+                                    - generic [ref=e221]:
+                                        - img [ref=e222]
+                                        - text: Suggested addition · from 10:14 photo
+                                    - generic [ref=e224]: Mira joined her briefly, watching her tracing pace before asking to take a turn — a small, unprompted moment of peer interest.
+                                    - generic [ref=e225]:
+                                        - button "Accept" [ref=e226] [cursor=pointer]
+                                        - button "Reject" [ref=e227] [cursor=pointer]
+                                        - button "Edit first" [ref=e228] [cursor=pointer]
+                            - generic [ref=e229]:
+                                - generic [ref=e230]:
+                                    - generic [ref=e231]: Afternoon
+                                    - button "Delete Afternoon section" [ref=e233] [cursor=pointer]:
+                                        - img [ref=e234]
+                                - generic [ref=e237]:
+                                    - button "Discuss" [ref=e239] [cursor=pointer]:
+                                        - img [ref=e240]
+                                        - text: Discuss
+                                    - textbox "Afternoon paragraph" [ref=e242]
+                            - generic [ref=e243]:
+                                - generic [ref=e244]:
+                                    - generic [ref=e245]: Social & emotional
+                                    - button "Delete Social & emotional section" [ref=e247] [cursor=pointer]:
+                                        - img [ref=e248]
+                                - generic [ref=e251]:
+                                    - button "Discuss" [ref=e253] [cursor=pointer]:
+                                        - img [ref=e254]
+                                        - text: Discuss
+                                    - textbox "Social & emotional paragraph" [ref=e256]
+                            - button "Add section" [ref=e257] [cursor=pointer]:
+                                - img [ref=e258]
+                                - text: Add section
+                        - generic [ref=e259]:
+                            - generic [ref=e260]:
+                                - generic [ref=e261]: Visible to
+                                - generic [ref=e262]: Ada's parents · Lead teacher
+                            - generic [ref=e263]:
+                                - button "Reject draft" [ref=e264] [cursor=pointer]
+                                - button "Save & close" [ref=e265] [cursor=pointer]
+    - button "Ask Mitable 2" [ref=e266] [cursor=pointer]:
+        - img [ref=e268]
+        - generic [ref=e270]: Ask Mitable
+        - generic [ref=e271]: "2"
+    - generic [ref=e272]:
+        - img [ref=e274]
+        - generic [ref=e277]:
+            - generic [ref=e278]: Install Mitable
+            - generic [ref=e279]: Add to home screen for offline capture.
+        - button "Install" [ref=e280] [cursor=pointer]
+        - button [ref=e281] [cursor=pointer]:
+            - img [ref=e282]

@@ -6,16 +6,20 @@ import {
   CHILDREN,
   INITIAL_ATTENDANCE,
   INITIAL_CHAT,
-  INITIAL_PROGRESS,
+  INITIAL_PROGRESS_BY_TOPIC,
   INITIAL_REPORTS,
   SCRIPTED_REPLIES,
   SUBTOPICS,
+  SUBTOPICS_BY_TOPIC,
   findChild,
   type AttendanceMark,
+  type CellNote,
   type ChatMessage,
   type ObservationMessage,
   type ProgressMark,
+  type RecentUpdateEntry,
   type Report,
+  type Topic,
 } from "./data";
 import { HandCheck, ToastBus } from "./primitives";
 
@@ -33,6 +37,10 @@ export type MontessoriStore = {
   // data
   chat: ChatMessage[];
   reports: Report[];
+  progressByTopic: Record<Topic, Record<string, ProgressMark[]>>;
+  notesByTopic: Record<Topic, Record<string, CellNote[]>>;
+  recentUpdates: RecentUpdateEntry[];
+  /** Sensorial-only view, kept so existing callers (e.g. ChildDetail) stay unchanged. */
   progress: Record<string, ProgressMark[]>;
   attendance: Record<string, AttendanceMark[]>;
   reportsFilter: string;
@@ -60,7 +68,21 @@ export type MontessoriStore = {
   addAssistantText: (text: string) => string;
   addObservations: (cards: Array<Omit<ObservationMessage, "id" | "type" | "status">>) => string[];
   approveReport: (id: string) => void;
+  /** Create a new in-session report and return its id. Mock-only — no
+     persistence. The /app/reports/[id] page reads it via findReport(id)
+     once the store has it. */
+  createReport: (input: {
+    childId: string;
+    kind: Report["kind"];
+    detail?: Report["detail"];
+  }) => string;
   toggleAttendance: (childId: string, dayIndex: number) => void;
+  applyBulkProgress: (args: {
+    topic: Topic;
+    cells: string[];
+    status: ProgressMark;
+    note?: string;
+  }) => void;
   clearAll: () => void;
 };
 
@@ -77,8 +99,21 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
   const [webChatMode, setWebChatMode] = React.useState<ChatMode>("pill");
   const [chat, setChat] = React.useState<ChatMessage[]>(INITIAL_CHAT);
   const [reports, setReports] = React.useState<Report[]>(INITIAL_REPORTS);
-  const [progress, setProgress] = React.useState(INITIAL_PROGRESS);
+  const [progressByTopic, setProgressByTopic] = React.useState(INITIAL_PROGRESS_BY_TOPIC);
+  const [notesByTopic, setNotesByTopic] = React.useState<Record<Topic, Record<string, CellNote[]>>>(
+    () => ({
+      Sensorial: {},
+      "Practical Life": {},
+      Language: {},
+      Math: {},
+    })
+  );
+  const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>([]);
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
+
+  // Sensorial view kept for back-compat with the chat-agent observation flow
+  // and the curriculum/whole-child surfaces that still read store.progress.
+  const progress = progressByTopic.Sensorial;
   const [reportsFilter, setReportsFilter] = React.useState("All");
   const [rosterFilter, setRosterFilter] = React.useState("All");
   const [selectedChild, setSelectedChild] = React.useState<string | null>(null);
@@ -133,15 +168,83 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
                   ? "i"
                   : null;
           if (lvl) {
-            setProgress((prev) => ({
-              ...prev,
-              [obs.childId]: prev[obs.childId].map((v, i) => (i === subIdx ? lvl : v)),
-            }));
+            setProgressByTopic((prev) => {
+              const sensorial = prev.Sensorial;
+              const childRow = sensorial[obs.childId];
+              if (!childRow) return prev;
+              return {
+                ...prev,
+                Sensorial: {
+                  ...sensorial,
+                  [obs.childId]: childRow.map((v, i) => (i === subIdx ? lvl : v)),
+                },
+              };
+            });
           }
         }
       }
     },
     [chat, progress]
+  );
+
+  const applyBulkProgress = React.useCallback(
+    ({
+      topic,
+      cells,
+      status,
+      note,
+    }: {
+      topic: Topic;
+      cells: string[];
+      status: ProgressMark;
+      note?: string;
+    }) => {
+      if (cells.length === 0) return;
+      const trimmedNote = note?.trim() || "";
+      const when = "just now";
+
+      setProgressByTopic((prev) => {
+        const topicRow = { ...(prev[topic] || {}) };
+        for (const k of cells) {
+          const [cid, idxStr] = k.split(":");
+          const row = topicRow[cid];
+          if (!row) continue;
+          const idx = parseInt(idxStr, 10);
+          const next = row.slice();
+          next[idx] = status;
+          topicRow[cid] = next;
+        }
+        return { ...prev, [topic]: topicRow };
+      });
+
+      if (trimmedNote) {
+        setNotesByTopic((prev) => {
+          const topicNotes = { ...(prev[topic] || {}) };
+          for (const k of cells) {
+            topicNotes[k] = [{ noteText: trimmedNote, when, status }, ...(topicNotes[k] || [])];
+          }
+          return { ...prev, [topic]: topicNotes };
+        });
+      }
+
+      const subs = SUBTOPICS_BY_TOPIC[topic] || [];
+      const newEntries: RecentUpdateEntry[] = cells.map((k) => {
+        const [cid, idxStr] = k.split(":");
+        const idx = parseInt(idxStr, 10);
+        return {
+          id: Math.random().toString(36).slice(2),
+          topic,
+          subtopicName: subs[idx] || "",
+          childId: cid,
+          subtopicIdx: idx,
+          status,
+          noteText: trimmedNote || null,
+          when,
+        };
+      });
+      setRecentUpdates((prev) => [...newEntries, ...prev].slice(0, 60));
+    },
+    []
   );
 
   const setAsideObservation = React.useCallback((id: string) => {
@@ -201,7 +304,14 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
   const clearAll = React.useCallback(() => {
     setChat(INITIAL_CHAT);
     setReports(INITIAL_REPORTS);
-    setProgress(INITIAL_PROGRESS);
+    setProgressByTopic(INITIAL_PROGRESS_BY_TOPIC);
+    setNotesByTopic({
+      Sensorial: {},
+      "Practical Life": {},
+      Language: {},
+      Math: {},
+    });
+    setRecentUpdates([]);
     setAttendance(INITIAL_ATTENDANCE);
   }, []);
 
@@ -218,6 +328,28 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
       }
     },
     [reports]
+  );
+
+  const createReport = React.useCallback(
+    (input: { childId: string; kind: Report["kind"]; detail?: Report["detail"] }) => {
+      const id = "r-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const today = new Date();
+      const when = today.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      setReports((prev) => [
+        {
+          id,
+          childId: input.childId,
+          kind: input.kind,
+          when,
+          period: "today",
+          status: "draft",
+          detail: input.detail,
+        },
+        ...prev,
+      ]);
+      return id;
+    },
+    []
   );
 
   const toggleAttendance = React.useCallback((childId: string, dayIndex: number) => {
@@ -239,6 +371,9 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
     setWebChatMode,
     chat,
     reports,
+    progressByTopic,
+    notesByTopic,
+    recentUpdates,
     progress,
     attendance,
     reportsFilter,
@@ -260,7 +395,9 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
     addAssistantText,
     addObservations,
     approveReport,
+    createReport,
     toggleAttendance,
+    applyBulkProgress,
     clearAll,
   };
 
