@@ -23,7 +23,7 @@ export interface AgentRunInput {
   studentRef: string;
   classroomToken: string;
   classroomRef: string;
-  reportType: "daily" | "major";
+  reportType: "daily" | "major" | "incident";
   periodStart: string;
   periodEnd: string;
   adapter: ReportDataAdapter;

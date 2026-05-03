@@ -728,61 +728,18 @@ const BEA_DETAIL: ReportDetail = {
   ],
 };
 
-export const INITIAL_REPORTS: Report[] = [
-  {
-    id: "r1",
-    childId: "ada",
-    kind: "Daily",
-    when: "Apr 30",
-    period: "today",
-    status: "draft",
-    detail: ADA_DETAIL,
-  },
-  {
-    id: "r2",
-    childId: "dgo",
-    kind: "Daily",
-    when: "Apr 30",
-    period: "today",
-    status: "draft",
-    detail: DIEGO_DETAIL,
-  },
-  {
-    id: "r3",
-    childId: "mira",
-    kind: "Major",
-    when: "Spring 2026",
-    period: "spring period",
-    status: "review",
-  },
-  {
-    id: "r4",
-    childId: "bea",
-    kind: "Major",
-    when: "Spring 2026",
-    period: "spring period",
-    status: "draft",
-    detail: BEA_DETAIL,
-  },
-  { id: "r5", childId: "levi", kind: "Daily", when: "Apr 29", period: "yesterday", status: "sent" },
-  { id: "r6", childId: "bea", kind: "Daily", when: "Apr 28", period: "2 days ago", status: "sent" },
-  {
-    id: "r7",
-    childId: "iris",
-    kind: "Daily",
-    when: "Apr 28",
-    period: "2 days ago",
-    status: "sent",
-  },
-  {
-    id: "r8",
-    childId: "dgo",
-    kind: "Major",
-    when: "Winter 2026",
-    period: "last term",
-    status: "sent",
-  },
-];
+/** Mock reports were retired when the reports list moved to real Supabase
+   data. Kept as an empty seed so the in-memory store and the bottom-nav
+   draft-count badge keep type-checking; bottom-nav still reads from the
+   store but the count will always be 0 here. The real list lives at
+   /app/reports backed by listReports() in src/lib/queries/reports.ts. */
+export const INITIAL_REPORTS: Report[] = [];
+
+// Sample detail blocks retained for tests that exercise the editor pane
+// directly with mock data.
+void ADA_DETAIL;
+void DIEGO_DETAIL;
+void BEA_DETAIL;
 
 export const INITIAL_CHAT: ChatMessage[] = [
   { id: "d1", type: "divider", label: "This morning · 8:42" },

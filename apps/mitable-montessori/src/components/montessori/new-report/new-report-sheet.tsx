@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { ArrowRight, X } from "lucide-react";
-import type { Child } from "../data";
-import { ChildPicker } from "./child-picker";
+import { ChildPicker, type PickerChild } from "./child-picker";
 import { TypePicker } from "./type-picker";
 import { AudioOptCard } from "./audio-block";
 import { NotesOptCard } from "./notes-block";
@@ -17,16 +16,26 @@ import {
   type ReportTemplate,
 } from "./mock-data";
 
+type CapturedToday = Record<string, { voice: number; photos: number }>;
+
 export function NewReportSheet({
   open,
   onClose,
   onSubmit,
+  roster,
+  capturedToday,
+  templates,
+  submitting,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (payload: NewReportPayload) => void;
+  roster: PickerChild[];
+  capturedToday: CapturedToday;
+  templates: ReportTemplate[];
+  submitting?: boolean;
 }) {
-  const [child, setChild] = React.useState<Child | null>(null);
+  const [child, setChild] = React.useState<PickerChild | null>(null);
   const [kind, setKind] = React.useState<ReportKind | null>(null);
   const [notes, setNotes] = React.useState<CapturedNote[]>([]);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
@@ -57,7 +66,7 @@ export function NewReportSheet({
 
   if (!open) return null;
 
-  const canStart = !!child && !!kind && recorder.state !== "recording";
+  const canStart = !!child && !!kind && recorder.state !== "recording" && !submitting;
   const isRecording = recorder.state === "recording";
 
   const submit = () => {
@@ -106,7 +115,12 @@ export function NewReportSheet({
               <span className="nr-label-cap">Child</span>
               <span className="nr-req">required</span>
             </div>
-            <ChildPicker value={child} onChange={setChild} />
+            <ChildPicker
+              value={child}
+              onChange={setChild}
+              roster={roster}
+              capturedToday={capturedToday}
+            />
           </div>
 
           <div className="nr-field">
@@ -143,7 +157,7 @@ export function NewReportSheet({
                   });
                 }}
               />
-              <TemplateOptCard selected={template} onPick={setTemplate} />
+              <TemplateOptCard selected={template} onPick={setTemplate} templates={templates} />
             </div>
           </div>
         </div>
@@ -160,7 +174,7 @@ export function NewReportSheet({
               disabled={!canStart}
               onClick={submit}
             >
-              Start drafting
+              {submitting ? "Starting…" : "Start drafting"}
               <ArrowRight size={14} strokeWidth={2.5} />
             </button>
           </div>
@@ -178,7 +192,7 @@ function NrSummary({
   noteCount,
   templateName,
 }: {
-  child: Child | null;
+  child: PickerChild | null;
   kind: ReportKind | null;
   audioDuration: number | null;
   isRecording: boolean;
