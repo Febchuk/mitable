@@ -177,3 +177,42 @@ export interface SyncMetaRow {
   key: string;
   value: string;
 }
+
+// Whole-child assessment data model (migration 0012).
+
+export type AxisLevel = "Emerging" | "Practicing" | "Deepening" | "Leading";
+
+export interface AxisRow {
+  id: string;
+  schoolId: string;
+  key: string;
+  label: string;
+  /** { Emerging: "...", Practicing: "...", Deepening: "...", Leading: "..." } */
+  descriptors: Record<AxisLevel, string>;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface AxisAssessmentRow {
+  id: string;
+  studentId: string;
+  axisKey: string;
+  level: AxisLevel;
+  assessedAt: string;
+  endedAt: string | null;
+  sourceObservationId: string | null;
+  authorUserId: string | null;
+}
+
+export interface WholeChildObservationRow {
+  id: string;
+  studentId: string;
+  axisKey: string;
+  fromLevel: AxisLevel | null;
+  toLevel: AxisLevel | null;
+  note: string;
+  /** Optional FK to commands(id) — the curriculum-side observation that prompted this note. */
+  sourceObservationId: string | null;
+  authorUserId: string;
+  createdAt: string;
+}

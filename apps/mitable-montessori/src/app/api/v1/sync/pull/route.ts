@@ -47,6 +47,9 @@ export async function GET() {
     curricula,
     curriculumTopics,
     curriculumSubtopics,
+    axes,
+    axisAssessments,
+    wholeChildObservations,
   ] = await Promise.all([
     supabase
       .from("students")
@@ -81,6 +84,21 @@ export async function GET() {
       .from("curriculum_subtopics")
       .select("id, topic_id, name, sort_order, is_active, aliases")
       .eq("is_active", true),
+    supabase
+      .from("axes")
+      .select("id, school_id, key, label, descriptors, sort_order, is_active")
+      .eq("is_active", true),
+    supabase
+      .from("axis_assessments")
+      .select(
+        "id, student_id, axis_key, level, assessed_at, ended_at, source_observation_id, author_user_id"
+      )
+      .is("ended_at", null),
+    supabase
+      .from("whole_child_observations")
+      .select(
+        "id, student_id, axis_key, from_level, to_level, note, source_observation_id, author_user_id, created_at"
+      ),
   ]);
 
   for (const r of [
@@ -93,6 +111,9 @@ export async function GET() {
     curricula,
     curriculumTopics,
     curriculumSubtopics,
+    axes,
+    axisAssessments,
+    wholeChildObservations,
   ]) {
     if (r.error) {
       return NextResponse.json({ error: r.error.message }, { status: 500 });
@@ -113,6 +134,9 @@ export async function GET() {
       curricula: curricula.data ?? [],
       curriculum_topics: curriculumTopics.data ?? [],
       curriculum_subtopics: curriculumSubtopics.data ?? [],
+      axes: axes.data ?? [],
+      axis_assessments: axisAssessments.data ?? [],
+      whole_child_observations: wholeChildObservations.data ?? [],
     },
   });
 }

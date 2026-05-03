@@ -3,6 +3,8 @@
 import Dexie, { type Table } from "dexie";
 import type {
   AttendanceProjRow,
+  AxisAssessmentRow,
+  AxisRow,
   ChatProposalRow,
   ClassroomRow,
   ClassroomTeacherRow,
@@ -15,6 +17,7 @@ import type {
   ReportRow,
   StudentGuardianRow,
   SyncMetaRow,
+  WholeChildObservationRow,
 } from "@/lib/db/types";
 
 /** PII tables are stored as encrypted envelopes; decryption happens on read. */
@@ -41,6 +44,9 @@ export class MontessoriDb extends Dexie {
   reports!: Table<ReportRow, string>;
   chatProposals!: Table<ChatProposalRow, string>;
   syncMeta!: Table<SyncMetaRow, string>;
+  axes!: Table<AxisRow, string>;
+  axisAssessments!: Table<AxisAssessmentRow, string>;
+  wholeChildObservations!: Table<WholeChildObservationRow, string>;
 
   constructor() {
     super("mitable-montessori");
@@ -70,6 +76,15 @@ export class MontessoriDb extends Dexie {
     // Dexie auto-rebuilds the indices on upgrade.
     this.version(2).stores({
       attendanceProj: "[studentId+date], date, studentId",
+    });
+
+    // v3 — whole-child assessment tables (migration 0012). Active assessments
+    // are filtered via where("endedAt").equals(null), so we only need a
+    // student+axis index for the lookup.
+    this.version(3).stores({
+      axes: "id, schoolId, key, sortOrder",
+      axisAssessments: "id, [studentId+axisKey], studentId, endedAt",
+      wholeChildObservations: "id, studentId, [studentId+axisKey], createdAt",
     });
   }
 }

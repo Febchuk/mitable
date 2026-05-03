@@ -1,14 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { AXES, LEVELS, LEVEL_TONES, type Axis, type AxisKey } from "../mock-data";
+import { LEVELS, LEVEL_TONES, type Level } from "../mock-data";
 import { CloseIcon, ExpandIcon } from "../icons";
 
+/** Shape the spider needs for each axis: a level it can plot + descriptors for the popover. */
+export type SpiderAxis = {
+  key: string;
+  label: string;
+  level: Level;
+  /** Display string for "last updated" — empty allowed. */
+  updated: string;
+  descriptors: Record<Level, string>;
+};
+
 type SpiderProps = {
-  axes: Axis[];
+  axes: SpiderAxis[];
   size?: number;
-  onAxisHover: (key: AxisKey) => void;
-  hoveredKey: AxisKey | null;
+  onAxisHover: (key: string) => void;
+  hoveredKey: string | null;
   mobile: boolean;
 };
 
@@ -166,14 +176,15 @@ export function Spider({ axes, size = 360, onAxisHover, hoveredKey, mobile }: Sp
 }
 
 type SpiderCardProps = {
+  axes: SpiderAxis[];
   mobile: boolean;
   size?: number;
-  selectedAxis: AxisKey | null;
-  onSelectAxis: (key: AxisKey | null) => void;
+  selectedAxis: string | null;
+  onSelectAxis: (key: string | null) => void;
 };
 
-export function SpiderCard({ mobile, size, selectedAxis, onSelectAxis }: SpiderCardProps) {
-  const handleAxisClick = (key: AxisKey) => {
+export function SpiderCard({ axes, mobile, size, selectedAxis, onSelectAxis }: SpiderCardProps) {
+  const handleAxisClick = (key: string) => {
     onSelectAxis(key === selectedAxis ? null : key);
   };
   const finalSize = size || (mobile ? 340 : 460);
@@ -181,7 +192,7 @@ export function SpiderCard({ mobile, size, selectedAxis, onSelectAxis }: SpiderC
     <div className="spider-card">
       <div style={{ width: "100%", aspectRatio: "1 / 1", position: "relative" }}>
         <Spider
-          axes={AXES}
+          axes={axes}
           size={finalSize}
           onAxisHover={handleAxisClick}
           hoveredKey={selectedAxis}
@@ -198,6 +209,7 @@ type HeroProps = SpiderCardProps & {
 };
 
 export function SpiderHeroCard({
+  axes,
   mobile,
   size,
   selectedAxis,
@@ -242,7 +254,7 @@ export function SpiderHeroCard({
         }}
       >
         <Spider
-          axes={AXES}
+          axes={axes}
           size={finalSize}
           onAxisHover={(key) => onSelectAxis(key === selectedAxis ? null : key)}
           hoveredKey={selectedAxis}
@@ -264,8 +276,8 @@ export function SpiderHeroCard({
   );
 }
 
-export function AxisDescriptorInline({ axisKey }: { axisKey: AxisKey }) {
-  const axis = AXES.find((a) => a.key === axisKey);
+export function AxisDescriptorInline({ axes, axisKey }: { axes: SpiderAxis[]; axisKey: string }) {
+  const axis = axes.find((a) => a.key === axisKey);
   if (!axis) return null;
   const t = LEVEL_TONES[axis.level];
   return (
@@ -286,22 +298,26 @@ export function AxisDescriptorInline({ axisKey }: { axisKey: AxisKey }) {
       <div style={{ fontSize: 13, color: "var(--color-ink)", lineHeight: 1.45 }}>
         {axis.descriptors[axis.level]}
       </div>
-      <div style={{ fontSize: 11, color: "var(--color-ink-muted)", marginTop: 6 }}>
-        Last updated {axis.updated}
-      </div>
+      {axis.updated && (
+        <div style={{ fontSize: 11, color: "var(--color-ink-muted)", marginTop: 6 }}>
+          Last updated {axis.updated}
+        </div>
+      )}
     </div>
   );
 }
 
 type SpiderModalProps = {
+  axes: SpiderAxis[];
   open: boolean;
   onClose: () => void;
   mobile: boolean;
-  selectedAxis: AxisKey | null;
-  onSelectAxis: (key: AxisKey | null) => void;
+  selectedAxis: string | null;
+  onSelectAxis: (key: string | null) => void;
 };
 
 export function SpiderModal({
+  axes,
   open,
   onClose,
   mobile,
@@ -387,10 +403,15 @@ export function SpiderModal({
         </div>
 
         <div style={{ marginTop: 4 }}>
-          <SpiderCard mobile={mobile} selectedAxis={selectedAxis} onSelectAxis={onSelectAxis} />
+          <SpiderCard
+            axes={axes}
+            mobile={mobile}
+            selectedAxis={selectedAxis}
+            onSelectAxis={onSelectAxis}
+          />
         </div>
 
-        {selectedAxis && <AxisDescriptorInline axisKey={selectedAxis} />}
+        {selectedAxis && <AxisDescriptorInline axes={axes} axisKey={selectedAxis} />}
       </div>
     </div>
   );

@@ -1,15 +1,49 @@
 "use client";
 
 import * as React from "react";
-import {
-  AXES,
-  LEVEL_TONES,
-  WHOLE_CHILD_OBSERVATIONS,
-  type AxisKey,
-  type Level,
-} from "../mock-data";
+import { LEVEL_TONES, type Level } from "../mock-data";
 import { SectionHeading } from "../section-heading";
-import { AxisDescriptorInline, SpiderHeroCard, SpiderModal } from "./spider";
+import type { StudentProfile } from "@/lib/queries/student-profile";
+import type { AxisWithAssessment, WholeChildObservation } from "@/lib/queries/whole-child";
+import { AxisDescriptorInline, SpiderHeroCard, SpiderModal, type SpiderAxis } from "./spider";
+
+const DEFAULT_LEVEL: Level = "Emerging";
+
+/** Server data → spider's flat shape; null assessments default to Emerging. */
+function toSpiderAxes(axes: AxisWithAssessment[]): SpiderAxis[] {
+  return axes.map((a) => ({
+    key: a.key,
+    label: a.label,
+    level: a.level ?? DEFAULT_LEVEL,
+    updated: a.assessedAt ? formatDate(a.assessedAt) : "",
+    descriptors: a.descriptors,
+  }));
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function formatRelative(iso: string): string {
+  try {
+    const then = new Date(iso).getTime();
+    const now = Date.now();
+    const diffMs = now - then;
+    const day = 24 * 60 * 60 * 1000;
+    const days = Math.floor(diffMs / day);
+    if (days <= 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return formatDate(iso);
+  } catch {
+    return "";
+  }
+}
 
 function LevelTransitionBadge({ from, to }: { from: Level | null; to: Level | null }) {
   if (!from && !to) {
@@ -49,28 +83,32 @@ function LevelTransitionBadge({ from, to }: { from: Level | null; to: Level | nu
 }
 
 type ObservationsProps = {
-  selectedAxis: AxisKey | null;
+  axes: SpiderAxis[];
+  observations: WholeChildObservation[];
+  selectedAxis: string | null;
   onClearAxis: () => void;
   initial?: number;
   pageSize?: number;
 };
 
 function WholeChildObservations({
+  axes,
+  observations,
   selectedAxis,
   onClearAxis,
   initial = 5,
   pageSize = 5,
 }: ObservationsProps) {
-  const all = WHOLE_CHILD_OBSERVATIONS;
-  const source = selectedAxis ? all.filter((o) => o.axis === selectedAxis) : all;
-
+  const source = selectedAxis
+    ? observations.filter((o) => o.axisKey === selectedAxis)
+    : observations;
   const [shown, setShown] = React.useState(initial);
   React.useEffect(() => {
     setShown(initial);
   }, [selectedAxis, initial]);
 
   const rows = source.slice(0, shown);
-  const axis = selectedAxis ? AXES.find((a) => a.key === selectedAxis) : null;
+  const axis = selectedAxis ? axes.find((a) => a.key === selectedAxis) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%" }}>
@@ -91,7 +129,7 @@ function WholeChildObservations({
             {axis ? `Notes that shaped ${axis.label}` : "Notes that shaped this assessment"}
           </div>
           <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 2 }}>
-            {source.length} of {all.length} {all.length === 1 ? "note" : "notes"}
+            {source.length} of {observations.length} {observations.length === 1 ? "note" : "notes"}
           </div>
         </div>
         {axis && (
@@ -114,11 +152,11 @@ function WholeChildObservations({
         )}
       </div>
 
-      {selectedAxis && <AxisDescriptorInline axisKey={selectedAxis} />}
+      {selectedAxis && <AxisDescriptorInline axes={axes} axisKey={selectedAxis} />}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((o) => {
-          const obsAxis = AXES.find((a) => a.key === o.axis);
+          const obsAxis = axes.find((a) => a.key === o.axisKey);
           return (
             <div
               key={o.id}
@@ -139,14 +177,14 @@ function WholeChildObservations({
                 }}
               >
                 <span className="label-cap" style={{ color: "var(--color-ink-secondary)" }}>
-                  {obsAxis?.label || o.axis}
+                  {obsAxis?.label || o.axisKey}
                 </span>
                 <span
                   className="font-numeric"
                   style={{ fontSize: 11, color: "var(--color-ink-muted)" }}
-                  title={o.abs}
+                  title={o.createdAt}
                 >
-                  {o.rel}
+                  {formatRelative(o.createdAt)}
                 </span>
               </div>
               <div style={{ fontSize: 13, color: "var(--color-ink)", lineHeight: 1.45 }}>
@@ -161,8 +199,12 @@ function WholeChildObservations({
                   flexWrap: "wrap",
                 }}
               >
-                <LevelTransitionBadge from={o.from} to={o.to} />
-                <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{o.author}</span>
+                <LevelTransitionBadge from={o.fromLevel} to={o.toLevel} />
+                {o.authorName && (
+                  <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
+                    {o.authorName}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -197,7 +239,7 @@ function WholeChildObservations({
             textAlign: "center",
           }}
         >
-          No notes for {axis?.label || "this axis"} yet.
+          No notes for {axis?.label || "this child"} yet.
         </div>
       )}
     </div>
@@ -211,16 +253,28 @@ const cardStyle: React.CSSProperties = {
   boxShadow: "0 1px 2px rgba(42,39,35,0.04)",
 };
 
-export function WholeChildView({ mobile }: { mobile: boolean }) {
+export function WholeChildView({
+  mobile,
+  profile,
+  axes,
+  observations,
+}: {
+  mobile: boolean;
+  profile: StudentProfile;
+  axes: AxisWithAssessment[];
+  observations: WholeChildObservation[];
+}) {
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [selectedAxis, setSelectedAxis] = React.useState<AxisKey | null>(null);
+  const [selectedAxis, setSelectedAxis] = React.useState<string | null>(null);
+  const spiderAxes = React.useMemo(() => toSpiderAxes(axes), [axes]);
+  const firstName = (profile.preferredName || profile.fullName).split(" ")[0];
 
   return (
     <>
       <SectionHeading
         overline="Whole-child assessment"
         title="Seven dimensions"
-        accent={mobile ? "how Ada is becoming" : "how Ada is becoming herself"}
+        accent={mobile ? `how ${firstName} is becoming` : `how ${firstName} is becoming themself`}
         mobile={mobile}
       />
 
@@ -229,6 +283,7 @@ export function WholeChildView({ mobile }: { mobile: boolean }) {
           <>
             <div style={{ ...cardStyle, padding: 16 }}>
               <SpiderHeroCard
+                axes={spiderAxes}
                 mobile
                 size={300}
                 selectedAxis={selectedAxis}
@@ -239,6 +294,8 @@ export function WholeChildView({ mobile }: { mobile: boolean }) {
             </div>
             <div style={{ ...cardStyle, padding: 16, marginTop: 14 }}>
               <WholeChildObservations
+                axes={spiderAxes}
+                observations={observations}
                 selectedAxis={selectedAxis}
                 onClearAxis={() => setSelectedAxis(null)}
               />
@@ -264,6 +321,7 @@ export function WholeChildView({ mobile }: { mobile: boolean }) {
               }}
             >
               <SpiderHeroCard
+                axes={spiderAxes}
                 mobile={false}
                 size={520}
                 selectedAxis={selectedAxis}
@@ -280,6 +338,8 @@ export function WholeChildView({ mobile }: { mobile: boolean }) {
               }}
             >
               <WholeChildObservations
+                axes={spiderAxes}
+                observations={observations}
                 selectedAxis={selectedAxis}
                 onClearAxis={() => setSelectedAxis(null)}
               />
@@ -289,6 +349,7 @@ export function WholeChildView({ mobile }: { mobile: boolean }) {
       </div>
 
       <SpiderModal
+        axes={spiderAxes}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         mobile={mobile}

@@ -3,14 +3,38 @@
 import * as React from "react";
 import Link from "next/link";
 import { Avatar } from "../primitives";
-import type { Child } from "../data";
 import { initialsFor } from "../data";
-import { CHILD_PROFILE } from "./mock-data";
+import type { Tone } from "../data";
+import type { StudentProfile } from "@/lib/queries/student-profile";
 import { ChevLeft, CloseIcon, InfoIcon, Kebab } from "./icons";
 
 export type PageView = "whole" | "curriculum" | "activity";
 
-function HeaderInfoTooltip({ mobile }: { mobile: boolean }) {
+const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
+
+/** Stable pseudo-random tone derived from the student id. UI decoration only. */
+function toneFor(id: string): Tone {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return TONES[Math.abs(h) % TONES.length];
+}
+
+function ageFromBirthDate(birthDate: string | null): string | null {
+  if (!birthDate) return null;
+  const d = new Date(birthDate);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let years = now.getFullYear() - d.getFullYear();
+  let months = now.getMonth() - d.getMonth();
+  if (now.getDate() < d.getDate()) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  return `${years}y ${months}m`;
+}
+
+function HeaderInfoTooltip({ profile, mobile }: { profile: StudentProfile; mobile: boolean }) {
   const [open, setOpen] = React.useState(false);
   const wrapRef = React.useRef<HTMLSpanElement | null>(null);
 
@@ -78,7 +102,7 @@ function HeaderInfoTooltip({ mobile }: { mobile: boolean }) {
           }}
         >
           <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
-            About {CHILD_PROFILE.fullName.split(" ")[0]}
+            About {profile.fullName.split(" ")[0]}
           </div>
           <div
             style={{
@@ -89,56 +113,86 @@ function HeaderInfoTooltip({ mobile }: { mobile: boolean }) {
               fontSize: 12.5,
             }}
           >
-            <span style={{ color: "var(--color-ink-muted)" }}>Born</span>
-            <span className="font-numeric">
-              {CHILD_PROFILE.dob} · {CHILD_PROFILE.age}
-            </span>
-            <span style={{ color: "var(--color-ink-muted)" }}>Pronouns</span>
-            <span>{CHILD_PROFILE.pronouns}</span>
-            <span style={{ color: "var(--color-ink-muted)" }}>Classroom</span>
-            <span>
-              {CHILD_PROFILE.classroom} · {CHILD_PROFILE.primaryTeacher}
-            </span>
-            <span style={{ color: "var(--color-ink-muted)" }}>Enrolled</span>
-            <span>{CHILD_PROFILE.enrolled}</span>
-            <span style={{ color: "var(--color-ink-muted)" }}>Allergies</span>
-            <span>{CHILD_PROFILE.allergies}</span>
+            {profile.birthDate && (
+              <>
+                <span style={{ color: "var(--color-ink-muted)" }}>Born</span>
+                <span className="font-numeric">
+                  {profile.birthDate}
+                  {ageFromBirthDate(profile.birthDate)
+                    ? ` · ${ageFromBirthDate(profile.birthDate)}`
+                    : ""}
+                </span>
+              </>
+            )}
+            {profile.classroom && (
+              <>
+                <span style={{ color: "var(--color-ink-muted)" }}>Classroom</span>
+                <span>
+                  {profile.classroom.name}
+                  {profile.primaryTeacher ? ` · ${profile.primaryTeacher.name}` : ""}
+                </span>
+              </>
+            )}
+            {profile.enrollmentStartDate && (
+              <>
+                <span style={{ color: "var(--color-ink-muted)" }}>Enrolled</span>
+                <span className="font-numeric">{profile.enrollmentStartDate}</span>
+              </>
+            )}
+            {profile.notes && (
+              <>
+                <span style={{ color: "var(--color-ink-muted)" }}>Notes</span>
+                <span>{profile.notes}</span>
+              </>
+            )}
           </div>
-          <div
-            style={{
-              marginTop: 14,
-              paddingTop: 12,
-              borderTop: "1px solid var(--color-border)",
-            }}
-          >
-            <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
-              Guardians
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {CHILD_PROFILE.guardians.map((g) => (
-                <div key={g.name} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <div
-                    style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}
-                  >
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{g.name}</span>
-                    <span style={{ fontSize: 11.5, color: "var(--color-ink-muted)" }}>
-                      {g.relationship}
-                      {g.primary ? " · primary" : ""}
-                    </span>
+          {profile.guardians.length > 0 && (
+            <div
+              style={{
+                marginTop: 14,
+                paddingTop: 12,
+                borderTop: "1px solid var(--color-border)",
+              }}
+            >
+              <div
+                className="label-cap"
+                style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}
+              >
+                Guardians
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {profile.guardians.map((g) => (
+                  <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "baseline",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{g.name}</span>
+                      <span style={{ fontSize: 11.5, color: "var(--color-ink-muted)" }}>
+                        {g.relationship}
+                        {g.primary ? " · primary" : ""}
+                      </span>
+                    </div>
+                    {g.contact && (
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "var(--color-ink-secondary)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {g.contact}
+                      </span>
+                    )}
                   </div>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: "var(--color-ink-secondary)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {g.contact}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </span>
@@ -257,8 +311,9 @@ function MobileKebabMenu({
   );
 }
 
-function GuardianChip() {
-  const gs = CHILD_PROFILE.guardians;
+function GuardianChip({ profile }: { profile: StudentProfile }) {
+  const gs = profile.guardians;
+  if (gs.length === 0) return null;
   const lasts = gs.map((g) => g.name.split(" ").slice(-1)[0]);
   const sameLast = lasts.every((l) => l === lasts[0]);
   const names = sameLast
@@ -289,16 +344,19 @@ function GuardianChip() {
 }
 
 export function ChildPageHeader({
-  child,
+  profile,
   mobile,
   onNewObservation,
   onGenerateReport,
 }: {
-  child: Child;
+  profile: StudentProfile;
   mobile: boolean;
   onNewObservation: () => void;
   onGenerateReport: () => void;
 }) {
+  const displayName = profile.preferredName || profile.fullName;
+  const tone = toneFor(profile.id);
+  const age = ageFromBirthDate(profile.birthDate);
   return (
     <div
       style={{
@@ -347,7 +405,7 @@ export function ChildPageHeader({
         }}
       >
         <div style={{ display: "flex", gap: mobile ? 12 : 18, alignItems: "center" }}>
-          <Avatar initials={initialsFor(child.name)} tone={child.tone} size={mobile ? 56 : 72} />
+          <Avatar initials={initialsFor(displayName)} tone={tone} size={mobile ? 56 : 72} />
 
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -361,18 +419,18 @@ export function ChildPageHeader({
                   lineHeight: 1.1,
                 }}
               >
-                {child.name}
+                {displayName}
               </h1>
-              <HeaderInfoTooltip mobile={mobile} />
+              <HeaderInfoTooltip profile={profile} mobile={mobile} />
             </div>
             <div className="meta-row label-cap" style={{ marginTop: mobile ? 4 : 6 }}>
-              <span>{child.age}</span>
-              <span className="dot-sep" />
-              <span>{CHILD_PROFILE.classroom}</span>
-              {!mobile && (
+              {age && <span>{age}</span>}
+              {age && profile.classroom && <span className="dot-sep" />}
+              {profile.classroom && <span>{profile.classroom.name}</span>}
+              {!mobile && profile.enrollmentStartDate && (
                 <>
                   <span className="dot-sep" />
-                  <span>Enrolled {child.enrolled}</span>
+                  <span>Enrolled {profile.enrollmentStartDate}</span>
                 </>
               )}
             </div>
@@ -400,7 +458,7 @@ export function ChildPageHeader({
                 Generate report
               </button>
             </div>
-            <GuardianChip />
+            <GuardianChip profile={profile} />
           </div>
         )}
       </div>
