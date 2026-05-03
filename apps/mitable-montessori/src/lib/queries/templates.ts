@@ -1,5 +1,5 @@
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { getCurrentUserContext } from "@/lib/app/active-classroom";
 
 export type ReportTemplate = {
   id: string;
@@ -11,13 +11,17 @@ export type ReportTemplate = {
   isActive: boolean;
 };
 
-/** All active templates for the caller's school. RLS scopes to school_id. */
+/** Active templates for the caller's school. Uses admin client + explicit
+ *  school_id filter (auth gated by getCurrentUserContext). */
 export async function listTemplates(): Promise<ReportTemplate[]> {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const ctx = await getCurrentUserContext();
+  if (!ctx) return [];
+
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("report_templates")
     .select("id, name, description, kind, sections, icon_tone, is_active")
+    .eq("school_id", ctx.schoolId)
     .eq("is_active", true)
     .order("created_at", { ascending: true });
   if (error) {

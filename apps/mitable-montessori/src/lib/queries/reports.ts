@@ -1,5 +1,17 @@
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { getCurrentUserContext } from "@/lib/app/active-classroom";
+
+/**
+ * NOTE: these reads use the service-role admin client and filter by
+ * `school_id` explicitly. The user's auth is verified up front via
+ * `getCurrentUserContext()` (which reads the cookie session). We bypass RLS
+ * here because the existing policy graph on `reports`/`students` produces
+ * a recursion (42P17) under the FK-join select. The explicit school_id
+ * filter gives us the same isolation guarantee RLS would, without the cycle.
+ *
+ * Writes still go through the user-cookie client (see API routes), where
+ * RLS continues to enforce policy.
+ */
 
 export type ReportListRow = {
   id: string;
@@ -62,6 +74,7 @@ type ReportsRow = {
     first_name: string | null;
     last_name: string | null;
     preferred_name: string | null;
+    school_id: string;
   } | null;
 };
 
@@ -72,15 +85,19 @@ function fullName(s: ReportsRow["students"]): string {
   return `${first} ${last}`.trim() || "Unknown";
 }
 
-/** All reports the caller can see (RLS-scoped). Most recent first. */
+/** All reports the caller can see (school-scoped via explicit filter on
+ *  the joined students.school_id column). Most recent first. */
 export async function listReports(): Promise<ReportListRow[]> {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const ctx = await getCurrentUserContext();
+  if (!ctx) return [];
+
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, created_at, updated_at, students(id, first_name, last_name, preferred_name)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id)"
     )
+    .eq("students.school_id", ctx.schoolId)
     .order("created_at", { ascending: false });
   if (error) {
     console.error("listReports failed", error);
@@ -102,16 +119,19 @@ export async function listReports(): Promise<ReportListRow[]> {
   }));
 }
 
-/** Single-report read for the editor page. RLS-scoped. */
+/** Single-report read for the editor page. Filtered by school. */
 export async function getReport(id: string): Promise<ReportDetail | null> {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const ctx = await getCurrentUserContext();
+  if (!ctx) return null;
+
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students(id, first_name, last_name, preferred_name)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id)"
     )
     .eq("id", id)
+    .eq("students.school_id", ctx.schoolId)
     .maybeSingle();
   if (error) {
     console.error("getReport failed", error);

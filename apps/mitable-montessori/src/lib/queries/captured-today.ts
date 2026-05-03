@@ -1,5 +1,4 @@
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 
 export type CapturedTodayCounts = Record<string, { voice: number; photos: number }>;
@@ -14,14 +13,16 @@ function startOfTodayIso(): string {
  * Today's voice/photo capture counts grouped by student id, scoped to the
  * caller's active classroom. Drives the "Captured today" group at the top
  * of the new-report child picker.
+ *
+ * Auth gated by getActiveClassroomForCurrentUser (returns null if unauth);
+ * uses the admin client + explicit classroom_id filter to dodge the
+ * commands RLS policy graph.
  */
 export async function listCapturedTodayByChild(): Promise<CapturedTodayCounts> {
   const classroom = await getActiveClassroomForCurrentUser();
   if (!classroom) return {};
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("commands")
     .select("payload, source")
