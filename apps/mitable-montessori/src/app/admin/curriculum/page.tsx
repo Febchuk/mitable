@@ -11,17 +11,25 @@ import {
   type DefaultCurriculum,
 } from "@/lib/admin/curriculum-data";
 
+type AdminSubtopic = { id: string; name: string };
+
 type AdminTopic = {
   id: string;
   name: string;
-  subtopics: Array<{ id: string; name: string }>;
+  subtopics: AdminSubtopic[];
+};
+
+type AdminSubject = {
+  id: string;
+  name: string;
+  topics: AdminTopic[];
 };
 
 type AdminCurriculum = {
   id: string;
   name: string;
   ageRange: string;
-  topics: AdminTopic[];
+  subjects: AdminSubject[];
 };
 
 function uid(prefix: string): string {
@@ -33,16 +41,32 @@ function fromDefault(curriculum: DefaultCurriculum): AdminCurriculum {
     id: curriculum.id,
     name: curriculum.name,
     ageRange: curriculum.ageRange,
-    topics: curriculum.topics.map((topic) => ({
-      id: uid("topic"),
-      name: topic.name,
-      subtopics: topic.subtopics.map((name) => ({ id: uid("sub"), name })),
+    subjects: curriculum.subjects.map((subject) => ({
+      id: uid("subject"),
+      name: subject.name,
+      topics: subject.topics.map((topic) => ({
+        id: uid("topic"),
+        name: topic.name,
+        subtopics: topic.subtopics.map((name) => ({ id: uid("sub"), name })),
+      })),
     })),
   };
 }
 
 function initialCurricula(): AdminCurriculum[] {
   return DEFAULT_CURRICULA.map(fromDefault);
+}
+
+function topicCount(curriculum: AdminCurriculum): number {
+  return curriculum.subjects.reduce((sum, subject) => sum + subject.topics.length, 0);
+}
+
+function subtopicCount(curriculum: AdminCurriculum): number {
+  return curriculum.subjects.reduce(
+    (sum, subject) =>
+      sum + subject.topics.reduce((s, topic) => s + topic.subtopics.length, 0),
+    0
+  );
 }
 
 export default function AdminCurriculumPage() {
@@ -55,9 +79,6 @@ export default function AdminCurriculumPage() {
   const selected =
     curricula.find((curriculum) => curriculum.id === selectedId) ?? curricula[0];
 
-  const subtopicCount = (curriculum: AdminCurriculum) =>
-    curriculum.topics.reduce((sum, topic) => sum + topic.subtopics.length, 0);
-
   const updateCurriculum = (
     id: string,
     update: (curriculum: AdminCurriculum) => AdminCurriculum
@@ -67,13 +88,38 @@ export default function AdminCurriculumPage() {
     );
   };
 
+  const updateSubject = (
+    curriculumId: string,
+    subjectId: string,
+    update: (subject: AdminSubject) => AdminSubject
+  ) => {
+    updateCurriculum(curriculumId, (curriculum) => ({
+      ...curriculum,
+      subjects: curriculum.subjects.map((subject) =>
+        subject.id === subjectId ? update(subject) : subject
+      ),
+    }));
+  };
+
+  const updateTopic = (
+    curriculumId: string,
+    subjectId: string,
+    topicId: string,
+    update: (topic: AdminTopic) => AdminTopic
+  ) => {
+    updateSubject(curriculumId, subjectId, (subject) => ({
+      ...subject,
+      topics: subject.topics.map((topic) => (topic.id === topicId ? update(topic) : topic)),
+    }));
+  };
+
   const addCurriculum = (input: { name: string; ageRange?: string }) => {
     const id = uid("curriculum");
     const next: AdminCurriculum = {
       id,
       name: input.name.trim(),
       ageRange: input.ageRange?.trim() ?? "",
-      topics: [],
+      subjects: [],
     };
     setCurricula((prev) => [...prev, next]);
     setSelectedId(id);
@@ -87,85 +133,96 @@ export default function AdminCurriculumPage() {
     });
   };
 
-  const addTopic = (curriculumId: string, name: string) => {
+  const addSubject = (curriculumId: string, name: string) => {
     if (!name.trim()) return;
     updateCurriculum(curriculumId, (curriculum) => ({
       ...curriculum,
-      topics: [
-        ...curriculum.topics,
-        { id: uid("topic"), name: name.trim(), subtopics: [] },
+      subjects: [
+        ...curriculum.subjects,
+        { id: uid("subject"), name: name.trim(), topics: [] },
       ],
     }));
   };
 
-  const removeTopic = (curriculumId: string, topicId: string) => {
+  const removeSubject = (curriculumId: string, subjectId: string) => {
     updateCurriculum(curriculumId, (curriculum) => ({
       ...curriculum,
-      topics: curriculum.topics.filter((topic) => topic.id !== topicId),
+      subjects: curriculum.subjects.filter((subject) => subject.id !== subjectId),
     }));
   };
 
-  const renameTopic = (curriculumId: string, topicId: string, name: string) => {
-    updateCurriculum(curriculumId, (curriculum) => ({
-      ...curriculum,
-      topics: curriculum.topics.map((topic) =>
-        topic.id === topicId ? { ...topic, name: name.trim() || topic.name } : topic
-      ),
+  const renameSubject = (curriculumId: string, subjectId: string, name: string) => {
+    updateSubject(curriculumId, subjectId, (subject) => ({
+      ...subject,
+      name: name.trim() || subject.name,
     }));
   };
 
-  const addSubtopic = (curriculumId: string, topicId: string, name: string) => {
+  const addTopic = (curriculumId: string, subjectId: string, name: string) => {
     if (!name.trim()) return;
-    updateCurriculum(curriculumId, (curriculum) => ({
-      ...curriculum,
-      topics: curriculum.topics.map((topic) =>
-        topic.id === topicId
-          ? {
-              ...topic,
-              subtopics: [...topic.subtopics, { id: uid("sub"), name: name.trim() }],
-            }
-          : topic
-      ),
+    updateSubject(curriculumId, subjectId, (subject) => ({
+      ...subject,
+      topics: [...subject.topics, { id: uid("topic"), name: name.trim(), subtopics: [] }],
+    }));
+  };
+
+  const removeTopic = (curriculumId: string, subjectId: string, topicId: string) => {
+    updateSubject(curriculumId, subjectId, (subject) => ({
+      ...subject,
+      topics: subject.topics.filter((topic) => topic.id !== topicId),
+    }));
+  };
+
+  const renameTopic = (
+    curriculumId: string,
+    subjectId: string,
+    topicId: string,
+    name: string
+  ) => {
+    updateTopic(curriculumId, subjectId, topicId, (topic) => ({
+      ...topic,
+      name: name.trim() || topic.name,
+    }));
+  };
+
+  const addSubtopic = (
+    curriculumId: string,
+    subjectId: string,
+    topicId: string,
+    name: string
+  ) => {
+    if (!name.trim()) return;
+    updateTopic(curriculumId, subjectId, topicId, (topic) => ({
+      ...topic,
+      subtopics: [...topic.subtopics, { id: uid("sub"), name: name.trim() }],
     }));
   };
 
   const removeSubtopic = (
     curriculumId: string,
+    subjectId: string,
     topicId: string,
     subtopicId: string
   ) => {
-    updateCurriculum(curriculumId, (curriculum) => ({
-      ...curriculum,
-      topics: curriculum.topics.map((topic) =>
-        topic.id === topicId
-          ? {
-              ...topic,
-              subtopics: topic.subtopics.filter((subtopic) => subtopic.id !== subtopicId),
-            }
-          : topic
-      ),
+    updateTopic(curriculumId, subjectId, topicId, (topic) => ({
+      ...topic,
+      subtopics: topic.subtopics.filter((subtopic) => subtopic.id !== subtopicId),
     }));
   };
 
   const renameSubtopic = (
     curriculumId: string,
+    subjectId: string,
     topicId: string,
     subtopicId: string,
     name: string
   ) => {
-    updateCurriculum(curriculumId, (curriculum) => ({
-      ...curriculum,
-      topics: curriculum.topics.map((topic) =>
-        topic.id === topicId
-          ? {
-              ...topic,
-              subtopics: topic.subtopics.map((subtopic) =>
-                subtopic.id === subtopicId
-                  ? { ...subtopic, name: name.trim() || subtopic.name }
-                  : subtopic
-              ),
-            }
-          : topic
+    updateTopic(curriculumId, subjectId, topicId, (topic) => ({
+      ...topic,
+      subtopics: topic.subtopics.map((subtopic) =>
+        subtopic.id === subtopicId
+          ? { ...subtopic, name: name.trim() || subtopic.name }
+          : subtopic
       ),
     }));
   };
@@ -199,6 +256,8 @@ export default function AdminCurriculumPage() {
           </div>
           {curricula.map((curriculum, index) => {
             const active = curriculum.id === selected?.id;
+            const sCount = curriculum.subjects.length;
+            const tCount = topicCount(curriculum);
             return (
               <button
                 key={curriculum.id}
@@ -223,8 +282,8 @@ export default function AdminCurriculumPage() {
                   </div>
                   <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
                     {curriculum.ageRange
-                      ? `${curriculum.ageRange} · ${curriculum.topics.length} topics`
-                      : `${curriculum.topics.length} topics`}
+                      ? `${curriculum.ageRange} · ${sCount} subjects · ${tCount} topics`
+                      : `${sCount} subjects · ${tCount} topics`}
                   </div>
                 </div>
                 <ChevronRight size={15} strokeWidth={1.5} />
@@ -237,16 +296,28 @@ export default function AdminCurriculumPage() {
           {selected ? (
             <CurriculumDetail
               curriculum={selected}
+              topicCount={topicCount(selected)}
               subtopicCount={subtopicCount(selected)}
-              onAddTopic={(name) => addTopic(selected.id, name)}
-              onRemoveTopic={(topicId) => removeTopic(selected.id, topicId)}
-              onRenameTopic={(topicId, name) => renameTopic(selected.id, topicId, name)}
-              onAddSubtopic={(topicId, name) => addSubtopic(selected.id, topicId, name)}
-              onRemoveSubtopic={(topicId, subtopicId) =>
-                removeSubtopic(selected.id, topicId, subtopicId)
+              onAddSubject={(name) => addSubject(selected.id, name)}
+              onRemoveSubject={(subjectId) => removeSubject(selected.id, subjectId)}
+              onRenameSubject={(subjectId, name) =>
+                renameSubject(selected.id, subjectId, name)
               }
-              onRenameSubtopic={(topicId, subtopicId, name) =>
-                renameSubtopic(selected.id, topicId, subtopicId, name)
+              onAddTopic={(subjectId, name) => addTopic(selected.id, subjectId, name)}
+              onRemoveTopic={(subjectId, topicId) =>
+                removeTopic(selected.id, subjectId, topicId)
+              }
+              onRenameTopic={(subjectId, topicId, name) =>
+                renameTopic(selected.id, subjectId, topicId, name)
+              }
+              onAddSubtopic={(subjectId, topicId, name) =>
+                addSubtopic(selected.id, subjectId, topicId, name)
+              }
+              onRemoveSubtopic={(subjectId, topicId, subtopicId) =>
+                removeSubtopic(selected.id, subjectId, topicId, subtopicId)
+              }
+              onRenameSubtopic={(subjectId, topicId, subtopicId, name) =>
+                renameSubtopic(selected.id, subjectId, topicId, subtopicId, name)
               }
               onRemoveCurriculum={() => removeCurriculum(selected.id)}
             />
@@ -269,7 +340,11 @@ export default function AdminCurriculumPage() {
 
 function CurriculumDetail({
   curriculum,
+  topicCount,
   subtopicCount,
+  onAddSubject,
+  onRemoveSubject,
+  onRenameSubject,
   onAddTopic,
   onRemoveTopic,
   onRenameTopic,
@@ -279,24 +354,33 @@ function CurriculumDetail({
   onRemoveCurriculum,
 }: {
   curriculum: AdminCurriculum;
+  topicCount: number;
   subtopicCount: number;
-  onAddTopic: (name: string) => void;
-  onRemoveTopic: (topicId: string) => void;
-  onRenameTopic: (topicId: string, name: string) => void;
-  onAddSubtopic: (topicId: string, name: string) => void;
-  onRemoveSubtopic: (topicId: string, subtopicId: string) => void;
-  onRenameSubtopic: (topicId: string, subtopicId: string, name: string) => void;
+  onAddSubject: (name: string) => void;
+  onRemoveSubject: (subjectId: string) => void;
+  onRenameSubject: (subjectId: string, name: string) => void;
+  onAddTopic: (subjectId: string, name: string) => void;
+  onRemoveTopic: (subjectId: string, topicId: string) => void;
+  onRenameTopic: (subjectId: string, topicId: string, name: string) => void;
+  onAddSubtopic: (subjectId: string, topicId: string, name: string) => void;
+  onRemoveSubtopic: (subjectId: string, topicId: string, subtopicId: string) => void;
+  onRenameSubtopic: (
+    subjectId: string,
+    topicId: string,
+    subtopicId: string,
+    name: string
+  ) => void;
   onRemoveCurriculum: () => void;
 }) {
-  const [showAddTopic, setShowAddTopic] = React.useState(false);
-  const [newTopicName, setNewTopicName] = React.useState("");
-  const isEmpty = curriculum.topics.length === 0;
+  const [showAddSubject, setShowAddSubject] = React.useState(false);
+  const [newSubjectName, setNewSubjectName] = React.useState("");
+  const isEmpty = curriculum.subjects.length === 0;
 
-  const submitTopic = () => {
-    if (!newTopicName.trim()) return;
-    onAddTopic(newTopicName);
-    setNewTopicName("");
-    setShowAddTopic(false);
+  const submitSubject = () => {
+    if (!newSubjectName.trim()) return;
+    onAddSubject(newSubjectName);
+    setNewSubjectName("");
+    setShowAddSubject(false);
   };
 
   return (
@@ -317,13 +401,13 @@ function CurriculumDetail({
             {curriculum.name}
           </h2>
           <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
-            {curriculum.topics.length} topics · {subtopicCount} subtopics
-            {curriculum.ageRange ? ` · ${curriculum.ageRange}` : ""}
+            {curriculum.subjects.length} subjects · {topicCount} topics · {subtopicCount}{" "}
+            lessons{curriculum.ageRange ? ` · ${curriculum.ageRange}` : ""}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <Button variant="default" onClick={() => setShowAddTopic(true)}>
-            <Plus size={16} strokeWidth={1.7} /> Add topic
+          <Button variant="default" onClick={() => setShowAddSubject(true)}>
+            <Plus size={16} strokeWidth={1.7} /> Add subject
           </Button>
           <Button variant="ghost" onClick={onRemoveCurriculum}>
             <Trash2 size={16} strokeWidth={1.6} /> Remove
@@ -331,8 +415,8 @@ function CurriculumDetail({
         </div>
       </div>
 
-      <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-        {showAddTopic && (
+      <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
+        {showAddSubject && (
           <div
             style={{
               border: "1px dashed var(--color-border)",
@@ -346,27 +430,27 @@ function CurriculumDetail({
           >
             <Input
               autoFocus
-              value={newTopicName}
-              onChange={(event) => setNewTopicName(event.target.value)}
+              value={newSubjectName}
+              onChange={(event) => setNewSubjectName(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") submitTopic();
+                if (event.key === "Enter") submitSubject();
                 if (event.key === "Escape") {
-                  setShowAddTopic(false);
-                  setNewTopicName("");
+                  setShowAddSubject(false);
+                  setNewSubjectName("");
                 }
               }}
-              placeholder="New topic name (e.g. Sensorial)"
+              placeholder="New subject name (e.g. Mathematics)"
               className="h-10 bg-surface"
             />
-            <Button type="button" onClick={submitTopic} disabled={!newTopicName.trim()}>
+            <Button type="button" onClick={submitSubject} disabled={!newSubjectName.trim()}>
               Add
             </Button>
             <Button
               type="button"
               variant="ghost"
               onClick={() => {
-                setShowAddTopic(false);
-                setNewTopicName("");
+                setShowAddSubject(false);
+                setNewSubjectName("");
               }}
             >
               Cancel
@@ -374,19 +458,24 @@ function CurriculumDetail({
           </div>
         )}
 
-        {isEmpty && !showAddTopic ? (
-          <EmptyCurriculumState onAddTopic={() => setShowAddTopic(true)} />
+        {isEmpty && !showAddSubject ? (
+          <EmptyCurriculumState onAddSubject={() => setShowAddSubject(true)} />
         ) : (
-          curriculum.topics.map((topic) => (
-            <TopicCard
-              key={topic.id}
-              topic={topic}
-              onRename={(name) => onRenameTopic(topic.id, name)}
-              onRemove={() => onRemoveTopic(topic.id)}
-              onAddSubtopic={(name) => onAddSubtopic(topic.id, name)}
-              onRemoveSubtopic={(subtopicId) => onRemoveSubtopic(topic.id, subtopicId)}
-              onRenameSubtopic={(subtopicId, name) =>
-                onRenameSubtopic(topic.id, subtopicId, name)
+          curriculum.subjects.map((subject) => (
+            <SubjectCard
+              key={subject.id}
+              subject={subject}
+              onRename={(name) => onRenameSubject(subject.id, name)}
+              onRemove={() => onRemoveSubject(subject.id)}
+              onAddTopic={(name) => onAddTopic(subject.id, name)}
+              onRemoveTopic={(topicId) => onRemoveTopic(subject.id, topicId)}
+              onRenameTopic={(topicId, name) => onRenameTopic(subject.id, topicId, name)}
+              onAddSubtopic={(topicId, name) => onAddSubtopic(subject.id, topicId, name)}
+              onRemoveSubtopic={(topicId, subtopicId) =>
+                onRemoveSubtopic(subject.id, topicId, subtopicId)
+              }
+              onRenameSubtopic={(topicId, subtopicId, name) =>
+                onRenameSubtopic(subject.id, topicId, subtopicId, name)
               }
             />
           ))
@@ -396,7 +485,7 @@ function CurriculumDetail({
   );
 }
 
-function EmptyCurriculumState({ onAddTopic }: { onAddTopic: () => void }) {
+function EmptyCurriculumState({ onAddSubject }: { onAddSubject: () => void }) {
   return (
     <div
       style={{
@@ -434,13 +523,179 @@ function EmptyCurriculumState({ onAddTopic }: { onAddTopic: () => void }) {
             maxWidth: 360,
           }}
         >
-          Add a topic to get started — for example "Practical Life" or "Mathematics".
+          Add a subject to get started — for example "Practical Life" or "Mathematics".
         </div>
       </div>
-      <Button onClick={onAddTopic}>
-        <Plus size={16} strokeWidth={1.7} /> Add first topic
+      <Button onClick={onAddSubject}>
+        <Plus size={16} strokeWidth={1.7} /> Add first subject
       </Button>
     </div>
+  );
+}
+
+function SubjectCard({
+  subject,
+  onRename,
+  onRemove,
+  onAddTopic,
+  onRemoveTopic,
+  onRenameTopic,
+  onAddSubtopic,
+  onRemoveSubtopic,
+  onRenameSubtopic,
+}: {
+  subject: AdminSubject;
+  onRename: (name: string) => void;
+  onRemove: () => void;
+  onAddTopic: (name: string) => void;
+  onRemoveTopic: (topicId: string) => void;
+  onRenameTopic: (topicId: string, name: string) => void;
+  onAddSubtopic: (topicId: string, name: string) => void;
+  onRemoveSubtopic: (topicId: string, subtopicId: string) => void;
+  onRenameSubtopic: (topicId: string, subtopicId: string, name: string) => void;
+}) {
+  const [showAddTopic, setShowAddTopic] = React.useState(false);
+  const [draftTopic, setDraftTopic] = React.useState("");
+  const totalSubtopics = subject.topics.reduce((sum, topic) => sum + topic.subtopics.length, 0);
+
+  const submitTopic = () => {
+    if (!draftTopic.trim()) return;
+    onAddTopic(draftTopic);
+    setDraftTopic("");
+    setShowAddTopic(false);
+  };
+
+  return (
+    <section
+      style={{
+        border: "1px solid var(--color-border)",
+        borderRadius: 16,
+        background: "var(--color-surface)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "14px 16px",
+          borderBottom: "1px solid var(--color-border)",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          background: "var(--color-terracotta-soft, var(--color-muted))",
+        }}
+      >
+        <InlineEditableText
+          value={subject.name}
+          onCommit={onRename}
+          textStyle={{ fontSize: 16, fontWeight: 700, color: "var(--color-ink)" }}
+        />
+        <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
+          {subject.topics.length} topic{subject.topics.length === 1 ? "" : "s"} ·{" "}
+          {totalSubtopics} lesson{totalSubtopics === 1 ? "" : "s"}
+        </span>
+        <div style={{ flex: 1 }} />
+        <Button variant="ghost" size="sm" onClick={() => setShowAddTopic(true)}>
+          <Plus size={14} strokeWidth={1.7} /> Add topic
+        </Button>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove subject"
+          className="tap"
+          style={{
+            border: 0,
+            background: "transparent",
+            padding: 6,
+            borderRadius: 8,
+            color: "var(--color-ink-muted)",
+            cursor: "pointer",
+          }}
+          title="Remove subject"
+        >
+          <Trash2 size={16} strokeWidth={1.6} />
+        </button>
+      </div>
+
+      <div
+        style={{
+          padding: 14,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          background: "var(--color-canvas, var(--color-surface))",
+        }}
+      >
+        {showAddTopic && (
+          <div
+            style={{
+              border: "1px dashed var(--color-border)",
+              borderRadius: 12,
+              padding: 10,
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              background: "var(--color-surface)",
+            }}
+          >
+            <Input
+              autoFocus
+              value={draftTopic}
+              onChange={(event) => setDraftTopic(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitTopic();
+                if (event.key === "Escape") {
+                  setShowAddTopic(false);
+                  setDraftTopic("");
+                }
+              }}
+              placeholder="New topic name (e.g. Decimal System)"
+              className="h-9 bg-canvas"
+            />
+            <Button type="button" size="sm" onClick={submitTopic} disabled={!draftTopic.trim()}>
+              Add
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setShowAddTopic(false);
+                setDraftTopic("");
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
+        {subject.topics.length === 0 && !showAddTopic ? (
+          <div
+            style={{
+              padding: "20px 12px",
+              textAlign: "center",
+              color: "var(--color-ink-muted)",
+              fontSize: 13,
+            }}
+          >
+            No topics yet. Add one to organize lessons.
+          </div>
+        ) : (
+          subject.topics.map((topic) => (
+            <TopicCard
+              key={topic.id}
+              topic={topic}
+              onRename={(name) => onRenameTopic(topic.id, name)}
+              onRemove={() => onRemoveTopic(topic.id)}
+              onAddSubtopic={(name) => onAddSubtopic(topic.id, name)}
+              onRemoveSubtopic={(subtopicId) => onRemoveSubtopic(topic.id, subtopicId)}
+              onRenameSubtopic={(subtopicId, name) =>
+                onRenameSubtopic(topic.id, subtopicId, name)
+              }
+            />
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -471,14 +726,14 @@ function TopicCard({
     <section
       style={{
         border: "1px solid var(--color-border)",
-        borderRadius: 14,
+        borderRadius: 12,
         background: "var(--color-surface)",
         overflow: "hidden",
       }}
     >
       <div
         style={{
-          padding: "12px 14px",
+          padding: "10px 12px",
           borderBottom: "1px solid var(--color-border)",
           display: "flex",
           alignItems: "center",
@@ -489,10 +744,10 @@ function TopicCard({
         <InlineEditableText
           value={topic.name}
           onCommit={onRename}
-          textStyle={{ fontSize: 15, fontWeight: 700, color: "var(--color-ink)" }}
+          textStyle={{ fontSize: 14, fontWeight: 600, color: "var(--color-ink)" }}
         />
         <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
-          {topic.subtopics.length} subtopic{topic.subtopics.length === 1 ? "" : "s"}
+          {topic.subtopics.length} lesson{topic.subtopics.length === 1 ? "" : "s"}
         </span>
         <div style={{ flex: 1 }} />
         <button
@@ -510,7 +765,7 @@ function TopicCard({
           }}
           title="Remove topic"
         >
-          <Trash2 size={16} strokeWidth={1.6} />
+          <Trash2 size={15} strokeWidth={1.6} />
         </button>
       </div>
 
@@ -519,7 +774,7 @@ function TopicCard({
           <li
             key={subtopic.id}
             style={{
-              padding: "10px 14px",
+              padding: "9px 12px",
               borderTop: index ? "1px solid var(--color-border)" : 0,
               display: "flex",
               alignItems: "center",
@@ -535,7 +790,7 @@ function TopicCard({
             <button
               type="button"
               onClick={() => onRemoveSubtopic(subtopic.id)}
-              aria-label="Remove subtopic"
+              aria-label="Remove lesson"
               className="tap"
               style={{
                 border: 0,
@@ -545,7 +800,7 @@ function TopicCard({
                 color: "var(--color-ink-muted)",
                 cursor: "pointer",
               }}
-              title="Remove subtopic"
+              title="Remove lesson"
             >
               <X size={14} />
             </button>
@@ -555,7 +810,7 @@ function TopicCard({
 
       <div
         style={{
-          padding: "10px 14px",
+          padding: "9px 12px",
           borderTop: "1px solid var(--color-border)",
           display: "flex",
           gap: 8,
@@ -569,7 +824,7 @@ function TopicCard({
           onKeyDown={(event) => {
             if (event.key === "Enter") submitSubtopic();
           }}
-          placeholder="+ Add subtopic"
+          placeholder="+ Add lesson"
           className="h-9 bg-canvas"
         />
         <Button type="button" size="sm" onClick={submitSubtopic} disabled={!draftSubtopic.trim()}>
@@ -665,7 +920,7 @@ function CreateCurriculumDialog({
         <DialogHeader className="border-b border-border px-6 py-5">
           <DialogTitle className="text-xl">Add curriculum</DialogTitle>
           <p className="text-sm text-ink-secondary">
-            Give it a name. You can fill in topics and subtopics next.
+            Give it a name. You can fill in subjects, topics, and lessons next.
           </p>
         </DialogHeader>
 
