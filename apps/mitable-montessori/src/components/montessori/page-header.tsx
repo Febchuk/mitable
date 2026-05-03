@@ -16,7 +16,7 @@ export function PageHeader({
   return (
     <div
       style={{
-        padding: "22px 24px 14px",
+        padding: "36px 24px 18px",
         borderBottom: "1px solid var(--color-border)",
       }}
     >

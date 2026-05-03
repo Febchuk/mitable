@@ -80,6 +80,7 @@ export async function getActiveClassroomForCurrentUser(): Promise<ActiveClassroo
 export interface CurrentUserContext {
   userId: string;
   schoolId: string;
+  schoolName: string | null;
   role: "admin" | "teacher";
   email: string;
   firstName: string | null;
@@ -98,9 +99,22 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     .eq("id", user.id)
     .maybeSingle();
   if (!data) return null;
+
+  // Best-effort school name lookup — failure should not block the page.
+  let schoolName: string | null = null;
+  if (data.school_id) {
+    const { data: school } = await supabase
+      .from("schools")
+      .select("name")
+      .eq("id", data.school_id as string)
+      .maybeSingle();
+    schoolName = (school?.name as string | null) ?? null;
+  }
+
   return {
     userId: data.id as string,
     schoolId: data.school_id as string,
+    schoolName,
     role: data.role as "admin" | "teacher",
     email: (data.email as string) ?? user.email ?? "",
     firstName: (data.first_name as string | null) ?? null,

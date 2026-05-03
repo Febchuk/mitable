@@ -6,15 +6,12 @@ import { OnlineToggle } from "./online-toggle";
 export function MobileTopRight({ children }: { children?: React.ReactNode }) {
   return (
     <div
-      className="lg:hidden"
+      className="flex items-center gap-2 lg:hidden"
       style={{
         position: "absolute",
         top: 14,
         right: 14,
         zIndex: 15,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
       }}
     >
       <OnlineToggle compact />
