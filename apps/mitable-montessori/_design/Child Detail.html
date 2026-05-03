@@ -135,6 +135,16 @@
         background: transparent;
       }
 
+      /* Used by Topics/Subtopics — affords horizontal scroll without
+         showing a scrollbar (the chips themselves cue overflow). */
+      .scroll-hidden {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .scroll-hidden::-webkit-scrollbar {
+        display: none;
+      }
+
       @keyframes slide-up {
         from {
           transform: translateY(8px);
@@ -756,6 +766,46 @@ const AXES = [
   },
 ];
 
+// Child profile — surfaced via the header "i" tooltip.
+// MOCK: real product reads from the students table + a guardians join.
+const CHILD_PROFILE = {
+  fullName: "Ada Chen",
+  dob: "Aug 14, 2021",
+  age: "4y 2m",
+  classroom: "Hummingbirds",
+  primaryTeacher: "Ms. Halima",
+  enrolled: "Sept 2024",
+  pronouns: "she/her",
+  allergies: "None on file",
+  guardians: [
+    { name: "Jane Chen",  relationship: "Mother",  primary: true,  contact: "jane.chen@example.com" },
+    { name: "Wei Chen",   relationship: "Father",  primary: false, contact: "(415) 555-0142" },
+  ],
+};
+
+// Whole-child observations — these are NOT curriculum activity entries.
+// They're the teacher's notes that triggered an axis re-evaluation
+// (e.g. "I bumped Self-Correction from Deepening → Leading because of X").
+// MOCK: real product would have these in a `whole_child_observations` table
+// linked 1:1 to the axis level history. Fields here mirror the eventual schema:
+//   axis    — which dimension the note moves
+//   from/to — level transition; null when it's a confirming observation, not a change
+//   note    — teacher's reasoning
+//   source  — optional curriculum-observation id that prompted the note
+const WHOLE_CHILD_OBSERVATIONS = [
+  { id: "w01", date: "Apr 30", abs: "Apr 30, 2026", rel: "today",       axis: "self-correction",     from: "Deepening",  to: "Leading",    note: "Caught her own missing-cube on the pink tower without prompt — explained the control of error to a younger child. Bumping to Leading.",       source: "t01", author: "Ms. Halima" },
+  { id: "w02", date: "Apr 28", abs: "Apr 28, 2026", rel: "2 days ago",  axis: "motivation",          from: "Practicing", to: "Deepening",  note: "Sequenced 11–16 on her own initiative, asked to bring out the teen board the next day. Initiation is broadening past Sensorial.",         source: "t02", author: "Ms. Halima" },
+  { id: "w03", date: "Apr 27", abs: "Apr 27, 2026", rel: "3 days ago",  axis: "concentration",       from: null,         to: null,         note: "27-minute work cycle on knobless cylinders. No reset. Confirms Practicing — not yet Deepening (still resets after lunch transition).",     source: null,  author: "Ms. Halima" },
+  { id: "w04", date: "Apr 24", abs: "Apr 24, 2026", rel: "6 days ago",  axis: "independence",        from: "Practicing", to: "Deepening",  note: "Set up dressing frame, completed it, returned every piece, refilled the basket. No adult cue at any step.",                                  source: "t04", author: "Mr. Owen" },
+  { id: "w05", date: "Apr 22", abs: "Apr 22, 2026", rel: "8 days ago",  axis: "choice-quality",      from: null,         to: null,         note: "Picked map of Africa because 'Iris was working with it yesterday.' Choice still proximity-driven — staying at Practicing for now.",       source: "t05", author: "Ms. Halima" },
+  { id: "w06", date: "Apr 18", abs: "Apr 18, 2026", rel: "12 days ago", axis: "error-resilience",    from: null,         to: null,         note: "Cried briefly when red rods didn't sequence — abandoned the work. Still at Emerging. Watch over the next two weeks.",                       source: "t09", author: "Ms. Halima" },
+  { id: "w07", date: "Apr 14", abs: "Apr 14, 2026", rel: "2 weeks ago", axis: "material-progression", from: "Emerging",   to: "Practicing", note: "Bridged Sensorial → Math intentionally — used pink tower experience to anchor teen board quantity work. First cross-area connection.",  source: "t08", author: "Ms. Halima" },
+  { id: "w08", date: "Apr 09", abs: "Apr 9, 2026",  rel: "3 weeks ago", axis: "independence",        from: null,         to: null,         note: "Sorted land/water/air without prompt. Confirms Practicing on independence; not yet helping peers, so not Deepening yet.",                  source: "t10", author: "Mr. Owen" },
+  { id: "w09", date: "Apr 02", abs: "Apr 2, 2026",  rel: "4 weeks ago", axis: "concentration",       from: "Emerging",   to: "Practicing", note: "Returned to brown stair three times across the week — sustained focus on familiar work. Moving up to Practicing.",                          source: "t12", author: "Ms. Halima" },
+  { id: "w10", date: "Mar 22", abs: "Mar 22, 2026", rel: "5 weeks ago", axis: "motivation",          from: "Emerging",   to: "Practicing", note: "Initiated sandpaper letters unprompted — first time choosing Language work without a presentation cue.",                                source: "t13", author: "Ms. Halima" },
+  { id: "w11", date: "Mar 18", abs: "Mar 18, 2026", rel: "6 weeks ago", axis: "self-correction",     from: "Practicing", to: "Deepening",  note: "Built pink tower, found her own size error mid-build, undid the top three blocks and rebuilt cleanly. Repeating the pattern across two days.", source: "t14", author: "Ms. Halima" },
+];
+
 const SUBTOPICS = [
   { name: "Pink tower",        area: "Sensorial",       state: "p", introduced: "Mar 2",  practicing: "Mar 18", mastered: null },
   { name: "Brown stair",       area: "Sensorial",       state: "p", introduced: "Mar 6",  practicing: "Apr 2",  mastered: null },
@@ -771,25 +821,23 @@ const SUBTOPICS = [
   { name: "Land/water/air",    area: "Cultural",        state: "p", introduced: "Mar 12", practicing: "Apr 9",  mastered: null },
 ];
 
-// 14 timeline entries — Mar 18 → Apr 30
-// MOCK: the `axes` field on each entry is a prototype-only mapping. Real
-// observations don't yet link to whole-child assessment axes; once that data
-// model exists, drop these literals and resolve via the join table instead.
+// 14 curriculum activity entries — Mar 18 → Apr 30. These are material/work
+// observations, distinct from WHOLE_CHILD_OBSERVATIONS above.
 const TIMELINE = [
-  { id: "t01", date: "Apr 30", abs: "Apr 30, 2026", rel: "today",      area: "Sensorial",      material: "Pink tower",        comment: "Built it correctly on first try — third return this week.", transition: null,                                              axes: ["concentration", "self-correction"] },
-  { id: "t02", date: "Apr 28", abs: "Apr 28, 2026", rel: "2 days ago", area: "Math",           material: "Teen board",        comment: "Sequenced 11 through 16 unprompted.",                       transition: null,                                              axes: ["motivation", "material-progression"] },
-  { id: "t03", date: "Apr 26", abs: "Apr 26, 2026", rel: "4 days ago", area: "Sensorial",      material: "Brown stair",       comment: "Paired with pink tower — noticed the missing dimension.",   transition: null,                                              axes: ["self-correction", "material-progression"] },
-  { id: "t04", date: "Apr 24", abs: "Apr 24, 2026", rel: "6 days ago", area: "Practical Life", material: "Dressing frame",    comment: "Buttoned top to bottom; did not ask for help.",            transition: null,                                              axes: ["independence"] },
-  { id: "t05", date: "Apr 21", abs: "Apr 21, 2026", rel: "9 days ago", area: "Cultural",       material: "Map of Africa",     comment: "First presentation. Held the puzzle map for a long time.", transition: { area: "Cultural", to: "Introduced" },           axes: ["concentration", "motivation"] },
-  { id: "t06", date: "Apr 19", abs: "Apr 19, 2026", rel: "11 days ago",area: "Language",       material: "Movable alphabet",  comment: "First presentation — picked out 'cat' on her own.",         transition: { area: "Language", to: "Introduced" },           axes: ["choice-quality", "motivation"] },
-  { id: "t07", date: "Apr 16", abs: "Apr 16, 2026", rel: "2 weeks ago",area: "Math",           material: "Number rods",       comment: "First presentation. Counted to 7 confidently.",            transition: { area: "Math", to: "Introduced" },               axes: ["material-progression"] },
-  { id: "t08", date: "Apr 14", abs: "Apr 14, 2026", rel: "2 weeks ago",area: "Math",           material: "Teen board",        comment: "Built 11 through 14 with quantity beads.",                  transition: { area: "Math", to: "Practicing" },               axes: ["material-progression", "concentration"] },
-  { id: "t09", date: "Apr 12", abs: "Apr 12, 2026", rel: "3 weeks ago",area: "Sensorial",      material: "Red rods",          comment: "First presentation; ordered them by length.",              transition: { area: "Sensorial", to: "Introduced" },          axes: ["choice-quality"] },
-  { id: "t10", date: "Apr 09", abs: "Apr 9, 2026",  rel: "3 weeks ago",area: "Cultural",       material: "Land/water/air",    comment: "Sorted the small objects without prompting.",              transition: { area: "Cultural", to: "Practicing" },           axes: ["independence", "self-correction"] },
-  { id: "t11", date: "Apr 08", abs: "Apr 8, 2026",  rel: "3 weeks ago",area: "Sensorial",      material: "Knobless cylinders",comment: "Completed all four boxes blindfolded.",                    transition: { area: "Sensorial", to: "Mastered" },            axes: ["self-correction", "concentration", "error-resilience"] },
-  { id: "t12", date: "Apr 02", abs: "Apr 2, 2026",  rel: "4 weeks ago",area: "Sensorial",      material: "Brown stair",       comment: "Returned to it three times this week.",                    transition: { area: "Sensorial", to: "Practicing" },          axes: ["motivation"] },
-  { id: "t13", date: "Mar 22", abs: "Mar 22, 2026", rel: "5 weeks ago",area: "Language",       material: "Sandpaper letters", comment: "Traced 'a', 'm', 's' with strong tactile interest.",       transition: { area: "Language", to: "Practicing" },           axes: ["concentration"] },
-  { id: "t14", date: "Mar 18", abs: "Mar 18, 2026", rel: "6 weeks ago",area: "Sensorial",      material: "Pink tower",        comment: "Built tower independently — two tries, both correct.",     transition: { area: "Sensorial", to: "Practicing" },          axes: ["self-correction", "independence"] },
+  { id: "t01", date: "Apr 30", abs: "Apr 30, 2026", rel: "today",      area: "Sensorial",      material: "Pink tower",        comment: "Built it correctly on first try — third return this week.", transition: null },
+  { id: "t02", date: "Apr 28", abs: "Apr 28, 2026", rel: "2 days ago", area: "Math",           material: "Teen board",        comment: "Sequenced 11 through 16 unprompted.",                       transition: null },
+  { id: "t03", date: "Apr 26", abs: "Apr 26, 2026", rel: "4 days ago", area: "Sensorial",      material: "Brown stair",       comment: "Paired with pink tower — noticed the missing dimension.",   transition: null },
+  { id: "t04", date: "Apr 24", abs: "Apr 24, 2026", rel: "6 days ago", area: "Practical Life", material: "Dressing frame",    comment: "Buttoned top to bottom; did not ask for help.",            transition: null },
+  { id: "t05", date: "Apr 21", abs: "Apr 21, 2026", rel: "9 days ago", area: "Cultural",       material: "Map of Africa",     comment: "First presentation. Held the puzzle map for a long time.", transition: { area: "Cultural", to: "Introduced" } },
+  { id: "t06", date: "Apr 19", abs: "Apr 19, 2026", rel: "11 days ago",area: "Language",       material: "Movable alphabet",  comment: "First presentation — picked out 'cat' on her own.",         transition: { area: "Language", to: "Introduced" } },
+  { id: "t07", date: "Apr 16", abs: "Apr 16, 2026", rel: "2 weeks ago",area: "Math",           material: "Number rods",       comment: "First presentation. Counted to 7 confidently.",            transition: { area: "Math", to: "Introduced" } },
+  { id: "t08", date: "Apr 14", abs: "Apr 14, 2026", rel: "2 weeks ago",area: "Math",           material: "Teen board",        comment: "Built 11 through 14 with quantity beads.",                  transition: { area: "Math", to: "Practicing" } },
+  { id: "t09", date: "Apr 12", abs: "Apr 12, 2026", rel: "3 weeks ago",area: "Sensorial",      material: "Red rods",          comment: "First presentation; ordered them by length.",              transition: { area: "Sensorial", to: "Introduced" } },
+  { id: "t10", date: "Apr 09", abs: "Apr 9, 2026",  rel: "3 weeks ago",area: "Cultural",       material: "Land/water/air",    comment: "Sorted the small objects without prompting.",              transition: { area: "Cultural", to: "Practicing" } },
+  { id: "t11", date: "Apr 08", abs: "Apr 8, 2026",  rel: "3 weeks ago",area: "Sensorial",      material: "Knobless cylinders",comment: "Completed all four boxes blindfolded.",                    transition: { area: "Sensorial", to: "Mastered" } },
+  { id: "t12", date: "Apr 02", abs: "Apr 2, 2026",  rel: "4 weeks ago",area: "Sensorial",      material: "Brown stair",       comment: "Returned to it three times this week.",                    transition: { area: "Sensorial", to: "Practicing" } },
+  { id: "t13", date: "Mar 22", abs: "Mar 22, 2026", rel: "5 weeks ago",area: "Language",       material: "Sandpaper letters", comment: "Traced 'a', 'm', 's' with strong tactile interest.",       transition: { area: "Language", to: "Practicing" } },
+  { id: "t14", date: "Mar 18", abs: "Mar 18, 2026", rel: "6 weeks ago",area: "Sensorial",      material: "Pink tower",        comment: "Built tower independently — two tries, both correct.",     transition: { area: "Sensorial", to: "Practicing" } },
 ];
 
 const FILTERS = ["All", "This week", "This month", "Sensorial", "Math", "Language", "Practical Life", "Cultural"];
@@ -1740,30 +1788,443 @@ const Kebab = () => (
   </svg>
 );
 
-function ChildPageHeader({ mobile }) {
+const InfoIcon = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M12 11 V17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <circle cx="12" cy="7.6" r="1.1" fill="currentColor" />
+  </svg>
+);
+
+function HeaderInfoTooltip({ mobile }) {
+  const [open, setOpen] = React.useState(false);
+  const wrapRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <span
+      ref={wrapRef}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+    >
+      <button
+        type="button"
+        className="tap"
+        aria-label="About this view"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 999,
+          border: "1px solid var(--color-border)",
+          background: open ? "var(--color-ink)" : "var(--color-surface)",
+          color: open ? "var(--color-surface)" : "var(--color-ink-secondary)",
+          display: "grid",
+          placeItems: "center",
+          padding: 0,
+        }}
+      >
+        <InfoIcon />
+      </button>
+      {open && (
+        <div
+          className="anim-fade-in"
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            // Center the popover under the "i" button.
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 40,
+            width: mobile ? "min(290px, calc(100vw - 32px))" : 340,
+            maxWidth: mobile ? "calc(100vw - 32px)" : "none",
+            background: "var(--color-surface)",
+            color: "var(--color-ink)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 14,
+            padding: "16px 18px",
+            boxShadow:
+              "0 18px 40px rgba(42,39,35,0.16), 0 6px 14px rgba(42,39,35,0.08)",
+            fontSize: 12.5,
+            lineHeight: 1.5,
+          }}
+        >
+          <div
+            className="label-cap"
+            style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}
+          >
+            About Ada
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", rowGap: 6, columnGap: 14, fontSize: 12.5 }}>
+            <span style={{ color: "var(--color-ink-muted)" }}>Born</span>
+            <span className="font-numeric">{CHILD_PROFILE.dob} · {CHILD_PROFILE.age}</span>
+            <span style={{ color: "var(--color-ink-muted)" }}>Pronouns</span>
+            <span>{CHILD_PROFILE.pronouns}</span>
+            <span style={{ color: "var(--color-ink-muted)" }}>Classroom</span>
+            <span>{CHILD_PROFILE.classroom} · {CHILD_PROFILE.primaryTeacher}</span>
+            <span style={{ color: "var(--color-ink-muted)" }}>Enrolled</span>
+            <span>{CHILD_PROFILE.enrolled}</span>
+            <span style={{ color: "var(--color-ink-muted)" }}>Allergies</span>
+            <span>{CHILD_PROFILE.allergies}</span>
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              paddingTop: 12,
+              borderTop: "1px solid var(--color-border)",
+            }}
+          >
+            <div
+              className="label-cap"
+              style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}
+            >
+              Guardians
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {CHILD_PROFILE.guardians.map((g) => (
+                <div
+                  key={g.name}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{g.name}</span>
+                    <span style={{ fontSize: 11.5, color: "var(--color-ink-muted)" }}>
+                      {g.relationship}{g.primary ? " · primary" : ""}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "var(--color-ink-secondary)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {g.contact}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
+// Per-tab observation modal — stub for the mockup. Real product would post
+// to different endpoints (whole_child_observations vs activity vs curriculum).
+function NewObservationModal({ open, pageView, onClose, mobile }) {
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+
+  // Title is unified across tabs; subhead + fields adapt to the active context.
+  const config = {
+    whole: {
+      sub: "Capture what you observed and which dimension it shifted.",
+      fields: ["Axis (Concentration, Self-Correction…)", "Level transition (optional)", "Note"],
+      cta: "Save observation",
+    },
+    curriculum: {
+      sub: "Tag a subtopic and the level Ada is working at.",
+      fields: ["Topic / Subtopic", "State (Introduced · Practicing · Mastered)", "Comment"],
+      cta: "Save observation",
+    },
+    activity: {
+      sub: "A material Ada worked with today.",
+      fields: ["Material", "Curriculum area", "Comment (optional)"],
+      cta: "Save observation",
+    },
+  };
+  const c = config[pageView] || config.activity;
+  const title = "New observation";
+
+  return (
+    <div
+      className="anim-fade-in"
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "rgba(42,39,35,0.42)",
+        zIndex: 90,
+        display: "flex",
+        alignItems: mobile ? "flex-end" : "center",
+        justifyContent: "center",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="anim-slide-up"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--color-surface)",
+          borderTopLeftRadius: mobile ? 22 : 18,
+          borderTopRightRadius: mobile ? 22 : 18,
+          borderBottomLeftRadius: mobile ? 0 : 18,
+          borderBottomRightRadius: mobile ? 0 : 18,
+          width: mobile ? "100%" : "min(560px, 92%)",
+          maxHeight: mobile ? "82%" : "92%",
+          overflow: "auto",
+          padding: mobile ? "20px 16px 28px" : "24px 26px 22px",
+          boxShadow: "0 -10px 30px rgba(42,39,35,0.22)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+          <div>
+            <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+              {pageView === "whole" ? "Whole child" : pageView === "curriculum" ? "Curriculum" : "Activity"}
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "var(--color-ink)" }}>
+              {title}
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--color-ink-secondary)", marginTop: 4 }}>
+              {c.sub}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="tap"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 10,
+              border: "1px solid var(--color-border)",
+              background: "var(--color-canvas)",
+              color: "var(--color-ink-secondary)",
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {c.fields.map((label) => (
+            <div
+              key={label}
+              style={{
+                background: "var(--color-canvas)",
+                border: "1px dashed var(--color-border)",
+                borderRadius: 10,
+                padding: "12px 14px",
+                fontSize: 13,
+                color: "var(--color-ink-muted)",
+                fontStyle: "italic",
+              }}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+          <button type="button" className="ghost-btn tap" onClick={onClose}>Cancel</button>
+          <button type="button" className="primary-btn tap" onClick={onClose}>{c.cta}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileKebabMenu({ pageView, onNewObservation, onGenerateReport }) {
+  const [open, setOpen] = React.useState(false);
+  const wrapRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const items = [
+    { key: "obs", label: "+ New observation",   onClick: () => { setOpen(false); onNewObservation(); } },
+    { key: "rep", label: "Generate report",     onClick: () => { setOpen(false); onGenerateReport(); } },
+  ];
+
+  return (
+    <span ref={wrapRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="tap"
+        aria-label="More actions"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          border: "1px solid var(--color-border)",
+          background: open ? "var(--color-ink)" : "var(--color-surface)",
+          color: open ? "var(--color-surface)" : "var(--color-ink-secondary)",
+          display: "grid",
+          placeItems: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Kebab />
+      </button>
+      {open && (
+        <div
+          className="anim-fade-in"
+          role="menu"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            right: 0,
+            zIndex: 50,
+            minWidth: 220,
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 12,
+            padding: 4,
+            boxShadow: "0 18px 40px rgba(42,39,35,0.16), 0 4px 10px rgba(42,39,35,0.06)",
+          }}
+        >
+          {items.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              role="menuitem"
+              className="tap"
+              onClick={it.onClick}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                padding: "10px 12px",
+                background: "transparent",
+                border: 0,
+                borderRadius: 8,
+                fontSize: 13.5,
+                fontWeight: 500,
+                color: "var(--color-ink)",
+              }}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
+function GuardianChip() {
+  // Render "Jane & Wei Chen" if guardians share a last name; otherwise full names.
+  const gs = CHILD_PROFILE.guardians;
+  const lasts = gs.map((g) => g.name.split(" ").slice(-1)[0]);
+  const sameLast = lasts.every((l) => l === lasts[0]);
+  const names = sameLast
+    ? gs.map((g) => g.name.split(" ")[0]).join(" & ") + " " + lasts[0]
+    : gs.map((g) => g.name).join(" & ");
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "2px 9px",
+        borderRadius: 999,
+        background: "transparent",
+        border: "1px solid var(--color-border)",
+        fontSize: 11,
+        color: "var(--color-ink-secondary)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span
+        className="label-cap"
+        style={{ color: "var(--color-ink-muted)", fontSize: 9.5 }}
+      >
+        Guardians
+      </span>
+      <span style={{ color: "var(--color-ink-muted)", opacity: 0.5 }}>·</span>
+      <span style={{ fontWeight: 500 }}>{names}</span>
+    </span>
+  );
+}
+
+function ChildPageHeader({ mobile, pageView, onNewObservation, onGenerateReport }) {
   return (
     <div
       style={{
-        padding: mobile ? "20px 16px 16px" : "26px 28px 18px",
+        padding: mobile ? "16px 16px 16px" : "26px 28px 18px",
         borderBottom: "1px solid var(--color-border)",
       }}
     >
-      <a
-        href="#"
+      {/* Top utility row — back link on left, mobile kebab on right */}
+      <div
         style={{
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
-          gap: 6,
-          fontSize: 12.5,
-          color: "var(--color-ink-muted)",
-          textDecoration: "none",
-          marginBottom: 12,
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: mobile ? 14 : 12,
         }}
-        onClick={(e) => e.preventDefault()}
       >
-        <ChevLeft />
-        <span>All children</span>
-      </a>
+        <a
+          href="#"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12.5,
+            color: "var(--color-ink-muted)",
+            textDecoration: "none",
+          }}
+          onClick={(e) => e.preventDefault()}
+        >
+          <ChevLeft />
+          <span>All children</span>
+        </a>
+        {mobile && (
+          <MobileKebabMenu
+            pageView={pageView}
+            onNewObservation={onNewObservation}
+            onGenerateReport={onGenerateReport}
+          />
+        )}
+      </div>
 
       <div
         style={{
@@ -1774,7 +2235,7 @@ function ChildPageHeader({ mobile }) {
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", gap: mobile ? 12 : 18, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", gap: mobile ? 12 : 18, alignItems: "center" }}>
           {/* Avatar */}
           <div
             style={{
@@ -1795,38 +2256,29 @@ function ChildPageHeader({ mobile }) {
           </div>
 
           <div style={{ minWidth: 0 }}>
-            <h1
-              style={{
-                fontSize: mobile ? 22 : 26,
-                fontWeight: 600,
-                margin: 0,
-                color: "var(--color-ink)",
-                letterSpacing: "-0.01em",
-                lineHeight: 1.1,
-              }}
-            >
-              Ada Chen
-            </h1>
-            <div
-              className="font-display"
-              style={{
-                fontSize: mobile ? 22 : 26,
-                color: "var(--color-terracotta-deep)",
-                marginTop: 2,
-                lineHeight: 1.05,
-              }}
-            >
-              just Ada
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <h1
+                style={{
+                  fontSize: mobile ? 22 : 26,
+                  fontWeight: 600,
+                  margin: 0,
+                  color: "var(--color-ink)",
+                  letterSpacing: "-0.01em",
+                  lineHeight: 1.1,
+                }}
+              >
+                Ada Chen
+              </h1>
+              <HeaderInfoTooltip mobile={mobile} />
             </div>
+            {/* Tightened from 8/10 → 4/6 so the meta row hugs the name */}
             <div
               className="meta-row label-cap"
-              style={{ marginTop: mobile ? 10 : 12 }}
+              style={{ marginTop: mobile ? 4 : 6 }}
             >
               <span>4y 2m</span>
               <span className="dot-sep" />
               <span>Hummingbirds</span>
-              <span className="dot-sep" />
-              <span>Jane Chen</span>
               {!mobile && (
                 <React.Fragment>
                   <span className="dot-sep" />
@@ -1834,33 +2286,40 @@ function ChildPageHeader({ mobile }) {
                 </React.Fragment>
               )}
             </div>
+            {/* Guardian chip lives in the right-rail on web (under the CTAs);
+                on mobile it's hidden — discoverable via the header "i". */}
           </div>
         </div>
 
-        {!mobile ? (
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <button type="button" className="ghost-btn tap">+ New observation</button>
-            <button type="button" className="ghost-btn tap">Edit</button>
-            <button type="button" className="primary-btn tap">Generate report</button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="tap"
+        {!mobile && (
+          <div
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
-              color: "var(--color-ink-secondary)",
-              display: "grid",
-              placeItems: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 12,
               flexShrink: 0,
             }}
           >
-            <Kebab />
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="ghost-btn tap"
+              onClick={onNewObservation}
+            >
+              + New observation
+            </button>
+            <button type="button" className="ghost-btn tap">Edit</button>
+            <button
+              type="button"
+              className="primary-btn tap"
+              onClick={onGenerateReport}
+            >
+              Generate report
+            </button>
+          </div>
+            <GuardianChip />
+          </div>
         )}
       </div>
     </div>
@@ -1925,7 +2384,7 @@ function ViewToggle({ value, onChange, mobile }) {
         borderBottom: "1px solid var(--color-border)",
         padding: mobile ? "10px 16px" : "12px 28px",
         display: "flex",
-        justifyContent: mobile ? "stretch" : "flex-start",
+        justifyContent: mobile ? "stretch" : "center",
       }}
     >
       <div
@@ -2150,7 +2609,6 @@ function RecentObservations({
             </div>
           )}
         </div>
-        <button type="button" className="ghost-btn tap">+ New observation</button>
       </div>
 
       <div style={mobile ? { display: "flex", flexDirection: "column", gap: 10 } : null}
@@ -2350,50 +2808,52 @@ const ExpandIcon = ({ size = 16 }) => (
   </svg>
 );
 
-function SpiderHeroCard({ mobile, selectedAxis, onSelectAxis, onExpand }) {
+function SpiderHeroCard({ mobile, size, selectedAxis, onSelectAxis, onExpand, showExpand = false }) {
+  const finalSize = size || (mobile ? 300 : 520);
   return (
     <div
-      className="card"
       style={{
-        padding: mobile ? 16 : 22,
         position: "relative",
+        width: "100%",
       }}
     >
-      <button
-        type="button"
-        className="tap"
-        onClick={onExpand}
-        aria-label="Expand spider chart"
-        title="Expand"
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 12,
-          width: 32,
-          height: 32,
-          borderRadius: 10,
-          border: "1px solid var(--color-border)",
-          background: "var(--color-canvas)",
-          color: "var(--color-ink-secondary)",
-          display: "grid",
-          placeItems: "center",
-          zIndex: 2,
-        }}
-      >
-        <ExpandIcon />
-      </button>
+      {showExpand && (
+        <button
+          type="button"
+          className="tap"
+          onClick={onExpand}
+          aria-label="Expand spider chart"
+          title="Expand"
+          style={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-canvas)",
+            color: "var(--color-ink-secondary)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 2,
+          }}
+        >
+          <ExpandIcon />
+        </button>
+      )}
 
       <div
         style={{
           width: "100%",
           aspectRatio: "1 / 1",
-          maxWidth: mobile ? 280 : 400,
+          maxWidth: finalSize,
           margin: "0 auto",
         }}
       >
         <Spider
           axes={AXES}
-          size={mobile ? 280 : 400}
+          size={finalSize}
           onAxisHover={(key) => onSelectAxis(key === selectedAxis ? null : key)}
           hoveredKey={selectedAxis}
           mobile={mobile || false}
@@ -2408,8 +2868,213 @@ function SpiderHeroCard({ mobile, selectedAxis, onSelectAxis, onExpand }) {
           textAlign: "center",
         }}
       >
-        {selectedAxis ? "Tap the same axis again to clear" : "Tap an axis to filter observations below"}
+        {selectedAxis ? "Tap the same axis again to clear" : "Tap an axis to filter observations"}
       </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/*  Whole-child observations — different shape from curriculum feed   */
+/* ---------------------------------------------------------------- */
+
+function LevelTransitionBadge({ from, to }) {
+  if (!from && !to) {
+    return (
+      <span
+        className="label-cap"
+        style={{
+          color: "var(--color-ink-muted)",
+          fontSize: 10,
+          padding: "2px 7px",
+          borderRadius: 999,
+          border: "1px solid var(--color-border)",
+          letterSpacing: "0.06em",
+        }}
+      >
+        Confirms current
+      </span>
+    );
+  }
+  const tFrom = LEVEL_TONES[from];
+  const tTo = LEVEL_TONES[to];
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 11,
+        fontWeight: 500,
+      }}
+    >
+      <span style={{ color: tFrom?.deep || "var(--color-ink-muted)" }}>{from}</span>
+      <span style={{ color: "var(--color-ink-muted)" }}>→</span>
+      <span style={{ color: tTo?.deep || "var(--color-ink)" }}>{to}</span>
+    </span>
+  );
+}
+
+function WholeChildObservations({
+  mobile,
+  selectedAxis,
+  onClearAxis,
+  initial = 5,
+  pageSize = 5,
+}) {
+  const all = WHOLE_CHILD_OBSERVATIONS;
+  const source = selectedAxis
+    ? all.filter((o) => o.axis === selectedAxis)
+    : all;
+
+  const [shown, setShown] = React.useState(initial);
+  React.useEffect(() => {
+    setShown(initial);
+  }, [selectedAxis, initial]);
+
+  const rows = source.slice(0, shown);
+  const axis = selectedAxis ? AXES.find((a) => a.key === selectedAxis) : null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        height: "100%",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          gap: 8,
+        }}
+      >
+        <div>
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+            {axis ? `${axis.label} · ${axis.level}` : "All seven dimensions"}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-ink)" }}>
+            {axis ? `Notes that shaped ${axis.label}` : "Notes that shaped this assessment"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 2 }}>
+            {source.length} of {all.length} {all.length === 1 ? "note" : "notes"}
+          </div>
+        </div>
+        {axis && (
+          <button
+            type="button"
+            className="tap"
+            onClick={onClearAxis}
+            style={{
+              fontSize: 11.5,
+              fontWeight: 500,
+              padding: "5px 10px",
+              borderRadius: 999,
+              background: "var(--color-canvas)",
+              color: "var(--color-ink-secondary)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            Clear filter
+          </button>
+        )}
+      </div>
+
+      {axis && <AxisDescriptorInline axisKey={selectedAxis} />}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {rows.map((o) => {
+          const obsAxis = AXES.find((a) => a.key === o.axis);
+          return (
+            <div
+              key={o.id}
+              style={{
+                background: "var(--color-canvas)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 12,
+                padding: "12px 14px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  marginBottom: 6,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  className="label-cap"
+                  style={{ color: "var(--color-ink-secondary)" }}
+                >
+                  {obsAxis?.label || o.axis}
+                </span>
+                <span
+                  className="font-numeric"
+                  style={{ fontSize: 11, color: "var(--color-ink-muted)" }}
+                  title={o.abs}
+                >
+                  {o.rel}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: "var(--color-ink)", lineHeight: 1.45 }}>
+                {o.note}
+              </div>
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <LevelTransitionBadge from={o.from} to={o.to} />
+                <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
+                  {o.author}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {shown < source.length && (
+        <button
+          type="button"
+          className="tap"
+          onClick={() => setShown((n) => Math.min(source.length, n + pageSize))}
+          style={{
+            padding: "10px 14px",
+            background: "var(--color-canvas)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--color-ink-secondary)",
+          }}
+        >
+          Load {Math.min(pageSize, source.length - shown)} more
+        </button>
+      )}
+      {source.length === 0 && (
+        <div
+          style={{
+            padding: "20px 0",
+            fontSize: 13,
+            color: "var(--color-ink-muted)",
+            fontStyle: "italic",
+            textAlign: "center",
+          }}
+        >
+          No notes for {axis?.label || "this axis"} yet.
+        </div>
+      )}
     </div>
   );
 }
@@ -2417,14 +3082,6 @@ function SpiderHeroCard({ mobile, selectedAxis, onSelectAxis, onExpand }) {
 function WholeChildView({ mobile }) {
   const [modalOpen, setModalOpen] = React.useState(false);
   const [selectedAxis, setSelectedAxis] = React.useState(null);
-
-  const filtered = selectedAxis
-    ? TIMELINE.filter((row) => Array.isArray(row.axes) && row.axes.includes(selectedAxis))
-    : TIMELINE;
-
-  const axis = AXES.find((a) => a.key === selectedAxis);
-  const headerTitle = axis ? `Observations · ${axis.label}` : "Across all dimensions";
-  const headerLabel = axis ? `${axis.level}` : "Whole-child observations";
 
   return (
     <React.Fragment>
@@ -2435,30 +3092,68 @@ function WholeChildView({ mobile }) {
         mobile={mobile}
       />
 
-      <div style={{ padding: mobile ? "8px 16px 20px" : "10px 28px 24px" }}>
-        <SpiderHeroCard
-          mobile={mobile}
-          selectedAxis={selectedAxis}
-          onSelectAxis={setSelectedAxis}
-          onExpand={() => setModalOpen(true)}
-        />
-        {selectedAxis && axis && (
-          <AxisDescriptorInline axisKey={selectedAxis} />
-        )}
-      </div>
-
-      <SectionHeading
-        overline={axis ? "Filtered by axis" : "Activity"}
-        title={axis ? `Observations tied to ${axis.label}` : "Whole-child observations"}
-        mobile={mobile}
-      />
       <div style={{ padding: mobile ? "8px 16px 36px" : "10px 28px 60px" }}>
-        <RecentObservations
-          mobile={mobile}
-          source={filtered}
-          headerLabel={axis ? `${axis.label} · ${axis.level}` : "All seven dimensions"}
-          headerTitle={axis ? `Observations tied to ${axis.label}` : "What Ada has worked with"}
-        />
+        {mobile ? (
+          <React.Fragment>
+            <div className="card" style={{ padding: 16 }}>
+              <SpiderHeroCard
+                mobile={true}
+                size={300}
+                selectedAxis={selectedAxis}
+                onSelectAxis={setSelectedAxis}
+                onExpand={() => setModalOpen(true)}
+              />
+            </div>
+            <div className="card" style={{ padding: 16, marginTop: 14 }}>
+              <WholeChildObservations
+                mobile={true}
+                selectedAxis={selectedAxis}
+                onClearAxis={() => setSelectedAxis(null)}
+              />
+            </div>
+          </React.Fragment>
+        ) : (
+          <div
+            className="card"
+            style={{
+              padding: 22,
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.05fr) minmax(320px, 1fr)",
+              gap: 28,
+              alignItems: "stretch",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              <SpiderHeroCard
+                mobile={false}
+                size={520}
+                selectedAxis={selectedAxis}
+                onSelectAxis={setSelectedAxis}
+                onExpand={() => setModalOpen(true)}
+              />
+            </div>
+            <div
+              style={{
+                borderLeft: "1px solid var(--color-border)",
+                paddingLeft: 28,
+                minWidth: 0,
+              }}
+            >
+              <WholeChildObservations
+                mobile={false}
+                selectedAxis={selectedAxis}
+                onClearAxis={() => setSelectedAxis(null)}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <SpiderModal
@@ -2525,7 +3220,7 @@ function TopicPicker({ value, onChange, mobile }) {
 
   if (mobile) {
     return (
-      <div className="subtopic-strip scroll-quiet" style={{ paddingBottom: 4 }}>
+      <div className="subtopic-strip scroll-hidden" style={{ paddingBottom: 4 }}>
         {inner}
       </div>
     );
@@ -2553,7 +3248,7 @@ function SubtopicPicker({ area, value, onChange, mobile }) {
 
   if (mobile) {
     return (
-      <div className="subtopic-strip scroll-quiet" style={{ paddingBottom: 4 }}>
+      <div className="subtopic-strip scroll-hidden" style={{ paddingBottom: 4 }}>
         {inner}
       </div>
     );
@@ -2628,19 +3323,6 @@ function SubtopicDetail({ subtopicName, mobile }) {
             {sub.area}
           </div>
         </div>
-        <span
-          style={{
-            fontSize: 11.5,
-            fontWeight: 500,
-            padding: "4px 10px",
-            borderRadius: 999,
-            background: meta.soft,
-            color: meta.deep,
-            border: `1px solid ${meta.tone}`,
-          }}
-        >
-          Currently {meta.label}
-        </span>
       </div>
 
       {mobile ? (
@@ -2846,12 +3528,23 @@ function renderPage(pageView, mobile) {
 /*  Web layout                                                        */
 /* ---------------------------------------------------------------- */
 
-function WebView({ pageView, onPageViewChange }) {
+function WebView({ pageView, onPageViewChange, onNewObservation, onGenerateReport, newObsOpen, onCloseNewObs }) {
   return (
     <div style={{ background: "var(--color-canvas)", position: "relative" }}>
-      <ChildPageHeader mobile={false} />
+      <ChildPageHeader
+        mobile={false}
+        pageView={pageView}
+        onNewObservation={onNewObservation}
+        onGenerateReport={onGenerateReport}
+      />
       <ViewToggle value={pageView} onChange={onPageViewChange} mobile={false} />
       {renderPage(pageView, false)}
+      <NewObservationModal
+        open={newObsOpen}
+        pageView={pageView}
+        mobile={false}
+        onClose={onCloseNewObs}
+      />
     </div>
   );
 }
@@ -2860,10 +3553,15 @@ function WebView({ pageView, onPageViewChange }) {
 /*  Mobile layout                                                     */
 /* ---------------------------------------------------------------- */
 
-function MobileView({ pageView, onPageViewChange }) {
+function MobileView({ pageView, onPageViewChange, onNewObservation, onGenerateReport }) {
   return (
     <div style={{ background: "var(--color-canvas)", paddingTop: 44, position: "relative" }}>
-      <ChildPageHeader mobile={true} />
+      <ChildPageHeader
+        mobile={true}
+        pageView={pageView}
+        onNewObservation={onNewObservation}
+        onGenerateReport={onGenerateReport}
+      />
       <ViewToggle value={pageView} onChange={onPageViewChange} mobile={true} />
       {renderPage(pageView, true)}
     </div>
@@ -2878,6 +3576,14 @@ function App() {
   const [tab, setTab] = React.useState("web");
   const [variant, setVariant] = React.useState("warm");
   const [pageView, setPageView] = React.useState("curriculum");
+  const [newObsOpen, setNewObsOpen] = React.useState(false);
+
+  const onNewObservation = () => setNewObsOpen(true);
+  const onGenerateReport = () => {
+    // stub for the mockup
+    console.info("[mockup] Generate report clicked for", pageView);
+  };
+  const onCloseNewObs = () => setNewObsOpen(false);
 
   return (
     <div data-variant={variant} className="shell">
@@ -2944,7 +3650,14 @@ function App() {
       {tab === "web" ? (
         <div className="viewport-web">
           <div className="frame">
-            <WebView pageView={pageView} onPageViewChange={setPageView} />
+            <WebView
+              pageView={pageView}
+              onPageViewChange={setPageView}
+              onNewObservation={onNewObservation}
+              onGenerateReport={onGenerateReport}
+              newObsOpen={newObsOpen}
+              onCloseNewObs={onCloseNewObs}
+            />
           </div>
         </div>
       ) : (
@@ -2952,8 +3665,21 @@ function App() {
           <div className="phone">
             <div className="phone-notch" />
             <div className="phone-content scroll-quiet">
-              <MobileView pageView={pageView} onPageViewChange={setPageView} />
+              <MobileView
+                pageView={pageView}
+                onPageViewChange={setPageView}
+                onNewObservation={onNewObservation}
+                onGenerateReport={onGenerateReport}
+              />
             </div>
+            {/* Modal lives at .phone level so it visually clips to the
+                phone frame (overflow:hidden) and pins to the visible viewport. */}
+            <NewObservationModal
+              open={newObsOpen}
+              pageView={pageView}
+              mobile={true}
+              onClose={onCloseNewObs}
+            />
           </div>
         </div>
       )}

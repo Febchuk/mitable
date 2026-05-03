@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { ChevronRight, Search } from "lucide-react";
 import { CHILDREN, initialsFor } from "@/components/montessori/data";
 import { FilterChips, PageHeader, cardStyle } from "@/components/montessori/page-header";
@@ -70,11 +71,11 @@ export default function RosterPage() {
             ))}
           </div>
           {list.map((c) => (
-            <button
+            <Link
               key={c.id}
-              type="button"
-              className="tap"
+              href={`/app/children/${c.id}`}
               onClick={() => store.setSelectedChild(c.id)}
+              className="tap"
               style={{
                 display: "grid",
                 gridTemplateColumns: "1.4fr 0.6fr 0.8fr 1.2fr 0.8fr 24px",
@@ -86,6 +87,8 @@ export default function RosterPage() {
                 background: "transparent",
                 border: 0,
                 borderTop: "1px solid var(--color-border)",
+                color: "inherit",
+                textDecoration: "none",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -104,18 +107,18 @@ export default function RosterPage() {
               <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>{c.recent}</div>
               <div style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>{c.guardian}</div>
               <ChevronRight size={14} strokeWidth={1.5} />
-            </button>
+            </Link>
           ))}
         </div>
 
         {/* Mobile list */}
         <div className="lg:hidden" style={cardStyle}>
           {list.map((c, i) => (
-            <button
+            <Link
               key={c.id}
-              type="button"
-              className="tap"
+              href={`/app/children/${c.id}`}
               onClick={() => store.setSelectedChild(c.id)}
+              className="tap"
               style={{
                 width: "100%",
                 textAlign: "left",
@@ -126,6 +129,8 @@ export default function RosterPage() {
                 background: "transparent",
                 border: 0,
                 borderTop: i ? "1px solid var(--color-border)" : "0",
+                color: "inherit",
+                textDecoration: "none",
               }}
             >
               <Avatar initials={initialsFor(c.name)} tone={c.tone} size={40} />
@@ -159,7 +164,7 @@ export default function RosterPage() {
                 {c.age}
               </div>
               <ChevronRight size={16} strokeWidth={1.5} />
-            </button>
+            </Link>
           ))}
           {list.length === 0 && (
             <div
