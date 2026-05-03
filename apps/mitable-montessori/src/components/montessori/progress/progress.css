@@ -1,0 +1,41 @@
+/* Route-scoped layout overrides for the Progress page.
+   Mirrors the report-detail pattern (apps/mitable-montessori/src/components/
+   montessori/report-detail/report-detail.css lines 4-32). The app layout's
+   <main> reserves paddingBottom: 96 for the mobile bottom-nav, which leaves
+   dead space below the matrix on desktop. We also need the page to clamp to
+   the viewport so the matrix can scroll internally instead of the whole
+   page scrolling.
+
+   Desktop only: cap the layout chain at 100vh and zero the bottom padding.
+   Mobile: keep the layout's natural page scroll and the 96px nav clearance,
+   so the Today's-focus card / topic chips / matrix / recent-updates strip
+   can scroll past the viewport like any other mobile page. */
+
+@media (min-width: 1024px) {
+  html:has(.progress-root),
+  body:has(.progress-root) {
+    height: 100vh;
+    overflow: hidden;
+  }
+  body:has(.progress-root) > div:has(.progress-root) {
+    height: 100vh;
+    min-height: 0;
+  }
+  body:has(.progress-root) > div:has(.progress-root) > div:has(.progress-root) {
+    min-height: 0;
+  }
+  main:has(> .progress-root) {
+    padding-bottom: 0 !important;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+  .progress-root {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
