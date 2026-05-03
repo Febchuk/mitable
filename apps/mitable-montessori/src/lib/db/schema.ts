@@ -9,6 +9,7 @@ import type {
   ClassroomRow,
   ClassroomTeacherRow,
   CommandRow,
+  CurriculumEventRow,
   CurriculumRow,
   CurriculumSubtopicRow,
   CurriculumTopicRow,
@@ -47,6 +48,7 @@ export class MontessoriDb extends Dexie {
   axes!: Table<AxisRow, string>;
   axisAssessments!: Table<AxisAssessmentRow, string>;
   wholeChildObservations!: Table<WholeChildObservationRow, string>;
+  curriculumEvents!: Table<CurriculumEventRow, string>;
 
   constructor() {
     super("mitable-montessori");
@@ -85,6 +87,13 @@ export class MontessoriDb extends Dexie {
       axes: "id, schoolId, key, sortOrder",
       axisAssessments: "id, [studentId+axisKey], studentId, endedAt",
       wholeChildObservations: "id, studentId, [studentId+axisKey], createdAt",
+    });
+
+    // v4 — curriculum_events table (migration 0013). Backs the Activity
+    // tab's curriculum half + lets us read the per-subtopic event log
+    // without re-deriving from student_progress_history.
+    this.version(4).stores({
+      curriculumEvents: "id, studentId, [studentId+subtopicId], createdAt",
     });
   }
 }

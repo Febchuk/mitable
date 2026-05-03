@@ -50,6 +50,7 @@ export async function GET() {
     axes,
     axisAssessments,
     wholeChildObservations,
+    curriculumEvents,
   ] = await Promise.all([
     supabase
       .from("students")
@@ -99,6 +100,11 @@ export async function GET() {
       .select(
         "id, student_id, axis_key, from_level, to_level, note, source_observation_id, author_user_id, created_at"
       ),
+    supabase
+      .from("curriculum_events")
+      .select(
+        "id, student_id, subtopic_id, comment, transition_to_status, author_user_id, created_at"
+      ),
   ]);
 
   for (const r of [
@@ -114,6 +120,7 @@ export async function GET() {
     axes,
     axisAssessments,
     wholeChildObservations,
+    curriculumEvents,
   ]) {
     if (r.error) {
       return NextResponse.json({ error: r.error.message }, { status: 500 });
@@ -137,6 +144,7 @@ export async function GET() {
       axes: axes.data ?? [],
       axis_assessments: axisAssessments.data ?? [],
       whole_child_observations: wholeChildObservations.data ?? [],
+      curriculum_events: curriculumEvents.data ?? [],
     },
   });
 }

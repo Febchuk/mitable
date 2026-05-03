@@ -3,6 +3,7 @@ import * as React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ChildDetail } from "@/components/montessori/child-detail";
+import type { ActivityFeedEntry } from "@/lib/queries/activity";
 import type { CurriculumByTopic } from "@/lib/queries/curriculum";
 import type { StudentProfile } from "@/lib/queries/student-profile";
 import type { AxisWithAssessment, WholeChildObservation } from "@/lib/queries/whole-child";
@@ -51,6 +52,7 @@ const axes: AxisWithAssessment[] = [
 
 const observations: WholeChildObservation[] = [];
 const curriculum: CurriculumByTopic[] = [];
+const activity: ActivityFeedEntry[] = [];
 
 describe("ChildDetail", () => {
   it("renders the child name and the three view tabs", () => {
@@ -60,6 +62,7 @@ describe("ChildDetail", () => {
         axes={axes}
         observations={observations}
         curriculum={curriculum}
+        activity={activity}
       />
     );
 
@@ -76,6 +79,7 @@ describe("ChildDetail", () => {
         axes={axes}
         observations={observations}
         curriculum={curriculum}
+        activity={activity}
       />
     );
 

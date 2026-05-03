@@ -544,9 +544,124 @@ async function seedDemoChildData({
     }
   }
 
+  // Curriculum events — mirrors the prototype's TIMELINE. Pairs each entry
+  // with a real subtopic id; entries that introduced/promoted a subtopic
+  // also set transition_to_status so the activity feed badges match.
+  const events: Array<{
+    topicSlash: string;
+    comment: string;
+    transition: "introduced" | "practicing" | "mastered" | null;
+    daysAgo: number;
+  }> = [
+    {
+      topicSlash: "Sensorial / Pink Tower",
+      comment: "Built it correctly on first try — third return this week.",
+      transition: null,
+      daysAgo: 0,
+    },
+    {
+      topicSlash: "Mathematics / Number Rods",
+      comment: "Sequenced 11 through 16 unprompted.",
+      transition: null,
+      daysAgo: 2,
+    },
+    {
+      topicSlash: "Sensorial / Brown Stair",
+      comment: "Paired with pink tower — noticed the missing dimension.",
+      transition: null,
+      daysAgo: 4,
+    },
+    {
+      topicSlash: "Practical Life / Buttoning frame",
+      comment: "Buttoned top to bottom; did not ask for help.",
+      transition: null,
+      daysAgo: 6,
+    },
+    {
+      topicSlash: "Cultural / Puzzle Map: World",
+      comment: "First presentation. Held the puzzle map for a long time.",
+      transition: "introduced",
+      daysAgo: 9,
+    },
+    {
+      topicSlash: "Language / Movable Alphabet",
+      comment: "First presentation — picked out 'cat' on her own.",
+      transition: "introduced",
+      daysAgo: 11,
+    },
+    {
+      topicSlash: "Mathematics / Spindle Box",
+      comment: "First presentation. Counted to 7 confidently.",
+      transition: "introduced",
+      daysAgo: 14,
+    },
+    {
+      topicSlash: "Mathematics / Number Rods",
+      comment: "Built 11 through 14 with quantity beads.",
+      transition: "practicing",
+      daysAgo: 16,
+    },
+    {
+      topicSlash: "Sensorial / Red Rods",
+      comment: "First presentation; ordered them by length.",
+      transition: "introduced",
+      daysAgo: 18,
+    },
+    {
+      topicSlash: "Cultural / Land & Water Forms",
+      comment: "Sorted the small objects without prompting.",
+      transition: "practicing",
+      daysAgo: 21,
+    },
+    {
+      topicSlash: "Sensorial / Sound Cylinders",
+      comment: "Completed all four boxes blindfolded.",
+      transition: "mastered",
+      daysAgo: 22,
+    },
+    {
+      topicSlash: "Sensorial / Brown Stair",
+      comment: "Returned to it three times this week.",
+      transition: "practicing",
+      daysAgo: 28,
+    },
+    {
+      topicSlash: "Language / Sandpaper Letters",
+      comment: "Traced 'a', 'm', 's' with strong tactile interest.",
+      transition: "practicing",
+      daysAgo: 38,
+    },
+    {
+      topicSlash: "Sensorial / Pink Tower",
+      comment: "Built tower independently — two tries, both correct.",
+      transition: "practicing",
+      daysAgo: 44,
+    },
+  ];
+
+  let eventCount = 0;
+  for (const ev of events) {
+    const subtopicId = subtopicIds.get(ev.topicSlash);
+    if (!subtopicId) {
+      console.warn(`  (skip event) no subtopic id for "${ev.topicSlash}"`);
+      continue;
+    }
+    const { error } = await supabase.from("curriculum_events").insert({
+      student_id: studentId,
+      subtopic_id: subtopicId,
+      comment: ev.comment,
+      transition_to_status: ev.transition,
+      author_user_id: teacherUserId,
+      created_at: daysAgoIso(ev.daysAgo),
+    });
+    if (error) throw error;
+    eventCount++;
+  }
+
   console.log(`  ✓ ${assessments.length} axis assessments`);
   console.log(`  ✓ ${observations.length} whole-child observations`);
   console.log(`  ✓ ${progressRows.length} curriculum progress rows`);
+  console.log(`  ✓ ${eventCount} curriculum events`);
 }
 
 function daysAgoIso(days: number): string {

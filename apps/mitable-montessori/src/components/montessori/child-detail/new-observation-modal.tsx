@@ -6,6 +6,7 @@ import { LEVELS, type Level } from "./mock-data";
 import { CloseIcon } from "./icons";
 import { ToastBus } from "../primitives";
 import type { PageView } from "./child-page-header";
+import type { CurriculumByTopic } from "@/lib/queries/curriculum";
 import type { AxisWithAssessment } from "@/lib/queries/whole-child";
 
 type Props = {
@@ -15,17 +16,10 @@ type Props = {
   mobile: boolean;
   studentId: string;
   axes: AxisWithAssessment[];
+  curriculum: CurriculumByTopic[];
 };
 
-const STUB_CONFIG: Record<
-  Exclude<PageView, "whole">,
-  { sub: string; fields: string[]; cta: string }
-> = {
-  curriculum: {
-    sub: "Tag a subtopic and the level the child is working at.",
-    fields: ["Topic / Subtopic", "State (Introduced · Practicing · Mastered)", "Comment"],
-    cta: "Save observation",
-  },
+const STUB_CONFIG: Record<"activity", { sub: string; fields: string[]; cta: string }> = {
   activity: {
     sub: "A material the child worked with today.",
     fields: ["Material", "Curriculum area", "Comment (optional)"],
@@ -33,7 +27,21 @@ const STUB_CONFIG: Record<
   },
 };
 
-export function NewObservationModal({ open, pageView, onClose, mobile, studentId, axes }: Props) {
+const TRANSITIONS = [
+  { value: "introduced", label: "Introduced" },
+  { value: "practicing", label: "Practicing" },
+  { value: "mastered", label: "Mastered" },
+] as const;
+
+export function NewObservationModal({
+  open,
+  pageView,
+  onClose,
+  mobile,
+  studentId,
+  axes,
+  curriculum,
+}: Props) {
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -80,15 +88,28 @@ export function NewObservationModal({ open, pageView, onClose, mobile, studentId
         }}
       >
         <ModalHeader tabLabel={tabLabel} pageView={pageView} onClose={onClose} />
-        {pageView === "whole" ? (
+        {pageView === "whole" && (
           <WholeChildForm studentId={studentId} axes={axes} onClose={onClose} onSaved={onClose} />
-        ) : (
-          <StubFields pageView={pageView} onClose={onClose} />
         )}
+        {pageView === "curriculum" && (
+          <CurriculumForm
+            studentId={studentId}
+            curriculum={curriculum}
+            onClose={onClose}
+            onSaved={onClose}
+          />
+        )}
+        {pageView === "activity" && <StubFields onClose={onClose} />}
       </div>
     </div>
   );
 }
+
+const SUB_FOR: Record<PageView, string> = {
+  whole: "Capture what you observed and which dimension it shifted.",
+  curriculum: "Tag a subtopic and the level the child is working at.",
+  activity: STUB_CONFIG.activity.sub,
+};
 
 function ModalHeader({
   tabLabel,
@@ -99,10 +120,7 @@ function ModalHeader({
   pageView: PageView;
   onClose: () => void;
 }) {
-  const sub =
-    pageView === "whole"
-      ? "Capture what you observed and which dimension it shifted."
-      : STUB_CONFIG[pageView].sub;
+  const sub = SUB_FOR[pageView];
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
       <div>
@@ -139,14 +157,8 @@ function ModalHeader({
   );
 }
 
-function StubFields({
-  pageView,
-  onClose,
-}: {
-  pageView: Exclude<PageView, "whole">;
-  onClose: () => void;
-}) {
-  const c = STUB_CONFIG[pageView];
+function StubFields({ onClose }: { onClose: () => void }) {
+  const c = STUB_CONFIG.activity;
   return (
     <>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -360,6 +372,210 @@ function WholeChildForm({
           type="submit"
           className="primary-btn tap"
           disabled={saving || !axisKey || note.trim().length === 0}
+        >
+          {saving ? "Saving…" : "Save observation"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CurriculumForm({
+  studentId,
+  curriculum,
+  onClose,
+  onSaved,
+}: {
+  studentId: string;
+  curriculum: CurriculumByTopic[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const router = useRouter();
+  const firstSubtopicId = curriculum[0]?.subtopics[0]?.subtopicId ?? "";
+  const [subtopicId, setSubtopicId] = React.useState<string>(firstSubtopicId);
+  const [movesState, setMovesState] = React.useState(false);
+  const [transitionToStatus, setTransitionToStatus] =
+    React.useState<(typeof TRANSITIONS)[number]["value"]>("practicing");
+  const [comment, setComment] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Reset transition default to one step above current when subtopic changes.
+  React.useEffect(() => {
+    setMovesState(false);
+    let current: string | null = null;
+    for (const t of curriculum) {
+      const s = t.subtopics.find((sub) => sub.subtopicId === subtopicId);
+      if (s) {
+        current = s.status;
+        break;
+      }
+    }
+    if (current === "introduced") setTransitionToStatus("practicing");
+    else if (current === "practicing") setTransitionToStatus("mastered");
+    else setTransitionToStatus("introduced");
+  }, [subtopicId, curriculum]);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subtopicId || comment.trim().length === 0) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/students/${studentId}/curriculum-events`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          subtopicId,
+          comment: comment.trim(),
+          transitionToStatus: movesState ? transitionToStatus : null,
+        }),
+      });
+      const body = await res.json().catch(() => ({}) as { error?: string; warning?: string });
+      if (!res.ok) {
+        setError(body.error || `Save failed (${res.status})`);
+        setSaving(false);
+        return;
+      }
+      ToastBus.push({ message: body.warning || "Observation saved" });
+      onSaved();
+      router.refresh();
+    } catch (err) {
+      setError((err as Error).message);
+      setSaving(false);
+    }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    background: "var(--color-canvas)",
+    border: "1px solid var(--color-border)",
+    borderRadius: 10,
+    fontSize: 13,
+    color: "var(--color-ink)",
+  };
+
+  if (curriculum.length === 0) {
+    return (
+      <div
+        style={{
+          padding: 16,
+          background: "var(--color-canvas)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 10,
+          fontSize: 13,
+          color: "var(--color-ink-muted)",
+        }}
+      >
+        No subtopics on this child&apos;s curriculum yet. Ask your admin to set one up first.
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+          Subtopic
+        </span>
+        <select
+          value={subtopicId}
+          onChange={(e) => setSubtopicId(e.target.value)}
+          style={inputStyle}
+          required
+        >
+          {curriculum.map((t) => (
+            <optgroup key={t.topicId} label={t.topicName}>
+              {t.subtopics.map((s) => (
+                <option key={s.subtopicId} value={s.subtopicId}>
+                  {s.name} · {s.status}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 13,
+          color: "var(--color-ink-secondary)",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={movesState}
+          onChange={(e) => setMovesState(e.target.checked)}
+        />
+        This note moves the state
+      </label>
+
+      {movesState && (
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+            New state
+          </span>
+          <select
+            value={transitionToStatus}
+            onChange={(e) =>
+              setTransitionToStatus(e.target.value as (typeof TRANSITIONS)[number]["value"])
+            }
+            style={inputStyle}
+          >
+            {TRANSITIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+          Comment
+        </span>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          rows={4}
+          required
+          maxLength={2000}
+          placeholder="What did the child do?"
+          style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" }}
+        />
+      </label>
+
+      {error && (
+        <div
+          role="alert"
+          style={{
+            fontSize: 12.5,
+            color: "var(--color-terracotta-deep)",
+            background: "var(--color-terracotta-soft)",
+            border: "1px solid var(--color-terracotta)",
+            borderRadius: 8,
+            padding: "8px 10px",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+        <button type="button" className="ghost-btn tap" onClick={onClose} disabled={saving}>
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="primary-btn tap"
+          disabled={saving || !subtopicId || comment.trim().length === 0}
         >
           {saving ? "Saving…" : "Save observation"}
         </button>

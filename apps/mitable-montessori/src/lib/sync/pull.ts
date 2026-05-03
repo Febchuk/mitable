@@ -116,6 +116,15 @@ interface PullResponse {
       author_user_id: string;
       created_at: string;
     }>;
+    curriculum_events: Array<{
+      id: string;
+      student_id: string;
+      subtopic_id: string;
+      comment: string;
+      transition_to_status: "introduced" | "practicing" | "mastered" | null;
+      author_user_id: string;
+      created_at: string;
+    }>;
   };
 }
 
@@ -175,6 +184,7 @@ export async function pullSync() {
       db.axes,
       db.axisAssessments,
       db.wholeChildObservations,
+      db.curriculumEvents,
       db.syncMeta,
     ],
     async () => {
@@ -308,6 +318,19 @@ export async function pullSync() {
           sourceObservationId: o.source_observation_id,
           authorUserId: o.author_user_id,
           createdAt: o.created_at,
+        }))
+      );
+
+      await db.curriculumEvents.clear();
+      await db.curriculumEvents.bulkPut(
+        body.data.curriculum_events.map((e) => ({
+          id: e.id,
+          studentId: e.student_id,
+          subtopicId: e.subtopic_id,
+          comment: e.comment,
+          transitionToStatus: e.transition_to_status,
+          authorUserId: e.author_user_id,
+          createdAt: e.created_at,
         }))
       );
 

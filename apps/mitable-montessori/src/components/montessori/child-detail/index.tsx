@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ToastBus } from "../primitives";
+import type { ActivityFeedEntry } from "@/lib/queries/activity";
 import type { CurriculumByTopic } from "@/lib/queries/curriculum";
 import type { StudentProfile } from "@/lib/queries/student-profile";
 import type { AxisWithAssessment, WholeChildObservation } from "@/lib/queries/whole-child";
@@ -18,9 +19,16 @@ export type ChildDetailProps = {
   axes: AxisWithAssessment[];
   observations: WholeChildObservation[];
   curriculum: CurriculumByTopic[];
+  activity: ActivityFeedEntry[];
 };
 
-export function ChildDetail({ profile, axes, observations, curriculum }: ChildDetailProps) {
+export function ChildDetail({
+  profile,
+  axes,
+  observations,
+  curriculum,
+  activity,
+}: ChildDetailProps) {
   const mobile = useIsMobile();
   const [pageView, setPageView] = React.useState<PageView>("whole");
   const [newObsOpen, setNewObsOpen] = React.useState(false);
@@ -40,7 +48,7 @@ export function ChildDetail({ profile, axes, observations, curriculum }: ChildDe
         <WholeChildView mobile={mobile} profile={profile} axes={axes} observations={observations} />
       )}
       {pageView === "curriculum" && <CurriculumView mobile={mobile} topics={curriculum} />}
-      {pageView === "activity" && <ActivityView mobile={mobile} />}
+      {pageView === "activity" && <ActivityView mobile={mobile} entries={activity} />}
       <NewObservationModal
         open={newObsOpen}
         pageView={pageView}
@@ -48,6 +56,7 @@ export function ChildDetail({ profile, axes, observations, curriculum }: ChildDe
         mobile={mobile}
         studentId={profile.id}
         axes={axes}
+        curriculum={curriculum}
       />
     </div>
   );

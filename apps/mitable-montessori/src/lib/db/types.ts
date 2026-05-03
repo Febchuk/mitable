@@ -216,3 +216,16 @@ export interface WholeChildObservationRow {
   authorUserId: string;
   createdAt: string;
 }
+
+export type CurriculumEventTransition = "introduced" | "practicing" | "mastered";
+
+export interface CurriculumEventRow {
+  id: string;
+  studentId: string;
+  subtopicId: string;
+  comment: string;
+  /** Set when this event also moved the subtopic state. */
+  transitionToStatus: CurriculumEventTransition | null;
+  authorUserId: string;
+  createdAt: string;
+}
