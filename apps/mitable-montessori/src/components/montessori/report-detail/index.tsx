@@ -2,26 +2,41 @@
 
 import * as React from "react";
 import Link from "next/link";
-import type { Child, Report } from "../data";
+import type { Child, Report, ReportDetail as ReportDetailType } from "../data";
 import { ChatPane } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
 import "./report-detail.css";
 
+const DIRTY_LABEL = "Unsaved changes";
+
 export function ReportDetail({ report, child }: { report: Report; child: Child | undefined }) {
+  const [detail, setDetail] = React.useState<ReportDetailType | undefined>(report.detail);
+  const [isDirty, setIsDirty] = React.useState(false);
+
+  const onChange = React.useCallback((next: ReportDetailType) => {
+    setDetail(next);
+    setIsDirty(true);
+  }, []);
+
+  const savedMeta = isDirty ? DIRTY_LABEL : (detail?.savedMeta ?? "Not saved yet");
+
   return (
     <div className="rd-root">
       <ReportTopBar
         child={child}
         status={report.status}
         kind={report.kind}
-        savedMeta={report.detail?.savedMeta ?? "Not saved yet"}
+        dayLabel={detail?.dayLabel}
+        classroom={detail?.classroom}
+        savedMeta={savedMeta}
+        savedMetaDirty={isDirty}
       />
-      {report.detail ? (
+      {detail ? (
         <div className="rd-workspace">
           <div className="rd-split">
             <ChatPane />
-            <ReportPane detail={report.detail} />
+            <ReportPane detail={detail} onChange={onChange} />
           </div>
         </div>
       ) : (

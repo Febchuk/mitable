@@ -1,75 +1,140 @@
 /* Styles ported from _design/report-editor-prototype.html. Scoped to .rd-root
    so they never leak. globals.css already provides --color-* and --font-*. */
 
+/* The app layout's <main> reserves paddingBottom: 96 for the mobile
+   bottom-nav. On the report editor we want the chat/report panes to
+   fill the full viewport on desktop, so we cancel that padding on any
+   <main> that contains an .rd-root, then size the root to fill the
+   parent. No fixed pixel math needed. */
+/* Cap the entire layout chain at viewport height when the report editor
+   is on screen. The app layout uses min-height: 100vh and stacks several
+   flex containers; min-height: 0 on each ancestor flex item lets the
+   editor pane (.rd-root) actually clamp to the viewport so its internal
+   panes scroll instead of the whole page. */
+html:has(.rd-root),
+body:has(.rd-root) {
+  height: 100vh;
+  overflow: hidden;
+}
+body:has(.rd-root) > div:has(.rd-root) {
+  height: 100vh;
+  min-height: 0;
+}
+body:has(.rd-root) > div:has(.rd-root) > div:has(.rd-root) {
+  min-height: 0;
+}
+main:has(> .rd-root) {
+  padding-bottom: 0 !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
 .rd-root {
   position: relative;
   background: var(--color-canvas);
-  min-height: calc(100vh - 64px);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* ---------- Top bar ---------- */
-.rd-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
-  backdrop-filter: saturate(140%) blur(8px);
+/* ---------- Page header (matches child-detail style) ---------- */
+.rd-page-header {
+  padding: 26px 28px 18px;
   border-bottom: 1px solid var(--color-border);
-  height: 56px;
-  display: flex;
-  align-items: center;
+  flex-shrink: 0;
 }
-.rd-topbar-inner {
-  width: 100%;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+@media (max-width: 767px) {
+  .rd-page-header {
+    padding: 16px 16px 16px;
+  }
 }
-.rd-crumbs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-ink-secondary);
-  min-width: 0;
+.rd-page-header-top {
+  margin-bottom: 12px;
 }
-.rd-back {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+.rd-back-link {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: var(--color-ink-secondary);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-}
-.rd-back:hover {
-  background: var(--color-muted);
-  color: var(--color-ink);
-}
-.rd-crumbs .rd-sep {
+  gap: 6px;
+  font-size: 12.5px;
   color: var(--color-ink-muted);
+  text-decoration: none;
+  transition: color 140ms ease;
 }
-.rd-crumbs .rd-current {
+.rd-back-link:hover {
   color: var(--color-ink);
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.rd-header-right {
+.rd-page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.rd-page-header-left {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .rd-page-header-left {
+    gap: 12px;
+  }
+}
+.rd-page-header-title-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
-.rd-saved-meta {
-  font-size: 12px;
+.rd-page-header-title {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+@media (max-width: 767px) {
+  .rd-page-header-title {
+    font-size: 22px;
+  }
+}
+.rd-page-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.rd-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
   color: var(--color-ink-muted);
+  margin-top: 6px;
+}
+.rd-meta-row > span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.rd-meta-row .rd-meta-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+  opacity: 0.6;
+}
+.rd-saved-meta-inline {
+  transition: color 140ms ease;
+}
+.rd-saved-meta-dirty {
+  color: var(--color-terracotta-deep);
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 /* ---------- Status pill ---------- */
@@ -147,11 +212,16 @@
 .rd-workspace {
   position: relative;
   z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .rd-split {
+  flex: 1;
   display: grid;
   grid-template-columns: 1fr;
-  height: calc(100vh - 56px - 64px); /* topbar + outer app bottom-nav allowance */
+  min-height: 0;
 }
 @media (min-width: 1024px) {
   .rd-split {
@@ -536,6 +606,127 @@
   color: var(--color-terracotta-deep);
   margin-bottom: 6px;
 }
+.rd-section-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0;
+}
+.rd-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.rd-section:hover .rd-section-actions,
+.rd-section:focus-within .rd-section-actions {
+  opacity: 1;
+}
+.rd-section-delete {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.rd-section-delete:hover {
+  border-color: var(--color-terracotta);
+  color: var(--color-terracotta-deep);
+}
+.rd-section-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 3px 4px 3px 10px;
+}
+.rd-section-confirm-label {
+  font-size: 11.5px;
+  color: var(--color-ink-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+.rd-section-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  font-family: inherit;
+}
+.rd-section-confirm-btn:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-ink);
+}
+.rd-section-confirm-yes {
+  background: var(--color-terracotta);
+  color: #fff;
+  border-color: var(--color-terracotta);
+}
+.rd-section-confirm-yes:hover {
+  background: var(--color-terracotta-deep);
+  border-color: var(--color-terracotta-deep);
+  color: #fff;
+}
+
+/* Inline new-section prompt */
+.rd-new-section-prompt {
+  margin-top: 24px;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-clay);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-clay-soft) 20%, transparent);
+}
+.rd-new-section-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rd-new-section-row .rd-section-heading {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.rd-new-section-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--color-ink);
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 180ms ease;
+}
+.rd-new-section-input:focus {
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+}
+.rd-new-section-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
 .rd-para-block {
   position: relative;
   padding: 8px 12px;
@@ -585,6 +776,17 @@
   font-family: var(--font-sans);
   font-weight: 400;
   margin: 0;
+  caret-color: var(--color-terracotta);
+}
+.rd-para-text:focus {
+  outline: 2px solid var(--color-terracotta-soft);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+/* While editing, suppress the para-block hover background so it doesn't
+   compete with the focus outline. */
+.rd-para-block:has(.rd-para-text:focus) {
+  background: transparent;
 }
 
 /* Token rendering */

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquare, Plus } from "lucide-react";
+import { Check, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import type { ReportDetail, ReportSection } from "../data";
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
@@ -9,27 +9,70 @@ import { Bolt } from "./icons";
 const COMING_SOON = "Editing this section is coming soon — chat assistant will land first.";
 const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
 
-export function ReportPane({ detail }: { detail: ReportDetail }) {
-  const [title, setTitle] = React.useState(detail.title);
+type ReportPaneProps = {
+  detail: ReportDetail;
+  onChange: (next: ReportDetail) => void;
+};
+
+function newId(prefix: string) {
+  // Stable enough for in-session ids; persistence will assign real ones.
+  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function ReportPane({ detail, onChange }: ReportPaneProps) {
+  const [addingSection, setAddingSection] = React.useState(false);
+  // ID of a paragraph that should grab focus on next render (e.g. the empty
+  // paragraph in a freshly-created section).
+  const [pendingFocusParagraphId, setPendingFocusParagraphId] = React.useState<string | null>(null);
+
+  const onTitleChange = (title: string) => onChange({ ...detail, title });
+
+  const onParagraphCommit = React.useCallback(
+    (sectionId: string, paragraphId: string, html: string) => {
+      const sections = detail.sections.map((section) => {
+        if (section.id !== sectionId) return section;
+        const paragraphs = section.paragraphs.map((p) =>
+          p.id === paragraphId ? { ...p, html } : p
+        );
+        return { ...section, paragraphs };
+      });
+      onChange({ ...detail, sections });
+    },
+    [detail, onChange]
+  );
+
+  const onCreateSection = (heading: string) => {
+    const trimmed = heading.trim();
+    if (!trimmed) {
+      setAddingSection(false);
+      return;
+    }
+    const paragraphId = newId("p");
+    const section: ReportSection = {
+      id: newId("s"),
+      heading: trimmed,
+      paragraphs: [{ id: paragraphId, html: "" }],
+    };
+    onChange({ ...detail, sections: [...detail.sections, section] });
+    setAddingSection(false);
+    setPendingFocusParagraphId(paragraphId);
+  };
+
+  const onDeleteSection = (sectionId: string) => {
+    const sections = detail.sections.filter((s) => s.id !== sectionId);
+    onChange({ ...detail, sections });
+  };
+
+  const clearPendingFocus = React.useCallback(() => setPendingFocusParagraphId(null), []);
 
   return (
     <main className="rd-pane rd-report-pane">
       <div className="rd-report-scroll scroll-quiet">
         <article className="rd-report-paper">
-          <div className="rd-report-meta">
-            <span className="rd-label-cap" style={{ color: "var(--color-sage-deep)" }}>
-              Daily report
-            </span>
-            <span style={{ color: "var(--color-ink-muted)" }}>·</span>
-            <span style={{ fontSize: 12.5, color: "var(--color-ink-secondary)" }}>
-              {detail.dayLabel} · {detail.classroom}
-            </span>
-          </div>
-
           <input
             className="rd-report-title-input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={detail.title}
+            onChange={(e) => onTitleChange(e.target.value)}
             spellCheck={false}
             aria-label="Report title"
           />
@@ -44,13 +87,26 @@ export function ReportPane({ detail }: { detail: ReportDetail }) {
           </div>
 
           {detail.sections.map((section) => (
-            <SectionBlock key={section.id} section={section} />
+            <SectionBlock
+              key={section.id}
+              section={section}
+              pendingFocusParagraphId={pendingFocusParagraphId}
+              onParagraphFocused={clearPendingFocus}
+              onParagraphCommit={(paragraphId, html) =>
+                onParagraphCommit(section.id, paragraphId, html)
+              }
+              onDelete={() => onDeleteSection(section.id)}
+            />
           ))}
 
-          <button type="button" className="rd-add-section" onClick={() => toast()}>
-            <Plus size={13} strokeWidth={2} />
-            Add section
-          </button>
+          {addingSection ? (
+            <NewSectionPrompt onCreate={onCreateSection} onCancel={() => setAddingSection(false)} />
+          ) : (
+            <button type="button" className="rd-add-section" onClick={() => setAddingSection(true)}>
+              <Plus size={13} strokeWidth={2} />
+              Add section
+            </button>
+          )}
         </article>
       </div>
 
@@ -72,13 +128,117 @@ export function ReportPane({ detail }: { detail: ReportDetail }) {
   );
 }
 
-function SectionBlock({ section }: { section: ReportSection }) {
+function NewSectionPrompt({
+  onCreate,
+  onCancel,
+}: {
+  onCreate: (heading: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="rd-new-section-prompt" role="group" aria-label="New section">
+      <div className="rd-new-section-row">
+        <span className="rd-section-heading">New section</span>
+        <input
+          ref={inputRef}
+          className="rd-new-section-input"
+          value={value}
+          placeholder="e.g. Outdoor, Math, Practical life"
+          aria-label="New section heading"
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onCreate(value);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel();
+            }
+          }}
+          onBlur={() => {
+            // Blur cancels if nothing has been typed; otherwise commit.
+            if (!value.trim()) onCancel();
+            else onCreate(value);
+          }}
+        />
+      </div>
+      <div className="rd-new-section-hint">
+        <span>
+          <span className="rd-kbd">Enter</span> to create · <span className="rd-kbd">Esc</span> to
+          cancel
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SectionBlock({
+  section,
+  pendingFocusParagraphId,
+  onParagraphFocused,
+  onParagraphCommit,
+  onDelete,
+}: {
+  section: ReportSection;
+  pendingFocusParagraphId: string | null;
+  onParagraphFocused: () => void;
+  onParagraphCommit: (paragraphId: string, html: string) => void;
+  onDelete: () => void;
+}) {
   const [ghostDismissed, setGhostDismissed] = React.useState(false);
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const showGhost = section.ghostEdit && !ghostDismissed;
 
   return (
     <div className="rd-section">
-      <div className="rd-section-heading">{section.heading}</div>
+      <div className="rd-section-heading-row">
+        <div className="rd-section-heading">{section.heading}</div>
+        <div className="rd-section-actions">
+          {confirmingDelete ? (
+            <span className="rd-section-confirm" role="group" aria-label="Confirm delete section">
+              <span className="rd-section-confirm-label">Delete this section?</span>
+              <button
+                type="button"
+                className="rd-section-confirm-btn rd-section-confirm-yes"
+                onClick={() => {
+                  onDelete();
+                  ToastBus.push({ message: `Deleted "${section.heading}" section` });
+                }}
+                aria-label="Confirm delete"
+              >
+                <Check size={12} strokeWidth={2.5} />
+                Delete
+              </button>
+              <button
+                type="button"
+                className="rd-section-confirm-btn"
+                onClick={() => setConfirmingDelete(false)}
+                aria-label="Cancel delete"
+              >
+                <X size={12} strokeWidth={2.5} />
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="rd-section-delete"
+              onClick={() => setConfirmingDelete(true)}
+              aria-label={`Delete ${section.heading} section`}
+              title="Delete section"
+            >
+              <Trash2 size={12} strokeWidth={2} />
+            </button>
+          )}
+        </div>
+      </div>
 
       {section.paragraphs.map((p) => (
         <div className="rd-para-block" key={p.id}>
@@ -93,7 +253,13 @@ function SectionBlock({ section }: { section: ReportSection }) {
               Discuss
             </button>
           </div>
-          <p className="rd-para-text" dangerouslySetInnerHTML={{ __html: p.html }} />
+          <EditableParagraph
+            html={p.html}
+            ariaLabel={`${section.heading} paragraph`}
+            autoFocus={pendingFocusParagraphId === p.id}
+            onAutoFocused={onParagraphFocused}
+            onCommit={(next) => onParagraphCommit(p.id, next)}
+          />
         </div>
       ))}
 
@@ -133,5 +299,75 @@ function SectionBlock({ section }: { section: ReportSection }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * A contenteditable <p> seeded with `html` once on mount, and re-seeded
+ * from props only while it is NOT focused. Commits its current innerHTML
+ * via `onCommit` on blur. Pasted content is sanitized to plain text;
+ * Enter inserts a <br>, not a new paragraph block. When `autoFocus` is
+ * true, focuses on next render and calls `onAutoFocused` to clear the
+ * upstream signal.
+ */
+function EditableParagraph({
+  html,
+  ariaLabel,
+  autoFocus = false,
+  onAutoFocused,
+  onCommit,
+}: {
+  html: string;
+  ariaLabel: string;
+  autoFocus?: boolean;
+  onAutoFocused?: () => void;
+  onCommit: (next: string) => void;
+}) {
+  const ref = React.useRef<HTMLParagraphElement>(null);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof document !== "undefined" && document.activeElement === el) return;
+    if (el.innerHTML !== html) el.innerHTML = html;
+  }, [html]);
+
+  React.useEffect(() => {
+    if (!autoFocus) return;
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    onAutoFocused?.();
+  }, [autoFocus, onAutoFocused]);
+
+  return (
+    <p
+      ref={ref}
+      className="rd-para-text"
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck
+      role="textbox"
+      aria-multiline="true"
+      aria-label={ariaLabel}
+      onBlur={(e) => {
+        const next = (e.currentTarget as HTMLElement).innerHTML;
+        if (next !== html) onCommit(next);
+      }}
+      onPaste={(e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData("text/plain");
+        // execCommand is deprecated but remains the simplest cross-browser
+        // way to insert plain text at the caret without pulling in a
+        // rich-text editor library. Replace if/when we adopt one.
+        document.execCommand("insertText", false, text);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          document.execCommand("insertLineBreak");
+        }
+      }}
+    />
   );
 }

@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, FileText } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 import type { Child, ReportStatus } from "../data";
-import { ToastBus } from "../primitives";
+import { initialsFor } from "../data";
+import { Avatar, ToastBus } from "../primitives";
+import { ChevLeft } from "../child-detail/icons";
 
 const STATUS_LABEL: Record<ReportStatus, string> = {
   draft: "Draft",
@@ -22,41 +24,71 @@ export function ReportTopBar({
   child,
   status,
   kind,
+  dayLabel,
+  classroom,
   savedMeta,
+  savedMetaDirty = false,
 }: {
   child: Child | undefined;
   status: ReportStatus;
   kind: string;
+  dayLabel?: string;
+  classroom?: string;
   savedMeta: string;
+  savedMetaDirty?: boolean;
 }) {
-  const childLabel = child
-    ? `${child.name.split(" ")[0]} ${child.name.split(" ").slice(-1)[0][0]}.`
-    : "Report";
+  const displayName = child?.name ?? "Report";
+  const headingTitle = child ? `${kind} report — ${child.name.split(" ")[0]}` : `${kind} report`;
 
   const onSaveDraft = () =>
     ToastBus.push({ message: "Saving drafts isn't wired up yet — coming soon." });
   const onSubmit = () => ToastBus.push({ message: "Submitting for review is coming soon." });
 
   return (
-    <header className="rd-topbar">
-      <div className="rd-topbar-inner">
-        <div className="rd-crumbs">
-          <Link href="/app/reports" className="rd-back" aria-label="Back to reports">
-            <ChevronLeft size={16} strokeWidth={2} />
-          </Link>
-          <span>Reports</span>
-          <span className="rd-sep">/</span>
-          <span>{kind}</span>
-          <span className="rd-sep">/</span>
-          <span className="rd-current">{childLabel}</span>
-          <span className={`rd-pill ${STATUS_CLASS[status]}`} style={{ marginLeft: 10 }}>
-            <span className="rd-dot" />
-            {STATUS_LABEL[status]}
-          </span>
+    <div className="rd-page-header">
+      <div className="rd-page-header-top">
+        <Link href="/app/reports" className="rd-back-link">
+          <ChevLeft />
+          <span>All reports</span>
+        </Link>
+      </div>
+
+      <div className="rd-page-header-row">
+        <div className="rd-page-header-left">
+          {child && <Avatar initials={initialsFor(displayName)} tone={child.tone} size={56} />}
+          <div style={{ minWidth: 0 }}>
+            <div className="rd-page-header-title-row">
+              <h1 className="rd-page-header-title">{headingTitle}</h1>
+              <span className={`rd-pill ${STATUS_CLASS[status]}`}>
+                <span className="rd-dot" />
+                {STATUS_LABEL[status]}
+              </span>
+            </div>
+            <div className="rd-meta-row label-cap">
+              <span>{kind}</span>
+              {dayLabel && (
+                <>
+                  <span className="rd-meta-sep" />
+                  <span>{dayLabel}</span>
+                </>
+              )}
+              {classroom && (
+                <>
+                  <span className="rd-meta-sep" />
+                  <span>{classroom}</span>
+                </>
+              )}
+              <span className="rd-meta-sep" />
+              <span
+                className={`rd-saved-meta-inline${savedMetaDirty ? " rd-saved-meta-dirty" : ""}`}
+              >
+                {savedMeta}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="rd-header-right">
-          <span className="rd-saved-meta">{savedMeta}</span>
+        <div className="rd-page-header-actions">
           <button type="button" className="rd-btn rd-btn-secondary" onClick={onSaveDraft}>
             <FileText size={14} strokeWidth={2} />
             Save draft
@@ -67,6 +99,6 @@ export function ReportTopBar({
           </button>
         </div>
       </div>
-    </header>
+    </div>
   );
 }
