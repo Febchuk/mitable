@@ -53,7 +53,7 @@ export type ReportDetail = {
 export type Report = {
   id: string;
   childId: string;
-  kind: "Daily" | "Major";
+  kind: "Daily" | "Major" | "Incident";
   when: string;
   period: string;
   status: ReportStatus;

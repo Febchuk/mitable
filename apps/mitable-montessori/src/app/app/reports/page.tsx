@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronRight, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { findChild, initialsFor, type ReportStatus } from "@/components/montessori/data";
 import { FilterChips, PageHeader, cardStyle } from "@/components/montessori/page-header";
+import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
 
@@ -58,27 +59,7 @@ export default function ReportsPage() {
         overline="My drafts + approved"
         title="Reports"
         subtitle={`${drafts} drafts · ${reviews} awaiting review · ${sent} sent`}
-        actions={
-          <button
-            type="button"
-            className="tap"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              border: 0,
-              background: "var(--color-terracotta)",
-              color: "var(--color-surface)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 10px rgba(196,106,79,0.25)",
-            }}
-            aria-label="New report"
-          >
-            <Plus size={18} strokeWidth={1.5} />
-          </button>
-        }
+        actions={<NewReportTrigger />}
       />
 
       <div style={{ padding: "16px 24px 0" }}>

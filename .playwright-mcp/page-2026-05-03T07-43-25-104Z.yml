@@ -1,0 +1,279 @@
+- generic [ref=e3]:
+    - generic [ref=e5]:
+        - generic [ref=e6]:
+            - generic [ref=e7]: m
+            - generic [ref=e8]: Mitable Montessori
+            - generic [ref=e9]: · Progress
+        - tablist "Viewport" [ref=e10]:
+            - button "Web" [ref=e11] [cursor=pointer]
+            - button "Mobile" [ref=e12] [cursor=pointer]
+        - generic [ref=e13]:
+            - generic [ref=e14]: Density
+            - generic [ref=e15]:
+                - button "v2.1 · Tight" [ref=e16] [cursor=pointer]
+                - button "v2.2 · Medium" [ref=e17] [cursor=pointer]
+                - button "v2.3 · Airy" [ref=e18] [cursor=pointer]
+    - generic [ref=e21]:
+        - generic [ref=e22]:
+            - generic [ref=e23]: Lesson planner · Apr 30 · v2.2 · Medium
+            - generic [ref=e24]:
+                - generic [ref=e25]:
+                    - heading "Progress" [level=1] [ref=e26]
+                    - generic [ref=e27]: 14 children present today · Balanced · the default planner read
+                - button "Export to CSV" [ref=e29] [cursor=pointer]
+        - generic [ref=e30]:
+            - generic [ref=e31]:
+                - generic [ref=e32]: Today's focus
+                - generic [ref=e33]:
+                    - generic [ref=e34]: Sensorial
+                    - generic [ref=e35]: 4 children due for re-presentation
+                - generic [ref=e36]: Area
+                - generic [ref=e37]:
+                    - button "Sensorial" [ref=e38] [cursor=pointer]
+                    - button "Practical Life soon" [ref=e39] [cursor=pointer]:
+                        - text: Practical Life
+                        - generic [ref=e40]: soon
+                    - button "Language soon" [ref=e41] [cursor=pointer]:
+                        - text: Language
+                        - generic [ref=e42]: soon
+                    - button "Math soon" [ref=e43] [cursor=pointer]:
+                        - text: Math
+                        - generic [ref=e44]: soon
+                - generic [ref=e45]: Group
+                - generic [ref=e46]:
+                    - button "All" [ref=e47] [cursor=pointer]
+                    - button "Primary" [ref=e48] [cursor=pointer]
+                    - button "Toddlers" [ref=e49] [cursor=pointer]
+                - generic [ref=e50]: Age band
+                - generic [ref=e51]:
+                    - button "All" [ref=e52] [cursor=pointer]
+                    - button "3-4y" [ref=e53] [cursor=pointer]
+                    - button "4-5y" [ref=e54] [cursor=pointer]
+                    - button "5-6y" [ref=e55] [cursor=pointer]
+                - generic [ref=e57]: "Tip: tap a subtopic name to lock it in for everyone."
+            - generic [ref=e60]:
+                - button "Select all subtopics for Ada Okafor" [ref=e62] [cursor=pointer]:
+                    - generic [ref=e63]: Ada
+                    - generic [ref=e64]: AO
+                - button "Select all subtopics for Bea Chen" [ref=e65] [cursor=pointer]:
+                    - generic [ref=e66]: Bea
+                    - generic [ref=e67]: BC
+                - button "Select all subtopics for Diego Ramos" [ref=e68] [cursor=pointer]:
+                    - generic [ref=e69]: Diego
+                    - generic [ref=e70]: DR
+                - button "Select all subtopics for Eli Okonkwo" [ref=e71] [cursor=pointer]:
+                    - generic [ref=e72]: Eli
+                    - generic [ref=e73]: EO
+                - button "Select all subtopics for Iris Moreau" [ref=e74] [cursor=pointer]:
+                    - generic [ref=e75]: Iris
+                    - generic [ref=e76]: IM
+                - button "Select all subtopics for Kai Nakamura" [ref=e77] [cursor=pointer]:
+                    - generic [ref=e78]: Kai
+                    - generic [ref=e79]: KN
+                - button "Select all subtopics for Levi Schwartz" [ref=e80] [cursor=pointer]:
+                    - generic [ref=e81]: Levi
+                    - generic [ref=e82]: LS
+                - button "Select all subtopics for Mira Khan" [ref=e83] [cursor=pointer]:
+                    - generic [ref=e84]: Mira
+                    - generic [ref=e85]: MK
+                - button "Select all subtopics for Noor Habib" [ref=e86] [cursor=pointer]:
+                    - generic [ref=e87]: Noor
+                    - generic [ref=e88]: NH
+                - button "Select all subtopics for Ren Tanaka" [ref=e89] [cursor=pointer]:
+                    - generic [ref=e90]: Ren
+                    - generic [ref=e91]: RT
+                - button "Select all subtopics for Pia Marin" [ref=e92] [cursor=pointer]:
+                    - generic [ref=e93]: Pia
+                    - generic [ref=e94]: PM
+                - button "Select all subtopics for Tom Walsh" [ref=e95] [cursor=pointer]:
+                    - generic [ref=e96]: Tom
+                    - generic [ref=e97]: TW
+                - button "Select all subtopics for Fin Nilsson" [ref=e98] [cursor=pointer]:
+                    - generic [ref=e99]: Fin
+                    - generic [ref=e100]: FN
+                - button "Select all subtopics for Val Lopez" [ref=e101] [cursor=pointer]:
+                    - generic [ref=e102]: Val
+                    - generic [ref=e103]: VL
+                - button "Select all children for Pink tower" [ref=e104] [cursor=pointer]: Pink tower
+                - 'button "Ada Okafor — Pink tower: Mastered" [ref=e105] [cursor=pointer]'
+                - 'button "Bea Chen — Pink tower: Mastered" [ref=e106] [cursor=pointer]'
+                - 'button "Diego Ramos — Pink tower: Mastered" [ref=e107] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Pink tower: Practicing" [ref=e108] [cursor=pointer]'
+                - 'button "Iris Moreau — Pink tower: Practicing" [ref=e109] [cursor=pointer]'
+                - 'button "Kai Nakamura — Pink tower: Mastered" [ref=e110] [cursor=pointer]'
+                - 'button "Levi Schwartz — Pink tower: Introduced" [ref=e111] [cursor=pointer]'
+                - 'button "Mira Khan — Pink tower: Mastered" [ref=e112] [cursor=pointer]'
+                - 'button "Noor Habib — Pink tower: Practicing" [ref=e113] [cursor=pointer]'
+                - 'button "Ren Tanaka — Pink tower: Mastered" [ref=e114] [cursor=pointer]'
+                - 'button "Pia Marin — Pink tower: Mastered" [ref=e115] [cursor=pointer]'
+                - 'button "Tom Walsh — Pink tower: Introduced" [ref=e116] [cursor=pointer]'
+                - 'button "Fin Nilsson — Pink tower: Mastered" [ref=e117] [cursor=pointer]'
+                - 'button "Val Lopez — Pink tower: Practicing" [ref=e118] [cursor=pointer]'
+                - button "Select all children for Brown stair" [ref=e119] [cursor=pointer]: Brown stair
+                - 'button "Ada Okafor — Brown stair: Mastered" [ref=e120] [cursor=pointer]'
+                - 'button "Bea Chen — Brown stair: Practicing" [ref=e121] [cursor=pointer]'
+                - 'button "Diego Ramos — Brown stair: Mastered" [ref=e122] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Brown stair: Practicing" [ref=e123] [cursor=pointer]'
+                - 'button "Iris Moreau — Brown stair: Introduced" [ref=e124] [cursor=pointer]'
+                - 'button "Kai Nakamura — Brown stair: Mastered" [ref=e125] [cursor=pointer]'
+                - 'button "Levi Schwartz — Brown stair: Not started" [ref=e126] [cursor=pointer]'
+                - 'button "Mira Khan — Brown stair: Mastered" [ref=e127] [cursor=pointer]'
+                - 'button "Noor Habib — Brown stair: Introduced" [ref=e128] [cursor=pointer]'
+                - 'button "Ren Tanaka — Brown stair: Mastered" [ref=e129] [cursor=pointer]'
+                - 'button "Pia Marin — Brown stair: Practicing" [ref=e130] [cursor=pointer]'
+                - 'button "Tom Walsh — Brown stair: Introduced" [ref=e131] [cursor=pointer]'
+                - 'button "Fin Nilsson — Brown stair: Mastered" [ref=e132] [cursor=pointer]'
+                - 'button "Val Lopez — Brown stair: Practicing" [ref=e133] [cursor=pointer]'
+                - button "Select all children for Red rods" [ref=e134] [cursor=pointer]: Red rods
+                - 'button "Ada Okafor — Red rods: Practicing" [ref=e135] [cursor=pointer]'
+                - 'button "Bea Chen — Red rods: Practicing" [ref=e136] [cursor=pointer]'
+                - 'button "Diego Ramos — Red rods: Mastered" [ref=e137] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Red rods: Introduced" [ref=e138] [cursor=pointer]'
+                - 'button "Iris Moreau — Red rods: Not started" [ref=e139] [cursor=pointer]'
+                - 'button "Kai Nakamura — Red rods: Practicing" [ref=e140] [cursor=pointer]'
+                - 'button "Levi Schwartz — Red rods: Not started" [ref=e141] [cursor=pointer]'
+                - 'button "Mira Khan — Red rods: Mastered" [ref=e142] [cursor=pointer]'
+                - 'button "Noor Habib — Red rods: Not started" [ref=e143] [cursor=pointer]'
+                - 'button "Ren Tanaka — Red rods: Practicing" [ref=e144] [cursor=pointer]'
+                - 'button "Pia Marin — Red rods: Practicing" [ref=e145] [cursor=pointer]'
+                - 'button "Tom Walsh — Red rods: Not started" [ref=e146] [cursor=pointer]'
+                - 'button "Fin Nilsson — Red rods: Mastered" [ref=e147] [cursor=pointer]'
+                - 'button "Val Lopez — Red rods: Introduced" [ref=e148] [cursor=pointer]'
+                - button "Select all children for Cylinder blocks" [ref=e149] [cursor=pointer]: Cylinder blocks
+                - 'button "Ada Okafor — Cylinder blocks: Mastered" [ref=e150] [cursor=pointer]'
+                - 'button "Bea Chen — Cylinder blocks: Introduced" [ref=e151] [cursor=pointer]'
+                - 'button "Diego Ramos — Cylinder blocks: Mastered" [ref=e152] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Cylinder blocks: Introduced" [ref=e153] [cursor=pointer]'
+                - 'button "Iris Moreau — Cylinder blocks: Not started" [ref=e154] [cursor=pointer]'
+                - 'button "Kai Nakamura — Cylinder blocks: Practicing" [ref=e155] [cursor=pointer]'
+                - 'button "Levi Schwartz — Cylinder blocks: Not started" [ref=e156] [cursor=pointer]'
+                - 'button "Mira Khan — Cylinder blocks: Mastered" [ref=e157] [cursor=pointer]'
+                - 'button "Noor Habib — Cylinder blocks: Not started" [ref=e158] [cursor=pointer]'
+                - 'button "Ren Tanaka — Cylinder blocks: Practicing" [ref=e159] [cursor=pointer]'
+                - 'button "Pia Marin — Cylinder blocks: Introduced" [ref=e160] [cursor=pointer]'
+                - 'button "Tom Walsh — Cylinder blocks: Not started" [ref=e161] [cursor=pointer]'
+                - 'button "Fin Nilsson — Cylinder blocks: Practicing" [ref=e162] [cursor=pointer]'
+                - 'button "Val Lopez — Cylinder blocks: Not started" [ref=e163] [cursor=pointer]'
+                - button "Select all children for Binomial cube" [ref=e164] [cursor=pointer]: Binomial cube
+                - 'button "Ada Okafor — Binomial cube: Practicing" [ref=e165] [cursor=pointer]'
+                - 'button "Bea Chen — Binomial cube: Not started" [ref=e166] [cursor=pointer]'
+                - 'button "Diego Ramos — Binomial cube: Practicing" [ref=e167] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Binomial cube: Not started" [ref=e168] [cursor=pointer]'
+                - 'button "Iris Moreau — Binomial cube: Not started" [ref=e169] [cursor=pointer]'
+                - 'button "Kai Nakamura — Binomial cube: Mastered" [ref=e170] [cursor=pointer]'
+                - 'button "Levi Schwartz — Binomial cube: Not started" [ref=e171] [cursor=pointer]'
+                - 'button "Mira Khan — Binomial cube: Practicing" [ref=e172] [cursor=pointer]'
+                - 'button "Noor Habib — Binomial cube: Not started" [ref=e173] [cursor=pointer]'
+                - 'button "Ren Tanaka — Binomial cube: Introduced" [ref=e174] [cursor=pointer]'
+                - 'button "Pia Marin — Binomial cube: Introduced" [ref=e175] [cursor=pointer]'
+                - 'button "Tom Walsh — Binomial cube: Not started" [ref=e176] [cursor=pointer]'
+                - 'button "Fin Nilsson — Binomial cube: Practicing" [ref=e177] [cursor=pointer]'
+                - 'button "Val Lopez — Binomial cube: Not started" [ref=e178] [cursor=pointer]'
+                - button "Select all children for Trinomial cube" [ref=e179] [cursor=pointer]: Trinomial cube
+                - 'button "Ada Okafor — Trinomial cube: Introduced" [ref=e180] [cursor=pointer]'
+                - 'button "Bea Chen — Trinomial cube: Not started" [ref=e181] [cursor=pointer]'
+                - 'button "Diego Ramos — Trinomial cube: Practicing" [ref=e182] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Trinomial cube: Not started" [ref=e183] [cursor=pointer]'
+                - 'button "Iris Moreau — Trinomial cube: Not started" [ref=e184] [cursor=pointer]'
+                - 'button "Kai Nakamura — Trinomial cube: Practicing" [ref=e185] [cursor=pointer]'
+                - 'button "Levi Schwartz — Trinomial cube: Not started" [ref=e186] [cursor=pointer]'
+                - 'button "Mira Khan — Trinomial cube: Practicing" [ref=e187] [cursor=pointer]'
+                - 'button "Noor Habib — Trinomial cube: Not started" [ref=e188] [cursor=pointer]'
+                - 'button "Ren Tanaka — Trinomial cube: Introduced" [ref=e189] [cursor=pointer]'
+                - 'button "Pia Marin — Trinomial cube: Not started" [ref=e190] [cursor=pointer]'
+                - 'button "Tom Walsh — Trinomial cube: Not started" [ref=e191] [cursor=pointer]'
+                - 'button "Fin Nilsson — Trinomial cube: Introduced" [ref=e192] [cursor=pointer]'
+                - 'button "Val Lopez — Trinomial cube: Not started" [ref=e193] [cursor=pointer]'
+                - button "Select all children for Geometric solids" [ref=e194] [cursor=pointer]: Geometric solids
+                - 'button "Ada Okafor — Geometric solids: Not started" [ref=e195] [cursor=pointer]'
+                - 'button "Bea Chen — Geometric solids: Not started" [ref=e196] [cursor=pointer]'
+                - 'button "Diego Ramos — Geometric solids: Introduced" [ref=e197] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Geometric solids: Not started" [ref=e198] [cursor=pointer]'
+                - 'button "Iris Moreau — Geometric solids: Not started" [ref=e199] [cursor=pointer]'
+                - 'button "Kai Nakamura — Geometric solids: Introduced" [ref=e200] [cursor=pointer]'
+                - 'button "Levi Schwartz — Geometric solids: Not started" [ref=e201] [cursor=pointer]'
+                - 'button "Mira Khan — Geometric solids: Not started" [ref=e202] [cursor=pointer]'
+                - 'button "Noor Habib — Geometric solids: Not started" [ref=e203] [cursor=pointer]'
+                - 'button "Ren Tanaka — Geometric solids: Not started" [ref=e204] [cursor=pointer]'
+                - 'button "Pia Marin — Geometric solids: Not started" [ref=e205] [cursor=pointer]'
+                - 'button "Tom Walsh — Geometric solids: Not started" [ref=e206] [cursor=pointer]'
+                - 'button "Fin Nilsson — Geometric solids: Introduced" [ref=e207] [cursor=pointer]'
+                - 'button "Val Lopez — Geometric solids: Not started" [ref=e208] [cursor=pointer]'
+                - button "Select all children for Smelling jars" [ref=e209] [cursor=pointer]: Smelling jars
+                - 'button "Ada Okafor — Smelling jars: Mastered" [ref=e210] [cursor=pointer]'
+                - 'button "Bea Chen — Smelling jars: Mastered" [ref=e211] [cursor=pointer]'
+                - 'button "Diego Ramos — Smelling jars: Mastered" [ref=e212] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Smelling jars: Practicing" [ref=e213] [cursor=pointer]'
+                - 'button "Iris Moreau — Smelling jars: Introduced" [ref=e214] [cursor=pointer]'
+                - 'button "Kai Nakamura — Smelling jars: Mastered" [ref=e215] [cursor=pointer]'
+                - 'button "Levi Schwartz — Smelling jars: Introduced" [ref=e216] [cursor=pointer]'
+                - 'button "Mira Khan — Smelling jars: Mastered" [ref=e217] [cursor=pointer]'
+                - 'button "Noor Habib — Smelling jars: Practicing" [ref=e218] [cursor=pointer]'
+                - 'button "Ren Tanaka — Smelling jars: Mastered" [ref=e219] [cursor=pointer]'
+                - 'button "Pia Marin — Smelling jars: Mastered" [ref=e220] [cursor=pointer]'
+                - 'button "Tom Walsh — Smelling jars: Practicing" [ref=e221] [cursor=pointer]'
+                - 'button "Fin Nilsson — Smelling jars: Mastered" [ref=e222] [cursor=pointer]'
+                - 'button "Val Lopez — Smelling jars: Introduced" [ref=e223] [cursor=pointer]'
+                - button "Select all children for Sound cylinders" [ref=e224] [cursor=pointer]: Sound cylinders
+                - 'button "Ada Okafor — Sound cylinders: Practicing" [ref=e225] [cursor=pointer]'
+                - 'button "Bea Chen — Sound cylinders: Practicing" [ref=e226] [cursor=pointer]'
+                - 'button "Diego Ramos — Sound cylinders: Mastered" [ref=e227] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Sound cylinders: Introduced" [ref=e228] [cursor=pointer]'
+                - 'button "Iris Moreau — Sound cylinders: Not started" [ref=e229] [cursor=pointer]'
+                - 'button "Kai Nakamura — Sound cylinders: Mastered" [ref=e230] [cursor=pointer]'
+                - 'button "Levi Schwartz — Sound cylinders: Not started" [ref=e231] [cursor=pointer]'
+                - 'button "Mira Khan — Sound cylinders: Mastered" [ref=e232] [cursor=pointer]'
+                - 'button "Noor Habib — Sound cylinders: Introduced" [ref=e233] [cursor=pointer]'
+                - 'button "Ren Tanaka — Sound cylinders: Practicing" [ref=e234] [cursor=pointer]'
+                - 'button "Pia Marin — Sound cylinders: Practicing" [ref=e235] [cursor=pointer]'
+                - 'button "Tom Walsh — Sound cylinders: Not started" [ref=e236] [cursor=pointer]'
+                - 'button "Fin Nilsson — Sound cylinders: Mastered" [ref=e237] [cursor=pointer]'
+                - 'button "Val Lopez — Sound cylinders: Not started" [ref=e238] [cursor=pointer]'
+                - button "Select all children for Color tablets" [ref=e239] [cursor=pointer]: Color tablets
+                - 'button "Ada Okafor — Color tablets: Introduced" [ref=e240] [cursor=pointer]'
+                - 'button "Bea Chen — Color tablets: Introduced" [ref=e241] [cursor=pointer]'
+                - 'button "Diego Ramos — Color tablets: Practicing" [ref=e242] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Color tablets: Not started" [ref=e243] [cursor=pointer]'
+                - 'button "Iris Moreau — Color tablets: Not started" [ref=e244] [cursor=pointer]'
+                - 'button "Kai Nakamura — Color tablets: Practicing" [ref=e245] [cursor=pointer]'
+                - 'button "Levi Schwartz — Color tablets: Not started" [ref=e246] [cursor=pointer]'
+                - 'button "Mira Khan — Color tablets: Mastered" [ref=e247] [cursor=pointer]'
+                - 'button "Noor Habib — Color tablets: Not started" [ref=e248] [cursor=pointer]'
+                - 'button "Ren Tanaka — Color tablets: Practicing" [ref=e249] [cursor=pointer]'
+                - 'button "Pia Marin — Color tablets: Introduced" [ref=e250] [cursor=pointer]'
+                - 'button "Tom Walsh — Color tablets: Not started" [ref=e251] [cursor=pointer]'
+                - 'button "Fin Nilsson — Color tablets: Practicing" [ref=e252] [cursor=pointer]'
+                - 'button "Val Lopez — Color tablets: Not started" [ref=e253] [cursor=pointer]'
+                - button "Select all children for Touch boards" [ref=e254] [cursor=pointer]: Touch boards
+                - 'button "Ada Okafor — Touch boards: Not started" [ref=e255] [cursor=pointer]'
+                - 'button "Bea Chen — Touch boards: Not started" [ref=e256] [cursor=pointer]'
+                - 'button "Diego Ramos — Touch boards: Introduced" [ref=e257] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Touch boards: Not started" [ref=e258] [cursor=pointer]'
+                - 'button "Iris Moreau — Touch boards: Not started" [ref=e259] [cursor=pointer]'
+                - 'button "Kai Nakamura — Touch boards: Practicing" [ref=e260] [cursor=pointer]'
+                - 'button "Levi Schwartz — Touch boards: Not started" [ref=e261] [cursor=pointer]'
+                - 'button "Mira Khan — Touch boards: Practicing" [ref=e262] [cursor=pointer]'
+                - 'button "Noor Habib — Touch boards: Not started" [ref=e263] [cursor=pointer]'
+                - 'button "Ren Tanaka — Touch boards: Introduced" [ref=e264] [cursor=pointer]'
+                - 'button "Pia Marin — Touch boards: Not started" [ref=e265] [cursor=pointer]'
+                - 'button "Tom Walsh — Touch boards: Not started" [ref=e266] [cursor=pointer]'
+                - 'button "Fin Nilsson — Touch boards: Introduced" [ref=e267] [cursor=pointer]'
+                - 'button "Val Lopez — Touch boards: Not started" [ref=e268] [cursor=pointer]'
+                - button "Select all children for Thermic tablets" [ref=e269] [cursor=pointer]: Thermic tablets
+                - 'button "Ada Okafor — Thermic tablets: Not started" [ref=e270] [cursor=pointer]'
+                - 'button "Bea Chen — Thermic tablets: Not started" [ref=e271] [cursor=pointer]'
+                - 'button "Diego Ramos — Thermic tablets: Not started" [ref=e272] [cursor=pointer]'
+                - 'button "Eli Okonkwo — Thermic tablets: Not started" [ref=e273] [cursor=pointer]'
+                - 'button "Iris Moreau — Thermic tablets: Not started" [ref=e274] [cursor=pointer]'
+                - 'button "Kai Nakamura — Thermic tablets: Introduced" [ref=e275] [cursor=pointer]'
+                - 'button "Levi Schwartz — Thermic tablets: Not started" [ref=e276] [cursor=pointer]'
+                - 'button "Mira Khan — Thermic tablets: Introduced" [ref=e277] [cursor=pointer]'
+                - 'button "Noor Habib — Thermic tablets: Not started" [ref=e278] [cursor=pointer]'
+                - 'button "Ren Tanaka — Thermic tablets: Not started" [ref=e279] [cursor=pointer]'
+                - 'button "Pia Marin — Thermic tablets: Not started" [ref=e280] [cursor=pointer]'
+                - 'button "Tom Walsh — Thermic tablets: Not started" [ref=e281] [cursor=pointer]'
+                - 'button "Fin Nilsson — Thermic tablets: Not started" [ref=e282] [cursor=pointer]'
+                - 'button "Val Lopez — Thermic tablets: Not started" [ref=e283] [cursor=pointer]'
+            - generic [ref=e285]:
+                - generic [ref=e286]: Today
+                - text: No updates yet. Select cells in the grid to record a lesson.

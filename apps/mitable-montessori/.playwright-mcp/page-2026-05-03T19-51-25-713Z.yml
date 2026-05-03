@@ -1,0 +1,268 @@
+- generic [ref=e1]:
+    - generic [ref=e2]:
+        - complementary [ref=e3]:
+            - generic [ref=e4]:
+                - generic [ref=e5]: Mitable
+                - generic [ref=e6]: Montessori
+            - generic [ref=e7]:
+                - generic [ref=e8]: C
+                - generic [ref=e9]:
+                    - generic [ref=e10]: Cypress Room
+                    - generic [ref=e11]: 18 children
+                - img [ref=e12]
+            - navigation [ref=e14]:
+                - link "Today" [ref=e15] [cursor=pointer]:
+                    - /url: /app/today
+                    - img [ref=e16]
+                    - generic [ref=e18]: Today
+                - link "Roster" [ref=e19] [cursor=pointer]:
+                    - /url: /app/roster
+                    - img [ref=e20]
+                    - generic [ref=e25]: Roster
+                - link "Curriculum" [ref=e26] [cursor=pointer]:
+                    - /url: /app/curriculum
+                    - img [ref=e27]
+                    - generic [ref=e29]: Curriculum
+                - link "Progress" [ref=e30] [cursor=pointer]:
+                    - /url: /app/progress
+                    - img [ref=e31]
+                    - generic [ref=e33]: Progress
+                - link "Attendance" [ref=e34] [cursor=pointer]:
+                    - /url: /app/attendance
+                    - img [ref=e35]
+                    - generic [ref=e37]: Attendance
+                - link "Reports 4" [ref=e38] [cursor=pointer]:
+                    - /url: /app/reports
+                    - img [ref=e39]
+                    - generic [ref=e41]: Reports
+                    - generic [ref=e42]: "4"
+            - button "Online" [ref=e45] [cursor=pointer]:
+                - img [ref=e46]
+                - text: Online
+            - generic [ref=e50]:
+                - generic [ref=e51]: TE
+                - generic [ref=e52]:
+                    - generic [ref=e53]: teacher@example.school
+                    - generic [ref=e54]: Lead guide
+                - button "Account menu" [ref=e56] [cursor=pointer]:
+                    - generic [ref=e57]: T
+        - main [ref=e59]:
+            - generic [ref=e60]:
+                - button "Online" [ref=e61] [cursor=pointer]:
+                    - img [ref=e62]
+                    - text: Online
+                - button "Account menu" [ref=e67] [cursor=pointer]:
+                    - generic [ref=e68]: T
+            - generic [ref=e69]:
+                - generic [ref=e70]:
+                    - generic [ref=e71]: My drafts + approved
+                    - generic [ref=e72]:
+                        - generic [ref=e73]:
+                            - heading "Reports" [level=1] [ref=e74]
+                            - generic [ref=e75]: 3 drafts · 1 awaiting review · 4 sent
+                        - generic [ref=e76]:
+                            - button "New report" [active] [ref=e77] [cursor=pointer]:
+                                - img [ref=e78]
+                            - dialog "Start a report" [ref=e425]:
+                                - generic [ref=e426]:
+                                    - generic [ref=e427]: A new report ✿
+                                    - generic [ref=e428]:
+                                        - heading "Start a report" [level=2] [ref=e429]
+                                        - paragraph [ref=e430]: Pick a child and a type. Add audio, handwritten notes, or a template — or hand it all to the assistant.
+                                    - button "Close" [ref=e431] [cursor=pointer]:
+                                        - img [ref=e432]
+                                - generic [ref=e435]:
+                                    - generic [ref=e436]:
+                                        - generic [ref=e437]:
+                                            - generic [ref=e438]: Child
+                                            - generic [ref=e439]: required
+                                        - generic [ref=e440]:
+                                            - textbox "Search children" [ref=e441]:
+                                                - /placeholder: Start typing a name…
+                                            - generic:
+                                                - img
+                                    - generic [ref=e442]:
+                                        - generic [ref=e443]:
+                                            - generic [ref=e444]: Report type
+                                            - generic [ref=e445]: required
+                                        - generic [ref=e446]:
+                                            - button "Daily A short snapshot of today." [ref=e447] [cursor=pointer]:
+                                                - img [ref=e449]
+                                                - generic [ref=e451]: Daily
+                                                - generic [ref=e452]: A short snapshot of today.
+                                            - button "Major Term or milestone summary." [ref=e453] [cursor=pointer]:
+                                                - img [ref=e455]
+                                                - generic [ref=e457]: Major
+                                                - generic [ref=e458]: Term or milestone summary.
+                                            - button "Incident Something parents should know." [ref=e459] [cursor=pointer]:
+                                                - img [ref=e461]
+                                                - generic [ref=e464]: Incident
+                                                - generic [ref=e465]: Something parents should know.
+                                    - generic [ref=e466]:
+                                        - generic [ref=e467]:
+                                            - generic [ref=e468]: Optional · capture
+                                            - generic [ref=e469]: skip if you’d rather just talk
+                                        - generic [ref=e470]:
+                                            - generic [ref=e471]:
+                                                - generic [ref=e472]:
+                                                    - img [ref=e474]
+                                                    - text: Voice memo
+                                                - generic [ref=e477]: Talk for a minute. The assistant will transcribe and pull facts into the draft.
+                                                - button "Start recording" [ref=e478] [cursor=pointer]: Start recording
+                                            - generic [ref=e480]:
+                                                - generic [ref=e481]:
+                                                    - img [ref=e483]
+                                                    - text: Handwritten notes
+                                                - generic [ref=e486]: Snap a photo of your jotted notes. The assistant will read them and pull the facts in.
+                                                - button "Add photo of notes" [ref=e487] [cursor=pointer]:
+                                                    - img [ref=e488]
+                                                    - text: Add photo of notes
+                                            - generic [ref=e489]:
+                                                - generic [ref=e490]:
+                                                    - img [ref=e492]
+                                                    - text: Template
+                                                    - generic [ref=e496]: admin-managed
+                                                - generic [ref=e497]: Start from one of your school’s templates, or skip and the assistant drafts from scratch.
+                                                - button "Pick a template" [ref=e498] [cursor=pointer]:
+                                                    - img [ref=e499]
+                                                    - text: Pick a template
+                                - generic [ref=e501]:
+                                    - generic [ref=e502]: Pick a child and a type to start.
+                                    - generic [ref=e503]:
+                                        - button "Cancel" [ref=e504] [cursor=pointer]
+                                        - button "Start drafting" [disabled] [ref=e505]:
+                                            - text: Start drafting
+                                            - img [ref=e506]
+                - generic [ref=e80]:
+                    - button "All" [ref=e81] [cursor=pointer]
+                    - button "Drafts · 3" [ref=e82] [cursor=pointer]
+                    - button "Awaiting review · 1" [ref=e83] [cursor=pointer]
+                    - button "Sent · 4" [ref=e84] [cursor=pointer]
+                    - button "Daily" [ref=e85] [cursor=pointer]
+                    - button "Major" [ref=e86] [cursor=pointer]
+                - generic [ref=e88]:
+                    - generic [ref=e89]:
+                        - generic [ref=e90]: Child
+                        - generic [ref=e91]: Type
+                        - generic [ref=e92]: Period
+                        - generic [ref=e93]: Status
+                    - link "AO Ada Okafor today Daily Apr 30 Drafted by Mitable Approve & send" [ref=e96] [cursor=pointer]:
+                        - /url: /app/reports/r1
+                        - generic [ref=e97]:
+                            - generic [ref=e98]: AO
+                            - generic [ref=e99]:
+                                - generic [ref=e100]: Ada Okafor
+                                - generic [ref=e101]: today
+                        - generic [ref=e102]: Daily
+                        - generic [ref=e103]: Apr 30
+                        - generic [ref=e105]:
+                            - img [ref=e106]
+                            - text: Drafted by Mitable
+                        - button "Approve & send" [ref=e109]
+                        - img [ref=e110]
+                    - link "DR Diego Ramos today Daily Apr 30 Drafted by Mitable Approve & send" [ref=e112] [cursor=pointer]:
+                        - /url: /app/reports/r2
+                        - generic [ref=e113]:
+                            - generic [ref=e114]: DR
+                            - generic [ref=e115]:
+                                - generic [ref=e116]: Diego Ramos
+                                - generic [ref=e117]: today
+                        - generic [ref=e118]: Daily
+                        - generic [ref=e119]: Apr 30
+                        - generic [ref=e121]:
+                            - img [ref=e122]
+                            - text: Drafted by Mitable
+                        - button "Approve & send" [ref=e125]
+                        - img [ref=e126]
+                    - link "MK Mira Khan spring period Major Spring 2026 Awaiting admin review" [ref=e128] [cursor=pointer]:
+                        - /url: /app/reports/r3
+                        - generic [ref=e129]:
+                            - generic [ref=e130]: MK
+                            - generic [ref=e131]:
+                                - generic [ref=e132]: Mira Khan
+                                - generic [ref=e133]: spring period
+                        - generic [ref=e134]: Major
+                        - generic [ref=e135]: Spring 2026
+                        - generic [ref=e137]: Awaiting admin review
+                        - img [ref=e138]
+                    - link "BC Bea Chen spring period Major Spring 2026 Drafted by Mitable Approve & send" [ref=e140] [cursor=pointer]:
+                        - /url: /app/reports/r4
+                        - generic [ref=e141]:
+                            - generic [ref=e142]: BC
+                            - generic [ref=e143]:
+                                - generic [ref=e144]: Bea Chen
+                                - generic [ref=e145]: spring period
+                        - generic [ref=e146]: Major
+                        - generic [ref=e147]: Spring 2026
+                        - generic [ref=e149]:
+                            - img [ref=e150]
+                            - text: Drafted by Mitable
+                        - button "Approve & send" [ref=e153]
+                        - img [ref=e154]
+                    - link "LS Levi Schwartz yesterday Daily Apr 29 Approved · sent" [ref=e156] [cursor=pointer]:
+                        - /url: /app/reports/r5
+                        - generic [ref=e157]:
+                            - generic [ref=e158]: LS
+                            - generic [ref=e159]:
+                                - generic [ref=e160]: Levi Schwartz
+                                - generic [ref=e161]: yesterday
+                        - generic [ref=e162]: Daily
+                        - generic [ref=e163]: Apr 29
+                        - generic [ref=e165]:
+                            - img [ref=e166]
+                            - text: Approved · sent
+                        - img [ref=e168]
+                    - link "BC Bea Chen 2 days ago Daily Apr 28 Approved · sent" [ref=e170] [cursor=pointer]:
+                        - /url: /app/reports/r6
+                        - generic [ref=e171]:
+                            - generic [ref=e172]: BC
+                            - generic [ref=e173]:
+                                - generic [ref=e174]: Bea Chen
+                                - generic [ref=e175]: 2 days ago
+                        - generic [ref=e176]: Daily
+                        - generic [ref=e177]: Apr 28
+                        - generic [ref=e179]:
+                            - img [ref=e180]
+                            - text: Approved · sent
+                        - img [ref=e182]
+                    - link "IM Iris Moreau 2 days ago Daily Apr 28 Approved · sent" [ref=e184] [cursor=pointer]:
+                        - /url: /app/reports/r7
+                        - generic [ref=e185]:
+                            - generic [ref=e186]: IM
+                            - generic [ref=e187]:
+                                - generic [ref=e188]: Iris Moreau
+                                - generic [ref=e189]: 2 days ago
+                        - generic [ref=e190]: Daily
+                        - generic [ref=e191]: Apr 28
+                        - generic [ref=e193]:
+                            - img [ref=e194]
+                            - text: Approved · sent
+                        - img [ref=e196]
+                    - link "DR Diego Ramos last term Major Winter 2026 Approved · sent" [ref=e198] [cursor=pointer]:
+                        - /url: /app/reports/r8
+                        - generic [ref=e199]:
+                            - generic [ref=e200]: DR
+                            - generic [ref=e201]:
+                                - generic [ref=e202]: Diego Ramos
+                                - generic [ref=e203]: last term
+                        - generic [ref=e204]: Major
+                        - generic [ref=e205]: Winter 2026
+                        - generic [ref=e207]:
+                            - img [ref=e208]
+                            - text: Approved · sent
+                        - img [ref=e210]
+    - button "Ask Mitable 2" [ref=e212] [cursor=pointer]:
+        - img [ref=e214]
+        - generic [ref=e216]: Ask Mitable
+        - generic [ref=e217]: "2"
+    - generic [ref=e218]:
+        - img [ref=e220]
+        - generic [ref=e223]:
+            - generic [ref=e224]: Install Mitable
+            - generic [ref=e225]: Add to home screen for offline capture.
+        - button "Install" [ref=e226] [cursor=pointer]
+        - button [ref=e227] [cursor=pointer]:
+            - img [ref=e228]
+    - button "Open Next.js Dev Tools" [ref=e236] [cursor=pointer]:
+        - img [ref=e237]
+    - alert [ref=e240]

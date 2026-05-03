@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+    - main [ref=e2]:
+        - generic [ref=e3]:
+            - generic [ref=e4]:
+                - heading "Welcome back" [level=3] [ref=e5]
+                - paragraph [ref=e6]: Sign in to your Mitable Montessori account.
+            - generic [ref=e8]:
+                - textbox "you@school.example" [ref=e9]
+                - textbox "Password" [ref=e10]
+                - button "Sign in" [ref=e11] [cursor=pointer]
+    - alert [ref=e12]

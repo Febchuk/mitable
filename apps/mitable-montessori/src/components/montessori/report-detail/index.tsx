@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import type { Child, Report, ReportDetail as ReportDetailType } from "../data";
+import { notFound } from "next/navigation";
+import {
+  findChild,
+  findReport,
+  type Child,
+  type Report,
+  type ReportDetail as ReportDetailType,
+} from "../data";
+import { useMontessori } from "../store";
 import { ChatPane } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
@@ -10,7 +18,31 @@ import "./report-detail.css";
 
 const DIRTY_LABEL = "Unsaved changes";
 
-export function ReportDetail({ report, child }: { report: Report; child: Child | undefined }) {
+type ReportDetailProps =
+  | { reportId: string; report?: never; child?: never }
+  | { reportId?: never; report: Report; child: Child | undefined };
+
+/** Renders the report editor. Accepts either a `reportId` (resolved via the
+   in-memory store, falling back to the seeded INITIAL_REPORTS) or, for tests,
+   a fully-formed `{ report, child }` pair. */
+export function ReportDetail(props: ReportDetailProps) {
+  if ("reportId" in props && props.reportId !== undefined) {
+    return <ReportDetailById reportId={props.reportId} />;
+  }
+  return <ReportDetailView report={props.report} child={props.child} />;
+}
+
+function ReportDetailById({ reportId }: { reportId: string }) {
+  const { reports } = useMontessori();
+  const report = reports.find((r) => r.id === reportId) ?? findReport(reportId);
+  if (!report) {
+    notFound();
+  }
+  const child = findChild(report.childId);
+  return <ReportDetailView report={report} child={child} />;
+}
+
+function ReportDetailView({ report, child }: { report: Report; child: Child | undefined }) {
   const [detail, setDetail] = React.useState<ReportDetailType | undefined>(report.detail);
   const [isDirty, setIsDirty] = React.useState(false);
 

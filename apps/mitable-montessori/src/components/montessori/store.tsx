@@ -68,6 +68,14 @@ export type MontessoriStore = {
   addAssistantText: (text: string) => string;
   addObservations: (cards: Array<Omit<ObservationMessage, "id" | "type" | "status">>) => string[];
   approveReport: (id: string) => void;
+  /** Create a new in-session report and return its id. Mock-only — no
+     persistence. The /app/reports/[id] page reads it via findReport(id)
+     once the store has it. */
+  createReport: (input: {
+    childId: string;
+    kind: Report["kind"];
+    detail?: Report["detail"];
+  }) => string;
   toggleAttendance: (childId: string, dayIndex: number) => void;
   applyBulkProgress: (args: {
     topic: Topic;
@@ -322,6 +330,28 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
     [reports]
   );
 
+  const createReport = React.useCallback(
+    (input: { childId: string; kind: Report["kind"]; detail?: Report["detail"] }) => {
+      const id = "r-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const today = new Date();
+      const when = today.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      setReports((prev) => [
+        {
+          id,
+          childId: input.childId,
+          kind: input.kind,
+          when,
+          period: "today",
+          status: "draft",
+          detail: input.detail,
+        },
+        ...prev,
+      ]);
+      return id;
+    },
+    []
+  );
+
   const toggleAttendance = React.useCallback((childId: string, dayIndex: number) => {
     setAttendance((prev) => {
       const cur = prev[childId][dayIndex];
@@ -365,6 +395,7 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
     addAssistantText,
     addObservations,
     approveReport,
+    createReport,
     toggleAttendance,
     applyBulkProgress,
     clearAll,
