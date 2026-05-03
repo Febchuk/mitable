@@ -821,6 +821,15 @@ class LocalDatabase {
     );
   }
 
+  getSessionsByStatus(status: string): LocalMonitoringSession[] {
+    if (!db) return [];
+    return mapRows<LocalMonitoringSession>(
+      db
+        .prepare(`SELECT * FROM monitoring_sessions WHERE status = ? ORDER BY started_at DESC`)
+        .all(status)
+    );
+  }
+
   getMonitoringSessionsByDateRange(
     userId: string,
     startMs: number,

@@ -421,6 +421,14 @@ interface ConsoleAPI {
     }) => void
   ) => () => void;
 
+  onDeviceReadinessUpdate: (
+    callback: (data: { ready: boolean; error?: string }) => void
+  ) => () => void;
+
+  onDeviceNotReady: (
+    callback: (data: { sessionId: string; message: string }) => void
+  ) => () => void;
+
   // Local-first data access
   getBlockExportPath: (sessionId: string) => Promise<string | null>;
   getLocalCalendarDays: (startMs: number, endMs: number) => Promise<unknown[]>;

@@ -180,6 +180,8 @@ export const IPC_CHANNELS = {
   ON_DEVICE_SET_GPU_PREFERENCE: "on-device:set-gpu-preference",
   ON_DEVICE_GET_GPU_PREFERENCE: "on-device:get-gpu-preference",
   ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
+  ON_DEVICE_READINESS_UPDATE: "on-device:readiness-update",
+  ON_DEVICE_NOT_READY: "on-device:not-ready",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

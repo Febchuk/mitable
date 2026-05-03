@@ -148,6 +148,8 @@ const IPC_CHANNELS = {
   ON_DEVICE_SET_GPU_PREFERENCE: "on-device:set-gpu-preference",
   ON_DEVICE_GET_GPU_PREFERENCE: "on-device:get-gpu-preference",
   ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
+  ON_DEVICE_READINESS_UPDATE: "on-device:readiness-update",
+  ON_DEVICE_NOT_READY: "on-device:not-ready",
   // Offline auth (main → renderer)
   AUTH_OFFLINE_USER: "auth-offline-user",
 } as const;
@@ -915,6 +917,22 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
     ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, handler);
+  },
+
+  onDeviceReadinessUpdate: (
+    callback: (data: { ready: boolean; error?: string }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_READINESS_UPDATE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_READINESS_UPDATE, handler);
+  },
+
+  onDeviceNotReady: (
+    callback: (data: { sessionId: string; message: string }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_NOT_READY, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_NOT_READY, handler);
   },
 
   getBlockExportPath: (sessionId: string): Promise<string | null> =>

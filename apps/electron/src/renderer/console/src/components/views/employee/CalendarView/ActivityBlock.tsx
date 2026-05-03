@@ -54,6 +54,31 @@ function usePipelineProgress(sessionId: string | undefined, enabled: boolean) {
   return { percent: displayPercent, label };
 }
 
+function useDeviceNotReady(sessionId: string | undefined) {
+  const [notReadyMessage, setNotReadyMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sessionId || !window.consoleAPI?.onDeviceNotReady) return;
+    const unsub = window.consoleAPI.onDeviceNotReady((data) => {
+      if (data.sessionId === sessionId) {
+        setNotReadyMessage(data.message);
+      }
+    });
+    return () => unsub();
+  }, [sessionId]);
+
+  // Clear message when readiness update arrives
+  useEffect(() => {
+    if (!notReadyMessage || !window.consoleAPI?.onDeviceReadinessUpdate) return;
+    const unsub = window.consoleAPI.onDeviceReadinessUpdate((data) => {
+      if (data.ready) setNotReadyMessage(null);
+    });
+    return () => unsub();
+  }, [notReadyMessage]);
+
+  return notReadyMessage;
+}
+
 interface ActivityBlockProps {
   block: WorkBlock;
   blockNumber: number;
@@ -250,6 +275,7 @@ export default function ActivityBlock({
   const isSummarizing = block.status === "summarizing";
   const [isExpanded, setIsExpanded] = useState(defaultExpanded || isSummarizing);
   const progress = usePipelineProgress(block.id, isSummarizing);
+  const notReadyMessage = useDeviceNotReady(block.id);
 
   useEffect(() => {
     if (isSummarizing) setIsExpanded(true);
@@ -575,8 +601,55 @@ export default function ActivityBlock({
           {/* -- Regular work block body -- */}
           {!isMeeting && (
             <>
-              {/* Summarization progress bar */}
-              {isSummarizing && (
+              {/* Summarization progress bar or "not ready" message */}
+              {isSummarizing && notReadyMessage && (
+                <div
+                  style={{
+                    padding: "16px 0 8px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: "rgba(99, 102, 241, 0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#818CF8"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
+                      lineHeight: 1.5,
+                      margin: 0,
+                    }}
+                  >
+                    {notReadyMessage}
+                  </p>
+                </div>
+              )}
+              {isSummarizing && !notReadyMessage && (
                 <div style={{ padding: "16px 0 8px" }}>
                   <div
                     style={{

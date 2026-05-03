@@ -6,7 +6,7 @@ import { initActiveWindowBridge } from "../activeWindowBridge";
 import { createConsoleWindow } from "../windows/console-window";
 import { createTrayIfSupported } from "../tray";
 import { registerGlobalShortcuts } from "../shortcuts";
-import { initOnDeviceAI } from "./on-device-init";
+import { initOnDeviceAI, eagerPreloadModels } from "./on-device-init";
 import { restoreAuthOnStartup } from "./startup-auth";
 import { initAnalytics, trackMainEvent } from "../../services/analyticsService";
 import { browserBridgeService } from "../../services/browserBridgeService";
@@ -123,6 +123,9 @@ export async function onAppReady(opts: AppReadyOptions): Promise<void> {
 
   // ── On-device AI ──────────────────────────────────────────────────────────
   await initOnDeviceAI();
+  eagerPreloadModels().catch((err) => {
+    consoleLogger.error("[EagerPreload] Background preload failed:", err);
+  });
 
   // ── Browser Bridge ────────────────────────────────────────────────────────
   browserBridgeService.start().catch((err) => {

@@ -58,6 +58,11 @@ export const ctx = {
   // Shutdown state
   isEndingSession: false,
   wasPassiveRunning: false,
+
+  // On-device AI readiness (eager preload)
+  onDeviceReady: false,
+  onDeviceError: null as string | null,
+  pendingSessions: [] as Array<{ sessionId: string; sessionDir: string }>,
 };
 
 export type MainContext = typeof ctx;

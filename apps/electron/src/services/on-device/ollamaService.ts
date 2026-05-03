@@ -3,7 +3,7 @@
  *
  * Manages the Ollama subprocess and provides an OpenAI-compatible chat
  * completion API backed by a single local model per hardware tier:
- *   integrated  → qwen3-vl:4b  |  constrained → gemma4:e2b  |  capable → gemma4:e4b
+ *   integrated  → gemma3:4b-it-qat  |  constrained → gemma4:e2b  |  capable → gemma4:e4b
  *
  * Responsibilities:
  *   1. Ensure Ollama is installed (download if needed)
@@ -380,7 +380,7 @@ class OllamaService {
     options?: {
       temperature?: number;
       max_tokens?: number;
-      format?: "json";
+      format?: "json" | Record<string, unknown>;
     }
   ): Promise<string> {
     if (!this.isReady()) throw new Error("Ollama is not ready");
@@ -407,15 +407,15 @@ class OllamaService {
         },
       };
 
-      if (options?.format === "json") {
-        body.format = "json";
+      if (options?.format) {
+        body.format = options.format;
       }
 
-      const response = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
+      const response = await fetch(`${OLLAMA_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(300_000),
       });
 
       if (!response.ok) {
@@ -427,7 +427,7 @@ class OllamaService {
       }
 
       const result = await response.json();
-      return result.choices?.[0]?.message?.content ?? "";
+      return result.message?.content ?? "";
     } finally {
       release!();
     }

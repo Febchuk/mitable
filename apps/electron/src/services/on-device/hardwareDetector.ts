@@ -3,12 +3,12 @@
  *
  * Auto-detects GPU capabilities to choose the right on-device vision model.
  * Each tier guarantees ~2 GB+ headroom above the loaded model:
- *   - "integrated" (<12 GB VRAM / no GPU): qwen3-vl:4b  (~2.5 GB, GUI-native)
- *   - "constrained" (12-16 GB VRAM):      gemma4:e2b    (~7.2 GB)
- *   - "capable"     (16 GB+ VRAM):        gemma4:e4b    (~10 GB)
+ *   - "integrated" (<12 GB VRAM / no GPU): gemma3:4b-it-qat (~4 GB, accurate vision + JSON)
+ *   - "constrained" (12-16 GB VRAM):      gemma4:e2b       (~7.2 GB)
+ *   - "capable"     (16 GB+ VRAM):        gemma4:e4b       (~10 GB)
  *
  * Mac unified memory: <12 GB → integrated, 12-16 GB → constrained, 16 GB+ → capable.
- * nvidia-smi failure implies integrated graphics — falls back to qwen3-vl:4b.
+ * nvidia-smi failure implies integrated graphics — falls back to gemma3:4b-it-qat.
  *
  * detectFullSystem() provides a richer view of the machine (CPU, RAM, OS, all GPUs)
  * used by the Setup tab's system info dashboard.
@@ -47,7 +47,7 @@ export interface SystemInfo {
   platform: string;
 }
 
-const INTEGRATED_MODEL = "qwen3-vl:4b";
+const INTEGRATED_MODEL = "gemma3:4b-it-qat";
 const CONSTRAINED_MODEL = "gemma4:e2b";
 const CAPABLE_MODEL = "gemma4:e4b";
 
@@ -140,7 +140,7 @@ export async function detectHardware(): Promise<HardwareProfile> {
   }
 
   // nvidia-smi failed → integrated graphics / no discrete GPU
-  logger.warn("No discrete GPU detected, using integrated tier (qwen3-vl:4b)");
+  logger.warn("No discrete GPU detected, using integrated tier (gemma3:4b-it-qat)");
   return buildProfile("integrated", 0, "Integrated graphics");
 }
 

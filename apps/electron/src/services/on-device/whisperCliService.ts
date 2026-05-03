@@ -21,7 +21,7 @@ import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("WhisperCLI");
 
-const CLI_NAME = "whisper-cli.exe";
+const CLI_NAME = process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli";
 const MODEL_NAME = "ggml-medium.en.bin";
 
 class WhisperCliService {
@@ -33,16 +33,34 @@ class WhisperCliService {
   async initialize(): Promise<boolean> {
     if (this.ready) return true;
 
-    // In dev: __dirname = apps/electron/out/main/chunks → ../../../ = apps/electron/
-    // Packaged: resources/app.asar/../ = resources/
-    const appRoot = app.isPackaged ? join(app.getAppPath(), "..") : join(__dirname, "../../..");
+    // Try modelManager paths first (downloaded to userData by ensureWhisperInstalled)
+    try {
+      const { modelManager } = await import("./index");
+      const managedCli = modelManager.getWhisperServerPath();
+      const managedModel = modelManager.getWhisperModelPath();
 
+      if (managedCli && existsSync(managedCli) && managedModel && existsSync(managedModel)) {
+        this.cliPath = managedCli;
+        this.modelPath = managedModel;
+        this.tmpDir = join(app.getPath("temp"), "mitable-whisper");
+        if (!existsSync(this.tmpDir)) mkdirSync(this.tmpDir, { recursive: true });
+        logger.info("whisper-cli.exe ready (managed):", this.cliPath);
+        logger.info("Model:", this.modelPath);
+        this.ready = true;
+        return true;
+      }
+    } catch {
+      // modelManager not available yet, fall through to legacy paths
+    }
+
+    // Fallback: legacy source-tree paths (dev only)
+    const appRoot = app.isPackaged ? join(app.getAppPath(), "..") : join(__dirname, "../../..");
     this.cliPath = join(appRoot, "bin", "whisper-cpp", "Release", CLI_NAME);
     this.modelPath = join(appRoot, "bin", "whisper-cpp", "models", MODEL_NAME);
     this.tmpDir = join(app.getPath("temp"), "mitable-whisper");
 
     if (!existsSync(this.cliPath)) {
-      logger.warn("whisper-cli.exe not found at:", this.cliPath);
+      logger.warn(`${CLI_NAME} not found at:`, this.cliPath);
       return false;
     }
 

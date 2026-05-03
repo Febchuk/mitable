@@ -54,12 +54,9 @@ export default function Sidebar() {
         }}
       />
 
-      {/* DEPRECATED: Team/Admin toggle hidden — admin experience moves to web app.
-         View mode is forced to "employee" for local-first product. */}
-
       {/* Navigation */}
       <nav style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
-        <Nav viewMode={viewMode} />
+        <Nav viewMode="employee" />
       </nav>
 
       {/* Bottom section */}

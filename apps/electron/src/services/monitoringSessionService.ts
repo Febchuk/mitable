@@ -29,6 +29,7 @@ import { focusWindowTracker } from "./focusWindowTracker";
 import { activityTracker, type IntervalEvidence } from "./activityTracker";
 import { windowDetectionService } from "./windowDetectionService";
 import { browserBridgeService } from "./browserBridgeService";
+import { ctx } from "../main/context";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
 import type {
   SelectedWindowInfo,
@@ -481,6 +482,23 @@ class MonitoringSessionService {
             logger.info("Cleared local inference state (short session)");
           } else {
             const sessionDir = localFrameStorage.getSessionPath(sessionId);
+
+            // If models aren't ready yet, queue and notify — process later
+            if (!ctx.onDeviceReady) {
+              logger.info("On-device AI not ready yet — queuing session for later processing");
+              ctx.pendingSessions.push({ sessionId, sessionDir });
+              BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                  win.webContents.send(IPC_CHANNELS.ON_DEVICE_NOT_READY, {
+                    sessionId,
+                    message:
+                      "Your session was recorded successfully! We're still setting up your on-device AI — your block will be summarized automatically once it's ready.",
+                  });
+                }
+              });
+              return;
+            }
+
             logger.info("Running deferred AI pipeline on all session data...");
 
             const broadcastProgress = (progress: Record<string, unknown>) => {

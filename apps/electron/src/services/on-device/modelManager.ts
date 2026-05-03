@@ -22,13 +22,12 @@ const logger = createLogger("ModelManager");
 // ── Whisper asset (needed for constrained/capable tiers) ────────────────────
 
 const WHISPER_BIN_URL: Record<string, string> = {
-  win32:
-    "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-cublas-12.4.0-bin-x64.zip",
+  win32: "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip",
   darwin: "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip",
 };
 
 const WHISPER_MODEL_URL =
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin";
 
 // ── Manifest ────────────────────────────────────────────────────────────────
 
@@ -90,7 +89,7 @@ class ModelManager {
 
   getWhisperModelPath(): string | null {
     if (!this.manifest?.whisperInstalled) return null;
-    return join(this.modelsDir, "ggml-whisper-small.bin");
+    return join(this.modelsDir, "ggml-medium.en.bin");
   }
 
   // ── Whisper download (capable tier only) ────────────────────────────────
@@ -111,7 +110,7 @@ class ModelManager {
 
     try {
       await this.downloadAndExtract(binUrl, this.whisperBinDir);
-      await this.downloadFile(WHISPER_MODEL_URL, join(this.modelsDir, "ggml-whisper-small.bin"));
+      await this.downloadFile(WHISPER_MODEL_URL, join(this.modelsDir, "ggml-medium.en.bin"));
 
       if (this.manifest) {
         this.manifest.whisperInstalled = true;

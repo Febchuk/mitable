@@ -45,7 +45,8 @@ import type { IntervalEvidence } from "../activityTracker";
 const logger = createLogger("LocalInference");
 
 const BATCH_SIZE = 20;
-const SENSOR_GROUP_SIZE = 4;
+const SENSOR_GROUP_SIZE_DEFAULT = 4;
+const SENSOR_GROUP_SIZE_INTEGRATED = 4;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -175,7 +176,11 @@ class LocalInferenceService {
 
     emit("transcribing", 12, "Processing audio transcripts...");
 
-    if (hasStreamedAudio) {
+    // Deduplicate: skip transcription if already done in a previous run
+    const existingTranscripts = localDb.getTranscriptionsForSession(sessionId);
+    if (existingTranscripts.length > 0) {
+      logger.info(`Skipping transcription — ${existingTranscripts.length} segments already in DB`);
+    } else if (hasStreamedAudio) {
       logger.info(`Using ${allTranscripts.length} streaming transcript segments`);
       for (let i = 0; i < allTranscripts.length; i++) {
         const seg = allTranscripts[i];
@@ -206,9 +211,28 @@ class LocalInferenceService {
       const totalBatches = Math.ceil(allFrameMeta.length / BATCH_SIZE);
       let batchIndex = 0;
 
+      // Deduplicate: determine which batches are already fully processed
+      const existingCaptures = localDb.getCapturesForSession(sessionId);
+      const existingClassifications = localDb.getClassificationsForSession(sessionId);
+      const processedSeqNumbers = new Set(existingCaptures.map((c) => c.sequenceNumber));
+      const processedBatchIndices = new Set(existingClassifications.map((c) => c.batchIndex));
+
+      if (processedBatchIndices.size > 0) {
+        logger.info(
+          `Resuming: ${processedBatchIndices.size}/${totalBatches} batches already processed, ` +
+            `${processedSeqNumbers.size}/${allFrameMeta.length} frames already captured`
+        );
+      }
+
       for (let offset = 0; offset < allFrameMeta.length; offset += BATCH_SIZE) {
         const batchMeta = allFrameMeta.slice(offset, offset + BATCH_SIZE);
         const batchIdx = batchIndex++;
+
+        // Skip batches that are already fully processed
+        if (processedBatchIndices.has(batchIdx)) {
+          logger.info(`Batch ${batchIdx}: already processed — skipping`);
+          continue;
+        }
 
         const batchPercent = 20 + Math.round((batchIdx / totalBatches) * 60);
         emit(
@@ -333,11 +357,16 @@ class LocalInferenceService {
       }
 
       // ── Step 5: RLM Storyteller ──────────────────────────────────────
-      emit("generating_summary", 85, "Writing summary...");
-      logger.info("Generating session summary via RLM storyteller...");
-      const lastFrameTs = new Date(allFrameMeta[allFrameMeta.length - 1].timestamp).getTime();
-      const realDurationMin = Math.max(1, Math.round((lastFrameTs - sessionStartMs) / 60_000));
-      await this.generateSummary(sessionId, realDurationMin);
+      const existingStory = localDb.getStoryForSession(sessionId);
+      if (existingStory) {
+        logger.info("Summary already exists — skipping storyteller");
+      } else {
+        emit("generating_summary", 85, "Writing summary...");
+        logger.info("Generating session summary via RLM storyteller...");
+        const lastFrameTs = new Date(allFrameMeta[allFrameMeta.length - 1].timestamp).getTime();
+        const realDurationMin = Math.max(1, Math.round((lastFrameTs - sessionStartMs) / 60_000));
+        await this.generateSummary(sessionId, realDurationMin);
+      }
 
       // ── Step 6: Prepend summary to .md ────────────────────────────────
       emit("exporting", 95, "Finalizing...");
@@ -363,8 +392,12 @@ class LocalInferenceService {
   private async runConsecutiveSensor(batch: BufferedFrame[]): Promise<SensorResult[]> {
     const results: SensorResult[] = [];
 
-    for (let i = 0; i < batch.length; i += SENSOR_GROUP_SIZE) {
-      const group = batch.slice(i, i + SENSOR_GROUP_SIZE);
+    const { getTier } = await import("./ollamaLifecycle");
+    const groupSize =
+      getTier() === "integrated" ? SENSOR_GROUP_SIZE_INTEGRATED : SENSOR_GROUP_SIZE_DEFAULT;
+
+    for (let i = 0; i < batch.length; i += groupSize) {
+      const group = batch.slice(i, i + groupSize);
       try {
         const result = await this.analyzeFrameGroup(group);
         results.push(result);
@@ -442,7 +475,7 @@ class LocalInferenceService {
           content: [...imageContents, { type: "text", text: promptText }],
         },
       ],
-      { temperature: 0.1, max_tokens: 200 }
+      { temperature: 0.1, max_tokens: 300 }
     );
 
     let fullDescription = response.trim();

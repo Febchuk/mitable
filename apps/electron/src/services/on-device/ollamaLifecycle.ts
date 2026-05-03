@@ -3,9 +3,9 @@
  *
  * Coordinated startup/shutdown of the Ollama-based on-device AI pipeline.
  * One Ollama instance serves a single model chosen by hardware tier:
- *   integrated  → qwen3-vl:4b   (2.5 GB, GUI-native vision)
- *   constrained → gemma4:e2b    (7.2 GB)
- *   capable     → gemma4:e4b    (10 GB)
+ *   integrated  → gemma3:4b-it-qat  (4 GB, accurate vision + JSON)
+ *   constrained → gemma4:e2b        (7.2 GB)
+ *   capable     → gemma4:e4b        (10 GB)
  *
  * Startup: detect tier → install Ollama → start serve → pull model → warmup.
  */
@@ -45,9 +45,9 @@ export async function initialize(onProgress?: OllamaProgressCallback): Promise<H
   _hardwareProfile = await detectHardware();
   logger.info("Hardware tier:", _hardwareProfile.tier, "Model:", _hardwareProfile.recommendedModel);
 
-  const numCtx = 32768;
+  const numCtx = _hardwareProfile.tier === "integrated" ? 8192 : 32768;
   ollamaService.setNumCtx(numCtx);
-  logger.info(`Context window set to ${numCtx} tokens (all tiers have 2GB+ headroom)`);
+  logger.info(`Context window set to ${numCtx} tokens (tier: ${_hardwareProfile.tier})`);
 
   await ollamaService.ensureInstalled();
   await ollamaService.startServe();
