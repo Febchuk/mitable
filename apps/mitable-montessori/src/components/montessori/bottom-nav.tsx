@@ -52,7 +52,7 @@ const ADMIN_TABS: Tab[] = [
   {
     id: "today",
     label: "Today",
-    href: "/app/today",
+    href: "/admin/today",
     renderIcon: (size) => <HouseSimple size={size} weight="regular" />,
   },
   {

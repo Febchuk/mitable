@@ -25,7 +25,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
           variant={isAdmin ? "admin" : "teacher"}
-          classroomName={isAdmin ? "Admin workspace" : classroomName}
+          classroomName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
+          contextSubtitle={isAdmin ? "Admin workspace" : undefined}
           userEmail={ctx.email}
           userMenuSlot={<UserMenu email={ctx.email} />}
           roleLabel={isAdmin ? "Admin" : undefined}
@@ -55,7 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       <MontessoriBottomNav variant={isAdmin ? "admin" : "teacher"} />
-      <ChatDock />
+      {!isAdmin && <ChatDock />}
       <ToastHost />
       <InstallBanner />
       <AppBootstrap />

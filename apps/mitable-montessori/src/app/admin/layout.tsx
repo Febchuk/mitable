@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { AppBootstrap } from "@/components/app/AppBootstrap";
 import { UserMenu } from "@/components/app/UserMenu";
 import { MontessoriBottomNav } from "@/components/montessori/bottom-nav";
-import { ChatDock } from "@/components/montessori/chat-dock";
 import { InstallBanner } from "@/components/montessori/install-banner";
 import { MobileTopRight } from "@/components/montessori/mobile-controls";
 import { ToastHost } from "@/components/montessori/primitives";
@@ -20,7 +19,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
           variant="admin"
-          classroomName="Admin workspace"
+          classroomName={ctx.schoolName ?? "School"}
+          contextSubtitle="Admin workspace"
           userEmail={ctx.email}
           userMenuSlot={<UserMenu email={ctx.email} />}
           roleLabel="Admin"
@@ -50,7 +50,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </div>
       <MontessoriBottomNav variant="admin" />
-      <ChatDock />
       <ToastHost />
       <InstallBanner />
       <AppBootstrap />

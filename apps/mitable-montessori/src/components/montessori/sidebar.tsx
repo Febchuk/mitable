@@ -40,7 +40,7 @@ const NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { href: "/app/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
+  { href: "/admin/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
   { href: "/admin/classrooms", label: "Classrooms", renderIcon: () => <Building2 {...lucide} /> },
   { href: "/admin/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
   { href: "/admin/teachers", label: "Teachers", renderIcon: () => <Users {...lucide} /> },
@@ -125,53 +125,51 @@ export function MontessoriSidebar({
           Montessori
         </div>
       </div>
-      {variant === "admin" ? null : (
+      <div
+        style={{
+          padding: "8px 10px",
+          background: "var(--color-surface)",
+          borderRadius: 10,
+          border: "1px solid var(--color-border)",
+          marginBottom: 14,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
         <div
           style={{
-            padding: "8px 10px",
-            background: "var(--color-surface)",
-            borderRadius: 10,
-            border: "1px solid var(--color-border)",
-            marginBottom: 14,
+            width: 26,
+            height: 26,
+            borderRadius: 8,
+            background: "var(--color-terracotta-soft)",
+            color: "var(--color-terracotta-deep)",
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            justifyContent: "center",
+            fontSize: 13,
+            fontWeight: 600,
           }}
         >
+          {classroomName.charAt(0).toUpperCase()}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: 8,
-              background: "var(--color-terracotta-soft)",
-              color: "var(--color-terracotta-deep)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               fontSize: 13,
               fontWeight: 600,
+              color: "var(--color-ink)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            {classroomName.charAt(0).toUpperCase()}
+            {classroomName}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--color-ink)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {classroomName}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{subtitleLine}</div>
-          </div>
-          <ChevronRight size={14} strokeWidth={1.5} />
+          <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{subtitleLine}</div>
         </div>
-      )}
+        <ChevronRight size={14} strokeWidth={1.5} />
+      </div>
       <nav>
         {navItems.map((n) => {
           const isActive = pathname?.startsWith(n.href) ?? false;
