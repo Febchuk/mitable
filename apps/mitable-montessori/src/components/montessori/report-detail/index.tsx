@@ -90,21 +90,15 @@ function sectionsAreOnlyPlaceholders(sections: ReportDetailRow["sections"]): boo
 function buildLocalDetail(report: ReportDetailRow): LocalDetail {
   const templateSections = report.sections as LocalSection[] | null | undefined;
   const hasBody = !!report.body?.trim();
-  const sectionsAreShell =
-    !templateSections?.length || sectionsAreOnlyPlaceholders(templateSections);
 
-  // Template rows ship with non-null `sections` but empty paragraphs. The draft
-  // agent only fills `body` — if we always prefer `sections`, the editor stays blank.
-  const sections: LocalSection[] =
-    hasBody && sectionsAreShell
+  // Sections JSON is the source of truth — the agent now fills per-section
+  // content directly. Body is only the fallback for legacy rows that pre-date
+  // section-aware drafting.
+  const sections: LocalSection[] = templateSections?.length
+    ? (templateSections as LocalSection[])
+    : hasBody
       ? bodyToSections(report.body!)
-      : templateSections?.length && !sectionsAreShell
-        ? (templateSections as LocalSection[])
-        : hasBody
-          ? bodyToSections(report.body!)
-          : templateSections?.length
-            ? (templateSections as LocalSection[])
-            : [];
+      : [];
   return {
     title: report.title || `${report.studentName} — ${fmtDay(report.reportDate)}`,
     observer: "You",
@@ -133,10 +127,17 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
   // Auto-trigger draft for fresh empty drafts. The new-report flow creates a
   // row with status='draft' and empty body; the editor opens here and
   // immediately fires /draft to fill it.
+  //
+  // We deliberately do NOT use a `cancelled` flag tied to effect cleanup. In
+  // dev with React Strict Mode the cleanup runs synchronously after the first
+  // mount, which would set the flag true and silently swallow the response
+  // when it arrives 20+ seconds later — leaving the spinner stuck and the
+  // editor blank. `draftKickedRef` already prevents a duplicate fetch from
+  // strict mode's second invocation, which is the only reason a flag was
+  // needed in the first place.
   React.useEffect(() => {
     if (!empty || draftKickedRef.current || report.status !== "draft") return;
     draftKickedRef.current = true;
-    let cancelled = false;
     setIsDrafting(true);
     const stash = readStoredDraftCapture(report.id);
     void fetch(`/api/v1/reports/${report.id}/draft`, {
@@ -149,7 +150,6 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
       }),
     })
       .then(async (res) => {
-        if (cancelled) return;
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
           ToastBus.push({
@@ -157,16 +157,22 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
           });
           return;
         }
+        const json = (await res.json().catch(() => ({}))) as {
+          report?: ReportDetailRow;
+        };
         clearStoredDraftCapture(report.id);
-        // Refresh server data with the drafted body
+        // Apply the freshly-drafted row to local state immediately so the
+        // editor shows filled sections without waiting for an RSC refresh.
+        if (json.report) {
+          setDetail(buildLocalDetail(json.report));
+        }
+        // Backup: still refresh so the server tree is in sync (e.g. status,
+        // updatedAt) the next time we navigate.
         router.refresh();
       })
       .finally(() => {
-        if (!cancelled) setIsDrafting(false);
+        setIsDrafting(false);
       });
-    return () => {
-      cancelled = true;
-    };
   }, [empty, report.id, report.status, router]);
 
   // Debounced PATCH on edit.

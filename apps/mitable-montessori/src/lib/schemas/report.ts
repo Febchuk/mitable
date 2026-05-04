@@ -86,9 +86,10 @@ export const DraftReportRequestSchema = z.object({
 export type DraftReportRequest = z.infer<typeof DraftReportRequestSchema>;
 
 /**
- * The draft tool the agent must call to finalize a report. The `body` field
- * must contain only tokens for student / subtopic / classroom — never raw
- * names. The validator in `lib/reports/token-preservation.ts` enforces this.
+ * The draft tool the agent must call to finalize a report. Each section's
+ * `content` must contain only tokens for student / subtopic / classroom —
+ * never raw names. The validator in `lib/reports/token-preservation.ts`
+ * enforces this against the concatenation of all section contents.
  */
 export const DraftReportToolCall = z.object({
   tool: z.literal("draft_report"),
@@ -98,7 +99,15 @@ export const DraftReportToolCall = z.object({
     period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     title: z.string().min(1).max(200),
-    draft_text: z.string().min(1).max(8000),
+    sections: z
+      .array(
+        z.object({
+          heading: z.string().min(1).max(200),
+          content: z.string().min(1).max(4000),
+        })
+      )
+      .min(1)
+      .max(20),
   }),
 });
 export type DraftReportToolCallT = z.infer<typeof DraftReportToolCall>;
