@@ -325,7 +325,6 @@ export const MultiSelectTagsValue = ({
     ...otherProps
 }: ComboBoxValueProps) => {
     return (
-        // @ts-expect-error react-aria-components Group type incompatibility with React 18 @types
         <AriaGroup
             {...otherProps}
             className={({ isFocusWithin, isDisabled }: { isFocusWithin: boolean; isDisabled: boolean }) =>

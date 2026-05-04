@@ -40,7 +40,6 @@ const ComboBoxValue = ({ size, shortcut, placeholder, shortcutClassName, ...othe
     const last = inputValue?.split(first)[1];
 
     return (
-        // @ts-expect-error react-aria-components Group type incompatibility with React 18 @types
         <AriaGroup
             {...otherProps}
             className={({ isFocusWithin, isDisabled }: { isFocusWithin: boolean; isDisabled: boolean }) =>
