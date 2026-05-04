@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, ChevronRight, Users } from "lucide-react";
+import { Book, Building2, ChevronRight, Users } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { CHILDREN } from "./data";
 import { OnlineToggle } from "./online-toggle";
@@ -39,20 +39,46 @@ const NAV: NavItem[] = [
   },
 ];
 
+const ADMIN_NAV: NavItem[] = [
+  { href: "/app/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
+  { href: "/admin/classrooms", label: "Classrooms", renderIcon: () => <Building2 {...lucide} /> },
+  { href: "/admin/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
+  { href: "/admin/teachers", label: "Teachers", renderIcon: () => <Users {...lucide} /> },
+  {
+    href: "/admin/reports",
+    label: "Reports",
+    renderIcon: () => <PencilSimple {...phosphor} />,
+    withDraftBadge: true,
+  },
+];
+
 export function MontessoriSidebar({
+  variant = "teacher",
   classroomName,
+  contextSubtitle,
   userEmail,
   userMenuSlot,
+  roleLabel,
 }: {
+  variant?: "teacher" | "admin";
   classroomName: string;
+  /** Replaces the default “{n} children” line under the workspace title */
+  contextSubtitle?: string;
   userEmail?: string;
   userMenuSlot?: React.ReactNode;
+  /** e.g. “Lead guide” or “Admin” */
+  roleLabel?: string;
 }) {
   const pathname = usePathname();
   const store = useMontessori();
   const draftCount =
     store.reports.filter((r) => r.status === "draft").length +
     store.reports.filter((r) => r.status === "review").length;
+  const navItems = variant === "admin" ? ADMIN_NAV : NAV;
+  const subtitleLine =
+    contextSubtitle ??
+    (variant === "admin" ? "People, curriculum, and reports" : `${CHILDREN.length} children`);
+  const footerRole = roleLabel ?? (variant === "admin" ? "Admin" : "Lead guide");
 
   const initials =
     (userEmail ?? "Anna Maren")
@@ -99,55 +125,55 @@ export function MontessoriSidebar({
           Montessori
         </div>
       </div>
-      <div
-        style={{
-          padding: "8px 10px",
-          background: "var(--color-surface)",
-          borderRadius: 10,
-          border: "1px solid var(--color-border)",
-          marginBottom: 14,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
+      {variant === "admin" ? null : (
         <div
           style={{
-            width: 26,
-            height: 26,
-            borderRadius: 8,
-            background: "var(--color-terracotta-soft)",
-            color: "var(--color-terracotta-deep)",
+            padding: "8px 10px",
+            background: "var(--color-surface)",
+            borderRadius: 10,
+            border: "1px solid var(--color-border)",
+            marginBottom: 14,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            fontSize: 13,
-            fontWeight: 600,
+            gap: 8,
           }}
         >
-          {classroomName.charAt(0).toUpperCase()}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
+              width: 26,
+              height: 26,
+              borderRadius: 8,
+              background: "var(--color-terracotta-soft)",
+              color: "var(--color-terracotta-deep)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               fontSize: 13,
               fontWeight: 600,
-              color: "var(--color-ink)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
             }}
           >
-            {classroomName}
+            {classroomName.charAt(0).toUpperCase()}
           </div>
-          <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-            {CHILDREN.length} children
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--color-ink)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {classroomName}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{subtitleLine}</div>
           </div>
+          <ChevronRight size={14} strokeWidth={1.5} />
         </div>
-        <ChevronRight size={14} strokeWidth={1.5} />
-      </div>
+      )}
       <nav>
-        {NAV.map((n) => {
+        {navItems.map((n) => {
           const isActive = pathname?.startsWith(n.href) ?? false;
           const showBadge = n.withDraftBadge && draftCount > 0;
           return (
@@ -219,7 +245,7 @@ export function MontessoriSidebar({
           >
             {userEmail ?? "Anna Maren"}
           </div>
-          <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>Lead guide</div>
+          <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{footerRole}</div>
         </div>
         {userMenuSlot}
       </div>

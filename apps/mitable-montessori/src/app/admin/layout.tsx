@@ -8,27 +8,22 @@ import { MobileTopRight } from "@/components/montessori/mobile-controls";
 import { ToastHost } from "@/components/montessori/primitives";
 import { MontessoriSidebar } from "@/components/montessori/sidebar";
 import { MontessoriProvider } from "@/components/montessori/store";
-import {
-  getActiveClassroomForCurrentUser,
-  getCurrentUserContext,
-} from "@/lib/app/active-classroom";
+import { getCurrentUserContext } from "@/lib/app/active-classroom";
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCurrentUserContext();
   if (!ctx) redirect("/login");
-  const isAdmin = ctx.role === "admin";
-  const classroom = await getActiveClassroomForCurrentUser();
-  const classroomName = classroom?.name ?? "Primrose Room";
+  if (ctx.role !== "admin") redirect("/app/today");
 
   return (
     <MontessoriProvider>
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
-          variant={isAdmin ? "admin" : "teacher"}
-          classroomName={isAdmin ? "Admin workspace" : classroomName}
+          variant="admin"
+          classroomName="Admin workspace"
           userEmail={ctx.email}
           userMenuSlot={<UserMenu email={ctx.email} />}
-          roleLabel={isAdmin ? "Admin" : undefined}
+          roleLabel="Admin"
         />
         <div
           style={{
@@ -54,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </main>
         </div>
       </div>
-      <MontessoriBottomNav variant={isAdmin ? "admin" : "teacher"} />
+      <MontessoriBottomNav variant="admin" />
       <ChatDock />
       <ToastHost />
       <InstallBanner />

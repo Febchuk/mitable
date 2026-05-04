@@ -23,9 +23,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Unacknowledged-privacy gate: any authenticated request to /app/* should
+  // Unacknowledged-privacy gate: authenticated /app/* and /admin/* should
   // redirect through onboarding first if the user hasn't acknowledged.
-  if (user && pathname.startsWith("/app")) {
+  if (user && (pathname.startsWith("/app") || pathname.startsWith("/admin"))) {
     const { data: profile } = await supabase
       .from("users")
       .select("privacy_acknowledged_at")
