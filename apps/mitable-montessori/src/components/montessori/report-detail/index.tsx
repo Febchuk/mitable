@@ -8,10 +8,6 @@ import { ChatPane } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
 import "./report-detail.css";
-import {
-  clearStoredDraftCapture,
-  readStoredDraftCapture,
-} from "@/lib/capture/draft-capture-storage";
 
 const DIRTY_LABEL = "Unsaved changes";
 const SAVING_LABEL = "Saving…";
@@ -79,32 +75,12 @@ function sectionsToBody(sections: LocalSection[]): string {
     .join("\n\n");
 }
 
-/** True if sections exist but every paragraph is still blank (template shell). */
-function sectionsAreOnlyPlaceholders(sections: ReportDetailRow["sections"]): boolean {
-  if (!sections?.length) return true;
-  return !sections.some((s) =>
-    s.paragraphs.some((p) => p.html.replace(/<[^>]+>/g, "").trim().length > 0)
-  );
-}
-
 function buildLocalDetail(report: ReportDetailRow): LocalDetail {
-  const templateSections = report.sections as LocalSection[] | null | undefined;
-  const hasBody = !!report.body?.trim();
-  const sectionsAreShell =
-    !templateSections?.length || sectionsAreOnlyPlaceholders(templateSections);
-
-  // Template rows ship with non-null `sections` but empty paragraphs. The draft
-  // agent only fills `body` — if we always prefer `sections`, the editor stays blank.
-  const sections: LocalSection[] =
-    hasBody && sectionsAreShell
-      ? bodyToSections(report.body!)
-      : templateSections?.length && !sectionsAreShell
-        ? (templateSections as LocalSection[])
-        : hasBody
-          ? bodyToSections(report.body!)
-          : templateSections?.length
-            ? (templateSections as LocalSection[])
-            : [];
+  const sections: LocalSection[] = report.sections
+    ? (report.sections as LocalSection[])
+    : report.body
+      ? bodyToSections(report.body)
+      : [];
   return {
     title: report.title || `${report.studentName} — ${fmtDay(report.reportDate)}`,
     observer: "You",
@@ -126,9 +102,7 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
   const draftKickedRef = React.useRef(false);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const empty =
-    !report.body?.trim() &&
-    (!report.sections?.length || sectionsAreOnlyPlaceholders(report.sections));
+  const empty = !report.body && (!report.sections || report.sections.length === 0);
 
   // Auto-trigger draft for fresh empty drafts. The new-report flow creates a
   // row with status='draft' and empty body; the editor opens here and
@@ -138,15 +112,10 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
     draftKickedRef.current = true;
     let cancelled = false;
     setIsDrafting(true);
-    const stash = readStoredDraftCapture(report.id);
     void fetch(`/api/v1/reports/${report.id}/draft`, {
       method: "POST",
-      credentials: "include",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        transcripts: stash?.transcripts ?? [],
-        notes: stash?.notes ?? [],
-      }),
+      body: JSON.stringify({}),
     })
       .then(async (res) => {
         if (cancelled) return;
@@ -157,7 +126,6 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
           });
           return;
         }
-        clearStoredDraftCapture(report.id);
         // Refresh server data with the drafted body
         router.refresh();
       })
@@ -212,22 +180,6 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, []);
-
-  // After draft (router.refresh) or navigation, merge server report into local editor
-  // state when the user isn't mid-edit.
-  React.useEffect(() => {
-    if (isDirty) return;
-    setDetail(buildLocalDetail(report));
-  }, [
-    report.id,
-    report.body,
-    report.title,
-    report.updatedAt,
-    report.reportDate,
-    report.studentName,
-    report.sections,
-    isDirty,
-  ]);
 
   const savedMeta = isSaving
     ? SAVING_LABEL

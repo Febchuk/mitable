@@ -43,8 +43,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (readErr || !report) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const studentSchool = (report as unknown as { students: { school_id: string } | null }).students
-    ?.school_id;
+  const studentSchool = (
+    report as unknown as { students: { school_id: string } | null }
+  ).students?.school_id;
   if (studentSchool !== auth.user.schoolId) {
     return NextResponse.json({ error: "Not in your school" }, { status: 403 });
   }
@@ -107,7 +108,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const adapter = new SupabaseReportDataAdapter(supabase);
-  const seedReferences = tokenizer.references();
 
   try {
     const result = await runReportAgent({
@@ -121,9 +121,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       adapter,
       anthropic: getAnthropic(),
       model: SONNET_MODEL,
-      captureTranscripts: input.transcripts,
-      captureNotes: input.notes,
-      seedReferences,
     });
 
     const { error: updateErr } = await supabase

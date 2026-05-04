@@ -5,7 +5,7 @@ import { auditLog } from "@/lib/audit/log";
 import { getAnthropic, SONNET_MODEL } from "@/lib/anthropic/client";
 import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
 import { runReportAgent, AgentAbortError } from "@/lib/reports/agent-loop";
-import { IncrementalTokenizer, SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
+import { SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
 import { createClient } from "@/utils/supabase/server";
 import { DraftReportRequestSchema } from "@/lib/schemas/report";
 
@@ -35,10 +35,6 @@ export async function POST(req: Request) {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const adapter = new SupabaseReportDataAdapter(supabase);
-  const tokenizer = new IncrementalTokenizer();
-  tokenizer.studentToken(input.studentRef, "");
-  tokenizer.classroomToken(input.classroomId, "");
-  const seedReferences = tokenizer.references();
 
   try {
     const result = await runReportAgent({
@@ -52,7 +48,6 @@ export async function POST(req: Request) {
       adapter,
       anthropic: getAnthropic(),
       model: SONNET_MODEL,
-      seedReferences,
     });
 
     const { data: report, error } = await supabase

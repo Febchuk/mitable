@@ -1,111 +1,38 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, Check } from "lucide-react";
-import { initialsFor } from "@/components/montessori/data";
-import type { Tone } from "@/components/montessori/data";
+import { Check } from "lucide-react";
+import { CHILDREN, findChild, initialsFor } from "@/components/montessori/data";
 import { PageHeader, cardHeaderStyle, cardStyle } from "@/components/montessori/page-header";
-import { Avatar } from "@/components/montessori/primitives";
-import type { AdminPendingReport, AdminSchoolAttendance } from "@/lib/queries/admin-today";
-import type { CapturedTodayEntry } from "@/lib/queries/today";
+import { Avatar, HandCheck } from "@/components/montessori/primitives";
+import { useMontessori } from "@/components/montessori/store";
 
-const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
-
-function toneFor(id: string): Tone {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return TONES[Math.abs(h) % TONES.length];
-}
-
-function timeOfDay(): "morning" | "afternoon" | "evening" {
-  const h = new Date().getHours();
-  if (h < 12) return "morning";
-  if (h < 18) return "afternoon";
-  return "evening";
-}
-
-function shortTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-}
-
-function formatUpdatedShort(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return (
-      d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " + shortTime(iso)
-    );
-  } catch {
-    return "";
-  }
-}
-
-function reportKindLabel(t: AdminPendingReport["reportType"]): string {
-  if (t === "daily") return "Daily";
-  if (t === "major") return "Major";
-  return "Incident";
-}
-
-type AdminTodayClientProps = {
-  firstName: string | null;
-  schoolName?: string | null;
-  dateLabel: string;
-  attendance: AdminSchoolAttendance;
-  captured: CapturedTodayEntry[];
-  pendingReports: AdminPendingReport[];
-};
+const TODAY_LABEL = "Tuesday · April 30";
 
 export default function AdminTodayClient({
   firstName,
   schoolName = null,
-  dateLabel,
-  attendance,
-  captured,
-  pendingReports,
-}: AdminTodayClientProps) {
+}: {
+  firstName: string | null;
+  schoolName?: string | null;
+}) {
+  const store = useMontessori();
   const router = useRouter();
-  const [hydrated, setHydrated] = React.useState(false);
-  const [approveBusy, setApproveBusy] = React.useState<string | null>(null);
-  React.useEffect(() => setHydrated(true), []);
+  const presentKids = CHILDREN.filter((c) => c.present);
+  const observations = store.chat.filter((m) => m.type === "observation");
+  const captured = observations.slice(-4).reverse();
+  const pendingApproval = store.reports.filter((r) => r.status !== "sent");
 
   const greetingName = firstName?.trim() || "there";
-  const greeting = hydrated ? `Good ${timeOfDay()}` : "Good day";
   const attendanceLabel = schoolName ?? "School-wide";
-
-  const placeholderCount = Math.max(
-    0,
-    attendance.totalStudents - attendance.presentStudents.length
-  );
-
-  async function handleApprove(reportId: string) {
-    setApproveBusy(reportId);
-    try {
-      const res = await fetch("/api/v1/reports/approve", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reportId }),
-      });
-      if (res.ok) router.refresh();
-    } finally {
-      setApproveBusy(null);
-    }
-  }
 
   return (
     <div>
       {/* Mobile-only header */}
       <div className="lg:hidden" style={{ padding: "26px 22px 10px" }}>
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 10 }}>
-          {dateLabel}
+          {TODAY_LABEL}
         </div>
         <h1
           style={{
@@ -117,7 +44,7 @@ export default function AdminTodayClient({
             lineHeight: 1.1,
           }}
         >
-          {greeting},{" "}
+          Good morning,{" "}
           <span
             className="font-display"
             style={{
@@ -143,7 +70,7 @@ export default function AdminTodayClient({
 
       {/* Desktop header */}
       <div className="hidden lg:block">
-        <PageHeader overline={dateLabel} title="Today" subtitle="Across the school today." />
+        <PageHeader overline={TODAY_LABEL} title="Today" subtitle="Across the school today." />
       </div>
 
       <div
@@ -187,26 +114,17 @@ export default function AdminTodayClient({
                   className="font-numeric"
                   style={{ fontSize: 40, fontWeight: 600, color: "var(--color-ink)" }}
                 >
-                  {attendance.presentCount}
+                  {presentKids.length}
                 </span>
                 <span style={{ fontSize: 14, color: "var(--color-ink-secondary)" }}>
-                  of {attendance.totalStudents}{" "}
-                  {attendance.totalStudents === 1 ? "child" : "children"} present across the school
+                  of {CHILDREN.length} children present across the school
                 </span>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                {attendance.presentStudents.map((s) => {
-                  const display = s.preferredName || s.fullName;
-                  return (
-                    <Avatar
-                      key={s.id}
-                      initials={initialsFor(display)}
-                      tone={toneFor(s.id)}
-                      size={30}
-                    />
-                  );
-                })}
-                {Array.from({ length: placeholderCount }).map((_, k) => (
+                {presentKids.map((c) => (
+                  <Avatar key={c.id} initials={initialsFor(c.name)} tone={c.tone} size={30} />
+                ))}
+                {Array.from({ length: CHILDREN.length - presentKids.length }).map((_, k) => (
                   <div
                     key={`a${k}`}
                     style={{
@@ -243,7 +161,7 @@ export default function AdminTodayClient({
                 Captured today
               </div>
               <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
-                {captured.length} {captured.length === 1 ? "entry" : "entries"}
+                {observations.length} observations
               </span>
             </div>
             {captured.length === 0 && (
@@ -258,23 +176,26 @@ export default function AdminTodayClient({
                 Nothing captured yet today.
               </div>
             )}
-            {captured.map((row, i) => {
-              const display = row.studentPreferredName || row.studentName;
+            {captured.map((r, i) => {
+              if (r.type !== "observation") return null;
+              const child = findChild(r.childId);
+              const isPrivate = r.area === "Private note";
               return (
-                <Link
-                  key={`${row.kind}-${row.id}`}
-                  href={`/app/children/${row.studentId}`}
+                <div
+                  key={r.id}
                   style={{
                     display: "flex",
                     alignItems: "flex-start",
                     gap: 12,
                     padding: "14px 18px",
                     borderTop: i ? "1px solid var(--color-border)" : "none",
-                    color: "inherit",
-                    textDecoration: "none",
                   }}
                 >
-                  <Avatar initials={initialsFor(display)} tone={toneFor(row.studentId)} size={32} />
+                  <Avatar
+                    initials={child ? initialsFor(child.name) : "··"}
+                    tone={child ? child.tone : "clay"}
+                    size={32}
+                  />
                   <div
                     style={{
                       flex: 1,
@@ -285,20 +206,43 @@ export default function AdminTodayClient({
                     }}
                   >
                     <div>
-                      <span style={{ fontWeight: 600 }}>{display}</span>{" "}
-                      <span style={{ color: "var(--color-ink-secondary)" }}>{row.comment}</span>
+                      <span style={{ fontWeight: 600 }}>{child ? child.name : ""}</span>{" "}
+                      <span style={{ color: "var(--color-ink-secondary)" }}>{r.body}</span>
                     </div>
-                    <div style={{ marginTop: 2, fontSize: 12, color: "var(--color-ink-muted)" }}>
-                      {row.kind === "curriculum" ? "Curriculum" : "Whole child"} ·{" "}
-                      {row.contextLabel} · {shortTime(row.createdAt)}
-                    </div>
+                    {(isPrivate || r.subtopic) && (
+                      <div
+                        style={{
+                          marginTop: 2,
+                          fontSize: 12,
+                          color: "var(--color-ink-muted)",
+                        }}
+                      >
+                        {isPrivate
+                          ? "Private note · not shared with family"
+                          : `${r.area} · ${r.level}`}
+                      </div>
+                    )}
                   </div>
-                  <ArrowUpRight
-                    size={14}
-                    strokeWidth={1.75}
-                    style={{ color: "var(--color-ink-muted)", flexShrink: 0, marginTop: 4 }}
-                  />
-                </Link>
+                  {r.status === "pending" ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        fontSize: 11,
+                        color: "var(--color-terracotta-deep)",
+                        background: "var(--color-terracotta-soft)",
+                        borderRadius: 999,
+                        padding: "3px 10px",
+                        fontWeight: 500,
+                        flexShrink: 0,
+                      }}
+                    >
+                      pending
+                    </span>
+                  ) : (
+                    <HandCheck color="var(--color-sage)" size={14} />
+                  )}
+                </div>
               );
             })}
           </div>
@@ -311,10 +255,10 @@ export default function AdminTodayClient({
                 Pending approval
               </div>
               <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
-                {pendingReports.length} report{pendingReports.length === 1 ? "" : "s"}
+                {pendingApproval.length} report{pendingApproval.length === 1 ? "" : "s"}
               </span>
             </div>
-            {pendingReports.length === 0 ? (
+            {pendingApproval.length === 0 ? (
               <div
                 style={{
                   padding: 24,
@@ -326,73 +270,75 @@ export default function AdminTodayClient({
                 Nothing to review right now.
               </div>
             ) : (
-              pendingReports.map((report, index) => (
-                <div
-                  key={report.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "14px 18px",
-                    borderTop: index ? "1px solid var(--color-border)" : 0,
-                  }}
-                >
-                  <Avatar
-                    initials={initialsFor(report.studentName)}
-                    tone={toneFor(report.studentId)}
-                    size={28}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{report.studentName}</div>
-                    <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-                      {reportKindLabel(report.reportType)} report ·{" "}
-                      {formatUpdatedShort(report.updatedAt)}
+              pendingApproval.map((report, index) => {
+                const child = findChild(report.childId);
+                return (
+                  <div
+                    key={report.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "14px 18px",
+                      borderTop: index ? "1px solid var(--color-border)" : 0,
+                    }}
+                  >
+                    <Avatar
+                      initials={child ? initialsFor(child.name) : "··"}
+                      tone={child ? child.tone : "clay"}
+                      size={28}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                        {child ? child.name : ""}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
+                        {report.kind} report · {report.when}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        className="tap"
+                        onClick={() => router.push("/admin/reports")}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          background: "transparent",
+                          color: "var(--color-ink-secondary)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: 7,
+                          padding: "4px 8px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Review
+                      </button>
+                      <button
+                        type="button"
+                        className="tap"
+                        onClick={() => store.approveReport(report.id)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          background: "var(--color-terracotta)",
+                          color: "var(--color-surface)",
+                          border: 0,
+                          borderRadius: 7,
+                          padding: "4px 8px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <Check size={11} strokeWidth={2} /> Approve
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      className="tap"
-                      onClick={() => router.push("/admin/reports")}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 3,
-                        background: "transparent",
-                        color: "var(--color-ink-secondary)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 7,
-                        padding: "4px 8px",
-                        fontSize: 11,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Review
-                    </button>
-                    <button
-                      type="button"
-                      className="tap"
-                      disabled={approveBusy === report.id}
-                      onClick={() => void handleApprove(report.id)}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 3,
-                        background: "var(--color-terracotta)",
-                        color: "var(--color-surface)",
-                        border: 0,
-                        borderRadius: 7,
-                        padding: "4px 8px",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        opacity: approveBusy === report.id ? 0.7 : 1,
-                      }}
-                    >
-                      <Check size={11} strokeWidth={2} /> Approve
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

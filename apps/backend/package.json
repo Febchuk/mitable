@@ -51,7 +51,7 @@
     "@babel/parser": "^7.28.5",
     "@deepgram/sdk": "^4.11.3",
     "@google/generative-ai": "^0.24.1",
-    "@mitable/shared": "workspace:*",
+    "@mitable/shared": "*",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@notionhq/client": "^5.2.1",
     "@octokit/app": "^15.1.6",
