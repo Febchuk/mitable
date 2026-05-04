@@ -41,9 +41,7 @@ async function loadAsr() {
     status: { state: "loading", progress: 0, message: "Loading speech model" },
   });
   try {
-    const mod = (await import(
-      /* webpackIgnore: true */ /* @vite-ignore */ "@xenova/transformers"
-    )) as {
+    const mod = (await import("@xenova/transformers")) as {
       pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<unknown>;
     };
     const pipe = (await mod.pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
@@ -78,7 +76,7 @@ async function loadOcr() {
     status: { state: "loading", progress: 0, message: "Loading text recognizer" },
   });
   try {
-    const mod = (await import(/* webpackIgnore: true */ /* @vite-ignore */ "tesseract.js")) as {
+    const mod = (await import("tesseract.js")) as {
       createWorker: (
         lang?: string,
         oem?: number,

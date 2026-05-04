@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 
-function todayDateString(): string {
+export function todayDateString(): string {
   // Local-day in ISO format. Used to query attendance_records.attendance_date.
   const d = new Date();
   const yyyy = d.getFullYear();

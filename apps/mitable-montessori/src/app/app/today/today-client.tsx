@@ -17,13 +17,20 @@ function toneFor(id: string): Tone {
   return TONES[Math.abs(h) % TONES.length];
 }
 
+/** Calendar date only — UTC so SSR (Node) and the browser agree (no locale / TZ mismatch). */
 function todayLabel(dateString: string): string {
   try {
-    const d = new Date(dateString + "T00:00:00");
-    return d.toLocaleDateString(undefined, {
+    const parts = dateString.split("-").map(Number);
+    const y = parts[0];
+    const m = parts[1];
+    const day = parts[2];
+    if (!y || !m || !day) return dateString;
+    const d = new Date(Date.UTC(y, m - 1, day, 12, 0, 0));
+    return d.toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
+      timeZone: "UTC",
     });
   } catch {
     return dateString;
@@ -60,7 +67,9 @@ export default function TodayClient({
   drafts: DraftReport[];
 }) {
   const greetingName = firstName?.trim() || "there";
-  const greeting = `Good ${timeOfDay()}`;
+  const [hydrated, setHydrated] = React.useState(false);
+  React.useEffect(() => setHydrated(true), []);
+  const greeting = hydrated ? `Good ${timeOfDay()}` : "Good day";
   const dateLabel = todayLabel(attendance.date);
 
   const presentStudents = attendance.students.filter((s) => s.status === "present");

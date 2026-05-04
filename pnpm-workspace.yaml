@@ -1,0 +1,5 @@
+# Mirrors npm "workspaces" in package.json — required so `pnpm install`
+# at the repo root links apps/* and packages/* (pnpm ignores workspaces field otherwise).
+packages:
+  - "apps/*"
+  - "packages/*"
