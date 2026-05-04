@@ -23,21 +23,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Unacknowledged-privacy gate: authenticated /app/* and /admin/* should
-  // redirect through onboarding first if the user hasn't acknowledged.
-  if (user && (pathname.startsWith("/app") || pathname.startsWith("/admin"))) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("privacy_acknowledged_at")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (profile && !profile.privacy_acknowledged_at) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding/privacy";
-      return NextResponse.redirect(url);
-    }
-  }
-
   return supabaseResponse;
 }
 

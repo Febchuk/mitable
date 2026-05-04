@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import { createClient } from "@/utils/supabase/server";
+import { getAxesForSchool } from "./axes";
 import type { AxisLevel } from "./whole-child";
 
 export type CurriculumTransition = "introduced" | "practicing" | "mastered";
@@ -72,18 +74,11 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // Resolve the caller's school so we can label axes (axes is school-scoped).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: profile } = user
-    ? await supabase.from("users").select("school_id").eq("id", user.id).maybeSingle<{
-        school_id: string;
-      }>()
-    : { data: null };
-  const schoolId = profile?.school_id ?? null;
+  // Cached per request — reuses the layout's user-context fetch.
+  const ctx = await getCurrentUserContext();
+  const schoolId = ctx?.schoolId ?? null;
 
-  const [eventsResp, obsResp, axesResp] = await Promise.all([
+  const [eventsResp, obsResp, axes] = await Promise.all([
     supabase
       .from("curriculum_events")
       .select(
@@ -105,16 +100,10 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
       .order("created_at", { ascending: false })
       .limit(100)
       .returns<Omit<WholeChildObsDbRow, "axes">[]>(),
-    schoolId
-      ? supabase
-          .from("axes")
-          .select("key, label")
-          .eq("school_id", schoolId)
-          .returns<Array<{ key: string; label: string }>>()
-      : Promise.resolve({ data: [] as Array<{ key: string; label: string }> }),
+    getAxesForSchool(schoolId),
   ]);
 
-  const axisLabels = new Map((axesResp.data ?? []).map((a) => [a.key, a.label]));
+  const axisLabels = new Map(axes.map((a) => [a.key, a.label]));
 
   const curriculumEntries: ActivityFeedEntry[] = (eventsResp.data ?? []).map((e) => ({
     kind: "curriculum",

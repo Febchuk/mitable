@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 
@@ -8,7 +9,7 @@ export interface ActiveClassroom {
   role: "lead" | "support" | "assistant" | null;
 }
 
-export async function getActiveClassroomForCurrentUser(): Promise<ActiveClassroom | null> {
+export const getActiveClassroomForCurrentUser = cache(async function getActiveClassroomForCurrentUser(): Promise<ActiveClassroom | null> {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const {
@@ -75,7 +76,7 @@ export async function getActiveClassroomForCurrentUser(): Promise<ActiveClassroo
     code: classroom.code,
     role: assignment.classroom_role,
   };
-}
+});
 
 export interface CurrentUserContext {
   userId: string;
@@ -84,9 +85,10 @@ export interface CurrentUserContext {
   role: "admin" | "teacher";
   email: string;
   firstName: string | null;
+  privacyAcknowledgedAt: string | null;
 }
 
-export async function getCurrentUserContext(): Promise<CurrentUserContext | null> {
+export const getCurrentUserContext = cache(async function getCurrentUserContext(): Promise<CurrentUserContext | null> {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const {
@@ -95,7 +97,7 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
   if (!user) return null;
   const { data } = await supabase
     .from("users")
-    .select("id, school_id, role, email, first_name")
+    .select("id, school_id, role, email, first_name, privacy_acknowledged_at")
     .eq("id", user.id)
     .maybeSingle();
   if (!data) return null;
@@ -118,5 +120,6 @@ export async function getCurrentUserContext(): Promise<CurrentUserContext | null
     role: data.role as "admin" | "teacher",
     email: (data.email as string) ?? user.email ?? "",
     firstName: (data.first_name as string | null) ?? null,
+    privacyAcknowledgedAt: (data.privacy_acknowledged_at as string | null) ?? null,
   };
-}
+});
