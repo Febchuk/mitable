@@ -11,7 +11,7 @@
         "lint": "next lint"
     },
     "dependencies": {
-        "@mitable/shared": "*",
+        "@mitable/shared": "workspace:*",
         "@supabase/ssr": "^0.8.0",
         "@supabase/supabase-js": "^2.95.2",
         "@tailwindcss/postcss": "^4.1.18",

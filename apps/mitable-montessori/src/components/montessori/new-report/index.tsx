@@ -7,6 +7,7 @@ import { ToastBus } from "../primitives";
 import { useIsMobile } from "../child-detail/use-is-mobile";
 import type { Tone } from "../data";
 import { parseCaptureInputs } from "@/lib/capture/parse-on-submit";
+import { writeStoredDraftCapture } from "@/lib/capture/draft-capture-storage";
 import { NewReportSheet } from "./new-report-sheet";
 import { NewReportMobile } from "./new-report-mobile";
 import type { PickerChild } from "./child-picker";
@@ -91,10 +92,8 @@ export function NewReportTrigger() {
       if (submitting) return;
       setSubmitting(true);
       try {
-        // Pull recorded audio + note images back into Blobs from their
-        // object URLs and run client-side parsing. Whisper + Tesseract are
-        // currently stubbed (returning empty strings); fuzzy tokenization
-        // works as soon as transcripts land.
+        // Pull recorded audio + note images into Blobs, run Whisper (worker)
+        // + OCR, fuzzy-match roster → tokenized strings for the draft API.
         const audioBlob = payload.audio
           ? await fetch(payload.audio.url)
               .then((r) => r.blob())
@@ -133,6 +132,10 @@ export function NewReportTrigger() {
           return;
         }
         const json = (await res.json()) as { reportId: string };
+        writeStoredDraftCapture(json.reportId, {
+          transcripts: parsed.transcripts,
+          notes: parsed.notes,
+        });
         const child = roster.find((c) => c.id === payload.childId);
         ToastBus.push({
           message: child

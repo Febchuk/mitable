@@ -32,6 +32,10 @@ export class WhisperAsrEngine implements AsrEngine {
   async transcribe(audio: Float32Array, sampleRate: number): Promise<TranscriptionResult> {
     const r = await this.host.transcribe(audio, sampleRate);
     this.ready = true;
+    if (process.env.NODE_ENV === "development") {
+      const text = (r.text ?? "").trim();
+      console.log("[capture][whisper] transcript:", text.length ? text : "(empty)");
+    }
     return r;
   }
 

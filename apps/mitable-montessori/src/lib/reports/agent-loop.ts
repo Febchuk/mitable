@@ -29,6 +29,14 @@ export interface AgentRunInput {
   adapter: ReportDataAdapter;
   anthropic: AnthropicLike;
   model: string;
+  /** Voice/OCR text from the client (already tokenized). Optional. */
+  captureTranscripts?: string[];
+  captureNotes?: string[];
+  /**
+   * Seed tokens for the active student/classroom so token validation passes
+   * even when the agent drafts from capture only (no read-tool calls).
+   */
+  seedReferences?: ReportReferenceSet;
 }
 
 export interface AgentRunOutput {
@@ -58,6 +66,9 @@ export class AgentAbortError extends Error {
  */
 export async function runReportAgent(input: AgentRunInput): Promise<AgentRunOutput> {
   const accumulatedRefs: ReportReferenceSet[] = [];
+  if (input.seedReferences?.refs?.length) {
+    accumulatedRefs.push(input.seedReferences);
+  }
   let attempts = 0;
 
   while (attempts <= MAX_REGENERATIONS) {
@@ -205,13 +216,37 @@ export async function runReportAgent(input: AgentRunInput): Promise<AgentRunOutp
 }
 
 function buildKickoff(input: AgentRunInput): string {
-  return [
+  const transcripts = (input.captureTranscripts ?? []).filter((t) => t.trim().length > 0);
+  const notes = (input.captureNotes ?? []).filter((t) => t.trim().length > 0);
+  const hasCapture = transcripts.length > 0 || notes.length > 0;
+
+  const lines = [
     `Draft a ${input.reportType} report.`,
     `Student token: ${input.studentToken}`,
     `Classroom token: ${input.classroomToken}`,
     `Period: ${input.periodStart} → ${input.periodEnd}`,
     "",
-    "Use get_student_commands first, then get_student_progress_summary if you need it.",
-    "Then call draft_report exactly once. Reference entities by token only.",
-  ].join("\n");
+  ];
+
+  if (hasCapture) {
+    lines.push("## Teacher capture (primary narrative source)");
+    lines.push("Ground the report body in this capture. Use tokens only — never real names.");
+    if (transcripts.length > 0) {
+      lines.push("", "Voice transcript(s):");
+      transcripts.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+    }
+    if (notes.length > 0) {
+      lines.push("", "Written notes / OCR:");
+      notes.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+    }
+    lines.push(
+      "",
+      "Supplement with get_student_commands and get_student_progress_summary when they add structured facts for this period."
+    );
+  } else {
+    lines.push("Use get_student_commands first, then get_student_progress_summary if you need it.");
+  }
+
+  lines.push("Then call draft_report exactly once. Reference entities by token only.");
+  return lines.join("\n");
 }
