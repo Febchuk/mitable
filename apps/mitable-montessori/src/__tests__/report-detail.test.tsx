@@ -89,9 +89,14 @@ describe("ReportDetail", () => {
     expect(screen.getByText("Social & emotional")).toBeTruthy();
   });
 
-  it("renders the empty state for a report without a body or sections", () => {
+  it("renders the editor (no sections, with Add section) for an empty report", () => {
     render(<ReportDetail report={EMPTY_REPORT} />);
-    expect(screen.getByRole("heading", { name: "No draft yet" })).toBeTruthy();
+    // No section headings present
+    expect(screen.queryByText("Morning")).toBeNull();
+    // Title input is editable
+    expect(screen.getByLabelText("Report title")).toBeTruthy();
+    // Add section button is available so the user can compose from scratch
+    expect(screen.getByRole("button", { name: "Add section" })).toBeTruthy();
   });
 
   it("flips the saved-meta to 'Unsaved changes' after a paragraph edit", () => {

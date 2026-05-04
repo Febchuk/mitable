@@ -1,9 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
 import { ToastBus } from "../primitives";
 import { ChatPane } from "./chat-pane";
@@ -213,45 +211,12 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
         savedMeta={savedMeta}
         savedMetaDirty={isDirty || isDrafting || isSaving}
       />
-      {detail.sections.length > 0 ? (
-        <div className="rd-workspace">
-          <div className="rd-split">
-            <ChatPane />
-            <ReportPane detail={detail} onChange={onChange} />
-          </div>
+      <div className="rd-workspace">
+        <div className="rd-split">
+          <ChatPane />
+          <ReportPane detail={detail} onChange={onChange} />
         </div>
-      ) : isDrafting ? (
-        <div className="rd-empty">
-          <h2>
-            <Sparkles size={18} strokeWidth={2} style={{ marginRight: 6, verticalAlign: -2 }} />
-            Drafting with assistant…
-          </h2>
-          <p>This usually takes 5–30 seconds. Hang tight.</p>
-        </div>
-      ) : (
-        <ReportEmptyState />
-      )}
-    </div>
-  );
-}
-
-function ReportEmptyState() {
-  return (
-    <div className="rd-empty">
-      <h2>No draft yet</h2>
-      <p>
-        This report doesn&rsquo;t have a draft body. The editing assistant will compose a first pass
-        once you tap Draft.
-      </p>
-      <p style={{ marginTop: 16 }}>
-        <Link
-          href="/app/reports"
-          className="rd-btn rd-btn-secondary"
-          style={{ display: "inline-flex" }}
-        >
-          Back to reports
-        </Link>
-      </p>
+      </div>
     </div>
   );
 }
