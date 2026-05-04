@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { getAnthropic, SONNET_MODEL } from "@/lib/anthropic/client";
@@ -30,18 +29,25 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
   const input = parsed.data;
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  // Admin client to dodge the reports RLS recursion. School isolation is
+  // enforced explicitly via the joined students.school_id check below.
+  const supabase = createAdminClient();
 
   const { data: report, error: readErr } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, period_start, period_end, report_date, status"
+      "id, student_id, classroom_id, report_type, period_start, period_end, report_date, status, students!inner(school_id)"
     )
     .eq("id", id)
     .maybeSingle();
   if (readErr || !report) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const studentSchool = (
+    report as unknown as { students: { school_id: string } | null }
+  ).students?.school_id;
+  if (studentSchool !== auth.user.schoolId) {
+    return NextResponse.json({ error: "Not in your school" }, { status: 403 });
   }
   if (report.status !== "draft") {
     return NextResponse.json(

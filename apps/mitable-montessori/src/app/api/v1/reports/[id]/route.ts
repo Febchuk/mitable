@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { getReport } from "@/lib/queries/reports";
@@ -34,18 +33,23 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  // Use admin client to dodge the reports RLS recursion. School-isolation
+  // enforced explicitly via the joined students.school_id check below.
+  const supabase = createAdminClient();
 
-  // RLS already constrains writes; this select also confirms the report exists
-  // and the caller can see it (returns 404 either way).
   const { data: existing } = await supabase
     .from("reports")
-    .select("id, status, created_by_user_id")
+    .select("id, status, created_by_user_id, students!inner(school_id)")
     .eq("id", id)
     .maybeSingle();
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const studentSchool = (
+    existing as unknown as { students: { school_id: string } | null }
+  ).students?.school_id;
+  if (studentSchool !== auth.user.schoolId) {
+    return NextResponse.json({ error: "Not in your school" }, { status: 403 });
   }
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };

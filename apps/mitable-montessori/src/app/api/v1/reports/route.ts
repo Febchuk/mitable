@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { listReports } from "@/lib/queries/reports";
@@ -39,10 +38,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No active classroom" }, { status: 403 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  // Use the admin client for reports/templates/students reads + the insert.
+  // The cookie-client INSERT triggers RLS evaluation on `reports` (RETURNING
+  // clause), which still recurses through the existing students/enrollment
+  // policy graph. We auth-gate via `requireUser` + verify the student
+  // belongs to the caller's school explicitly below.
+  const supabase = createAdminClient();
 
-  // Resolve template (if provided) so we can seed sections.
+  // Verify the picked student is in the caller's school. This is the
+  // school-isolation guarantee that RLS would have given us.
+  const { data: student } = await supabase
+    .from("students")
+    .select("first_name, preferred_name, school_id")
+    .eq("id", input.childId)
+    .maybeSingle();
+  if (!student) {
+    return NextResponse.json({ error: "Student not found" }, { status: 404 });
+  }
+  if ((student.school_id as string) !== auth.user.schoolId) {
+    return NextResponse.json({ error: "Student not in your school" }, { status: 403 });
+  }
+
+  // Resolve template (if provided) so we can seed sections. Also verify
+  // it's a template from the caller's school.
   let sections: Array<{
     id: string;
     heading: string;
@@ -51,10 +69,10 @@ export async function POST(req: Request) {
   if (input.templateId) {
     const { data: tpl } = await supabase
       .from("report_templates")
-      .select("id, sections, kind")
+      .select("id, sections, kind, school_id")
       .eq("id", input.templateId)
       .maybeSingle();
-    if (tpl?.sections) {
+    if (tpl && (tpl.school_id as string) === auth.user.schoolId && tpl.sections) {
       sections = (tpl.sections as string[]).map((heading, i) => ({
         id: `s-${i}-${heading.toLowerCase().replace(/\s+/g, "-")}`,
         heading,
@@ -63,13 +81,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // Build a quick title from the student's first name + today's date.
-  const { data: student } = await supabase
-    .from("students")
-    .select("first_name, preferred_name")
-    .eq("id", input.childId)
-    .maybeSingle();
-  const firstName = (student?.preferred_name || student?.first_name || "Student") as string;
+  const firstName = (student.preferred_name || student.first_name || "Student") as string;
   const today = new Date();
   const dayLabel = today.toLocaleDateString(undefined, {
     weekday: "long",
