@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import { ArrowLeft, ArrowRight, Clock, Search, X } from "lucide-react";
-import { CHILDREN, initialsFor, type Child } from "../data";
+import { initialsFor } from "../data";
+import { type PickerChild } from "./child-picker";
 import { TypePicker } from "./type-picker";
 import { LiveWave, AudioPreview } from "./audio-block";
 import { NotesMobileRow } from "./notes-block";
 import { TemplateMobileCard } from "./template-block";
 import { useAudioRecorder } from "./use-audio-recorder";
 import {
-  CAPTURED_TODAY,
   formatDuration,
   type CapturedNote,
   type NewReportPayload,
@@ -18,18 +18,27 @@ import {
 } from "./mock-data";
 
 type Step = 1 | 2 | 3 | 4;
+type CapturedToday = Record<string, { voice: number; photos: number }>;
 
 export function NewReportMobile({
   open,
   onClose,
   onSubmit,
+  roster,
+  capturedToday,
+  templates,
+  submitting,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (payload: NewReportPayload) => void;
+  roster: PickerChild[];
+  capturedToday: CapturedToday;
+  templates: ReportTemplate[];
+  submitting?: boolean;
 }) {
   const [step, setStep] = React.useState<Step>(1);
-  const [child, setChild] = React.useState<Child | null>(null);
+  const [child, setChild] = React.useState<PickerChild | null>(null);
   const [kind, setKind] = React.useState<ReportKind | null>(null);
   const [notes, setNotes] = React.useState<CapturedNote[]>([]);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
@@ -84,6 +93,8 @@ export function NewReportMobile({
             setStep(2);
           }}
           onClose={onClose}
+          roster={roster}
+          capturedToday={capturedToday}
         />
       )}
       {step === 2 && (
@@ -104,6 +115,7 @@ export function NewReportMobile({
           setNotes={setNotes}
           template={template}
           setTemplate={setTemplate}
+          templates={templates}
           onBack={() => setStep(2)}
           onNext={() => setStep(4)}
         />
@@ -115,6 +127,7 @@ export function NewReportMobile({
           audioDuration={recorder.memo?.durationSec ?? null}
           noteCount={notes.length}
           template={template}
+          submitting={submitting}
           onBack={() => setStep(3)}
           onSubmit={submit}
           onJump={(s) => setStep(s)}
@@ -133,17 +146,21 @@ function Step1Child({
   setQuery,
   onPick,
   onClose,
+  roster,
+  capturedToday,
 }: {
-  child: Child | null;
+  child: PickerChild | null;
   query: string;
   setQuery: (q: string) => void;
-  onPick: (c: Child) => void;
+  onPick: (c: PickerChild) => void;
   onClose: () => void;
+  roster: PickerChild[];
+  capturedToday: CapturedToday;
 }) {
   const filter = query.trim().toLowerCase();
-  const matches = filter ? CHILDREN.filter((c) => c.name.toLowerCase().includes(filter)) : CHILDREN;
-  const today = matches.filter((c) => CAPTURED_TODAY[c.id]);
-  const others = matches.filter((c) => !CAPTURED_TODAY[c.id]);
+  const matches = filter ? roster.filter((c) => c.name.toLowerCase().includes(filter)) : roster;
+  const today = matches.filter((c) => capturedToday[c.id]);
+  const others = matches.filter((c) => !capturedToday[c.id]);
 
   return (
     <>
@@ -186,6 +203,7 @@ function Step1Child({
                 child={c}
                 selected={child?.id === c.id}
                 onPick={() => onPick(c)}
+                badge={capturedToday[c.id]}
               />
             ))}
           </>
@@ -224,12 +242,13 @@ function MobileChildRow({
   child,
   selected,
   onPick,
+  badge,
 }: {
-  child: Child;
+  child: PickerChild;
   selected: boolean;
   onPick: () => void;
+  badge?: { voice: number; photos: number };
 }) {
-  const today = CAPTURED_TODAY[child.id];
   return (
     <button type="button" className={`nr-m-row${selected ? " nr-selected" : ""}`} onClick={onPick}>
       <span className={`nr-av nr-${child.tone}`} style={{ width: 40, height: 40, fontSize: 14 }}>
@@ -240,12 +259,12 @@ function MobileChildRow({
           {child.name}
         </span>
         <span className="nr-sub" style={{ display: "block" }}>
-          {child.age}
+          {child.age ?? ""}
         </span>
       </span>
-      {today ? (
+      {badge ? (
         <span className="nr-today-badge">
-          📷 {today.voice}·{today.photos}
+          📷 {badge.voice}·{badge.photos}
         </span>
       ) : (
         <span />
@@ -264,7 +283,7 @@ function Step2Type({
   onBack,
   onNext,
 }: {
-  child: Child;
+  child: PickerChild;
   kind: ReportKind | null;
   setKind: (k: ReportKind) => void;
   onBack: () => void;
@@ -316,16 +335,18 @@ function Step3Capture({
   setNotes,
   template,
   setTemplate,
+  templates,
   onBack,
   onNext,
 }: {
-  child: Child;
+  child: PickerChild;
   kind: ReportKind;
   recorder: ReturnType<typeof useAudioRecorder>;
   notes: CapturedNote[];
   setNotes: React.Dispatch<React.SetStateAction<CapturedNote[]>>;
   template: ReportTemplate | null;
   setTemplate: (t: ReportTemplate | null) => void;
+  templates: ReportTemplate[];
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -427,7 +448,7 @@ function Step3Capture({
             <span className="nr-label-cap">Template</span>
             <span className="nr-m-opt-skip">admin-managed · optional</span>
           </div>
-          <TemplateMobileCard selected={template} onPick={setTemplate} />
+          <TemplateMobileCard selected={template} onPick={setTemplate} templates={templates} />
         </div>
       </div>
 
@@ -458,15 +479,17 @@ function Step4Review({
   audioDuration,
   noteCount,
   template,
+  submitting,
   onBack,
   onSubmit,
   onJump,
 }: {
-  child: Child;
+  child: PickerChild;
   kind: ReportKind;
   audioDuration: number | null;
   noteCount: number;
   template: ReportTemplate | null;
+  submitting?: boolean;
   onBack: () => void;
   onSubmit: () => void;
   onJump: (step: Step) => void;
@@ -583,8 +606,8 @@ function Step4Review({
       </div>
 
       <div className="nr-m-foot">
-        <button type="button" className="nr-m-btn-primary" onClick={onSubmit}>
-          Start drafting
+        <button type="button" className="nr-m-btn-primary" onClick={onSubmit} disabled={submitting}>
+          {submitting ? "Starting…" : "Start drafting"}
           <ArrowRight size={14} strokeWidth={2.5} />
         </button>
       </div>

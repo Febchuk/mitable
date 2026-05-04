@@ -6,8 +6,54 @@ import { z } from "zod";
  * tokens (or no PII at all), the client de-tokenizes for display.
  */
 
-export const ReportType = z.enum(["daily", "major"]);
+export const ReportType = z.enum(["daily", "major", "incident"]);
 export type ReportType = z.infer<typeof ReportType>;
+
+export const ReportKind = z.enum(["Daily", "Major", "Incident"]);
+export type ReportKind = z.infer<typeof ReportKind>;
+
+export const TokenMapEntrySchema = z.object({
+  token: z.string().regex(/^\[STUDENT_\d+\]$/),
+  studentId: z.string().uuid(),
+  matchedText: z.string(),
+});
+export type TokenMapEntry = z.infer<typeof TokenMapEntrySchema>;
+
+export const CreateReportRequestSchema = z.object({
+  childId: z.string().uuid(),
+  kind: ReportKind,
+  templateId: z.string().uuid().nullable().optional(),
+  /** Client-derived transcripts — never persisted as binary. */
+  transcripts: z.array(z.string().min(1)).max(8).optional().default([]),
+  /** Client-derived OCR text from handwritten notes. */
+  notes: z.array(z.string().min(1)).max(20).optional().default([]),
+  /** Fuzzy-matched tokens. */
+  tokenMap: z.array(TokenMapEntrySchema).max(50).optional().default([]),
+});
+export type CreateReportRequest = z.infer<typeof CreateReportRequestSchema>;
+
+export const UpdateReportRequestSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  body: z.string().max(8000).optional(),
+  sections: z
+    .array(
+      z.object({
+        id: z.string(),
+        heading: z.string(),
+        paragraphs: z.array(z.object({ id: z.string(), html: z.string() })),
+      })
+    )
+    .max(20)
+    .optional(),
+});
+export type UpdateReportRequest = z.infer<typeof UpdateReportRequestSchema>;
+
+export const DraftFromCaptureRequestSchema = z.object({
+  transcripts: z.array(z.string().min(1)).max(8).optional().default([]),
+  notes: z.array(z.string().min(1)).max(20).optional().default([]),
+  tokenMap: z.array(TokenMapEntrySchema).max(50).optional().default([]),
+});
+export type DraftFromCaptureRequest = z.infer<typeof DraftFromCaptureRequestSchema>;
 
 export const ReportStatus = z.enum([
   "draft",

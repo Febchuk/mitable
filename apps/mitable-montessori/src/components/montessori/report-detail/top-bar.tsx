@@ -3,8 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowRight, FileText } from "lucide-react";
-import type { Child, ReportStatus } from "../data";
+import type { Tone } from "../data";
 import { initialsFor } from "../data";
+
+type ReportStatus = "draft" | "review" | "sent";
+type ChildLike = { name: string; tone: Tone };
 import { Avatar, ToastBus } from "../primitives";
 import { ChevLeft } from "../child-detail/icons";
 
@@ -29,7 +32,7 @@ export function ReportTopBar({
   savedMeta,
   savedMetaDirty = false,
 }: {
-  child: Child | undefined;
+  child: ChildLike | undefined;
   status: ReportStatus;
   kind: string;
   dayLabel?: string;

@@ -252,6 +252,8 @@ async function wipeDemoSchool(schoolId: string) {
   await delByIds("student_classroom_enrollments", "student_id", studentIds);
   // Axes (school-scoped catalog) — must drop before students/users since none reference it back.
   await delBySchool("axes");
+  // Report templates — school-scoped, no FKs to roster.
+  await delBySchool("report_templates");
 
   // ---- Phase 2: middle layer ----
   await delByIds("classroom_teacher_assignments", "classroom_id", classroomIds);
@@ -347,6 +349,12 @@ async function main() {
 
   console.log("→ Seeding 7 axes for the school (catalog)");
   await seedAxesForSchool(schoolId);
+
+  console.log("→ Seeding 5 starter report templates");
+  const { error: tplErr } = await supabase.rpc("seed_default_report_templates", {
+    p_school_id: schoolId,
+  });
+  if (tplErr) throw tplErr;
 
   console.log("→ Creating curriculum (5 topics, 30 subtopics)");
   const curriculumId = randomUUID();

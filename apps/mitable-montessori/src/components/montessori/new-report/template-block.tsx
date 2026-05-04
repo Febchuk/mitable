@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronDown, LayoutTemplate, X } from "lucide-react";
-import { TEMPLATES, type ReportTemplate } from "./mock-data";
+import { type ReportTemplate } from "./mock-data";
 
 const TONE_TO_CLASS = {
   clay: "nr-clay",
@@ -65,9 +65,11 @@ function TemplateRow({
 export function TemplateOptCard({
   selected,
   onPick,
+  templates,
 }: {
   selected: ReportTemplate | null;
   onPick: (t: ReportTemplate | null) => void;
+  templates: ReportTemplate[];
 }) {
   const [showList, setShowList] = React.useState(false);
 
@@ -173,7 +175,7 @@ export function TemplateOptCard({
       </div>
       <div className="nr-opt-help">Tap one to use as the starting structure.</div>
       <div className="nr-template-list">
-        {TEMPLATES.map((t) => (
+        {templates.map((t) => (
           <TemplateRow
             key={t.id}
             template={t}
@@ -193,9 +195,11 @@ export function TemplateOptCard({
 export function TemplateMobileCard({
   selected,
   onPick,
+  templates,
 }: {
   selected: ReportTemplate | null;
   onPick: (t: ReportTemplate | null) => void;
+  templates: ReportTemplate[];
 }) {
   const [open, setOpen] = React.useState(!!selected);
 
@@ -255,7 +259,7 @@ export function TemplateMobileCard({
               <span />
             </button>
           )}
-          {TEMPLATES.map((t) => (
+          {templates.map((t) => (
             <TemplateRow
               key={t.id}
               template={t}

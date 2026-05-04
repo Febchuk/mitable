@@ -2,15 +2,25 @@
 
 import * as React from "react";
 import { Search, Clock } from "lucide-react";
-import { CHILDREN, initialsFor, type Child } from "../data";
-import { CAPTURED_TODAY } from "./mock-data";
+import { initialsFor, type Tone } from "../data";
 
-type ChildPickerProps = {
-  value: Child | null;
-  onChange: (child: Child) => void;
+export type PickerChild = {
+  id: string;
+  name: string;
+  age: string | null;
+  tone: Tone;
 };
 
-export function ChildPicker({ value, onChange }: ChildPickerProps) {
+type CapturedToday = Record<string, { voice: number; photos: number }>;
+
+type ChildPickerProps = {
+  value: PickerChild | null;
+  onChange: (child: PickerChild) => void;
+  roster: PickerChild[];
+  capturedToday: CapturedToday;
+};
+
+export function ChildPicker({ value, onChange, roster, capturedToday }: ChildPickerProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const wrapRef = React.useRef<HTMLDivElement>(null);
@@ -33,11 +43,12 @@ export function ChildPicker({ value, onChange }: ChildPickerProps) {
   }, [open]);
 
   const filter = query.trim().toLowerCase();
-  const matches = filter ? CHILDREN.filter((c) => c.name.toLowerCase().includes(filter)) : CHILDREN;
-  const todayChildren = matches.filter((c) => CAPTURED_TODAY[c.id]);
-  const otherChildren = matches.filter((c) => !CAPTURED_TODAY[c.id]);
+  const matches = filter ? roster.filter((c) => c.name.toLowerCase().includes(filter)) : roster;
+  const todayChildren = matches.filter((c) => capturedToday[c.id]);
+  const otherChildren = matches.filter((c) => !capturedToday[c.id]);
 
   if (value && !open) {
+    const today = capturedToday[value.id];
     return (
       <div className="nr-picker-selected" ref={wrapRef}>
         <span className={`nr-av nr-${value.tone}`} style={{ width: 36, height: 36, fontSize: 13 }}>
@@ -46,10 +57,8 @@ export function ChildPicker({ value, onChange }: ChildPickerProps) {
         <div style={{ minWidth: 0 }}>
           <div className="nr-name">{value.name}</div>
           <div className="nr-sub">
-            {value.age}
-            {CAPTURED_TODAY[value.id]
-              ? ` · ${CAPTURED_TODAY[value.id].voice} voice · ${CAPTURED_TODAY[value.id].photos} photos today`
-              : ""}
+            {value.age ?? ""}
+            {today ? ` · ${today.voice} voice · ${today.photos} photos today` : ""}
           </div>
         </div>
         <button
@@ -97,7 +106,7 @@ export function ChildPicker({ value, onChange }: ChildPickerProps) {
                 <PickerRow
                   key={c.id}
                   child={c}
-                  badge={CAPTURED_TODAY[c.id]}
+                  badge={capturedToday[c.id]}
                   onPick={() => {
                     onChange(c);
                     setOpen(false);
@@ -123,7 +132,11 @@ export function ChildPicker({ value, onChange }: ChildPickerProps) {
               ))}
             </>
           )}
-          {matches.length === 0 && <div className="nr-empty-row">No children match.</div>}
+          {matches.length === 0 && (
+            <div className="nr-empty-row">
+              {roster.length === 0 ? "Loading children…" : "No children match."}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -135,7 +148,7 @@ function PickerRow({
   badge,
   onPick,
 }: {
-  child: Child;
+  child: PickerChild;
   badge?: { voice: number; photos: number };
   onPick: () => void;
 }) {
@@ -149,7 +162,7 @@ function PickerRow({
           {child.name}
         </span>
         <span className="nr-sub" style={{ display: "block" }}>
-          {child.age}
+          {child.age ?? ""}
         </span>
       </span>
       {badge ? (
