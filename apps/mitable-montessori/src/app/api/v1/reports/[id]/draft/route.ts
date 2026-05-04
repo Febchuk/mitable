@@ -68,6 +68,45 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const periodStart = (report.period_start || report.report_date) as string;
   const periodEnd = (report.period_end || report.report_date) as string;
 
+  // Pre-flight: if there's no captured context for this student in the
+  // period AND the client didn't supply transcripts/notes, the agent has
+  // nothing to draft from. Skip the agent run — the editor will render
+  // the template's empty sections and the teacher fills them in (or
+  // re-drafts later once observations exist).
+  if (input.transcripts.length === 0 && input.notes.length === 0) {
+    const studentRef = report.student_id as string;
+    const periodEndDay = `${periodEnd}T23:59:59`;
+    const [{ count: cmdCount }, { count: progCount }] = await Promise.all([
+      supabase
+        .from("commands")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", auth.user.userId)
+        .gte("created_at", periodStart)
+        .lte("created_at", periodEndDay),
+      supabase
+        .from("student_progress_history")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", studentRef)
+        .gte("changed_at", periodStart)
+        .lte("changed_at", periodEndDay),
+    ]);
+    if ((cmdCount ?? 0) === 0 && (progCount ?? 0) === 0) {
+      await auditLog({
+        actor_id: auth.user.userId,
+        actor_role: auth.user.role,
+        action: "report.draft_skipped_empty",
+        target_table: "reports",
+        target_id: id,
+        metadata: { reason: "no commands or progress in period" },
+      });
+      return NextResponse.json({
+        reportId: id,
+        skipped: true,
+        reason: "no_context",
+      });
+    }
+  }
+
   const adapter = new SupabaseReportDataAdapter(supabase);
 
   try {
