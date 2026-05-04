@@ -1,29 +1,31 @@
 /**
  * Default Montessori scope-and-sequence preloaded for new schools.
  *
- * Structure:
- *   Curriculum (level, e.g. "Primary 3-6")
- *     Topic (Domain, e.g. "Mathematics")
- *       Subtopic (lesson, e.g. "Pink Tower")
+ * Hierarchy (4 levels):
+ *   Curriculum  — Level (e.g. "Primary 3–6")
+ *     Subject   — Domain (e.g. "Mathematics")
+ *       Topic   — Sub-Domain (e.g. "Decimal System")
+ *         Subtopic — Lesson / Material (e.g. "Intro to Golden Beads")
  *
- * Subtopic names are kept short so the list stays scannable. Admins can
- * rename, add, or remove anything freely.
+ * Subtopic strings are kept short so the list stays scannable. Admins can
+ * rename, add, or remove anything freely from the curriculum admin page.
  */
-
-export interface DefaultSubtopic {
-  name: string;
-}
 
 export interface DefaultTopic {
   name: string;
   subtopics: string[];
 }
 
+export interface DefaultSubject {
+  name: string;
+  topics: DefaultTopic[];
+}
+
 export interface DefaultCurriculum {
   id: string;
   name: string;
   ageRange: string;
-  topics: DefaultTopic[];
+  subjects: DefaultSubject[];
 }
 
 export const DEFAULT_CURRICULA: DefaultCurriculum[] = [
@@ -31,53 +33,84 @@ export const DEFAULT_CURRICULA: DefaultCurriculum[] = [
     id: "infant-toddler",
     name: "Infant & Toddler",
     ageRange: "0–3 years",
-    topics: [
+    subjects: [
       {
         name: "Practical Life",
-        subtopics: [
-          "Washing hands",
-          "Brushing teeth",
-          "Nose blowing",
-          "Putting on a coat (flip over head)",
-          "Dressing frames (Velcro, large button, zipper)",
-          "Undressing & dressing",
-          "Dusting a shelf",
-          "Watering a plant",
-          "Folding cloths",
-          "Sweeping (small broom)",
-          "Mopping a spill",
-          "Arranging flowers",
-          "Peeling a banana",
-          "Slicing a banana (dull knife)",
-          "Spreading (butter or jam)",
-          "Pouring water (small pitcher)",
-          "Setting a placemat",
-          "Greeting a teacher",
-          "Waiting for a turn",
-          "Offering a snack",
+        topics: [
+          {
+            name: "Care of Person",
+            subtopics: [
+              "Washing hands",
+              "Brushing teeth",
+              "Nose blowing",
+              "Putting on a coat (flip over head)",
+              "Dressing frames (Velcro, large button, zipper)",
+              "Undressing & dressing",
+            ],
+          },
+          {
+            name: "Care of Environment",
+            subtopics: [
+              "Dusting a shelf",
+              "Watering a plant",
+              "Folding cloths",
+              "Sweeping (small broom)",
+              "Mopping a spill",
+              "Arranging flowers",
+            ],
+          },
+          {
+            name: "Food Preparation",
+            subtopics: [
+              "Peeling a banana",
+              "Slicing a banana (dull knife)",
+              "Spreading (butter or jam)",
+              "Pouring water (small pitcher)",
+              "Setting a placemat",
+            ],
+          },
+          {
+            name: "Grace and Courtesy",
+            subtopics: ["Greeting a teacher", "Waiting for a turn", "Offering a snack"],
+          },
         ],
       },
       {
         name: "Psychomotor (Movement)",
-        subtopics: [
-          "Walking a line",
-          "Carrying a tray",
-          "Climbing stairs",
-          "Pushing a wagon",
-          "Bead stringing",
-          "Pegs in a board",
-          "Coin box (object permanence)",
-          "Using a screwdriver (toy)",
-          "Opening & closing containers",
+        topics: [
+          {
+            name: "Gross Motor",
+            subtopics: [
+              "Walking a line",
+              "Carrying a tray",
+              "Climbing stairs",
+              "Pushing a wagon",
+            ],
+          },
+          {
+            name: "Fine Motor",
+            subtopics: [
+              "Bead stringing",
+              "Pegs in a board",
+              "Coin box (object permanence)",
+              "Using a screwdriver (toy)",
+              "Opening & closing containers",
+            ],
+          },
         ],
       },
       {
         name: "Language",
-        subtopics: [
-          "Object-to-object matching",
-          "Object-to-picture matching",
-          "Parts of the body",
-          "Animal nomenclature",
+        topics: [
+          {
+            name: "Oral Language",
+            subtopics: [
+              "Object-to-object matching",
+              "Object-to-picture matching",
+              "Parts of the body",
+              "Animal nomenclature",
+            ],
+          },
         ],
       },
     ],
@@ -86,94 +119,155 @@ export const DEFAULT_CURRICULA: DefaultCurriculum[] = [
     id: "primary",
     name: "Primary",
     ageRange: "3–6 years",
-    topics: [
+    subjects: [
       {
         name: "Practical Life",
-        subtopics: [
-          "Carrying a mat",
-          "Rolling & unrolling a mat",
-          "Walking around a mat",
-          "Pouring (rice → beans → water)",
-          "Spooning",
-          "Tweezing",
-          "Using a funnel",
-          "The silence game",
-          "Walking on the line",
-          "Dressing frames (safety pin, bow tying, lacing)",
-          "Hand washing",
-          "Polishing shoes",
-          "Table scrubbing",
-          "Metal polishing",
-          "Wood polishing",
-          "Sweeping dust to a square",
+        topics: [
+          {
+            name: "Preliminary",
+            subtopics: ["Carrying a mat", "Rolling & unrolling a mat", "Walking around a mat"],
+          },
+          {
+            name: "Control of Movement",
+            subtopics: [
+              "Pouring (rice → beans → water)",
+              "Spooning",
+              "Tweezing",
+              "Using a funnel",
+              "The silence game",
+              "Walking on the line",
+            ],
+          },
+          {
+            name: "Care of Self",
+            subtopics: [
+              "Dressing frames (safety pin, bow tying, lacing)",
+              "Hand washing",
+              "Polishing shoes",
+            ],
+          },
+          {
+            name: "Care of Environment",
+            subtopics: [
+              "Table scrubbing",
+              "Metal polishing",
+              "Wood polishing",
+              "Sweeping dust to a square",
+            ],
+          },
         ],
       },
       {
         name: "Sensorial",
-        subtopics: [
-          "Pink Tower",
-          "Brown Stair",
-          "Red Rods",
-          "Knobbed Cylinders",
-          "Knobless Cylinders",
-          "Color Tablets (1, 2, 3)",
-          "Geometric Cabinet",
-          "Botany Cabinet",
-          "Binomial Cube",
-          "Trinomial Cube",
-          "Rough/Smooth Boards",
-          "Touch Tablets",
-          "Fabric Box",
-          "Thermic Tablets",
-          "Baric Tablets",
-          "Sound Cylinders",
-          "Musical Bells (matching & grading)",
-          "Smelling Bottles",
-          "Tasting Jars",
-          "Mystery Bag",
-          "Sorting Grains",
-          "Geometric Solids",
+        topics: [
+          {
+            name: "Visual",
+            subtopics: [
+              "Pink Tower",
+              "Brown Stair",
+              "Red Rods",
+              "Knobbed Cylinders",
+              "Knobless Cylinders",
+              "Color Tablets (1, 2, 3)",
+              "Geometric Cabinet",
+              "Botany Cabinet",
+              "Binomial Cube",
+              "Trinomial Cube",
+            ],
+          },
+          {
+            name: "Tactile",
+            subtopics: [
+              "Rough/Smooth Boards",
+              "Touch Tablets",
+              "Fabric Box",
+              "Thermic Tablets",
+              "Baric Tablets",
+            ],
+          },
+          {
+            name: "Auditory",
+            subtopics: ["Sound Cylinders", "Musical Bells (matching & grading)"],
+          },
+          {
+            name: "Olfactory & Gustatory",
+            subtopics: ["Smelling Bottles", "Tasting Jars"],
+          },
+          {
+            name: "Stereognostic",
+            subtopics: ["Mystery Bag", "Sorting Grains", "Geometric Solids"],
+          },
         ],
       },
       {
         name: "Mathematics",
-        subtopics: [
-          "Number Rods",
-          "Sandpaper Numbers",
-          "Spindle Box",
-          "Cards & Counters",
-          "Intro to Golden Beads (Unit, Ten, Hundred, Thousand)",
-          "Formation of Numbers (Bird's Eye View)",
-          "45-Layout",
-          "Change Game",
-          "Addition (static & dynamic)",
-          "Subtraction (static & dynamic)",
-          "Multiplication",
-          "Division",
-          "Teen Board (quantity & symbols)",
-          "Ten Board",
-          "Bead Chains (100 & 1000)",
-          "Addition Snake Game",
-          "Subtraction Snake Game",
-          "Addition Strip Board",
-          "Multiplication Bead Board",
-          "Unit Division Board",
-          "Intro to Fraction Circles (1/1 to 1/10)",
+        topics: [
+          {
+            name: "Numbers 1–10",
+            subtopics: ["Number Rods", "Sandpaper Numbers", "Spindle Box", "Cards & Counters"],
+          },
+          {
+            name: "Decimal System",
+            subtopics: [
+              "Intro to Golden Beads (Unit, Ten, Hundred, Thousand)",
+              "Formation of Numbers (Bird's Eye View)",
+              "45-Layout",
+              "Change Game",
+            ],
+          },
+          {
+            name: "Operations (Golden Beads)",
+            subtopics: [
+              "Addition (static & dynamic)",
+              "Subtraction (static & dynamic)",
+              "Multiplication",
+              "Division",
+            ],
+          },
+          {
+            name: "Linear Counting",
+            subtopics: [
+              "Teen Board (quantity & symbols)",
+              "Ten Board",
+              "Bead Chains (100 & 1000)",
+            ],
+          },
+          {
+            name: "Memorization",
+            subtopics: [
+              "Addition Snake Game",
+              "Subtraction Snake Game",
+              "Addition Strip Board",
+              "Multiplication Bead Board",
+              "Unit Division Board",
+            ],
+          },
+          {
+            name: "Fractions",
+            subtopics: ["Intro to Fraction Circles (1/1 to 1/10)"],
+          },
         ],
       },
       {
         name: "Language",
-        subtopics: [
-          "Metal Insets",
-          "Sandpaper Letters",
-          "Sand Tray",
-          "Large Movable Alphabet",
-          "Phonetic Object Box",
-          "Green Series (phonograms)",
-          "Puzzle Words (sight words)",
-          "Noun Game (symbol)",
-          "Adjective Game",
-          "Verb Game (actions)",
+        topics: [
+          {
+            name: "Pre-Writing",
+            subtopics: ["Metal Insets", "Sandpaper Letters", "Sand Tray"],
+          },
+          {
+            name: "Writing & Reading",
+            subtopics: [
+              "Large Movable Alphabet",
+              "Phonetic Object Box",
+              "Green Series (phonograms)",
+              "Puzzle Words (sight words)",
+            ],
+          },
+          {
+            name: "Function of Word",
+            subtopics: ["Noun Game (symbol)", "Adjective Game", "Verb Game (actions)"],
+          },
         ],
       },
     ],
@@ -182,68 +276,117 @@ export const DEFAULT_CURRICULA: DefaultCurriculum[] = [
     id: "lower-elementary",
     name: "Lower Elementary",
     ageRange: "6–9 years",
-    topics: [
+    subjects: [
       {
         name: "Mathematics",
-        subtopics: [
-          "Wooden Hierarchical Material",
-          "Large Bead Frame",
-          "Stamp Game",
-          "Bead Frame Addition & Subtraction",
-          "Checkerboard (long multiplication)",
-          "Racks & Tubes (long division)",
-          "Equivalence with Fraction Circles",
-          "Addition & Subtraction (like denominators)",
+        topics: [
+          {
+            name: "Decimal System",
+            subtopics: ["Wooden Hierarchical Material", "Large Bead Frame"],
+          },
+          {
+            name: "Operations",
+            subtopics: [
+              "Stamp Game",
+              "Bead Frame Addition & Subtraction",
+              "Checkerboard (long multiplication)",
+              "Racks & Tubes (long division)",
+            ],
+          },
+          {
+            name: "Fractions",
+            subtopics: [
+              "Equivalence with Fraction Circles",
+              "Addition & Subtraction (like denominators)",
+            ],
+          },
         ],
       },
       {
         name: "Geometry",
-        subtopics: [
-          "Point, Line, Surface, Solid",
-          "Straight, Curved, Ray, Line Segment",
-          "Parallel, Divergent, Perpendicular",
-          "Acute, Right, Obtuse, Straight, Reflex angles",
-          "Construction of Triangles",
-          "Quadrilateral Box",
-          "Circle Nomenclature",
+        topics: [
+          {
+            name: "Concepts",
+            subtopics: ["Point", "Line", "Surface", "Solid"],
+          },
+          {
+            name: "Lines",
+            subtopics: [
+              "Straight",
+              "Curved",
+              "Ray",
+              "Line Segment",
+              "Parallel",
+              "Divergent",
+              "Perpendicular",
+            ],
+          },
+          {
+            name: "Angles",
+            subtopics: ["Acute", "Right", "Obtuse", "Straight", "Reflex"],
+          },
+          {
+            name: "Shapes",
+            subtopics: [
+              "Construction of Triangles",
+              "Quadrilateral Box",
+              "Circle Nomenclature",
+            ],
+          },
         ],
       },
       {
         name: "Language",
-        subtopics: [
-          "Noun (common & proper)",
-          "Article",
-          "Adjective (comparison)",
-          "Verb (tense)",
-          "Adverb",
-          "Preposition",
-          "Conjunction",
-          "Pronoun",
-          "Interjection",
-          "Subject & Predicate",
-          "Direct Object",
-          "Indirect Object",
-          "Compound Words",
-          "Suffixes",
-          "Prefixes",
-          "Synonyms",
-          "Homonyms",
+        topics: [
+          {
+            name: "Grammar",
+            subtopics: [
+              "Noun (common & proper)",
+              "Article",
+              "Adjective (comparison)",
+              "Verb (tense)",
+              "Adverb",
+              "Preposition",
+              "Conjunction",
+              "Pronoun",
+              "Interjection",
+            ],
+          },
+          {
+            name: "Sentence Analysis",
+            subtopics: ["Subject & Predicate", "Direct Object", "Indirect Object"],
+          },
+          {
+            name: "Word Study",
+            subtopics: ["Compound Words", "Suffixes", "Prefixes", "Synonyms", "Homonyms"],
+          },
         ],
       },
       {
         name: "History & Geography",
-        subtopics: [
-          "Coming of the Universe (Great Lesson 1)",
-          "Coming of Life (Great Lesson 2)",
-          "Coming of Humans (Great Lesson 3)",
-          "Timeline of Life",
-          "Clock of Eras",
-          "Fundamental Needs of Humans",
-          "Layers of the Earth",
-          "Volcanoes",
-          "The Water Cycle",
-          "Wind Currents",
-          "Maps of the Continents",
+        topics: [
+          {
+            name: "The Great Lessons",
+            subtopics: [
+              "Coming of the Universe",
+              "Coming of Life",
+              "Coming of Humans",
+            ],
+          },
+          {
+            name: "History",
+            subtopics: ["Timeline of Life", "Clock of Eras", "Fundamental Needs of Humans"],
+          },
+          {
+            name: "Geography",
+            subtopics: [
+              "Layers of the Earth",
+              "Volcanoes",
+              "The Water Cycle",
+              "Wind Currents",
+              "Maps of the Continents",
+            ],
+          },
         ],
       },
     ],
@@ -252,62 +395,108 @@ export const DEFAULT_CURRICULA: DefaultCurriculum[] = [
     id: "upper-elementary",
     name: "Upper Elementary",
     ageRange: "9–12 years",
-    topics: [
+    subjects: [
       {
         name: "Mathematics",
-        subtopics: [
-          "Multiplication & Division of Fractions",
-          "Decimal Board",
-          "Percentages",
-          "Decanomial Square",
-          "Square Root (Peg Board)",
-          "Cube Root",
-          "Signed Numbers (negative)",
-          "Balance Scale (solving for x)",
-          "Binomial & Trinomial Formulae",
+        topics: [
+          {
+            name: "Fractions & Decimals",
+            subtopics: [
+              "Multiplication & Division of Fractions",
+              "Decimal Board",
+              "Percentages",
+            ],
+          },
+          {
+            name: "Squaring & Cubing",
+            subtopics: ["Decanomial Square", "Square Root (Peg Board)", "Cube Root"],
+          },
+          {
+            name: "Pre-Algebra",
+            subtopics: [
+              "Signed Numbers (negative)",
+              "Balance Scale (solving for x)",
+              "Binomial & Trinomial Formulae",
+            ],
+          },
         ],
       },
       {
         name: "Geometry",
-        subtopics: [
-          "Protractor use",
-          "Compass use",
-          "Area of a Rectangle",
-          "Area of a Parallelogram",
-          "Area of a Triangle",
-          "Area of a Rhombus",
-          "Area of a Trapezoid",
-          "Area of a Circle",
-          "Volume of Prisms",
-          "Volume of Pyramids",
+        topics: [
+          {
+            name: "Measurement",
+            subtopics: ["Protractor use", "Compass use"],
+          },
+          {
+            name: "Area",
+            subtopics: [
+              "Rectangle",
+              "Parallelogram",
+              "Triangle",
+              "Rhombus",
+              "Trapezoid",
+              "Circle",
+            ],
+          },
+          {
+            name: "Volume",
+            subtopics: ["Prisms", "Pyramids"],
+          },
         ],
       },
       {
         name: "Biology & Science",
-        subtopics: [
-          "Plant Kingdom (vascular & non-vascular)",
-          "Photosynthesis",
-          "Animal Kingdom Classification (Phylum, Class, Order, Genus, Species)",
-          "Skeletal System",
-          "Muscular System",
-          "Circulatory System",
-          "Nervous System",
-          "Digestive System",
-          "Atoms & Molecules",
-          "Elements",
-          "Periodic Table (intro)",
+        topics: [
+          {
+            name: "Botany",
+            subtopics: [
+              "Detailed Plant Kingdom (vascular & non-vascular)",
+              "Photosynthesis",
+            ],
+          },
+          {
+            name: "Zoology",
+            subtopics: [
+              "Animal Kingdom Classification (Phylum, Class, Order, Genus, Species)",
+            ],
+          },
+          {
+            name: "Human Body",
+            subtopics: [
+              "Skeletal System",
+              "Muscular System",
+              "Circulatory System",
+              "Nervous System",
+              "Digestive System",
+            ],
+          },
+          {
+            name: "Chemistry",
+            subtopics: ["Atoms", "Molecules", "Elements", "Periodic Table (intro)"],
+          },
         ],
       },
       {
         name: "Language",
-        subtopics: [
-          "Verb Conjugation (mood & voice)",
-          "Clause Analysis",
-          "Sentence Diagramming",
-          "Creative Writing",
-          "Expository Writing",
-          "Bibliography",
-          "Persuasive Essays",
+        topics: [
+          {
+            name: "Grammar & Logic",
+            subtopics: [
+              "Verb Conjugation (mood & voice)",
+              "Clause Analysis",
+              "Sentence Diagramming",
+            ],
+          },
+          {
+            name: "Composition",
+            subtopics: [
+              "Creative Writing",
+              "Expository Writing",
+              "Bibliography",
+              "Persuasive Essays",
+            ],
+          },
         ],
       },
     ],
@@ -316,39 +505,62 @@ export const DEFAULT_CURRICULA: DefaultCurriculum[] = [
     id: "adolescent",
     name: "Adolescent",
     ageRange: "12–15+ years",
-    topics: [
+    subjects: [
       {
         name: "Occupations (Applied Curriculum)",
-        subtopics: [
-          "Garden Management",
-          "Animal Husbandry",
-          "Culinary Arts",
-          "Carpentry",
-          "Accounting & Bookkeeping",
-          "Marketing",
-          "Micro-Economy Management",
+        topics: [
+          {
+            name: "Production",
+            subtopics: ["Garden Management", "Animal Husbandry", "Culinary Arts", "Carpentry"],
+          },
+          {
+            name: "Business",
+            subtopics: [
+              "Accounting & Bookkeeping",
+              "Marketing",
+              "Micro-Economy Management",
+            ],
+          },
         ],
       },
       {
         name: "Humanities",
-        subtopics: [
-          "Social Justice",
-          "Evolution of Law",
-          "Political Systems",
-          "Contemporary World Issues",
-          "Seminar discussions on literature & morality",
+        topics: [
+          {
+            name: "History",
+            subtopics: [
+              "Social Justice",
+              "Evolution of Law",
+              "Political Systems",
+              "Contemporary World Issues",
+            ],
+          },
+          {
+            name: "Ethics",
+            subtopics: ["Seminar discussions on literature & morality"],
+          },
         ],
       },
       {
         name: "Science & Math (Applied)",
-        subtopics: [
-          "Environmental Science",
-          "Physics of Machines",
-          "Biology of Growth",
-          "Personal Finance",
-          "Statistics",
-          "Trigonometry",
-          "Calculus (intro)",
+        topics: [
+          {
+            name: "Applied Science",
+            subtopics: [
+              "Environmental Science",
+              "Physics of Machines",
+              "Biology of Growth",
+            ],
+          },
+          {
+            name: "Applied Math",
+            subtopics: [
+              "Personal Finance",
+              "Statistics",
+              "Trigonometry",
+              "Calculus (intro)",
+            ],
+          },
         ],
       },
     ],

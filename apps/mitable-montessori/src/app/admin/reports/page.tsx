@@ -1,24 +1,10 @@
-import { PageHeader } from "@/components/montessori/page-header";
+import { listReports } from "@/lib/queries/reports";
+import { ReportsListView } from "@/app/app/reports/reports-list-view";
 
-export default function AdminReportsPage() {
-  return (
-    <div>
-      <PageHeader
-        overline="Admin workspace"
-        title="Reports"
-        subtitle="Review and approve reports before families receive them."
-      />
-      <div
-        style={{
-          padding: "24px",
-          fontSize: 14,
-          color: "var(--color-ink-secondary)",
-          maxWidth: 520,
-          lineHeight: 1.5,
-        }}
-      >
-        Report review tools will connect here. Guides still draft and submit from the guide app; you will approve and send from this view.
-      </div>
-    </div>
-  );
+// Future split-view workspace UI archived at ./PHASE_8_FUTURE_WORKSPACE.md
+// (originally Phase 8 commit 49505b8f, dropped during the Supabase migration).
+
+export default async function AdminReportsPage() {
+  const reports = await listReports();
+  return <ReportsListView reports={reports} variant="admin" />;
 }
