@@ -12,6 +12,7 @@ import { getCurrentUserContext } from "@/lib/app/active-classroom";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCurrentUserContext();
   if (!ctx) redirect("/login");
+  if (!ctx.privacyAcknowledgedAt) redirect("/onboarding/privacy");
   if (ctx.role !== "admin") redirect("/app/today");
 
   return (

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { getActiveAxesCatalog } from "./axes";
 
 export type AxisLevel = "Emerging" | "Practicing" | "Deepening" | "Leading";
 
@@ -26,13 +27,6 @@ export type WholeChildObservation = {
   createdAt: string;
 };
 
-type AxisDbRow = {
-  key: string;
-  label: string;
-  descriptors: Record<string, string>;
-  sort_order: number;
-};
-
 type AssessmentDbRow = {
   axis_key: string;
   level: AxisLevel;
@@ -54,13 +48,8 @@ export async function listAxesWithAssessment(studentId: string): Promise<AxisWit
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const [axesResp, assessmentsResp] = await Promise.all([
-    supabase
-      .from("axes")
-      .select("key, label, descriptors, sort_order")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true })
-      .returns<AxisDbRow[]>(),
+  const [axes, assessmentsResp] = await Promise.all([
+    getActiveAxesCatalog(),
     supabase
       .from("axis_assessments")
       .select("axis_key, level, assessed_at")
@@ -69,7 +58,6 @@ export async function listAxesWithAssessment(studentId: string): Promise<AxisWit
       .returns<AssessmentDbRow[]>(),
   ]);
 
-  const axes = axesResp.data ?? [];
   const assessments = assessmentsResp.data ?? [];
   const byAxis = new Map(assessments.map((a) => [a.axis_key, a]));
 

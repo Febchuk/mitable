@@ -16,6 +16,7 @@ import {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCurrentUserContext();
   if (!ctx) redirect("/login");
+  if (!ctx.privacyAcknowledgedAt) redirect("/onboarding/privacy");
   const isAdmin = ctx.role === "admin";
   const classroom = await getActiveClassroomForCurrentUser();
   const classroomName = classroom?.name ?? "Primrose Room";

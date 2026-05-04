@@ -56,5 +56,24 @@ export function AppBootstrap() {
     };
   }, []);
 
+  // Re-pull when the tab becomes visible after being hidden — keeps Dexie
+  // reads fresh after the user switches tabs without forcing a hard reload.
+  useEffect(() => {
+    let inFlight = false;
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      if (inFlight) return;
+      inFlight = true;
+      pullSync()
+        .then(() => invalidateRosterIndex())
+        .catch((err) => console.error("Visibility re-sync failed", err))
+        .finally(() => {
+          inFlight = false;
+        });
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
   return null;
 }
