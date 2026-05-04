@@ -64,8 +64,16 @@ function tonesByIndex(i: number): "clay" | "sage" | "butter" | "blue" | "terraco
   return (["clay", "sage", "butter", "blue", "terracotta"] as const)[i % 5];
 }
 
-export function ReportsListView({ reports }: { reports: ReportListRow[] }) {
+export function ReportsListView({
+  reports,
+  variant = "teacher",
+}: {
+  reports: ReportListRow[];
+  variant?: "teacher" | "admin";
+}) {
   const [filter, setFilter] = React.useState("All");
+  const isAdmin = variant === "admin";
+  const detailHref = (id: string) => (isAdmin ? `/admin/reports/${id}` : `/app/reports/${id}`);
 
   const drafts = reports.filter((r) => r.status === "draft").length;
   const reviews = reports.filter(
@@ -98,10 +106,14 @@ export function ReportsListView({ reports }: { reports: ReportListRow[] }) {
   return (
     <div>
       <PageHeader
-        overline="My drafts + approved"
+        overline={isAdmin ? "Across the school" : "My drafts + approved"}
         title="Reports"
-        subtitle={`${drafts} drafts · ${reviews} awaiting review · ${sent} sent`}
-        actions={<NewReportTrigger />}
+        subtitle={
+          isAdmin
+            ? `${reviews} awaiting review · ${drafts} drafts · ${sent} sent`
+            : `${drafts} drafts · ${reviews} awaiting review · ${sent} sent`
+        }
+        actions={isAdmin ? undefined : <NewReportTrigger />}
       />
 
       <div style={{ padding: "16px 24px 0" }}>
@@ -142,7 +154,7 @@ export function ReportsListView({ reports }: { reports: ReportListRow[] }) {
               return (
                 <Link
                   key={r.id}
-                  href={`/app/reports/${r.id}`}
+                  href={detailHref(r.id)}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 24px",
