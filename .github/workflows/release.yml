@@ -37,17 +37,22 @@ jobs:
       - name: Install setuptools (required for native modules)
         run: pip install setuptools
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build shared package
-        run: npm run build --workspace=packages/shared
+        run: pnpm --filter @mitable/shared build
 
       - name: Fix notarize version (override bundled 2.2.1 with 2.5.0)
         run: |
@@ -56,7 +61,7 @@ jobs:
           node -e "const p=require('./node_modules/app-builder-lib/node_modules/@electron/notarize/package.json');console.log(p.version)" 2>/dev/null || echo "Nested copy removed, using hoisted version"
 
       - name: Build Electron app for macOS
-        run: npm run build:mac --workspace=apps/electron
+        run: pnpm --filter @mitable/electron build:mac
         env:
           # Production API URL (baked into the build)
           VITE_API_URL: https://mitablebackend-production.up.railway.app
@@ -125,20 +130,25 @@ jobs:
           npm version $VERSION --no-git-tag-version --allow-same-version
           cat package.json | grep '"version"'
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build shared package
-        run: npm run build --workspace=packages/shared
+        run: pnpm --filter @mitable/shared build
 
       - name: Build Electron app for Windows
-        run: npm run build:win --workspace=apps/electron
+        run: pnpm --filter @mitable/electron build:win
         env:
           # Production API URL (baked into the build)
           VITE_API_URL: https://mitablebackend-production.up.railway.app

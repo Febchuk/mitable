@@ -290,9 +290,9 @@ describe("Phase 4 — admin agent + tokenization", () => {
     ]);
 
     const ctx = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       supabase: {
         from: () => ({ update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }) }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any,
       schoolId: SCHOOL_ID,
       actorUserId: ACTOR_ID,

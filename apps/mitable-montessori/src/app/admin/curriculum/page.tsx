@@ -523,7 +523,7 @@ function EmptyCurriculumState({ onAddSubject }: { onAddSubject: () => void }) {
             maxWidth: 360,
           }}
         >
-          Add a subject to get started — for example "Practical Life" or "Mathematics".
+          Add a subject to get started — for example &quot;Practical Life&quot; or &quot;Mathematics&quot;.
         </div>
       </div>
       <Button onClick={onAddSubject}>

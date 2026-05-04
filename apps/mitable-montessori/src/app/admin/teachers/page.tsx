@@ -372,7 +372,7 @@ function InviteTeacherDialog({
             <UserPlus size={18} strokeWidth={1.6} /> Invite teacher
           </DialogTitle>
           <p className="text-sm text-ink-secondary">
-            They'll get an email with a link to set up their account.
+            They&apos;ll get an email with a link to set up their account.
           </p>
         </DialogHeader>
 
@@ -407,7 +407,7 @@ function InviteTeacherDialog({
           </FieldLabel>
           {email.length > 0 && !isValidEmail && (
             <div style={{ fontSize: 12, color: "var(--color-terracotta-deep)" }}>
-              That doesn't look like a valid email yet.
+              That doesn&apos;t look like a valid email yet.
             </div>
           )}
         </div>

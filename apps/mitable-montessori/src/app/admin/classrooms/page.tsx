@@ -1156,7 +1156,7 @@ function IssueMessage({
   if (issue.kind === "invalid_birth_date") {
     return (
       <div className={shell}>
-        Birthday "{issue.value}" could not be read. Try 2019-04-15, 15 April 2019, or 04/15/2019.
+        Birthday &quot;{issue.value}&quot; could not be read. Try 2019-04-15, 15 April 2019, or 04/15/2019.
       </div>
     );
   }
@@ -1181,7 +1181,7 @@ function IssueMessage({
     const count = typoCounts.get(issue.value.trim().toLowerCase()) ?? 1;
     return (
       <div className={`${shell} flex flex-wrap items-center gap-2`}>
-        <span>Classroom "{issue.value}" does not exist.</span>
+        <span>Classroom &quot;{issue.value}&quot; does not exist.</span>
         {issue.suggestion && (
           <>
             <span>

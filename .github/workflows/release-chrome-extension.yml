@@ -16,14 +16,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "20"
+          cache: 'pnpm'
 
       - name: Install dependencies
-        working-directory: apps/chrome-extension
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Sync version from tag
         working-directory: apps/chrome-extension
@@ -34,15 +39,14 @@ jobs:
           echo "Set manifest version to $VERSION"
 
       - name: Build extension
-        working-directory: apps/chrome-extension
-        run: npm run build
+        run: pnpm --filter @mitable/chrome-extension build
 
       - name: Package extension
         working-directory: apps/chrome-extension
         run: |
           zip -r mitable-browser-bridge.zip \
             manifest.json dist/ popup/ icons/ \
-            -x "*.ts" "*.map" "node_modules/*" "tsconfig.json" "build.mjs" "package.json" "package-lock.json"
+            -x "*.ts" "*.map" "node_modules/*" "tsconfig.json" "build.mjs" "package.json" "package-lock.json" "pnpm-lock.yaml"
           mkdir -p ../../release-artifacts
           cp mitable-browser-bridge.zip ../../release-artifacts/
 
