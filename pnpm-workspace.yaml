@@ -1,5 +1,8 @@
 # Mirrors npm "workspaces" in package.json — required so `pnpm install`
 # at the repo root links apps/* and packages/* (pnpm ignores workspaces field otherwise).
+# apps/mitable-montessori is excluded: it's deployed standalone on Railway
+# with its own pnpm-lock.yaml so Railway can install it from its own root dir.
 packages:
   - "apps/*"
   - "packages/*"
+  - "!apps/mitable-montessori"

@@ -1,11 +1,10 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "RAILPACK",
-    "buildCommand": "pnpm --filter @mitable/shared build && pnpm --filter @mitable/mitable-montessori build"
+    "builder": "RAILPACK"
   },
   "deploy": {
-    "startCommand": "cd apps/mitable-montessori && pnpm exec next start -p $PORT",
+    "startCommand": "pnpm exec next start -p $PORT",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
