@@ -14,7 +14,7 @@
     "supabase:seed": "tsx supabase/seed.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@anthropic-ai/sdk": "^0.74.0",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-scroll-area": "^1.2.1",
