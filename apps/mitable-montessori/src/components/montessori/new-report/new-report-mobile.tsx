@@ -9,6 +9,7 @@ import { LiveWave, AudioPreview } from "./audio-block";
 import { NotesMobileRow } from "./notes-block";
 import { TemplateMobileCard } from "./template-block";
 import { useAudioRecorder } from "./use-audio-recorder";
+import { ToastBus } from "../primitives";
 import {
   formatDuration,
   type CapturedNote,
@@ -352,6 +353,16 @@ function Step3Capture({
 }) {
   const isRecording = recorder.state === "recording";
   const isRecorded = recorder.state === "recorded" && recorder.memo;
+
+  React.useEffect(() => {
+    if (recorder.state === "denied") {
+      ToastBus.push({
+        message: "Microphone access denied. Enable it in browser settings to record.",
+      });
+    } else if (recorder.state === "error") {
+      ToastBus.push({ message: "Couldn't start recording. Try again." });
+    }
+  }, [recorder.state]);
 
   return (
     <>

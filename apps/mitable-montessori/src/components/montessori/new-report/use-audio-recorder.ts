@@ -39,17 +39,32 @@ export function useAudioRecorder() {
 
   const start = React.useCallback(async () => {
     if (state === "recording") return;
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof window === "undefined" ||
+      typeof window.MediaRecorder === "undefined"
+    ) {
+      setState("error");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const rec = new MediaRecorder(stream);
+      const candidates = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
+      const supported = candidates.find((t) =>
+        typeof MediaRecorder.isTypeSupported === "function"
+          ? MediaRecorder.isTypeSupported(t)
+          : false,
+      );
+      const rec = supported ? new MediaRecorder(stream, { mimeType: supported }) : new MediaRecorder(stream);
       recRef.current = rec;
       chunksRef.current = [];
       rec.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
       rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || supported || "audio/webm" });
         const url = URL.createObjectURL(blob);
         const durationSec = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
         setMemo({ url, durationSec });

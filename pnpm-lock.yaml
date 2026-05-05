@@ -18839,7 +18839,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 20.19.39
+      '@types/node': 22.19.17
 
   '@types/yargs-parser@21.0.3': {}
 
