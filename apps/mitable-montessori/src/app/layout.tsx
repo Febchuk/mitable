@@ -1,21 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "@/styles/globals.css";
 import "@/styles/tokens.css";
 import { cn } from "@/lib/utils";
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
+const dmSans = localFont({
+  src: [
+    { path: "../../public/fonts/dm-sans-latin-400.woff2", weight: "400", style: "normal" },
+    { path: "../../public/fonts/dm-sans-latin-500.woff2", weight: "500", style: "normal" },
+    { path: "../../public/fonts/dm-sans-latin-600.woff2", weight: "600", style: "normal" },
+    { path: "../../public/fonts/dm-sans-latin-700.woff2", weight: "700", style: "normal" },
+  ],
   display: "swap",
   variable: "--font-dm-sans",
-  weight: ["400", "500", "600", "700"],
 });
 
-const caveat = Caveat({
-  subsets: ["latin"],
+const caveat = localFont({
+  src: [
+    { path: "../../public/fonts/caveat-latin-400.woff2", weight: "400", style: "normal" },
+    { path: "../../public/fonts/caveat-latin-600.woff2", weight: "600", style: "normal" },
+  ],
   display: "swap",
   variable: "--font-caveat",
-  weight: ["400", "600"],
 });
 
 export const metadata: Metadata = {
