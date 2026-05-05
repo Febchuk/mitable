@@ -147,37 +147,15 @@ class SessionTitleService {
 
   /**
    * Call LLM for title generation.
-   * Claude Sonnet 4.5 (primary, no extended thinking needed for titles).
-   * OpenAI GPT-5 (fallback).
+   * GPT-4.1 Mini (primary — cheap and fast for simple title gen).
+   * Claude Haiku 4.5 (fallback). Groq (last resort).
    */
   private async callLLM(activitySummary: string): Promise<string> {
-    // Try Claude first
-    if (this.anthropic) {
-      try {
-        const response = await this.anthropic.messages.create({
-          model: "claude-sonnet-4-5-20250929",
-          max_tokens: 50,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: activitySummary }],
-        });
-
-        for (const block of response.content) {
-          if (block.type === "text") {
-            logger.info("✅ Title generated via Claude Sonnet 4.5");
-            return block.text.trim();
-          }
-        }
-        throw new Error("No text block in Claude response");
-      } catch (error) {
-        logger.warn(`Claude title generation failed, falling back to GPT-5: ${String(error)}`);
-      }
-    }
-
-    // OpenAI GPT-5.4 fallback
+    // Try GPT-4.1 Mini first (cheapest for simple tasks)
     if (this.openai) {
       try {
         const completion = await this.openai.chat.completions.create({
-          model: "gpt-5.4",
+          model: "gpt-4.1-mini",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: activitySummary },
@@ -188,11 +166,35 @@ class SessionTitleService {
 
         const title = completion.choices[0]?.message?.content?.trim();
         if (title) {
-          logger.info("⚠️ Title generated via GPT-5.4 (fallback)");
+          logger.info("✅ Title generated via GPT-4.1 Mini");
           return title;
         }
       } catch (error) {
-        logger.warn(`GPT-5 title generation failed, trying Groq: ${String(error)}`);
+        logger.warn(
+          `GPT-4.1 Mini title generation failed, falling back to Haiku: ${String(error)}`
+        );
+      }
+    }
+
+    // Claude Haiku 4.5 fallback
+    if (this.anthropic) {
+      try {
+        const response = await this.anthropic.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 50,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: activitySummary }],
+        });
+
+        for (const block of response.content) {
+          if (block.type === "text") {
+            logger.info("⚠️ Title generated via Claude Haiku 4.5 (fallback)");
+            return block.text.trim();
+          }
+        }
+        throw new Error("No text block in Claude response");
+      } catch (error) {
+        logger.warn(`Haiku title generation failed, trying Groq: ${String(error)}`);
       }
     }
 

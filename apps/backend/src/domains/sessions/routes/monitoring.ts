@@ -11,6 +11,7 @@ import {
 import { sessionSummarizationService } from "../services/session-summarization.service.js";
 import { recapRLMService } from "../../updates/services/recap-rlm.service.js";
 import { frameAnalysisService } from "../../capture/services/frame-analysis.service.js";
+import { batchVisionClassifierService } from "../../capture/services/batch-vision-classifier.service.js";
 import { classifierService } from "../services/classifier.service.js";
 import { masterStoryService } from "../../updates/services/master-story.service.js";
 import { searchService } from "../../agent/services/search.service.js";
@@ -1476,13 +1477,20 @@ router.post(
 
 /**
  * POST /api/monitoring/sessions/:id/analyze-frame
- * Analyze a frame using delta detection (Groq Vision)
- * Compares current frame with previous frame to detect meaningful changes
+ * DEPRECATED: Per-frame analysis disabled in batch mode deployment.
+ * Use POST /sessions/:id/analyze-batch instead (30 frames → 1 Gemini call).
  */
 router.post(
   "/sessions/:id/analyze-frame",
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
+    res.status(410).json({
+      error: "Gone",
+      message: "Per-frame analysis is disabled. Use /analyze-batch endpoint instead.",
+    });
+    return;
+
+    // Original implementation preserved below for reference
     const userId = req.userId!;
     const { id } = req.params;
     const {
@@ -1828,6 +1836,218 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: error instanceof Error ? error.message : "Failed to analyze frame",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/monitoring/sessions/:id/analyze-batch
+ * Accepts a batch of frames (up to 30) from the Electron client.
+ * Processes all frames in a SINGLE Gemini 2.5 Flash call that performs
+ * both visual delta detection and activity classification together.
+ *
+ * Replaces the per-frame sensor + classifier pipeline (60 calls → 1 call).
+ */
+router.post(
+  "/sessions/:id/analyze-batch",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { frames, transcriptSnippet } = req.body as {
+      frames: Array<{
+        frameId: string;
+        imageBase64: string;
+        windowInfo: { windowSourceId: string; appName: string; windowTitle: string };
+        sequenceNumber: number;
+        captureTrigger: "periodic" | "focus_change" | "manual";
+        capturedAt: number;
+        intervalEvidence?: {
+          keyboardEventCount: number;
+          copyCount: number;
+          pasteCount: number;
+          cutCount: number;
+          mouseClickCount: number;
+          mouseScrollCount: number;
+        };
+        browserContext?: { activeTabUrl: string; activeTabTitle: string; tabCount: number };
+      }>;
+      transcriptSnippet?: string;
+    };
+
+    if (!frames || !Array.isArray(frames) || frames.length === 0) {
+      res.status(400).json({ error: "Bad Request", message: "frames array is required" });
+      return;
+    }
+
+    try {
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session) {
+        res.status(404).json({ error: "Not Found", message: "Session not found" });
+        return;
+      }
+      if (session.userId !== userId) {
+        res.status(403).json({ error: "Forbidden", message: "You do not have permission" });
+        return;
+      }
+      if (!["active", "paused", "summarizing"].includes(session.status)) {
+        res.status(409).json({ error: "Conflict", message: `Session is ${session.status}` });
+        return;
+      }
+
+      const log = createSessionLogger({
+        sessionId: id,
+        userId,
+        organizationId: session.organizationId,
+      });
+      log.info(`[BatchAnalyze] Received ${frames.length} frames — single Gemini 2.5 Flash call`);
+
+      if (!batchVisionClassifierService.isAvailable()) {
+        log.warn("[BatchAnalyze] Service unavailable (no GEMINI_API_KEY)");
+        res
+          .status(503)
+          .json({ error: "Service Unavailable", message: "Gemini API key not configured" });
+        return;
+      }
+
+      // Build batch input (filter invalid frames)
+      const validFrames = frames.filter((f) => f.frameId && f.imageBase64 && f.windowInfo);
+
+      const batchInput = validFrames.map((f) => ({
+        frameId: f.frameId,
+        imageBase64: f.imageBase64,
+        windowInfo: f.windowInfo,
+        sequenceNumber: f.sequenceNumber,
+        capturedAt: f.capturedAt,
+        intervalEvidence: f.intervalEvidence,
+        browserContext: f.browserContext,
+      }));
+
+      // Query Deepgram transcripts that overlap this batch's time window
+      let transcript = transcriptSnippet || "";
+      if (!transcript && validFrames.length > 0) {
+        const batchStart = new Date(validFrames[0].capturedAt);
+        const batchEnd = new Date(validFrames[validFrames.length - 1].capturedAt);
+
+        const transcriptRows = await db
+          .select({
+            speakerId: schema.sessionTranscripts.speakerId,
+            transcript: schema.sessionTranscripts.transcript,
+            startTime: schema.sessionTranscripts.startTime,
+          })
+          .from(schema.sessionTranscripts)
+          .where(
+            and(
+              eq(schema.sessionTranscripts.sessionId, id),
+              gte(schema.sessionTranscripts.startTime, batchStart),
+              lte(schema.sessionTranscripts.startTime, batchEnd)
+            )
+          );
+
+        if (transcriptRows.length > 0) {
+          transcript = transcriptRows
+            .map((r) => `Speaker ${r.speakerId}: ${r.transcript}`)
+            .join("\n");
+          log.info(
+            `[BatchAnalyze] Found ${transcriptRows.length} transcript segments for batch window`
+          );
+        }
+      }
+
+      // Single API call for all frames + transcript context
+      const batchResult = await batchVisionClassifierService.analyzeBatch(
+        batchInput,
+        transcript || undefined
+      );
+
+      // Write results to DB
+      const analyses: Array<Record<string, unknown>> = [];
+
+      for (const result of batchResult.frames) {
+        const frame = validFrames.find((f) => f.frameId === result.frameId);
+        if (!frame) continue;
+
+        try {
+          const [existingCapture] = await db
+            .select({ id: schema.sessionCaptures.id })
+            .from(schema.sessionCaptures)
+            .where(
+              and(
+                eq(schema.sessionCaptures.sessionId, id),
+                eq(schema.sessionCaptures.sequenceNumber, frame.sequenceNumber)
+              )
+            )
+            .limit(1);
+
+          const captureData = {
+            analysisStatus: "analyzed" as const,
+            activityDescription: result.activity,
+            confidence: String(result.confidence),
+            deltaChanged: result.changed,
+            deltaChangeType: result.changeType,
+            deltaChangeDescription: result.description,
+            importanceScore: result.importanceScore,
+          };
+
+          if (existingCapture) {
+            await db
+              .update(schema.sessionCaptures)
+              .set(captureData)
+              .where(eq(schema.sessionCaptures.id, existingCapture.id));
+          } else {
+            await db.insert(schema.sessionCaptures).values({
+              sessionId: id,
+              sequenceNumber: frame.sequenceNumber,
+              captureTrigger: frame.captureTrigger,
+              capturedAt: new Date(frame.capturedAt),
+              windowId: frame.windowInfo.windowSourceId || null,
+              appName: frame.windowInfo.appName || null,
+              windowTitle: frame.windowInfo.windowTitle || null,
+              ...captureData,
+            });
+          }
+        } catch (dbErr) {
+          log.warn("[BatchAnalyze] DB write failed", {
+            frameId: result.frameId,
+            error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+          });
+        }
+
+        analyses.push({
+          frameId: result.frameId,
+          deltaChanged: result.changed,
+          changeType: result.changeType,
+          changeDescription: result.description,
+          activityDescription: result.activity,
+          onTask: result.onTask,
+          importanceScore: result.importanceScore,
+          summaryOfAction: result.activity,
+        });
+      }
+
+      log.info(
+        `[BatchAnalyze] Done — ${analyses.length} frames, 1 API call, ${batchResult.latencyMs}ms`
+      );
+      res.json({
+        success: true,
+        processedCount: analyses.length,
+        batchNarrative: batchResult.batchNarrative,
+        analyses,
+      });
+    } catch (error) {
+      logger.error("[BatchAnalyze] Fatal error", {
+        sessionId: id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: error instanceof Error ? error.message : "Batch analysis failed",
       });
     }
   }

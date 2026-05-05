@@ -4,8 +4,8 @@
  * Mini-RLM runtime for the Storyteller step.
  * Orchestrates tool execution based on LLM decisions.
  *
- * Uses Claude Sonnet 4.5 with extended thinking for high-quality,
- * deliberate summarization. Falls back to OpenAI GPT-5, then DeepSeek V3.2 (deepseek-chat).
+ * Uses Claude Haiku 4.5 for cost-efficient agentic summarization.
+ * Falls back to OpenAI GPT-5, then DeepSeek V3.2 (deepseek-chat).
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -56,7 +56,7 @@ class StorytellerRLMService {
   constructor() {
     if (config.anthropic.apiKey) {
       this.anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
-      logger.info("Storyteller RLM using Claude Sonnet 4.5 with extended thinking");
+      logger.info("Storyteller RLM using Claude Haiku 4.5");
     } else {
       logger.warn("ANTHROPIC_API_KEY not set — will use GPT-5 fallback");
     }
@@ -175,7 +175,7 @@ class StorytellerRLMService {
 
   /**
    * Get LLM decision on which tool to call next.
-   * Uses Claude Sonnet 4.5 with extended thinking (primary) or GPT-5 (fallback).
+   * Uses Claude Haiku 4.5 (primary) or GPT-5 (fallback).
    */
   private async getLLMDecision(
     systemPrompt: string,
@@ -187,7 +187,7 @@ class StorytellerRLMService {
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
           const result = await this.getLLMDecisionClaude(systemPrompt, messages);
-          logger.info("✅ Storyteller decision via Claude Sonnet 4.5");
+          logger.info("✅ Storyteller decision via Claude Haiku 4.5");
           return result;
         } catch (error) {
           const errStr = String(error);
@@ -249,25 +249,20 @@ class StorytellerRLMService {
   }
 
   /**
-   * Claude Sonnet 4.5 with extended thinking — primary path
+   * Claude Haiku 4.5 — fast + cheap agentic path
    */
   private async getLLMDecisionClaude(
     systemPrompt: string,
     messages: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<LLMResponse> {
-    // Append JSON instruction to the last user message context
     const claudeMessages = messages.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
 
     const response = await this.anthropic!.messages.create({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 16000, // High limit to accommodate thinking + response
-      thinking: {
-        type: "enabled",
-        budget_tokens: 4000, // Let Claude think through the tool selection / summary
-      },
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 8000,
       system:
         systemPrompt +
         "\n\nIMPORTANT: Always respond with a valid JSON object. No markdown, no code fences, just raw JSON.",

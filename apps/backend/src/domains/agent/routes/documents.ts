@@ -925,7 +925,7 @@ router.post("/ai-command", requireAuth, async (req: Request, res: Response): Pro
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Generate streaming response
     const result = await model.generateContentStream({

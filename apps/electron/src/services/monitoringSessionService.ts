@@ -69,16 +69,32 @@ interface ActiveSession {
 
 type MaxDurationCallback = (sessionId: string) => void;
 
+// Batch config: send all 30 frames to backend in one Gemini 2.5 Flash call
+const BATCH_SIZE = 30;
+
+interface BufferedFrame {
+  frameId: string;
+  imageBase64: string;
+  windowInfo: { windowSourceId: string; appName: string; windowTitle: string };
+  sequenceNumber: number;
+  captureTrigger: "periodic" | "focus_change" | "manual";
+  capturedAt: number;
+  intervalEvidence?: IntervalEvidence;
+  browserContext?: { activeTabUrl: string; activeTabTitle: string; tabCount: number };
+}
+
 class MonitoringSessionService {
   private activeSession: ActiveSession | null = null;
   private captureTimer: NodeJS.Timeout | null = null;
   private cleanupTimer: NodeJS.Timeout | null = null;
   private maxDurationTimer: NodeJS.Timeout | null = null;
   private onMaxDurationReached: MaxDurationCallback | null = null;
+  private frameBatch: BufferedFrame[] = [];
+  private batchFlushInProgress = false;
 
   constructor() {
     logger.info(
-      "[MonitoringSessionService] Initialized with LocalFrameStorage + CheckpointService"
+      "[MonitoringSessionService] Initialized (cloud batch mode: 30 frames → 1 Gemini call)"
     );
   }
 
@@ -369,6 +385,12 @@ class MonitoringSessionService {
     const sessionId = this.activeSession.id;
 
     try {
+      // Flush remaining buffered frames before ending
+      if (this.frameBatch.length > 0) {
+        logger.info(`[EndSession] Flushing ${this.frameBatch.length} remaining buffered frames`);
+        await this.flushBatchAsync(sessionId);
+      }
+
       // End checkpoint tracking (removes checkpoint file)
       await checkpointService.endSession();
 
@@ -850,11 +872,7 @@ class MonitoringSessionService {
       const base64Data = screenshot.dataUrl.replace(/^data:image\/\w+;base64,/, "");
       const imageBuffer = Buffer.from(base64Data, "base64");
 
-      // Get previous frame for this window (for delta analysis)
-      const previousFrame = await localFrameStorage.getPreviousFrameForWindow(
-        this.activeSession.id,
-        screenshot.windowId
-      );
+      // Previous frame lookup removed — batch mode handles sequential comparison server-side
 
       // Save to local frame storage
       const frameMetadata = await localFrameStorage.saveFrame(this.activeSession.id, imageBuffer, {
@@ -935,29 +953,102 @@ class MonitoringSessionService {
         }
       }
 
-      // Trigger async frame analysis (don't block capture loop)
-      this.analyzeFrameAsync(
-        this.activeSession.id,
-        frameMetadata.frameId,
-        base64Data,
-        previousFrame?.imageData || null,
+      // Buffer frame for batch analysis (cloud batch mode — 30 frames → 1 Gemini call)
+      this.frameBatch.push({
+        frameId: frameMetadata.frameId,
+        imageBase64: base64Data,
         windowInfo,
-        {
-          sequenceNumber: frameMetadata.sequenceNumber,
-          captureTrigger: trigger,
-          capturedAt: new Date(frameMetadata.timestamp).getTime(),
-        },
+        sequenceNumber: frameMetadata.sequenceNumber,
+        captureTrigger: trigger,
+        capturedAt: new Date(frameMetadata.timestamp).getTime(),
         intervalEvidence,
-        browserContext
-      );
+        browserContext,
+      });
+
+      logger.info(`[BatchBuffer] ${this.frameBatch.length}/${BATCH_SIZE} frames buffered`);
+
+      if (this.frameBatch.length >= BATCH_SIZE) {
+        this.flushBatchAsync(this.activeSession.id);
+      }
     } catch (error) {
       logger.error(" Error saving capture:", error);
     }
   }
 
   /**
-   * Analyze frame asynchronously (don't block capture loop)
+   * Flush buffered frames to the backend batch endpoint.
+   * Sends all frames in one POST — backend processes them in a single Gemini call.
    */
+  private async flushBatchAsync(sessionId: string): Promise<void> {
+    if (this.batchFlushInProgress || this.frameBatch.length === 0) return;
+
+    const batch = this.frameBatch.splice(0);
+    this.batchFlushInProgress = true;
+
+    logger.info(`[BatchFlush] Sending ${batch.length} frames for session ${sessionId}`);
+
+    if (!authManager.getAccessToken()) {
+      logger.warn("[BatchFlush] No auth token — dropping batch");
+      this.batchFlushInProgress = false;
+      return;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+      const response = await authManager.authenticatedFetch(
+        `/api/monitoring/sessions/${sessionId}/analyze-batch`,
+        {
+          method: "POST",
+          signal: controller.signal,
+          body: JSON.stringify({ frames: batch }),
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.warn(`[BatchFlush] Failed: ${response.status}`, errorText);
+      } else {
+        const result = await response.json();
+        logger.info(
+          `[BatchFlush] Success — ${result.processedCount} frames analyzed in 1 API call`
+        );
+
+        // Update local frame metadata with batch results
+        if (result.analyses && Array.isArray(result.analyses)) {
+          for (const analysis of result.analyses) {
+            if (analysis.frameId) {
+              await localFrameStorage.updateFrameAnalysis(sessionId, analysis.frameId, {
+                deltaChanged: analysis.deltaChanged,
+                deltaChangeType: analysis.changeType,
+                deltaChangeDescription: analysis.changeDescription,
+                activityDescription: analysis.activityDescription,
+                onTask: analysis.onTask,
+                importanceScore: analysis.importanceScore,
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        logger.warn("[BatchFlush] Request timed out (120s)");
+      } else {
+        logger.error("[BatchFlush] Error:", error);
+      }
+    } finally {
+      this.batchFlushInProgress = false;
+    }
+  }
+
+  /**
+   * Analyze frame asynchronously (don't block capture loop)
+   * @deprecated Kept for reference — batch mode uses flushBatchAsync instead
+   */
+  // @ts-expect-error Deprecated method retained for reference, not called in batch mode
   private async analyzeFrameAsync(
     sessionId: string,
     frameId: string,
