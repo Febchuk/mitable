@@ -12,7 +12,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { CHILDREN, initialsFor, type Tone } from "@/components/montessori/data";
+import { initialsFor, type Tone } from "@/components/montessori/data";
 import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { Avatar } from "@/components/montessori/primitives";
 import { Badge } from "@/components/ui/badge";
@@ -52,27 +52,110 @@ type AdminChild = {
 
 type AdminClassroom = ClassroomOption & {
   level?: string;
+  curriculumName?: string | null;
   mainTeacherId?: string;
 };
 
-type Teacher = { id: string; name: string };
+type ApiTeacher = { id: string; name: string };
 
-const LEVEL_OPTIONS = [
-  "Toddler",
-  "Primary",
-  "Lower Elementary",
-  "Upper Elementary",
-];
+type ApiClassroom = {
+  id: string;
+  name: string;
+  code: string | null;
+  curriculumName: string | null;
+  leadTeacherId: string | null;
+};
 
-// Mock teacher list — wire to real users when admin/teachers page lands.
-const TEACHERS: Teacher[] = [
-  { id: "t-anna", name: "Anna Maren" },
-  { id: "t-olivia", name: "Olivia Brand" },
-  { id: "t-marcus", name: "Marcus Kelly" },
-  { id: "t-yuki", name: "Yuki Tanaka" },
-];
+type ApiRosterStudent = {
+  id: string;
+  classroomId: string;
+  firstName: string;
+  lastName: string;
+  preferredName: string | null;
+  birthDate: string | null;
+  enrolledStart: string;
+  guardians: Array<{
+    relationship: string | null;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+  }>;
+};
+
+type OverviewResponse = {
+  classrooms: ApiClassroom[];
+  teachers: ApiTeacher[];
+  roster: ApiRosterStudent[];
+};
+
+const LEVEL_OPTIONS = ["Toddler", "Primary", "Lower Elementary", "Upper Elementary"];
 
 const TONE_CYCLE: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
+
+function formatEnrolled(isoDate: string): string {
+  try {
+    const d = new Date(`${isoDate}T12:00:00`);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return isoDate;
+  }
+}
+
+function guardianRelationshipLabel(r: string | null): string {
+  switch (r) {
+    case "mother":
+      return "Mother";
+    case "father":
+      return "Father";
+    case "other":
+      return "Family";
+    default:
+      return "Guardian";
+  }
+}
+
+function mapGuardianRelationship(raw: string): "mother" | "father" | "guardian" | "other" {
+  const x = raw.trim().toLowerCase();
+  if (x.includes("mother") || x === "mom") return "mother";
+  if (x.includes("father") || x === "dad") return "father";
+  if (x.includes("other")) return "other";
+  return "guardian";
+}
+
+function splitPersonName(full: string): { first_name: string; last_name: string } {
+  const t = full.trim();
+  const space = t.indexOf(" ");
+  if (space === -1) return { first_name: t || "Unknown", last_name: "" };
+  return { first_name: t.slice(0, space).trim(), last_name: t.slice(space + 1).trim() };
+}
+
+function rosterToAdminChildren(roster: ApiRosterStudent[]): AdminChild[] {
+  return roster.map((r, index) => ({
+    id: r.id,
+    name: `${r.firstName} ${r.lastName}`.trim(),
+    age: r.birthDate ? ageLabelFromBirthDate(r.birthDate) : "—",
+    birthDate: r.birthDate ?? undefined,
+    enrolled: formatEnrolled(r.enrolledStart),
+    recent: "No observations yet",
+    tone: TONE_CYCLE[index % TONE_CYCLE.length],
+    classroomId: r.classroomId,
+    guardians: r.guardians.map((g) => ({
+      name: `${g.firstName} ${g.lastName}`.trim(),
+      email: g.email ?? "",
+      relationship: guardianRelationshipLabel(g.relationship),
+    })),
+  }));
+}
+
+async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+  });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data as T;
+}
 
 const FIELD_LABELS: Record<ImportField, string> = {
   first_name: "First name",
@@ -98,50 +181,60 @@ const FIELD_OPTIONS: ImportField[] = [
   "ignore",
 ];
 
-const INITIAL_CLASSROOMS: AdminClassroom[] = [
-  { id: "primary-east", name: "Primary East", level: "Primary", mainTeacherId: "t-anna" },
-  {
-    id: "elementary-west",
-    name: "Elementary West",
-    level: "Lower Elementary",
-    mainTeacherId: "t-olivia",
-  },
-  { id: "toddler-north", name: "Toddler North", level: "Toddler", mainTeacherId: "t-marcus" },
-];
-
-function initialChildren(): AdminChild[] {
-  return CHILDREN.map((child, index) => ({
-    id: child.id,
-    name: child.name,
-    age: child.age,
-    enrolled: child.enrolled,
-    recent: child.recent,
-    tone: child.tone,
-    classroomId: index % 3 === 1 ? "elementary-west" : index % 3 === 2 ? "toddler-north" : "primary-east",
-    guardians: [
-      {
-        name: child.guardian,
-        email: "",
-        relationship: "Family",
-      },
-    ],
-  }));
-}
-
 export default function AdminClassroomsPage() {
-  const [classrooms, setClassrooms] = React.useState<AdminClassroom[]>(INITIAL_CLASSROOMS);
-  const [selectedClassroomId, setSelectedClassroomId] = React.useState(INITIAL_CLASSROOMS[0].id);
-  const [children, setChildren] = React.useState<AdminChild[]>(() => initialChildren());
+  const [classrooms, setClassrooms] = React.useState<AdminClassroom[]>([]);
+  const [teacherPool, setTeacherPool] = React.useState<ApiTeacher[]>([]);
+  const [children, setChildren] = React.useState<AdminChild[]>([]);
+  const [selectedClassroomId, setSelectedClassroomId] = React.useState<string | null>(null);
+  const [loadState, setLoadState] = React.useState<"idle" | "loading" | "error">("loading");
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [mutationError, setMutationError] = React.useState<string | null>(null);
   const [importOpen, setImportOpen] = React.useState(false);
   const [createClassroomOpen, setCreateClassroomOpen] = React.useState(false);
   const [addChildOpen, setAddChildOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
-  const selectedClassroom =
-    classrooms.find((classroom) => classroom.id === selectedClassroomId) ?? classrooms[0];
-  const selectedChildren = children
-    .filter((child) => child.classroomId === selectedClassroom.id)
-    .filter((child) => child.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const reload = React.useCallback(async () => {
+    setLoadState("loading");
+    setLoadError(null);
+    try {
+      const data = await apiJson<OverviewResponse>("/api/admin/classrooms");
+      const mappedClassrooms: AdminClassroom[] = data.classrooms.map((c) => ({
+        id: c.id,
+        name: c.name,
+        level: c.code ?? "",
+        curriculumName: c.curriculumName,
+        mainTeacherId: c.leadTeacherId ?? undefined,
+      }));
+      setClassrooms(mappedClassrooms);
+      setTeacherPool(data.teachers);
+      setChildren(rosterToAdminChildren(data.roster));
+      setSelectedClassroomId((prev) => {
+        if (mappedClassrooms.length === 0) return null;
+        if (prev && mappedClassrooms.some((x) => x.id === prev)) return prev;
+        return mappedClassrooms[0].id;
+      });
+      setLoadState("idle");
+    } catch (e) {
+      setLoadState("error");
+      setLoadError(e instanceof Error ? e.message : "Failed to load classrooms");
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const selectedClassroom = selectedClassroomId
+    ? (classrooms.find((c) => c.id === selectedClassroomId) ?? null)
+    : null;
+
+  const selectedChildren = React.useMemo(() => {
+    if (!selectedClassroom) return [];
+    return children
+      .filter((child) => child.classroomId === selectedClassroom.id)
+      .filter((child) => child.name.toLowerCase().includes(search.trim().toLowerCase()));
+  }, [children, selectedClassroom, search]);
 
   const counts = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -149,83 +242,179 @@ export default function AdminClassroomsPage() {
     return map;
   }, [children]);
 
-  const totalInClassroom = counts.get(selectedClassroom.id) ?? 0;
+  const totalInClassroom = selectedClassroom ? (counts.get(selectedClassroom.id) ?? 0) : 0;
 
   const existingStudents = React.useMemo(
     () => children.map((child) => ({ id: child.id, name: child.name, birthDate: child.birthDate })),
     [children]
   );
 
-  const applyImportPlan = (plan: StudentImportPlan) => {
-    setChildren((prev) => {
-      const next = [...prev];
-      plan.newStudents.forEach((student) => {
-        next.push({
-          id: `student_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          name: student.fullName,
-          age: ageLabelFromBirthDate(student.birthDate),
-          birthDate: student.birthDate,
-          enrolled: "Imported today",
-          recent: "No observations yet",
-          tone: TONE_CYCLE[next.length % TONE_CYCLE.length],
-          classroomId: student.classroomId,
-          guardians: student.guardians,
+  const applyImportPlan = async (plan: StudentImportPlan) => {
+    setMutationError(null);
+    try {
+      for (const s of plan.newStudents) {
+        const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
+          method: "POST",
+          body: JSON.stringify({
+            first_name: s.firstName,
+            last_name: s.lastName,
+            birth_date: s.birthDate,
+            classroom_id: s.classroomId,
+          }),
         });
-      });
-      plan.guardiansForExisting.forEach((item) => {
-        const index = next.findIndex((child) => child.id === item.studentId);
-        if (index < 0) return;
-        next[index] = { ...next[index], guardians: [...next[index].guardians, item.guardian] };
-      });
-      return next;
-    });
+        const studentId = created.id;
+        for (const g of s.guardians) {
+          if (!(g.name ?? "").trim()) continue;
+          const gn = splitPersonName(g.name);
+          const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
+            method: "POST",
+            body: JSON.stringify({
+              first_name: gn.first_name,
+              last_name: gn.last_name || gn.first_name,
+              email: (g.email ?? "").trim() || undefined,
+              preferred_contact_method: "either",
+            }),
+          });
+          await apiJson("/api/admin/student-guardians", {
+            method: "POST",
+            body: JSON.stringify({
+              student_id: studentId,
+              guardian_id: guardianRow.id,
+              relationship: mapGuardianRelationship(g.relationship || "guardian"),
+              is_primary_contact: false,
+              receives_reports: true,
+            }),
+          });
+        }
+      }
+      for (const item of plan.guardiansForExisting) {
+        const gn = splitPersonName(item.guardian.name);
+        const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
+          method: "POST",
+          body: JSON.stringify({
+            first_name: gn.first_name,
+            last_name: gn.last_name || gn.first_name,
+            email: (item.guardian.email ?? "").trim() || undefined,
+            preferred_contact_method: "either",
+          }),
+        });
+        await apiJson("/api/admin/student-guardians", {
+          method: "POST",
+          body: JSON.stringify({
+            student_id: item.studentId,
+            guardian_id: guardianRow.id,
+            relationship: mapGuardianRelationship(item.guardian.relationship || "guardian"),
+            is_primary_contact: false,
+            receives_reports: true,
+          }),
+        });
+      }
+      await reload();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Import failed";
+      setMutationError(msg);
+      throw e;
+    }
   };
 
-  const createClassroom = (input: { name: string; level: string; mainTeacherId: string }) => {
-    const id = `classroom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const next: AdminClassroom = {
-      id,
-      name: input.name.trim(),
-      level: input.level,
-      mainTeacherId: input.mainTeacherId,
-    };
-    setClassrooms((prev) => [...prev, next]);
-    setSelectedClassroomId(id);
+  const createClassroom = async (input: { name: string; level: string; mainTeacherId: string }) => {
+    setMutationError(null);
+    try {
+      const code = input.level.length <= 20 ? input.level : input.level.slice(0, 20);
+      const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/classrooms", {
+        method: "POST",
+        body: JSON.stringify({
+          name: input.name.trim(),
+          code: code || undefined,
+        }),
+      });
+      const id = created.id;
+      if (input.mainTeacherId) {
+        await apiJson("/api/admin/classroom-teachers", {
+          method: "POST",
+          body: JSON.stringify({
+            classroom_id: id,
+            teacher_user_id: input.mainTeacherId,
+            classroom_role: "lead",
+            start_date: new Date().toISOString().slice(0, 10),
+          }),
+        });
+      }
+      await reload();
+      setSelectedClassroomId(id);
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not create classroom");
+    }
   };
 
-  const addChildManually = (input: {
+  const addChildManually = async (input: {
     firstName: string;
     lastName: string;
     birthDate: string;
-    guardianName?: string;
+    guardianFirstName?: string;
+    guardianLastName?: string;
     guardianEmail?: string;
   }) => {
-    const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
-    setChildren((prev) => {
-      const next = [...prev];
-      next.push({
-        id: `student_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        name: fullName,
-        age: ageLabelFromBirthDate(input.birthDate),
-        birthDate: input.birthDate,
-        enrolled: "Added today",
-        recent: "No observations yet",
-        tone: TONE_CYCLE[next.length % TONE_CYCLE.length],
-        classroomId: selectedClassroom.id,
-        guardians:
-          input.guardianName && input.guardianEmail
-            ? [
-                {
-                  name: input.guardianName.trim(),
-                  email: input.guardianEmail.trim(),
-                  relationship: "Guardian",
-                },
-              ]
-            : [],
+    if (!selectedClassroomId) return;
+    setMutationError(null);
+    try {
+      const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
+        method: "POST",
+        body: JSON.stringify({
+          first_name: input.firstName.trim(),
+          last_name: input.lastName.trim(),
+          birth_date: input.birthDate,
+          classroom_id: selectedClassroomId,
+        }),
       });
-      return next;
-    });
+      const gfn = input.guardianFirstName?.trim();
+      const gln = input.guardianLastName?.trim();
+      const gem = input.guardianEmail?.trim();
+      if (gfn && gln && gem) {
+        const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
+          method: "POST",
+          body: JSON.stringify({
+            first_name: gfn,
+            last_name: gln,
+            email: gem,
+            preferred_contact_method: "either",
+          }),
+        });
+        await apiJson("/api/admin/student-guardians", {
+          method: "POST",
+          body: JSON.stringify({
+            student_id: created.id,
+            guardian_id: guardianRow.id,
+            relationship: "guardian",
+            is_primary_contact: true,
+            receives_reports: true,
+          }),
+        });
+      }
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not add child");
+    }
   };
+
+  if (loadState === "loading") {
+    return (
+      <div style={{ padding: 48, textAlign: "center", color: "var(--color-ink-muted)" }}>
+        Loading classrooms…
+      </div>
+    );
+  }
+
+  if (loadState === "error") {
+    return (
+      <div style={{ padding: 48 }}>
+        <p style={{ color: "var(--color-status-error, #b42318)" }}>{loadError}</p>
+        <Button type="button" variant="secondary" onClick={() => void reload()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -238,6 +427,21 @@ export default function AdminClassroomsPage() {
           </Button>
         }
       />
+
+      {mutationError ? (
+        <div
+          style={{
+            margin: "0 24px",
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: "rgba(180, 35, 24, 0.08)",
+            color: "var(--color-status-error, #b42318)",
+            fontSize: 13,
+          }}
+        >
+          {mutationError}
+        </div>
+      ) : null}
 
       <div
         style={{
@@ -254,143 +458,171 @@ export default function AdminClassroomsPage() {
               Classrooms
             </div>
           </div>
-          {classrooms.map((classroom, index) => {
-            const active = classroom.id === selectedClassroom.id;
-            return (
-              <button
-                key={classroom.id}
-                type="button"
-                className="tap"
-                onClick={() => setSelectedClassroomId(classroom.id)}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "14px 16px",
-                  border: 0,
-                  borderTop: index ? "1px solid var(--color-border)" : 0,
-                  background: active ? "var(--color-terracotta-soft)" : "transparent",
-                  textAlign: "left",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
-                    {classroom.name}
+          {classrooms.length === 0 ? (
+            <div
+              style={{ padding: "18px 16px", fontSize: 13, color: "var(--color-ink-secondary)" }}
+            >
+              No classrooms yet. Use &quot;Add classroom&quot; to create one.
+            </div>
+          ) : (
+            classrooms.map((classroom, index) => {
+              const active = classroom.id === selectedClassroomId;
+              return (
+                <button
+                  key={classroom.id}
+                  type="button"
+                  className="tap"
+                  onClick={() => setSelectedClassroomId(classroom.id)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "14px 16px",
+                    border: 0,
+                    borderTop: index ? "1px solid var(--color-border)" : 0,
+                    background: active ? "var(--color-terracotta-soft)" : "transparent",
+                    textAlign: "left",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
+                      {classroom.name}
+                    </div>
+                    <div
+                      style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}
+                    >
+                      {counts.get(classroom.id) ?? 0} children
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
-                    {counts.get(classroom.id) ?? 0} children
-                  </div>
-                </div>
-                <ChevronRight size={15} strokeWidth={1.5} />
-              </button>
-            );
-          })}
+                  <ChevronRight size={15} strokeWidth={1.5} />
+                </button>
+              );
+            })
+          )}
         </aside>
 
-        <section style={cardStyle}>
-          <div
-            style={{
-              padding: "16px 18px",
-              borderBottom: "1px solid var(--color-border)",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <h2
-                style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-ink)" }}
-              >
-                {selectedClassroom.name}
-              </h2>
-              <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
-                {totalInClassroom} children
+        {selectedClassroom ? (
+          <section style={cardStyle}>
+            <div
+              style={{
+                padding: "16px 18px",
+                borderBottom: "1px solid var(--color-border)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-ink)" }}>
+                  {selectedClassroom.name}
+                </h2>
+                <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
+                  {totalInClassroom} children
+                  {selectedClassroom.curriculumName ? (
+                    <span style={{ marginLeft: 8, color: "var(--color-ink-muted)" }}>
+                      · {selectedClassroom.curriculumName}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <Button variant="default" onClick={() => setImportOpen(true)}>
+                  <Upload size={16} strokeWidth={1.7} /> Import children
+                </Button>
+                <Button variant="secondary" onClick={() => setAddChildOpen(true)}>
+                  <Plus size={16} strokeWidth={1.7} /> Add child
+                </Button>
+                <div style={{ position: "relative", width: 220 }}>
+                  <Search
+                    size={15}
+                    strokeWidth={1.5}
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--color-ink-muted)",
+                    }}
+                  />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search children"
+                    style={{ paddingLeft: 32 }}
+                  />
+                </div>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Button variant="default" onClick={() => setImportOpen(true)}>
-                <Upload size={16} strokeWidth={1.7} /> Import children
-              </Button>
-              <Button variant="secondary" onClick={() => setAddChildOpen(true)}>
-                <Plus size={16} strokeWidth={1.7} /> Add child
-              </Button>
-              <div style={{ position: "relative", width: 220 }}>
-                <Search
-                  size={15}
-                  strokeWidth={1.5}
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "var(--color-ink-muted)",
-                  }}
-                />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search children"
-                  style={{ paddingLeft: 32 }}
-                />
-              </div>
-            </div>
-          </div>
 
-          {totalInClassroom === 0 ? (
-            <EmptyClassroomState
-              onImport={() => setImportOpen(true)}
-              onAddChild={() => setAddChildOpen(true)}
-            />
-          ) : (
-            <>
-              <div className="hidden lg:block">
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1.6fr 0.6fr 0.9fr 1.4fr 24px",
-                    padding: "12px 20px",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  {["Child", "Age", "Enrolled", "Latest observation", ""].map((header) => (
-                    <div
-                      key={header}
-                      className="label-cap"
-                      style={{ color: "var(--color-ink-muted)" }}
-                    >
-                      {header}
-                    </div>
+            {totalInClassroom === 0 ? (
+              <EmptyClassroomState
+                onImport={() => setImportOpen(true)}
+                onAddChild={() => setAddChildOpen(true)}
+              />
+            ) : (
+              <>
+                <div className="hidden lg:block">
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1.6fr 0.6fr 0.9fr 1.4fr 24px",
+                      padding: "12px 20px",
+                      borderBottom: "1px solid var(--color-border)",
+                    }}
+                  >
+                    {["Child", "Age", "Enrolled", "Latest observation", ""].map((header) => (
+                      <div
+                        key={header}
+                        className="label-cap"
+                        style={{ color: "var(--color-ink-muted)" }}
+                      >
+                        {header}
+                      </div>
+                    ))}
+                  </div>
+                  {selectedChildren.map((child) => (
+                    <RosterRow key={child.id} child={child} />
                   ))}
                 </div>
-                {selectedChildren.map((child) => (
-                  <RosterRow key={child.id} child={child} />
-                ))}
-              </div>
 
-              <div className="lg:hidden">
-                {selectedChildren.map((child, index) => (
-                  <RosterMobileRow key={child.id} child={child} index={index} />
-                ))}
-              </div>
-
-              {selectedChildren.length === 0 && (
-                <div
-                  style={{
-                    padding: 28,
-                    textAlign: "center",
-                    fontSize: 13,
-                    color: "var(--color-ink-muted)",
-                  }}
-                >
-                  No children match this search.
+                <div className="lg:hidden">
+                  {selectedChildren.map((child, index) => (
+                    <RosterMobileRow key={child.id} child={child} index={index} />
+                  ))}
                 </div>
-              )}
-            </>
-          )}
-        </section>
+
+                {selectedChildren.length === 0 && (
+                  <div
+                    style={{
+                      padding: 28,
+                      textAlign: "center",
+                      fontSize: 13,
+                      color: "var(--color-ink-muted)",
+                    }}
+                  >
+                    No children match this search.
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        ) : (
+          <section style={cardStyle}>
+            <div
+              style={{
+                padding: 40,
+                textAlign: "center",
+                fontSize: 14,
+                color: "var(--color-ink-secondary)",
+              }}
+            >
+              Add a classroom to manage children.
+            </div>
+          </section>
+        )}
       </div>
 
       <StudentImportDialog
@@ -405,12 +637,13 @@ export default function AdminClassroomsPage() {
         open={createClassroomOpen}
         onOpenChange={setCreateClassroomOpen}
         onCreate={createClassroom}
+        teachers={teacherPool}
       />
 
       <AddChildDialog
         open={addChildOpen}
         onOpenChange={setAddChildOpen}
-        classroomName={selectedClassroom.name}
+        classroomName={selectedClassroom?.name ?? "Classroom"}
         onAdd={addChildManually}
       />
     </div>
@@ -480,20 +713,22 @@ function CreateClassroomDialog({
   open,
   onOpenChange,
   onCreate,
+  teachers,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (input: { name: string; level: string; mainTeacherId: string }) => void;
+  onCreate: (input: { name: string; level: string; mainTeacherId: string }) => void | Promise<void>;
+  teachers: ApiTeacher[];
 }) {
   const [name, setName] = React.useState("");
   const [level, setLevel] = React.useState(LEVEL_OPTIONS[0]);
-  const [mainTeacherId, setMainTeacherId] = React.useState(TEACHERS[0].id);
+  const [mainTeacherId, setMainTeacherId] = React.useState("");
 
   React.useEffect(() => {
     if (!open) {
       setName("");
       setLevel(LEVEL_OPTIONS[0]);
-      setMainTeacherId(TEACHERS[0].id);
+      setMainTeacherId("");
     }
   }, [open]);
 
@@ -532,7 +767,13 @@ function CreateClassroomDialog({
             <SelectInput
               value={mainTeacherId}
               onChange={setMainTeacherId}
-              options={TEACHERS.map((teacher) => ({ value: teacher.id, label: teacher.name }))}
+              options={[
+                {
+                  value: "",
+                  label: teachers.length ? "— Optional —" : "Add teachers under Staff first",
+                },
+                ...teachers.map((teacher) => ({ value: teacher.id, label: teacher.name })),
+              ]}
             />
           </FieldLabel>
         </div>
@@ -571,9 +812,10 @@ function AddChildDialog({
     firstName: string;
     lastName: string;
     birthDate: string;
-    guardianName?: string;
+    guardianFirstName?: string;
+    guardianLastName?: string;
     guardianEmail?: string;
-  }) => void;
+  }) => void | Promise<void>;
 }) {
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
@@ -593,9 +835,12 @@ function AddChildDialog({
     }
   }, [open]);
 
-  const guardianFullName = `${guardianFirstName.trim()} ${guardianLastName.trim()}`.trim();
-  const guardianHalf =
-    Boolean(guardianFullName) !== Boolean(guardianEmail.trim());
+  const gf = guardianFirstName.trim();
+  const gl = guardianLastName.trim();
+  const ge = guardianEmail.trim();
+  const guardianFilled = Boolean(gf || gl || ge);
+  const guardianComplete = Boolean(gf && gl && ge);
+  const guardianHalf = guardianFilled && !guardianComplete;
   const canSubmit =
     firstName.trim().length > 0 &&
     lastName.trim().length > 0 &&
@@ -695,12 +940,13 @@ function AddChildDialog({
             disabled={!canSubmit}
             onClick={() => {
               if (!canSubmit) return;
-              onAdd({
+              void onAdd({
                 firstName,
                 lastName,
                 birthDate,
-                guardianName: guardianFullName || undefined,
-                guardianEmail: guardianEmail.trim() || undefined,
+                guardianFirstName: gf || undefined,
+                guardianLastName: gl || undefined,
+                guardianEmail: ge || undefined,
               });
               onOpenChange(false);
             }}
@@ -832,13 +1078,14 @@ function StudentImportDialog({
   onOpenChange: (open: boolean) => void;
   classrooms: ClassroomOption[];
   existingStudents: Array<{ id: string; name: string; birthDate?: string }>;
-  onImport: (plan: StudentImportPlan) => void;
+  onImport: (plan: StudentImportPlan) => void | Promise<void>;
 }) {
   const [rawData, setRawData] = React.useState<RawImportData | null>(null);
   const [mapping, setMapping] = React.useState<ImportMapping>({});
   const [drafts, setDrafts] = React.useState<StudentImportDraft[]>([]);
   const [pasteText, setPasteText] = React.useState("");
   const [fileName, setFileName] = React.useState<string | null>(null);
+  const [importBusy, setImportBusy] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) {
@@ -847,6 +1094,7 @@ function StudentImportDialog({
       setDrafts([]);
       setPasteText("");
       setFileName(null);
+      setImportBusy(false);
     }
   }, [open]);
 
@@ -877,9 +1125,14 @@ function StudentImportDialog({
     return map;
   }, [analyses, planResult]);
 
-  const issueCount = Array.from(issuesById.values()).reduce((sum, issues) => sum + issues.length, 0);
-  const readyRows = drafts.length - Array.from(issuesById.values()).filter((issues) => issues.length > 0).length;
-  const canImport = drafts.length > 0 && issueCount === 0 && !!planResult.plan;
+  const issueCount = Array.from(issuesById.values()).reduce(
+    (sum, issues) => sum + issues.length,
+    0
+  );
+  const readyRows =
+    drafts.length - Array.from(issuesById.values()).filter((issues) => issues.length > 0).length;
+  const canImport =
+    drafts.length > 0 && issueCount === 0 && !!planResult.plan && classrooms.length > 0;
 
   const updateDraft = (id: string, update: Partial<StudentImportDraft>) => {
     setDrafts((prev) => prev.map((draft) => (draft.id === id ? { ...draft, ...update } : draft)));
@@ -920,7 +1173,8 @@ function StudentImportDialog({
         <DialogHeader className="border-b border-border px-6 py-5">
           <DialogTitle className="text-xl">Import children</DialogTitle>
           <p className="text-sm text-ink-secondary">
-            Paste rows from a spreadsheet or upload a CSV. We will show every issue before anything is added.
+            Paste rows from a spreadsheet or upload a CSV. We will show every issue before anything
+            is added.
           </p>
         </DialogHeader>
 
@@ -969,7 +1223,11 @@ function StudentImportDialog({
                 className="min-h-40 bg-canvas font-mono text-xs"
               />
               <div className="flex justify-end">
-                <Button type="button" disabled={!pasteText.trim()} onClick={() => loadText(pasteText)}>
+                <Button
+                  type="button"
+                  disabled={!pasteText.trim()}
+                  onClick={() => loadText(pasteText)}
+                >
                   Continue
                 </Button>
               </div>
@@ -1026,7 +1284,9 @@ function StudentImportDialog({
                     classrooms={classrooms}
                     typoCounts={typoCounts}
                     onUpdate={updateDraft}
-                    onRemove={() => setDrafts((prev) => prev.filter((item) => item.id !== draft.id))}
+                    onRemove={() =>
+                      setDrafts((prev) => prev.filter((item) => item.id !== draft.id))
+                    }
                     onApplyClassroomToAll={applyClassroomToAll}
                   />
                 ))}
@@ -1041,14 +1301,20 @@ function StudentImportDialog({
           </Button>
           <Button
             type="button"
-            disabled={!canImport}
+            disabled={!canImport || importBusy}
             onClick={() => {
-              if (!planResult.plan) return;
-              onImport(planResult.plan);
-              onOpenChange(false);
+              if (!planResult.plan || importBusy) return;
+              setImportBusy(true);
+              void Promise.resolve(onImport(planResult.plan))
+                .then(() => onOpenChange(false))
+                .finally(() => setImportBusy(false));
             }}
           >
-            {canImport ? `Import ${planResult.plan?.newStudents.length ?? 0} children` : `Fix ${issueCount} issue${issueCount === 1 ? "" : "s"} first`}
+            {importBusy
+              ? "Importing…"
+              : canImport
+                ? `Import ${planResult.plan?.newStudents.length ?? 0} children`
+                : `Fix ${issueCount} issue${issueCount === 1 ? "" : "s"} first`}
           </Button>
         </div>
       </DialogContent>
@@ -1078,28 +1344,68 @@ function ImportDraftCard({
   const hasIssues = issues.length > 0;
   return (
     <section
-      className={hasIssues ? "rounded-2xl border border-terracotta/40 bg-terracotta/10 p-4" : "rounded-2xl border border-border bg-canvas p-4"}
+      className={
+        hasIssues
+          ? "rounded-2xl border border-terracotta/40 bg-terracotta/10 p-4"
+          : "rounded-2xl border border-border bg-canvas p-4"
+      }
     >
       <div className="mb-3 flex items-center gap-2">
-        {hasIssues ? <AlertTriangle size={16} className="text-terracotta" /> : <Check size={16} className="text-sage" />}
+        {hasIssues ? (
+          <AlertTriangle size={16} className="text-terracotta" />
+        ) : (
+          <Check size={16} className="text-sage" />
+        )}
         <span className="label-cap text-ink-muted">Row {draft.sourceRow}</span>
         <div className="flex-1" />
-        <button type="button" onClick={onRemove} className="rounded-md p-1 text-ink-muted hover:bg-ink/5">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-md p-1 text-ink-muted hover:bg-ink/5"
+        >
           <X size={16} />
         </button>
       </div>
 
       <div className="grid gap-2 md:grid-cols-[1fr_1fr_140px_1.2fr]">
-        <MiniInput label="First name" value={draft.firstName} onChange={(value) => onUpdate(draft.id, { firstName: value })} />
-        <MiniInput label="Last name" value={draft.lastName} onChange={(value) => onUpdate(draft.id, { lastName: value })} />
-        <MiniInput label="Birthday" value={draft.birthDate} onChange={(value) => onUpdate(draft.id, { birthDate: value })} />
-        <MiniInput label="Classroom" value={draft.classroomName} onChange={(value) => onUpdate(draft.id, { classroomName: value })} />
+        <MiniInput
+          label="First name"
+          value={draft.firstName}
+          onChange={(value) => onUpdate(draft.id, { firstName: value })}
+        />
+        <MiniInput
+          label="Last name"
+          value={draft.lastName}
+          onChange={(value) => onUpdate(draft.id, { lastName: value })}
+        />
+        <MiniInput
+          label="Birthday"
+          value={draft.birthDate}
+          onChange={(value) => onUpdate(draft.id, { birthDate: value })}
+        />
+        <MiniInput
+          label="Classroom"
+          value={draft.classroomName}
+          onChange={(value) => onUpdate(draft.id, { classroomName: value })}
+        />
       </div>
 
       <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1.3fr_130px]">
-        <MiniInput label="Guardian" value={draft.guardianName} onChange={(value) => onUpdate(draft.id, { guardianName: value })} />
-        <MiniInput label="Guardian email" value={draft.guardianEmail} onChange={(value) => onUpdate(draft.id, { guardianEmail: value })} />
-        <MiniInput label="Relation" value={draft.guardianRelationship} onChange={(value) => onUpdate(draft.id, { guardianRelationship: value })} />
+        <MiniInput
+          label="Guardian"
+          value={draft.guardianName}
+          onChange={(value) => onUpdate(draft.id, { guardianName: value })}
+        />
+        <MiniInput
+          label="Guardian email"
+          value={draft.guardianEmail}
+          onChange={(value) => onUpdate(draft.id, { guardianEmail: value })}
+        />
+        <MiniInput
+          label="Relation"
+          value={draft.guardianRelationship}
+          onChange={(value) => onUpdate(draft.id, { guardianRelationship: value })}
+        />
       </div>
 
       {analysis.dateHint && !hasIssues && (
@@ -1125,11 +1431,23 @@ function ImportDraftCard({
   );
 }
 
-function MiniInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function MiniInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <label>
       <div className="label-cap mb-1 text-ink-muted">{label}</div>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} className="h-9 bg-surface" />
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 bg-surface"
+      />
     </label>
   );
 }
@@ -1151,20 +1469,29 @@ function IssueMessage({
 }) {
   const shell = "rounded-xl border border-terracotta/20 bg-surface px-3 py-2 text-sm text-ink";
 
-  if (issue.kind === "missing_name") return <div className={shell}>Add both a first name and a last name.</div>;
-  if (issue.kind === "missing_birth_date") return <div className={shell}>Add a birthday for this child.</div>;
+  if (issue.kind === "missing_name")
+    return <div className={shell}>Add both a first name and a last name.</div>;
+  if (issue.kind === "missing_birth_date")
+    return <div className={shell}>Add a birthday for this child.</div>;
   if (issue.kind === "invalid_birth_date") {
     return (
       <div className={shell}>
-        Birthday &quot;{issue.value}&quot; could not be read. Try 2019-04-15, 15 April 2019, or 04/15/2019.
+        Birthday &quot;{issue.value}&quot; could not be read. Try 2019-04-15, 15 April 2019, or
+        04/15/2019.
       </div>
     );
   }
   if (issue.kind === "guardian_incomplete") {
-    return <div className={shell}>Guardian needs both a name and an email, or leave both blank.</div>;
+    return (
+      <div className={shell}>Guardian needs both a name and an email, or leave both blank.</div>
+    );
   }
   if (issue.kind === "duplicate_without_guardian") {
-    return <div className={shell}>{issue.name} already exists. Remove this row or add a guardian to it.</div>;
+    return (
+      <div className={shell}>
+        {issue.name} already exists. Remove this row or add a guardian to it.
+      </div>
+    );
   }
   if (issue.kind === "missing_classroom") {
     return (
@@ -1187,17 +1514,28 @@ function IssueMessage({
             <span>
               Did you mean <strong>{issue.suggestion.name}</strong>?
             </span>
-            <Button size="sm" variant="secondary" onClick={() => onUpdate(draft.id, { classroomName: issue.suggestion!.name })}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => onUpdate(draft.id, { classroomName: issue.suggestion!.name })}
+            >
               Use it
             </Button>
             {count > 1 && (
-              <Button size="sm" variant="ghost" onClick={() => onApplyClassroomToAll(issue.value, issue.suggestion!.name)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onApplyClassroomToAll(issue.value, issue.suggestion!.name)}
+              >
                 Apply to all {count}
               </Button>
             )}
           </>
         )}
-        <ClassroomPicker classrooms={classrooms} onPick={(name) => onUpdate(draft.id, { classroomName: name })} />
+        <ClassroomPicker
+          classrooms={classrooms}
+          onPick={(name) => onUpdate(draft.id, { classroomName: name })}
+        />
       </div>
     );
   }

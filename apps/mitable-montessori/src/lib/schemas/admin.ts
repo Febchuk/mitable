@@ -22,6 +22,8 @@ export const CreateStudentSchema = z.object({
     .optional(),
   nicknames: z.array(z.string().max(100)).max(10).default([]),
   notes: z.string().max(2000).optional(),
+  /** When set, creates an active primary enrollment in this classroom. */
+  classroom_id: z.string().uuid().optional(),
 });
 export type CreateStudentInput = z.infer<typeof CreateStudentSchema>;
 
