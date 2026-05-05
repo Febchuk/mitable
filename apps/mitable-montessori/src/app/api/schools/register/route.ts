@@ -11,8 +11,10 @@ import { createAdminClient } from "@/utils/supabase/admin";
  * row (role=admin, status=active) tied to a Supabase auth user.
  *
  * Two flows:
- *   1. Password flow — body has `password`. We sign the user up via the
- *      anon client, then write schools + users with the service-role client.
+ *   1. Password flow — body has `password`. We create the auth user via the
+ *      service-role admin API with email_confirm true (same pattern as teacher
+ *      invite claim). Plain signUp leaves emails unconfirmed when the project
+ *      requires confirmation, and the client-side sign-in right after fails.
  *   2. Google flow — no password. The user already authenticated via OAuth
  *      and was bounced to /signup?provider=google&email=... by the callback
  *      route. We use the existing session and just write schools + users.
@@ -49,18 +51,38 @@ export async function POST(req: Request) {
   let createdAuthUser = false;
 
   if (password) {
-    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+    const created = await admin.auth.admin.createUser({
       email,
       password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+      },
     });
-    if (signUpErr || !signUpData.user) {
-      return NextResponse.json(
-        { error: signUpErr?.message ?? "Could not create auth account" },
-        { status: 400 }
-      );
+    if (created.error) {
+      const message = created.error.message ?? "";
+      const lower = message.toLowerCase();
+      const alreadyExists =
+        lower.includes("already") || lower.includes("exists") || lower.includes("registered");
+      if (!alreadyExists) {
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+      const foundId = await findAuthUserByEmail(admin, email);
+      if (!foundId) {
+        return NextResponse.json(
+          { error: "Could not create or recover auth account" },
+          { status: 400 }
+        );
+      }
+      authUserId = foundId;
+      createdAuthUser = false;
+    } else if (!created.data.user) {
+      return NextResponse.json({ error: "Auth signup returned no user" }, { status: 400 });
+    } else {
+      authUserId = created.data.user.id;
+      createdAuthUser = true;
     }
-    authUserId = signUpData.user.id;
-    createdAuthUser = true;
   } else {
     // Google flow — must already be authenticated.
     const {
@@ -171,4 +193,15 @@ export async function POST(req: Request) {
     schoolId: school.id,
     redirect: "/onboarding/privacy",
   });
+}
+
+async function findAuthUserByEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string
+): Promise<string | null> {
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  if (error) return null;
+  const lower = email.toLowerCase();
+  const found = data.users.find((u) => u.email?.toLowerCase() === lower);
+  return found?.id ?? null;
 }
