@@ -135,6 +135,7 @@ export function NewReportTrigger() {
         writeStoredDraftCapture(json.reportId, {
           transcripts: parsed.transcripts,
           notes: parsed.notes,
+          tokenMap: parsed.tokenMap,
         });
         const child = roster.find((c) => c.id === payload.childId);
         ToastBus.push({

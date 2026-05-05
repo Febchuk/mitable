@@ -33,11 +33,15 @@ type LocalDetail = {
   sections: LocalSection[];
 };
 
+// Pin to "en-US" instead of `undefined` (the runtime default) so the server
+// (Node, en-US) and the client (browser locale, often fr-CA on this team)
+// agree. Without this, hydration throws on dates like "Monday, May 4" vs
+// "lundi 4 mai".
 function fmtDay(d: string | null | undefined): string {
   if (!d) return "";
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return d;
-  return dt.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  return dt.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 }
 
 function relSavedAt(updatedAt: string): string {
@@ -48,7 +52,7 @@ function relSavedAt(updatedAt: string): string {
   if (mins < 60) return `Saved ${mins} min ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `Saved ${hours} hr ago`;
-  return `Saved ${dt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  return `Saved ${dt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 }
 
 function bodyToSections(body: string): LocalSection[] {
@@ -118,6 +122,8 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDrafting, setIsDrafting] = React.useState(false);
   const draftKickedRef = React.useRef(false);
+  /** Set while a /draft request is in flight so the overlay can abort it. */
+  const draftAbortRef = React.useRef<AbortController | null>(null);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const empty =
@@ -139,6 +145,8 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
     if (!empty || draftKickedRef.current || report.status !== "draft") return;
     draftKickedRef.current = true;
     setIsDrafting(true);
+    const ac = new AbortController();
+    draftAbortRef.current = ac;
     const stash = readStoredDraftCapture(report.id);
     void fetch(`/api/v1/reports/${report.id}/draft`, {
       method: "POST",
@@ -147,9 +155,12 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
       body: JSON.stringify({
         transcripts: stash?.transcripts ?? [],
         notes: stash?.notes ?? [],
+        tokenMap: stash?.tokenMap ?? [],
       }),
+      signal: ac.signal,
     })
       .then(async (res) => {
+        if (ac.signal.aborted) return;
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
           ToastBus.push({
@@ -170,10 +181,25 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
         // updatedAt) the next time we navigate.
         router.refresh();
       })
+      .catch((err: unknown) => {
+        const name =
+          err instanceof DOMException
+            ? err.name
+            : err && typeof err === "object" && "name" in err
+              ? String((err as { name: unknown }).name)
+              : "";
+        if (name === "AbortError") return;
+        console.warn("[report-detail] draft fetch failed:", err);
+      })
       .finally(() => {
+        if (draftAbortRef.current === ac) draftAbortRef.current = null;
         setIsDrafting(false);
       });
   }, [empty, report.id, report.status, router]);
+
+  const cancelDraftGeneration = React.useCallback(() => {
+    draftAbortRef.current?.abort();
+  }, []);
 
   // Debounced PATCH on edit.
   const queueSave = React.useCallback(
@@ -268,7 +294,12 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
       <div className="rd-workspace">
         <div className="rd-split">
           <ChatPane />
-          <ReportPane detail={detail} onChange={onChange} />
+          <ReportPane
+            detail={detail}
+            onChange={onChange}
+            isDrafting={isDrafting}
+            onCancelDrafting={cancelDraftGeneration}
+          />
         </div>
       </div>
     </div>

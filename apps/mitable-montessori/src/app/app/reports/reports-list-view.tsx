@@ -57,7 +57,8 @@ function formatWhen(row: ReportListRow): string {
   const date = row.reportDate || row.createdAt.slice(0, 10);
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return date;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  // Pin locale so SSR (Node, en-US) and the browser (e.g. fr-CA) match — avoids hydration errors.
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function tonesByIndex(i: number): "clay" | "sage" | "butter" | "blue" | "terracotta" {

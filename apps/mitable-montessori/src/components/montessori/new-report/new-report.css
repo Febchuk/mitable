@@ -52,7 +52,9 @@
 }
 
 .nr-head {
-  padding: 22px 28px 16px;
+  /* Extra top padding so the crest badge (absolutely positioned) stays inside
+     the sheet — negative top used to clip against the viewport. */
+  padding: 48px 28px 16px;
   border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: flex-start;
@@ -63,7 +65,7 @@
 }
 .nr-crest {
   position: absolute;
-  top: -16px;
+  top: 14px;
   left: 28px;
   transform: rotate(-4deg);
   font-family: var(--font-display);

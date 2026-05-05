@@ -4,7 +4,7 @@ import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { getAnthropic, SONNET_MODEL } from "@/lib/anthropic/client";
 import { runReportAgent, AgentAbortError } from "@/lib/reports/agent-loop";
-import { SupabaseReportDataAdapter, IncrementalTokenizer } from "@/lib/reports/supabase-adapter";
+import { SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
 import { DraftFromCaptureRequestSchema } from "@/lib/schemas/report";
 import { detokenizeReportText } from "@/lib/reports/detokenize";
 
@@ -111,9 +111,82 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     }
   }
 
-  const tokenizer = new IncrementalTokenizer();
-  const studentToken = tokenizer.studentToken(report.student_id as string, studentDisplay);
-  const classroomToken = tokenizer.classroomToken(report.classroom_id as string, classroomDisplay);
+  // Seed the agent's reference set with every student the client tokenized
+  // from the transcript (NOT just the active one) — otherwise the validator
+  // sees their tokens as "unknown" and rejects the draft until the agent
+  // budget is exhausted, returning 502. tokenMap entries come from the
+  // client's fuzzy-match step and are trusted only after we re-fetch each
+  // student from this caller's school.
+  const studentIdsToFetch = new Set<string>([report.student_id as string]);
+  for (const entry of input.tokenMap) studentIdsToFetch.add(entry.studentId);
+
+  const { data: rosterRows } = await supabase
+    .from("students")
+    .select("id, first_name, preferred_name, school_id")
+    .in("id", Array.from(studentIdsToFetch))
+    .eq("school_id", auth.user.schoolId);
+
+  const firstNameById = new Map<string, string>();
+  for (const r of (rosterRows ?? []) as Array<{
+    id: string;
+    first_name: string | null;
+    preferred_name: string | null;
+  }>) {
+    const name = (r.preferred_name || r.first_name || "").trim() || "Student";
+    firstNameById.set(r.id, name);
+  }
+
+  // Build the explicit reference set. Each ref pairs a token with the display
+  // name we'll de-tokenize to AND the name the validator forbids leaking.
+  type SeedRef = {
+    id: string;
+    token: string;
+    display: string;
+    kind: "student" | "classroom";
+  };
+  const seedRefs: SeedRef[] = [];
+  const usedTokens = new Set<string>();
+
+  for (const entry of input.tokenMap) {
+    const firstName = firstNameById.get(entry.studentId);
+    if (!firstName) continue; // student not in caller's school — drop silently
+    seedRefs.push({
+      id: entry.studentId,
+      token: entry.token,
+      display: firstName,
+      kind: "student",
+    });
+    usedTokens.add(entry.token);
+  }
+
+  // Active student: respect whatever token the client gave him in tokenMap
+  // (so the agent's kickoff aligns with the transcript). Otherwise pick the
+  // next free [STUDENT_n] slot. This is the case when Whisper mistranscribed
+  // the active student's name and the fuzzy matcher didn't catch him.
+  const activeMapEntry = input.tokenMap.find((t) => t.studentId === report.student_id);
+  let studentToken: string;
+  if (activeMapEntry) {
+    studentToken = activeMapEntry.token;
+  } else {
+    let n = 1;
+    while (usedTokens.has(`[STUDENT_${n}]`)) n++;
+    studentToken = `[STUDENT_${n}]`;
+    seedRefs.push({
+      id: report.student_id as string,
+      token: studentToken,
+      display: studentDisplay,
+      kind: "student",
+    });
+    usedTokens.add(studentToken);
+  }
+
+  const classroomToken = "[CLASSROOM_0]";
+  seedRefs.push({
+    id: report.classroom_id as string,
+    token: classroomToken,
+    display: classroomDisplay || "this classroom",
+    kind: "classroom",
+  });
 
   const periodStart = (report.period_start || report.report_date) as string;
   const periodEnd = (report.period_end || report.report_date) as string;
@@ -158,7 +231,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const adapter = new SupabaseReportDataAdapter(supabase);
-  const seedReferences = tokenizer.references();
+  const seedReferences = { refs: seedRefs };
 
   try {
     const result = await runReportAgent({
