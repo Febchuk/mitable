@@ -349,6 +349,7 @@ class LocalDatabase {
   private dbPath: string = "";
 
   async initialize(): Promise<void> {
+    // userData survives uninstall by default (standard Electron behavior)
     this.dbPath = join(app.getPath("userData"), "on-device", "mitable-local.db");
 
     const { mkdirSync } = await import("fs");

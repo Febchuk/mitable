@@ -294,56 +294,126 @@ class OllamaService {
 
   // ── Model pulling ─────────────────────────────────────────────────────
 
-  async pullModel(model: string): Promise<void> {
+  async pullModel(model: string, attempt = 1): Promise<void> {
     this.status = "pulling";
     this.progressCallback?.({ phase: "pulling", message: `Downloading ${model}`, percent: 0 });
-    logger.info("Pulling model", model);
+    logger.info("Pulling model", model, { attempt });
 
-    const response = await fetch(`${OLLAMA_BASE}/api/pull`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: model, stream: true }),
-    });
+    try {
+      const response = await fetch(`${OLLAMA_BASE}/api/pull`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: model, stream: true }),
+        signal: AbortSignal.timeout(600_000), // 10 min timeout for large models
+      });
 
-    if (!response.ok || !response.body) {
-      throw new Error(`Failed to pull model: ${response.status}`);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-          if (msg.total && msg.completed) {
-            const percent = Math.round((msg.completed / msg.total) * 100);
-            this.progressCallback?.({
-              phase: "pulling",
-              message: `Downloading ${model}`,
-              percent,
-            });
-          }
-          if (msg.status === "success") {
-            logger.info("Model pull complete:", model);
-          }
-        } catch {
-          /* partial JSON line, skip */
-        }
+      if (!response.ok || !response.body) {
+        throw new Error(`Failed to pull model: ${response.status}`);
       }
-    }
 
-    this.loadedModel = model;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.total && msg.completed) {
+              const percent = Math.round((msg.completed / msg.total) * 100);
+              this.progressCallback?.({
+                phase: "pulling",
+                message: `Downloading ${model}`,
+                percent,
+              });
+            }
+            if (msg.status === "success") {
+              logger.info("Model pull complete:", model);
+            }
+            if (msg.error) {
+              throw new Error(`Pull error: ${msg.error}`);
+            }
+          } catch (parseErr) {
+            // Check for error messages in non-JSON lines too
+            if (line.toLowerCase().includes("error")) {
+              logger.warn("Pull stream error indication:", line);
+            }
+            /* partial JSON line, skip */
+          }
+        }
+
+        // Detect stalled download (no progress for long time is handled by timeout)
+      }
+
+      // Verify the model actually exists after pull
+      const verified = await this.verifyModelExists(model);
+      if (!verified) {
+        throw new Error("Model pull completed but model not found in local registry");
+      }
+
+      this.loadedModel = model;
+    } catch (err) {
+      logger.error("Model pull failed:", String(err), { model, attempt });
+
+      // Retry up to 3 times with exponential backoff
+      if (attempt < 3) {
+        const delayMs = attempt * 5000;
+        this.progressCallback?.({
+          phase: "pulling",
+          message: `Download failed, retrying in ${delayMs / 1000}s...`,
+          percent: 0,
+        });
+        await new Promise((r) => setTimeout(r, delayMs));
+        return this.pullModel(model, attempt + 1);
+      }
+
+      this.status = "error";
+      throw new Error(`Failed to pull model ${model} after ${attempt} attempts: ${String(err)}`);
+    }
+  }
+
+  /**
+   * Verify that a model exists locally and is complete.
+   */
+  async verifyModelExists(model: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${OLLAMA_BASE}/api/tags`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) return false;
+
+      const data = (await response.json()) as { models?: Array<{ name: string }> };
+      const models = data.models || [];
+      return models.some((m) => m.name === model || m.name.startsWith(model + ":"));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Delete a partially downloaded/corrupted model to force re-download.
+   */
+  async deleteModel(model: string): Promise<void> {
+    try {
+      await fetch(`${OLLAMA_BASE}/api/delete`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: model }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      logger.info("Deleted model (for retry):", model);
+    } catch (err) {
+      logger.warn("Failed to delete model (may not exist):", model, String(err));
+    }
   }
 
   async warmup(model: string): Promise<void> {

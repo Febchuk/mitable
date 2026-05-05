@@ -47,6 +47,7 @@ class ModelManager {
   private manifest: OnDeviceManifest | null = null;
 
   async initialize(): Promise<void> {
+    // userData survives uninstall by default (standard Electron behavior)
     this.baseDir = join(app.getPath("userData"), "on-device");
     this.whisperBinDir = join(this.baseDir, "bin", "whisper");
     this.modelsDir = join(this.baseDir, "models");
