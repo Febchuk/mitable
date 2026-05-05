@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mitable Montessori — Auth Prototypes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ----------------------------------------------------------------
+     Mitable Montessori — design tokens
+     (verbatim from src/styles/tokens.css)
+  ---------------------------------------------------------------- */
+  :root {
+    --canvas: #faf6ee;
+    --ink: #2a2723;
+    --terracotta: #c46a4f;
+    --terracotta-soft: #f4ddd2;
+    --sage: #7a9b7a;
+    --sage-soft: #dde7da;
+    --butter: #e8c56a;
+    --dusty-blue: #6b8aa6;
+    --clay: #b89880;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+
+    --shadow-sm: 0 1px 2px rgba(42, 39, 35, 0.06);
+    --shadow-md: 0 4px 24px rgba(42, 39, 35, 0.08);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "DM Sans", -apple-system, sans-serif;
+    color: var(--ink);
+    background: var(--canvas);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ----------------------------------------------------------------
+     Tweaks panel — top-right, controls variant + screen
+  ---------------------------------------------------------------- */
+  .tweaks {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    background: var(--canvas);
+    border: 1px solid rgba(42, 39, 35, 0.1);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 220px;
+  }
+
+  .tweaks__label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(42, 39, 35, 0.5);
+    margin: 0;
+  }
+
+  .tweaks__group {
+    display: flex;
+    gap: 4px;
+    background: rgba(42, 39, 35, 0.05);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+  }
+
+  .tweaks__btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .tweaks__btn:hover {
+    background: rgba(42, 39, 35, 0.06);
+  }
+  .tweaks__btn[aria-pressed="true"] {
+    background: var(--canvas);
+    box-shadow: 0 1px 2px rgba(42, 39, 35, 0.12);
+    color: var(--terracotta);
+  }
+
+  /* ----------------------------------------------------------------
+     Stage — show/hide variants and screens
+  ---------------------------------------------------------------- */
+  .stage {
+    min-height: 100vh;
+    display: flex;
+  }
+
+  .variant {
+    display: none;
+    width: 100%;
+    min-height: 100vh;
+  }
+  .variant.is-active {
+    display: flex;
+  }
+
+  .screen {
+    display: none;
+    width: 100%;
+    min-height: 100vh;
+  }
+  .screen.is-active {
+    display: flex;
+  }
+
+  /* ----------------------------------------------------------------
+     Common split-screen layout
+  ---------------------------------------------------------------- */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    min-height: 100vh;
+  }
+  @media (max-width: 1024px) {
+    .split {
+      grid-template-columns: 0.4fr 0.6fr;
+    }
+  }
+  @media (max-width: 768px) {
+    .split {
+      grid-template-columns: 1fr;
+      grid-template-rows: 30vh auto;
+    }
+  }
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 64px;
+  }
+  @media (max-width: 768px) {
+    .hero {
+      padding: 32px;
+      justify-content: flex-end;
+    }
+  }
+
+  .form-side {
+    background: var(--canvas);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+  }
+  @media (max-width: 768px) {
+    .form-side {
+      padding: 32px 24px;
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     Form components — match src/components/ui/
+  ---------------------------------------------------------------- */
+  .form {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .form__brand {
+    font-family: "Caveat", cursive;
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--terracotta);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .form__heading {
+    font-family: "Caveat", cursive;
+    font-size: 3rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .form__sub {
+    font-size: 0.9375rem;
+    color: rgba(42, 39, 35, 0.7);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field__label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .field__label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .field__hint {
+    font-size: 0.75rem;
+    color: var(--terracotta);
+    text-decoration: none;
+  }
+  .field__hint:hover {
+    text-decoration: underline;
+    text-decoration-color: rgba(196, 106, 79, 0.4);
+    text-underline-offset: 3px;
+  }
+
+  .input {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid rgba(42, 39, 35, 0.15);
+    border-radius: var(--radius-md);
+    background: var(--canvas);
+    font-family: inherit;
+    font-size: 0.9375rem;
+    color: var(--ink);
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+    width: 100%;
+  }
+  .input::placeholder {
+    color: rgba(42, 39, 35, 0.35);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--terracotta);
+    box-shadow: 0 0 0 2px rgba(196, 106, 79, 0.4);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .btn {
+    height: 48px;
+    padding: 0 16px;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      transform 0.05s ease;
+    width: 100%;
+    border: 1px solid transparent;
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+
+  .btn--primary {
+    background: var(--terracotta);
+    color: var(--canvas);
+  }
+  .btn--primary:hover {
+    background: #b15e44;
+  }
+
+  .btn--outline {
+    background: transparent;
+    border-color: rgba(42, 39, 35, 0.15);
+    color: var(--ink);
+  }
+  .btn--outline:hover {
+    background: rgba(42, 39, 35, 0.04);
+    border-color: rgba(42, 39, 35, 0.25);
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: rgba(42, 39, 35, 0.4);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: lowercase;
+    letter-spacing: 0.06em;
+  }
+  .divider::before,
+  .divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(42, 39, 35, 0.12);
+  }
+
+  .footer-note {
+    font-size: 0.875rem;
+    color: rgba(42, 39, 35, 0.7);
+    text-align: center;
+    margin: 0;
+  }
+  .footer-link {
+    color: var(--terracotta);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px solid rgba(196, 106, 79, 0.35);
+    padding-bottom: 1px;
+  }
+  .footer-link:hover {
+    border-bottom-color: var(--terracotta);
+  }
+
+  /* ----------------------------------------------------------------
+     VARIANT 1 — Classroom warmth (cartoon edition)
+     AI-generated cartoon illustration + Caveat quote overlay.
+     Image source: assets/auth-hero-cartoon.png (drop yours in)
+  ---------------------------------------------------------------- */
+  .v1-hero {
+    /* Fallback gradient shows if the cartoon PNG isn't generated yet,
+       so the prototype never looks broken. */
+    background:
+      linear-gradient(
+        160deg,
+        var(--terracotta-soft) 0%,
+        #f5e9d4 45%,
+        var(--sage-soft) 100%
+      );
+    color: var(--ink);
+  }
+  .v1-hero__art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    z-index: 0;
+  }
+  .v1-hero__placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(42, 39, 35, 0.35);
+    font-size: 0.875rem;
+    font-style: italic;
+    text-align: center;
+    padding: 0 32px;
+    z-index: 0;
+  }
+  /* Hide placeholder when an actual image loads */
+  .v1-hero__art:not([src=""]) ~ .v1-hero__placeholder {
+    display: none;
+  }
+  /* Subtle terracotta-deepening wash at bottom so the white Caveat quote
+     sits on slightly deeper warm tone — preserves the cartoon's mood
+     without going dark/muddy. */
+  .v1-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(196, 106, 79, 0) 50%,
+        rgba(146, 68, 48, 0.35) 100%
+      );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .v1-hero__content {
+    position: relative;
+    z-index: 2;
+    max-width: 480px;
+  }
+
+  .v1-hero__brand {
+    font-family: "Caveat", cursive;
+    font-size: 1.875rem;
+    font-weight: 600;
+    color: var(--canvas);
+    margin: 0 0 auto 0;
+    position: absolute;
+    top: 64px;
+    left: 64px;
+    z-index: 2;
+    text-shadow: 0 1px 12px rgba(42, 39, 35, 0.35);
+  }
+  @media (max-width: 768px) {
+    .v1-hero__brand {
+      top: 32px;
+      left: 32px;
+      font-size: 1.5rem;
+    }
+  }
+
+  .v1-hero__quote {
+    font-family: "Caveat", cursive;
+    font-size: 3rem;
+    font-weight: 500;
+    line-height: 1.1;
+    color: var(--canvas);
+    margin: 0 0 12px 0;
+    text-shadow: 0 2px 24px rgba(42, 39, 35, 0.4);
+  }
+  @media (max-width: 768px) {
+    .v1-hero__quote {
+      font-size: 2rem;
+    }
+  }
+
+  .v1-hero__attr {
+    font-size: 0.8125rem;
+    color: rgba(250, 246, 238, 0.85);
+    letter-spacing: 0.05em;
+    margin: 0;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  /* ----------------------------------------------------------------
+     VARIANT 2 — Editorial mark
+     Pure typographic composition on cream canvas
+  ---------------------------------------------------------------- */
+  .v2-hero {
+    background: var(--canvas);
+    border-right: 1px solid rgba(42, 39, 35, 0.06);
+    padding: 80px;
+    justify-content: space-between;
+  }
+  @media (max-width: 768px) {
+    .v2-hero {
+      padding: 40px 32px;
+      border-right: none;
+      border-bottom: 1px solid rgba(42, 39, 35, 0.06);
+    }
+  }
+
+  .v2-hero__top-mark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(42, 39, 35, 0.4);
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .v2-hero__top-mark-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sage);
+  }
+
+  .v2-hero__center {
+    display: flex;
+    flex-direction: column;
+    margin: auto 0;
+  }
+
+  .v2-hero__wordmark {
+    font-family: "Caveat", cursive;
+    font-size: 9rem;
+    font-weight: 600;
+    line-height: 0.9;
+    color: var(--terracotta);
+    margin: 0;
+    letter-spacing: -0.02em;
+    position: relative;
+    display: inline-block;
+    width: fit-content;
+  }
+  @media (max-width: 1024px) {
+    .v2-hero__wordmark {
+      font-size: 7rem;
+    }
+  }
+  @media (max-width: 768px) {
+    .v2-hero__wordmark {
+      font-size: 5rem;
+    }
+  }
+
+  /* hand-drawn underline stroke */
+  .v2-hero__wordmark::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 28px;
+    bottom: -4px;
+    height: 14px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 14' preserveAspectRatio='none'><path d='M2 8 C 40 3, 95 12, 145 6 S 235 11, 278 5' stroke='%23c46a4f' stroke-width='3.5' stroke-linecap='round' fill='none' opacity='0.85'/></svg>");
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+  }
+
+  .v2-hero__tagline {
+    font-size: 1rem;
+    color: rgba(42, 39, 35, 0.7);
+    margin: 32px 0 0 8px;
+    max-width: 340px;
+    line-height: 1.5;
+  }
+
+  .v2-hero__bottom-mark {
+    color: rgba(42, 39, 35, 0.35);
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .v2-hero__corner {
+    position: absolute;
+    bottom: 80px;
+    right: 80px;
+    color: var(--sage);
+    width: 40px;
+    height: 40px;
+    opacity: 0.55;
+  }
+  @media (max-width: 768px) {
+    .v2-hero__corner {
+      bottom: 32px;
+      right: 32px;
+      width: 28px;
+      height: 28px;
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     VARIANT 3 — Botanical illustration
+     Hand-drawn sage fronds + terracotta bloom
+  ---------------------------------------------------------------- */
+  .v3-hero {
+    background: linear-gradient(
+      180deg,
+      var(--canvas) 0%,
+      var(--sage-soft) 100%
+    );
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+
+  .v3-hero__bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .v3-hero__content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .v3-hero__brand {
+    font-family: "Caveat", cursive;
+    font-size: 5rem;
+    font-weight: 600;
+    line-height: 0.95;
+    color: var(--ink);
+    margin: 0;
+  }
+  @media (max-width: 768px) {
+    .v3-hero__brand {
+      font-size: 3rem;
+    }
+  }
+
+  .v3-hero__tagline {
+    font-size: 0.9375rem;
+    color: rgba(42, 39, 35, 0.65);
+    margin: 0;
+    max-width: 280px;
+    line-height: 1.5;
+  }
+
+  /* ================================================================
+     Initial state
+  ================================================================ */
+  .variant--1 { /* default active set via JS */ }
+</style>
+</head>
+<body>
+
+<!-- ====================================================================
+     TWEAKS PANEL
+==================================================================== -->
+<div class="tweaks" role="region" aria-label="Prototype controls">
+  <p class="tweaks__label">Hero variant</p>
+  <div class="tweaks__group" role="tablist" aria-label="Variant">
+    <button class="tweaks__btn" data-variant="1" aria-pressed="true">1 · Classroom</button>
+    <button class="tweaks__btn" data-variant="2" aria-pressed="false">2 · Editorial</button>
+    <button class="tweaks__btn" data-variant="3" aria-pressed="false">3 · Botanical</button>
+  </div>
+  <p class="tweaks__label">Screen</p>
+  <div class="tweaks__group" role="tablist" aria-label="Screen">
+    <button class="tweaks__btn" data-screen="login" aria-pressed="true">Login</button>
+    <button class="tweaks__btn" data-screen="signup" aria-pressed="false">Signup</button>
+  </div>
+</div>
+
+<!-- ====================================================================
+     STAGE — 3 variants × 2 screens = 6 layouts
+==================================================================== -->
+<main class="stage">
+
+  <!-- =================================================================
+       VARIANT 1 — CLASSROOM WARMTH
+  ================================================================= -->
+  <section class="variant variant--1 is-active" data-variant="1">
+
+    <!-- Login -->
+    <div class="screen screen--login is-active" data-screen="login">
+      <div class="split">
+        <aside class="hero v1-hero">
+          <!-- AI-generated cartoon goes here. Generate with the prompt in
+               _design/ASSET-GEN.md, save to _design/assets/auth-hero-cartoon.png.
+               If the file is missing the placeholder + gradient fallback show. -->
+          <img class="v1-hero__art" src="assets/auth-hero-cartoon.png" alt=""
+               onerror="this.style.display='none'" />
+          <div class="v1-hero__placeholder">
+            cartoon hero — drop generated image at<br/>
+            <code style="font-family: ui-monospace, monospace; font-size: 0.75rem;">_design/assets/auth-hero-cartoon.png</code>
+          </div>
+          <h2 class="v1-hero__brand">Mitable</h2>
+          <div class="v1-hero__content">
+            <p class="v1-hero__quote">"Help the child do it themselves."</p>
+            <p class="v1-hero__attr">— Maria Montessori</p>
+          </div>
+        </aside>
+        <section class="form-side">
+          <form class="form" onsubmit="event.preventDefault()">
+            <header>
+              <h1 class="form__heading">Welcome back</h1>
+              <p class="form__sub">Sign in to your school.</p>
+            </header>
+            <div class="field">
+              <label class="field__label">Email</label>
+              <input class="input" type="email" placeholder="you@school.example" />
+            </div>
+            <div class="field">
+              <div class="field__label-row">
+                <label class="field__label">Password</label>
+                <a class="field__hint" href="#">Forgot?</a>
+              </div>
+              <input class="input" type="password" placeholder="••••••••" />
+            </div>
+            <button class="btn btn--primary" type="submit">Sign in</button>
+            <div class="divider">or</div>
+            <button class="btn btn--outline" type="button">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+            <p class="footer-note">
+              New to Mitable? <a class="footer-link" href="#">Create a school →</a>
+            </p>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <!-- Signup -->
+    <div class="screen screen--signup" data-screen="signup">
+      <div class="split">
+        <aside class="hero v1-hero">
+          <!-- AI-generated cartoon goes here. Generate with the prompt in
+               _design/ASSET-GEN.md, save to _design/assets/auth-hero-cartoon.png.
+               If the file is missing the placeholder + gradient fallback show. -->
+          <img class="v1-hero__art" src="assets/auth-hero-cartoon.png" alt=""
+               onerror="this.style.display='none'" />
+          <div class="v1-hero__placeholder">
+            cartoon hero — drop generated image at<br/>
+            <code style="font-family: ui-monospace, monospace; font-size: 0.75rem;">_design/assets/auth-hero-cartoon.png</code>
+          </div>
+          <h2 class="v1-hero__brand">Mitable</h2>
+          <div class="v1-hero__content">
+            <p class="v1-hero__quote">"Help the child do it themselves."</p>
+            <p class="v1-hero__attr">— Maria Montessori</p>
+          </div>
+        </aside>
+        <section class="form-side">
+          <form class="form" onsubmit="event.preventDefault()">
+            <header>
+              <h1 class="form__heading">Start your school</h1>
+              <p class="form__sub">Create your Mitable account — you'll be the first admin.</p>
+            </header>
+            <div class="field">
+              <label class="field__label">School name</label>
+              <input class="input" type="text" placeholder="Sunrise Montessori" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field__label">First name</label>
+                <input class="input" type="text" placeholder="Maria" />
+              </div>
+              <div class="field">
+                <label class="field__label">Last name</label>
+                <input class="input" type="text" placeholder="Montessori" />
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label">Email</label>
+              <input class="input" type="email" placeholder="you@school.example" />
+            </div>
+            <div class="field">
+              <label class="field__label">Password</label>
+              <input class="input" type="password" placeholder="At least 8 characters" />
+            </div>
+            <button class="btn btn--primary" type="submit">Create your school</button>
+            <div class="divider">or</div>
+            <button class="btn btn--outline" type="button">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+            <p class="footer-note">
+              Already have an account? <a class="footer-link" href="#">Sign in →</a>
+            </p>
+          </form>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       VARIANT 2 — EDITORIAL MARK
+  ================================================================= -->
+  <section class="variant variant--2" data-variant="2">
+
+    <!-- Login -->
+    <div class="screen screen--login is-active" data-screen="login">
+      <div class="split">
+        <aside class="hero v2-hero">
+          <div class="v2-hero__top-mark">
+            <span class="v2-hero__top-mark-dot"></span>
+            <span>Mitable Montessori — est. 2026</span>
+          </div>
+          <div class="v2-hero__center">
+            <h2 class="v2-hero__wordmark">Mitable</h2>
+            <p class="v2-hero__tagline">A calmer classroom platform — built for Montessori.</p>
+          </div>
+          <p class="v2-hero__bottom-mark">For directors, guides, and the children they serve.</p>
+          <svg class="v2-hero__corner" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 4 C 22 14, 28 18, 36 20 C 28 22, 22 26, 20 36 C 18 26, 12 22, 4 20 C 12 18, 18 14, 20 4 Z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </aside>
+        <section class="form-side">
+          <form class="form" onsubmit="event.preventDefault()">
+            <header>
+              <h1 class="form__heading">Welcome back</h1>
+              <p class="form__sub">Sign in to your school.</p>
+            </header>
+            <div class="field">
+              <label class="field__label">Email</label>
+              <input class="input" type="email" placeholder="you@school.example" />
+            </div>
+            <div class="field">
+              <div class="field__label-row">
+                <label class="field__label">Password</label>
+                <a class="field__hint" href="#">Forgot?</a>
+              </div>
+              <input class="input" type="password" placeholder="••••••••" />
+            </div>
+            <button class="btn btn--primary" type="submit">Sign in</button>
+            <div class="divider">or</div>
+            <button class="btn btn--outline" type="button">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+            <p class="footer-note">
+              New to Mitable? <a class="footer-link" href="#">Create a school →</a>
+            </p>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <!-- Signup -->
+    <div class="screen screen--signup" data-screen="signup">
+      <div class="split">
+        <aside class="hero v2-hero">
+          <div class="v2-hero__top-mark">
+            <span class="v2-hero__top-mark-dot"></span>
+            <span>Mitable Montessori — est. 2026</span>
+          </div>
+          <div class="v2-hero__center">
+            <h2 class="v2-hero__wordmark">Mitable</h2>
+            <p class="v2-hero__tagline">A calmer classroom platform — built for Montessori.</p>
+          </div>
+          <p class="v2-hero__bottom-mark">For directors, guides, and the children they serve.</p>
+          <svg class="v2-hero__corner" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 4 C 22 14, 28 18, 36 20 C 28 22, 22 26, 20 36 C 18 26, 12 22, 4 20 C 12 18, 18 14, 20 4 Z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </aside>
+        <section class="form-side">
+          <form class="form" onsubmit="event.preventDefault()">
+            <header>
+              <h1 class="form__heading">Start your school</h1>
+              <p class="form__sub">Create your Mitable account — you'll be the first admin.</p>
+            </header>
+            <div class="field">
+              <label class="field__label">School name</label>
+              <input class="input" type="text" placeholder="Sunrise Montessori" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field__label">First name</label>
+                <input class="input" type="text" placeholder="Maria" />
+              </div>
+              <div class="field">
+                <label class="field__label">Last name</label>
+                <input class="input" type="text" placeholder="Montessori" />
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label">Email</label>
+              <input class="input" type="email" placeholder="you@school.example" />
+            </div>
+            <div class="field">
+              <label class="field__label">Password</label>
+              <input class="input" type="password" placeholder="At least 8 characters" />
+            </div>
+            <button class="btn btn--primary" type="submit">Create your school</button>
+            <div class="divider">or</div>
+            <button class="btn btn--outline" type="button">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+            <p class="footer-note">
+              Already have an account? <a class="footer-link" href="#">Sign in →</a>
+            </p>
+          </form>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       VARIANT 3 — BOTANICAL ILLUSTRATION
+  ================================================================= -->
+  <section class="variant variant--3" data-variant="3">
+
+    <!-- Login -->
+    <div class="screen screen--login is-active" data-screen="login">
+      <div class="split">
+        <aside class="hero v3-hero">
+          <!-- Hand-drawn-ish botanical SVG. Slightly imperfect curves intentional. -->
+          <svg class="v3-hero__bg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice"
+               xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <!-- Top-left fronds -->
+            <g stroke="#7a9b7a" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.85">
+              <path d="M-20 80 C 60 50, 130 110, 180 70" />
+              <path d="M-15 80 Q 30 60, 60 75" />
+              <path d="M50 95 Q 90 75, 110 100" />
+              <path d="M120 90 Q 150 70, 165 95" />
+            </g>
+            <!-- leafy buds top-left -->
+            <g fill="#7a9b7a" opacity="0.7">
+              <ellipse cx="40" cy="70" rx="9" ry="4" transform="rotate(-22 40 70)"/>
+              <ellipse cx="78" cy="83" rx="11" ry="4.5" transform="rotate(-12 78 83)"/>
+              <ellipse cx="128" cy="82" rx="10" ry="4" transform="rotate(-30 128 82)"/>
+              <ellipse cx="170" cy="68" rx="8" ry="3.5" transform="rotate(-15 170 68)"/>
+            </g>
+
+            <!-- Bottom-right fronds -->
+            <g stroke="#7a9b7a" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.85">
+              <path d="M620 720 C 520 760, 460 700, 410 740" />
+              <path d="M615 720 Q 560 740, 540 720" />
+              <path d="M555 705 Q 500 720, 470 700" />
+              <path d="M460 715 Q 430 695, 415 730" />
+            </g>
+            <g fill="#7a9b7a" opacity="0.7">
+              <ellipse cx="565" cy="730" rx="10" ry="4" transform="rotate(160 565 730)"/>
+              <ellipse cx="510" cy="715" rx="11" ry="4.5" transform="rotate(168 510 715)"/>
+              <ellipse cx="455" cy="715" rx="9" ry="4" transform="rotate(150 455 715)"/>
+            </g>
+
+            <!-- top-right small frond -->
+            <g stroke="#7a9b7a" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.6">
+              <path d="M540 60 Q 580 40, 615 65"/>
+              <path d="M555 80 Q 585 70, 600 85"/>
+            </g>
+            <g fill="#7a9b7a" opacity="0.55">
+              <ellipse cx="575" cy="55" rx="7" ry="3" transform="rotate(-20 575 55)"/>
+              <ellipse cx="600" cy="70" rx="6" ry="2.5" transform="rotate(-10 600 70)"/>
+            </g>
+
+            <!-- Bottom-left small frond -->
+            <g stroke="#7a9b7a" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.55">
+              <path d="M-15 740 Q 30 760, 70 735"/>
+              <path d="M0 760 Q 30 770, 55 760"/>
+            </g>
+
+            <!-- Terracotta flower bloom (right of brand) -->
+            <g transform="translate(420 270)">
+              <!-- 5 loose petals -->
+              <g fill="#c46a4f" opacity="0.92">
+                <ellipse cx="0" cy="-22" rx="13" ry="20" transform="rotate(-12 0 -22)"/>
+                <ellipse cx="22" cy="-8" rx="13" ry="20" transform="rotate(58 22 -8)"/>
+                <ellipse cx="14" cy="20" rx="13" ry="20" transform="rotate(128 14 20)"/>
+                <ellipse cx="-16" cy="18" rx="13" ry="20" transform="rotate(-148 -16 18)"/>
+                <ellipse cx="-22" cy="-10" rx="13" ry="20" transform="rotate(-72 -22 -10)"/>
+              </g>
+              <!-- center -->
+              <circle cx="0" cy="0" r="8" fill="#e8c56a" opacity="0.9"/>
+              <circle cx="0" cy="0" r="3" fill="#2a2723" opacity="0.6"/>
+              <!-- stem -->
+              <path d="M0 8 Q -6 60, 4 130" stroke="#7a9b7a" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.75"/>
+              <!-- 1 leaf on stem -->
+              <ellipse cx="-12" cy="60" rx="14" ry="6" transform="rotate(-32 -12 60)" fill="#7a9b7a" opacity="0.7"/>
+            </g>
+
+            <!-- butter seed accent -->
+            <circle cx="170" cy="540" r="5" fill="#e8c56a" opacity="0.85"/>
+            <circle cx="186" cy="554" r="3" fill="#e8c56a" opacity="0.7"/>
+          </svg>
+
+          <div class="v3-hero__content">
+            <h2 class="v3-hero__brand">Mitable</h2>
+            <p class="v3-hero__tagline">A calmer classroom platform — built for Montessori.</p>
+          </div>
+        </aside>
+        <section class="form-side">
+          <form class="form" onsubmit="event.preventDefault()">
+            <header>
+              <h1 class="form__heading">Welcome back</h1>
+              <p class="form__sub">Sign in to your school.</p>
+            </header>
+            <div class="field">
+              <label class="field__label">Email</label>
+              <input class="input" type="email" placeholder="you@school.example" />
+            </div>
+            <div class="field">
+              <div class="field__label-row">
+                <label class="field__label">Password</label>
+                <a class="field__hint" href="#">Forgot?</a>
+              </div>
+              <input class="input" type="password" placeholder="••••••••" />
+            </div>
+            <button class="btn btn--primary" type="submit">Sign in</button>
+            <div class="divider">or</div>
+            <button class="btn btn--outline" type="button">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+            <p class="footer-note">
+              New to Mitable? <a class="footer-link" href="#">Create a school →</a>
+            </p>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <!-- Signup -->
+    <div class="screen screen--signup" data-screen="signup">
+      <div class="split">
+        <aside class="hero v3-hero">
+          <svg class="v3-hero__bg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice"
+               xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <g stroke="#7a9b7a" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.85">
+              <path d="M-20 80 C 60 50, 130 110, 180 70" />
+              <path d="M-15 80 Q 30 60, 60 75" />
+              <path d="M50 95 Q 90 75, 110 100" />
+              <path d="M120 90 Q 150 70, 165 95" />
+            </g>
+            <g fill="#7a9b7a" opacity="0.7">
+              <ellipse cx="40" cy="70" rx="9" ry="4" transform="rotate(-22 40 70)"/>
+              <ellipse cx="78" cy="83" rx="11" ry="4.5" transform="rotate(-12 78 83)"/>
+              <ellipse cx="128" cy="82" rx="10" ry="4" transform="rotate(-30 128 82)"/>
+              <ellipse cx="170" cy="68" rx="8" ry="3.5" transform="rotate(-15 170 68)"/>
+            </g>
+            <g stroke="#7a9b7a" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.85">
+              <path d="M620 720 C 520 760, 460 700, 410 740" />
+              <path d="M615 720 Q 560 740, 540 720" />
+              <path d="M555 705 Q 500 720, 470 700" />
+              <path d="M460 715 Q 430 695, 415 730" />
+            </g>
+            <g fill="#7a9b7a" opacity="0.7">
+              <ellipse cx="565" cy="730" rx="10" ry="4" transform="rotate(160 565 730)"/>
+              <ellipse cx="510" cy="715" rx="11" ry="4.5" transform="rotate(168 510 715)"/>
+              <ellipse cx="455" cy="715" rx="9" ry="4" transform="rotate(150 455 715)"/>
+            </g>
+            <g stroke="#7a9b7a" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.6">
+              <path d="M540 60 Q 580 40, 615 65"/>
+              <path d="M555 80 Q 585 70, 600 85"/>
+            </g>
+            <g fill="#7a9b7a" opacity="0.55">
+              <ellipse cx="575" cy="55" rx="7" ry="3" transform="rotate(-20 575 55)"/>
+              <ellipse cx="600" cy="70" rx="6" ry="2.5" transform="rotate(-10 600 70)"/>
+            </g>
+            <g stroke="#7a9b7a" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.55">
+              <path d="M-15 740 Q 30 760, 70 735"/>
+              <path d="M0 760 Q 30 770, 55 760"/>
+            </g>
+            <g transform="translate(420 270)">
+              <g fill="#c46a4f" opacity="0.92">
+                <ellipse cx="0" cy="-22" rx="13" ry="20" transform="rotate(-12 0 -22)"/>
+                <ellipse cx="22" cy="-8" rx="13" ry="20" transform="rotate(58 22 -8)"/>
+                <ellipse cx="14" cy="20" rx="13" ry="20" transform="rotate(128 14 20)"/>
+                <ellipse cx="-16" cy="18" rx="13" ry="20" transform="rotate(-148 -16 18)"/>
+                <ellipse cx="-22" cy="-10" rx="13" ry="20" transform="rotate(-72 -22 -10)"/>
+              </g>
+              <circle cx="0" cy="0" r="8" fill="#e8c56a" opacity="0.9"/>
+              <circle cx="0" cy="0" r="3" fill="#2a2723" opacity="0.6"/>
+              <path d="M0 8 Q -6 60, 4 130" stroke="#7a9b7a" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.75"/>
+              <ellipse cx="-12" cy="60" rx="14" ry="6" transform="rotate(-32 -12 60)" fill="#7a9b7a" opacity="0.7"/>
+            </g>
+            <circle cx="170" cy="540" r="5" fill="#e8c56a" opacity="0.85"/>
+            <circle cx="186" cy="554" r="3" fill="#e8c56a" opacity="0.7"/>
+          </svg>
+          <div class="v3-hero__content">
+            <h2 class="v3-hero__brand">Mitable</h2>
+            <p class="v3-hero__tagline">A calmer classroom platform — built for Montessori.</p>
+          </div>
+        </aside>
+        <section class="form-side">
+          <form class="form" onsubmit="event.preventDefault()">
+            <header>
+              <h1 class="form__heading">Start your school</h1>
+              <p class="form__sub">Create your Mitable account — you'll be the first admin.</p>
+            </header>
+            <div class="field">
+              <label class="field__label">School name</label>
+              <input class="input" type="text" placeholder="Sunrise Montessori" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field__label">First name</label>
+                <input class="input" type="text" placeholder="Maria" />
+              </div>
+              <div class="field">
+                <label class="field__label">Last name</label>
+                <input class="input" type="text" placeholder="Montessori" />
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label">Email</label>
+              <input class="input" type="email" placeholder="you@school.example" />
+            </div>
+            <div class="field">
+              <label class="field__label">Password</label>
+              <input class="input" type="password" placeholder="At least 8 characters" />
+            </div>
+            <button class="btn btn--primary" type="submit">Create your school</button>
+            <div class="divider">or</div>
+            <button class="btn btn--outline" type="button">
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </button>
+            <p class="footer-note">
+              Already have an account? <a class="footer-link" href="#">Sign in →</a>
+            </p>
+          </form>
+        </section>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ----------------------------------------------------------------
+  // Tweaks panel: switch variant + screen via class toggling.
+  // ----------------------------------------------------------------
+  const variantBtns = document.querySelectorAll(".tweaks__btn[data-variant]");
+  const screenBtns = document.querySelectorAll(".tweaks__btn[data-screen]");
+  const variants = document.querySelectorAll(".variant");
+  let currentVariant = "1";
+  let currentScreen = "login";
+
+  function applyState() {
+    variants.forEach((v) => {
+      const isActive = v.dataset.variant === currentVariant;
+      v.classList.toggle("is-active", isActive);
+      // Screens within: only update on the active variant; others kept in sync too
+      v.querySelectorAll(".screen").forEach((s) => {
+        s.classList.toggle("is-active", s.dataset.screen === currentScreen);
+      });
+    });
+    variantBtns.forEach((b) => {
+      b.setAttribute("aria-pressed", b.dataset.variant === currentVariant ? "true" : "false");
+    });
+    screenBtns.forEach((b) => {
+      b.setAttribute("aria-pressed", b.dataset.screen === currentScreen ? "true" : "false");
+    });
+  }
+
+  variantBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentVariant = btn.dataset.variant;
+      applyState();
+    });
+  });
+  screenBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentScreen = btn.dataset.screen;
+      applyState();
+    });
+  });
+
+  // Persist in localStorage so reload keeps state
+  try {
+    const saved = JSON.parse(localStorage.getItem("mitable-auth-prototype") || "{}");
+    if (saved.variant) currentVariant = saved.variant;
+    if (saved.screen) currentScreen = saved.screen;
+    applyState();
+    [...variantBtns, ...screenBtns].forEach((b) =>
+      b.addEventListener("click", () => {
+        localStorage.setItem(
+          "mitable-auth-prototype",
+          JSON.stringify({ variant: currentVariant, screen: currentScreen })
+        );
+      })
+    );
+  } catch {}
+</script>
+</body>
+</html>
