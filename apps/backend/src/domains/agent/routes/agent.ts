@@ -512,7 +512,6 @@ const AGENT_QUERY_MAX_ITERATIONS = 10;
 // ── LLM clients (lazy init) — Claude → GPT-5 → DeepSeek V3.2 ──────
 
 let agentAnthropicClient: Anthropic | null = null;
-let agentOpenaiClient: OpenAI | null = null;
 let agentDeepseekClient: OpenAI | null = null;
 
 function getAgentAnthropicClient(): Anthropic | null {
@@ -520,13 +519,6 @@ function getAgentAnthropicClient(): Anthropic | null {
     agentAnthropicClient = new Anthropic({ apiKey: config.anthropic.apiKey });
   }
   return agentAnthropicClient;
-}
-
-function getAgentOpenaiClient(): OpenAI | null {
-  if (!agentOpenaiClient && config.openai.apiKey) {
-    agentOpenaiClient = new OpenAI({ apiKey: config.openai.apiKey });
-  }
-  return agentOpenaiClient;
 }
 
 function getAgentDeepseekClient(): OpenAI | null {
@@ -543,12 +535,12 @@ async function callAgentQueryLLM(
   systemPrompt: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>
 ): Promise<string> {
-  // 1. Claude Sonnet 4.5 (primary)
+  // 1. Claude Haiku 4.5 (primary — cost-effective for agent chat)
   const claude = getAgentAnthropicClient();
   if (claude) {
     try {
       const response = await claude.messages.create({
-        model: "claude-sonnet-4-5-20250929",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 4000,
         system: systemPrompt,
         messages,
@@ -560,32 +552,15 @@ async function callAgentQueryLLM(
       const errStr = String(error);
       const isFatal = /401|403|invalid.*key|billing|authentication/i.test(errStr);
       if (isFatal) {
-        logger.error({ error: errStr }, "Agent query: Claude auth/billing error");
+        logger.error({ error: errStr }, "Agent query: Haiku auth/billing error");
         agentAnthropicClient = null;
       } else {
-        logger.warn({ error: errStr }, "Agent query: Claude failed (transient) — trying GPT-5");
+        logger.warn({ error: errStr }, "Agent query: Haiku failed (transient) — trying DeepSeek");
       }
     }
   }
 
-  // 2. GPT-5 (fallback)
-  const oai = getAgentOpenaiClient();
-  if (oai) {
-    try {
-      const completion = await oai.chat.completions.create({
-        model: "gpt-5.4",
-        messages: [{ role: "system", content: systemPrompt }, ...messages],
-        temperature: 0.7,
-        max_completion_tokens: 4000,
-      });
-      const content = completion.choices[0]?.message?.content?.trim();
-      if (content) return content;
-    } catch (error) {
-      logger.warn({ error: String(error) }, "Agent query: GPT-5.4 failed — trying DeepSeek");
-    }
-  }
-
-  // 3. DeepSeek V3.2 (last resort)
+  // 2. DeepSeek V3.2 (fallback)
   const deepseek = getAgentDeepseekClient();
   if (deepseek) {
     const completion = await deepseek.chat.completions.create({
@@ -597,7 +572,7 @@ async function callAgentQueryLLM(
     return completion.choices[0]?.message?.content?.trim() || "";
   }
 
-  throw new Error("No LLM available — need ANTHROPIC_API_KEY, OPENAI_API_KEY, or DEEPSEEK_API_KEY");
+  throw new Error("No LLM available — need ANTHROPIC_API_KEY or DEEPSEEK_API_KEY");
 }
 
 agentRouter.post("/ask", async (req: Request, res: Response) => {
