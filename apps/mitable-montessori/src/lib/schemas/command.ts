@@ -5,6 +5,11 @@ export const AttendancePayloadSchema = z.object({
   status: z.enum(["present", "absent"]),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   comment: z.string().max(500).optional(),
+  /** "HH:MM" or "HH:MM:SS" — only stored when status = "present". */
+  arrival_time: z
+    .string()
+    .regex(/^\d{2}:\d{2}(:\d{2})?$/)
+    .optional(),
 });
 
 export const ProgressPayloadSchema = z.object({

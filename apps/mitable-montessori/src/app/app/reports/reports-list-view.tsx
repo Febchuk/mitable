@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Sparkles, Trash2 } from "lucide-react";
+import { Sparkles, Trash2 } from "lucide-react";
 import { initialsFor } from "@/components/montessori/data";
 import type { ReportListRow } from "@/lib/queries/reports";
 import { FilterChips, PageHeader, cardStyle } from "@/components/montessori/page-header";
@@ -171,12 +171,12 @@ export function ReportsListView({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 24px 36px",
+                gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 36px",
                 padding: "12px 20px",
                 borderBottom: "1px solid var(--color-border)",
               }}
             >
-              {["Child", "Type", "Date", "Status", "", ""].map((h, i) => (
+              {["Child", "Type", "Date", "Status", ""].map((h, i) => (
                 <div key={i} className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
                   {h}
                 </div>
@@ -189,7 +189,7 @@ export function ReportsListView({
                   key={r.id}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 24px 36px",
+                    gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 36px",
                     alignItems: "center",
                     padding: "12px 20px",
                     borderTop: "1px solid var(--color-border)",
@@ -242,9 +242,6 @@ export function ReportsListView({
                         {tone.sent && <HandCheck color={tone.fg} size={11} />}
                         {tone.label}
                       </span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                      <ChevronRight size={14} strokeWidth={1.5} />
                     </div>
                   </Link>
                   <button
@@ -337,7 +334,6 @@ export function ReportsListView({
                       {tone.label}
                     </div>
                   </div>
-                  <ChevronRight size={16} strokeWidth={1.5} />
                 </Link>
                 <button
                   type="button"
