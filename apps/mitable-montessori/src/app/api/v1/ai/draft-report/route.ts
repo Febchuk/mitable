@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         report_date: input.periodEnd,
         status: "draft",
         title: result.draft.title,
-        body: result.draft.draft_text,
+        body: result.draft.sections.map((s) => `# ${s.heading}\n\n${s.content}`).join("\n\n"),
         created_by_user_id: auth.user.userId,
       })
       .select("id")

@@ -7,7 +7,7 @@ import type { SubscriptionTier } from "../schema/billing.schema.js";
 
 const stripe = config.stripe.secretKey
   ? new Stripe(config.stripe.secretKey, {
-      apiVersion: "2026-01-28.clover",
+      apiVersion: "2026-02-25.clover",
     })
   : (null as unknown as Stripe);
 

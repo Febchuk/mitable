@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, FileText } from "lucide-react";
+import { ArrowRight, FileText, Trash2 } from "lucide-react";
 import type { Tone } from "../data";
 import { initialsFor } from "../data";
 
@@ -31,6 +31,8 @@ export function ReportTopBar({
   classroom,
   savedMeta,
   savedMetaDirty = false,
+  reportsListHref = "/app/reports",
+  onDeleteClick,
 }: {
   child: ChildLike | undefined;
   status: ReportStatus;
@@ -39,6 +41,10 @@ export function ReportTopBar({
   classroom?: string;
   savedMeta: string;
   savedMetaDirty?: boolean;
+  /** Back link target — `/admin/reports` on admin report detail. */
+  reportsListHref?: string;
+  /** Opens delete confirmation (parent owns dialog). */
+  onDeleteClick?: () => void;
 }) {
   const displayName = child?.name ?? "Report";
   const headingTitle = child ? `${kind} report — ${child.name.split(" ")[0]}` : `${kind} report`;
@@ -50,7 +56,7 @@ export function ReportTopBar({
   return (
     <div className="rd-page-header">
       <div className="rd-page-header-top">
-        <Link href="/app/reports" className="rd-back-link">
+        <Link href={reportsListHref} className="rd-back-link">
           <ChevLeft />
           <span>All reports</span>
         </Link>
@@ -100,6 +106,17 @@ export function ReportTopBar({
             Submit for review
             <ArrowRight size={13} strokeWidth={2.5} />
           </button>
+          {onDeleteClick ? (
+            <button
+              type="button"
+              className="rd-btn rd-btn-danger-ghost"
+              onClick={onDeleteClick}
+              aria-label="Delete report"
+            >
+              <Trash2 size={14} strokeWidth={2} />
+              Delete
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

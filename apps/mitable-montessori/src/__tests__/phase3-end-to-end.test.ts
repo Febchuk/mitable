@@ -101,10 +101,15 @@ interface StubTurn {
           period_start: string;
           period_end: string;
           title: string;
-          draft_text: string;
+          sections: { heading: string; content: string }[];
         };
       }
   >;
+}
+
+/** Concatenate all section contents for assertions. */
+function draftText(d: { sections: { heading: string; content: string }[] }): string {
+  return d.sections.map((s) => s.content).join("\n\n");
 }
 
 function buildStubAnthropic(turns: StubTurn[]) {
@@ -185,9 +190,14 @@ describe("Phase 3 — report drafting agent loop", () => {
               period_start: "2026-04-28",
               period_end: "2026-05-01",
               title: "Daily report for [STUDENT_1]",
-              draft_text:
-                "[STUDENT_1] showed strong concentration during [SUBTOPIC_1] this week. " +
-                "We saw consistent practicing across [CLASSROOM_0], with attentive return to materials.",
+              sections: [
+                {
+                  heading: "Today",
+                  content:
+                    "[STUDENT_1] showed strong concentration during [SUBTOPIC_1] this week. " +
+                    "We saw consistent practicing across [CLASSROOM_0], with attentive return to materials.",
+                },
+              ],
             },
           },
         ],
@@ -203,10 +213,11 @@ describe("Phase 3 — report drafting agent loop", () => {
     expect(result.turns).toBe(2);
     expect(result.regenerations).toBe(0);
     expect(result.draft.title).toContain("[STUDENT_1]");
-    expect(result.draft.draft_text).toContain("[STUDENT_1]");
-    expect(result.draft.draft_text).toContain("[SUBTOPIC_1]");
-    expect(result.draft.draft_text.toLowerCase()).not.toContain("maya");
-    expect(result.draft.draft_text.toLowerCase()).not.toContain("pink tower");
+    const text = draftText(result.draft);
+    expect(text).toContain("[STUDENT_1]");
+    expect(text).toContain("[SUBTOPIC_1]");
+    expect(text.toLowerCase()).not.toContain("maya");
+    expect(text.toLowerCase()).not.toContain("pink tower");
 
     // References merged across both read tools.
     const tokens = new Set(result.references.refs.map((r) => r.token));
@@ -215,7 +226,7 @@ describe("Phase 3 — report drafting agent loop", () => {
     expect(tokens.has("[CLASSROOM_0]")).toBe(true);
 
     // Validator agrees the draft is clean.
-    const v = validateTokenPreservation(result.draft.draft_text, result.references.refs);
+    const v = validateTokenPreservation(text, result.references.refs);
     expect(v.ok).toBe(true);
   });
 
@@ -237,7 +248,9 @@ describe("Phase 3 — report drafting agent loop", () => {
               period_start: "2026-04-28",
               period_end: "2026-05-01",
               title: "Daily report",
-              draft_text: "Maya did the [SUBTOPIC_1] today and was attentive.",
+              sections: [
+                { heading: "Today", content: "Maya did the [SUBTOPIC_1] today and was attentive." },
+              ],
             },
           },
         ],
@@ -258,7 +271,9 @@ describe("Phase 3 — report drafting agent loop", () => {
               period_start: "2026-04-28",
               period_end: "2026-05-01",
               title: "Daily report",
-              draft_text: "[STUDENT_1] worked steadily on [SUBTOPIC_1] today.",
+              sections: [
+                { heading: "Today", content: "[STUDENT_1] worked steadily on [SUBTOPIC_1] today." },
+              ],
             },
           },
         ],
@@ -272,7 +287,7 @@ describe("Phase 3 — report drafting agent loop", () => {
     });
 
     expect(result.regenerations).toBe(1);
-    expect(result.draft.draft_text.toLowerCase()).not.toContain("maya");
+    expect(draftText(result.draft).toLowerCase()).not.toContain("maya");
   });
 
   it("aborts cleanly when the agent never calls draft_report", async () => {

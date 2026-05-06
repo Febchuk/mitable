@@ -69,13 +69,13 @@ export function ReportDraftButton(props: ReportDraftButtonProps) {
       }
       const json = (await res.json()) as {
         reportId: string;
-        draft: { title: string; draft_text: string };
+        draft: { title: string; sections: { heading: string; content: string }[] };
         references: ReportReferenceSet;
       };
       props.onDraft?.({
         reportId: json.reportId,
         title: json.draft.title,
-        body: json.draft.draft_text,
+        body: json.draft.sections.map((s) => `# ${s.heading}\n\n${s.content}`).join("\n\n"),
         references: json.references,
       });
     } catch (err) {

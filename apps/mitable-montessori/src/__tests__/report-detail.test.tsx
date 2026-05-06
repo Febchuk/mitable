@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ReportDetail } from "@/components/montessori/report-detail";
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
 
@@ -10,6 +10,11 @@ vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("notFound");
   },
+}));
+
+vi.mock("@/lib/capture/draft-capture-storage", () => ({
+  readStoredDraftCapture: vi.fn(() => null),
+  clearStoredDraftCapture: vi.fn(),
 }));
 
 void React;
@@ -64,6 +69,27 @@ const EMPTY_REPORT: ReportDetailRow = {
   sections: null,
   // Promote out of "draft" so the auto-draft effect doesn't fire.
   status: "approved",
+};
+
+/** Triggers the auto-`useEffect` that POSTs `/draft` (empty body + empty/placeholder sections). */
+const EMPTY_DRAFT_FOR_AUTO: ReportDetailRow = {
+  ...ADA_REPORT,
+  id: "r-auto-draft",
+  body: null,
+  sections: null,
+  status: "draft",
+  title: null,
+};
+
+/** Simulated API payload after `draft` completes — same id as `EMPTY_DRAFT_FOR_AUTO`. */
+const AFTER_DRAFT_REPORT: ReportDetailRow = {
+  ...ADA_REPORT,
+  id: "r-auto-draft",
+  status: "draft",
+  title: "A steady Friday for Ada",
+  body: null,
+  sections: ADA_REPORT.sections,
+  updatedAt: "2026-05-02T12:30:00Z",
 };
 
 beforeEach(() => {
@@ -153,5 +179,47 @@ describe("ReportDetail", () => {
 
     expect(screen.queryByText("Afternoon")).toBeNull();
     expect(screen.getByText("Unsaved changes")).toBeTruthy();
+  });
+
+  /**
+   * Guards the dev-only Strict Mode issue: a `cancelled` flag tied to effect cleanup could drop a
+   * late `/draft` JSON response (spinner stuck). React Strict Mode double-invokes effects only in
+   * development — production builds do not replay this. This test only documents that a delayed
+   * success response still reaches the UI when Strict Mode is on.
+   */
+  it("still applies a delayed auto-draft response when wrapped in StrictMode", async () => {
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : "url" in input ? input.url : String(input);
+      if (url.includes("/reports/r-auto-draft/draft") && init?.method === "POST") {
+        return new Promise<Response>((resolve) => {
+          setTimeout(() => {
+            resolve(
+              new Response(JSON.stringify({ report: AFTER_DRAFT_REPORT }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              })
+            );
+          }, 40);
+        });
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+
+    render(
+      <React.StrictMode>
+        <ReportDetail report={EMPTY_DRAFT_FOR_AUTO} />
+      </React.StrictMode>
+    );
+
+    expect(screen.getByText("Drafting with assistant…")).toBeTruthy();
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("Morning")).toBeTruthy();
+      },
+      { timeout: 4000 }
+    );
+
+    expect(screen.queryByText("Drafting with assistant…")).toBeNull();
   });
 });

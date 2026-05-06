@@ -12,6 +12,10 @@ const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
 type ReportPaneProps = {
   detail: ReportDetail;
   onChange: (next: ReportDetail) => void;
+  /** True while POST /draft is filling the report from capture — blocks edits on this pane only. */
+  isDrafting?: boolean;
+  /** Aborts the in-flight /draft request (client-side); optional for tests. */
+  onCancelDrafting?: () => void;
 };
 
 function newId(prefix: string) {
@@ -19,7 +23,12 @@ function newId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export function ReportPane({ detail, onChange }: ReportPaneProps) {
+export function ReportPane({
+  detail,
+  onChange,
+  isDrafting = false,
+  onCancelDrafting,
+}: ReportPaneProps) {
   const [addingSection, setAddingSection] = React.useState(false);
   // ID of a paragraph that should grab focus on next render (e.g. the empty
   // paragraph in a freshly-created section).
@@ -124,6 +133,26 @@ export function ReportPane({ detail, onChange }: ReportPaneProps) {
           </button>
         </div>
       </div>
+
+      {isDrafting ? (
+        <div
+          className="rd-report-loading-overlay"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="Report loading"
+        >
+          <div className="rd-report-loading-card">
+            <span className="rd-report-loading-spinner" aria-hidden />
+            <p>Report loading</p>
+            {onCancelDrafting ? (
+              <button type="button" className="rd-report-loading-cancel" onClick={onCancelDrafting}>
+                Stop drafting
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

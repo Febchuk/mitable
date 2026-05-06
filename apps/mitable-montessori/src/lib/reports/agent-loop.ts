@@ -37,6 +37,12 @@ export interface AgentRunInput {
    * even when the agent drafts from capture only (no read-tool calls).
    */
   seedReferences?: ReportReferenceSet;
+  /**
+   * Template sections (heading + guidance). The agent fills one prose block
+   * per heading, in order. If empty, the agent will fall back to a single
+   * "Report" section.
+   */
+  templateSections?: { heading: string; guidance: string }[];
 }
 
 export interface AgentRunOutput {
@@ -174,8 +180,11 @@ export async function runReportAgent(input: AgentRunInput): Promise<AgentRunOutp
       if (draftCall) {
         // Validate token preservation against the union of refs gathered so far.
         const merged = mergeReferenceSets(...accumulatedRefs);
+        const concatenated = draftCall.sections
+          .map((s) => `${s.heading}\n${s.content}`)
+          .join("\n\n");
         const validation = validateTokenPreservation(
-          `${draftCall.title}\n\n${draftCall.draft_text}`,
+          `${draftCall.title}\n\n${concatenated}`,
           merged.refs
         );
         if (validation.ok) {
@@ -219,6 +228,10 @@ function buildKickoff(input: AgentRunInput): string {
   const transcripts = (input.captureTranscripts ?? []).filter((t) => t.trim().length > 0);
   const notes = (input.captureNotes ?? []).filter((t) => t.trim().length > 0);
   const hasCapture = transcripts.length > 0 || notes.length > 0;
+  const templateSections =
+    input.templateSections && input.templateSections.length > 0
+      ? input.templateSections
+      : [{ heading: "Report", guidance: "A single prose summary of the period." }];
 
   const lines = [
     `Draft a ${input.reportType} report.`,
@@ -226,11 +239,20 @@ function buildKickoff(input: AgentRunInput): string {
     `Classroom token: ${input.classroomToken}`,
     `Period: ${input.periodStart} → ${input.periodEnd}`,
     "",
+    "## Sections to fill (in this exact order)",
+    "Write one prose block per section. Match each heading verbatim. Follow each section's guidance.",
+    "",
   ];
+
+  templateSections.forEach((s, i) => {
+    const guidance = s.guidance?.trim().length ? s.guidance.trim() : "(no specific guidance)";
+    lines.push(`${i + 1}. ${s.heading} — ${guidance}`);
+  });
+  lines.push("");
 
   if (hasCapture) {
     lines.push("## Teacher capture (primary narrative source)");
-    lines.push("Ground the report body in this capture. Use tokens only — never real names.");
+    lines.push("Ground the report content in this capture. Use tokens only — never real names.");
     if (transcripts.length > 0) {
       lines.push("", "Voice transcript(s):");
       transcripts.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
@@ -247,6 +269,9 @@ function buildKickoff(input: AgentRunInput): string {
     lines.push("Use get_student_commands first, then get_student_progress_summary if you need it.");
   }
 
-  lines.push("Then call draft_report exactly once. Reference entities by token only.");
+  lines.push(
+    "",
+    "Then call draft_report exactly once with a `sections` array — one entry per heading above, in order. Reference entities by token only."
+  );
   return lines.join("\n");
 }

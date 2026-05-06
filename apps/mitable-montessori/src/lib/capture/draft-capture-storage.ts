@@ -3,6 +3,9 @@
  * draft API call (Option A — not persisted in the database).
  */
 
+import type { TokenMapEntry } from "@/lib/schemas/report";
+import { TokenMapEntrySchema } from "@/lib/schemas/report";
+
 export const REPORT_DRAFT_CAPTURE_PREFIX = "mitable:report-draft-capture:";
 
 export function draftCaptureStorageKey(reportId: string): string {
@@ -12,6 +15,8 @@ export function draftCaptureStorageKey(reportId: string): string {
 export type StoredDraftCapture = {
   transcripts: string[];
   notes: string[];
+  /** Roster tokens for every name fuzzy-matched in capture (multi-student transcripts). */
+  tokenMap: TokenMapEntry[];
 };
 
 export function writeStoredDraftCapture(reportId: string, data: StoredDraftCapture): void {
@@ -37,7 +42,14 @@ export function readStoredDraftCapture(reportId: string): StoredDraftCapture | n
     const notes = Array.isArray(o.notes)
       ? o.notes.filter((t): t is string => typeof t === "string" && t.length > 0)
       : [];
-    return { transcripts, notes };
+    const tokenMap: TokenMapEntry[] = [];
+    if (Array.isArray(o.tokenMap)) {
+      for (const item of o.tokenMap) {
+        const p = TokenMapEntrySchema.safeParse(item);
+        if (p.success) tokenMap.push(p.data);
+      }
+    }
+    return { transcripts, notes, tokenMap };
   } catch {
     return null;
   }

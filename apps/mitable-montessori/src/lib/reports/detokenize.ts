@@ -1,5 +1,3 @@
-"use client";
-
 import type { ReportReferenceSet } from "@/lib/reports/data-adapter";
 
 /**

@@ -4,12 +4,14 @@ import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { getAnthropic, SONNET_MODEL } from "@/lib/anthropic/client";
 import { runReportAgent, AgentAbortError } from "@/lib/reports/agent-loop";
-import { SupabaseReportDataAdapter, IncrementalTokenizer } from "@/lib/reports/supabase-adapter";
+import { SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
 import { DraftFromCaptureRequestSchema } from "@/lib/schemas/report";
+import { detokenizeReportText } from "@/lib/reports/detokenize";
 
 /**
  * Draft an existing reports row (created by /api/v1/reports). Pulls the row,
- * verifies the caller can see it, runs the agent, writes title+body back.
+ * verifies the caller can see it, runs the agent, writes title + sections + body
+ * back, and returns the updated row so the client can apply it without a refetch.
  *
  * Body is optional client-derived context: transcripts (Whisper), notes (OCR),
  * tokenMap (fuzzy). All thrown away after the agent run; nothing persists.
@@ -36,17 +38,47 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { data: report, error: readErr } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, period_start, period_end, report_date, status, students!inner(school_id)"
+      "id, student_id, classroom_id, report_type, period_start, period_end, report_date, status, template_id, students!inner(school_id, first_name, last_name, preferred_name)"
     )
     .eq("id", id)
     .maybeSingle();
   if (readErr || !report) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const studentSchool = (report as unknown as { students: { school_id: string } | null }).students
-    ?.school_id;
+  const studentRow = (
+    report as unknown as {
+      students: {
+        school_id: string;
+        first_name: string | null;
+        last_name: string | null;
+        preferred_name: string | null;
+      } | null;
+    }
+  ).students;
+  const studentSchool = studentRow?.school_id;
   if (studentSchool !== auth.user.schoolId) {
     return NextResponse.json({ error: "Not in your school" }, { status: 403 });
+  }
+  // Resolve display names. Two distinct values:
+  //   - studentDisplay: used to seed [STUDENT_n] for de-tokenization. Just the
+  //     first name (preferred if set, else legal). Teachers write "Max worked
+  //     on math today", not "Maximilian Smith worked on math today".
+  //   - studentFullName: used in the JSON payload's `studentName` for the top
+  //     bar, where the full name belongs.
+  const studentFirst = studentRow?.preferred_name || studentRow?.first_name || "";
+  const studentLast = studentRow?.last_name || "";
+  const studentDisplay = studentFirst.trim() || "Student";
+  const studentFullName = `${studentFirst} ${studentLast}`.trim() || "Unknown";
+
+  // Fetch classroom name so [CLASSROOM_n] also de-tokenizes properly.
+  let classroomDisplay = "";
+  {
+    const { data: classroom } = await supabase
+      .from("classrooms")
+      .select("name")
+      .eq("id", report.classroom_id as string)
+      .maybeSingle();
+    classroomDisplay = (classroom as { name: string | null } | null)?.name?.trim() ?? "";
   }
   if (report.status !== "draft") {
     return NextResponse.json(
@@ -60,9 +92,101 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Not assigned to classroom" }, { status: 403 });
   }
 
-  const tokenizer = new IncrementalTokenizer();
-  const studentToken = tokenizer.studentToken(report.student_id as string, "");
-  const classroomToken = tokenizer.classroomToken(report.classroom_id as string, "");
+  // Resolve template sections + guidance. If the report has no template_id,
+  // the agent falls back to a single "Report" section (handled in agent-loop).
+  let templateSections: { heading: string; guidance: string }[] = [];
+  if (report.template_id) {
+    const { data: tpl } = await supabase
+      .from("report_templates")
+      .select("sections, section_guidance, school_id")
+      .eq("id", report.template_id as string)
+      .maybeSingle();
+    if (tpl && (tpl.school_id as string) === auth.user.schoolId) {
+      const headings = (tpl.sections as string[] | null) ?? [];
+      const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
+      templateSections = headings.map((heading) => ({
+        heading,
+        guidance: guidance[heading] ?? "",
+      }));
+    }
+  }
+
+  // Seed the agent's reference set with every student the client tokenized
+  // from the transcript (NOT just the active one) — otherwise the validator
+  // sees their tokens as "unknown" and rejects the draft until the agent
+  // budget is exhausted, returning 502. tokenMap entries come from the
+  // client's fuzzy-match step and are trusted only after we re-fetch each
+  // student from this caller's school.
+  const studentIdsToFetch = new Set<string>([report.student_id as string]);
+  for (const entry of input.tokenMap) studentIdsToFetch.add(entry.studentId);
+
+  const { data: rosterRows } = await supabase
+    .from("students")
+    .select("id, first_name, preferred_name, school_id")
+    .in("id", Array.from(studentIdsToFetch))
+    .eq("school_id", auth.user.schoolId);
+
+  const firstNameById = new Map<string, string>();
+  for (const r of (rosterRows ?? []) as Array<{
+    id: string;
+    first_name: string | null;
+    preferred_name: string | null;
+  }>) {
+    const name = (r.preferred_name || r.first_name || "").trim() || "Student";
+    firstNameById.set(r.id, name);
+  }
+
+  // Build the explicit reference set. Each ref pairs a token with the display
+  // name we'll de-tokenize to AND the name the validator forbids leaking.
+  type SeedRef = {
+    id: string;
+    token: string;
+    display: string;
+    kind: "student" | "classroom";
+  };
+  const seedRefs: SeedRef[] = [];
+  const usedTokens = new Set<string>();
+
+  for (const entry of input.tokenMap) {
+    const firstName = firstNameById.get(entry.studentId);
+    if (!firstName) continue; // student not in caller's school — drop silently
+    seedRefs.push({
+      id: entry.studentId,
+      token: entry.token,
+      display: firstName,
+      kind: "student",
+    });
+    usedTokens.add(entry.token);
+  }
+
+  // Active student: respect whatever token the client gave him in tokenMap
+  // (so the agent's kickoff aligns with the transcript). Otherwise pick the
+  // next free [STUDENT_n] slot. This is the case when Whisper mistranscribed
+  // the active student's name and the fuzzy matcher didn't catch him.
+  const activeMapEntry = input.tokenMap.find((t) => t.studentId === report.student_id);
+  let studentToken: string;
+  if (activeMapEntry) {
+    studentToken = activeMapEntry.token;
+  } else {
+    let n = 1;
+    while (usedTokens.has(`[STUDENT_${n}]`)) n++;
+    studentToken = `[STUDENT_${n}]`;
+    seedRefs.push({
+      id: report.student_id as string,
+      token: studentToken,
+      display: studentDisplay,
+      kind: "student",
+    });
+    usedTokens.add(studentToken);
+  }
+
+  const classroomToken = "[CLASSROOM_0]";
+  seedRefs.push({
+    id: report.classroom_id as string,
+    token: classroomToken,
+    display: classroomDisplay || "this classroom",
+    kind: "classroom",
+  });
 
   const periodStart = (report.period_start || report.report_date) as string;
   const periodEnd = (report.period_end || report.report_date) as string;
@@ -107,7 +231,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const adapter = new SupabaseReportDataAdapter(supabase);
-  const seedReferences = tokenizer.references();
+  const seedReferences = { refs: seedRefs };
 
   try {
     const result = await runReportAgent({
@@ -124,13 +248,39 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       captureTranscripts: input.transcripts,
       captureNotes: input.notes,
       seedReferences,
+      templateSections,
     });
+
+    // De-tokenize the draft and shape it for the editor. We persist the
+    // de-tokenized form because the editor reads `sections` JSON directly;
+    // the reference set isn't stored alongside the row, so re-tokenizing on
+    // every render isn't possible without redesign.
+    const detokTitle = detokenizeReportText(result.draft.title, result.references);
+    const editorSections = result.draft.sections.map((s, i) => {
+      const detokHeading = detokenizeReportText(s.heading, result.references);
+      const detokContent = detokenizeReportText(s.content, result.references);
+      const slug =
+        detokHeading
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40) || `section-${i}`;
+      return {
+        id: `s-${i}-${slug}`,
+        heading: detokHeading,
+        paragraphs: [{ id: `p-${i}-1`, html: detokContent }],
+      };
+    });
+    const concatenatedBody = editorSections
+      .map((s) => `# ${s.heading}\n\n${s.paragraphs.map((p) => p.html).join("\n\n")}`)
+      .join("\n\n");
 
     const { error: updateErr } = await supabase
       .from("reports")
       .update({
-        title: result.draft.title,
-        body: result.draft.draft_text,
+        title: detokTitle,
+        sections: editorSections,
+        body: concatenatedBody,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -140,6 +290,42 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         { status: 500 }
       );
     }
+
+    // Re-read the full row + student so the client can apply it directly.
+    const { data: fresh, error: freshErr } = await supabase
+      .from("reports")
+      .select(
+        "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id)"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (freshErr || !fresh) {
+      return NextResponse.json(
+        { error: "Drafted but failed to re-read row", details: freshErr?.message },
+        { status: 500 }
+      );
+    }
+    const reportPayload = {
+      id: fresh.id,
+      studentId: fresh.student_id,
+      studentName: studentFullName,
+      classroomId: fresh.classroom_id,
+      reportType: fresh.report_type,
+      reportDate: fresh.report_date,
+      periodStart: fresh.period_start,
+      periodEnd: fresh.period_end,
+      status: fresh.status,
+      title: fresh.title,
+      body: fresh.body,
+      sections: fresh.sections,
+      templateId: fresh.template_id,
+      createdByUserId: fresh.created_by_user_id,
+      approvedByUserId: fresh.approved_by_user_id,
+      approvedAt: fresh.approved_at,
+      sentAt: fresh.sent_at,
+      createdAt: fresh.created_at,
+      updatedAt: fresh.updated_at,
+    };
 
     await auditLog({
       actor_id: auth.user.userId,
@@ -154,11 +340,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         capture_transcripts: input.transcripts.length,
         capture_notes: input.notes.length,
         capture_tokens: input.tokenMap.length,
+        section_count: editorSections.length,
       },
     });
 
     return NextResponse.json({
       reportId: id,
+      report: reportPayload,
       draft: result.draft,
       references: result.references,
       meta: { turns: result.turns, regenerations: result.regenerations },
