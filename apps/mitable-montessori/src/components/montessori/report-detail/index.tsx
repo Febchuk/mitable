@@ -12,6 +12,14 @@ import {
   clearStoredDraftCapture,
   readStoredDraftCapture,
 } from "@/lib/capture/draft-capture-storage";
+import { useUiLocale } from "@/lib/hooks/use-ui-locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const DIRTY_LABEL = "Unsaved changes";
 const SAVING_LABEL = "Saving…";
@@ -33,26 +41,30 @@ type LocalDetail = {
   sections: LocalSection[];
 };
 
-// Pin to "en-US" instead of `undefined` (the runtime default) so the server
-// (Node, en-US) and the client (browser locale, often fr-CA on this team)
-// agree. Without this, hydration throws on dates like "Monday, May 4" vs
-// "lundi 4 mai".
-function fmtDay(d: string | null | undefined): string {
+/** Calendar line for the report — uses `locale` via `useUiLocale` for hydration-safe Intl. */
+function fmtDay(d: string | null | undefined, locale: string): string {
   if (!d) return "";
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return d;
-  return dt.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  return dt.toLocaleDateString(locale, { weekday: "long", month: "short", day: "numeric" });
 }
 
-function relSavedAt(updatedAt: string): string {
+/** Relative saved-at label using the user's UI locale. */
+function relSavedAt(updatedAt: string, locale: string): string {
   const dt = new Date(updatedAt);
-  if (Number.isNaN(dt.getTime())) return "Saved";
-  const mins = Math.floor((Date.now() - dt.getTime()) / 60000);
-  if (mins < 1) return "Saved just now";
-  if (mins < 60) return `Saved ${mins} min ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `Saved ${hours} hr ago`;
-  return `Saved ${dt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  if (Number.isNaN(dt.getTime())) {
+    return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(0, "second");
+  }
+  const diffMs = Date.now() - dt.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (mins < 1) return rtf.format(0, "second");
+  if (mins < 60) return rtf.format(-mins, "minute");
+  if (hours < 24) return rtf.format(-hours, "hour");
+  if (days < 7) return rtf.format(-days, "day");
+  return dt.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
 function bodyToSections(body: string): LocalSection[] {
@@ -91,7 +103,7 @@ function sectionsAreOnlyPlaceholders(sections: ReportDetailRow["sections"]): boo
   );
 }
 
-function buildLocalDetail(report: ReportDetailRow): LocalDetail {
+function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail {
   const templateSections = report.sections as LocalSection[] | null | undefined;
   const hasBody = !!report.body?.trim();
 
@@ -104,23 +116,33 @@ function buildLocalDetail(report: ReportDetailRow): LocalDetail {
       ? bodyToSections(report.body!)
       : [];
   return {
-    title: report.title || `${report.studentName} — ${fmtDay(report.reportDate)}`,
+    title: report.title || `${report.studentName} — ${fmtDay(report.reportDate, locale)}`,
     observer: "You",
     classroom: "Your classroom",
-    dayLabel: fmtDay(report.reportDate),
-    savedMeta: relSavedAt(report.updatedAt),
+    dayLabel: fmtDay(report.reportDate, locale),
+    savedMeta: relSavedAt(report.updatedAt, locale),
     sources: { voiceNotes: 0, photos: 0, worksheets: 0 },
     visibleTo: [`${report.studentName.split(" ")[0]}'s parents`, "Lead teacher"],
     sections,
   };
 }
 
-export function ReportDetail({ report }: { report: ReportDetailRow }) {
+export function ReportDetail({
+  report,
+  backToReportsHref = "/app/reports",
+}: {
+  report: ReportDetailRow;
+  /** Where "All reports" and post-delete navigation go (`/admin/reports` for admin). */
+  backToReportsHref?: string;
+}) {
   const router = useRouter();
-  const [detail, setDetail] = React.useState<LocalDetail>(() => buildLocalDetail(report));
+  const locale = useUiLocale();
+  const [detail, setDetail] = React.useState<LocalDetail>(() => buildLocalDetail(report, locale));
   const [isDirty, setIsDirty] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDrafting, setIsDrafting] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
   const draftKickedRef = React.useRef(false);
   /** Set while a /draft request is in flight so the overlay can abort it. */
   const draftAbortRef = React.useRef<AbortController | null>(null);
@@ -175,7 +197,7 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
         // Apply the freshly-drafted row to local state immediately so the
         // editor shows filled sections without waiting for an RSC refresh.
         if (json.report) {
-          setDetail(buildLocalDetail(json.report));
+          setDetail(buildLocalDetail(json.report, locale));
         }
         // Backup: still refresh so the server tree is in sync (e.g. status,
         // updatedAt) the next time we navigate.
@@ -195,11 +217,36 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
         if (draftAbortRef.current === ac) draftAbortRef.current = null;
         setIsDrafting(false);
       });
-  }, [empty, report.id, report.status, router]);
+  }, [empty, report.id, report.status, router, locale]);
 
   const cancelDraftGeneration = React.useCallback(() => {
     draftAbortRef.current?.abort();
-  }, []);
+    setIsDrafting(false);
+    setIsDirty(false);
+    setDetail(buildLocalDetail(report, locale));
+    ToastBus.push({ message: "Drafting stopped. You can edit the report yourself." });
+  }, [report, locale]);
+
+  const confirmDeleteReport = React.useCallback(async () => {
+    setDeleteBusy(true);
+    try {
+      draftAbortRef.current?.abort();
+      const res = await fetch(`/api/v1/reports/${report.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        ToastBus.push({ message: data.error || "Couldn't delete this report." });
+        return;
+      }
+      setDeleteDialogOpen(false);
+      router.push(backToReportsHref);
+      router.refresh();
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [report.id, router, backToReportsHref]);
 
   // Debounced PATCH on edit.
   const queueSave = React.useCallback(
@@ -249,7 +296,7 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
   // state when the user isn't mid-edit.
   React.useEffect(() => {
     if (isDirty) return;
-    setDetail(buildLocalDetail(report));
+    setDetail(buildLocalDetail(report, locale));
   }, [
     report.id,
     report.body,
@@ -258,6 +305,7 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
     report.reportDate,
     report.studentName,
     report.sections,
+    locale,
     isDirty,
   ]);
 
@@ -281,27 +329,62 @@ export function ReportDetail({ report }: { report: ReportDetailRow }) {
     report.reportType === "daily" ? "Daily" : report.reportType === "major" ? "Major" : "Incident";
 
   return (
-    <div className="rd-root">
-      <ReportTopBar
-        child={{ name: report.studentName, tone: "clay" }}
-        status={topbarStatus}
-        kind={topbarKind}
-        dayLabel={detail.dayLabel}
-        classroom={detail.classroom}
-        savedMeta={savedMeta}
-        savedMetaDirty={isDirty || isDrafting || isSaving}
-      />
-      <div className="rd-workspace">
-        <div className="rd-split">
-          <ChatPane />
-          <ReportPane
-            detail={detail}
-            onChange={onChange}
-            isDrafting={isDrafting}
-            onCancelDrafting={cancelDraftGeneration}
-          />
+    <>
+      <div className="rd-root">
+        <ReportTopBar
+          child={{ name: report.studentName, tone: "clay" }}
+          status={topbarStatus}
+          kind={topbarKind}
+          dayLabel={detail.dayLabel}
+          classroom={detail.classroom}
+          savedMeta={savedMeta}
+          savedMetaDirty={isDirty || isDrafting || isSaving}
+          reportsListHref={backToReportsHref}
+          onDeleteClick={() => setDeleteDialogOpen(true)}
+        />
+        <div className="rd-workspace">
+          <div className="rd-split">
+            <ChatPane />
+            <ReportPane
+              detail={detail}
+              onChange={onChange}
+              isDrafting={isDrafting}
+              onCancelDrafting={cancelDraftGeneration}
+            />
+          </div>
         </div>
       </div>
-    </div>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="border-ink/10 bg-canvas">
+          <DialogHeader>
+            <DialogTitle>Delete this report?</DialogTitle>
+            <DialogDescription>
+              This removes the report for{" "}
+              <span className="font-medium text-ink">{report.studentName}</span> from the database.
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rd-btn rd-btn-secondary"
+              disabled={deleteBusy}
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rd-btn rd-btn-danger-ghost"
+              disabled={deleteBusy}
+              onClick={() => void confirmDeleteReport()}
+            >
+              {deleteBusy ? "Deleting…" : "Delete report"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { requireUser } from "@/lib/api/auth";
+import { requireTeacherForClassroom, requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { getReport } from "@/lib/queries/reports";
 import { UpdateReportRequestSchema } from "@/lib/schemas/report";
@@ -45,9 +45,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const studentSchool = (
-    existing as unknown as { students: { school_id: string } | null }
-  ).students?.school_id;
+  const studentSchool = (existing as unknown as { students: { school_id: string } | null }).students
+    ?.school_id;
   if (studentSchool !== auth.user.schoolId) {
     return NextResponse.json({ error: "Not in your school" }, { status: 403 });
   }
@@ -74,6 +73,75 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     metadata: {
       fields: Object.keys(parsed.data),
     },
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  const { id } = await ctx.params;
+
+  const supabase = createAdminClient();
+
+  const { data: existing } = await supabase
+    .from("reports")
+    .select("id, classroom_id, students!inner(school_id)")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const studentSchool = (existing as unknown as { students: { school_id: string } | null }).students
+    ?.school_id;
+  if (studentSchool !== auth.user.schoolId) {
+    return NextResponse.json({ error: "Not in your school" }, { status: 403 });
+  }
+
+  const classroomId = existing.classroom_id as string;
+  const allowed = auth.user.role === "admin" || (await requireTeacherForClassroom(classroomId));
+  if (!allowed) {
+    return NextResponse.json({ error: "Not allowed to delete this report" }, { status: 403 });
+  }
+
+  const { error: delRecipients } = await supabase
+    .from("report_recipients")
+    .delete()
+    .eq("report_id", id);
+  if (delRecipients) {
+    return NextResponse.json(
+      { error: "Failed to delete report recipients", details: delRecipients.message },
+      { status: 500 }
+    );
+  }
+
+  const { error: delActions } = await supabase
+    .from("report_review_actions")
+    .delete()
+    .eq("report_id", id);
+  if (delActions) {
+    return NextResponse.json(
+      { error: "Failed to delete review history", details: delActions.message },
+      { status: 500 }
+    );
+  }
+
+  const { error: delReport } = await supabase.from("reports").delete().eq("id", id);
+  if (delReport) {
+    return NextResponse.json(
+      { error: "Failed to delete report", details: delReport.message },
+      { status: 500 }
+    );
+  }
+
+  await auditLog({
+    actor_id: auth.user.userId,
+    actor_role: auth.user.role,
+    action: "report.delete",
+    target_table: "reports",
+    target_id: id,
+    metadata: {},
   });
 
   return NextResponse.json({ ok: true });

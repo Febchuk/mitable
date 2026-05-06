@@ -2,12 +2,21 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronRight, Sparkles, Trash2 } from "lucide-react";
 import { initialsFor } from "@/components/montessori/data";
 import type { ReportListRow } from "@/lib/queries/reports";
 import { FilterChips, PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { NewReportTrigger } from "@/components/montessori/new-report";
-import { Avatar, HandCheck } from "@/components/montessori/primitives";
+import { Avatar, HandCheck, ToastBus } from "@/components/montessori/primitives";
+import { useUiLocale } from "@/lib/hooks/use-ui-locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const STATUS_TONE: Record<
   ReportListRow["status"],
@@ -53,12 +62,11 @@ function kindLabel(t: ReportListRow["reportType"]): string {
   return "Incident";
 }
 
-function formatWhen(row: ReportListRow): string {
+function formatWhen(row: ReportListRow, locale: string): string {
   const date = row.reportDate || row.createdAt.slice(0, 10);
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return date;
-  // Pin locale so SSR (Node, en-US) and the browser (e.g. fr-CA) match — avoids hydration errors.
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
 function tonesByIndex(i: number): "clay" | "sage" | "butter" | "blue" | "terracotta" {
@@ -72,7 +80,31 @@ export function ReportsListView({
   reports: ReportListRow[];
   variant?: "teacher" | "admin";
 }) {
+  const router = useRouter();
+  const locale = useUiLocale();
   const [filter, setFilter] = React.useState("All");
+  const [pendingDelete, setPendingDelete] = React.useState<ReportListRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
+
+  const confirmListDelete = React.useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleteBusy(true);
+    try {
+      const res = await fetch(`/api/v1/reports/${pendingDelete.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        ToastBus.push({ message: data.error || "Couldn't delete this report." });
+        return;
+      }
+      setPendingDelete(null);
+      router.refresh();
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [pendingDelete, router]);
   const isAdmin = variant === "admin";
   const detailHref = (id: string) => (isAdmin ? `/admin/reports/${id}` : `/app/reports/${id}`);
 
@@ -139,12 +171,12 @@ export function ReportsListView({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 24px",
+                gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 24px 36px",
                 padding: "12px 20px",
                 borderBottom: "1px solid var(--color-border)",
               }}
             >
-              {["Child", "Type", "Date", "Status", ""].map((h, i) => (
+              {["Child", "Type", "Date", "Status", "", ""].map((h, i) => (
                 <div key={i} className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
                   {h}
                 </div>
@@ -153,43 +185,142 @@ export function ReportsListView({
             {filtered.map((r, idx) => {
               const tone = STATUS_TONE[r.status];
               return (
-                <Link
+                <div
                   key={r.id}
-                  href={detailHref(r.id)}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 24px",
+                    gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 24px 36px",
                     alignItems: "center",
                     padding: "12px 20px",
                     borderTop: "1px solid var(--color-border)",
+                  }}
+                >
+                  <Link
+                    href={detailHref(r.id)}
+                    style={{
+                      display: "contents",
+                      textDecoration: "none",
+                      color: "inherit",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <Avatar
+                        initials={initialsFor(r.studentName)}
+                        tone={tonesByIndex(idx)}
+                        size={32}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: "var(--color-ink)" }}>
+                          {r.studentName}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
+                          {r.title || "Untitled"}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
+                      {kindLabel(r.reportType)}
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
+                      {formatWhen(r, locale)}
+                    </div>
+                    <div>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          padding: "3px 9px",
+                          background: tone.bg,
+                          color: tone.fg,
+                          borderRadius: 999,
+                        }}
+                      >
+                        {tone.sparkle && <Sparkles size={11} strokeWidth={1.5} />}
+                        {tone.sent && <HandCheck color={tone.fg} size={11} />}
+                        {tone.label}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <ChevronRight size={14} strokeWidth={1.5} />
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    aria-label={`Delete report for ${r.studentName}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPendingDelete(r);
+                    }}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      padding: 6,
+                      borderRadius: 8,
+                      color: "var(--color-ink-muted)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Trash2 size={16} strokeWidth={2} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="lg:hidden" style={{ padding: "16px 16px 60px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {filtered.map((r, idx) => {
+            const tone = STATUS_TONE[r.status];
+            return (
+              <div
+                key={r.id}
+                className="tap"
+                style={{
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 14,
+                  padding: 14,
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "flex-start",
+                }}
+              >
+                <Link
+                  href={detailHref(r.id)}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
                     textDecoration: "none",
                     color: "inherit",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <Avatar
-                      initials={initialsFor(r.studentName)}
-                      tone={tonesByIndex(idx)}
-                      size={32}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: "var(--color-ink)" }}>
-                        {r.studentName}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-                        {r.title || "Untitled"}
-                      </div>
+                  <Avatar
+                    initials={initialsFor(r.studentName)}
+                    tone={tonesByIndex(idx)}
+                    size={36}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-ink)" }}>
+                      {r.studentName}
                     </div>
-                  </div>
-                  <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
-                    {kindLabel(r.reportType)}
-                  </div>
-                  <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
-                    {formatWhen(r)}
-                  </div>
-                  <div>
-                    <span
+                    <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 1 }}>
+                      {kindLabel(r.reportType)} report · {formatWhen(r, locale)}
+                    </div>
+                    <div
                       style={{
+                        marginTop: 8,
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 6,
@@ -204,71 +335,74 @@ export function ReportsListView({
                       {tone.sparkle && <Sparkles size={11} strokeWidth={1.5} />}
                       {tone.sent && <HandCheck color={tone.fg} size={11} />}
                       {tone.label}
-                    </span>
+                    </div>
                   </div>
-                  <ChevronRight size={14} strokeWidth={1.5} />
+                  <ChevronRight size={16} strokeWidth={1.5} />
                 </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Mobile cards */}
-      <div className="lg:hidden" style={{ padding: "16px 16px 60px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {filtered.map((r, idx) => {
-            const tone = STATUS_TONE[r.status];
-            return (
-              <Link
-                key={r.id}
-                href={`/app/reports/${r.id}`}
-                className="tap"
-                style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 14,
-                  padding: 14,
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "flex-start",
-                  textDecoration: "none",
-                  color: "inherit",
-                }}
-              >
-                <Avatar initials={initialsFor(r.studentName)} tone={tonesByIndex(idx)} size={36} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-ink)" }}>
-                    {r.studentName}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 1 }}>
-                    {kindLabel(r.reportType)} report · {formatWhen(r)}
-                  </div>
-                  <div
-                    style={{
-                      marginTop: 8,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      padding: "3px 9px",
-                      background: tone.bg,
-                      color: tone.fg,
-                      borderRadius: 999,
-                    }}
-                  >
-                    {tone.sparkle && <Sparkles size={11} strokeWidth={1.5} />}
-                    {tone.sent && <HandCheck color={tone.fg} size={11} />}
-                    {tone.label}
-                  </div>
-                </div>
-                <ChevronRight size={16} strokeWidth={1.5} />
-              </Link>
+                <button
+                  type="button"
+                  aria-label={`Delete report for ${r.studentName}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPendingDelete(r);
+                  }}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    padding: 6,
+                    marginTop: -2,
+                    borderRadius: 8,
+                    color: "var(--color-ink-muted)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Trash2 size={18} strokeWidth={2} />
+                </button>
+              </div>
             );
           })}
         </div>
       </div>
+
+      <Dialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent className="border-ink/10 bg-canvas">
+          <DialogHeader>
+            <DialogTitle>Delete this report?</DialogTitle>
+            <DialogDescription>
+              {pendingDelete ? (
+                <>
+                  This removes the report for{" "}
+                  <span className="font-medium text-ink">{pendingDelete.studentName}</span> from the
+                  database. This cannot be undone.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-ink/15 bg-canvas px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas-muted"
+              disabled={deleteBusy}
+              onClick={() => setPendingDelete(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+              style={{
+                borderColor: "rgba(232, 116, 116, 0.45)",
+                color: "var(--status-error, #e87474)",
+              }}
+              disabled={deleteBusy}
+              onClick={() => void confirmListDelete()}
+            >
+              {deleteBusy ? "Deleting…" : "Delete report"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

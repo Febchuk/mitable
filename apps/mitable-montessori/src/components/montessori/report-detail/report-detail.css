@@ -105,8 +105,10 @@ main:has(> .rd-root) {
 }
 .rd-page-header-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
+  justify-content: flex-end;
 }
 .rd-meta-row {
   display: flex;
@@ -206,6 +208,14 @@ main:has(> .rd-root) {
 }
 .rd-btn-primary:hover {
   background: var(--color-terracotta-deep);
+}
+.rd-btn-danger-ghost {
+  border-color: rgba(232, 116, 116, 0.35);
+  color: var(--status-error, #e87474);
+}
+.rd-btn-danger-ghost:hover {
+  background: rgba(232, 116, 116, 0.1);
+  border-color: rgba(232, 116, 116, 0.55);
 }
 
 /* ---------- Workspace split (V2 only: 35/65) ---------- */
