@@ -1,6 +1,23 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
 
+type MontessoriSupabase = ReturnType<typeof createAdminClient>;
+
+export async function fetchTemplateLogoUrl(
+  supabase: MontessoriSupabase,
+  templateId: string | null,
+  schoolId: string
+): Promise<string | null> {
+  if (!templateId) return null;
+  const { data } = await supabase
+    .from("report_templates")
+    .select("logo_url, school_id")
+    .eq("id", templateId)
+    .maybeSingle();
+  if (!data || (data.school_id as string) !== schoolId) return null;
+  return (data.logo_url as string | null) ?? null;
+}
+
 /**
  * NOTE: these reads use the service-role admin client and filter by
  * `school_id` explicitly. The user's auth is verified up front via
@@ -44,6 +61,8 @@ export type ReportDetail = ReportListRow & {
   body: string | null;
   sections: ReportSection[] | null;
   templateId: string | null;
+  /** Header logo from the report's template — not sent to the LLM. */
+  templateLogoUrl: string | null;
   createdByUserId: string | null;
   approvedByUserId: string | null;
   approvedAt: string | null;
@@ -139,6 +158,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   }
   if (!data) return null;
   const row = data as unknown as ReportsRow;
+  const templateLogoUrl = await fetchTemplateLogoUrl(supabase, row.template_id, ctx.schoolId);
   return {
     id: row.id,
     studentId: row.student_id,
@@ -153,6 +173,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     body: row.body,
     sections: row.sections,
     templateId: row.template_id,
+    templateLogoUrl,
     createdByUserId: row.created_by_user_id,
     approvedByUserId: row.approved_by_user_id,
     approvedAt: row.approved_at,

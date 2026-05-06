@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, ChevronRight, Users } from "lucide-react";
+import { Book, Building2, ChevronRight, LayoutTemplate, Users } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { CHILDREN } from "./data";
 import { OnlineToggle } from "./online-toggle";
@@ -42,6 +42,11 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/admin/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
   { href: "/admin/classrooms", label: "Classrooms", renderIcon: () => <Building2 {...lucide} /> },
   { href: "/admin/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
+  {
+    href: "/admin/report-templates",
+    label: "Templates",
+    renderIcon: () => <LayoutTemplate {...lucide} />,
+  },
   { href: "/admin/teachers", label: "Teachers", renderIcon: () => <Users {...lucide} /> },
   {
     href: "/admin/reports",

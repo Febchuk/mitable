@@ -1,0 +1,194 @@
+/* IEP feature — local layout + cell styles. Reuses the same warm tokens
+   as the class-mode progress matrix so both grids feel related. */
+
+@keyframes iep-slide-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes iep-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.scrollQuiet::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollQuiet::-webkit-scrollbar-thumb {
+  background: var(--color-clay-soft);
+  border-radius: 999px;
+}
+.scrollQuiet::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- entry modal / bottom sheet ---------- */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(42, 39, 35, 0.4);
+  z-index: 70;
+  animation: iep-fade-in 160ms ease both;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+@media (min-width: 1024px) {
+  .modalBackdrop {
+    align-items: center;
+  }
+}
+.modalCard {
+  background: var(--color-surface);
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  padding: 14px 18px 28px;
+  box-shadow: 0 -10px 30px rgba(42, 39, 35, 0.22);
+  animation: iep-slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+@media (min-width: 1024px) {
+  .modalCard {
+    border-radius: 18px;
+    padding: 22px 24px 24px;
+    box-shadow:
+      0 24px 60px rgba(42, 39, 35, 0.32),
+      0 6px 14px rgba(42, 39, 35, 0.14);
+  }
+}
+.sheetGrip {
+  width: 36px;
+  height: 4px;
+  background: var(--color-border-strong);
+  border-radius: 999px;
+  margin: 0 auto 12px;
+  opacity: 0.55;
+}
+@media (min-width: 1024px) {
+  .sheetGrip {
+    display: none;
+  }
+}
+
+/* ---------- band/prompt chips inside the modal ---------- */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.chip:hover {
+  background: var(--color-muted);
+}
+.chip[data-active="true"] {
+  background: var(--color-ink);
+  color: var(--color-surface);
+  border-color: var(--color-ink);
+}
+.chipSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* 0–10 stepper row */
+.countRow {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 4px;
+}
+.countBtn {
+  padding: 0;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 100ms ease,
+    border-color 100ms ease,
+    color 100ms ease;
+}
+.countBtn:hover {
+  background: var(--color-muted);
+}
+.countBtn[data-active="true"] {
+  background: var(--color-ink);
+  color: var(--color-surface);
+  border-color: var(--color-ink);
+}
+
+/* ---------- grid ---------- */
+.codeCell {
+  width: 56px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+  flex-shrink: 0;
+}
+.codeCell:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(42, 39, 35, 0.12);
+}
+.codeCell[data-empty="true"] {
+  border-style: dashed;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-weight: 500;
+}
+.codeCell[data-add="true"] {
+  border-style: dashed;
+  background: var(--color-muted);
+  color: var(--color-ink-secondary);
+  font-size: 18px;
+  font-weight: 500;
+}

@@ -4,12 +4,15 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
+import { toAdminTemplateDto } from "@/lib/report-templates/admin-dto";
+import { rowsToDb, TemplateSectionsSchema } from "@/lib/report-templates/sections";
 
 const CreateTemplateSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(400).nullable().optional(),
   kind: z.enum(["Daily", "Major", "Incident"]),
-  sections: z.array(z.string().min(1).max(80)).min(1).max(20),
+  templateSections: TemplateSectionsSchema,
+  writingStyle: z.string().max(8000).optional().default(""),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).default("clay"),
 });
 
@@ -23,12 +26,16 @@ export async function GET() {
   const supabase = createClient(cookieStore);
   const { data, error } = await supabase
     .from("report_templates")
-    .select("id, name, description, kind, sections, icon_tone, is_active, created_at, updated_at")
+    .select(
+      "id, name, description, kind, sections, section_guidance, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
+    )
     .order("created_at", { ascending: true });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ templates: data });
+  return NextResponse.json({
+    templates: (data ?? []).map((row) => toAdminTemplateDto(row as Record<string, unknown>)),
+  });
 }
 
 export async function POST(req: Request) {
@@ -47,6 +54,7 @@ export async function POST(req: Request) {
     );
   }
   const input = parsed.data;
+  const { sections, section_guidance } = rowsToDb(input.templateSections);
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
@@ -58,7 +66,9 @@ export async function POST(req: Request) {
       name: input.name,
       description: input.description ?? null,
       kind: input.kind,
-      sections: input.sections,
+      sections,
+      section_guidance,
+      writing_style: input.writingStyle ?? "",
       icon_tone: input.iconTone,
       created_by_user_id: auth.user.userId,
     })

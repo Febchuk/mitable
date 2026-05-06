@@ -48,6 +48,8 @@ export type ReportDetail = {
   sources: ReportSources;
   visibleTo: string[];
   sections: ReportSection[];
+  /** Crest from the school's report template — display only. */
+  templateLogoUrl?: string | null;
 };
 
 export type Report = {

@@ -91,6 +91,9 @@ export function ReportPane({
     <main className="rd-pane rd-report-pane">
       <div className="rd-report-scroll scroll-quiet">
         <article className="rd-report-paper">
+          {detail.templateLogoUrl ? (
+            <img src={detail.templateLogoUrl} alt="" className="rd-report-logo" />
+          ) : null}
           <input
             className="rd-report-title-input"
             value={detail.title}

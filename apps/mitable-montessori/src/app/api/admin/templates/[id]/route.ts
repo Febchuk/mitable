@@ -2,17 +2,67 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
+import { toAdminTemplateDto } from "@/lib/report-templates/admin-dto";
+import { rowsToDb, TemplateSectionsSchema } from "@/lib/report-templates/sections";
+
+const LOGO_BUCKET = "report-template-logos";
+
+function storagePathFromPublicUrl(url: string): string | null {
+  const marker = `/${LOGO_BUCKET}/`;
+  const i = url.indexOf(marker);
+  if (i < 0) return null;
+  return decodeURIComponent(url.slice(i + marker.length));
+}
+
+async function removeLogoObjectIfAny(
+  supabase: ReturnType<typeof createAdminClient>,
+  url: string | null
+) {
+  if (!url) return;
+  const path = storagePathFromPublicUrl(url);
+  if (!path) return;
+  await supabase.storage.from(LOGO_BUCKET).remove([path]);
+}
 
 const UpdateTemplateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   description: z.string().max(400).nullable().optional(),
   kind: z.enum(["Daily", "Major", "Incident"]).optional(),
-  sections: z.array(z.string().min(1).max(80)).min(1).max(20).optional(),
+  templateSections: TemplateSectionsSchema.optional(),
+  writingStyle: z.string().max(8000).optional(),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).optional(),
   isActive: z.boolean().optional(),
+  /** Set `true` to remove the logo file and clear `logo_url`. */
+  clearLogo: z.boolean().optional(),
 });
+
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== "admin") {
+    return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  }
+  const { id } = await ctx.params;
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data, error } = await supabase
+    .from("report_templates")
+    .select(
+      "id, name, description, kind, sections, section_guidance, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json({ template: toAdminTemplateDto(data as Record<string, unknown>) });
+}
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireUser();
@@ -36,14 +86,34 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
+  const admin = createAdminClient();
+
+  const { data: existing } = await admin
+    .from("report_templates")
+    .select("id, school_id, logo_url")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing || (existing.school_id as string) !== auth.user.schoolId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (parsed.data.name !== undefined) update.name = parsed.data.name;
   if (parsed.data.description !== undefined) update.description = parsed.data.description;
   if (parsed.data.kind !== undefined) update.kind = parsed.data.kind;
-  if (parsed.data.sections !== undefined) update.sections = parsed.data.sections;
+  if (parsed.data.templateSections !== undefined) {
+    const db = rowsToDb(parsed.data.templateSections);
+    update.sections = db.sections;
+    update.section_guidance = db.section_guidance;
+  }
+  if (parsed.data.writingStyle !== undefined) update.writing_style = parsed.data.writingStyle;
   if (parsed.data.iconTone !== undefined) update.icon_tone = parsed.data.iconTone;
   if (parsed.data.isActive !== undefined) update.is_active = parsed.data.isActive;
+
+  if (parsed.data.clearLogo) {
+    await removeLogoObjectIfAny(admin, (existing.logo_url as string | null) ?? null);
+    update.logo_url = null;
+  }
 
   const { error } = await supabase.from("report_templates").update(update).eq("id", id);
   if (error) {
@@ -71,6 +141,17 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
   const { id } = await ctx.params;
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("report_templates")
+    .select("school_id, logo_url")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing || (existing.school_id as string) !== auth.user.schoolId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  await removeLogoObjectIfAny(admin, (existing.logo_url as string | null) ?? null);
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);

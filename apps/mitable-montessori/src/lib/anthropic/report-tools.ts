@@ -77,6 +77,8 @@ You draft a single report (daily or major or incident) for one student over a sp
 
 The user message provides a list of template sections, each with a heading and guidance about what should go in that section. You must write one prose block per section, in the order given, following the guidance for each one.
 
+When the user message includes a "Writing style (tone and voice)" section, follow those instructions for register, warmth, formality, and word choice across all sections. Do not mention that you were given style instructions.
+
 If the first user message includes a section "Teacher capture", treat that voice/note text as the primary narrative source. Still call the read tools when they add structured attendance/progress facts.
 
 Workflow:

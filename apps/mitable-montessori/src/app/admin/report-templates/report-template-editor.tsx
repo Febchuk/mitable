@@ -1,0 +1,508 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from "lucide-react";
+import type { AdminReportTemplateDto } from "@/lib/report-templates/admin-dto";
+import type { TemplateSectionRow } from "@/lib/report-templates/sections";
+import { PageHeader, cardHeaderStyle, cardStyle } from "@/components/montessori/page-header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { HandDivider, ToastBus } from "@/components/montessori/primitives";
+
+const KINDS = ["Daily", "Major", "Incident"] as const;
+const ICON_TONES = ["clay", "butter", "blue", "sage"] as const;
+
+function emptySection(): TemplateSectionRow {
+  return { section: "", description: "" };
+}
+
+export function ReportTemplateEditor({
+  mode,
+  templateId,
+}: {
+  mode: "create" | "edit";
+  templateId?: string;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = React.useState(mode === "edit");
+  const [saving, setSaving] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const [kind, setKind] = React.useState<(typeof KINDS)[number]>("Daily");
+  const [iconTone, setIconTone] = React.useState<(typeof ICON_TONES)[number]>("clay");
+  const [writingStyle, setWritingStyle] = React.useState("");
+  const [rows, setRows] = React.useState<TemplateSectionRow[]>([emptySection()]);
+  const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (mode !== "edit" || !templateId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/templates/${templateId}`, { cache: "no-store" });
+        const data = (await res.json().catch(() => ({}))) as {
+          template?: AdminReportTemplateDto;
+          error?: string;
+        };
+        if (!res.ok || !data.template) {
+          ToastBus.push({ message: data.error || "Couldn't load template" });
+          router.replace("/admin/report-templates");
+          return;
+        }
+        if (cancelled) return;
+        const t = data.template;
+        setName(t.name);
+        setDescription(t.description ?? "");
+        setKind(t.kind as (typeof KINDS)[number]);
+        setIconTone(t.iconTone as (typeof ICON_TONES)[number]);
+        setWritingStyle(t.writingStyle ?? "");
+        setRows(t.templateSections.length ? t.templateSections : [emptySection()]);
+        setLogoUrl(t.logoUrl);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, templateId, router]);
+
+  const moveRow = (index: number, dir: -1 | 1) => {
+    const next = index + dir;
+    if (next < 0 || next >= rows.length) return;
+    setRows((prev) => {
+      const copy = [...prev];
+      const tmp = copy[index]!;
+      copy[index] = copy[next]!;
+      copy[next] = tmp;
+      return copy;
+    });
+  };
+
+  const validate = (): boolean => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      ToastBus.push({ message: "Add a template name." });
+      return false;
+    }
+    const filled = rows.map((r) => ({
+      section: r.section.trim(),
+      description: (r.description ?? "").trim(),
+    }));
+    if (filled.some((r) => !r.section)) {
+      ToastBus.push({ message: "Every section needs a title." });
+      return false;
+    }
+    const titles = filled.map((r) => r.section);
+    if (new Set(titles).size !== titles.length) {
+      ToastBus.push({ message: "Section titles must be unique." });
+      return false;
+    }
+    return true;
+  };
+
+  const buildPayload = () => ({
+    name: name.trim(),
+    description: description.trim() || null,
+    kind,
+    iconTone,
+    writingStyle: writingStyle.trim(),
+    templateSections: rows.map((r) => ({
+      section: r.section.trim(),
+      description: (r.description ?? "").trim(),
+    })),
+  });
+
+  const onSave = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      if (mode === "create") {
+        const res = await fetch("/api/admin/templates", {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(buildPayload()),
+        });
+        const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+        if (!res.ok || !data.id) {
+          ToastBus.push({ message: data.error || "Couldn't create template" });
+          return;
+        }
+        ToastBus.push({ message: "Template saved" });
+        router.replace(`/admin/report-templates/${data.id}`);
+        router.refresh();
+        return;
+      }
+      const res = await fetch(`/api/admin/templates/${templateId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(buildPayload()),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        ToastBus.push({ message: data.error || "Couldn't save" });
+        return;
+      }
+      ToastBus.push({ message: "Saved" });
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onLogoSelected = async (f: File | null) => {
+    if (!f || mode !== "edit" || !templateId) return;
+    if (f.size > 5 * 1024 * 1024) {
+      ToastBus.push({ message: "Logo must be 5MB or smaller." });
+      return;
+    }
+    const fd = new FormData();
+    fd.set("file", f);
+    const res = await fetch(`/api/admin/templates/${templateId}/logo`, {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+    });
+    const data = (await res.json().catch(() => ({}))) as { logoUrl?: string; error?: string };
+    if (!res.ok || !data.logoUrl) {
+      ToastBus.push({ message: data.error || "Upload failed" });
+      return;
+    }
+    setLogoUrl(data.logoUrl);
+    ToastBus.push({ message: "Logo updated" });
+    router.refresh();
+  };
+
+  const onRemoveLogo = async () => {
+    if (!templateId) return;
+    const res = await fetch(`/api/admin/templates/${templateId}/logo`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      ToastBus.push({ message: "Couldn't remove logo" });
+      return;
+    }
+    setLogoUrl(null);
+    ToastBus.push({ message: "Logo removed" });
+    router.refresh();
+  };
+
+  const onDeleteTemplate = async () => {
+    if (!templateId || mode !== "edit") return;
+    if (!window.confirm("Delete this template? Reports already created keep their content."))
+      return;
+    const res = await fetch(`/api/admin/templates/${templateId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      ToastBus.push({ message: "Couldn't delete" });
+      return;
+    }
+    router.replace("/admin/report-templates");
+    router.refresh();
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 48, color: "var(--color-ink-muted)", fontSize: 14 }}>Loading…</div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        overline={
+          <Link
+            href="/admin/report-templates"
+            className="inline-flex items-center gap-1.5 text-[13px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+          >
+            <ArrowLeft size={14} strokeWidth={1.6} />
+            Report templates
+          </Link>
+        }
+        title={mode === "create" ? "New template" : "Edit template"}
+        subtitle="Logo and layout stay here for teachers; tone and section notes go to the assistant."
+        actions={
+          mode === "edit" ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-[var(--color-border)] text-[var(--color-ink-secondary)]"
+              onClick={() => void onDeleteTemplate()}
+            >
+              Delete
+            </Button>
+          ) : null
+        }
+      />
+
+      <div style={{ padding: "24px", maxWidth: 720 }}>
+        <div style={{ ...cardStyle }}>
+          <div style={{ ...cardHeaderStyle, borderBottom: "1px solid var(--color-border)" }}>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Basics</span>
+          </div>
+          <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                Template name
+              </span>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Sunflower daily"
+              />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                Short description (teachers see this when picking)
+              </span>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="One line · what this template is for"
+              />
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                  Report type
+                </span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value as (typeof KINDS)[number])}
+                >
+                  {KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                  Accent
+                </span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
+                  value={iconTone}
+                  onChange={(e) => setIconTone(e.target.value as (typeof ICON_TONES)[number])}
+                >
+                  {ICON_TONES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <HandDivider />
+
+        <div style={{ ...cardStyle, marginTop: 18 }}>
+          <div style={{ ...cardHeaderStyle, borderBottom: "1px solid var(--color-border)" }}>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>School logo</span>
+          </div>
+          <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13,
+                color: "var(--color-ink-secondary)",
+                lineHeight: 1.45,
+              }}
+            >
+              Shown at the top of the report for families. Not sent to the writing assistant.
+            </p>
+            {logoUrl ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                <img src={logoUrl} alt="" style={{ maxHeight: 48, objectFit: "contain" }} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void onRemoveLogo()}
+                >
+                  Remove logo
+                </Button>
+              </div>
+            ) : null}
+            {mode === "edit" ? (
+              <>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                  className="hidden"
+                  onChange={(e) => void onLogoSelected(e.target.files?.[0] ?? null)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  Upload logo
+                </Button>
+              </>
+            ) : (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 12.5,
+                  color: "var(--color-ink-muted)",
+                  fontStyle: "italic",
+                }}
+              >
+                Save the template first, then you can upload a logo.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <HandDivider />
+
+        <div style={{ ...cardStyle, marginTop: 18 }}>
+          <div style={{ ...cardHeaderStyle, borderBottom: "1px solid var(--color-border)" }}>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Writing style</span>
+          </div>
+          <div style={{ padding: 18 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                Tone and voice (assistant only)
+              </span>
+              <Textarea
+                value={writingStyle}
+                onChange={(e) => setWritingStyle(e.target.value)}
+                placeholder="e.g. Warm and concise; lead with observations; avoid jargon; address parents as partners."
+                rows={5}
+                className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
+              />
+            </label>
+          </div>
+        </div>
+
+        <HandDivider />
+
+        <div style={{ ...cardStyle, marginTop: 18 }}>
+          <div
+            style={{
+              ...cardHeaderStyle,
+              borderBottom: "1px solid var(--color-border)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Sections</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-8 gap-1 text-[var(--color-terracotta)]"
+              onClick={() => setRows((r) => [...r, emptySection()])}
+            >
+              <Plus size={14} strokeWidth={2} />
+              Add section
+            </Button>
+          </div>
+          <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
+            {rows.map((row, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: 14,
+                  borderRadius: 10,
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-muted)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                  }}
+                >
+                  <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                    Section {i + 1}
+                  </span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button
+                      type="button"
+                      className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
+                      aria-label="Move section up"
+                      onClick={() => moveRow(i, -1)}
+                      disabled={i === 0}
+                    >
+                      <ArrowUp size={16} strokeWidth={1.6} />
+                    </button>
+                    <button
+                      type="button"
+                      className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
+                      aria-label="Move section down"
+                      onClick={() => moveRow(i, 1)}
+                      disabled={i === rows.length - 1}
+                    >
+                      <ArrowDown size={16} strokeWidth={1.6} />
+                    </button>
+                    <button
+                      type="button"
+                      className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-terracotta-deep)]"
+                      aria-label="Remove section"
+                      onClick={() => rows.length > 1 && setRows((r) => r.filter((_, j) => j !== i))}
+                      disabled={rows.length <= 1}
+                    >
+                      <Trash2 size={16} strokeWidth={1.6} />
+                    </button>
+                  </div>
+                </div>
+                <Input
+                  value={row.section}
+                  onChange={(e) =>
+                    setRows((prev) =>
+                      prev.map((p, j) => (j === i ? { ...p, section: e.target.value } : p))
+                    )
+                  }
+                  placeholder="Section heading"
+                  className="mb-2"
+                />
+                <Textarea
+                  value={row.description}
+                  onChange={(e) =>
+                    setRows((prev) =>
+                      prev.map((p, j) => (j === i ? { ...p, description: e.target.value } : p))
+                    )
+                  }
+                  placeholder="What should the assistant write here? Facts to include, length, tone for this block."
+                  rows={4}
+                  className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 28, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Button type="button" disabled={saving} onClick={() => void onSave()}>
+            {saving ? "Saving…" : "Save template"}
+          </Button>
+          <Button type="button" variant="outline" asChild>
+            <Link href="/admin/report-templates">Cancel</Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
