@@ -22,9 +22,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           variant="admin"
           classroomName={ctx.schoolName ?? "School"}
           contextSubtitle="Admin workspace"
-          userEmail={ctx.email}
-          userMenuSlot={<UserMenu email={ctx.email} />}
-          roleLabel="Admin"
+          userMenuSlot={
+            <UserMenu
+              email={ctx.email}
+              firstName={ctx.firstName}
+              roleLabel="Admin"
+              variant="row"
+              direction="up"
+              align="left"
+            />
+          }
         />
         <div
           style={{

@@ -70,6 +70,7 @@ export async function applyApprovedToolCall(
         date: payload.date,
         status: payload.status,
         comment: payload.comment ?? null,
+        arrivalTime: null,
         sourceCommandId: id,
         updatedAt: now,
       });

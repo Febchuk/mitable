@@ -28,9 +28,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           variant={isAdmin ? "admin" : "teacher"}
           classroomName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
           contextSubtitle={isAdmin ? "Admin workspace" : undefined}
-          userEmail={ctx.email}
-          userMenuSlot={<UserMenu email={ctx.email} />}
-          roleLabel={isAdmin ? "Admin" : undefined}
+          userMenuSlot={
+            <UserMenu
+              email={ctx.email}
+              firstName={ctx.firstName}
+              roleLabel={isAdmin ? "Admin" : "Lead guide"}
+              variant="row"
+              direction="up"
+              align="left"
+            />
+          }
         />
         <div
           style={{

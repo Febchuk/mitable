@@ -7,7 +7,6 @@ import { Book, Building2, ChevronRight, Users } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { CHILDREN } from "./data";
 import { OnlineToggle } from "./online-toggle";
-import { Avatar } from "./primitives";
 import { useMontessori } from "./store";
 
 type NavItem = {
@@ -56,18 +55,18 @@ export function MontessoriSidebar({
   variant = "teacher",
   classroomName,
   contextSubtitle,
-  userEmail,
   userMenuSlot,
-  roleLabel,
 }: {
   variant?: "teacher" | "admin";
   classroomName: string;
   /** Replaces the default “{n} children” line under the workspace title */
   contextSubtitle?: string;
-  userEmail?: string;
+  /**
+   * Footer slot — renders directly above the bottom of the sidebar. Layouts
+   * pass a `<UserMenu variant="row" … />` here; the menu is responsible for
+   * its own identity card + popup.
+   */
   userMenuSlot?: React.ReactNode;
-  /** e.g. “Lead guide” or “Admin” */
-  roleLabel?: string;
 }) {
   const pathname = usePathname();
   const store = useMontessori();
@@ -78,15 +77,6 @@ export function MontessoriSidebar({
   const subtitleLine =
     contextSubtitle ??
     (variant === "admin" ? "People, curriculum, and reports" : `${CHILDREN.length} children`);
-  const footerRole = roleLabel ?? (variant === "admin" ? "Admin" : "Lead guide");
-
-  const initials =
-    (userEmail ?? "Anna Maren")
-      .split(/[\s@.]/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase() ?? "")
-      .join("") || "AM";
 
   return (
     <aside
@@ -101,6 +91,7 @@ export function MontessoriSidebar({
         position: "sticky",
         top: 0,
         height: "100vh",
+        overflow: "visible",
       }}
     >
       <div
@@ -218,35 +209,7 @@ export function MontessoriSidebar({
       <div style={{ marginBottom: 10, display: "flex", justifyContent: "flex-start" }}>
         <OnlineToggle />
       </div>
-      <div
-        style={{
-          padding: 10,
-          background: "var(--color-surface)",
-          borderRadius: 10,
-          border: "1px solid var(--color-border)",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <Avatar initials={initials} tone="terracotta" size={30} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-ink)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {userEmail ?? "Anna Maren"}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{footerRole}</div>
-        </div>
-        {userMenuSlot}
-      </div>
+      {userMenuSlot}
     </aside>
   );
 }

@@ -96,6 +96,8 @@ export interface AttendancePayload {
   status: "present" | "absent";
   date: string;
   comment?: string;
+  /** "HH:MM" — only meaningful when status = "present". */
+  arrival_time?: string;
 }
 
 export interface ProgressPayload {
@@ -133,6 +135,8 @@ export interface AttendanceProjRow {
   date: string;
   status: "present" | "absent";
   comment: string | null;
+  /** "HH:MM" — only meaningful when status = "present". */
+  arrivalTime: string | null;
   sourceCommandId: string;
   updatedAt: string;
 }
