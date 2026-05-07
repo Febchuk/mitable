@@ -69,3 +69,20 @@ export async function requireTeacherForClassroom(classroomId: string) {
     .maybeSingle();
   return !!data && !error;
 }
+
+/**
+ * Read/write access to a report's editing-chat thread. Allows EITHER a teacher
+ * actively assigned to the report's classroom OR an admin in the same school.
+ * Used by /api/v1/reports/{id}/chat/* endpoints. Returns the actor's role so
+ * audit logs can record who did what.
+ */
+export async function requireReportAccess(args: {
+  user: AuthedUser;
+  classroomId: string;
+}): Promise<{ ok: true; actorRole: "teacher" | "admin" } | { ok: false }> {
+  if (args.user.role === "admin") {
+    return { ok: true, actorRole: "admin" };
+  }
+  const allowed = await requireTeacherForClassroom(args.classroomId);
+  return allowed ? { ok: true, actorRole: "teacher" } : { ok: false };
+}

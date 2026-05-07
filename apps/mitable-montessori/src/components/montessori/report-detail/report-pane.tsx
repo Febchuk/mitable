@@ -16,6 +16,16 @@ type ReportPaneProps = {
   isDrafting?: boolean;
   /** Aborts the in-flight /draft request (client-side); optional for tests. */
   onCancelDrafting?: () => void;
+  /** When the user clicks "Discuss" on a paragraph, scope the chat to it. */
+  onDiscussParagraph?: (sectionId: string, paragraphId: string) => void;
+  /**
+   * Accept the ghostEdit attached to a section: appends ghost.html as a new
+   * paragraph + clears the slot. The parent records the editorial action on
+   * the originating chat message row.
+   */
+  onAcceptGhostEdit?: (sectionId: string) => void;
+  /** Dismiss the ghostEdit attached to a section: clears the slot, no append. */
+  onDismissGhostEdit?: (sectionId: string) => void;
 };
 
 function newId(prefix: string) {
@@ -28,6 +38,9 @@ export function ReportPane({
   onChange,
   isDrafting = false,
   onCancelDrafting,
+  onDiscussParagraph,
+  onAcceptGhostEdit,
+  onDismissGhostEdit,
 }: ReportPaneProps) {
   const [addingSection, setAddingSection] = React.useState(false);
   // ID of a paragraph that should grab focus on next render (e.g. the empty
@@ -105,6 +118,17 @@ export function ReportPane({
                 onParagraphCommit(section.id, paragraphId, html)
               }
               onDelete={() => onDeleteSection(section.id)}
+              onDiscussParagraph={
+                onDiscussParagraph
+                  ? (paragraphId) => onDiscussParagraph(section.id, paragraphId)
+                  : undefined
+              }
+              onAcceptGhostEdit={
+                onAcceptGhostEdit ? () => onAcceptGhostEdit(section.id) : undefined
+              }
+              onDismissGhostEdit={
+                onDismissGhostEdit ? () => onDismissGhostEdit(section.id) : undefined
+              }
             />
           ))}
 
@@ -214,16 +238,21 @@ function SectionBlock({
   onParagraphFocused,
   onParagraphCommit,
   onDelete,
+  onDiscussParagraph,
+  onAcceptGhostEdit,
+  onDismissGhostEdit,
 }: {
   section: ReportSection;
   pendingFocusParagraphId: string | null;
   onParagraphFocused: () => void;
   onParagraphCommit: (paragraphId: string, html: string) => void;
   onDelete: () => void;
+  onDiscussParagraph?: (paragraphId: string) => void;
+  onAcceptGhostEdit?: () => void;
+  onDismissGhostEdit?: () => void;
 }) {
-  const [ghostDismissed, setGhostDismissed] = React.useState(false);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
-  const showGhost = section.ghostEdit && !ghostDismissed;
+  const showGhost = !!section.ghostEdit;
 
   return (
     <div className="rd-section">
@@ -275,8 +304,12 @@ function SectionBlock({
             <button
               type="button"
               className="rd-para-action"
-              onClick={() => toast()}
-              title={COMING_SOON}
+              onClick={() =>
+                onDiscussParagraph
+                  ? onDiscussParagraph(p.id)
+                  : toast("Open the editing assistant on the left to discuss this paragraph.")
+              }
+              title="Discuss this paragraph in the chat"
             >
               <MessageSquare size={11} strokeWidth={2} />
               Discuss
@@ -303,14 +336,22 @@ function SectionBlock({
             dangerouslySetInnerHTML={{ __html: section.ghostEdit.html }}
           />
           <div className="rd-ghost-edit-actions">
-            <button type="button" className="rd-ghost-btn rd-accept" onClick={() => toast()}>
+            <button
+              type="button"
+              className="rd-ghost-btn rd-accept"
+              onClick={() => {
+                if (onAcceptGhostEdit) onAcceptGhostEdit();
+                else toast("Ghost suggestions need a chat thread to accept.");
+              }}
+            >
               Accept
             </button>
             <button
               type="button"
               className="rd-ghost-btn"
               onClick={() => {
-                setGhostDismissed(true);
+                if (onDismissGhostEdit) onDismissGhostEdit();
+                else toast("Ghost suggestions need a chat thread to dismiss.");
                 ToastBus.push({ message: "Suggestion dismissed" });
               }}
             >
@@ -320,7 +361,9 @@ function SectionBlock({
               type="button"
               className="rd-ghost-btn"
               style={{ marginLeft: "auto" }}
-              onClick={() => toast()}
+              onClick={() =>
+                toast("Edit-first lands with the inline ghost editor in a later phase.")
+              }
             >
               Edit first
             </button>

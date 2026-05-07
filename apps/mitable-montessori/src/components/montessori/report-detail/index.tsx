@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
 import { ToastBus } from "../primitives";
-import { ChatPane } from "./chat-pane";
+import { ChatPane, type ChatPaneHandle } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
 import "./report-detail.css";
@@ -28,6 +28,8 @@ type LocalSection = {
   id: string;
   heading: string;
   paragraphs: { id: string; html: string }[];
+  /** Phase 4: chat-driven ghost suggestion attached to this section. */
+  ghostEdit?: { id: string; html: string; sourceLabel: string };
 };
 
 type LocalDetail = {
@@ -147,6 +149,10 @@ export function ReportDetail({
   /** Set while a /draft request is in flight so the overlay can abort it. */
   const draftAbortRef = React.useRef<AbortController | null>(null);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Latest LocalDetail queued for save. Lets `flushPendingSave` find it. */
+  const pendingSaveRef = React.useRef<LocalDetail | null>(null);
+  /** When a save is in flight, this resolves once it completes — so flush() can await it. */
+  const inFlightSaveRef = React.useRef<Promise<void> | null>(null);
 
   const empty =
     !report.body?.trim() &&
@@ -248,11 +254,11 @@ export function ReportDetail({
     }
   }, [report.id, router, backToReportsHref]);
 
-  // Debounced PATCH on edit.
-  const queueSave = React.useCallback(
-    (next: LocalDetail) => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(async () => {
+  // Inner save: actually fires the PATCH. Tracks in-flight so flush() can await.
+  const performSave = React.useCallback(
+    (next: LocalDetail): Promise<void> => {
+      pendingSaveRef.current = null;
+      const promise = (async () => {
         setIsSaving(true);
         try {
           const res = await fetch(`/api/v1/reports/${report.id}`, {
@@ -272,10 +278,46 @@ export function ReportDetail({
         } finally {
           setIsSaving(false);
         }
-      }, 800);
+      })();
+      inFlightSaveRef.current = promise;
+      void promise.finally(() => {
+        if (inFlightSaveRef.current === promise) inFlightSaveRef.current = null;
+      });
+      return promise;
     },
     [report.id]
   );
+
+  // Debounced PATCH on edit.
+  const queueSave = React.useCallback(
+    (next: LocalDetail) => {
+      pendingSaveRef.current = next;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        saveTimer.current = null;
+        const pending = pendingSaveRef.current;
+        if (pending) void performSave(pending);
+      }, 800);
+    },
+    [performSave]
+  );
+
+  /**
+   * Flush any pending debounced PATCH and await the in-flight save (if any).
+   * The chat agent calls this before each turn so its `read_report_sections`
+   * sees the latest persisted state. Plan §7 calls this out as the single
+   * most important integration concern.
+   */
+  const flushPendingSave = React.useCallback(async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      const pending = pendingSaveRef.current;
+      if (pending) await performSave(pending);
+    } else if (inFlightSaveRef.current) {
+      await inFlightSaveRef.current;
+    }
+  }, [performSave]);
 
   const onChange = React.useCallback(
     (next: LocalDetail) => {
@@ -292,10 +334,194 @@ export function ReportDetail({
     };
   }, []);
 
+  // ----- Phase 3: chat-driven proposal apply + discuss-from-paragraph -----
+  const chatPaneRef = React.useRef<ChatPaneHandle>(null);
+
+  /** Mutate the report's local state when chat applies a proposal or undo. */
+  const onApplyProposalFromChat = React.useCallback(
+    (args: { sectionId: string; paragraphId: string; newText: string }) => {
+      setDetail((prev) => {
+        const sections = prev.sections.map((section) => {
+          if (section.id !== args.sectionId) return section;
+          const paragraphs = section.paragraphs.map((p) =>
+            p.id === args.paragraphId ? { ...p, html: args.newText } : p
+          );
+          return { ...section, paragraphs };
+        });
+        const next = { ...prev, sections };
+        setIsDirty(true);
+        queueSave(next);
+        return next;
+      });
+    },
+    [queueSave]
+  );
+
+  /** Called when the user clicks "Discuss" on a paragraph. Seeds the chat scope. */
+  const onDiscussParagraph = React.useCallback(
+    (sectionId: string, paragraphId: string) => {
+      const section = detail.sections.find((s) => s.id === sectionId);
+      const heading = section?.heading;
+      chatPaneRef.current?.seedTurn({
+        targetRef: { sectionId, paragraphId },
+        targetLabel: heading ? `${heading} paragraph` : "this paragraph",
+      });
+    },
+    [detail.sections]
+  );
+
+  // ----- Phase 4: ghost edits + obs-ref pull-in -----
+
+  /** Tracks which originating chat-message id seeded each section's ghost so
+   *  Accept/Reject can post the editorial action to the right row. */
+  const ghostMessageIdsRef = React.useRef(new Map<string, string>());
+
+  /** Chat agent emitted a ghost-edit — merge into the section's slot. */
+  const onApplyGhostEdit = React.useCallback(
+    ({
+      sectionId,
+      ghostEdit,
+      messageId,
+    }: {
+      sectionId: string;
+      ghostEdit: { id: string; html: string; sourceLabel: string };
+      messageId?: string;
+    }) => {
+      setDetail((prev) => {
+        const sections = prev.sections.map((s) => (s.id === sectionId ? { ...s, ghostEdit } : s));
+        return { ...prev, sections };
+      });
+      if (messageId) ghostMessageIdsRef.current.set(sectionId, messageId);
+    },
+    []
+  );
+
+  const recordGhostAction = React.useCallback(
+    async (
+      messageId: string,
+      action: "applied" | "dismissed",
+      appliedTo?: { sectionId: string; paragraphId: string; before: string; after: string }
+    ) => {
+      try {
+        await fetch(`/api/v1/reports/${report.id}/chat/messages/${messageId}/applied`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action, appliedTo }),
+        });
+      } catch {
+        // Non-fatal — the local mutation already happened.
+      }
+    },
+    [report.id]
+  );
+
+  /** Accept the ghost: append it as a new paragraph and clear the slot. */
+  const onAcceptGhostEdit = React.useCallback(
+    (sectionId: string) => {
+      setDetail((prev) => {
+        const section = prev.sections.find((s) => s.id === sectionId);
+        const ghost = section?.ghostEdit;
+        if (!section || !ghost) return prev;
+        const paragraphId = `p-ghost-${Math.random().toString(36).slice(2, 9)}`;
+        const sections = prev.sections.map((s) => {
+          if (s.id !== sectionId) return s;
+          const { ghostEdit: _drop, ...rest } = s;
+          void _drop;
+          return {
+            ...rest,
+            paragraphs: [...s.paragraphs, { id: paragraphId, html: ghost.html }],
+          };
+        });
+        const next = { ...prev, sections };
+        setIsDirty(true);
+        queueSave(next);
+        const messageId = ghostMessageIdsRef.current.get(sectionId);
+        ghostMessageIdsRef.current.delete(sectionId);
+        if (messageId) {
+          void recordGhostAction(messageId, "applied", {
+            sectionId,
+            paragraphId,
+            before: "",
+            after: ghost.html,
+          });
+        }
+        return next;
+      });
+    },
+    [queueSave, recordGhostAction]
+  );
+
+  /** Dismiss the ghost: clear the slot. */
+  const onDismissGhostEdit = React.useCallback(
+    (sectionId: string) => {
+      setDetail((prev) => {
+        const sections = prev.sections.map((s) => {
+          if (s.id !== sectionId) return s;
+          const { ghostEdit: _drop, ...rest } = s;
+          void _drop;
+          return rest;
+        });
+        const next = { ...prev, sections };
+        // No PATCH needed — ghostEdit lives only in client state, never persisted.
+        return next;
+      });
+      const messageId = ghostMessageIdsRef.current.get(sectionId);
+      ghostMessageIdsRef.current.delete(sectionId);
+      if (messageId) void recordGhostAction(messageId, "dismissed");
+    },
+    [recordGhostAction]
+  );
+
+  /** Chat agent's obs-ref Pull in — append a paragraph with the captured text. */
+  const onPullObservation = React.useCallback(
+    ({
+      text,
+      suggestedTarget,
+    }: {
+      text: string;
+      suggestedTarget?: { sectionId: string; position: "append" | "after" | "new-paragraph" };
+    }) => {
+      setDetail((prev) => {
+        // If suggestedTarget points at an existing section, append there.
+        // Otherwise put it in the last section so the teacher can move it.
+        const targetSectionId =
+          suggestedTarget?.sectionId &&
+          prev.sections.some((s) => s.id === suggestedTarget.sectionId)
+            ? suggestedTarget.sectionId
+            : prev.sections[prev.sections.length - 1]?.id;
+        if (!targetSectionId) {
+          ToastBus.push({ message: "Add a section first, then pull observations into it." });
+          return prev;
+        }
+        const paragraphId = `p-obs-${Math.random().toString(36).slice(2, 9)}`;
+        const sections = prev.sections.map((s) =>
+          s.id === targetSectionId
+            ? { ...s, paragraphs: [...s.paragraphs, { id: paragraphId, html: text }] }
+            : s
+        );
+        const next = { ...prev, sections };
+        setIsDirty(true);
+        queueSave(next);
+        return next;
+      });
+    },
+    [queueSave]
+  );
+
   // After draft (router.refresh) or navigation, merge server report into local editor
   // state when the user isn't mid-edit.
+  //
+  // IMPORTANT: `isDirty` is intentionally NOT in the dep list. When a save
+  // completes (`setIsDirty(false)`), the effect would otherwise re-run with
+  // a stale parent `report` prop and clobber the freshly-applied chat edit.
+  // We only want this resync to fire when the server-side `report` actually
+  // changes (route refresh, navigation). The early `isDirty` guard handles
+  // the mid-edit case for renders where `report.*` does change.
+  const isDirtyRef = React.useRef(isDirty);
+  isDirtyRef.current = isDirty;
   React.useEffect(() => {
-    if (isDirty) return;
+    if (isDirtyRef.current) return;
     setDetail(buildLocalDetail(report, locale));
   }, [
     report.id,
@@ -306,7 +532,6 @@ export function ReportDetail({
     report.studentName,
     report.sections,
     locale,
-    isDirty,
   ]);
 
   const savedMeta = isSaving
@@ -344,12 +569,23 @@ export function ReportDetail({
         />
         <div className="rd-workspace">
           <div className="rd-split">
-            <ChatPane />
+            <ChatPane
+              ref={chatPaneRef}
+              reportId={report.id}
+              sections={detail.sections}
+              flushPendingSave={flushPendingSave}
+              onApplyProposal={onApplyProposalFromChat}
+              onPullObservation={onPullObservation}
+              onApplyGhostEdit={onApplyGhostEdit}
+            />
             <ReportPane
               detail={detail}
               onChange={onChange}
               isDrafting={isDrafting}
               onCancelDrafting={cancelDraftGeneration}
+              onDiscussParagraph={onDiscussParagraph}
+              onAcceptGhostEdit={onAcceptGhostEdit}
+              onDismissGhostEdit={onDismissGhostEdit}
             />
           </div>
         </div>
