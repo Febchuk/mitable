@@ -16,6 +16,8 @@ type ReportPaneProps = {
   isDrafting?: boolean;
   /** Aborts the in-flight /draft request (client-side); optional for tests. */
   onCancelDrafting?: () => void;
+  /** When the user clicks "Discuss" on a paragraph, scope the chat to it. */
+  onDiscussParagraph?: (sectionId: string, paragraphId: string) => void;
 };
 
 function newId(prefix: string) {
@@ -28,6 +30,7 @@ export function ReportPane({
   onChange,
   isDrafting = false,
   onCancelDrafting,
+  onDiscussParagraph,
 }: ReportPaneProps) {
   const [addingSection, setAddingSection] = React.useState(false);
   // ID of a paragraph that should grab focus on next render (e.g. the empty
@@ -105,6 +108,11 @@ export function ReportPane({
                 onParagraphCommit(section.id, paragraphId, html)
               }
               onDelete={() => onDeleteSection(section.id)}
+              onDiscussParagraph={
+                onDiscussParagraph
+                  ? (paragraphId) => onDiscussParagraph(section.id, paragraphId)
+                  : undefined
+              }
             />
           ))}
 
@@ -214,12 +222,14 @@ function SectionBlock({
   onParagraphFocused,
   onParagraphCommit,
   onDelete,
+  onDiscussParagraph,
 }: {
   section: ReportSection;
   pendingFocusParagraphId: string | null;
   onParagraphFocused: () => void;
   onParagraphCommit: (paragraphId: string, html: string) => void;
   onDelete: () => void;
+  onDiscussParagraph?: (paragraphId: string) => void;
 }) {
   const [ghostDismissed, setGhostDismissed] = React.useState(false);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
@@ -275,8 +285,12 @@ function SectionBlock({
             <button
               type="button"
               className="rd-para-action"
-              onClick={() => toast()}
-              title={COMING_SOON}
+              onClick={() =>
+                onDiscussParagraph
+                  ? onDiscussParagraph(p.id)
+                  : toast("Open the editing assistant on the left to discuss this paragraph.")
+              }
+              title="Discuss this paragraph in the chat"
             >
               <MessageSquare size={11} strokeWidth={2} />
               Discuss

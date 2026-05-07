@@ -25,7 +25,7 @@ import type { AnthropicLike } from "@/lib/reports/agent-loop";
 export const MAX_CHAT_TURNS_PER_REQUEST = 4;
 export const MAX_CHAT_REGENERATIONS = 1;
 
-export type ChatAgentTerminalKind = "prose" | "clarify";
+export type ChatAgentTerminalKind = "prose" | "clarify" | "proposal";
 
 export interface ChatHistoryTurn {
   role: "user" | "assistant";
@@ -36,6 +36,22 @@ export interface ChatHistoryTurn {
    */
   body: string;
   targetHint?: string;
+}
+
+export interface ChatAgentProposalPayload {
+  target: { sectionId: string; paragraphId: string };
+  /** Detokenized — ready for the wire. */
+  lead: string;
+  oldText: string;
+  newText: string;
+  rationale?: string;
+  /** Tokenized snapshot of every prose field — kept on tool_trace for debugging. */
+  tokenized: {
+    lead: string;
+    oldText: string;
+    newText: string;
+    rationale?: string;
+  };
 }
 
 export interface ChatAgentInput {
@@ -61,18 +77,27 @@ export interface ChatTokenizedSection {
   paragraphs: { id: string; html: string }[];
 }
 
-export interface ChatAgentOutput {
-  /** The terminal tool the agent landed on. */
-  terminalKind: ChatAgentTerminalKind;
-  /** Detokenized body, ready for the wire / persistence. */
-  body: string;
-  /** Tokenized body the agent actually emitted (kept for tool_trace). */
-  tokenizedBody: string;
+interface ChatAgentMeta {
   turns: number;
   regenerations: number;
   inputTokens: number;
   outputTokens: number;
 }
+
+export interface ChatAgentProseOutput extends ChatAgentMeta {
+  terminalKind: "prose" | "clarify";
+  /** Detokenized body, ready for the wire / persistence. */
+  body: string;
+  /** Tokenized body the agent actually emitted (kept for tool_trace). */
+  tokenizedBody: string;
+}
+
+export interface ChatAgentProposalOutput extends ChatAgentMeta {
+  terminalKind: "proposal";
+  proposal: ChatAgentProposalPayload;
+}
+
+export type ChatAgentOutput = ChatAgentProseOutput | ChatAgentProposalOutput;
 
 export class ChatAgentAbortError extends Error {
   constructor(
@@ -157,7 +182,10 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
       // Process this turn's tool uses. We expect either read_report_sections
       // or one of the terminal tools.
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
-      let terminalEmission: { kind: ChatAgentTerminalKind; tokenizedBody: string } | null = null;
+      let terminalEmission:
+        | { kind: "prose" | "clarify"; tokenizedBody: string }
+        | { kind: "proposal"; proposal: ChatAgentProposalPayload }
+        | null = null;
       let validationFailed = false;
 
       for (const block of toolUses) {
@@ -191,7 +219,7 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
               type: "tool_result",
               tool_use_id: block.id,
               is_error: true,
-              content: `Token preservation failed. Leaked names: ${validation.leakedNames.join(", ") || "(none)"}. Unknown tokens: ${validation.unknownTokens.join(", ") || "(none)"}. Re-emit using only tokens already in the report (e.g. [STUDENT_1]).`,
+              content: leakReminder(validation),
             });
             continue;
           }
@@ -199,13 +227,83 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
             kind: block.name === "propose_prose_reply" ? "prose" : "clarify",
             tokenizedBody,
           };
-        } else if (CHAT_TERMINAL_TOOL_NAMES.has(block.name)) {
-          // Future-proof: a structured tool name we don't handle yet.
+          continue;
+        }
+        if (block.name === "propose_rewrite") {
+          const args = block.input as {
+            target?: { sectionId?: unknown; paragraphId?: unknown };
+            lead?: unknown;
+            oldText?: unknown;
+            newText?: unknown;
+            rationale?: unknown;
+          };
+          const sectionId = typeof args.target?.sectionId === "string" ? args.target.sectionId : "";
+          const paragraphId =
+            typeof args.target?.paragraphId === "string" ? args.target.paragraphId : "";
+          const lead = typeof args.lead === "string" ? args.lead.trim() : "";
+          const oldText = typeof args.oldText === "string" ? args.oldText.trim() : "";
+          const newText = typeof args.newText === "string" ? args.newText.trim() : "";
+          const rationale =
+            typeof args.rationale === "string" && args.rationale.trim().length > 0
+              ? args.rationale.trim()
+              : undefined;
+
+          // Structural validation first — cheap to check, gives the agent a
+          // clear retry signal rather than a privacy one.
+          const targetExists = input.tokenizedSections.some(
+            (s) => s.id === sectionId && s.paragraphs.some((p) => p.id === paragraphId)
+          );
+          if (!sectionId || !paragraphId || !targetExists) {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content: `Unknown target. Use a sectionId+paragraphId pair from read_report_sections. Got sectionId=${sectionId || "(empty)"}, paragraphId=${paragraphId || "(empty)"}.`,
+            });
+            continue;
+          }
+          if (!lead || !oldText || !newText) {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content: "lead, oldText, and newText are all required and must be non-empty strings.",
+            });
+            continue;
+          }
+          // Concatenate every prose field for one validator pass — leaks
+          // anywhere abort the whole emission.
+          const concatenated = [lead, oldText, newText, rationale ?? ""].join("\n");
+          const validation = validateTokenPreservation(concatenated, refs);
+          if (!validation.ok) {
+            validationFailed = true;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content: leakReminder(validation),
+            });
+            continue;
+          }
+          terminalEmission = {
+            kind: "proposal",
+            proposal: {
+              target: { sectionId, paragraphId },
+              lead: detokenizeReportText(lead, input.references),
+              oldText: detokenizeReportText(oldText, input.references),
+              newText: detokenizeReportText(newText, input.references),
+              rationale: rationale ? detokenizeReportText(rationale, input.references) : undefined,
+              tokenized: { lead, oldText, newText, rationale },
+            },
+          };
+          continue;
+        }
+        if (CHAT_TERMINAL_TOOL_NAMES.has(block.name)) {
           toolResults.push({
             type: "tool_result",
             tool_use_id: block.id,
             is_error: true,
-            content: `Tool ${block.name} is not supported in this phase. Use propose_prose_reply or ask_clarifying_question.`,
+            content: `Tool ${block.name} is not supported in this phase.`,
           });
         } else {
           toolResults.push({
@@ -218,14 +316,20 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
       }
 
       if (terminalEmission) {
-        return {
-          terminalKind: terminalEmission.kind,
-          tokenizedBody: terminalEmission.tokenizedBody,
-          body: detokenizeReportText(terminalEmission.tokenizedBody, input.references),
+        const meta: ChatAgentMeta = {
           turns: turn,
           regenerations: attempts - 1,
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
+        };
+        if (terminalEmission.kind === "proposal") {
+          return { terminalKind: "proposal", proposal: terminalEmission.proposal, ...meta };
+        }
+        return {
+          terminalKind: terminalEmission.kind,
+          tokenizedBody: terminalEmission.tokenizedBody,
+          body: detokenizeReportText(terminalEmission.tokenizedBody, input.references),
+          ...meta,
         };
       }
 
@@ -273,6 +377,10 @@ function tokenizeAgainstRefs(text: string, refs: ReportReferenceSet["refs"]): st
     out = out.replace(re, r.token);
   }
   return out;
+}
+
+function leakReminder(validation: ReturnType<typeof validateTokenPreservation>): string {
+  return `Token preservation failed. Leaked names: ${validation.leakedNames.join(", ") || "(none)"}. Unknown tokens: ${validation.unknownTokens.join(", ") || "(none)"}. Re-emit using only tokens already in the report (e.g. [STUDENT_1]).`;
 }
 
 function buildUserTurn(

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
 import { ToastBus } from "../primitives";
-import { ChatPane } from "./chat-pane";
+import { ChatPane, type ChatPaneHandle } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
 import "./report-detail.css";
@@ -147,6 +147,10 @@ export function ReportDetail({
   /** Set while a /draft request is in flight so the overlay can abort it. */
   const draftAbortRef = React.useRef<AbortController | null>(null);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Latest LocalDetail queued for save. Lets `flushPendingSave` find it. */
+  const pendingSaveRef = React.useRef<LocalDetail | null>(null);
+  /** When a save is in flight, this resolves once it completes — so flush() can await it. */
+  const inFlightSaveRef = React.useRef<Promise<void> | null>(null);
 
   const empty =
     !report.body?.trim() &&
@@ -248,11 +252,11 @@ export function ReportDetail({
     }
   }, [report.id, router, backToReportsHref]);
 
-  // Debounced PATCH on edit.
-  const queueSave = React.useCallback(
-    (next: LocalDetail) => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(async () => {
+  // Inner save: actually fires the PATCH. Tracks in-flight so flush() can await.
+  const performSave = React.useCallback(
+    (next: LocalDetail): Promise<void> => {
+      pendingSaveRef.current = null;
+      const promise = (async () => {
         setIsSaving(true);
         try {
           const res = await fetch(`/api/v1/reports/${report.id}`, {
@@ -272,10 +276,46 @@ export function ReportDetail({
         } finally {
           setIsSaving(false);
         }
-      }, 800);
+      })();
+      inFlightSaveRef.current = promise;
+      void promise.finally(() => {
+        if (inFlightSaveRef.current === promise) inFlightSaveRef.current = null;
+      });
+      return promise;
     },
     [report.id]
   );
+
+  // Debounced PATCH on edit.
+  const queueSave = React.useCallback(
+    (next: LocalDetail) => {
+      pendingSaveRef.current = next;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        saveTimer.current = null;
+        const pending = pendingSaveRef.current;
+        if (pending) void performSave(pending);
+      }, 800);
+    },
+    [performSave]
+  );
+
+  /**
+   * Flush any pending debounced PATCH and await the in-flight save (if any).
+   * The chat agent calls this before each turn so its `read_report_sections`
+   * sees the latest persisted state. Plan §7 calls this out as the single
+   * most important integration concern.
+   */
+  const flushPendingSave = React.useCallback(async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      const pending = pendingSaveRef.current;
+      if (pending) await performSave(pending);
+    } else if (inFlightSaveRef.current) {
+      await inFlightSaveRef.current;
+    }
+  }, [performSave]);
 
   const onChange = React.useCallback(
     (next: LocalDetail) => {
@@ -291,6 +331,42 @@ export function ReportDetail({
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, []);
+
+  // ----- Phase 3: chat-driven proposal apply + discuss-from-paragraph -----
+  const chatPaneRef = React.useRef<ChatPaneHandle>(null);
+
+  /** Mutate the report's local state when chat applies a proposal or undo. */
+  const onApplyProposalFromChat = React.useCallback(
+    (args: { sectionId: string; paragraphId: string; newText: string }) => {
+      setDetail((prev) => {
+        const sections = prev.sections.map((section) => {
+          if (section.id !== args.sectionId) return section;
+          const paragraphs = section.paragraphs.map((p) =>
+            p.id === args.paragraphId ? { ...p, html: args.newText } : p
+          );
+          return { ...section, paragraphs };
+        });
+        const next = { ...prev, sections };
+        setIsDirty(true);
+        queueSave(next);
+        return next;
+      });
+    },
+    [queueSave]
+  );
+
+  /** Called when the user clicks "Discuss" on a paragraph. Seeds the chat scope. */
+  const onDiscussParagraph = React.useCallback(
+    (sectionId: string, paragraphId: string) => {
+      const section = detail.sections.find((s) => s.id === sectionId);
+      const heading = section?.heading;
+      chatPaneRef.current?.seedTurn({
+        targetRef: { sectionId, paragraphId },
+        targetLabel: heading ? `${heading} paragraph` : "this paragraph",
+      });
+    },
+    [detail.sections]
+  );
 
   // After draft (router.refresh) or navigation, merge server report into local editor
   // state when the user isn't mid-edit.
@@ -344,12 +420,19 @@ export function ReportDetail({
         />
         <div className="rd-workspace">
           <div className="rd-split">
-            <ChatPane reportId={report.id} />
+            <ChatPane
+              ref={chatPaneRef}
+              reportId={report.id}
+              sections={detail.sections}
+              flushPendingSave={flushPendingSave}
+              onApplyProposal={onApplyProposalFromChat}
+            />
             <ReportPane
               detail={detail}
               onChange={onChange}
               isDrafting={isDrafting}
               onCancelDrafting={cancelDraftGeneration}
+              onDiscussParagraph={onDiscussParagraph}
             />
           </div>
         </div>

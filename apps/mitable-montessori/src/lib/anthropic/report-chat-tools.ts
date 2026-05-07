@@ -27,6 +27,51 @@ export const CHAT_READ_TOOLS: Anthropic.Tool[] = [
 
 export const CHAT_TERMINAL_TOOLS: Anthropic.Tool[] = [
   {
+    name: "propose_rewrite",
+    description:
+      "Propose a targeted rewrite of one paragraph. Use this when the teacher asks for an edit ('make it warmer', 'tighten this', 'add a sentence about X'). Must specify which paragraph by sectionId+paragraphId from read_report_sections, the exact existing text in oldText, and the proposed replacement in newText. The teacher will see Apply / Skip / Try another buttons.",
+    input_schema: {
+      type: "object",
+      properties: {
+        target: {
+          type: "object",
+          properties: {
+            sectionId: {
+              type: "string",
+              description: "The section's stable id from read_report_sections.",
+            },
+            paragraphId: {
+              type: "string",
+              description: "The paragraph's stable id within that section.",
+            },
+          },
+          required: ["sectionId", "paragraphId"],
+        },
+        lead: {
+          type: "string",
+          description:
+            "One short sentence (≤140 chars) introducing the rewrite — what you changed and why. Tokens only.",
+        },
+        oldText: {
+          type: "string",
+          description:
+            "The paragraph's current text, copied verbatim from read_report_sections. Tokens preserved as-is.",
+        },
+        newText: {
+          type: "string",
+          description:
+            "The proposed replacement prose. One paragraph, no bullets, no headings. Tokens only — never real names.",
+        },
+        rationale: {
+          type: "string",
+          description:
+            "Optional one-line justification grounded in the report or capture (≤200 chars). Tokens only.",
+        },
+      },
+      required: ["target", "lead", "oldText", "newText"],
+    },
+  },
+  {
     name: "propose_prose_reply",
     description:
       "Reply to the teacher with one short paragraph of prose. Use this for factual questions, confirmations, or when no edit is needed. Body must use tokens for student / subtopic / classroom names — never real names.",
@@ -45,7 +90,7 @@ export const CHAT_TERMINAL_TOOLS: Anthropic.Tool[] = [
   {
     name: "ask_clarifying_question",
     description:
-      "When the teacher's request is ambiguous and you'd otherwise have to guess, ask one short clarifying question instead. Use sparingly — most turns should resolve to prose or (in later phases) a structured proposal.",
+      "When the teacher's request is ambiguous and you'd otherwise have to guess, ask one short clarifying question instead. Use sparingly — most turns should resolve to prose or a proposal.",
     input_schema: {
       type: "object",
       properties: {
@@ -74,10 +119,11 @@ Privacy rules — non-negotiable:
 - The server substitutes real display names before showing your reply to the teacher.
 
 Workflow:
-1. On the first turn, call read_report_sections so you can ground every suggestion in the current text. The result is tokenized — that is normal.
+1. On the first turn, call read_report_sections so you can ground every suggestion in the current text. The result is tokenized — that is normal. The result includes stable section ids and paragraph ids you MUST use when proposing a rewrite.
 2. Decide which terminal tool fits the teacher's request:
+   - propose_rewrite: the teacher asked you to change a specific span ("make morning warmer", "tighten this", "add a sentence about her pencil grip"). Pick exactly one paragraph as the target. Copy its current text verbatim into oldText. Write the replacement in newText. Ground every concrete claim in either the existing report or what the teacher just said.
    - propose_prose_reply: factual questions, confirmations, or any reply that doesn't propose a specific edit.
-   - ask_clarifying_question: the request is genuinely ambiguous and a reasonable human would ask before answering.
+   - ask_clarifying_question: the request is genuinely ambiguous (e.g. you can't tell which paragraph to edit) and a reasonable human would ask before answering.
 3. Call exactly one terminal tool per turn. Do NOT produce assistant text outside a terminal tool call.
 
 Honesty rules — STRICT:

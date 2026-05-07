@@ -10,16 +10,18 @@ import {
   type ChatTokenizedSection,
 } from "@/lib/reports/chat-agent-loop";
 import type { ReportReferenceSet } from "@/lib/reports/data-adapter";
+import { rowToChatMessage, type StoredChatRow } from "@/lib/reports/chat-message";
 import { auditLog } from "@/lib/audit/log";
 
 export const runtime = "nodejs";
 
 /**
- * Phase 2: runs the bounded chat agent loop with read_report_sections +
- * propose_prose_reply / ask_clarifying_question terminal tools. Persists the
- * user message and the assistant's reply to report_chat_messages with full
- * tokenization parity (agent reasons in tokens; payload stored detokenized
- * with the references snapshot used).
+ * Phase 3: runs the bounded chat agent loop. Read tool: read_report_sections.
+ * Terminal tools: propose_rewrite (structured paragraph rewrite),
+ * propose_prose_reply, ask_clarifying_question. Persists the user message
+ * and the assistant's reply to report_chat_messages with full tokenization
+ * parity (agent reasons in tokens; payload stored detokenized with the
+ * references snapshot used).
  */
 
 type ReportSection = {
@@ -120,19 +122,30 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     (historyRows ?? []) as Array<{
       role: "user" | "assistant";
       kind: string;
-      payload: { body?: string };
+      payload: Record<string, unknown> | null;
       target_ref: { sectionId?: string } | null;
     }>
   )
     .reverse()
-    .filter((r) => typeof r.payload?.body === "string")
-    .map((r) => ({
-      role: r.role,
-      body: r.payload.body as string,
-      targetHint: r.target_ref?.sectionId
-        ? sectionHeadingForId(sections, r.target_ref.sectionId)
-        : undefined,
-    }));
+    .map((r) => {
+      // Proposal/ghost-edit payloads are summarized for context (the agent
+      // doesn't need full oldText/newText replayed). Prose/clarify/user-text
+      // pass through as their body.
+      const body =
+        r.kind === "proposal"
+          ? `(I proposed a rewrite: "${String(r.payload?.lead ?? "")}")`
+          : typeof r.payload?.body === "string"
+            ? (r.payload.body as string)
+            : "";
+      return {
+        role: r.role,
+        body,
+        targetHint: r.target_ref?.sectionId
+          ? sectionHeadingForId(sections, r.target_ref.sectionId)
+          : undefined,
+      };
+    })
+    .filter((h) => h.body.length > 0);
 
   const targetHint = parsed.data.targetRef?.sectionId
     ? sectionHeadingForId(sections, parsed.data.targetRef.sectionId)
@@ -169,27 +182,55 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       targetHint,
     });
 
-    const assistantRow = await persistMessage(supabase, {
-      report_id: id,
-      role: "assistant",
-      kind: result.terminalKind,
-      payload: { body: result.body },
-      references: references,
-      target_ref: parsed.data.targetRef ?? null,
-      actor_role: "assistant",
-      created_by_user_id: null,
-      tool_trace: {
+    let assistantPayload: Record<string, unknown>;
+    let assistantToolTrace: Record<string, unknown>;
+    if (result.terminalKind === "proposal") {
+      const headingDisplay = sectionHeadingForId(sections, result.proposal.target.sectionId);
+      assistantPayload = {
+        lead: result.proposal.lead,
+        target: {
+          sectionId: result.proposal.target.sectionId,
+          paragraphId: result.proposal.target.paragraphId,
+          ...(headingDisplay ? { headingDisplay } : {}),
+        },
+        oldText: result.proposal.oldText,
+        newText: result.proposal.newText,
+        ...(result.proposal.rationale ? { rationale: result.proposal.rationale } : {}),
+      };
+      assistantToolTrace = {
+        tokenized: result.proposal.tokenized,
+        target: result.proposal.target,
+        turns: result.turns,
+        regenerations: result.regenerations,
+        input_tokens: result.inputTokens,
+        output_tokens: result.outputTokens,
+      };
+    } else {
+      assistantPayload = { body: result.body };
+      assistantToolTrace = {
         tokenized_body: result.tokenizedBody,
         turns: result.turns,
         regenerations: result.regenerations,
         input_tokens: result.inputTokens,
         output_tokens: result.outputTokens,
-      },
+      };
+    }
+
+    const assistantRow = await persistMessage(supabase, {
+      report_id: id,
+      role: "assistant",
+      kind: result.terminalKind,
+      payload: assistantPayload,
+      references: references,
+      target_ref: parsed.data.targetRef ?? null,
+      actor_role: "assistant",
+      created_by_user_id: null,
+      tool_trace: assistantToolTrace,
     });
     if (!assistantRow) {
       return NextResponse.json({ error: "Failed to persist assistant message" }, { status: 500 });
     }
-    assistantMessage = rowToMessage(assistantRow);
+    assistantMessage = rowToChatMessage(assistantRow);
     toolTrace = {
       turns: result.turns,
       regenerations: result.regenerations,
@@ -224,7 +265,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           { status: 500 }
         );
       }
-      assistantMessage = rowToMessage(assistantRow);
+      assistantMessage = rowToChatMessage(assistantRow);
       toolTrace = { aborted: true, reason: err.reason };
     } else {
       return NextResponse.json(
@@ -242,27 +283,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     target_id: id,
     metadata: {
       latency_ms: Date.now() - startedAt,
-      phase: 2,
+      phase: 3,
       ...toolTrace,
     },
   });
 
   return NextResponse.json({
-    messages: [rowToMessage(userMessageRow), assistantMessage],
+    messages: [rowToChatMessage(userMessageRow), assistantMessage],
   });
 }
 
 // ----- helpers -------------------------------------------------------------
-
-type PersistedRow = {
-  id: string;
-  role: "user" | "assistant";
-  kind: string;
-  payload: { body?: string } | null;
-  target_ref: unknown;
-  actor_role: "teacher" | "admin" | "assistant";
-  created_at: string;
-};
 
 async function persistMessage(
   supabase: ReturnType<typeof createAdminClient>,
@@ -270,14 +301,14 @@ async function persistMessage(
     report_id: string;
     role: "user" | "assistant";
     kind: string;
-    payload: { body: string };
+    payload: Record<string, unknown>;
     references: ReportReferenceSet;
     target_ref: unknown;
     actor_role: "teacher" | "admin" | "assistant";
     created_by_user_id: string | null;
     tool_trace?: Record<string, unknown>;
   }
-): Promise<PersistedRow | null> {
+): Promise<StoredChatRow | null> {
   const { data, error } = await supabase
     .from("report_chat_messages")
     .insert({
@@ -291,26 +322,13 @@ async function persistMessage(
       created_by_user_id: row.created_by_user_id,
       tool_trace: row.tool_trace ?? null,
     })
-    .select("id, role, kind, payload, target_ref, actor_role, created_at")
+    .select("id, role, kind, payload, target_ref, actor_role, applied_at, dismissed_at, created_at")
     .single();
   if (error || !data) {
     console.error("[chat/turn] insert failed", error);
     return null;
   }
-  return data as PersistedRow;
-}
-
-function rowToMessage(row: PersistedRow): ChatTurnMessage {
-  const body = row.payload?.body ?? "";
-  const kind = row.kind as ChatTurnMessage["kind"];
-  return {
-    kind,
-    id: row.id,
-    body,
-    createdAt: row.created_at,
-    actorRole: row.actor_role,
-    targetRef: (row.target_ref as ChatTurnMessage["targetRef"]) ?? undefined,
-  };
+  return data as StoredChatRow;
 }
 
 function stripHtml(html: string): string {

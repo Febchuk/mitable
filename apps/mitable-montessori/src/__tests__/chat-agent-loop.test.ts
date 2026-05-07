@@ -125,8 +125,8 @@ describe("runReportChatAgent — Phase 2", () => {
     ]);
 
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "prose") throw new Error(`expected prose, got ${out.terminalKind}`);
 
-    expect(out.terminalKind).toBe("prose");
     expect(out.body).toBe(
       "Ada Okafor settled into the morning by reaching for the pink tower without a prompt."
     );
@@ -157,7 +157,9 @@ describe("runReportChatAgent — Phase 2", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    expect(out.terminalKind).toBe("clarify");
+    if (out.terminalKind !== "clarify") {
+      throw new Error(`expected clarify, got ${out.terminalKind}`);
+    }
     expect(out.body).toBe("Should I focus only on Ada Okafor or include peers?");
   });
 
@@ -190,7 +192,7 @@ describe("runReportChatAgent — Phase 2", () => {
     ]);
 
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    expect(out.terminalKind).toBe("prose");
+    if (out.terminalKind !== "prose") throw new Error(`expected prose, got ${out.terminalKind}`);
     expect(out.body).toBe("Ada Okafor had a steady morning with the pink tower.");
     expect(out.regenerations).toBe(1);
   });
@@ -293,6 +295,127 @@ describe("runReportChatAgent — Phase 2", () => {
     expect(userTextOf(firstCall.messages[0])).toContain("[STUDENT_1]");
     expect(userTextOf(firstCall.messages[0])).not.toContain("Ada Okafor");
     expect(userTextOf(firstCall.messages[1])).toContain("[STUDENT_1]");
+  });
+
+  // ----- Phase 3: propose_rewrite emission -----
+
+  it("propose_rewrite returns a proposal payload with detokenized prose fields", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_rewrite",
+            input: {
+              target: { sectionId: "morning", paragraphId: "morning-p1" },
+              lead: "Here's a warmer take:",
+              oldText: "[STUDENT_1] arrived quietly and chose the pink tower.",
+              newText:
+                "[STUDENT_1] came in quietly this morning and reached for the pink tower without prompting.",
+              rationale: "Same facts, warmer tone.",
+            },
+          },
+        ],
+      },
+    ]);
+
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "proposal") {
+      throw new Error(`expected proposal, got ${out.terminalKind}`);
+    }
+
+    expect(out.proposal.target).toEqual({
+      sectionId: "morning",
+      paragraphId: "morning-p1",
+    });
+    expect(out.proposal.lead).toBe("Here's a warmer take:");
+    expect(out.proposal.oldText).toContain("Ada Okafor");
+    expect(out.proposal.newText).toContain("Ada Okafor");
+    expect(out.proposal.rationale).toBe("Same facts, warmer tone.");
+    // Tokenized snapshot kept for tool_trace.
+    expect(out.proposal.tokenized.newText).toContain("[STUDENT_1]");
+    expect(out.proposal.tokenized.newText).not.toContain("Ada Okafor");
+  });
+
+  it("rejects propose_rewrite with an unknown sectionId+paragraphId pair", async () => {
+    const stub = buildStubAnthropic([
+      // First attempt: bad target — agent should retry within the same loop.
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_rewrite",
+            input: {
+              target: { sectionId: "ghost", paragraphId: "ghost-p" },
+              lead: "Lead",
+              oldText: "[STUDENT_1] foo.",
+              newText: "[STUDENT_1] bar.",
+            },
+          },
+        ],
+      },
+      // Recovery turn: correct target.
+      {
+        toolUses: [
+          {
+            id: "tu-2",
+            name: "propose_rewrite",
+            input: {
+              target: { sectionId: "morning", paragraphId: "morning-p1" },
+              lead: "Lead",
+              oldText: "[STUDENT_1] foo.",
+              newText: "[STUDENT_1] bar.",
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "proposal") throw new Error("expected proposal");
+    expect(out.proposal.target.sectionId).toBe("morning");
+    expect(out.turns).toBe(2);
+    // Recovered without a regeneration (the bad target was a tool-error response,
+    // not a token-leak validation failure).
+    expect(out.regenerations).toBe(0);
+  });
+
+  it("regenerates the loop once when propose_rewrite leaks a real name", async () => {
+    const stub = buildStubAnthropic([
+      // First attempt: leaks "Ada Okafor" inside newText.
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_rewrite",
+            input: {
+              target: { sectionId: "morning", paragraphId: "morning-p1" },
+              lead: "Lead",
+              oldText: "[STUDENT_1] arrived quietly and chose the pink tower.",
+              newText: "Ada Okafor came in calm.",
+            },
+          },
+        ],
+      },
+      // Second attempt: tokenized newText.
+      {
+        toolUses: [
+          {
+            id: "tu-2",
+            name: "propose_rewrite",
+            input: {
+              target: { sectionId: "morning", paragraphId: "morning-p1" },
+              lead: "Lead",
+              oldText: "[STUDENT_1] arrived quietly and chose the pink tower.",
+              newText: "[STUDENT_1] came in calm.",
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "proposal") throw new Error("expected proposal");
+    expect(out.proposal.newText).toBe("Ada Okafor came in calm.");
+    expect(out.regenerations).toBe(1);
   });
 });
 

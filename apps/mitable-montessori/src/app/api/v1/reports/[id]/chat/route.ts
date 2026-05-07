@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser, requireReportAccess } from "@/lib/api/auth";
 import type { ChatTurnMessage } from "@/lib/schemas/report-chat";
+import { rowToChatMessage, type StoredChatRow } from "@/lib/reports/chat-message";
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   const { data: rows, error } = await supabase
     .from("report_chat_messages")
-    .select("id, role, kind, payload, target_ref, actor_role, created_at")
+    .select("id, role, kind, payload, target_ref, actor_role, applied_at, dismissed_at, created_at")
     .eq("report_id", id)
     .order("created_at", { ascending: true });
   if (error) {
@@ -48,26 +49,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     );
   }
 
-  const messages: ChatTurnMessage[] = (
-    (rows ?? []) as Array<{
-      id: string;
-      role: string;
-      kind: string;
-      payload: { body?: string } | null;
-      target_ref: unknown;
-      actor_role: "teacher" | "admin" | "assistant";
-      created_at: string;
-    }>
-  )
-    .filter((r) => typeof r.payload?.body === "string")
-    .map((r) => ({
-      kind: r.kind as ChatTurnMessage["kind"],
-      id: r.id,
-      body: r.payload!.body as string,
-      createdAt: r.created_at,
-      actorRole: r.actor_role,
-      targetRef: (r.target_ref as ChatTurnMessage["targetRef"]) ?? undefined,
-    }));
+  const messages: ChatTurnMessage[] = ((rows ?? []) as StoredChatRow[]).map(rowToChatMessage);
 
   return NextResponse.json({ messages });
 }

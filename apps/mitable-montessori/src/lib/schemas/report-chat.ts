@@ -23,6 +23,10 @@ const baseFields = {
   /** Who posted this turn — null/undefined for the initial empty load. */
   actorRole: z.enum(["teacher", "admin", "assistant"]).optional(),
   targetRef: TargetRefSchema.optional(),
+  /** Set when teacher accepts a proposal/ghost. ISO 8601 timestamp. */
+  appliedAt: z.string().optional(),
+  /** Set when teacher rejects a proposal/ghost. ISO 8601 timestamp. */
+  dismissedAt: z.string().optional(),
 };
 
 export const ChatProseMessageSchema = z.object({
@@ -43,10 +47,30 @@ export const ChatUserTextMessageSchema = z.object({
   ...baseFields,
 });
 
+export const ChatProposalTargetSchema = z.object({
+  sectionId: z.string(),
+  paragraphId: z.string(),
+  /** Server-derived display string (e.g. "Morning paragraph") for the UI label. */
+  headingDisplay: z.string().optional(),
+});
+export type ChatProposalTarget = z.infer<typeof ChatProposalTargetSchema>;
+
+export const ChatProposalMessageSchema = z.object({
+  kind: z.literal("proposal"),
+  /** One short sentence introducing the rewrite. */
+  lead: z.string().min(1).max(500),
+  target: ChatProposalTargetSchema,
+  oldText: z.string().min(1).max(4000),
+  newText: z.string().min(1).max(4000),
+  rationale: z.string().max(500).optional(),
+  ...baseFields,
+});
+
 export const ChatTurnMessageSchema = z.discriminatedUnion("kind", [
   ChatProseMessageSchema,
   ChatClarifyMessageSchema,
   ChatUserTextMessageSchema,
+  ChatProposalMessageSchema,
 ]);
 export type ChatTurnMessage = z.infer<typeof ChatTurnMessageSchema>;
 
@@ -70,3 +94,18 @@ export const ChatHistoryResponseSchema = z.object({
   messages: z.array(ChatTurnMessageSchema),
 });
 export type ChatHistoryResponse = z.infer<typeof ChatHistoryResponseSchema>;
+
+export const ChatMessageActionSchema = z.object({
+  /** What the teacher did to a proposal/ghost. */
+  action: z.enum(["applied", "dismissed", "regenerated"]),
+  /** Optional snapshot of what the apply changed (for audit + undo). */
+  appliedTo: z
+    .object({
+      sectionId: z.string(),
+      paragraphId: z.string(),
+      before: z.string(),
+      after: z.string(),
+    })
+    .optional(),
+});
+export type ChatMessageAction = z.infer<typeof ChatMessageActionSchema>;
