@@ -1,16 +1,17 @@
 "use client";
 
 import * as React from "react";
-import {
-  CHILDREN,
-  SUBTOPICS_BY_TOPIC,
-  TOPICS,
-  type ProgressMark,
-  type Topic,
-} from "@/components/montessori/data";
+import Link from "next/link";
+import { type ProgressMark } from "@/components/montessori/data";
 import { FilterChips, PageHeader } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
+import type {
+  ClassroomProgressStudent,
+  ClassroomProgressSubtopic,
+  ClassroomProgressTopic,
+  ClassroomProgressSubject,
+} from "@/lib/queries/classroom-progress";
 import { BulkBar } from "./bulk-bar";
 import { BulkSheet } from "./bulk-sheet";
 import { LeftRail } from "./left-rail";
@@ -21,19 +22,21 @@ import { RecentUpdatesPanel } from "./recent-updates-panel";
 import { SelectionCapsule } from "./selection-capsule";
 import { SubtopicPopover } from "./subtopic-popover";
 
-function useSelection() {
+const ALL_SUBJECTS = "__all__";
+
+function useSelection(presentStudents: ClassroomProgressStudent[]) {
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
   const [draftStatus, setDraftStatus] = React.useState<ProgressMark | null>(null);
   const [draftNote, setDraftNote] = React.useState("");
 
   const isSelected = React.useCallback(
-    (cid: string, idx: number) => selected.has(`${cid}:${idx}`),
+    (studentId: string, subtopicId: string) => selected.has(`${studentId}:${subtopicId}`),
     [selected]
   );
 
-  const toggle = React.useCallback((cid: string, idx: number) => {
+  const toggle = React.useCallback((studentId: string, subtopicId: string) => {
     setSelected((prev) => {
-      const k = `${cid}:${idx}`;
+      const k = `${studentId}:${subtopicId}`;
       const next = new Set(prev);
       if (next.has(k)) next.delete(k);
       else next.add(k);
@@ -41,23 +44,25 @@ function useSelection() {
     });
   }, []);
 
-  const selectRow = React.useCallback((idx: number) => {
-    const presentChildren = CHILDREN.filter((c) => c.present);
-    setSelected((prev) => {
-      const next = new Set(prev);
-      const allOn = presentChildren.every((c) => next.has(`${c.id}:${idx}`));
-      if (allOn) presentChildren.forEach((c) => next.delete(`${c.id}:${idx}`));
-      else presentChildren.forEach((c) => next.add(`${c.id}:${idx}`));
-      return next;
-    });
-  }, []);
+  const selectRow = React.useCallback(
+    (subtopicId: string) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        const allOn = presentStudents.every((s) => next.has(`${s.id}:${subtopicId}`));
+        if (allOn) presentStudents.forEach((s) => next.delete(`${s.id}:${subtopicId}`));
+        else presentStudents.forEach((s) => next.add(`${s.id}:${subtopicId}`));
+        return next;
+      });
+    },
+    [presentStudents]
+  );
 
-  const selectColumn = React.useCallback((cid: string, subs: string[]) => {
+  const selectColumn = React.useCallback((studentId: string, subtopicIds: string[]) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      const allOn = subs.every((_, i) => next.has(`${cid}:${i}`));
-      if (allOn) subs.forEach((_, i) => next.delete(`${cid}:${i}`));
-      else subs.forEach((_, i) => next.add(`${cid}:${i}`));
+      const allOn = subtopicIds.every((sid) => next.has(`${studentId}:${sid}`));
+      if (allOn) subtopicIds.forEach((sid) => next.delete(`${studentId}:${sid}`));
+      else subtopicIds.forEach((sid) => next.add(`${studentId}:${sid}`));
       return next;
     });
   }, []);
@@ -84,16 +89,14 @@ function useSelection() {
 }
 
 function TodaysFocusCard({
-  topic,
-  progressByTopic,
+  topicName,
+  subtopicCount,
+  inProgressChildren,
 }: {
-  topic: Topic;
-  progressByTopic: Record<Topic, Record<string, ProgressMark[]>>;
+  topicName: string;
+  subtopicCount: number;
+  inProgressChildren: number;
 }) {
-  const data = progressByTopic[topic] || {};
-  const dueCount = CHILDREN.filter((c) => c.present).filter((c) =>
-    (data[c.id] || []).some((s) => s === "p" || s === "i")
-  ).length;
   return (
     <div
       style={{
@@ -108,10 +111,11 @@ function TodaysFocusCard({
     >
       <div>
         <div style={{ fontSize: 12, fontWeight: 500, color: "var(--color-butter-deep)" }}>
-          Today&rsquo;s focus · {topic}
+          Today&rsquo;s focus · {topicName}
         </div>
         <div style={{ fontSize: 11, color: "var(--color-ink-secondary)" }}>
-          {dueCount} {dueCount === 1 ? "child" : "children"} with work in progress
+          {inProgressChildren} {inProgressChildren === 1 ? "child" : "children"} with work in
+          progress
         </div>
       </div>
       <div
@@ -121,18 +125,174 @@ function TodaysFocusCard({
           fontWeight: 500,
         }}
       >
-        {SUBTOPICS_BY_TOPIC[topic].length} subtopics
+        {subtopicCount} subtopics
       </div>
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  body,
+  ctaHref,
+  ctaLabel,
+}: {
+  title: string;
+  body: string;
+  ctaHref?: string;
+  ctaLabel?: string;
+}) {
+  return (
+    <div
+      style={{
+        margin: "32px 16px",
+        padding: "32px 24px",
+        textAlign: "center",
+        border: "1px dashed var(--color-border)",
+        borderRadius: 14,
+        background: "var(--color-surface)",
+      }}
+    >
+      <div className="font-display" style={{ fontSize: 22, color: "var(--color-ink)" }}>
+        {title}
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          color: "var(--color-ink-secondary)",
+          fontSize: 13.5,
+          maxWidth: 460,
+          margin: "8px auto 0",
+        }}
+      >
+        {body}
+      </div>
+      {ctaHref && ctaLabel && (
+        <Link
+          href={ctaHref}
+          style={{
+            display: "inline-block",
+            marginTop: 16,
+            padding: "10px 16px",
+            borderRadius: 10,
+            background: "var(--color-ink)",
+            color: "var(--color-surface)",
+            fontSize: 13,
+            fontWeight: 500,
+            textDecoration: "none",
+          }}
+        >
+          {ctaLabel}
+        </Link>
+      )}
     </div>
   );
 }
 
 export function ProgressFeature() {
   const store = useMontessori();
-  const sel = useSelection();
-  const [topic, setTopic] = React.useState<Topic>("Sensorial");
-  const [info, setInfo] = React.useState<{ idx: number; rect: DOMRect } | null>(null);
+  const cp = store.classroomProgress;
+
+  // No active classroom at all (admin or unseated teacher).
+  if (!cp) {
+    return (
+      <div className="progress-root">
+        <PageHeader
+          overline="Lesson planner"
+          title="Progress"
+          subtitle="No active classroom assigned to your account."
+        />
+        <EmptyState
+          title="No active classroom"
+          body="Ask an admin to assign you to a classroom — once they do, your roster, curriculum, and progress will load here."
+        />
+      </div>
+    );
+  }
+
+  // Classroom exists but no curriculum is attached yet.
+  if (!cp.curriculumAssigned) {
+    return (
+      <div className="progress-root">
+        <PageHeader
+          overline="Lesson planner"
+          title="Progress"
+          subtitle={`${cp.students.length} children in ${cp.classroomName} · curriculum not assigned`}
+        />
+        <EmptyState
+          title="No curriculum yet"
+          body="Once an admin assigns a curriculum to this classroom, you'll see subjects, topics, and subtopics here so you can record progress for each child."
+          ctaHref="/admin/curriculum"
+          ctaLabel="Open curriculum admin"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <ProgressFeatureLoaded
+      classroomName={cp.classroomName}
+      subjects={cp.subjects}
+      topics={cp.topics}
+      subtopics={cp.subtopics}
+      students={cp.students}
+    />
+  );
+}
+
+function ProgressFeatureLoaded({
+  classroomName,
+  subjects,
+  topics,
+  subtopics,
+  students,
+}: {
+  classroomName: string;
+  subjects: ClassroomProgressSubject[];
+  topics: ClassroomProgressTopic[];
+  subtopics: ClassroomProgressSubtopic[];
+  students: ClassroomProgressStudent[];
+}) {
+  const store = useMontessori();
+  const presentStudents = React.useMemo(() => students.filter((s) => s.present), [students]);
+  const sel = useSelection(presentStudents);
+
+  // Subject filter. ALL_SUBJECTS sentinel = no filter.
+  const [subjectId, setSubjectId] = React.useState<string>(ALL_SUBJECTS);
+  const visibleTopics = React.useMemo(
+    () => (subjectId === ALL_SUBJECTS ? topics : topics.filter((t) => t.subjectId === subjectId)),
+    [topics, subjectId]
+  );
+
+  const [topicId, setTopicId] = React.useState<string | null>(visibleTopics[0]?.id ?? null);
+  // Keep topicId in sync with the visible-topics list when a subject filter
+  // narrows it out from under us.
+  React.useEffect(() => {
+    if (visibleTopics.length === 0) {
+      if (topicId !== null) setTopicId(null);
+      return;
+    }
+    if (!topicId || !visibleTopics.some((t) => t.id === topicId)) {
+      setTopicId(visibleTopics[0].id);
+      sel.clear();
+    }
+  }, [visibleTopics, topicId, sel]);
+
+  const [info, setInfo] = React.useState<{ subtopicId: string; rect: DOMRect } | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+
+  const currentTopic = visibleTopics.find((t) => t.id === topicId) ?? visibleTopics[0] ?? null;
+  const currentSubtopics = React.useMemo(
+    () =>
+      currentTopic
+        ? subtopics
+            .filter((st) => st.topicId === currentTopic.id)
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+        : [],
+    [subtopics, currentTopic]
+  );
+  const currentSubject =
+    subjectId === ALL_SUBJECTS ? null : (subjects.find((s) => s.id === subjectId) ?? null);
 
   // ESC clears selection + closes any popover/sheet.
   React.useEffect(() => {
@@ -146,15 +306,24 @@ export function ProgressFeature() {
     return () => window.removeEventListener("keydown", onKey);
   }, [sel]);
 
-  // Switching topics invalidates selection (subtopic indices don't carry across).
   const switchTopic = React.useCallback(
-    (t: Topic) => {
-      if (t === topic) return;
+    (id: string) => {
+      if (id === topicId) return;
       sel.clear();
       setInfo(null);
-      setTopic(t);
+      setTopicId(id);
     },
-    [sel, topic]
+    [sel, topicId]
+  );
+
+  const switchSubject = React.useCallback(
+    (id: string) => {
+      if (id === subjectId) return;
+      sel.clear();
+      setInfo(null);
+      setSubjectId(id);
+    },
+    [sel, subjectId]
   );
 
   // Mobile: when selection clears, close the sheet too.
@@ -170,11 +339,23 @@ export function ProgressFeature() {
   };
 
   const onApply = () => {
-    if (!sel.draftStatus || sel.count === 0) return;
-    const cells = Array.from(sel.selected);
+    if (!sel.draftStatus || sel.count === 0 || !currentTopic) return;
+    const subtopicNameById = new Map(currentSubtopics.map((st) => [st.id, st.name] as const));
+    const cells = Array.from(sel.selected)
+      .map((k) => {
+        const [studentId, subtopicId] = k.split(":");
+        const subtopicName = subtopicNameById.get(subtopicId) ?? "";
+        return { studentId, subtopicId, subtopicName };
+      })
+      // Defensive: drop any selection key that no longer points at a current
+      // subtopic (e.g. user changed topic mid-selection).
+      .filter((c) => subtopicNameById.has(c.subtopicId));
+    if (cells.length === 0) return;
+
     const trimmed = sel.draftNote.trim();
-    store.applyBulkProgress({
-      topic,
+    void store.applyBulkProgress({
+      topicId: currentTopic.id,
+      topicName: currentTopic.name,
       cells,
       status: sel.draftStatus,
       note: trimmed || undefined,
@@ -189,107 +370,181 @@ export function ProgressFeature() {
     sel.clear();
   };
 
-  const presentCount = CHILDREN.filter((c) => c.present).length;
-  const subCount = SUBTOPICS_BY_TOPIC[topic].length;
-  const subtopicAtInfo = info ? SUBTOPICS_BY_TOPIC[topic][info.idx] : null;
+  const presentCount = presentStudents.length;
+  const subCount = currentSubtopics.length;
+  const subtopicAtInfo = info
+    ? (currentSubtopics.find((s) => s.id === info.subtopicId) ?? null)
+    : null;
+
+  // Compute "in progress" count for Today's focus on mobile.
+  const inProgress = currentTopic
+    ? presentStudents.filter((s) => {
+        const row = store.progressByTopic[currentTopic.id]?.[s.id] ?? {};
+        return Object.values(row).some((m) => m === "p" || m === "i");
+      }).length
+    : 0;
+
+  const subjectChipOptions = ["All", ...subjects.map((s) => s.name)];
+  const subjectChipValue =
+    subjectId === ALL_SUBJECTS ? "All" : (subjects.find((s) => s.id === subjectId)?.name ?? "All");
+  const onSubjectChipChange = (label: string) => {
+    if (label === "All") switchSubject(ALL_SUBJECTS);
+    else {
+      const found = subjects.find((s) => s.name === label);
+      if (found) switchSubject(found.id);
+    }
+  };
+
+  const topicChipOptions = visibleTopics.map((t) => t.name);
+  const topicChipValue = currentTopic?.name ?? "";
+  const onTopicChipChange = (label: string) => {
+    const found = visibleTopics.find((t) => t.name === label);
+    if (found) switchTopic(found.id);
+  };
+
+  const overline = currentTopic
+    ? `Lesson planner · ${currentTopic.name.toLowerCase()}`
+    : "Lesson planner";
+  const subtitle = currentTopic
+    ? currentSubject
+      ? `${presentCount} children present · ${currentTopic.name} · ${currentSubject.name}`
+      : `${presentCount} children present · ${subCount} subtopics in ${currentTopic.name}`
+    : `${presentCount} children present`;
 
   return (
-    // Outer wrapper carries the literal `progress-root` class so the
-    // route-scoped overrides in progress.css can target it via :has().
-    // On desktop those rules clamp the layout chain to 100vh and zero the
-    // /app layout's mobile-bottom-nav padding so the matrix fills the page.
-    // On mobile the class has no effect — natural page scroll resumes and
-    // the layout's 96px bottom padding keeps content above the bottom nav.
     <div className="progress-root">
       <PageHeader
-        overline={`Lesson planner · ${topic.toLowerCase()}`}
+        overline={`${overline} · ${classroomName}`}
         title="Progress"
-        subtitle={`${presentCount} children present · ${subCount} subtopics in ${topic}`}
+        subtitle={subtitle}
       />
 
-      {/* Desktop layout: left rail · matrix · recent updates.
-          NB: keep inline style off this wrapper — `hidden lg:grid` controls
-          display, and inline `display` would beat it in specificity, leaving
-          both layouts visible on desktop. Layout sizing lives on the inner
-          grid via styles.desktopGrid. */}
-      <div className={`hidden lg:grid ${styles.desktopGrid}`}>
-        <LeftRail
-          topic={topic}
-          onTopicChange={switchTopic}
-          progressByTopic={store.progressByTopic}
+      {visibleTopics.length === 0 ? (
+        <EmptyState
+          title="No topics in this subject yet"
+          body="Add a topic in the curriculum admin to start recording progress here."
+          ctaHref="/admin/curriculum"
+          ctaLabel="Open curriculum admin"
         />
-        <div className={styles.matrixPane}>
-          <ProgressMatrix
-            topic={topic}
-            progressByTopic={store.progressByTopic}
-            sel={matrixSel}
-            presentOnly
-            openInfoIdx={info?.idx ?? null}
-            onInfoOpen={(idx, rect) =>
-              setInfo((cur) => (cur && cur.idx === idx ? null : { idx, rect }))
-            }
-          />
-        </div>
-        <div className={styles.recentPanel}>
-          <RecentUpdatesPanel entries={store.recentUpdates} />
-        </div>
-      </div>
-
-      {/* Mobile layout: Today's focus → topic chips → matrix → updates.
-          Same caveat as above: `lg:hidden` owns display; inner sections own
-          their own flex layout. */}
-      <div className={`lg:hidden ${styles.mobileColumn}`}>
-        <div style={{ padding: "12px 16px 8px" }}>
-          <TodaysFocusCard topic={topic} progressByTopic={store.progressByTopic} />
-        </div>
-        <div
-          style={{
-            padding: "4px 16px 8px",
-            display: "flex",
-            gap: 6,
-            overflowX: "auto",
-          }}
-        >
-          <FilterChips
-            options={TOPICS as unknown as string[]}
-            value={topic}
-            onChange={(v) => switchTopic(v as Topic)}
-          />
-        </div>
-        <div
-          style={{
-            padding: "4px 16px 12px",
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
-          <ProgressMatrix
-            topic={topic}
-            progressByTopic={store.progressByTopic}
-            sel={matrixSel}
-            presentOnly
-            mobile
-            openInfoIdx={info?.idx ?? null}
-            onInfoOpen={(idx, rect) =>
-              setInfo((cur) => (cur && cur.idx === idx ? null : { idx, rect }))
-            }
-          />
-        </div>
-        <div style={{ padding: "0 16px 16px" }}>
-          <div
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 14,
-              overflow: "hidden",
-            }}
-          >
-            <RecentUpdatesPanel entries={store.recentUpdates} />
+      ) : (
+        <>
+          {/* Desktop layout */}
+          <div className={`hidden lg:grid ${styles.desktopGrid}`}>
+            <LeftRail
+              subjects={subjects}
+              subjectId={subjectId === ALL_SUBJECTS ? null : subjectId}
+              onSubjectChange={(id) => switchSubject(id ?? ALL_SUBJECTS)}
+              topics={visibleTopics}
+              topicId={currentTopic?.id ?? null}
+              onTopicChange={switchTopic}
+              students={presentStudents}
+              currentSubtopics={currentSubtopics}
+              progressByTopic={store.progressByTopic}
+            />
+            <div className={styles.matrixPane}>
+              {currentTopic && (
+                <ProgressMatrix
+                  topicId={currentTopic.id}
+                  subtopics={currentSubtopics}
+                  students={presentStudents}
+                  progressByTopic={store.progressByTopic}
+                  sel={matrixSel}
+                  openInfoId={info?.subtopicId ?? null}
+                  onInfoOpen={(subtopicId, rect) =>
+                    setInfo((cur) =>
+                      cur && cur.subtopicId === subtopicId ? null : { subtopicId, rect }
+                    )
+                  }
+                />
+              )}
+            </div>
+            <div className={styles.recentPanel}>
+              <RecentUpdatesPanel entries={store.recentUpdates} students={students} />
+            </div>
           </div>
-        </div>
-      </div>
+
+          {/* Mobile layout */}
+          <div className={`lg:hidden ${styles.mobileColumn}`}>
+            <div style={{ padding: "12px 16px 8px" }}>
+              {currentTopic && (
+                <TodaysFocusCard
+                  topicName={currentTopic.name}
+                  subtopicCount={subCount}
+                  inProgressChildren={inProgress}
+                />
+              )}
+            </div>
+            {subjects.length > 1 && (
+              <div
+                style={{
+                  padding: "4px 16px 4px",
+                  display: "flex",
+                  gap: 6,
+                  overflowX: "auto",
+                }}
+              >
+                <FilterChips
+                  options={subjectChipOptions}
+                  value={subjectChipValue}
+                  onChange={onSubjectChipChange}
+                />
+              </div>
+            )}
+            <div
+              style={{
+                padding: "4px 16px 8px",
+                display: "flex",
+                gap: 6,
+                overflowX: "auto",
+              }}
+            >
+              <FilterChips
+                options={topicChipOptions}
+                value={topicChipValue}
+                onChange={onTopicChipChange}
+              />
+            </div>
+            <div
+              style={{
+                padding: "4px 16px 12px",
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              {currentTopic && (
+                <ProgressMatrix
+                  topicId={currentTopic.id}
+                  subtopics={currentSubtopics}
+                  students={presentStudents}
+                  progressByTopic={store.progressByTopic}
+                  sel={matrixSel}
+                  mobile
+                  openInfoId={info?.subtopicId ?? null}
+                  onInfoOpen={(subtopicId, rect) =>
+                    setInfo((cur) =>
+                      cur && cur.subtopicId === subtopicId ? null : { subtopicId, rect }
+                    )
+                  }
+                />
+              )}
+            </div>
+            <div style={{ padding: "0 16px 16px" }}>
+              <div
+                style={{
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 14,
+                  overflow: "hidden",
+                }}
+              >
+                <RecentUpdatesPanel entries={store.recentUpdates} students={students} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Desktop bulk bar — fixed bottom-center, only when selection > 0 */}
       <div className="hidden lg:block">
@@ -313,9 +568,9 @@ export function ProgressFeature() {
             onApply={() => setSheetOpen(true)}
           />
         )}
-        {sheetOpen && (
+        {sheetOpen && currentTopic && (
           <BulkSheet
-            topic={topic}
+            topic={currentTopic.name}
             count={sel.count}
             draftStatus={sel.draftStatus}
             draftNote={sel.draftNote}
@@ -332,7 +587,7 @@ export function ProgressFeature() {
 
       {info && subtopicAtInfo && (
         <SubtopicPopover
-          subtopic={subtopicAtInfo}
+          subtopic={subtopicAtInfo.name}
           anchorRect={info.rect}
           onClose={() => setInfo(null)}
         />

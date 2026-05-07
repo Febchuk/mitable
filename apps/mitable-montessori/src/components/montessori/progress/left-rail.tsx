@@ -1,47 +1,85 @@
 "use client";
 
 import * as React from "react";
-import {
-  CHILDREN,
-  STATUS_COLOR,
-  STATUS_LABEL,
-  SUBTOPICS_BY_TOPIC,
-  TOPICS,
-  type ProgressMark,
-  type Topic,
-} from "@/components/montessori/data";
+import { STATUS_COLOR, STATUS_LABEL, type ProgressMark } from "@/components/montessori/data";
+import type { ProgressByTopic } from "@/components/montessori/store";
+import type {
+  ClassroomProgressStudent,
+  ClassroomProgressSubject,
+  ClassroomProgressSubtopic,
+  ClassroomProgressTopic,
+} from "@/lib/queries/classroom-progress";
 
 const MASTERY_ORDER: ProgressMark[] = ["m", "p", "i", "-"];
 
 type LeftRailProps = {
-  topic: Topic;
-  onTopicChange: (t: Topic) => void;
-  progressByTopic: Record<Topic, Record<string, ProgressMark[]>>;
-  presentOnly?: boolean;
+  subjects: ClassroomProgressSubject[];
+  /** null = "All subjects". */
+  subjectId: string | null;
+  onSubjectChange: (id: string | null) => void;
+  topics: ClassroomProgressTopic[];
+  topicId: string | null;
+  onTopicChange: (id: string) => void;
+  students: ClassroomProgressStudent[];
+  currentSubtopics: ClassroomProgressSubtopic[];
+  progressByTopic: ProgressByTopic;
 };
 
 export function LeftRail({
-  topic,
+  subjects,
+  subjectId,
+  onSubjectChange,
+  topics,
+  topicId,
   onTopicChange,
+  students,
+  currentSubtopics,
   progressByTopic,
-  presentOnly = true,
 }: LeftRailProps) {
-  const data = React.useMemo(() => progressByTopic[topic] || {}, [progressByTopic, topic]);
-  const presentChildren = React.useMemo(
-    () => (presentOnly ? CHILDREN.filter((c) => c.present) : CHILDREN),
-    [presentOnly]
+  const currentTopicData = React.useMemo(
+    () => (topicId ? (progressByTopic[topicId] ?? {}) : {}),
+    [progressByTopic, topicId]
   );
-  const dueCount = presentChildren.filter((c) =>
-    (data[c.id] || []).some((s) => s === "p" || s === "i")
-  ).length;
+  const currentTopic = topics.find((t) => t.id === topicId) ?? null;
+
+  const dueCount = students.filter((s) => {
+    const row = currentTopicData[s.id] ?? {};
+    return Object.values(row).some((m) => m === "p" || m === "i");
+  }).length;
 
   const counts = React.useMemo(() => {
-    const ids = presentChildren.map((c) => c.id);
-    const all = ids.flatMap((cid) => data[cid] || []);
     const o: Record<ProgressMark, number> = { m: 0, p: 0, i: 0, "-": 0 };
-    for (const s of all) o[s]++;
-    return { ...o, total: all.length };
-  }, [data, presentChildren]);
+    let total = 0;
+    for (const s of students) {
+      const row = currentTopicData[s.id] ?? {};
+      // Only count cells whose subtopic is part of the current topic — guards
+      // against any stale entries lingering after a curriculum edit.
+      for (const st of currentSubtopics) {
+        const v = row[st.id] ?? "-";
+        o[v]++;
+        total++;
+      }
+    }
+    return { ...o, total };
+  }, [currentTopicData, students, currentSubtopics]);
+
+  const subtopicCountByTopicId = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of topics) m.set(t.id, 0);
+    // currentSubtopics is current-topic only; we need a flat lookup, so the
+    // caller already passes topics filtered by subject. Topic count uses the
+    // store-side classroomProgress.subtopics list — but here we only have the
+    // current topic's subtopics. Approximate: compute from progressByTopic
+    // keys for each topic. Falls back to 0 when topic has no rows yet.
+    for (const t of topics) {
+      const tp = progressByTopic[t.id] ?? {};
+      // First student row's keys reflect all subtopics in that topic since
+      // the seed pass in store.tsx initialises every cell.
+      const firstStudent = Object.values(tp)[0];
+      m.set(t.id, firstStudent ? Object.keys(firstStudent).length : 0);
+    }
+    return m;
+  }, [topics, progressByTopic]);
 
   return (
     <div
@@ -67,7 +105,7 @@ export function LeftRail({
           }}
         >
           <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--color-butter-deep)" }}>
-            {topic}
+            {currentTopic?.name ?? "—"}
           </div>
           <div style={{ fontSize: 11.5, color: "var(--color-ink-secondary)", marginTop: 2 }}>
             {dueCount} {dueCount === 1 ? "child" : "children"} with work in progress
@@ -75,20 +113,43 @@ export function LeftRail({
         </div>
       </div>
 
+      {subjects.length > 0 && (
+        <div>
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
+            Subject
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <SubjectButton
+              label="All subjects"
+              isActive={subjectId === null}
+              onClick={() => onSubjectChange(null)}
+            />
+            {subjects.map((s) => (
+              <SubjectButton
+                key={s.id}
+                label={s.name}
+                isActive={subjectId === s.id}
+                onClick={() => onSubjectChange(s.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
           Topic
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {TOPICS.map((t) => {
-            const subCount = SUBTOPICS_BY_TOPIC[t].length;
-            const isActive = topic === t;
+          {topics.map((t) => {
+            const subCount = subtopicCountByTopicId.get(t.id) ?? 0;
+            const isActive = topicId === t.id;
             return (
               <button
-                key={t}
+                key={t.id}
                 type="button"
                 className="tap"
-                onClick={() => onTopicChange(t)}
+                onClick={() => onTopicChange(t.id)}
                 style={{
                   textAlign: "left",
                   padding: "8px 10px",
@@ -105,7 +166,7 @@ export function LeftRail({
                   fontFamily: "inherit",
                 }}
               >
-                <span>{t}</span>
+                <span>{t.name}</span>
                 <span
                   style={{
                     fontSize: 10.5,
@@ -184,5 +245,40 @@ export function LeftRail({
         </div>
       </div>
     </div>
+  );
+}
+
+function SubjectButton({
+  label,
+  isActive,
+  onClick,
+}: {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="tap"
+      onClick={onClick}
+      style={{
+        textAlign: "left",
+        padding: "8px 10px",
+        borderRadius: 8,
+        border: 0,
+        background: isActive ? "var(--color-muted)" : "transparent",
+        color: isActive ? "var(--color-ink)" : "var(--color-ink-secondary)",
+        fontSize: 13,
+        fontWeight: isActive ? 500 : 400,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      <span>{label}</span>
+    </button>
   );
 }

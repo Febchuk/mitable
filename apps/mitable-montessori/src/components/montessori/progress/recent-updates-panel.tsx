@@ -1,13 +1,9 @@
 "use client";
 
 import * as React from "react";
-import {
-  CHILDREN,
-  STATUS_COLOR,
-  STATUS_LABEL,
-  type RecentUpdateEntry,
-} from "@/components/montessori/data";
+import { STATUS_COLOR, STATUS_LABEL, type RecentUpdateEntry } from "@/components/montessori/data";
 import { Avatar } from "@/components/montessori/primitives";
+import type { ClassroomProgressStudent } from "@/lib/queries/classroom-progress";
 
 const initialsFor = (name: string) =>
   name
@@ -15,11 +11,25 @@ const initialsFor = (name: string) =>
     .map((w) => w[0])
     .join("");
 
+const TONES = ["clay", "sage", "butter", "blue", "terracotta"] as const;
+function toneFor(id: string): (typeof TONES)[number] {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return TONES[h % TONES.length];
+}
+
 type RecentUpdatesPanelProps = {
   entries: RecentUpdateEntry[];
+  students: ClassroomProgressStudent[];
 };
 
-export function RecentUpdatesPanel({ entries }: RecentUpdatesPanelProps) {
+export function RecentUpdatesPanel({ entries, students }: RecentUpdatesPanelProps) {
+  const studentsById = React.useMemo(() => {
+    const m = new Map<string, ClassroomProgressStudent>();
+    for (const s of students) m.set(s.id, s);
+    return m;
+  }, [students]);
+
   if (entries.length === 0) {
     return (
       <div style={{ padding: "18px 16px", color: "var(--color-ink-muted)", fontSize: 12.5 }}>
@@ -38,8 +48,9 @@ export function RecentUpdatesPanel({ entries }: RecentUpdatesPanelProps) {
         </div>
       </div>
       {entries.slice(0, 24).map((e) => {
-        const child = CHILDREN.find((c) => c.id === e.childId);
-        if (!child) return null;
+        const student = studentsById.get(e.childId);
+        if (!student) return null;
+        const display = student.preferredName ?? student.fullName.split(" ")[0];
         return (
           <div
             key={e.id}
@@ -52,10 +63,10 @@ export function RecentUpdatesPanel({ entries }: RecentUpdatesPanelProps) {
               alignItems: "flex-start",
             }}
           >
-            <Avatar initials={initialsFor(child.name)} tone={child.tone} size={26} />
+            <Avatar initials={initialsFor(student.fullName)} tone={toneFor(student.id)} size={26} />
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-ink)" }}>
-                {child.name.split(" ")[0]}{" "}
+                {display}{" "}
                 <span style={{ color: "var(--color-ink-muted)", fontWeight: 400 }}>·</span>{" "}
                 <span style={{ color: "var(--color-ink-secondary)", fontWeight: 400 }}>
                   {e.subtopicName}

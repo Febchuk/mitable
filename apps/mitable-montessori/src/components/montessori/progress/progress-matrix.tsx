@@ -1,14 +1,13 @@
 "use client";
 
 import * as React from "react";
-import {
-  CHILDREN,
-  STATUS_LABEL,
-  SUBTOPICS_BY_TOPIC,
-  type ProgressMark,
-  type Topic,
-} from "@/components/montessori/data";
+import { STATUS_LABEL, type ProgressMark } from "@/components/montessori/data";
 import { Avatar } from "@/components/montessori/primitives";
+import type { ProgressByTopic } from "@/components/montessori/store";
+import type {
+  ClassroomProgressStudent,
+  ClassroomProgressSubtopic,
+} from "@/lib/queries/classroom-progress";
 import styles from "./progress.module.css";
 
 const initialsFor = (name: string) =>
@@ -17,11 +16,20 @@ const initialsFor = (name: string) =>
     .map((w) => w[0])
     .join("");
 
+const TONES = ["clay", "sage", "butter", "blue", "terracotta"] as const;
+function toneFor(id: string): (typeof TONES)[number] {
+  // Stable hash of student id → palette slot. Keeps the matrix avatar palette
+  // consistent across renders without persisting a tone column on students.
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return TONES[h % TONES.length];
+}
+
 export type SelectionApi = {
-  isSelected: (cid: string, idx: number) => boolean;
-  toggle: (cid: string, idx: number) => void;
-  selectRow: (idx: number) => void;
-  selectColumn: (cid: string, subs: string[]) => void;
+  isSelected: (studentId: string, subtopicId: string) => boolean;
+  toggle: (studentId: string, subtopicId: string) => void;
+  selectRow: (subtopicId: string) => void;
+  selectColumn: (studentId: string, subtopicIds: string[]) => void;
 };
 
 const InfoIcon = ({ size = 11 }: { size?: number }) => (
@@ -33,30 +41,28 @@ const InfoIcon = ({ size = 11 }: { size?: number }) => (
 );
 
 type ProgressMatrixProps = {
-  topic: Topic;
-  progressByTopic: Record<Topic, Record<string, ProgressMark[]>>;
+  topicId: string;
+  subtopics: ClassroomProgressSubtopic[];
+  students: ClassroomProgressStudent[];
+  progressByTopic: ProgressByTopic;
   sel: SelectionApi;
-  presentOnly?: boolean;
   mobile?: boolean;
-  onInfoOpen?: (idx: number, anchorRect: DOMRect) => void;
-  openInfoIdx?: number | null;
+  onInfoOpen?: (subtopicId: string, anchorRect: DOMRect) => void;
+  openInfoId?: string | null;
 };
 
 export function ProgressMatrix({
-  topic,
+  topicId,
+  subtopics,
+  students,
   progressByTopic,
   sel,
-  presentOnly = true,
   mobile = false,
   onInfoOpen,
-  openInfoIdx,
+  openInfoId,
 }: ProgressMatrixProps) {
-  const presentChildren = React.useMemo(
-    () => (presentOnly ? CHILDREN.filter((c) => c.present) : CHILDREN),
-    [presentOnly]
-  );
-  const subs = SUBTOPICS_BY_TOPIC[topic];
-  const progress = progressByTopic[topic] || {};
+  const progress = progressByTopic[topicId] ?? {};
+  const subtopicIds = React.useMemo(() => subtopics.map((st) => st.id), [subtopics]);
 
   // Airy density only — spacious, touch-friendly cells. Mobile keeps the same
   // size but tightens the label column so long subtopic names ellipsize.
@@ -68,13 +74,13 @@ export function ProgressMatrix({
 
   const draggingRef = React.useRef(false);
 
-  const handlePointerDown = (cid: string, idx: number) => {
+  const handlePointerDown = (studentId: string, subtopicId: string) => {
     draggingRef.current = true;
-    sel.toggle(cid, idx);
+    sel.toggle(studentId, subtopicId);
   };
-  const handlePointerEnter = (cid: string, idx: number) => {
+  const handlePointerEnter = (studentId: string, subtopicId: string) => {
     if (!draggingRef.current) return;
-    if (!sel.isSelected(cid, idx)) sel.toggle(cid, idx);
+    if (!sel.isSelected(studentId, subtopicId)) sel.toggle(studentId, subtopicId);
   };
 
   React.useEffect(() => {
@@ -100,8 +106,8 @@ export function ProgressMatrix({
           className={`${styles.scrollQuiet} ${styles.sheetGrid}`}
           style={{
             display: "grid",
-            gridTemplateColumns: `${labelColW}px repeat(${presentChildren.length}, ${colSize}px)`,
-            gridTemplateRows: `${headerH}px repeat(${subs.length}, ${rowH}px)`,
+            gridTemplateColumns: `${labelColW}px repeat(${students.length}, ${colSize}px)`,
+            gridTemplateRows: `${headerH}px repeat(${subtopics.length}, ${rowH}px)`,
             width: "fit-content",
             maxWidth: "100%",
             maxHeight: "100%",
@@ -111,16 +117,17 @@ export function ProgressMatrix({
           <div className={styles.cornerCell} style={{ height: headerH }} />
 
           {/* column headers (children) */}
-          {presentChildren.map((c) => {
-            const isHotCol = subs.every((_, i) => sel.isSelected(c.id, i));
+          {students.map((s) => {
+            const isHotCol = subtopicIds.every((sid) => sel.isSelected(s.id, sid));
+            const display = s.preferredName ?? s.fullName.split(" ")[0];
             return (
               <button
-                key={c.id}
+                key={s.id}
                 type="button"
                 className={`tap ${styles.colHeader}`}
                 data-armed={isHotCol ? "true" : "false"}
-                onClick={() => sel.selectColumn(c.id, subs)}
-                aria-label={`Select all subtopics for ${c.name}`}
+                onClick={() => sel.selectColumn(s.id, subtopicIds)}
+                aria-label={`Select all subtopics for ${s.fullName}`}
                 style={{
                   height: headerH,
                   background: isHotCol ? "var(--color-muted)" : "var(--color-surface)",
@@ -138,19 +145,19 @@ export function ProgressMatrix({
                     overflow: "hidden",
                   }}
                 >
-                  {c.name.split(" ")[0]}
+                  {display}
                 </span>
-                <Avatar initials={initialsFor(c.name)} tone={c.tone} size={22} />
+                <Avatar initials={initialsFor(s.fullName)} tone={toneFor(s.id)} size={22} />
               </button>
             );
           })}
 
           {/* rows */}
-          {subs.map((sub, idx) => {
-            const isHotRow = presentChildren.every((c) => sel.isSelected(c.id, idx));
-            const isInfoOpen = openInfoIdx === idx;
+          {subtopics.map((sub, idx) => {
+            const isHotRow = students.every((s) => sel.isSelected(s.id, sub.id));
+            const isInfoOpen = openInfoId === sub.id;
             return (
-              <React.Fragment key={sub}>
+              <React.Fragment key={sub.id}>
                 <div
                   className={styles.rowHeader}
                   data-armed={isHotRow ? "true" : "false"}
@@ -161,9 +168,9 @@ export function ProgressMatrix({
                     className="tap"
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest('[data-info-btn="true"]')) return;
-                      sel.selectRow(idx);
+                      sel.selectRow(sub.id);
                     }}
-                    aria-label={`Select all children for ${sub}`}
+                    aria-label={`Select all children for ${sub.name}`}
                     style={{
                       flex: 1,
                       minWidth: 0,
@@ -182,18 +189,18 @@ export function ProgressMatrix({
                       lineHeight: 1.2,
                     }}
                   >
-                    {sub}
+                    {sub.name}
                   </button>
                   <button
                     type="button"
                     className="tap"
                     data-info-btn="true"
-                    aria-label={`About ${sub}`}
+                    aria-label={`About ${sub.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!onInfoOpen) return;
                       const rect = e.currentTarget.getBoundingClientRect();
-                      onInfoOpen(idx, rect);
+                      onInfoOpen(sub.id, rect);
                     }}
                     style={{
                       width: 18,
@@ -213,21 +220,22 @@ export function ProgressMatrix({
                     <InfoIcon size={11} />
                   </button>
                 </div>
-                {presentChildren.map((c, ci) => {
-                  const k = `${c.id}:${idx}`;
-                  const state = (progress[c.id] || [])[idx] || "-";
-                  const isSel = sel.isSelected(c.id, idx);
+                {students.map((s, ci) => {
+                  const k = `${s.id}:${sub.id}`;
+                  const state: ProgressMark = progress[s.id]?.[sub.id] ?? "-";
+                  const isSel = sel.isSelected(s.id, sub.id);
                   // Edge = this cell is selected AND the neighbor in that
                   // direction is NOT selected (or the matrix edge). Edge sides
                   // paint 2px; non-edge sides paint 1px so two adjacent selected
                   // cells share a 2px line instead of doubling to 4px.
-                  const left = ci > 0 ? presentChildren[ci - 1] : null;
-                  const right = ci < presentChildren.length - 1 ? presentChildren[ci + 1] : null;
-                  const edgeT = isSel && (idx === 0 || !sel.isSelected(c.id, idx - 1));
-                  const edgeB =
-                    isSel && (idx === subs.length - 1 || !sel.isSelected(c.id, idx + 1));
-                  const edgeL = isSel && (left === null || !sel.isSelected(left.id, idx));
-                  const edgeR = isSel && (right === null || !sel.isSelected(right.id, idx));
+                  const left = ci > 0 ? students[ci - 1] : null;
+                  const right = ci < students.length - 1 ? students[ci + 1] : null;
+                  const aboveSubId = idx > 0 ? subtopics[idx - 1].id : null;
+                  const belowSubId = idx < subtopics.length - 1 ? subtopics[idx + 1].id : null;
+                  const edgeT = isSel && (aboveSubId === null || !sel.isSelected(s.id, aboveSubId));
+                  const edgeB = isSel && (belowSubId === null || !sel.isSelected(s.id, belowSubId));
+                  const edgeL = isSel && (left === null || !sel.isSelected(left.id, sub.id));
+                  const edgeR = isSel && (right === null || !sel.isSelected(right.id, sub.id));
                   return (
                     <button
                       key={k}
@@ -239,9 +247,9 @@ export function ProgressMatrix({
                       data-edge-r={edgeR ? "true" : "false"}
                       data-edge-b={edgeB ? "true" : "false"}
                       data-edge-l={edgeL ? "true" : "false"}
-                      onPointerDown={() => handlePointerDown(c.id, idx)}
-                      onPointerEnter={() => handlePointerEnter(c.id, idx)}
-                      aria-label={`${c.name} — ${sub}: ${STATUS_LABEL[state]}`}
+                      onPointerDown={() => handlePointerDown(s.id, sub.id)}
+                      onPointerEnter={() => handlePointerEnter(s.id, sub.id)}
+                      aria-label={`${s.fullName} — ${sub.name}: ${STATUS_LABEL[state]}`}
                     />
                   );
                 })}
