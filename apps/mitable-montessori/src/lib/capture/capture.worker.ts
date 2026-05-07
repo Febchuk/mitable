@@ -43,10 +43,10 @@ async function loadAsr() {
   try {
     // CDN-loaded; see comment in intent.worker.ts:loadNli — Turbopack's worker
     // bundler breaks transformers.js's `fs` import at module evaluation.
-    const mod = (await import(
-      /* webpackIgnore: true */ /* @vite-ignore */
-      "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2"
-    )) as {
+    // URL is indirected through a string binding so TS does not attempt module
+    // resolution on the literal (TS2307 at build time).
+    const transformersUrl: string = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
+    const mod = (await import(/* webpackIgnore: true */ /* @vite-ignore */ transformersUrl)) as {
       pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<unknown>;
     };
     const pipe = (await mod.pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
