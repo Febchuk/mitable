@@ -42,60 +42,101 @@ const ADMIN_EMAIL = "admin@example.school";
 const TEACHER_EMAIL = "teacher@example.school";
 const SHARED_PASSWORD = "montessori-demo-1!";
 
-const MONTESSORI_CURRICULUM = [
+/**
+ * Curriculum tree: subject → topics → subtopics. Subjects were introduced in
+ * migration 0026; the seed now inserts a real subject row per top-level area
+ * so the Progress tab's Subject filter has something to narrow by.
+ *
+ * The five top-level Montessori areas (Practical Life, Sensorial, Language,
+ * Mathematics, Cultural) each become a subject with one or more topics
+ * underneath. Existing seed data referenced topics like "Sensorial / Pink
+ * Tower" via a single "TopicName / SubtopicName" lookup — to keep that
+ * lookup table working without rewriting every demo-progress entry, the
+ * subject and the (single) topic share the same name. We can split topics
+ * inside a subject later; today the demo doesn't need it.
+ */
+const MONTESSORI_CURRICULUM: Array<{
+  subject: string;
+  topics: Array<{ name: string; subtopics: string[] }>;
+}> = [
   {
-    name: "Practical Life",
-    subtopics: [
-      "Pouring (water)",
-      "Spooning beans",
-      "Tying laces",
-      "Buttoning frame",
-      "Polishing wood",
-      "Sweeping",
+    subject: "Practical Life",
+    topics: [
+      {
+        name: "Practical Life",
+        subtopics: [
+          "Pouring (water)",
+          "Spooning beans",
+          "Tying laces",
+          "Buttoning frame",
+          "Polishing wood",
+          "Sweeping",
+        ],
+      },
     ],
   },
   {
-    name: "Sensorial",
-    subtopics: [
-      "Pink Tower",
-      "Brown Stair",
-      "Red Rods",
-      "Color Tablets (Box 2)",
-      "Geometric Cabinet",
-      "Sound Cylinders",
+    subject: "Sensorial",
+    topics: [
+      {
+        name: "Sensorial",
+        subtopics: [
+          "Pink Tower",
+          "Brown Stair",
+          "Red Rods",
+          "Color Tablets (Box 2)",
+          "Geometric Cabinet",
+          "Sound Cylinders",
+        ],
+      },
     ],
   },
   {
-    name: "Language",
-    subtopics: [
-      "Sandpaper Letters",
-      "Movable Alphabet",
-      "Object-to-Picture matching",
-      "Phonogram cards",
-      "Reading folders",
-      "Grammar boxes",
+    subject: "Language",
+    topics: [
+      {
+        name: "Language",
+        subtopics: [
+          "Sandpaper Letters",
+          "Movable Alphabet",
+          "Object-to-Picture matching",
+          "Phonogram cards",
+          "Reading folders",
+          "Grammar boxes",
+        ],
+      },
     ],
   },
   {
-    name: "Mathematics",
-    subtopics: [
-      "Number Rods",
-      "Sandpaper Numbers",
-      "Spindle Box",
-      "Cards and Counters",
-      "Golden Bead Material",
-      "Stamp Game",
+    subject: "Mathematics",
+    topics: [
+      {
+        name: "Mathematics",
+        subtopics: [
+          "Number Rods",
+          "Sandpaper Numbers",
+          "Spindle Box",
+          "Cards and Counters",
+          "Golden Bead Material",
+          "Stamp Game",
+        ],
+      },
     ],
   },
   {
-    name: "Cultural",
-    subtopics: [
-      "Continent Globe",
-      "Puzzle Map: World",
-      "Land & Water Forms",
-      "Botany Cabinet",
-      "Life Cycle: Frog",
-      "Life Cycle: Butterfly",
+    subject: "Cultural",
+    topics: [
+      {
+        name: "Cultural",
+        subtopics: [
+          "Continent Globe",
+          "Puzzle Map: World",
+          "Land & Water Forms",
+          "Botany Cabinet",
+          "Life Cycle: Frog",
+          "Life Cycle: Butterfly",
+        ],
+      },
     ],
   },
 ];
@@ -259,9 +300,12 @@ async function wipeDemoSchool(schoolId: string) {
   await delByIds("classroom_teacher_assignments", "classroom_id", classroomIds);
   await delByIds("students", "school_id", [schoolId]);
   await delByIds("classrooms", "school_id", [schoolId]);
-  // Curriculum: subtopics → topics → curricula.
+  // Curriculum: subtopics → topics → subjects → curricula. Subjects must
+  // come after topics because curriculum_topics.subject_id references
+  // curriculum_subjects(id) without ON DELETE CASCADE.
   await delByIds("curriculum_subtopics", "topic_id", topicIds);
   await delByIds("curriculum_topics", "curriculum_id", curriculumIds);
+  await delByIds("curriculum_subjects", "curriculum_id", curriculumIds);
   await delByIds("curricula", "school_id", [schoolId]);
 
   // ---- Phase 3: top of the tree ----
@@ -372,31 +416,45 @@ async function main() {
   // Capture subtopic ids so we can seed student_progress later. Keyed by
   // "TopicName / SubtopicName" for stable lookup.
   const subtopicIds = new Map<string, string>();
-  for (let i = 0; i < MONTESSORI_CURRICULUM.length; i++) {
-    const topic = MONTESSORI_CURRICULUM[i];
-    const topicId = randomUUID();
-    const { error: tErr } = await supabase.from("curriculum_topics").insert({
-      id: topicId,
+  let topicSortIndex = 0;
+  for (let s = 0; s < MONTESSORI_CURRICULUM.length; s++) {
+    const subject = MONTESSORI_CURRICULUM[s];
+    const subjectId = randomUUID();
+    const { error: subjErr } = await supabase.from("curriculum_subjects").insert({
+      id: subjectId,
       curriculum_id: curriculumId,
-      name: topic.name,
-      sort_order: i,
+      name: subject.subject,
+      sort_order: s,
       is_active: true,
     });
-    if (tErr) throw tErr;
-    const subRows = topic.subtopics.map((name, idx) => {
-      const id = randomUUID();
-      subtopicIds.set(`${topic.name} / ${name}`, id);
-      return {
-        id,
-        topic_id: topicId,
-        name,
-        sort_order: idx,
+    if (subjErr) throw subjErr;
+
+    for (const topic of subject.topics) {
+      const topicId = randomUUID();
+      const { error: tErr } = await supabase.from("curriculum_topics").insert({
+        id: topicId,
+        curriculum_id: curriculumId,
+        subject_id: subjectId,
+        name: topic.name,
+        sort_order: topicSortIndex++,
         is_active: true,
-        aliases: [] as string[],
-      };
-    });
-    const { error: sErr } = await supabase.from("curriculum_subtopics").insert(subRows);
-    if (sErr) throw sErr;
+      });
+      if (tErr) throw tErr;
+      const subRows = topic.subtopics.map((name, idx) => {
+        const id = randomUUID();
+        subtopicIds.set(`${topic.name} / ${name}`, id);
+        return {
+          id,
+          topic_id: topicId,
+          name,
+          sort_order: idx,
+          is_active: true,
+          aliases: [] as string[],
+        };
+      });
+      const { error: sErr } = await supabase.from("curriculum_subtopics").insert(subRows);
+      if (sErr) throw sErr;
+    }
   }
 
   console.log("→ Creating classroom + teacher assignment");
