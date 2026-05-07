@@ -344,7 +344,7 @@ export function ReportDetail({
         />
         <div className="rd-workspace">
           <div className="rd-split">
-            <ChatPane />
+            <ChatPane reportId={report.id} />
             <ReportPane
               detail={detail}
               onChange={onChange}
