@@ -54,6 +54,53 @@ export interface ChatAgentProposalPayload {
   };
 }
 
+export interface ChatAgentChipsPayload {
+  body: string;
+  chips: { id: string; label: string; prefill: string }[];
+  tokenized: { body: string; chips: { label: string; prefill: string }[] };
+}
+
+export interface ChatAgentObsRefPayload {
+  body: string;
+  obs: {
+    artifactId: string;
+    quote: string;
+    when: string;
+    area?: string;
+    source?: "photo" | "transcript" | "ocr";
+  };
+  suggestedTarget?: { sectionId: string; position: "append" | "after" | "new-paragraph" };
+  tokenized: { body: string; quote: string };
+}
+
+export interface ChatAgentGhostEditPayload {
+  body: string;
+  target: { sectionId: string };
+  ghostEdit: { id: string; html: string; sourceLabel: string };
+  tokenized: { body: string; html: string; sourceLabel: string };
+}
+
+/**
+ * Search result returned by the `search_capture_artifacts` tool. The agent
+ * sees these tokenized; the route layer is responsible for tokenizing
+ * `quote` and `area` against the report's reference set before passing in.
+ */
+export interface ChatTokenizedArtifact {
+  artifactId: string;
+  /** Tokenized OCR text or transcript snippet. */
+  quote: string;
+  /** Display string for capturedAt (e.g. "10:14 AM"). */
+  when: string;
+  /** Optional area / heading hint (already tokenized). */
+  area?: string;
+  source?: "photo" | "transcript" | "ocr";
+}
+
+export type SearchArtifactsFn = (args: {
+  query: string;
+  limit: number;
+}) => Promise<ChatTokenizedArtifact[]>;
+
 export interface ChatAgentInput {
   anthropic: AnthropicLike;
   model: string;
@@ -69,6 +116,12 @@ export interface ChatAgentInput {
   userMessage: string;
   /** Optional scope ("Morning paragraph"). Server-derived display string. */
   targetHint?: string;
+  /**
+   * Backend for `search_capture_artifacts`. The route is responsible for
+   * tokenizing the result before returning. Optional — when omitted the
+   * agent gets an empty array.
+   */
+  searchArtifacts?: SearchArtifactsFn;
 }
 
 export interface ChatTokenizedSection {
@@ -97,7 +150,27 @@ export interface ChatAgentProposalOutput extends ChatAgentMeta {
   proposal: ChatAgentProposalPayload;
 }
 
-export type ChatAgentOutput = ChatAgentProseOutput | ChatAgentProposalOutput;
+export interface ChatAgentChipsOutput extends ChatAgentMeta {
+  terminalKind: "chips";
+  chips: ChatAgentChipsPayload;
+}
+
+export interface ChatAgentObsRefOutput extends ChatAgentMeta {
+  terminalKind: "obs-ref";
+  obsRef: ChatAgentObsRefPayload;
+}
+
+export interface ChatAgentGhostEditOutput extends ChatAgentMeta {
+  terminalKind: "ghost-edit";
+  ghostEdit: ChatAgentGhostEditPayload;
+}
+
+export type ChatAgentOutput =
+  | ChatAgentProseOutput
+  | ChatAgentProposalOutput
+  | ChatAgentChipsOutput
+  | ChatAgentObsRefOutput
+  | ChatAgentGhostEditOutput;
 
 export class ChatAgentAbortError extends Error {
   constructor(
@@ -179,12 +252,16 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
         continue;
       }
 
-      // Process this turn's tool uses. We expect either read_report_sections
-      // or one of the terminal tools.
+      // Process this turn's tool uses. We expect either a read tool
+      // (read_report_sections, search_capture_artifacts) or one of the
+      // terminal tools.
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       let terminalEmission:
         | { kind: "prose" | "clarify"; tokenizedBody: string }
         | { kind: "proposal"; proposal: ChatAgentProposalPayload }
+        | { kind: "chips"; chips: ChatAgentChipsPayload }
+        | { kind: "obs-ref"; obsRef: ChatAgentObsRefPayload }
+        | { kind: "ghost-edit"; ghostEdit: ChatAgentGhostEditPayload }
         | null = null;
       let validationFailed = false;
 
@@ -197,6 +274,21 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
               title: input.tokenizedTitle,
               sections: input.tokenizedSections,
             }),
+          });
+          continue;
+        }
+        if (block.name === "search_capture_artifacts") {
+          const args = block.input as { query?: unknown; limit?: unknown };
+          const query = typeof args.query === "string" ? args.query.trim() : "";
+          const limitRaw = typeof args.limit === "number" ? Math.floor(args.limit) : 5;
+          const limit = Math.max(1, Math.min(20, limitRaw));
+          const results = input.searchArtifacts
+            ? await input.searchArtifacts({ query, limit })
+            : [];
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: JSON.stringify({ artifacts: results }),
           });
           continue;
         }
@@ -298,6 +390,193 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
           };
           continue;
         }
+        if (block.name === "propose_chips") {
+          const args = block.input as { body?: unknown; chips?: unknown };
+          const body = typeof args.body === "string" ? args.body.trim() : "";
+          const chipsRaw = Array.isArray(args.chips) ? args.chips : [];
+          const chips: { label: string; prefill: string }[] = [];
+          for (const raw of chipsRaw) {
+            if (raw && typeof raw === "object") {
+              const r = raw as { label?: unknown; prefill?: unknown };
+              const label = typeof r.label === "string" ? r.label.trim() : "";
+              const prefill = typeof r.prefill === "string" ? r.prefill.trim() : "";
+              if (label && prefill) chips.push({ label, prefill });
+            }
+          }
+          if (!body || chips.length < 2 || chips.length > 4) {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content:
+                "propose_chips requires a non-empty body and 2–4 chips, each with non-empty label + prefill.",
+            });
+            continue;
+          }
+          const concatenated = [body, ...chips.flatMap((c) => [c.label, c.prefill])].join("\n");
+          const validation = validateTokenPreservation(concatenated, refs);
+          if (!validation.ok) {
+            validationFailed = true;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content: leakReminder(validation),
+            });
+            continue;
+          }
+          terminalEmission = {
+            kind: "chips",
+            chips: {
+              body: detokenizeReportText(body, input.references),
+              chips: chips.map((c, i) => ({
+                id: `c-${i}`,
+                label: detokenizeReportText(c.label, input.references),
+                prefill: detokenizeReportText(c.prefill, input.references),
+              })),
+              tokenized: { body, chips },
+            },
+          };
+          continue;
+        }
+        if (block.name === "propose_observation_ref") {
+          const args = block.input as {
+            body?: unknown;
+            obs?: {
+              artifactId?: unknown;
+              quote?: unknown;
+              when?: unknown;
+              area?: unknown;
+              source?: unknown;
+            };
+            suggestedTarget?: { sectionId?: unknown; position?: unknown };
+          };
+          const body = typeof args.body === "string" ? args.body.trim() : "";
+          const artifactId =
+            typeof args.obs?.artifactId === "string" ? args.obs.artifactId.trim() : "";
+          const quote = typeof args.obs?.quote === "string" ? args.obs.quote.trim() : "";
+          const when = typeof args.obs?.when === "string" ? args.obs.when.trim() : "";
+          const area =
+            typeof args.obs?.area === "string" && args.obs.area.trim().length > 0
+              ? args.obs.area.trim()
+              : undefined;
+          const source =
+            args.obs?.source === "photo" ||
+            args.obs?.source === "transcript" ||
+            args.obs?.source === "ocr"
+              ? args.obs.source
+              : undefined;
+
+          if (!body || !artifactId || !quote || !when) {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content:
+                "propose_observation_ref requires non-empty body and obs.{artifactId, quote, when}.",
+            });
+            continue;
+          }
+          // Body + quote get the leak validator. when/area are short server-stamped
+          // display strings that the client passes through tokenized when needed,
+          // so they go through detokenization but are NOT validated against refs
+          // (they may legitimately reference areas not in the report).
+          const validation = validateTokenPreservation([body, quote].join("\n"), refs);
+          if (!validation.ok) {
+            validationFailed = true;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content: leakReminder(validation),
+            });
+            continue;
+          }
+          // suggestedTarget is structural — validate the sectionId exists if provided.
+          let suggestedTarget:
+            | { sectionId: string; position: "append" | "after" | "new-paragraph" }
+            | undefined;
+          if (args.suggestedTarget && typeof args.suggestedTarget === "object") {
+            const sid =
+              typeof args.suggestedTarget.sectionId === "string"
+                ? args.suggestedTarget.sectionId
+                : "";
+            const sectionExists = input.tokenizedSections.some((s) => s.id === sid);
+            if (sid && sectionExists) {
+              const pos = args.suggestedTarget.position;
+              suggestedTarget = {
+                sectionId: sid,
+                position: pos === "after" || pos === "new-paragraph" ? pos : "append",
+              };
+            }
+          }
+          terminalEmission = {
+            kind: "obs-ref",
+            obsRef: {
+              body: detokenizeReportText(body, input.references),
+              obs: {
+                artifactId,
+                quote: detokenizeReportText(quote, input.references),
+                when,
+                area,
+                source,
+              },
+              suggestedTarget,
+              tokenized: { body, quote },
+            },
+          };
+          continue;
+        }
+        if (block.name === "propose_ghost_edit") {
+          const args = block.input as {
+            body?: unknown;
+            target?: { sectionId?: unknown };
+            ghostEdit?: { html?: unknown; sourceLabel?: unknown };
+          };
+          const body = typeof args.body === "string" ? args.body.trim() : "";
+          const sectionId = typeof args.target?.sectionId === "string" ? args.target.sectionId : "";
+          const html = typeof args.ghostEdit?.html === "string" ? args.ghostEdit.html.trim() : "";
+          const sourceLabel =
+            typeof args.ghostEdit?.sourceLabel === "string"
+              ? args.ghostEdit.sourceLabel.trim()
+              : "";
+          const sectionExists = input.tokenizedSections.some((s) => s.id === sectionId);
+          if (!body || !sectionId || !sectionExists || !html || !sourceLabel) {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content:
+                "propose_ghost_edit requires body, target.sectionId (must exist), ghostEdit.html, ghostEdit.sourceLabel.",
+            });
+            continue;
+          }
+          const validation = validateTokenPreservation([body, html, sourceLabel].join("\n"), refs);
+          if (!validation.ok) {
+            validationFailed = true;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content: leakReminder(validation),
+            });
+            continue;
+          }
+          terminalEmission = {
+            kind: "ghost-edit",
+            ghostEdit: {
+              body: detokenizeReportText(body, input.references),
+              target: { sectionId },
+              ghostEdit: {
+                id: `g-${cryptoRandomId()}`,
+                html: detokenizeReportText(html, input.references),
+                sourceLabel: detokenizeReportText(sourceLabel, input.references),
+              },
+              tokenized: { body, html, sourceLabel },
+            },
+          };
+          continue;
+        }
         if (CHAT_TERMINAL_TOOL_NAMES.has(block.name)) {
           toolResults.push({
             type: "tool_result",
@@ -324,6 +603,15 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
         };
         if (terminalEmission.kind === "proposal") {
           return { terminalKind: "proposal", proposal: terminalEmission.proposal, ...meta };
+        }
+        if (terminalEmission.kind === "chips") {
+          return { terminalKind: "chips", chips: terminalEmission.chips, ...meta };
+        }
+        if (terminalEmission.kind === "obs-ref") {
+          return { terminalKind: "obs-ref", obsRef: terminalEmission.obsRef, ...meta };
+        }
+        if (terminalEmission.kind === "ghost-edit") {
+          return { terminalKind: "ghost-edit", ghostEdit: terminalEmission.ghostEdit, ...meta };
         }
         return {
           terminalKind: terminalEmission.kind,
@@ -401,6 +689,16 @@ function buildUserTurn(
   }
   lines.push(tokenizedUserMessage);
   return lines.join("\n");
+}
+
+/** Short id for ghost edits — independent of the message id so the report pane
+ *  can address the ghost slot directly. Falls back to Math.random when crypto
+ *  isn't available (e.g. older Node test runners). */
+function cryptoRandomId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().slice(0, 8);
+  }
+  return Math.random().toString(36).slice(2, 10);
 }
 
 export const __TEST__ = { tokenizeAgainstRefs };

@@ -1121,3 +1121,94 @@ main:has(> .rd-root) {
 .rd-target-chip-close:hover {
   color: var(--color-terracotta-deep);
 }
+
+/* Phase 4 — obs-ref applied/dismissed states + ghost-edit chat confirmation */
+.rd-obs-ref[data-applied="true"] {
+  opacity: 0.65;
+}
+.rd-obs-ref[data-dismissed="true"] {
+  opacity: 0.5;
+}
+
+.rd-ghost-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: var(--color-clay-soft);
+  border-radius: 8px;
+  font-size: 11.5px;
+}
+.rd-ghost-confirm-source {
+  color: var(--color-ink-muted);
+  font-style: italic;
+}
+
+/* Phase 4 — photo attach inline viewfinder + thumbnail strip above composer */
+.rd-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.rd-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--color-ink-secondary);
+}
+.rd-attachment-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-clay-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-terracotta-deep);
+}
+.rd-attachment-remove {
+  background: transparent;
+  border: none;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px;
+}
+.rd-attachment-remove:hover {
+  color: var(--color-terracotta-deep);
+}
+
+.rd-camera {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #000;
+  overflow: hidden;
+  margin-bottom: 6px;
+  position: relative;
+}
+.rd-camera video {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.rd-camera-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.rd-camera-progress {
+  font-size: 11.5px;
+  color: var(--color-ink-muted);
+  padding: 6px 8px;
+  background: var(--color-surface);
+}

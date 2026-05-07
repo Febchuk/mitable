@@ -28,6 +28,8 @@ type LocalSection = {
   id: string;
   heading: string;
   paragraphs: { id: string; html: string }[];
+  /** Phase 4: chat-driven ghost suggestion attached to this section. */
+  ghostEdit?: { id: string; html: string; sourceLabel: string };
 };
 
 type LocalDetail = {
@@ -368,6 +370,145 @@ export function ReportDetail({
     [detail.sections]
   );
 
+  // ----- Phase 4: ghost edits + obs-ref pull-in -----
+
+  /** Tracks which originating chat-message id seeded each section's ghost so
+   *  Accept/Reject can post the editorial action to the right row. */
+  const ghostMessageIdsRef = React.useRef(new Map<string, string>());
+
+  /** Chat agent emitted a ghost-edit — merge into the section's slot. */
+  const onApplyGhostEdit = React.useCallback(
+    ({
+      sectionId,
+      ghostEdit,
+      messageId,
+    }: {
+      sectionId: string;
+      ghostEdit: { id: string; html: string; sourceLabel: string };
+      messageId?: string;
+    }) => {
+      setDetail((prev) => {
+        const sections = prev.sections.map((s) => (s.id === sectionId ? { ...s, ghostEdit } : s));
+        return { ...prev, sections };
+      });
+      if (messageId) ghostMessageIdsRef.current.set(sectionId, messageId);
+    },
+    []
+  );
+
+  const recordGhostAction = React.useCallback(
+    async (
+      messageId: string,
+      action: "applied" | "dismissed",
+      appliedTo?: { sectionId: string; paragraphId: string; before: string; after: string }
+    ) => {
+      try {
+        await fetch(`/api/v1/reports/${report.id}/chat/messages/${messageId}/applied`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action, appliedTo }),
+        });
+      } catch {
+        // Non-fatal — the local mutation already happened.
+      }
+    },
+    [report.id]
+  );
+
+  /** Accept the ghost: append it as a new paragraph and clear the slot. */
+  const onAcceptGhostEdit = React.useCallback(
+    (sectionId: string) => {
+      setDetail((prev) => {
+        const section = prev.sections.find((s) => s.id === sectionId);
+        const ghost = section?.ghostEdit;
+        if (!section || !ghost) return prev;
+        const paragraphId = `p-ghost-${Math.random().toString(36).slice(2, 9)}`;
+        const sections = prev.sections.map((s) => {
+          if (s.id !== sectionId) return s;
+          const { ghostEdit: _drop, ...rest } = s;
+          void _drop;
+          return {
+            ...rest,
+            paragraphs: [...s.paragraphs, { id: paragraphId, html: ghost.html }],
+          };
+        });
+        const next = { ...prev, sections };
+        setIsDirty(true);
+        queueSave(next);
+        const messageId = ghostMessageIdsRef.current.get(sectionId);
+        ghostMessageIdsRef.current.delete(sectionId);
+        if (messageId) {
+          void recordGhostAction(messageId, "applied", {
+            sectionId,
+            paragraphId,
+            before: "",
+            after: ghost.html,
+          });
+        }
+        return next;
+      });
+    },
+    [queueSave, recordGhostAction]
+  );
+
+  /** Dismiss the ghost: clear the slot. */
+  const onDismissGhostEdit = React.useCallback(
+    (sectionId: string) => {
+      setDetail((prev) => {
+        const sections = prev.sections.map((s) => {
+          if (s.id !== sectionId) return s;
+          const { ghostEdit: _drop, ...rest } = s;
+          void _drop;
+          return rest;
+        });
+        const next = { ...prev, sections };
+        // No PATCH needed — ghostEdit lives only in client state, never persisted.
+        return next;
+      });
+      const messageId = ghostMessageIdsRef.current.get(sectionId);
+      ghostMessageIdsRef.current.delete(sectionId);
+      if (messageId) void recordGhostAction(messageId, "dismissed");
+    },
+    [recordGhostAction]
+  );
+
+  /** Chat agent's obs-ref Pull in — append a paragraph with the captured text. */
+  const onPullObservation = React.useCallback(
+    ({
+      text,
+      suggestedTarget,
+    }: {
+      text: string;
+      suggestedTarget?: { sectionId: string; position: "append" | "after" | "new-paragraph" };
+    }) => {
+      setDetail((prev) => {
+        // If suggestedTarget points at an existing section, append there.
+        // Otherwise put it in the last section so the teacher can move it.
+        const targetSectionId =
+          suggestedTarget?.sectionId &&
+          prev.sections.some((s) => s.id === suggestedTarget.sectionId)
+            ? suggestedTarget.sectionId
+            : prev.sections[prev.sections.length - 1]?.id;
+        if (!targetSectionId) {
+          ToastBus.push({ message: "Add a section first, then pull observations into it." });
+          return prev;
+        }
+        const paragraphId = `p-obs-${Math.random().toString(36).slice(2, 9)}`;
+        const sections = prev.sections.map((s) =>
+          s.id === targetSectionId
+            ? { ...s, paragraphs: [...s.paragraphs, { id: paragraphId, html: text }] }
+            : s
+        );
+        const next = { ...prev, sections };
+        setIsDirty(true);
+        queueSave(next);
+        return next;
+      });
+    },
+    [queueSave]
+  );
+
   // After draft (router.refresh) or navigation, merge server report into local editor
   // state when the user isn't mid-edit.
   React.useEffect(() => {
@@ -426,6 +567,8 @@ export function ReportDetail({
               sections={detail.sections}
               flushPendingSave={flushPendingSave}
               onApplyProposal={onApplyProposalFromChat}
+              onPullObservation={onPullObservation}
+              onApplyGhostEdit={onApplyGhostEdit}
             />
             <ReportPane
               detail={detail}
@@ -433,6 +576,8 @@ export function ReportDetail({
               isDrafting={isDrafting}
               onCancelDrafting={cancelDraftGeneration}
               onDiscussParagraph={onDiscussParagraph}
+              onAcceptGhostEdit={onAcceptGhostEdit}
+              onDismissGhostEdit={onDismissGhostEdit}
             />
           </div>
         </div>

@@ -25,6 +25,8 @@ function defaultProps(overrides: Partial<ChatPaneProps> = {}): ChatPaneProps {
     reportId: "r1",
     sections: SECTIONS,
     onApplyProposal: vi.fn(),
+    onPullObservation: vi.fn(),
+    onApplyGhostEdit: vi.fn(),
     flushPendingSave: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -331,5 +333,111 @@ describe("ChatPane (Phase 3)", () => {
     await waitFor(() => expect(screen.getByText("Morning paragraph")).toBeTruthy());
     fireEvent.click(screen.getByLabelText(/Clear target scope/i));
     await waitFor(() => expect(screen.queryByText("Morning paragraph")).toBeNull());
+  });
+
+  // ----- Phase 4 archetypes -----
+
+  it("chip click prefills the composer (does not auto-send)", async () => {
+    const fetchMock = setupFetch({
+      history: {
+        messages: [
+          {
+            kind: "chips",
+            id: "c1",
+            body: "Two ways to handle Mateo:",
+            chips: [
+              { id: "c1-0", label: "Drop Mateo", prefill: "Drop Mateo from the report." },
+              {
+                id: "c1-1",
+                label: "Keep brief mention",
+                prefill: "Mention Mateo briefly in the morning paragraph.",
+              },
+            ],
+            actorRole: "assistant",
+          },
+        ],
+      },
+    });
+    render(<ChatPane {...defaultProps()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Drop Mateo/i })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /Drop Mateo/i }));
+    const textarea = screen.getByLabelText(/Message the editing assistant/i) as HTMLTextAreaElement;
+    expect(textarea.value).toBe("Drop Mateo from the report.");
+    // Click only prefills — no POST should have fired.
+    const postCalls = fetchMock.mock.calls.filter(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST"
+    );
+    expect(postCalls).toHaveLength(0);
+  });
+
+  it("Pull in calls onPullObservation with the quote and suggestedTarget", async () => {
+    const props = defaultProps();
+    setupFetch({
+      history: {
+        messages: [
+          {
+            kind: "obs-ref",
+            id: "o1",
+            body: "Found a moment for Ada you didn't reference yet.",
+            obs: {
+              artifactId: "a-1",
+              quote: "Ada traced S three times slowly.",
+              when: "10:14 AM",
+              area: "Language area",
+            },
+            suggestedTarget: { sectionId: "morning", position: "append" },
+            actorRole: "assistant",
+          },
+        ],
+      },
+    });
+    render(<ChatPane {...props} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Pull in/i })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /Pull in/i }));
+    expect(props.onPullObservation).toHaveBeenCalledWith({
+      text: "Ada traced S three times slowly.",
+      suggestedTarget: { sectionId: "morning", position: "append" },
+    });
+    // After Pull in, the obs-ref switches to a "Pulled in" pill.
+    await waitFor(() => expect(screen.getByText("Pulled in")).toBeTruthy());
+  });
+
+  it("ghost-edit message merges into the report's section slot via onApplyGhostEdit", async () => {
+    const props = defaultProps();
+    setupFetch({
+      history: {
+        messages: [
+          {
+            kind: "ghost-edit",
+            id: "g1",
+            body: "I added a suggestion below the Morning section.",
+            target: { sectionId: "morning" },
+            ghostEdit: {
+              id: "g-deadbeef",
+              html: "Ada held the pencil with a tripod grip today.",
+              sourceLabel: "10:14 AM photo",
+            },
+            actorRole: "assistant",
+          },
+        ],
+      },
+    });
+    render(<ChatPane {...props} />);
+    await waitFor(() =>
+      expect(screen.getByText(/I added a suggestion below the Morning section/i)).toBeTruthy()
+    );
+    expect(props.onApplyGhostEdit).toHaveBeenCalledWith({
+      sectionId: "morning",
+      ghostEdit: expect.objectContaining({
+        id: "g-deadbeef",
+        html: "Ada held the pencil with a tripod grip today.",
+        sourceLabel: "10:14 AM photo",
+      }),
+      messageId: "g1",
+    });
+    // Confirmation card renders the source label.
+    expect(screen.getByText(/10:14 AM photo/i)).toBeTruthy();
   });
 });

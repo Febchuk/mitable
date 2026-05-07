@@ -7,7 +7,9 @@ import {
   runReportChatAgent,
   ChatAgentAbortError,
   type ChatHistoryTurn,
+  type ChatTokenizedArtifact,
   type ChatTokenizedSection,
+  type SearchArtifactsFn,
 } from "@/lib/reports/chat-agent-loop";
 import type { ReportReferenceSet } from "@/lib/reports/data-adapter";
 import { rowToChatMessage, type StoredChatRow } from "@/lib/reports/chat-message";
@@ -16,12 +18,11 @@ import { auditLog } from "@/lib/audit/log";
 export const runtime = "nodejs";
 
 /**
- * Phase 3: runs the bounded chat agent loop. Read tool: read_report_sections.
- * Terminal tools: propose_rewrite (structured paragraph rewrite),
- * propose_prose_reply, ask_clarifying_question. Persists the user message
- * and the assistant's reply to report_chat_messages with full tokenization
- * parity (agent reasons in tokens; payload stored detokenized with the
- * references snapshot used).
+ * Phase 4: runs the bounded chat agent loop with the full archetype set.
+ * Read tools: read_report_sections, search_capture_artifacts. Terminal tools:
+ * propose_rewrite, propose_chips, propose_observation_ref, propose_ghost_edit,
+ * propose_prose_reply, ask_clarifying_question. Persists the user message and
+ * the assistant's reply to report_chat_messages with full tokenization parity.
  */
 
 type ReportSection = {
@@ -128,15 +129,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   )
     .reverse()
     .map((r) => {
-      // Proposal/ghost-edit payloads are summarized for context (the agent
-      // doesn't need full oldText/newText replayed). Prose/clarify/user-text
-      // pass through as their body.
-      const body =
-        r.kind === "proposal"
-          ? `(I proposed a rewrite: "${String(r.payload?.lead ?? "")}")`
-          : typeof r.payload?.body === "string"
-            ? (r.payload.body as string)
-            : "";
+      // Structured payloads are summarized for context (the agent doesn't
+      // need full oldText/newText/chips/etc replayed). Prose/clarify/
+      // user-text pass through as their body.
+      const body = summarizeHistoryRow(r);
       return {
         role: r.role,
         body,
@@ -151,13 +147,33 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     ? sectionHeadingForId(sections, parsed.data.targetRef.sectionId)
     : undefined;
 
+  // Build the user message context. Attachments append a one-liner so the
+  // agent knows there's something to search for; the OCR text + thumbnail
+  // already live in report_chat_artifacts (see /chat/artifacts upload).
+  const attachments = parsed.data.attachments ?? [];
+  const attachmentSuffix = attachments
+    .map((a) => {
+      const ocr = a.ocrText
+        ? ` (OCR snippet: "${a.ocrText.slice(0, 140)}${a.ocrText.length > 140 ? "…" : ""}")`
+        : "";
+      return `(Attached ${a.kind} artifactId=${a.artifactId}${ocr})`;
+    })
+    .join("\n");
+  const userMessageForAgent = attachmentSuffix
+    ? `${parsed.data.userMessage}\n\n${attachmentSuffix}`
+    : parsed.data.userMessage;
+
   // Persist the user message first so that even if the agent fails, the
-  // teacher's text isn't lost.
+  // teacher's text isn't lost. Attachments are recorded in the payload so
+  // GET /chat can replay them on reload.
   const userMessageRow = await persistMessage(supabase, {
     report_id: id,
     role: "user",
     kind: "user-text",
-    payload: { body: parsed.data.userMessage },
+    payload: {
+      body: parsed.data.userMessage,
+      ...(attachments.length > 0 ? { attachments } : {}),
+    },
     references: references,
     target_ref: parsed.data.targetRef ?? null,
     actor_role: access.actorRole,
@@ -166,6 +182,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!userMessageRow) {
     return NextResponse.json({ error: "Failed to persist message" }, { status: 500 });
   }
+
+  const searchArtifacts: SearchArtifactsFn = async ({ query, limit }) => {
+    return searchReportArtifacts(supabase, id, references, query, limit);
+  };
 
   const startedAt = Date.now();
   let assistantMessage: ChatTurnMessage;
@@ -178,42 +198,75 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       tokenizedTitle,
       references,
       history,
-      userMessage: parsed.data.userMessage,
+      userMessage: userMessageForAgent,
       targetHint,
+      searchArtifacts,
     });
 
+    const meta = {
+      turns: result.turns,
+      regenerations: result.regenerations,
+      input_tokens: result.inputTokens,
+      output_tokens: result.outputTokens,
+    };
     let assistantPayload: Record<string, unknown>;
     let assistantToolTrace: Record<string, unknown>;
-    if (result.terminalKind === "proposal") {
-      const headingDisplay = sectionHeadingForId(sections, result.proposal.target.sectionId);
-      assistantPayload = {
-        lead: result.proposal.lead,
-        target: {
-          sectionId: result.proposal.target.sectionId,
-          paragraphId: result.proposal.target.paragraphId,
-          ...(headingDisplay ? { headingDisplay } : {}),
-        },
-        oldText: result.proposal.oldText,
-        newText: result.proposal.newText,
-        ...(result.proposal.rationale ? { rationale: result.proposal.rationale } : {}),
-      };
-      assistantToolTrace = {
-        tokenized: result.proposal.tokenized,
-        target: result.proposal.target,
-        turns: result.turns,
-        regenerations: result.regenerations,
-        input_tokens: result.inputTokens,
-        output_tokens: result.outputTokens,
-      };
-    } else {
-      assistantPayload = { body: result.body };
-      assistantToolTrace = {
-        tokenized_body: result.tokenizedBody,
-        turns: result.turns,
-        regenerations: result.regenerations,
-        input_tokens: result.inputTokens,
-        output_tokens: result.outputTokens,
-      };
+    switch (result.terminalKind) {
+      case "proposal": {
+        const headingDisplay = sectionHeadingForId(sections, result.proposal.target.sectionId);
+        assistantPayload = {
+          lead: result.proposal.lead,
+          target: {
+            sectionId: result.proposal.target.sectionId,
+            paragraphId: result.proposal.target.paragraphId,
+            ...(headingDisplay ? { headingDisplay } : {}),
+          },
+          oldText: result.proposal.oldText,
+          newText: result.proposal.newText,
+          ...(result.proposal.rationale ? { rationale: result.proposal.rationale } : {}),
+        };
+        assistantToolTrace = {
+          tokenized: result.proposal.tokenized,
+          target: result.proposal.target,
+          ...meta,
+        };
+        break;
+      }
+      case "chips": {
+        assistantPayload = {
+          body: result.chips.body,
+          chips: result.chips.chips,
+        };
+        assistantToolTrace = { tokenized: result.chips.tokenized, ...meta };
+        break;
+      }
+      case "obs-ref": {
+        assistantPayload = {
+          body: result.obsRef.body,
+          obs: result.obsRef.obs,
+          ...(result.obsRef.suggestedTarget
+            ? { suggestedTarget: result.obsRef.suggestedTarget }
+            : {}),
+        };
+        assistantToolTrace = { tokenized: result.obsRef.tokenized, ...meta };
+        break;
+      }
+      case "ghost-edit": {
+        assistantPayload = {
+          body: result.ghostEdit.body,
+          target: result.ghostEdit.target,
+          ghostEdit: result.ghostEdit.ghostEdit,
+        };
+        assistantToolTrace = { tokenized: result.ghostEdit.tokenized, ...meta };
+        break;
+      }
+      case "prose":
+      case "clarify":
+      default: {
+        assistantPayload = { body: result.body };
+        assistantToolTrace = { tokenized_body: result.tokenizedBody, ...meta };
+        break;
+      }
     }
 
     const assistantRow = await persistMessage(supabase, {
@@ -283,7 +336,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     target_id: id,
     metadata: {
       latency_ms: Date.now() - startedAt,
-      phase: 3,
+      phase: 4,
       ...toolTrace,
     },
   });
@@ -353,6 +406,32 @@ function sectionHeadingForId(sections: ReportSection[], id: string): string | un
   return sections.find((s) => s.id === id)?.heading;
 }
 
+/** Compress a stored row into a one-line summary for replay context. */
+function summarizeHistoryRow(r: { kind: string; payload: Record<string, unknown> | null }): string {
+  const p = r.payload ?? {};
+  switch (r.kind) {
+    case "proposal":
+      return `(I proposed a rewrite: "${String(p.lead ?? "")}")`;
+    case "chips": {
+      const labels = Array.isArray(p.chips)
+        ? (p.chips as Array<{ label?: string }>)
+            .map((c) => c.label)
+            .filter(Boolean)
+            .join(" / ")
+        : "";
+      return `(I offered chips: ${labels})`;
+    }
+    case "obs-ref": {
+      const obs = (p.obs ?? {}) as { quote?: string };
+      return `(I surfaced an observation: "${String(obs.quote ?? "").slice(0, 120)}")`;
+    }
+    case "ghost-edit":
+      return `(I added an inline suggestion: "${String(p.body ?? "")}")`;
+    default:
+      return typeof p.body === "string" ? (p.body as string) : "";
+  }
+}
+
 async function fetchClassroomName(
   supabase: ReturnType<typeof createAdminClient>,
   classroomId: string
@@ -363,4 +442,60 @@ async function fetchClassroomName(
     .eq("id", classroomId)
     .maybeSingle();
   return ((data as { name: string | null } | null)?.name ?? "").trim();
+}
+
+/**
+ * Search this report's chat artifacts. Empty query returns the most recent
+ * rows; otherwise uses Postgres ILIKE on ocr_text. Results are tokenized
+ * before returning so the agent never sees raw names.
+ */
+async function searchReportArtifacts(
+  supabase: ReturnType<typeof createAdminClient>,
+  reportId: string,
+  references: ReportReferenceSet,
+  query: string,
+  limit: number
+): Promise<ChatTokenizedArtifact[]> {
+  let q = supabase
+    .from("report_chat_artifacts")
+    .select("id, kind, ocr_text, capture_metadata, created_at")
+    .eq("report_id", reportId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (query.length > 0) {
+    q = q.ilike("ocr_text", `%${query.replace(/[%_]/g, "")}%`);
+  }
+  const { data } = await q;
+  const rows = (data ?? []) as Array<{
+    id: string;
+    kind: "photo" | "transcript" | "ocr";
+    ocr_text: string | null;
+    capture_metadata: { capturedAt?: string; area?: string } | null;
+    created_at: string;
+  }>;
+  return rows.map((r) => {
+    const ocr = (r.ocr_text ?? "").trim();
+    const quote = ocr.length > 280 ? ocr.slice(0, 277).trimEnd() + "…" : ocr || "(no text)";
+    const capturedAt = r.capture_metadata?.capturedAt ?? r.created_at;
+    return {
+      artifactId: r.id,
+      quote: tokenizeText(quote, references),
+      when: formatCapturedAt(capturedAt),
+      area: r.capture_metadata?.area
+        ? tokenizeText(r.capture_metadata.area, references)
+        : undefined,
+      source: r.kind,
+    };
+  });
+}
+
+function formatCapturedAt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  // Format like "10:14 AM" — short, locale-neutral, matches mock copy.
+  return d
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    .toLowerCase()
+    .replace(/(\d)(am|pm)/, "$1 $2")
+    .toUpperCase();
 }

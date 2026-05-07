@@ -12,7 +12,7 @@
  *   - tokenization-against-refs respects multi-word display strings
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   runReportChatAgent,
@@ -450,5 +450,246 @@ describe("tokenizeAgainstRefs", () => {
       { id: "1", token: "[STUDENT_1]", display: "Ada", kind: "student" },
     ]);
     expect(out).toBe("Adams was here, not [STUDENT_1].");
+  });
+});
+
+// =============================================================================
+// Phase 4: chips, obs-ref, ghost-edit, search_capture_artifacts
+// =============================================================================
+
+describe("runReportChatAgent — Phase 4 archetypes", () => {
+  it("propose_chips returns a chips payload with detokenized labels and prefills", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_chips",
+            input: {
+              body: "Two ways to handle [STUDENT_1] today:",
+              chips: [
+                { label: "Keep focus on [STUDENT_1]", prefill: "Keep focus on [STUDENT_1]." },
+                {
+                  label: "Drop the peer mention",
+                  prefill: "Drop the peer mention from this report.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "chips") throw new Error("expected chips");
+
+    expect(out.chips.body).toBe("Two ways to handle Ada Okafor today:");
+    expect(out.chips.chips).toHaveLength(2);
+    expect(out.chips.chips[0].label).toBe("Keep focus on Ada Okafor");
+    expect(out.chips.chips[0].prefill).toBe("Keep focus on Ada Okafor.");
+    expect(out.chips.chips[0].id).toBeTypeOf("string");
+    // Tokenized snapshot kept for tool_trace.
+    expect(out.chips.tokenized.body).toContain("[STUDENT_1]");
+  });
+
+  it("rejects propose_chips with fewer than 2 chips", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_chips",
+            input: {
+              body: "One option only:",
+              chips: [{ label: "OK", prefill: "OK." }],
+            },
+          },
+        ],
+      },
+      // Recovery turn: valid chips.
+      {
+        toolUses: [
+          {
+            id: "tu-2",
+            name: "propose_chips",
+            input: {
+              body: "Two options:",
+              chips: [
+                { label: "Yes", prefill: "Yes please." },
+                { label: "No", prefill: "No thanks." },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "chips") throw new Error("expected chips");
+    expect(out.chips.chips).toHaveLength(2);
+    expect(out.turns).toBe(2);
+  });
+
+  it("propose_observation_ref returns artifact metadata + detokenized body/quote", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_observation_ref",
+            input: {
+              body: "Found a moment for [STUDENT_1] you didn't reference yet.",
+              obs: {
+                artifactId: "a-123",
+                quote: "[STUDENT_1] traced S three times slowly.",
+                when: "10:14 AM",
+                area: "Language area",
+              },
+              suggestedTarget: { sectionId: "morning", position: "append" },
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
+
+    expect(out.obsRef.body).toContain("Ada Okafor");
+    expect(out.obsRef.obs.artifactId).toBe("a-123");
+    expect(out.obsRef.obs.quote).toContain("Ada Okafor");
+    expect(out.obsRef.obs.when).toBe("10:14 AM");
+    expect(out.obsRef.obs.area).toBe("Language area");
+    expect(out.obsRef.suggestedTarget?.sectionId).toBe("morning");
+    expect(out.obsRef.suggestedTarget?.position).toBe("append");
+  });
+
+  it("propose_observation_ref drops a suggestedTarget that points at a missing section", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_observation_ref",
+            input: {
+              body: "Found a moment.",
+              obs: { artifactId: "a-1", quote: "[STUDENT_1] tracing S.", when: "10:14 AM" },
+              suggestedTarget: { sectionId: "ghost-section", position: "append" },
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
+    expect(out.obsRef.suggestedTarget).toBeUndefined();
+  });
+
+  it("propose_ghost_edit returns a ghost payload scoped to a real section", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_ghost_edit",
+            input: {
+              body: "I added a suggestion below the morning section.",
+              target: { sectionId: "morning" },
+              ghostEdit: {
+                html: "[STUDENT_1] held the pencil with a tripod grip today.",
+                sourceLabel: "10:14 AM photo",
+              },
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
+    expect(out.ghostEdit.target.sectionId).toBe("morning");
+    expect(out.ghostEdit.ghostEdit.html).toContain("Ada Okafor");
+    expect(out.ghostEdit.ghostEdit.sourceLabel).toBe("10:14 AM photo");
+    // Server-stamped id so the report pane can address the slot.
+    expect(out.ghostEdit.ghostEdit.id.length).toBeGreaterThan(0);
+  });
+
+  it("propose_ghost_edit rejects a missing section", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_ghost_edit",
+            input: {
+              body: "body",
+              target: { sectionId: "ghost-section" },
+              ghostEdit: { html: "[STUDENT_1] foo.", sourceLabel: "label" },
+            },
+          },
+        ],
+      },
+      // Recovery: real section.
+      {
+        toolUses: [
+          {
+            id: "tu-2",
+            name: "propose_ghost_edit",
+            input: {
+              body: "body",
+              target: { sectionId: "morning" },
+              ghostEdit: { html: "[STUDENT_1] foo.", sourceLabel: "label" },
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    if (out.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
+    expect(out.turns).toBe(2);
+  });
+
+  it("search_capture_artifacts returns the caller-provided list to the agent", async () => {
+    const search = vi.fn().mockResolvedValue([
+      {
+        artifactId: "a-1",
+        quote: "[STUDENT_1] traced S.",
+        when: "10:14 AM",
+        area: "Language area",
+        source: "photo" as const,
+      },
+    ]);
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          { id: "tu-1", name: "search_capture_artifacts", input: { query: "letter S", limit: 5 } },
+        ],
+      },
+      {
+        toolUses: [
+          {
+            id: "tu-2",
+            name: "propose_prose_reply",
+            input: {
+              body: "I found one capture for [STUDENT_1] with the sandpaper letter.",
+            },
+          },
+        ],
+      },
+    ]);
+
+    const out = await runReportChatAgent({
+      ...BASE_INPUT,
+      anthropic: stub.sdk,
+      searchArtifacts: search,
+    });
+    if (out.terminalKind !== "prose") throw new Error("expected prose");
+    expect(search).toHaveBeenCalledWith({ query: "letter S", limit: 5 });
+    expect(out.body).toContain("Ada Okafor");
+
+    // Inspect the second SDK call for the tool_result block — the agent
+    // should have received the artifacts list verbatim.
+    const second = stub.calls[1];
+    const last = second.messages[second.messages.length - 1];
+    const block = (last.content as Array<{ content?: string }>)[0];
+    const json = JSON.parse(block.content as string);
+    expect(json.artifacts).toHaveLength(1);
+    expect(json.artifacts[0].artifactId).toBe("a-1");
   });
 });

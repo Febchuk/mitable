@@ -1,10 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { Check, Clock, Mic, RotateCcw, Send, Undo2, X } from "lucide-react";
+import { Camera, Check, Clock, Mic, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
 import { ToastBus } from "../primitives";
 import { SparkleGlyph } from "./icons";
-import type { ChatTurnMessage, ChatProposalTarget, TargetRef } from "@/lib/schemas/report-chat";
+import type {
+  ChatAttachment,
+  ChatChip,
+  ChatGhostEdit,
+  ChatObsRefSuggestedTarget,
+  ChatProposalTarget,
+  ChatTurnMessage,
+  TargetRef,
+} from "@/lib/schemas/report-chat";
+import { startCamera, type CameraSession } from "@/lib/capture/camera-capture";
+import { TesseractOcrEngine } from "@/lib/capture/ocr-engine";
 
 const COMING_SOON_MIC = "Voice input lands in a later phase — type for now.";
 const HISTORY_HIDDEN = "Conversation history will land later — one thread per report for now.";
@@ -36,6 +46,22 @@ export interface ChatPaneProps {
    */
   onApplyProposal: (args: { sectionId: string; paragraphId: string; newText: string }) => void;
   /**
+   * Insert a captured observation as a new paragraph. The parent decides
+   * which section to insert into when no suggestedTarget is present.
+   */
+  onPullObservation?: (args: { text: string; suggestedTarget?: ChatObsRefSuggestedTarget }) => void;
+  /**
+   * Merge a ghost-edit suggestion into the report pane's section slot. The
+   * report pane already renders ghosts inline (Accept/Reject/Edit-first).
+   * `messageId` is the originating chat message — the parent uses it to
+   * record applied/dismissed via /chat/messages/[id]/applied.
+   */
+  onApplyGhostEdit?: (args: {
+    sectionId: string;
+    ghostEdit: ChatGhostEdit;
+    messageId: string;
+  }) => void;
+  /**
    * Awaits any pending debounced PATCH so the agent's read_report_sections
    * reflects the user's latest typing. Plan §7 single most important
    * integration concern.
@@ -44,7 +70,7 @@ export interface ChatPaneProps {
 }
 
 export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatPane(
-  { reportId, sections, onApplyProposal, flushPendingSave },
+  { reportId, sections, onApplyProposal, onPullObservation, onApplyGhostEdit, flushPendingSave },
   ref
 ) {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -61,6 +87,14 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     before: string;
     label: string;
   } | null>(null);
+  const [pendingAttachments, setPendingAttachments] = React.useState<ChatAttachment[]>([]);
+  const [cameraSession, setCameraSession] = React.useState<CameraSession | null>(null);
+  const [cameraStatus, setCameraStatus] = React.useState<
+    "idle" | "opening" | "ready" | "capturing" | "ocr" | "uploading" | "error"
+  >("idle");
+  const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const ocrRef = React.useRef<TesseractOcrEngine | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -85,6 +119,133 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages.length, sending]);
+
+  // When a ghost-edit message arrives that hasn't been applied/dismissed yet,
+  // merge it into the report pane's section slot so it renders inline. We
+  // track which ones we've already merged so re-renders don't double-fire.
+  const mergedGhostIdsRef = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    if (!onApplyGhostEdit) return;
+    for (const m of messages) {
+      if (m.kind !== "ghost-edit") continue;
+      if (m.appliedAt || m.dismissedAt) continue;
+      if (mergedGhostIdsRef.current.has(m.id)) continue;
+      mergedGhostIdsRef.current.add(m.id);
+      onApplyGhostEdit({
+        sectionId: m.target.sectionId,
+        ghostEdit: m.ghostEdit,
+        messageId: m.id,
+      });
+    }
+  }, [messages, onApplyGhostEdit]);
+
+  // Bind the live camera stream to the inline viewfinder once both exist.
+  React.useEffect(() => {
+    if (!cameraSession || !videoRef.current) return;
+    videoRef.current.srcObject = cameraSession.stream;
+    void videoRef.current.play().catch(() => {
+      /* autoplay policy — user can hit capture anyway */
+    });
+  }, [cameraSession]);
+
+  // Tear down camera + OCR worker when the chat pane unmounts.
+  React.useEffect(() => {
+    return () => {
+      cameraSession?.stop();
+      ocrRef.current?.destroy();
+      ocrRef.current = null;
+    };
+  }, [cameraSession]);
+
+  const openCamera = React.useCallback(async () => {
+    if (cameraSession) return;
+    setCameraStatus("opening");
+    setCameraError(null);
+    try {
+      const session = await startCamera({ facingMode: "environment" });
+      setCameraSession(session);
+      setCameraStatus("ready");
+      // Pre-warm Tesseract in the background so the first capture isn't slow.
+      if (!ocrRef.current) {
+        ocrRef.current = new TesseractOcrEngine();
+        void ocrRef.current.init().catch(() => {
+          // OCR isn't fatal — we'll skip it on failure and let the agent
+          // search by recency only.
+        });
+      }
+    } catch (err) {
+      setCameraStatus("error");
+      setCameraError((err as Error).message || "Couldn't open the camera.");
+    }
+  }, [cameraSession]);
+
+  const closeCamera = React.useCallback(() => {
+    cameraSession?.stop();
+    setCameraSession(null);
+    setCameraStatus("idle");
+    setCameraError(null);
+  }, [cameraSession]);
+
+  const captureAndAttach = React.useCallback(async () => {
+    if (!cameraSession) return;
+    setCameraStatus("capturing");
+    setCameraError(null);
+    try {
+      const blob = await cameraSession.capture();
+      // Run OCR client-side. If the engine isn't ready or fails, ship the
+      // photo without text — the agent can still surface it by recency.
+      let ocrText = "";
+      if (ocrRef.current) {
+        setCameraStatus("ocr");
+        try {
+          const r = await ocrRef.current.recognize(blob);
+          ocrText = (r.text ?? "").trim();
+        } catch {
+          // Skip OCR on engine error.
+        }
+      }
+      setCameraStatus("uploading");
+      const form = new FormData();
+      form.append("photo", blob, "capture.jpg");
+      if (ocrText) form.append("ocrText", ocrText);
+      form.append("capturedAt", new Date().toISOString());
+      const res = await fetch(`/api/v1/reports/${reportId}/chat/artifacts`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || "Upload failed");
+      }
+      const json = (await res.json()) as {
+        artifactId: string;
+        ocrText: string | null;
+        capturedAt: string;
+      };
+      setPendingAttachments((prev) => [
+        ...prev,
+        {
+          kind: "photo",
+          artifactId: json.artifactId,
+          ...(json.ocrText ? { ocrText: json.ocrText } : {}),
+          ...(json.capturedAt ? { capturedAt: json.capturedAt } : {}),
+        },
+      ]);
+      // Close the viewfinder once the attachment chip lands so the teacher
+      // can keep typing without dismissing the camera manually.
+      cameraSession.stop();
+      setCameraSession(null);
+      setCameraStatus("idle");
+    } catch (err) {
+      setCameraStatus("error");
+      setCameraError((err as Error).message || "Capture failed.");
+    }
+  }, [cameraSession, reportId]);
+
+  const removeAttachment = React.useCallback((artifactId: string) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.artifactId !== artifactId));
+  }, []);
 
   // Load persisted thread on mount.
   React.useEffect(() => {
@@ -132,8 +293,10 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     };
     setMessages((prev) => [...prev, optimistic]);
     const sentTargetRef = pinnedTarget?.ref;
+    const sentAttachments = pendingAttachments;
     setInput("");
     setPinnedTarget(null);
+    setPendingAttachments([]);
     setSending(true);
 
     try {
@@ -144,6 +307,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         body: JSON.stringify({
           userMessage: trimmed,
           ...(sentTargetRef ? { targetRef: sentTargetRef } : {}),
+          ...(sentAttachments.length > 0 ? { attachments: sentAttachments } : {}),
         }),
       });
       if (!res.ok) {
@@ -157,6 +321,8 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
             body: j.error || "Something went wrong. Try again.",
           },
         ]);
+        // Restore attachments so the teacher can retry without re-uploading.
+        if (sentAttachments.length > 0) setPendingAttachments(sentAttachments);
         return;
       }
       const json = (await res.json()) as { messages: ChatTurnMessage[] };
@@ -174,7 +340,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
       setSending(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
-  }, [input, reportId, sending, pinnedTarget, flushPendingSave]);
+  }, [input, reportId, sending, pinnedTarget, pendingAttachments, flushPendingSave]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -302,6 +468,29 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   }, [undo, onApplyProposal]);
 
+  const onChipClick = React.useCallback((chip: ChatChip) => {
+    setInput(chip.prefill);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
+  const onPullIn = React.useCallback(
+    (message: Extract<ChatTurnMessage, { kind: "obs-ref" }>) => {
+      if (!onPullObservation) {
+        ToastBus.push({ message: "Pulling observations isn't wired up here." });
+        return;
+      }
+      onPullObservation({
+        text: message.obs.quote,
+        suggestedTarget: message.suggestedTarget,
+      });
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, appliedAt: new Date().toISOString() } : m))
+      );
+      void recordAction(message.id, "applied");
+    },
+    [onPullObservation, recordAction]
+  );
+
   return (
     <aside className="rd-pane rd-chat-pane" aria-label="Editing assistant">
       <div className="rd-chat-header">
@@ -347,6 +536,8 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
               onApply={onApply}
               onSkip={onSkip}
               onTryAnother={onTryAnother}
+              onChipClick={onChipClick}
+              onPullIn={onPullIn}
             />
           ))
         )}
@@ -366,6 +557,64 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
             >
               <X size={11} strokeWidth={2.5} />
             </button>
+          </div>
+        ) : null}
+        {pendingAttachments.length > 0 ? (
+          <div className="rd-attachments" aria-label="Attached photos">
+            {pendingAttachments.map((a) => (
+              <span key={a.artifactId} className="rd-attachment">
+                <span className="rd-attachment-thumb" aria-hidden="true">
+                  📷
+                </span>
+                <span>Photo</span>
+                <button
+                  type="button"
+                  className="rd-attachment-remove"
+                  onClick={() => removeAttachment(a.artifactId)}
+                  aria-label="Remove attachment"
+                >
+                  <X size={11} strokeWidth={2.5} />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {cameraSession ? (
+          <div className="rd-camera" aria-label="Camera viewfinder">
+            <video ref={videoRef} autoPlay playsInline muted />
+            <div className="rd-camera-actions">
+              <button
+                type="button"
+                className="rd-btn rd-btn-primary"
+                onClick={() => void captureAndAttach()}
+                disabled={
+                  cameraStatus === "capturing" ||
+                  cameraStatus === "ocr" ||
+                  cameraStatus === "uploading"
+                }
+              >
+                {cameraStatus === "capturing"
+                  ? "Capturing…"
+                  : cameraStatus === "ocr"
+                    ? "Reading text…"
+                    : cameraStatus === "uploading"
+                      ? "Uploading…"
+                      : "Capture"}
+              </button>
+              <button
+                type="button"
+                className="rd-btn rd-btn-ghost"
+                onClick={closeCamera}
+                disabled={cameraStatus === "uploading"}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {cameraError ? (
+          <div className="rd-camera-progress" role="alert">
+            {cameraError}
           </div>
         ) : null}
         <div className="rd-composer">
@@ -391,6 +640,16 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
               onClick={() => ToastBus.push({ message: COMING_SOON_MIC })}
             >
               <Mic size={16} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className="rd-icon-btn"
+              title={cameraSession ? "Close camera" : "Attach a photo"}
+              aria-label="Attach a photo"
+              onClick={() => (cameraSession ? closeCamera() : void openCamera())}
+              disabled={cameraStatus === "opening" || cameraStatus === "uploading"}
+            >
+              <Camera size={16} strokeWidth={2} />
             </button>
             <button
               type="button"
@@ -450,9 +709,18 @@ type MessageViewProps = {
   onApply: (m: Extract<ChatTurnMessage, { kind: "proposal" }>, opts?: { force?: boolean }) => void;
   onSkip: (m: Extract<ChatTurnMessage, { kind: "proposal" }>) => void;
   onTryAnother: (m: Extract<ChatTurnMessage, { kind: "proposal" }>) => void;
+  onChipClick: (chip: ChatChip) => void;
+  onPullIn: (m: Extract<ChatTurnMessage, { kind: "obs-ref" }>) => void;
 };
 
-function MessageView({ message, onApply, onSkip, onTryAnother }: MessageViewProps) {
+function MessageView({
+  message,
+  onApply,
+  onSkip,
+  onTryAnother,
+  onChipClick,
+  onPullIn,
+}: MessageViewProps) {
   if (message.kind === "user-text") {
     return (
       <div className="rd-msg rd-msg-user">
@@ -481,6 +749,15 @@ function MessageView({ message, onApply, onSkip, onTryAnother }: MessageViewProp
       />
     );
   }
+  if (message.kind === "chips") {
+    return <ChipsView message={message} onChipClick={onChipClick} />;
+  }
+  if (message.kind === "obs-ref") {
+    return <ObsRefView message={message} onPullIn={onPullIn} />;
+  }
+  if (message.kind === "ghost-edit") {
+    return <GhostEditConfirmationView message={message} />;
+  }
   // prose | clarify
   return (
     <div className="rd-msg rd-msg-ai">
@@ -488,6 +765,108 @@ function MessageView({ message, onApply, onSkip, onTryAnother }: MessageViewProp
         <SparkleGlyph size={12} />
       </div>
       <div className="rd-body">{message.body}</div>
+    </div>
+  );
+}
+
+function ChipsView({
+  message,
+  onChipClick,
+}: {
+  message: Extract<ChatTurnMessage, { kind: "chips" }>;
+  onChipClick: (chip: ChatChip) => void;
+}) {
+  return (
+    <div className="rd-msg rd-msg-ai">
+      <div className="rd-avatar">
+        <SparkleGlyph size={12} />
+      </div>
+      <div className="rd-body">
+        {message.body}
+        <div className="rd-reply-chips">
+          {message.chips.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              className="rd-reply-chip"
+              onClick={() => onChipClick(chip)}
+              title={chip.prefill}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ObsRefView({
+  message,
+  onPullIn,
+}: {
+  message: Extract<ChatTurnMessage, { kind: "obs-ref" }>;
+  onPullIn: (m: Extract<ChatTurnMessage, { kind: "obs-ref" }>) => void;
+}) {
+  const applied = !!message.appliedAt;
+  const dismissed = !!message.dismissedAt;
+  return (
+    <div className="rd-msg rd-msg-ai">
+      <div className="rd-avatar">
+        <SparkleGlyph size={12} />
+      </div>
+      <div className="rd-body">
+        {message.body}
+        <div className="rd-obs-ref" data-applied={applied} data-dismissed={dismissed}>
+          <div className="rd-obs-thumb" aria-hidden="true">
+            📷
+          </div>
+          <div className="rd-obs-meta">
+            <div className="rd-obs-when">
+              {message.obs.when}
+              {message.obs.area ? ` · ${message.obs.area}` : ""}
+            </div>
+            <div className="rd-obs-text">{`"${message.obs.quote}"`}</div>
+          </div>
+          {applied ? (
+            <span className="rd-applied-pill">
+              <Check size={12} strokeWidth={2.5} />
+              Pulled in
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="rd-obs-pull"
+              onClick={() => onPullIn(message)}
+              disabled={dismissed}
+            >
+              <Plus size={11} strokeWidth={2.5} style={{ marginRight: 3 }} />
+              Pull in
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GhostEditConfirmationView({
+  message,
+}: {
+  message: Extract<ChatTurnMessage, { kind: "ghost-edit" }>;
+}) {
+  return (
+    <div className="rd-msg rd-msg-ai">
+      <div className="rd-avatar">
+        <SparkleGlyph size={12} />
+      </div>
+      <div className="rd-body">
+        {message.body}
+        <div className="rd-ghost-confirm">
+          <span className="rd-label-cap">Suggested addition</span>
+          <span className="rd-ghost-confirm-source">{message.ghostEdit.sourceLabel}</span>
+        </div>
+      </div>
     </div>
   );
 }

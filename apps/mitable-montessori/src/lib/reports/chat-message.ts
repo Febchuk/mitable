@@ -46,6 +46,73 @@ export function rowToChatMessage(row: StoredChatRow): ChatTurnMessage {
       ...base,
     };
   }
+  if (kind === "chips") {
+    const chipsRaw = Array.isArray(payload.chips) ? payload.chips : [];
+    return {
+      kind: "chips",
+      body: String(payload.body ?? ""),
+      chips: chipsRaw.map((c, i) => {
+        const cc = c as { id?: string; label?: string; prefill?: string };
+        return {
+          id: cc?.id ?? `c-${i}`,
+          label: String(cc?.label ?? ""),
+          prefill: String(cc?.prefill ?? ""),
+        };
+      }),
+      ...base,
+    };
+  }
+  if (kind === "obs-ref") {
+    const obs = payload.obs as
+      | {
+          artifactId?: string;
+          quote?: string;
+          when?: string;
+          area?: string;
+          source?: "photo" | "transcript" | "ocr";
+        }
+      | undefined;
+    const suggested = payload.suggestedTarget as
+      | { sectionId?: string; position?: "append" | "after" | "new-paragraph" }
+      | undefined;
+    return {
+      kind: "obs-ref",
+      body: String(payload.body ?? ""),
+      obs: {
+        artifactId: obs?.artifactId ?? "",
+        quote: obs?.quote ?? "",
+        when: obs?.when ?? "",
+        ...(obs?.area ? { area: obs.area } : {}),
+        ...(obs?.source ? { source: obs.source } : {}),
+      },
+      ...(suggested?.sectionId
+        ? {
+            suggestedTarget: {
+              sectionId: suggested.sectionId,
+              position: suggested.position ?? "append",
+            },
+          }
+        : {}),
+      ...base,
+    };
+  }
+  if (kind === "ghost-edit") {
+    const target = payload.target as { sectionId?: string } | undefined;
+    const ghost = payload.ghostEdit as
+      | { id?: string; html?: string; sourceLabel?: string }
+      | undefined;
+    return {
+      kind: "ghost-edit",
+      body: String(payload.body ?? ""),
+      target: { sectionId: target?.sectionId ?? "" },
+      ghostEdit: {
+        id: ghost?.id ?? row.id,
+        html: ghost?.html ?? "",
+        sourceLabel: ghost?.sourceLabel ?? "",
+      },
+      ...base,
+    };
+  }
   return {
     kind: kind as "prose" | "clarify" | "user-text",
     body: String(payload.body ?? ""),
