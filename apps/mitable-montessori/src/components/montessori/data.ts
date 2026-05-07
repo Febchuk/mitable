@@ -273,9 +273,13 @@ export const CHILDREN: Child[] = [
   },
 ];
 
-export type Topic = "Sensorial" | "Practical Life" | "Language" | "Math";
+/** Topic name kept as a free-form string now that the Progress tab reads from
+ *  the curriculum tree. The previous literal union remains as MOCK_TOPICS for
+ *  surfaces that still reference the four canonical mock topics. */
+export type Topic = string;
 
-export const TOPICS: Topic[] = ["Sensorial", "Practical Life", "Language", "Math"];
+export const MOCK_TOPICS = ["Sensorial", "Practical Life", "Language", "Math"] as const;
+export const TOPICS: Topic[] = [...MOCK_TOPICS];
 
 export const SUBTOPICS_BY_TOPIC: Record<Topic, string[]> = {
   Sensorial: [
@@ -447,6 +451,18 @@ export const STATUS_COLOR: Record<ProgressMark, string> = {
   "-": "var(--color-border)",
 };
 
+/** UI ↔ DB status converters. Source of truth for the DB enum lives in
+ *  src/lib/queries/curriculum.ts (CurriculumStatus). */
+export type CurriculumStatusValue = "introduced" | "practicing" | "mastered" | "na";
+
+export function markToStatus(m: ProgressMark): CurriculumStatusValue {
+  return m === "m" ? "mastered" : m === "p" ? "practicing" : m === "i" ? "introduced" : "na";
+}
+
+export function statusToMark(s: CurriculumStatusValue): ProgressMark {
+  return s === "mastered" ? "m" : s === "practicing" ? "p" : s === "introduced" ? "i" : "-";
+}
+
 // Per-topic seeded data. Sensorial mirrors the original 12-cell sensorial seed
 // for the 10 children that already had data; the other three topics use
 // plausible classroom-flavored mixes generated to feel realistic.
@@ -542,7 +558,10 @@ export type RecentUpdateEntry = {
   topic: Topic;
   subtopicName: string;
   childId: string;
-  subtopicIdx: number;
+  /** Stable subtopic identifier — UUID when sourced from Supabase, mock string
+   *  for legacy in-memory entries. Replaced the positional `subtopicIdx`
+   *  when the Progress tab moved off mock arrays. */
+  subtopicId: string;
   status: ProgressMark;
   noteText: string | null;
   when: string;

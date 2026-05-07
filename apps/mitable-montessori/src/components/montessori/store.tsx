@@ -6,12 +6,10 @@ import {
   CHILDREN,
   INITIAL_ATTENDANCE,
   INITIAL_CHAT,
-  INITIAL_PROGRESS_BY_TOPIC,
   INITIAL_REPORTS,
   SCRIPTED_REPLIES,
-  SUBTOPICS,
-  SUBTOPICS_BY_TOPIC,
   findChild,
+  markToStatus,
   type AttendanceMark,
   type CellNote,
   type ChatMessage,
@@ -19,13 +17,18 @@ import {
   type ProgressMark,
   type RecentUpdateEntry,
   type Report,
-  type Topic,
 } from "./data";
+import type { ClassroomProgress } from "@/lib/queries/classroom-progress";
 import { HandCheck, ToastBus } from "./primitives";
 
 export type WebRoute = "today" | "roster" | "progress" | "attendance" | "reports" | "curriculum";
 
 export type ChatMode = "open" | "pill";
+
+/** Id-keyed progress map: progressByTopic[topicId][studentId][subtopicId] = ProgressMark.
+ *  Replaces the legacy positional shape so subtopic insertion/reorder doesn't
+ *  silently misalign cells. */
+export type ProgressByTopic = Record<string, Record<string, Record<string, ProgressMark>>>;
 
 export type MontessoriStore = {
   // navigation per surface
@@ -37,11 +40,13 @@ export type MontessoriStore = {
   // data
   chat: ChatMessage[];
   reports: Report[];
-  progressByTopic: Record<Topic, Record<string, ProgressMark[]>>;
-  notesByTopic: Record<Topic, Record<string, CellNote[]>>;
+  /** Real classroom curriculum + roster + progress, hydrated server-side.
+   *  Null when the page that owns the provider didn't pass an initial payload
+   *  (mock-only surfaces) or when there's no active classroom. */
+  classroomProgress: ClassroomProgress | null;
+  progressByTopic: ProgressByTopic;
+  notesByTopic: Record<string, Record<string, CellNote[]>>;
   recentUpdates: RecentUpdateEntry[];
-  /** Sensorial-only view, kept so existing callers (e.g. ChildDetail) stay unchanged. */
-  progress: Record<string, ProgressMark[]>;
   attendance: Record<string, AttendanceMark[]>;
   reportsFilter: string;
   setReportsFilter: (s: string) => void;
@@ -77,12 +82,17 @@ export type MontessoriStore = {
     detail?: Report["detail"];
   }) => string;
   toggleAttendance: (childId: string, dayIndex: number) => void;
+  /** Persist a bulk progress edit. Optimistically updates `progressByTopic`
+   *  and `classroomProgress.progress`, then POSTs one `command` row per cell
+   *  to /api/v1/student-progress/bulk. The server-side trigger projects each
+   *  command into student_progress + student_progress_history atomically. */
   applyBulkProgress: (args: {
-    topic: Topic;
-    cells: string[];
+    topicId: string;
+    topicName: string;
+    cells: Array<{ studentId: string; subtopicId: string; subtopicName: string }>;
     status: ProgressMark;
     note?: string;
-  }) => void;
+  }) => Promise<void>;
   clearAll: () => void;
 };
 
@@ -94,26 +104,73 @@ export function useMontessori(): MontessoriStore {
   return ctx;
 }
 
-export function MontessoriProvider({ children }: { children: React.ReactNode }) {
+/** Build the initial id-keyed progressByTopic from the server payload.
+ *  Initializes every (topic, student, subtopic) cell — missing rows default
+ *  to "-" so the matrix can render without per-cell undefined checks. */
+function progressFromClassroom(initial: ClassroomProgress): ProgressByTopic {
+  const out: ProgressByTopic = {};
+  // Seed the structure so even unwritten cells show as "-".
+  const subsByTopic = new Map<string, string[]>();
+  for (const st of initial.subtopics) {
+    const arr = subsByTopic.get(st.topicId) ?? [];
+    arr.push(st.id);
+    subsByTopic.set(st.topicId, arr);
+  }
+  for (const t of initial.topics) {
+    const subs = subsByTopic.get(t.id) ?? [];
+    const studentMap: Record<string, Record<string, ProgressMark>> = {};
+    for (const s of initial.students) {
+      const cells: Record<string, ProgressMark> = {};
+      for (const subId of subs) cells[subId] = "-";
+      studentMap[s.id] = cells;
+    }
+    out[t.id] = studentMap;
+  }
+  // Overlay actual student_progress rows.
+  for (const [studentId, byStudent] of Object.entries(initial.progress)) {
+    for (const [subtopicId, status] of Object.entries(byStudent)) {
+      const subtopic = initial.subtopics.find((s) => s.id === subtopicId);
+      if (!subtopic) continue;
+      const topic = out[subtopic.topicId];
+      if (!topic) continue;
+      const studentRow = topic[studentId];
+      if (!studentRow) continue;
+      studentRow[subtopicId] =
+        status === "mastered"
+          ? "m"
+          : status === "practicing"
+            ? "p"
+            : status === "introduced"
+              ? "i"
+              : "-";
+    }
+  }
+  return out;
+}
+
+export function MontessoriProvider({
+  children,
+  initialClassroomProgress = null,
+}: {
+  children: React.ReactNode;
+  initialClassroomProgress?: ClassroomProgress | null;
+}) {
   const [webRoute, setWebRouteState] = React.useState<WebRoute>("today");
   const [webChatMode, setWebChatMode] = React.useState<ChatMode>("pill");
   const [chat, setChat] = React.useState<ChatMessage[]>(INITIAL_CHAT);
   const [reports, setReports] = React.useState<Report[]>(INITIAL_REPORTS);
-  const [progressByTopic, setProgressByTopic] = React.useState(INITIAL_PROGRESS_BY_TOPIC);
-  const [notesByTopic, setNotesByTopic] = React.useState<Record<Topic, Record<string, CellNote[]>>>(
-    () => ({
-      Sensorial: {},
-      "Practical Life": {},
-      Language: {},
-      Math: {},
-    })
+  const [classroomProgress, setClassroomProgress] = React.useState<ClassroomProgress | null>(
+    initialClassroomProgress
   );
+  const [progressByTopic, setProgressByTopic] = React.useState<ProgressByTopic>(() =>
+    initialClassroomProgress ? progressFromClassroom(initialClassroomProgress) : {}
+  );
+  const [notesByTopic, setNotesByTopic] = React.useState<
+    Record<string, Record<string, CellNote[]>>
+  >({});
   const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>([]);
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
 
-  // Sensorial view kept for back-compat with the chat-agent observation flow
-  // and the curriculum/whole-child surfaces that still read store.progress.
-  const progress = progressByTopic.Sensorial;
   const [reportsFilter, setReportsFilter] = React.useState("All");
   const [rosterFilter, setRosterFilter] = React.useState("All");
   const [selectedChild, setSelectedChild] = React.useState<string | null>(null);
@@ -151,51 +208,33 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
           m.id === id && m.type === "observation" ? { ...m, status: "approved" } : m
         )
       );
+      // The chat-agent observation-approval flow used to also write a
+      // positional mock cell into Sensorial; that mutation has been retired
+      // along with the positional progressByTopic shape. The toast still
+      // fires; real progress now flows through applyBulkProgress on the
+      // Progress tab (which writes via /api/v1/student-progress/bulk).
       if (obs) {
         const ch = findChild(obs.childId);
         ToastBus.push({
           message: `Approved · synced to ${ch ? ch.name.split(" ")[0] : "child"}'s record`,
           icon: <HandCheck color="var(--color-surface)" size={14} />,
         });
-        const subIdx = SUBTOPICS.indexOf(obs.subtopic);
-        if (subIdx >= 0 && progress[obs.childId]) {
-          const lvl: ProgressMark | null =
-            obs.level === "Mastered"
-              ? "m"
-              : obs.level === "Practicing"
-                ? "p"
-                : obs.level === "Introduced"
-                  ? "i"
-                  : null;
-          if (lvl) {
-            setProgressByTopic((prev) => {
-              const sensorial = prev.Sensorial;
-              const childRow = sensorial[obs.childId];
-              if (!childRow) return prev;
-              return {
-                ...prev,
-                Sensorial: {
-                  ...sensorial,
-                  [obs.childId]: childRow.map((v, i) => (i === subIdx ? lvl : v)),
-                },
-              };
-            });
-          }
-        }
       }
     },
-    [chat, progress]
+    [chat]
   );
 
   const applyBulkProgress = React.useCallback(
-    ({
-      topic,
+    async ({
+      topicId,
+      topicName,
       cells,
       status,
       note,
     }: {
-      topic: Topic;
-      cells: string[];
+      topicId: string;
+      topicName: string;
+      cells: Array<{ studentId: string; subtopicId: string; subtopicName: string }>;
       status: ProgressMark;
       note?: string;
     }) => {
@@ -203,48 +242,84 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
       const trimmedNote = note?.trim() || "";
       const when = "just now";
 
+      // Snapshot for rollback.
+      const prevProgressByTopic = progressByTopic;
+      const prevClassroomProgress = classroomProgress;
+      const prevNotes = notesByTopic;
+      const prevRecent = recentUpdates;
+
+      // Optimistic local updates.
       setProgressByTopic((prev) => {
-        const topicRow = { ...(prev[topic] || {}) };
-        for (const k of cells) {
-          const [cid, idxStr] = k.split(":");
-          const row = topicRow[cid];
-          if (!row) continue;
-          const idx = parseInt(idxStr, 10);
-          const next = row.slice();
-          next[idx] = status;
-          topicRow[cid] = next;
+        const topicMap = { ...(prev[topicId] || {}) };
+        for (const c of cells) {
+          const studentRow = { ...(topicMap[c.studentId] || {}) };
+          studentRow[c.subtopicId] = status;
+          topicMap[c.studentId] = studentRow;
         }
-        return { ...prev, [topic]: topicRow };
+        return { ...prev, [topicId]: topicMap };
+      });
+
+      setClassroomProgress((prev) => {
+        if (!prev) return prev;
+        const dbStatus = markToStatus(status);
+        const next = { ...prev, progress: { ...prev.progress } };
+        for (const c of cells) {
+          const studentRow = { ...(next.progress[c.studentId] || {}) };
+          studentRow[c.subtopicId] = dbStatus;
+          next.progress[c.studentId] = studentRow;
+        }
+        return next;
       });
 
       if (trimmedNote) {
         setNotesByTopic((prev) => {
-          const topicNotes = { ...(prev[topic] || {}) };
-          for (const k of cells) {
+          const topicNotes = { ...(prev[topicId] || {}) };
+          for (const c of cells) {
+            const k = `${c.studentId}:${c.subtopicId}`;
             topicNotes[k] = [{ noteText: trimmedNote, when, status }, ...(topicNotes[k] || [])];
           }
-          return { ...prev, [topic]: topicNotes };
+          return { ...prev, [topicId]: topicNotes };
         });
       }
 
-      const subs = SUBTOPICS_BY_TOPIC[topic] || [];
-      const newEntries: RecentUpdateEntry[] = cells.map((k) => {
-        const [cid, idxStr] = k.split(":");
-        const idx = parseInt(idxStr, 10);
-        return {
-          id: Math.random().toString(36).slice(2),
-          topic,
-          subtopicName: subs[idx] || "",
-          childId: cid,
-          subtopicIdx: idx,
-          status,
-          noteText: trimmedNote || null,
-          when,
-        };
-      });
+      const newEntries: RecentUpdateEntry[] = cells.map((c) => ({
+        id: Math.random().toString(36).slice(2),
+        topic: topicName,
+        subtopicName: c.subtopicName,
+        childId: c.studentId,
+        subtopicId: c.subtopicId,
+        status,
+        noteText: trimmedNote || null,
+        when,
+      }));
       setRecentUpdates((prev) => [...newEntries, ...prev].slice(0, 60));
+
+      // Persist via the canonical commands path. The trigger writes both
+      // student_progress (upsert) and student_progress_history atomically.
+      try {
+        const res = await fetch("/api/v1/student-progress/bulk", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            updates: cells.map((c) => ({
+              studentId: c.studentId,
+              subtopicId: c.subtopicId,
+              status: markToStatus(status),
+              comment: trimmedNote || undefined,
+            })),
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch {
+        // Roll back on any failure.
+        setProgressByTopic(prevProgressByTopic);
+        setClassroomProgress(prevClassroomProgress);
+        setNotesByTopic(prevNotes);
+        setRecentUpdates(prevRecent);
+        ToastBus.push({ message: "Couldn't save — try again" });
+      }
     },
-    []
+    [progressByTopic, classroomProgress, notesByTopic, recentUpdates]
   );
 
   const setAsideObservation = React.useCallback((id: string) => {
@@ -304,16 +379,14 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
   const clearAll = React.useCallback(() => {
     setChat(INITIAL_CHAT);
     setReports(INITIAL_REPORTS);
-    setProgressByTopic(INITIAL_PROGRESS_BY_TOPIC);
-    setNotesByTopic({
-      Sensorial: {},
-      "Practical Life": {},
-      Language: {},
-      Math: {},
-    });
+    setProgressByTopic(
+      initialClassroomProgress ? progressFromClassroom(initialClassroomProgress) : {}
+    );
+    setClassroomProgress(initialClassroomProgress);
+    setNotesByTopic({});
     setRecentUpdates([]);
     setAttendance(INITIAL_ATTENDANCE);
-  }, []);
+  }, [initialClassroomProgress]);
 
   const approveReport = React.useCallback(
     (id: string) => {
@@ -371,10 +444,10 @@ export function MontessoriProvider({ children }: { children: React.ReactNode }) 
     setWebChatMode,
     chat,
     reports,
+    classroomProgress,
     progressByTopic,
     notesByTopic,
     recentUpdates,
-    progress,
     attendance,
     reportsFilter,
     setReportsFilter,

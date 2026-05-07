@@ -72,9 +72,20 @@ export interface CurriculumRow {
   isActive: boolean;
 }
 
+export interface CurriculumSubjectRow {
+  id: string;
+  curriculumId: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
 export interface CurriculumTopicRow {
   id: string;
   curriculumId: string;
+  /** Optional in the offline cache — older rows synced before the
+   *  curriculum_subjects schema (migration 0026) won't carry one. */
+  subjectId?: string;
   name: string;
   sortOrder: number;
   isActive: boolean;

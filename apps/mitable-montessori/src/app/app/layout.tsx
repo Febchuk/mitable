@@ -12,6 +12,7 @@ import {
   getActiveClassroomForCurrentUser,
   getCurrentUserContext,
 } from "@/lib/app/active-classroom";
+import { getClassroomProgress } from "@/lib/queries/classroom-progress";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCurrentUserContext();
@@ -20,9 +21,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isAdmin = ctx.role === "admin";
   const classroom = await getActiveClassroomForCurrentUser();
   const classroomName = classroom?.name ?? "Primrose Room";
+  // Teachers' Progress tab needs the curriculum tree + roster + progress
+  // hydrated server-side. Skipped for admins (their /app shell shows admin
+  // pages, not the teacher Progress tab).
+  const initialClassroomProgress = isAdmin ? null : await getClassroomProgress();
 
   return (
-    <MontessoriProvider>
+    <MontessoriProvider initialClassroomProgress={initialClassroomProgress}>
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
           variant={isAdmin ? "admin" : "teacher"}

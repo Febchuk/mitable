@@ -251,12 +251,25 @@ export async function createCurriculum(
   });
 }
 
-export async function createCurriculumTopic(
+export async function createCurriculumSubject(
   ctx: AdminContext,
   input: { curriculum_id: string; name: string; sort_order: number }
 ) {
+  return insertReturningId(ctx, "curriculum_subjects", {
+    curriculum_id: input.curriculum_id,
+    name: input.name,
+    sort_order: input.sort_order,
+    is_active: true,
+  });
+}
+
+export async function createCurriculumTopic(
+  ctx: AdminContext,
+  input: { curriculum_id: string; subject_id: string; name: string; sort_order: number }
+) {
   return insertReturningId(ctx, "curriculum_topics", {
     curriculum_id: input.curriculum_id,
+    subject_id: input.subject_id,
     name: input.name,
     sort_order: input.sort_order,
     is_active: true,
