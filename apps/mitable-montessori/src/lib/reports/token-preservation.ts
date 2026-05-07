@@ -12,6 +12,55 @@
 
 const TOKEN_RE = /\[(STUDENT|SUBTOPIC|CLASSROOM|GUARDIAN|USER|TOPIC|CURRICULUM)_\d+\]/g;
 
+/**
+ * Common English words that can appear inside a multi-word display string
+ * (e.g. "this classroom", "main room", "the student"). The leak check skips
+ * these as standalone fragments — the full display is still matched verbatim
+ * and rare words alongside them still trigger leaks. Without this filter, any
+ * benign agent reply containing "the", "this", or "room" would be rejected.
+ */
+const STOPWORD_FRAGMENTS = new Set([
+  "this",
+  "that",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "of",
+  "to",
+  "in",
+  "on",
+  "for",
+  "with",
+  "student",
+  "students",
+  "teacher",
+  "teachers",
+  "child",
+  "children",
+  "kid",
+  "kids",
+  "room",
+  "class",
+  "classroom",
+  "classrooms",
+  "report",
+  "reports",
+  "note",
+  "notes",
+  "day",
+  "days",
+  "time",
+  "times",
+  "name",
+  "names",
+  "today",
+  "morning",
+  "afternoon",
+  "evening",
+]);
+
 export interface NameRef {
   /** UUID of the entity (used for de-tokenization later). */
   id: string;
@@ -41,9 +90,26 @@ export function validateTokenPreservation(text: string, refs: NameRef[]): Valida
     if (display.length < 2) continue;
     // Check both the full display and each component (first name, last name,
     // multi-word lesson titles). The agent may leak any one of those.
-    const fragments = new Set<string>([display.toLowerCase()]);
-    for (const word of display.split(/\s+/)) {
-      if (word.length >= 3) fragments.add(word.toLowerCase());
+    const fragments = new Set<string>();
+    const lowerDisplay = display.toLowerCase();
+    const words = display.split(/\s+/);
+    // Add the full display only when it's NOT a single-word stopword. A
+    // multi-word display like "this classroom" can stay (its verbatim
+    // appearance in agent prose still trips), but a single-word fallback
+    // like "Student" or "this" must be dropped entirely or every benign
+    // English sentence containing the word would fail validation.
+    const isSingleStopword = words.length === 1 && STOPWORD_FRAGMENTS.has(lowerDisplay);
+    if (!isSingleStopword) {
+      fragments.add(lowerDisplay);
+    }
+    for (const word of words) {
+      if (word.length < 3) continue;
+      const lc = word.toLowerCase();
+      // Skip common English words that would false-positive on benign prose.
+      // Only the per-word splits are suppressed for stopwords; the full
+      // multi-word display still gets matched verbatim above.
+      if (STOPWORD_FRAGMENTS.has(lc)) continue;
+      fragments.add(lc);
     }
     for (const fragment of fragments) {
       const escaped = fragment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

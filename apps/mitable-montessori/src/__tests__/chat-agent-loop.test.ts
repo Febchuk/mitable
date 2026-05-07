@@ -693,3 +693,52 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
     expect(json.artifacts[0].artifactId).toBe("a-1");
   });
 });
+
+// =============================================================================
+// Phase 6: regression — fallback-display refs must not poison benign prose
+// =============================================================================
+
+describe("runReportChatAgent — Phase 6 regression", () => {
+  it("does NOT validation-fail when a fallback-style display ('Student') exists in refs", async () => {
+    // Reproduces the staging bug: when the route falls back to display="Student"
+    // because the source row has no name, the validator's per-word splitter
+    // used to forbid the literal word "student" anywhere in the agent's reply.
+    // The fix (token-preservation.ts STOPWORD_FRAGMENTS) keeps benign prose
+    // through validation. The route's own fix is to drop the ref entirely,
+    // but defense-in-depth means the validator must also tolerate a leaked
+    // fallback if it ever sneaks in.
+    const fallbackRefs = {
+      refs: [
+        {
+          id: "11111111-1111-1111-1111-111111111111",
+          token: "[STUDENT_1]",
+          display: "Student",
+          kind: "student" as const,
+        },
+      ],
+    };
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_prose_reply",
+            input: {
+              body: "Hi! How can I help you with the morning section of this report?",
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({
+      ...BASE_INPUT,
+      anthropic: stub.sdk,
+      references: fallbackRefs,
+    });
+    if (out.terminalKind !== "prose") {
+      throw new Error(`expected prose, got ${out.terminalKind}`);
+    }
+    expect(out.body).toContain("morning section");
+    expect(out.regenerations).toBe(0);
+  });
+});

@@ -81,25 +81,34 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // Build the reference set for this turn. Phase 2 covers active student +
   // classroom. Subtopics ship with the read tool that surfaces them in
   // Phase 4. The validator only checks the names we declare here.
-  const studentDisplay = (studentRow?.preferred_name || studentRow?.first_name || "Student").trim();
+  //
+  // IMPORTANT: never substitute a fallback English-prose display string
+  // (e.g. "Student", "this classroom"). The leak validator splits displays
+  // into whole-word fragments and forbids each one in the agent's output —
+  // a fallback like "this classroom" forbids the word "this" from any
+  // reply, breaking benign prose. If the source row has no name, drop the
+  // ref entirely; the system prompt's privacy rules still apply.
+  const studentDisplay = (studentRow?.preferred_name || studentRow?.first_name || "").trim();
   const classroomDisplay = await fetchClassroomName(supabase, report.classroom_id as string);
 
-  const references: ReportReferenceSet = {
-    refs: [
-      {
-        id: report.student_id as string,
-        token: "[STUDENT_1]",
-        display: studentDisplay,
-        kind: "student",
-      },
-      {
-        id: report.classroom_id as string,
-        token: "[CLASSROOM_0]",
-        display: classroomDisplay || "this classroom",
-        kind: "classroom",
-      },
-    ],
-  };
+  const refs: ReportReferenceSet["refs"] = [];
+  if (studentDisplay.length >= 2) {
+    refs.push({
+      id: report.student_id as string,
+      token: "[STUDENT_1]",
+      display: studentDisplay,
+      kind: "student",
+    });
+  }
+  if (classroomDisplay.length >= 2) {
+    refs.push({
+      id: report.classroom_id as string,
+      token: "[CLASSROOM_0]",
+      display: classroomDisplay,
+      kind: "classroom",
+    });
+  }
+  const references: ReportReferenceSet = { refs };
 
   const sections = (report.sections as ReportSection[] | null) ?? [];
   const tokenizedSections: ChatTokenizedSection[] = sections.map((s) => ({
