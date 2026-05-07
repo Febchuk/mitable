@@ -95,6 +95,23 @@ export class MontessoriDb extends Dexie {
     this.version(4).stores({
       curriculumEvents: "id, studentId, [studentId+subtopicId], createdAt",
     });
+
+    // v5 — chat proposals gain `source` ("local" | "server") + `intentScore`
+    // columns so we can audit on-device vs Haiku-fallback resolution. No new
+    // index needed; existing rows are backfilled with source="server" and
+    // intentScore=null because they were written before the local resolver
+    // existed.
+    this.version(5)
+      .stores({
+        chatProposals: "id, threadId, status, createdAt",
+      })
+      .upgrade(async (tx) => {
+        const table = tx.table<ChatProposalRow>("chatProposals");
+        await table.toCollection().modify((row) => {
+          if (row.source === undefined) row.source = "server";
+          if (row.intentScore === undefined) row.intentScore = null;
+        });
+      });
   }
 }
 

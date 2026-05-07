@@ -26,3 +26,6 @@ next-env.d.ts
 # supabase CLI metadata
 supabase/.temp/
 supabase/.branches/
+
+# playwright-mcp artifacts (browser snapshots, console logs, extension installs)
+.playwright-mcp/

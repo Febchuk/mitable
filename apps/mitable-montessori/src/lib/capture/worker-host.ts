@@ -6,6 +6,7 @@ export type HostInbound =
   | { type: "init"; modelUrl?: string }
   | { type: "transcribe"; jobId: string; audio: Float32Array; sampleRate: number }
   | { type: "recognize"; jobId: string; payload: ArrayBuffer; mime: string }
+  | { type: "classify"; jobId: string; text: string; labels: string[] }
   | { type: "destroy" };
 
 export type HostOutbound =
@@ -23,6 +24,13 @@ export type HostOutbound =
       text: string;
       durationMs: number;
       confidence?: number;
+    }
+  | {
+      type: "classify-result";
+      jobId: string;
+      labels: string[];
+      scores: number[];
+      durationMs: number;
     }
   | { type: "error"; jobId?: string; message: string };
 
@@ -99,7 +107,11 @@ export class WorkerHost {
       }
       return;
     }
-    if (msg.type === "transcribe-result" || msg.type === "recognize-result") {
+    if (
+      msg.type === "transcribe-result" ||
+      msg.type === "recognize-result" ||
+      msg.type === "classify-result"
+    ) {
       const r = this.resolvers.get(msg.jobId);
       if (r) {
         r.resolve(msg);
@@ -125,6 +137,26 @@ export class WorkerHost {
         reject,
       });
       w.postMessage({ type: "transcribe", jobId, audio, sampleRate });
+    });
+  }
+
+  async classify(
+    text: string,
+    labels: string[]
+  ): Promise<{ labels: string[]; scores: number[]; durationMs: number }> {
+    const w = await this.ensureWorker();
+    const jobId = `c-${++pendingId}`;
+    this.setStatus({ state: "running" });
+    return new Promise((resolve, reject) => {
+      this.resolvers.set(jobId, {
+        resolve: (m) => {
+          if (m.type !== "classify-result") return reject(new Error("unexpected reply"));
+          this.setStatus({ state: "ready" });
+          resolve({ labels: m.labels, scores: m.scores, durationMs: m.durationMs });
+        },
+        reject,
+      });
+      w.postMessage({ type: "classify", jobId, text, labels });
     });
   }
 
