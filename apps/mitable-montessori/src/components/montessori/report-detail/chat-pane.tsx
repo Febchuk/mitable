@@ -15,8 +15,10 @@ import type {
 } from "@/lib/schemas/report-chat";
 import { startCamera, type CameraSession } from "@/lib/capture/camera-capture";
 import { TesseractOcrEngine } from "@/lib/capture/ocr-engine";
+import { WhisperAsrEngine } from "@/lib/capture/asr-engine";
+import { decodeBlobToMonoFloat32 } from "@/lib/capture/decode-audio-blob";
+import { useAudioRecorder } from "@/components/montessori/new-report/use-audio-recorder";
 
-const COMING_SOON_MIC = "Voice input lands in a later phase — type for now.";
 const HISTORY_HIDDEN = "Conversation history will land later — one thread per report for now.";
 
 type ChatMessage = ChatTurnMessage | { kind: "error"; id: string; body: string };
@@ -93,8 +95,17 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     "idle" | "opening" | "ready" | "capturing" | "ocr" | "uploading" | "error"
   >("idle");
   const [cameraError, setCameraError] = React.useState<string | null>(null);
+  const [micStatus, setMicStatus] = React.useState<"idle" | "recording" | "transcribing" | "error">(
+    "idle"
+  );
+  const [micError, setMicError] = React.useState<string | null>(null);
+  const recorder = useAudioRecorder();
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const ocrRef = React.useRef<TesseractOcrEngine | null>(null);
+  const asrRef = React.useRef<WhisperAsrEngine | null>(null);
+  /** Tracks the most recent recorded memo we've already transcribed so the
+   *  transcription effect doesn't re-fire on re-renders. */
+  const transcribedMemoRef = React.useRef<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -247,6 +258,101 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     setPendingAttachments((prev) => prev.filter((a) => a.artifactId !== artifactId));
   }, []);
 
+  // Mic dictation: when the recorder transitions to "recorded" with a fresh
+  // memo, fetch the blob → decode → Whisper transcribe → append to composer.
+  React.useEffect(() => {
+    if (recorder.state !== "recorded" || !recorder.memo) return;
+    if (transcribedMemoRef.current === recorder.memo.url) return;
+    transcribedMemoRef.current = recorder.memo.url;
+
+    let cancelled = false;
+    void (async () => {
+      setMicStatus("transcribing");
+      setMicError(null);
+      try {
+        const res = await fetch(recorder.memo!.url);
+        const blob = await res.blob();
+        const { audio, sampleRate } = await decodeBlobToMonoFloat32(blob);
+        if (!asrRef.current) {
+          asrRef.current = new WhisperAsrEngine();
+          await asrRef.current.init();
+        }
+        const result = await asrRef.current.transcribe(audio, sampleRate);
+        if (cancelled) return;
+        const text = (result.text ?? "").trim();
+        if (text) {
+          setInput((prev) => (prev ? `${prev} ${text}` : text));
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }
+        setMicStatus("idle");
+      } catch (err) {
+        if (cancelled) return;
+        setMicStatus("error");
+        setMicError((err as Error).message || "Couldn't transcribe that — try typing.");
+      } finally {
+        // Always reset the recorder so the next press starts a fresh memo.
+        recorder.clear();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // recorder.clear is stable from the hook; we only react to state/memo changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.state, recorder.memo]);
+
+  const onToggleMic = React.useCallback(async () => {
+    if (recorder.state === "recording") {
+      recorder.stop();
+      return;
+    }
+    if (recorder.state === "denied") {
+      ToastBus.push({
+        message: "Microphone access denied. Enable it in your browser settings.",
+      });
+      return;
+    }
+    setMicStatus("recording");
+    setMicError(null);
+    await recorder.start();
+  }, [recorder]);
+
+  // Tear down ASR engine on unmount.
+  React.useEffect(() => {
+    return () => {
+      asrRef.current?.destroy();
+      asrRef.current = null;
+    };
+  }, []);
+
+  // Pre-warm Whisper + Tesseract workers when the capture flag is on so the
+  // first mic/photo press doesn't pay the model-download cost. Errors are
+  // ignored — we'll fall back to the slow path on demand.
+  React.useEffect(() => {
+    if (typeof process === "undefined") return;
+    if (process.env.NEXT_PUBLIC_ENABLE_CAPTURE_WORKER !== "1") return;
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      if (cancelled) return;
+      if (!asrRef.current) {
+        asrRef.current = new WhisperAsrEngine();
+        void asrRef.current.init().catch(() => {
+          /* pre-warm is best-effort */
+        });
+      }
+      if (!ocrRef.current) {
+        ocrRef.current = new TesseractOcrEngine();
+        void ocrRef.current.init().catch(() => {
+          /* pre-warm is best-effort */
+        });
+      }
+    }, 1500); // give the report editor itself a head start
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, []);
+
   // Load persisted thread on mount.
   React.useEffect(() => {
     let cancelled = false;
@@ -342,7 +448,41 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     }
   }, [input, reportId, sending, pinnedTarget, pendingAttachments, flushPendingSave]);
 
+  // Slash-section targeting: show a dropdown of sections when the user types
+  // "/" at the start. Filter as they type after the slash.
+  const slashQuery = React.useMemo(() => {
+    if (!input.startsWith("/")) return null;
+    return input.slice(1).toLowerCase();
+  }, [input]);
+  const slashMatches = React.useMemo(() => {
+    if (slashQuery === null) return [] as ChatPaneSection[];
+    if (!slashQuery) return sections.slice(0, 8);
+    return sections.filter((s) => s.heading.toLowerCase().includes(slashQuery)).slice(0, 8);
+  }, [slashQuery, sections]);
+  const slashOpen = slashQuery !== null && slashMatches.length > 0;
+
+  const pickSlashSection = React.useCallback((section: ChatPaneSection) => {
+    setPinnedTarget({
+      ref: { sectionId: section.id },
+      label: `${section.heading} section`,
+    });
+    setInput("");
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashOpen && e.key === "Enter") {
+      // Pick the top match instead of sending when the slash dropdown is open.
+      e.preventDefault();
+      const top = slashMatches[0];
+      if (top) pickSlashSection(top);
+      return;
+    }
+    if (slashOpen && e.key === "Escape") {
+      e.preventDefault();
+      setInput("");
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void onSend();
@@ -617,6 +757,37 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
             {cameraError}
           </div>
         ) : null}
+        {micStatus === "recording" ? (
+          <div className="rd-camera-progress" role="status" aria-live="polite">
+            🎤 Recording… {recorder.elapsed}s
+          </div>
+        ) : micStatus === "transcribing" ? (
+          <div className="rd-camera-progress" role="status" aria-live="polite">
+            Transcribing…
+          </div>
+        ) : micError ? (
+          <div className="rd-camera-progress" role="alert">
+            {micError}
+          </div>
+        ) : null}
+        {slashOpen ? (
+          <ul className="rd-slash-menu" role="listbox" aria-label="Pick a section">
+            {slashMatches.map((s, i) => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  className="rd-slash-item"
+                  role="option"
+                  aria-selected={i === 0}
+                  onClick={() => pickSlashSection(s)}
+                >
+                  <span className="rd-slash-heading">{s.heading}</span>
+                  <span className="rd-slash-hint">section</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <div className="rd-composer">
           <textarea
             ref={textareaRef}
@@ -635,9 +806,18 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
           <div className="rd-composer-actions">
             <button
               type="button"
-              className="rd-icon-btn"
-              title={COMING_SOON_MIC}
-              onClick={() => ToastBus.push({ message: COMING_SOON_MIC })}
+              className={`rd-icon-btn${recorder.state === "recording" ? " rd-recording" : ""}`}
+              title={
+                recorder.state === "recording"
+                  ? `Stop recording (${recorder.elapsed}s)`
+                  : micStatus === "transcribing"
+                    ? "Transcribing…"
+                    : "Hold to talk — releases when you tap again"
+              }
+              aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
+              aria-pressed={recorder.state === "recording"}
+              onClick={() => void onToggleMic()}
+              disabled={micStatus === "transcribing"}
             >
               <Mic size={16} strokeWidth={2} />
             </button>

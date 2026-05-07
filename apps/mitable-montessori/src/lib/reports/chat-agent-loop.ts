@@ -135,6 +135,10 @@ interface ChatAgentMeta {
   regenerations: number;
   inputTokens: number;
   outputTokens: number;
+  /** Sum of cache_creation_input_tokens across all SDK calls this turn. */
+  cacheCreationInputTokens: number;
+  /** Sum of cache_read_input_tokens across all SDK calls this turn. */
+  cacheReadInputTokens: number;
 }
 
 export interface ChatAgentProseOutput extends ChatAgentMeta {
@@ -198,6 +202,8 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
   let attempts = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalCacheCreation = 0;
+  let totalCacheRead = 0;
 
   while (attempts <= MAX_CHAT_REGENERATIONS) {
     attempts++;
@@ -224,12 +230,27 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
       const resp = await input.anthropic.messages.create({
         model: input.model,
         max_tokens: 1024,
-        system: REPORT_CHAT_SYSTEM_PROMPT,
-        tools: CHAT_TOOLS,
+        // Phase 5: prompt caching. The system prompt is the highest-leverage
+        // cache target — it's identical across every turn in a thread. Mark
+        // the last tool with cache_control too so the tools block is reused.
+        system: [
+          {
+            type: "text",
+            text: REPORT_CHAT_SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          } as Anthropic.TextBlockParam,
+        ],
+        tools: CHAT_TOOLS.map((t, i) =>
+          i === CHAT_TOOLS.length - 1
+            ? ({ ...t, cache_control: { type: "ephemeral" } } as Anthropic.Tool)
+            : t
+        ),
         messages: conv,
       });
       totalInputTokens += resp.usage.input_tokens;
       totalOutputTokens += resp.usage.output_tokens;
+      totalCacheCreation += resp.usage.cache_creation_input_tokens ?? 0;
+      totalCacheRead += resp.usage.cache_read_input_tokens ?? 0;
 
       const toolUses = resp.content.filter(
         (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
@@ -600,6 +621,8 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
           regenerations: attempts - 1,
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
+          cacheCreationInputTokens: totalCacheCreation,
+          cacheReadInputTokens: totalCacheRead,
         };
         if (terminalEmission.kind === "proposal") {
           return { terminalKind: "proposal", proposal: terminalEmission.proposal, ...meta };

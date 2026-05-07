@@ -208,6 +208,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       regenerations: result.regenerations,
       input_tokens: result.inputTokens,
       output_tokens: result.outputTokens,
+      cache_creation_input_tokens: result.cacheCreationInputTokens,
+      cache_read_input_tokens: result.cacheReadInputTokens,
     };
     let assistantPayload: Record<string, unknown>;
     let assistantToolTrace: Record<string, unknown>;
@@ -289,7 +291,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       regenerations: result.regenerations,
       input_tokens: result.inputTokens,
       output_tokens: result.outputTokens,
+      cache_creation_input_tokens: result.cacheCreationInputTokens,
+      cache_read_input_tokens: result.cacheReadInputTokens,
       terminal_kind: result.terminalKind,
+      attachments_count: attachments.length,
     };
   } catch (err) {
     if (err instanceof ChatAgentAbortError) {
@@ -336,7 +341,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     target_id: id,
     metadata: {
       latency_ms: Date.now() - startedAt,
-      phase: 4,
+      phase: 5,
       ...toolTrace,
     },
   });
