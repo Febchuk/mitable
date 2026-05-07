@@ -511,8 +511,17 @@ export function ReportDetail({
 
   // After draft (router.refresh) or navigation, merge server report into local editor
   // state when the user isn't mid-edit.
+  //
+  // IMPORTANT: `isDirty` is intentionally NOT in the dep list. When a save
+  // completes (`setIsDirty(false)`), the effect would otherwise re-run with
+  // a stale parent `report` prop and clobber the freshly-applied chat edit.
+  // We only want this resync to fire when the server-side `report` actually
+  // changes (route refresh, navigation). The early `isDirty` guard handles
+  // the mid-edit case for renders where `report.*` does change.
+  const isDirtyRef = React.useRef(isDirty);
+  isDirtyRef.current = isDirty;
   React.useEffect(() => {
-    if (isDirty) return;
+    if (isDirtyRef.current) return;
     setDetail(buildLocalDetail(report, locale));
   }, [
     report.id,
@@ -523,7 +532,6 @@ export function ReportDetail({
     report.studentName,
     report.sections,
     locale,
-    isDirty,
   ]);
 
   const savedMeta = isSaving
