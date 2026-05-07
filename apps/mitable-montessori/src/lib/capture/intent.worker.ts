@@ -47,30 +47,26 @@ async function loadNli() {
     // own `fs` polyfill correctly. The /* webpackIgnore: true */ pragma keeps
     // bundlers from trying to resolve the URL at build time. Keep the version
     // pinned to match package.json so the type contract holds.
-    const mod = (await import(
-      /* webpackIgnore: true */ /* @vite-ignore */
-      "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2"
-    )) as {
+    // URL is indirected through a string binding so TS does not attempt module
+    // resolution on the literal (TS2307 at build time).
+    const transformersUrl: string = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
+    const mod = (await import(/* webpackIgnore: true */ /* @vite-ignore */ transformersUrl)) as {
       pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<unknown>;
     };
-    const pipe = (await mod.pipeline(
-      "zero-shot-classification",
-      "Xenova/nli-deberta-v3-small",
-      {
-        progress_callback: (p: { status: string; progress?: number; file?: string }) => {
-          if (p.status === "progress" && typeof p.progress === "number") {
-            send({
-              type: "status",
-              status: {
-                state: "loading",
-                progress: Math.max(0, Math.min(1, p.progress / 100)),
-                message: `Downloading ${p.file ?? "model"}`,
-              },
-            });
-          }
-        },
-      }
-    )) as unknown as (
+    const pipe = (await mod.pipeline("zero-shot-classification", "Xenova/nli-deberta-v3-small", {
+      progress_callback: (p: { status: string; progress?: number; file?: string }) => {
+        if (p.status === "progress" && typeof p.progress === "number") {
+          send({
+            type: "status",
+            status: {
+              state: "loading",
+              progress: Math.max(0, Math.min(1, p.progress / 100)),
+              message: `Downloading ${p.file ?? "model"}`,
+            },
+          });
+        }
+      },
+    })) as unknown as (
       text: string,
       labels: string[],
       opts?: Record<string, unknown>
