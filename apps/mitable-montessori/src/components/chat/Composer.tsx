@@ -119,6 +119,11 @@ export function Composer(props: ComposerProps & { onProposals: (e: ComposerEmit)
 }
 
 function classifyParseError(message: string): string {
+  // Local resolution short-circuits the network call entirely, so a network
+  // error only reaches here when we fell through to `/api/v1/ai/parse-command`
+  // — i.e. the on-device classifier was unconfident AND the device was online
+  // when we tried, AND the request itself failed. (When offline + unconfident,
+  // parse-pipeline synthesizes a request_clarification and never throws.)
   if (/network|fetch|offline/i.test(message)) return "network";
   if (/parse-command failed: 4/i.test(message)) return "client-error";
   if (/parse-command failed: 5/i.test(message)) return "server-error";

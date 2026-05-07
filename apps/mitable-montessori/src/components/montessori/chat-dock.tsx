@@ -2,12 +2,20 @@
 
 import * as React from "react";
 import { MessageSquare, Sparkles, X } from "lucide-react";
-import { ChatPanel } from "./chat";
+import { ChatThread } from "@/components/chat/ChatThread";
 import { useMontessori } from "./store";
 
-export function ChatDock() {
+export interface ChatDockProps {
+  classroomId: string | null;
+  classroomName: string;
+  schoolId: string;
+  userId: string;
+}
+
+export function ChatDock(props: ChatDockProps) {
   const store = useMontessori();
   const isOpen = store.webChatMode === "open";
+  const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
 
   return (
     <div className="hidden lg:block">
@@ -60,7 +68,7 @@ export function ChatDock() {
                 Mitable
               </div>
               <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-                Capture &amp; review · Primrose Room
+                Capture &amp; review · {props.classroomName}
               </div>
             </div>
             <button
@@ -82,7 +90,33 @@ export function ChatDock() {
               <X size={14} strokeWidth={1.5} />
             </button>
           </div>
-          <ChatPanel small={true} />
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            {props.classroomId ? (
+              <ChatThread
+                threadId={threadId}
+                classroomId={props.classroomId}
+                schoolId={props.schoolId}
+                userId={props.userId}
+              />
+            ) : (
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 24,
+                  textAlign: "center",
+                  fontSize: 13,
+                  color: "var(--color-ink-muted)",
+                  lineHeight: 1.5,
+                }}
+              >
+                You aren&apos;t assigned to a classroom yet. Ask an admin to add you to one before
+                capturing observations.
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <button

@@ -57,7 +57,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       <MontessoriBottomNav variant={isAdmin ? "admin" : "teacher"} />
-      {!isAdmin && <ChatDock />}
+      {!isAdmin && (
+        <ChatDock
+          classroomId={classroom?.id ?? null}
+          classroomName={classroomName}
+          schoolId={ctx.schoolId}
+          userId={ctx.userId}
+        />
+      )}
       <ToastHost />
       <InstallBanner />
       <AppBootstrap />

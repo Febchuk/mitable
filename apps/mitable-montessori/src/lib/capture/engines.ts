@@ -1,32 +1,43 @@
 "use client";
 
 import { StubAsrEngine, WhisperAsrEngine } from "@/lib/capture/asr-engine";
+import {
+  NliIntentClassifier,
+  StubIntentClassifier,
+  type IntentClassifier,
+} from "@/lib/capture/intent-classifier";
 import { StubOcrEngine, TesseractOcrEngine } from "@/lib/capture/ocr-engine";
 import type { AsrEngine, OcrEngine, WorkerStatus } from "@/lib/capture/types";
 
 export interface EngineFactories {
   createAsr: () => AsrEngine;
   createOcr: () => OcrEngine;
+  createIntent: () => IntentClassifier;
 }
 
 let factories: EngineFactories = {
   createAsr: () => new WhisperAsrEngine(),
   createOcr: () => new TesseractOcrEngine(),
+  createIntent: () => new NliIntentClassifier(),
 };
 
 let asrSingleton: AsrEngine | null = null;
 let ocrSingleton: OcrEngine | null = null;
+let intentSingleton: IntentClassifier | null = null;
 
 /** Test hook — swap real engines for stubs/spies. */
 export function setCaptureFactoriesForTest(next: Partial<EngineFactories>) {
   factories = {
     createAsr: next.createAsr ?? factories.createAsr,
     createOcr: next.createOcr ?? factories.createOcr,
+    createIntent: next.createIntent ?? factories.createIntent,
   };
   asrSingleton?.destroy();
   ocrSingleton?.destroy();
+  intentSingleton?.destroy();
   asrSingleton = null;
   ocrSingleton = null;
+  intentSingleton = null;
 }
 
 /** Reset to production defaults. */
@@ -34,11 +45,14 @@ export function resetCaptureFactories() {
   factories = {
     createAsr: () => new WhisperAsrEngine(),
     createOcr: () => new TesseractOcrEngine(),
+    createIntent: () => new NliIntentClassifier(),
   };
   asrSingleton?.destroy();
   ocrSingleton?.destroy();
+  intentSingleton?.destroy();
   asrSingleton = null;
   ocrSingleton = null;
+  intentSingleton = null;
 }
 
 export function getAsrEngine(): AsrEngine {
@@ -49,6 +63,11 @@ export function getAsrEngine(): AsrEngine {
 export function getOcrEngine(): OcrEngine {
   if (!ocrSingleton) ocrSingleton = factories.createOcr();
   return ocrSingleton;
+}
+
+export function getIntentEngine(): IntentClassifier {
+  if (!intentSingleton) intentSingleton = factories.createIntent();
+  return intentSingleton;
 }
 
 /** True if the device looks capable of running on-device ML.  */
@@ -78,4 +97,4 @@ export function onAsrStatusOnce(handler: (s: WorkerStatus) => void): () => void 
 }
 
 // Re-export stub helpers so tests can import from one place.
-export { StubAsrEngine, StubOcrEngine };
+export { StubAsrEngine, StubOcrEngine, StubIntentClassifier };

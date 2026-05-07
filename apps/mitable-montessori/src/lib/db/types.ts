@@ -163,6 +163,15 @@ export interface ChatProposalRow {
   display: string;
   /** Filled in once the approve handler writes the matching commands.id. */
   commandId?: string;
+  /**
+   * Where this proposal was resolved.
+   *   "local"  — on-device NLI + rules (parse-pipeline.ts:resolveLocally)
+   *   "server" — fell back to /api/v1/ai/parse-command (Anthropic Haiku)
+   * Defaults to "server" for rows written before migration v5.
+   */
+  source: "local" | "server";
+  /** Top-1 NLI confidence in [0,1]; null when source = "server". */
+  intentScore: number | null;
 }
 
 export interface ReportRow {

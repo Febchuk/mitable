@@ -277,6 +277,8 @@ describe("Phase 1 — teacher text capture loop", () => {
         tokenizedPayload: {},
         resolvedPayload: call as unknown as Record<string, unknown>,
         display: describeDetokenized(call),
+        source: "server",
+        intentScore: null,
       });
     }
 

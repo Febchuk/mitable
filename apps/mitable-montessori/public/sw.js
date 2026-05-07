@@ -7,9 +7,11 @@
  *   - same-origin static: cache-first (icons, manifest, JS chunks)
  *   - API:                network-only (we never want stale auth/data)
  *
- * Whisper / Tesseract model assets are fetched from the CDN and cached in the
- * browser's HTTP cache by the worker thread; we deliberately don't intercept
- * those here so we don't double-cache 75-150MB of weights.
+ * Whisper / Tesseract / NLI (Xenova/nli-deberta-v3-small) model assets are
+ * fetched from the CDN (huggingface.co/Xenova/...) and cached in the browser's
+ * HTTP cache by the worker thread; we deliberately don't intercept those here
+ * so we don't double-cache ~115MB of weights. The fetch handler below skips
+ * cross-origin requests, which is what enforces this.
  */
 
 const VERSION = "v1";
