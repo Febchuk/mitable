@@ -8,6 +8,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * deterministic stub that never hits the network.
  */
 
+export interface ReportSection {
+  heading: string;
+  paragraphs: { html: string }[];
+}
+
 export interface EmailJob {
   recipientId: string;
   reportId: string;
@@ -15,6 +20,11 @@ export interface EmailJob {
   email: string | null;
   reportTitle: string | null;
   reportBody: string | null;
+  reportSections: ReportSection[] | null;
+  reportDate: string | null;
+  studentName: string | null;
+  reportType: string | null;
+  messageBody: string | null;
 }
 
 export interface EmailSender {
@@ -37,7 +47,9 @@ export async function drainPendingReports(
 
   const { data: rows, error } = await supabase
     .from("report_recipients")
-    .select("id, report_id, guardian_id, email_snapshot, reports(title, body, status)")
+    .select(
+      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, status, report_date, report_type, students(first_name, last_name))"
+    )
     .eq("delivery_status", "pending")
     .limit(limit);
   if (error) {
@@ -52,15 +64,37 @@ export async function drainPendingReports(
       report_id: string;
       guardian_id: string;
       email_snapshot: string | null;
+      message_body: string | null;
       reports:
-        | { title: string | null; body: string | null; status: string }
-        | { title: string | null; body: string | null; status: string }[]
+        | {
+            title: string | null;
+            body: string | null;
+            sections: ReportSection[] | null;
+            status: string;
+            report_date: string | null;
+            report_type: string | null;
+            students:
+              | { first_name: string; last_name: string }
+              | { first_name: string; last_name: string }[]
+              | null;
+          }
+        | {
+            title: string | null;
+            body: string | null;
+            sections: ReportSection[] | null;
+            status: string;
+            report_date: string | null;
+            report_type: string | null;
+            students:
+              | { first_name: string; last_name: string }
+              | { first_name: string; last_name: string }[]
+              | null;
+          }[]
         | null;
     };
     const report = Array.isArray(row.reports) ? row.reports[0] : row.reports;
     result.attempted++;
 
-    // Defense-in-depth: never deliver if the parent report isn't 'sent'.
     if (!report || report.status !== "sent") {
       await supabase
         .from("report_recipients")
@@ -81,6 +115,12 @@ export async function drainPendingReports(
       continue;
     }
 
+    const student = report.students
+      ? Array.isArray(report.students)
+        ? report.students[0]
+        : report.students
+      : null;
+
     const sendResult = await sender.send({
       recipientId: row.id,
       reportId: row.report_id,
@@ -88,6 +128,11 @@ export async function drainPendingReports(
       email: row.email_snapshot,
       reportTitle: report.title,
       reportBody: report.body,
+      reportSections: report.sections,
+      reportDate: report.report_date,
+      studentName: student ? `${student.first_name} ${student.last_name}` : null,
+      reportType: report.report_type,
+      messageBody: row.message_body,
     });
 
     if (sendResult.ok) {

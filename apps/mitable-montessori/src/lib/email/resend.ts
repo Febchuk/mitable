@@ -10,7 +10,7 @@
  */
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
-const FROM = process.env.RESEND_FROM?.trim() || "Mitable <onboarding@resend.dev>";
+const FROM = process.env.RESEND_FROM?.trim() || "Mitable <noreply@mitable.ai>";
 
 export interface SendInviteInput {
   to: string;
@@ -119,6 +119,222 @@ function renderInviteHtml({ inviteUrl, schoolName, inviterName }: SendInviteInpu
       </tr>
     </table>
   </body>
+</html>`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Report delivery email (sent to guardians / parents)               */
+/* ------------------------------------------------------------------ */
+
+import type { EmailJob, EmailSender } from "@/lib/admin/email-worker";
+import { generateReportPdf } from "@/lib/pdf/generate-report-pdf";
+
+export class ResendEmailSender implements EmailSender {
+  async send(job: EmailJob): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      return { ok: false, error: "RESEND_API_KEY is not set" };
+    }
+    if (!job.email) {
+      return { ok: false, error: "No email address for guardian" };
+    }
+
+    const studentName = job.studentName ?? "Student";
+    const reportType = capitalizeReportType(job.reportType ?? "daily");
+    const dateLabel = job.reportDate
+      ? formatEmailDate(job.reportDate)
+      : new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const subject = `${reportType} Report for ${studentName} — ${dateLabel}`;
+
+    let pdfAttachment: { content: string; filename: string } | undefined;
+    try {
+      const { buffer, filename } = await generateReportPdf({
+        title: job.reportTitle ?? `${reportType} Report`,
+        studentName,
+        reportDate: job.reportDate,
+        classroom: "",
+        reportType: job.reportType ?? "daily",
+        sections: job.reportSections ?? [],
+        body: job.reportBody,
+      });
+      pdfAttachment = {
+        content: buffer.toString("base64"),
+        filename,
+      };
+    } catch (err) {
+      console.warn("[ResendEmailSender] PDF generation failed, sending without attachment:", err);
+    }
+
+    const html = renderReportEmailHtml({
+      studentName,
+      reportType,
+      dateLabel,
+      messageBody: job.messageBody,
+    });
+    const text = renderReportEmailText({
+      studentName,
+      reportType,
+      dateLabel,
+      messageBody: job.messageBody,
+    });
+
+    try {
+      const payload: Record<string, unknown> = {
+        from: FROM,
+        to: [job.email],
+        subject,
+        html,
+        text,
+      };
+      if (pdfAttachment) {
+        payload.attachments = [pdfAttachment];
+      }
+
+      const res = await fetch(RESEND_ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        return { ok: false, error: `Resend ${res.status}: ${body}` };
+      }
+
+      const json = (await res.json()) as { id?: string };
+      return { ok: true, messageId: json.id ?? undefined };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  }
+}
+
+function capitalizeReportType(t: string): string {
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+function formatEmailDate(raw: string): string {
+  try {
+    const d = new Date(raw);
+    return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  } catch {
+    return raw;
+  }
+}
+
+interface EmailRenderInput {
+  studentName: string;
+  reportType: string;
+  dateLabel: string;
+  messageBody: string | null;
+}
+
+function renderReportEmailText(input: EmailRenderInput): string {
+  const { studentName, reportType, dateLabel, messageBody } = input;
+  const lines = [`${reportType} Report for ${studentName}`, dateLabel, ""];
+  if (messageBody?.trim()) {
+    lines.push(messageBody.trim(), "");
+  }
+  lines.push(
+    "The full report is attached to this email as a PDF.",
+    "",
+    "—",
+    "Sent by your child's school via Mitable.",
+    "Questions? Please reach out to the school directly."
+  );
+  return lines.join("\n");
+}
+
+function renderReportEmailHtml(input: EmailRenderInput): string {
+  const { studentName, reportType, dateLabel, messageBody } = input;
+  const safeName = escapeHtml(studentName);
+  const safeType = escapeHtml(reportType);
+  const safeDate = escapeHtml(dateLabel);
+
+  const hasMessage = !!messageBody?.trim();
+  const messageHtml = hasMessage
+    ? messageBody!
+        .trim()
+        .split(/\n{2,}/)
+        .map(
+          (p) =>
+            `<p style="font-size:15px;line-height:1.65;color:#4A453E;margin:0 0 12px;">${escapeHtml(p.trim())}</p>`
+        )
+        .join("\n")
+    : "";
+
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#F5F1EA;font-family:Georgia,'Iowan Old Style','Palatino Linotype',serif;color:#2A2723;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F1EA;">
+    <tr><td style="padding:48px 20px 32px;" align="center">
+
+      <!-- Card -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(42,39,35,0.06);">
+
+        <!-- Accent stripe -->
+        <tr><td style="height:4px;background:#82C0CC;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+        <!-- Header -->
+        <tr><td style="padding:32px 36px 0;">
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;line-height:1.2;color:#2A2723;letter-spacing:-0.02em;">
+            ${safeName}
+          </p>
+          <p style="margin:0;font-size:13px;color:#8A8275;line-height:1.5;">
+            ${safeType} Report &nbsp;&middot;&nbsp; ${safeDate}
+          </p>
+        </td></tr>
+
+        <!-- Divider -->
+        <tr><td style="padding:20px 36px 0;">
+          <hr style="border:none;border-top:1px solid #E8DFD0;margin:0;" />
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:20px 36px 0;">
+          ${
+            hasMessage
+              ? `
+          ${messageHtml}
+          <p style="font-size:14px;line-height:1.6;color:#6B665C;margin:16px 0 0;font-style:italic;">
+            The full report is attached as a PDF.
+          </p>
+          `
+              : `
+          <p style="font-size:15px;line-height:1.65;color:#4A453E;margin:0;">
+            A new report for ${safeName} is ready for you. Please find it attached to this email as a PDF.
+          </p>
+          `
+          }
+        </td></tr>
+
+        <!-- Footer divider -->
+        <tr><td style="padding:24px 36px 0;">
+          <hr style="border:none;border-top:1px solid #E8DFD0;margin:0;" />
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:16px 36px 28px;">
+          <p style="margin:0;font-size:12px;line-height:1.5;color:#A09A8E;">
+            Sent by your child&rsquo;s school via Mitable.<br/>
+            Questions? Please reach out to the school directly.
+          </p>
+        </td></tr>
+
+      </table>
+      <!-- /Card -->
+
+      <p style="margin:20px 0 0;font-size:11px;color:#A09A8E;letter-spacing:0.04em;text-align:center;">
+        Mitable
+      </p>
+
+    </td></tr>
+  </table>
+</body>
 </html>`;
 }
 

@@ -117,16 +117,16 @@ export async function approveReport(ctx: TransitionContext) {
 export async function sendReport(
   ctx: TransitionContext,
   guardianRefs: string[],
-  guardianEmailMap: Record<string, string>
+  guardianEmailMap: Record<string, string>,
+  messageBody?: string
 ) {
   await applyTransition(ctx, "sent", null);
-  // Insert recipient rows in 'pending' — the email worker (Phase 4 Week 12)
-  // flips them to sent / failed.
   const rows = guardianRefs.map((gid) => ({
     report_id: ctx.reportId,
     guardian_id: gid,
     email_snapshot: guardianEmailMap[gid] ?? null,
     delivery_status: "pending" as const,
+    message_body: messageBody ?? null,
   }));
   const { error } = await ctx.supabase.from("report_recipients").insert(rows);
   if (error) throw new WorkflowError(error.message, "db_error");

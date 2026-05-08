@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auditLog } from "@/lib/audit/log";
 import { requireUser } from "@/lib/api/auth";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { ApproveReportSchema } from "@/lib/schemas/report";
 import { approveReport, WorkflowError } from "@/lib/reports/workflow";
 
@@ -15,8 +14,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   // Daily reports owned by the teacher may short-circuit draft → approved.
   // Major reports require admin role (RLS ultimately enforces this).

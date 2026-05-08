@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auditLog } from "@/lib/audit/log";
 import { requireUser } from "@/lib/api/auth";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { SendReportSchema } from "@/lib/schemas/report";
 import { sendReport, WorkflowError } from "@/lib/reports/workflow";
 
@@ -14,8 +13,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   // Lookup guardian emails. Honors `student_guardians.receives_reports = true`.
   const { data: report } = await supabase
@@ -62,7 +60,8 @@ export async function POST(req: Request) {
         actorUserId: auth.user.userId,
       },
       links.map((l) => (l as { guardian_id: string }).guardian_id),
-      emailMap
+      emailMap,
+      parsed.data.messageBody
     );
     await auditLog({
       actor_id: auth.user.userId,
