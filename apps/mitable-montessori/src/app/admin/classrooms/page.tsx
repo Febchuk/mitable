@@ -45,6 +45,11 @@ import {
   type StudentImportDraft,
   type StudentImportPlan,
 } from "@/lib/admin/student-import";
+import {
+  PROGRAM_LABEL,
+  PROGRAM_ORDER,
+  type ProgressProgram,
+} from "@/lib/queries/progress-programs";
 
 type AdminChild = {
   id: string;
@@ -62,6 +67,7 @@ type AdminClassroom = ClassroomOption & {
   level?: string;
   curriculumName?: string | null;
   mainTeacherId?: string;
+  programTypes: ProgressProgram[];
 };
 
 type ApiTeacher = { id: string; name: string };
@@ -72,6 +78,7 @@ type ApiClassroom = {
   code: string | null;
   curriculumName: string | null;
   leadTeacherId: string | null;
+  programTypes: ProgressProgram[];
 };
 
 type ApiRosterStudent = {
@@ -217,6 +224,10 @@ export default function AdminClassroomsPage() {
         level: c.code ?? "",
         curriculumName: c.curriculumName,
         mainTeacherId: c.leadTeacherId ?? undefined,
+        programTypes:
+          Array.isArray(c.programTypes) && c.programTypes.length > 0
+            ? c.programTypes
+            : ["montessori"],
       }));
       setClassrooms(mappedClassrooms);
       setTeacherPool(data.teachers);
@@ -341,7 +352,12 @@ export default function AdminClassroomsPage() {
     }
   };
 
-  const createClassroom = async (input: { name: string; level: string; mainTeacherId: string }) => {
+  const createClassroom = async (input: {
+    name: string;
+    level: string;
+    mainTeacherId: string;
+    programTypes: ProgressProgram[];
+  }) => {
     setMutationError(null);
     try {
       const code = input.level.length <= 20 ? input.level : input.level.slice(0, 20);
@@ -350,6 +366,7 @@ export default function AdminClassroomsPage() {
         body: JSON.stringify({
           name: input.name.trim(),
           code: code || undefined,
+          program_types: input.programTypes,
         }),
       });
       const id = created.id;
@@ -368,6 +385,24 @@ export default function AdminClassroomsPage() {
       setSelectedClassroomId(id);
     } catch (e) {
       setMutationError(e instanceof Error ? e.message : "Could not create classroom");
+    }
+  };
+
+  const setClassroomPrograms = async (
+    classroomId: string,
+    programTypes: ProgressProgram[]
+  ): Promise<boolean> => {
+    setMutationError(null);
+    try {
+      await apiJson("/api/admin/classrooms", {
+        method: "PATCH",
+        body: JSON.stringify({ classroom_id: classroomId, program_types: programTypes }),
+      });
+      await reload();
+      return true;
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not update programs");
+      return false;
     }
   };
 
@@ -540,6 +575,34 @@ export default function AdminClassroomsPage() {
                     >
                       {counts.get(classroom.id) ?? 0} children
                     </div>
+                    {classroom.programTypes.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: 4,
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 4,
+                        }}
+                      >
+                        {classroom.programTypes.map((p) => (
+                          <span
+                            key={p}
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 500,
+                              padding: "1px 6px",
+                              borderRadius: 999,
+                              background: "var(--color-surface)",
+                              border: "1px solid var(--color-border)",
+                              color: "var(--color-ink-muted)",
+                              letterSpacing: "0.02em",
+                            }}
+                          >
+                            {PROGRAM_LABEL[p]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <ChevronRight size={15} strokeWidth={1.5} />
                 </button>
@@ -573,6 +636,10 @@ export default function AdminClassroomsPage() {
                     </span>
                   ) : null}
                 </div>
+                <ProgramTypesEditor
+                  value={selectedClassroom.programTypes}
+                  onSave={(next) => setClassroomPrograms(selectedClassroom.id, next)}
+                />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <Button variant="default" onClick={() => setImportOpen(true)}>
@@ -815,22 +882,29 @@ function CreateClassroomDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (input: { name: string; level: string; mainTeacherId: string }) => void | Promise<void>;
+  onCreate: (input: {
+    name: string;
+    level: string;
+    mainTeacherId: string;
+    programTypes: ProgressProgram[];
+  }) => void | Promise<void>;
   teachers: ApiTeacher[];
 }) {
   const [name, setName] = React.useState("");
   const [level, setLevel] = React.useState(LEVEL_OPTIONS[0]);
   const [mainTeacherId, setMainTeacherId] = React.useState("");
+  const [programTypes, setProgramTypes] = React.useState<ProgressProgram[]>(["montessori"]);
 
   React.useEffect(() => {
     if (!open) {
       setName("");
       setLevel(LEVEL_OPTIONS[0]);
       setMainTeacherId("");
+      setProgramTypes(["montessori"]);
     }
   }, [open]);
 
-  const canSubmit = name.trim().length > 0;
+  const canSubmit = name.trim().length > 0 && programTypes.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -874,6 +948,14 @@ function CreateClassroomDialog({
               ]}
             />
           </FieldLabel>
+
+          <FieldLabel label="Programs (drives the Progress route for teachers)">
+            <ProgramPicker value={programTypes} onChange={setProgramTypes} />
+            <p className="mt-1 text-xs text-ink-muted">
+              Pick at least one. A classroom with multiple programs surfaces a top switcher in
+              Progress.
+            </p>
+          </FieldLabel>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
@@ -885,7 +967,7 @@ function CreateClassroomDialog({
             disabled={!canSubmit}
             onClick={() => {
               if (!canSubmit) return;
-              onCreate({ name, level, mainTeacherId });
+              onCreate({ name, level, mainTeacherId, programTypes });
               onOpenChange(false);
             }}
           >
@@ -1067,6 +1149,145 @@ function AddChildDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ProgramPicker({
+  value,
+  onChange,
+}: {
+  value: ProgressProgram[];
+  onChange: (next: ProgressProgram[]) => void;
+}) {
+  const toggle = (p: ProgressProgram) => {
+    if (value.includes(p)) {
+      // Don't let the user clear the last one — at least one program is required.
+      if (value.length === 1) return;
+      onChange(value.filter((x) => x !== p));
+    } else {
+      onChange(PROGRAM_ORDER.filter((x) => x === p || value.includes(x)));
+    }
+  };
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {PROGRAM_ORDER.map((p) => {
+        const active = value.includes(p);
+        return (
+          <button
+            key={p}
+            type="button"
+            onClick={() => toggle(p)}
+            className="tap"
+            aria-pressed={active}
+            style={{
+              padding: "7px 12px",
+              borderRadius: 999,
+              border: `1px solid ${active ? "var(--color-ink)" : "var(--color-border)"}`,
+              background: active ? "var(--color-ink)" : "var(--color-canvas)",
+              color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
+              fontSize: 12.5,
+              fontWeight: 500,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "background 120ms ease, color 120ms ease, border-color 120ms ease",
+            }}
+          >
+            {PROGRAM_LABEL[p]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProgramTypesEditor({
+  value,
+  onSave,
+}: {
+  value: ProgressProgram[];
+  onSave: (next: ProgressProgram[]) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState<ProgressProgram[]>(value);
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  if (!editing) {
+    return (
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}
+      >
+        {value.map((p) => (
+          <span
+            key={p}
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              padding: "3px 8px",
+              borderRadius: 999,
+              background: "var(--color-canvas)",
+              border: "1px solid var(--color-border)",
+              color: "var(--color-ink-secondary)",
+            }}
+          >
+            {PROGRAM_LABEL[p]}
+          </span>
+        ))}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="tap"
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            padding: "2px 6px",
+            background: "transparent",
+            border: 0,
+            color: "var(--color-ink-muted)",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+        >
+          Edit programs
+        </button>
+      </div>
+    );
+  }
+
+  const dirty = draft.length !== value.length || draft.some((p, i) => p !== value[i]);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+      <ProgramPicker value={draft} onChange={setDraft} />
+      <Button
+        type="button"
+        size="sm"
+        disabled={!dirty || busy}
+        onClick={async () => {
+          setBusy(true);
+          const ok = await onSave(draft);
+          setBusy(false);
+          if (ok) setEditing(false);
+        }}
+      >
+        {busy ? "Saving…" : "Save"}
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={busy}
+        onClick={() => {
+          setDraft(value);
+          setEditing(false);
+        }}
+      >
+        Cancel
+      </Button>
+    </div>
   );
 }
 

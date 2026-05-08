@@ -178,7 +178,12 @@ export async function unlinkGuardianFromStudent(
 // === Classrooms + assignments ===
 export async function createClassroom(
   ctx: AdminContext,
-  input: { name: string; code?: string; curriculum_id?: string }
+  input: {
+    name: string;
+    code?: string;
+    curriculum_id?: string;
+    program_types?: Array<"montessori" | "iep" | "session_notes">;
+  }
 ) {
   return insertReturningId(ctx, "classrooms", {
     school_id: ctx.schoolId,
@@ -186,7 +191,27 @@ export async function createClassroom(
     code: input.code ?? null,
     curriculum_id: input.curriculum_id ?? null,
     status: "active",
+    // The DB has a default of ['montessori']; only send the column when the
+    // caller explicitly chose programs so the default still applies on omit.
+    ...(input.program_types && input.program_types.length > 0
+      ? { program_types: input.program_types }
+      : {}),
   });
+}
+
+export async function updateClassroomPrograms(
+  ctx: AdminContext,
+  input: {
+    classroom_id: string;
+    program_types: Array<"montessori" | "iep" | "session_notes">;
+  }
+): Promise<void> {
+  const { error } = await ctx.supabase
+    .from("classrooms")
+    .update({ program_types: input.program_types })
+    .eq("id", input.classroom_id)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
 }
 
 export async function assignTeacherToClassroom(

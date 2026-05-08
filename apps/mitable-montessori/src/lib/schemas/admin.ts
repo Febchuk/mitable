@@ -69,10 +69,21 @@ export const CreateGuardianSchema = CreateGuardianBaseSchema.transform((v) => ({
 });
 export type CreateGuardianInput = z.infer<typeof CreateGuardianSchema>;
 
+export const ProgressProgramSchema = z.enum(["montessori", "iep", "session_notes"]);
+
 export const CreateClassroomSchema = z.object({
   name: z.string().min(1).max(200),
   code: z.string().max(20).optional(),
   curriculum_id: z.string().uuid().optional(),
+  /** Programs the classroom unlocks. Defaults to ['montessori'] when omitted. */
+  program_types: z.array(ProgressProgramSchema).min(1).max(3).optional(),
+});
+
+/** Patch a classroom's program_types. Used by the admin "Edit programs"
+ *  control to flip a Montessori room into Montessori + IEP, etc. */
+export const UpdateClassroomProgramsSchema = z.object({
+  classroom_id: z.string().uuid(),
+  program_types: z.array(ProgressProgramSchema).min(1).max(3),
 });
 
 export const CreateCurriculumSchema = z.object({

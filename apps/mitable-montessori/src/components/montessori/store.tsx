@@ -20,12 +20,20 @@ import {
 } from "./data";
 import type { ClassroomProgress } from "@/lib/queries/classroom-progress";
 import {
-  INITIAL_IEP_BY_STUDENT,
-  type IepByStudent,
-  type IepEntry,
-  type PerformanceBand,
+  INITIAL_IEP_STATE,
+  emptyIepItem,
+  type IepComment,
+  type IepDomain,
+  type IepRating,
+  type IepStateByStudent,
   type PromptingCode,
 } from "./iep/data";
+import {
+  INITIAL_SESSION_NOTES,
+  type SessionNote,
+  type SessionNoteDraft,
+  type SessionNotesByStudent,
+} from "./session-notes/data";
 import { HandCheck, ToastBus } from "./primitives";
 
 export type WebRoute = "today" | "roster" | "progress" | "attendance" | "reports" | "curriculum";
@@ -101,20 +109,38 @@ export type MontessoriStore = {
     note?: string;
   }) => Promise<void>;
 
-  // IEP progress (student-scoped). Stored as studentId → goalId → entries
-  // (newest first). The class-mode `progressByTopic` map is independent.
-  iepByStudent: IepByStudent;
-  upsertIepEntry: (args: {
-    entryId?: string;
+  // IEP progress (student-scoped). One IepItemState per student × goal —
+  // current rating + completion + prompting + comments thread. The
+  // class-mode `progressByTopic` map is independent.
+  iepState: IepStateByStudent;
+  /** Patch any subset of {rating, successCount, promptingCode} on an item.
+   *  Initializes the item if it doesn't exist yet. */
+  setIepItemFields: (args: {
     studentId: string;
     goalId: string;
-    domain: IepEntry["domain"];
-    performanceBand: PerformanceBand;
-    successCount: number;
-    promptingCode: PromptingCode;
-    note?: string;
+    domain: IepDomain;
+    rating?: IepRating | null;
+    successCount?: number | null;
+    promptingCode?: PromptingCode | null;
   }) => void;
-  removeIepEntry: (args: { studentId: string; goalId: string; entryId: string }) => void;
+  /** Append a comment to an IEP item, creating it if needed. */
+  addIepComment: (args: {
+    studentId: string;
+    goalId: string;
+    domain: IepDomain;
+    text: string;
+    author?: string;
+  }) => void;
+  removeIepComment: (args: { studentId: string; goalId: string; commentId: string }) => void;
+
+  // Session notes (student-scoped). One ordered list per student, newest
+  // first. Stored client-side for now; persisted later via the existing
+  // /api/v1/reports endpoint with a `session_note` template.
+  sessionNotes: SessionNotesByStudent;
+  addSessionNote: (args: { studentId: string; draft: SessionNoteDraft }) => SessionNote;
+  updateSessionNote: (args: { studentId: string; noteId: string; draft: SessionNoteDraft }) => void;
+  removeSessionNote: (args: { studentId: string; noteId: string }) => void;
+
   clearAll: () => void;
 };
 
@@ -192,7 +218,9 @@ export function MontessoriProvider({
   >({});
   const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>([]);
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
-  const [iepByStudent, setIepByStudent] = React.useState<IepByStudent>(INITIAL_IEP_BY_STUDENT);
+  const [iepState, setIepState] = React.useState<IepStateByStudent>(INITIAL_IEP_STATE);
+  const [sessionNotes, setSessionNotes] =
+    React.useState<SessionNotesByStudent>(INITIAL_SESSION_NOTES);
 
   const [reportsFilter, setReportsFilter] = React.useState("All");
   const [rosterFilter, setRosterFilter] = React.useState("All");
@@ -409,77 +437,134 @@ export function MontessoriProvider({
     setNotesByTopic({});
     setRecentUpdates([]);
     setAttendance(INITIAL_ATTENDANCE);
-    setIepByStudent(INITIAL_IEP_BY_STUDENT);
+    setIepState(INITIAL_IEP_STATE);
+    setSessionNotes(INITIAL_SESSION_NOTES);
   }, [initialClassroomProgress]);
 
-  const upsertIepEntry = React.useCallback(
+  const setIepItemFields = React.useCallback(
     (args: {
-      entryId?: string;
       studentId: string;
       goalId: string;
-      domain: IepEntry["domain"];
-      performanceBand: PerformanceBand;
-      successCount: number;
-      promptingCode: PromptingCode;
-      note?: string;
+      domain: IepDomain;
+      rating?: IepRating | null;
+      successCount?: number | null;
+      promptingCode?: PromptingCode | null;
     }) => {
-      const clamped = Math.max(0, Math.min(10, Math.round(args.successCount)));
-      const trimmedNote = args.note?.trim() ? args.note.trim() : undefined;
-      setIepByStudent((prev) => {
+      setIepState((prev) => {
         const studentRow = { ...(prev[args.studentId] || {}) };
-        const list = studentRow[args.goalId] ? [...studentRow[args.goalId]] : [];
-
-        if (args.entryId) {
-          const idx = list.findIndex((e) => e.id === args.entryId);
-          if (idx >= 0) {
-            list[idx] = {
-              ...list[idx],
-              performanceBand: args.performanceBand,
-              successCount: clamped,
-              promptingCode: args.promptingCode,
-              note: trimmedNote,
-            };
-            studentRow[args.goalId] = list;
-            return { ...prev, [args.studentId]: studentRow };
-          }
-        }
-
-        const next: IepEntry = {
-          id: `e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-          studentId: args.studentId,
-          goalId: args.goalId,
-          domain: args.domain,
-          performanceBand: args.performanceBand,
-          successCount: clamped,
-          promptingCode: args.promptingCode,
-          note: trimmedNote,
-          recordedAt: new Date().toISOString(),
+        const cur = studentRow[args.goalId] ?? emptyIepItem();
+        const nextSuccess =
+          args.successCount === undefined
+            ? cur.successCount
+            : args.successCount === null
+              ? null
+              : Math.max(0, Math.min(10, Math.round(args.successCount)));
+        studentRow[args.goalId] = {
+          ...cur,
+          rating: args.rating === undefined ? cur.rating : args.rating,
+          successCount: nextSuccess,
+          promptingCode: args.promptingCode === undefined ? cur.promptingCode : args.promptingCode,
+          updatedAt: new Date().toISOString(),
         };
-        // Newest-first ordering — UI reads in this order.
-        list.unshift(next);
-        studentRow[args.goalId] = list;
         return { ...prev, [args.studentId]: studentRow };
       });
     },
     []
   );
 
-  const removeIepEntry = React.useCallback(
-    (args: { studentId: string; goalId: string; entryId: string }) => {
-      setIepByStudent((prev) => {
+  const addIepComment = React.useCallback(
+    (args: {
+      studentId: string;
+      goalId: string;
+      domain: IepDomain;
+      text: string;
+      author?: string;
+    }) => {
+      const text = args.text.trim();
+      if (!text) return;
+      setIepState((prev) => {
+        const studentRow = { ...(prev[args.studentId] || {}) };
+        const cur = studentRow[args.goalId] ?? emptyIepItem();
+        const comment: IepComment = {
+          id: `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+          text,
+          createdAt: new Date().toISOString(),
+          author: args.author,
+        };
+        // Newest-first ordering keeps the drawer cheap to render.
+        studentRow[args.goalId] = {
+          ...cur,
+          comments: [comment, ...cur.comments],
+          updatedAt: comment.createdAt,
+        };
+        return { ...prev, [args.studentId]: studentRow };
+      });
+    },
+    []
+  );
+
+  const removeIepComment = React.useCallback(
+    (args: { studentId: string; goalId: string; commentId: string }) => {
+      setIepState((prev) => {
         const studentRow = prev[args.studentId];
         if (!studentRow) return prev;
-        const list = studentRow[args.goalId];
-        if (!list) return prev;
-        const next = list.filter((e) => e.id !== args.entryId);
+        const cur = studentRow[args.goalId];
+        if (!cur) return prev;
         return {
           ...prev,
-          [args.studentId]: { ...studentRow, [args.goalId]: next },
+          [args.studentId]: {
+            ...studentRow,
+            [args.goalId]: {
+              ...cur,
+              comments: cur.comments.filter((c) => c.id !== args.commentId),
+            },
+          },
         };
       });
     },
     []
   );
+
+  const addSessionNote = React.useCallback(
+    (args: { studentId: string; draft: SessionNoteDraft }): SessionNote => {
+      const note: SessionNote = {
+        id: `sn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        studentId: args.studentId,
+        ...args.draft,
+        createdAt: new Date().toISOString(),
+      };
+      setSessionNotes((prev) => ({
+        ...prev,
+        [args.studentId]: [note, ...(prev[args.studentId] ?? [])],
+      }));
+      return note;
+    },
+    []
+  );
+
+  const updateSessionNote = React.useCallback(
+    (args: { studentId: string; noteId: string; draft: SessionNoteDraft }) => {
+      setSessionNotes((prev) => {
+        const list = prev[args.studentId];
+        if (!list) return prev;
+        return {
+          ...prev,
+          [args.studentId]: list.map((n) =>
+            n.id === args.noteId ? { ...n, ...args.draft, updatedAt: new Date().toISOString() } : n
+          ),
+        };
+      });
+    },
+    []
+  );
+
+  const removeSessionNote = React.useCallback((args: { studentId: string; noteId: string }) => {
+    setSessionNotes((prev) => {
+      const list = prev[args.studentId];
+      if (!list) return prev;
+      return { ...prev, [args.studentId]: list.filter((n) => n.id !== args.noteId) };
+    });
+  }, []);
 
   const approveReport = React.useCallback(
     (id: string) => {
@@ -564,9 +649,14 @@ export function MontessoriProvider({
     createReport,
     toggleAttendance,
     applyBulkProgress,
-    iepByStudent,
-    upsertIepEntry,
-    removeIepEntry,
+    iepState,
+    setIepItemFields,
+    addIepComment,
+    removeIepComment,
+    sessionNotes,
+    addSessionNote,
+    updateSessionNote,
+    removeSessionNote,
     clearAll,
   };
 

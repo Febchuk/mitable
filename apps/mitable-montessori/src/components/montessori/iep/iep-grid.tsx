@@ -1,139 +1,77 @@
 "use client";
 
 import * as React from "react";
-import { Plus } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import {
-  PERFORMANCE_BG,
-  PERFORMANCE_FG,
-  PERFORMANCE_LABEL,
   PROMPTING_LABEL,
-  formatIepCode,
-  type IepEntry,
+  RATING_BG,
+  RATING_FG,
+  RATING_LABEL,
+  type IepItemState,
   type IepGoal,
 } from "./data";
 import styles from "./iep.module.css";
 
-// Number of slots shown per goal row. Leftmost slot is "+ add new"; the
-// rest hold the most recent N entries (newest first), padded with empty
-// dashed slots when there's less history.
-const SLOT_COUNT = 6;
-
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diffDays = Math.round((now - then) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 0) return "today";
-  if (diffDays === 1) return "yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.round(diffDays / 7)}w ago`;
-  return `${Math.round(diffDays / 30)}mo ago`;
-}
-
-export type IepGoalRowProps = {
+export type IepItemRowProps = {
   goal: IepGoal;
-  entries: IepEntry[];
-  onAdd: (goal: IepGoal) => void;
-  onEdit: (goal: IepGoal, entry: IepEntry) => void;
+  state: IepItemState;
+  selected: boolean;
+  onSelect: () => void;
 };
 
-export function IepGoalRow({ goal, entries, onAdd, onEdit }: IepGoalRowProps) {
-  // Most recent first; pad to SLOT_COUNT - 1 slots (the +1 is the add cell).
-  const filled = entries.slice(0, SLOT_COUNT - 1);
-  const padding = Math.max(0, SLOT_COUNT - 1 - filled.length);
-  const latest = filled[0];
+/** A single IEP item row — one student × one goal. Shows the 3 standard
+ *  fields inline (rating chip, completion x/10, prompting). Tapping the row
+ *  opens the black comment bar (see iep-comment-bar.tsx). */
+export function IepItemRow({ goal, state, selected, onSelect }: IepItemRowProps) {
+  const ratingLabel =
+    state.rating !== null ? `${state.rating} · ${RATING_LABEL[state.rating]}` : "Not yet rated";
+  const ratingBg = state.rating !== null ? RATING_BG[state.rating] : "var(--color-muted)";
+  const ratingFg = state.rating !== null ? RATING_FG[state.rating] : "var(--color-ink-muted)";
+  const completionLabel = state.successCount !== null ? `${state.successCount}/10` : "—/10";
+  const promptLabel = state.promptingCode ? PROMPTING_LABEL[state.promptingCode] : "—";
+  const commentCount = state.comments.length;
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) auto",
-        alignItems: "center",
-        gap: 16,
-        padding: "10px 12px",
-        borderBottom: "1px solid var(--color-border)",
-      }}
+    <button
+      type="button"
+      className={`${styles.itemRow} tap`}
+      data-selected={selected ? "true" : "false"}
+      onClick={onSelect}
+      aria-pressed={selected}
     >
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 13.5,
-            fontWeight: 500,
-            color: "var(--color-ink)",
-            lineHeight: 1.3,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-          title={goal.name}
-        >
+      <div className={styles.itemMain}>
+        <div className={styles.itemName} title={goal.name}>
           {goal.name}
         </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--color-ink-muted)",
-            marginTop: 2,
-            display: "flex",
-            gap: 6,
-            alignItems: "baseline",
-          }}
-        >
-          {latest ? (
-            <>
-              <span>
-                Latest · {PERFORMANCE_LABEL[latest.performanceBand]} · {latest.successCount}/10 ·{" "}
-                {PROMPTING_LABEL[latest.promptingCode]}
-              </span>
-              <span style={{ opacity: 0.7 }}>· {formatRelative(latest.recordedAt)}</span>
-            </>
-          ) : (
-            <span style={{ opacity: 0.8 }}>No observations yet — tap to log first</span>
-          )}
-        </div>
-      </div>
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          type="button"
-          className={`${styles.codeCell} tap`}
-          data-add="true"
-          onClick={() => onAdd(goal)}
-          aria-label={`Log new entry for ${goal.name}`}
-          title="Log new entry"
-        >
-          <Plus size={16} strokeWidth={1.8} />
-        </button>
-        {filled.map((e) => {
-          const code = formatIepCode(e);
-          return (
-            <button
-              key={e.id}
-              type="button"
-              className={`${styles.codeCell} tap`}
-              onClick={() => onEdit(goal, e)}
-              aria-label={`${code} — ${PERFORMANCE_LABEL[e.performanceBand]}, ${e.successCount} of 10, prompting ${PROMPTING_LABEL[e.promptingCode]} · ${formatRelative(e.recordedAt)}`}
-              title={`${PERFORMANCE_LABEL[e.performanceBand]} · ${e.successCount}/10 · ${PROMPTING_LABEL[e.promptingCode]}\n${formatRelative(e.recordedAt)}${e.note ? `\n"${e.note}"` : ""}`}
-              style={{
-                background: PERFORMANCE_BG[e.performanceBand],
-                color: PERFORMANCE_FG[e.performanceBand],
-                borderColor: "rgba(0,0,0,0.06)",
-              }}
-            >
-              {code}
-            </button>
-          );
-        })}
-        {Array.from({ length: padding }).map((_, i) => (
-          <div
-            key={`pad-${i}`}
-            className={styles.codeCell}
-            data-empty="true"
-            aria-hidden="true"
-            style={{ cursor: "default" }}
-          >
-            —
+        {commentCount > 0 && (
+          <div className={styles.itemMeta}>
+            <MessageSquare size={11} strokeWidth={1.6} />
+            {commentCount} {commentCount === 1 ? "comment" : "comments"}
           </div>
-        ))}
+        )}
       </div>
-    </div>
+      <div className={styles.itemFields}>
+        <span
+          className={styles.ratingPill}
+          style={{ background: ratingBg, color: ratingFg }}
+          aria-label={`Rating ${ratingLabel}`}
+          title={`Rating · ${ratingLabel}`}
+        >
+          {state.rating !== null ? state.rating : "—"}
+          <span className={styles.ratingPillSub}>
+            {state.rating !== null ? RATING_LABEL[state.rating] : "Rate"}
+          </span>
+        </span>
+        <span className={styles.fieldChip} title="Completion rate">
+          <span className={styles.fieldLabel}>Compl</span>
+          {completionLabel}
+        </span>
+        <span className={styles.fieldChip} title="Prompting">
+          <span className={styles.fieldLabel}>Prompt</span>
+          {state.promptingCode ?? "—"}
+          {state.promptingCode && <span className={styles.fieldHintInline}>{promptLabel}</span>}
+        </span>
+      </div>
+    </button>
   );
 }

@@ -1,16 +1,8 @@
-/* IEP feature — local layout + cell styles. Reuses the same warm tokens
-   as the class-mode progress matrix so both grids feel related. */
+/* IEP feature — list rows + right-side comments drawer + bottom comment bar.
+   The bar reuses progress.module.css :: .bulkBar for the shell (fixed
+   bottom-center, ink background, animation, shadow); these rules style what
+   sits inside it. */
 
-@keyframes iep-slide-up {
-  from {
-    transform: translateY(12px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
 @keyframes iep-fade-in {
   from {
     opacity: 0;
@@ -20,175 +12,410 @@
   }
 }
 
-.scrollQuiet::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.scrollQuiet::-webkit-scrollbar-thumb {
-  background: var(--color-clay-soft);
-  border-radius: 999px;
-}
-.scrollQuiet::-webkit-scrollbar-track {
-  background: transparent;
+.iepRoot {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-/* ---------- entry modal / bottom sheet ---------- */
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(42, 39, 35, 0.4);
-  z-index: 70;
-  animation: iep-fade-in 160ms ease both;
+/* ---------- main + right drawer ---------- */
+.iepLayout {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 16px 240px;
 }
 @media (min-width: 1024px) {
-  .modalBackdrop {
-    align-items: center;
+  .iepLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 18px;
+    padding: 12px 18px 240px;
   }
 }
-.modalCard {
+.iepMain {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ---------- domain card ---------- */
+.iepDomain {
   background: var(--color-surface);
-  border-top-left-radius: 22px;
-  border-top-right-radius: 22px;
-  padding: 14px 18px 28px;
-  box-shadow: 0 -10px 30px rgba(42, 39, 35, 0.22);
-  animation: iep-slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  width: 100%;
-  max-width: 520px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-@media (min-width: 1024px) {
-  .modalCard {
-    border-radius: 18px;
-    padding: 22px 24px 24px;
-    box-shadow:
-      0 24px 60px rgba(42, 39, 35, 0.32),
-      0 6px 14px rgba(42, 39, 35, 0.14);
-  }
-}
-.sheetGrip {
-  width: 36px;
-  height: 4px;
-  background: var(--color-border-strong);
-  border-radius: 999px;
-  margin: 0 auto 12px;
-  opacity: 0.55;
-}
-@media (min-width: 1024px) {
-  .sheetGrip {
-    display: none;
-  }
-}
-
-/* ---------- band/prompt chips inside the modal ---------- */
-.chipRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.chip {
-  padding: 8px 10px;
-  border-radius: 10px;
   border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.iepDomainHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-canvas);
+}
+.iepDomainName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+}
+.iepDomainMeta {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
+
+/* ---------- inline 3-field row (the "IEP item") ---------- */
+.itemRow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
-  color: var(--color-ink-secondary);
-  font-size: 12.5px;
-  font-weight: 500;
-  font-family: inherit;
   cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 100ms ease;
+}
+.itemRow:hover {
+  background: var(--color-canvas);
+}
+.itemRow[data-selected="true"] {
+  background: color-mix(in srgb, var(--color-butter) 22%, var(--color-surface));
+  box-shadow: inset 3px 0 0 var(--color-ink);
+}
+.itemRow:last-child {
+  border-bottom: 0;
+}
+.itemMain {
+  flex: 1;
+  min-width: 0;
+}
+.itemName {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--color-ink);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.itemMeta {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  margin-top: 2px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
-.chip:hover {
-  background: var(--color-muted);
-}
-.chip[data-active="true"] {
-  background: var(--color-ink);
-  color: var(--color-surface);
-  border-color: var(--color-ink);
-}
-.chipSwatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-  display: inline-block;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  gap: 4px;
 }
 
-/* 0–10 stepper row */
-.countRow {
+.itemFields {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Rating pill — compact glanceable chip showing the 1–5 plus a faint label. */
+.ratingPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 64px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.ratingPillSub {
+  font-weight: 500;
+  font-size: 10.5px;
+  opacity: 0.78;
+  letter-spacing: 0;
+}
+
+.fieldChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fieldLabel {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.fieldHintInline {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  margin-left: 2px;
+}
+
+/* ---------- right-side comments drawer ---------- */
+.iepDrawer {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  min-width: 0;
+  align-self: flex-start;
+}
+@media (min-width: 1024px) {
+  .iepDrawer {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+}
+.drawerRoot {
+  display: flex;
+  flex-direction: column;
+}
+.drawerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 14px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.drawerFilterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 12px 4px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-butter-soft);
+  color: var(--color-butter-deep);
+  border: 1px solid color-mix(in srgb, var(--color-butter) 40%, transparent);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  animation: iep-fade-in 140ms ease both;
+}
+.drawerEmpty {
+  padding: 16px 14px 18px;
+  color: var(--color-ink-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.drawerCommentRow {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+.drawerCommentRow:last-child {
+  border-bottom: 0;
+}
+.drawerCommentGoal {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+/* =========================================================================
+   Bottom comment bar — IEP-specific layout slotted into .bulkBar
+   -------------------------------------------------------------------------
+   Layout:
+     • header on top (overline + goal name)
+     • below: 2-column grid
+         [actions col]  [clusters col]
+     • actions col stacks Apply over Cancel
+     • clusters col stacks Rating / Completion / Prompting / Comment
+       with equal vertical spacing
+   ========================================================================= */
+.commentBar {
+  width: min(820px, calc(100% - 48px));
+  max-height: min(calc(100vh - 32px), 640px);
+  overflow-y: auto;
+  gap: 14px;
+}
+
+.barHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 251, 243, 0.12);
+}
+.barOverline {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(255, 251, 243, 0.6);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.barTitle {
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--color-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barLayout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (min-width: 720px) {
+  .barLayout {
+    grid-template-columns: 124px minmax(0, 1fr);
+    column-gap: 18px;
+    align-items: start;
+  }
+}
+
+/* LEFT column — vertically stacked action buttons. */
+.barActions {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+@media (min-width: 720px) {
+  .barActions {
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+  }
+}
+.barActionBtn {
+  width: 100%;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+/* RIGHT column — vertically stacked option clusters with equal spacing. */
+.barClusters {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.barCluster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.barClusterHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.barClusterLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 251, 243, 0.78);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.barClusterHint {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(255, 251, 243, 0.5);
+}
+
+/* Chip rows (Rating, Prompting). Equal-width cells, equal gaps. */
+.barChipRow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.barChip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 6px 4px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(255, 251, 243, 0.1);
+  color: rgba(255, 251, 243, 0.92);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.barChip:hover {
+  background: rgba(255, 251, 243, 0.18);
+}
+.barChip[data-active="true"] {
+  border-color: rgba(255, 251, 243, 0.55);
+}
+.barChipKey {
+  font-size: 13px;
+  font-weight: 700;
+}
+.barChipHint {
+  font-weight: 500;
+  font-size: 9.5px;
+  opacity: 0.85;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+/* Completion row — 11 equal cells, slimmer than chip cluster. */
+.barCountRow {
   display: grid;
   grid-template-columns: repeat(11, minmax(0, 1fr));
   gap: 4px;
 }
-.countBtn {
-  padding: 0;
+.barCountBtn {
   height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition:
-    background 100ms ease,
-    border-color 100ms ease,
-    color 100ms ease;
-}
-.countBtn:hover {
-  background: var(--color-muted);
-}
-.countBtn[data-active="true"] {
-  background: var(--color-ink);
-  color: var(--color-surface);
-  border-color: var(--color-ink);
-}
-
-/* ---------- grid ---------- */
-.codeCell {
-  width: 56px;
-  height: 44px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-ink-muted);
+  border-radius: 6px;
+  background: rgba(255, 251, 243, 0.1);
+  color: rgba(255, 251, 243, 0.92);
+  border: 1px solid transparent;
   font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  font-family: inherit;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease;
-  flex-shrink: 0;
+  font-family: inherit;
+  transition: background 100ms ease, border-color 100ms ease;
 }
-.codeCell:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(42, 39, 35, 0.12);
+.barCountBtn:hover {
+  background: rgba(255, 251, 243, 0.2);
 }
-.codeCell[data-empty="true"] {
-  border-style: dashed;
-  background: transparent;
-  color: var(--color-ink-muted);
-  font-weight: 500;
+.barCountBtn[data-active="true"] {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border-color: var(--color-surface);
 }
-.codeCell[data-add="true"] {
-  border-style: dashed;
-  background: var(--color-muted);
-  color: var(--color-ink-secondary);
-  font-size: 18px;
-  font-weight: 500;
-}
+
+/* Comment cluster textarea uses the .bulkBar textarea rules verbatim — no
+   override needed here. */

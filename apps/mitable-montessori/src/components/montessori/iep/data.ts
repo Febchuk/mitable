@@ -1,14 +1,17 @@
-// IEP progress mode — types, scales, helpers, and a small seed.
+// IEP progress mode — types, scales, and seed data.
 //
-// MVP scope:
-//   * student-scoped instead of class-scoped
-//   * structured storage (band, count, prompt, note) with a derived display code
-//   * seed goals only — UI for adding new goals comes later
+// Iteration shape (the spec the UI now follows):
+//   * student-scoped, one row per goal → "IEP item"
+//   * each item has a single current state (rating + completion + prompting)
+//     plus a comments thread, instead of an entry-history grid
+//   * rating is 1–5 (replaces the I/E/P/C/S band) for parity with how
+//     teachers verbally describe progress
+//   * prompting stays a single primary value — multi-select was deferred
 //
-// All types are deliberately narrow strings so the cell-code helpers can
-// stay total. See `formatIepCode()` for the display rule.
+// All scales are deliberately narrow types so the rendering helpers can
+// stay total.
 
-export type PerformanceBand = "I" | "E" | "P" | "C" | "S";
+export type IepRating = 1 | 2 | 3 | 4 | 5;
 export type PromptingCode = "N" | "G" | "V" | "H" | "F";
 
 export type IepDomain =
@@ -30,15 +33,15 @@ export const IEP_DOMAINS: IepDomain[] = [
   "Self-help skills",
 ];
 
-export const PERFORMANCE_LABEL: Record<PerformanceBand, string> = {
-  I: "Introduced",
-  E: "Emerging",
-  P: "Progressing",
-  C: "Consistent",
-  S: "Self-sufficient",
+export const RATING_LABEL: Record<IepRating, string> = {
+  1: "Introduced",
+  2: "Emerging",
+  3: "Progressing",
+  4: "Consistent",
+  5: "Self-sufficient",
 };
 
-export const PERFORMANCE_BANDS: PerformanceBand[] = ["I", "E", "P", "C", "S"];
+export const RATINGS: IepRating[] = [1, 2, 3, 4, 5];
 
 export const PROMPTING_LABEL: Record<PromptingCode, string> = {
   N: "None",
@@ -50,22 +53,22 @@ export const PROMPTING_LABEL: Record<PromptingCode, string> = {
 
 export const PROMPTING_CODES: PromptingCode[] = ["N", "G", "V", "H", "F"];
 
-// Performance band tints — reuse the same warm palette used by the
-// class-mode matrix so the two grids feel like cousins.
-export const PERFORMANCE_BG: Record<PerformanceBand, string> = {
-  I: "var(--color-clay-soft)",
-  E: "var(--color-clay)",
-  P: "var(--color-butter)",
-  C: "var(--color-sage-soft)",
-  S: "var(--color-sage)",
+// Rating tints — reuse the warm palette used by the class-mode matrix so
+// the two grids feel like cousins. Mapped from low (clay) to high (sage).
+export const RATING_BG: Record<IepRating, string> = {
+  1: "var(--color-clay-soft)",
+  2: "var(--color-clay)",
+  3: "var(--color-butter)",
+  4: "var(--color-sage-soft)",
+  5: "var(--color-sage)",
 };
 
-export const PERFORMANCE_FG: Record<PerformanceBand, string> = {
-  I: "var(--color-terracotta-deep)",
-  E: "var(--color-ink)",
-  P: "var(--color-ink)",
-  C: "var(--color-sage-deep)",
-  S: "var(--color-ink)",
+export const RATING_FG: Record<IepRating, string> = {
+  1: "var(--color-terracotta-deep)",
+  2: "var(--color-ink)",
+  3: "var(--color-ink)",
+  4: "var(--color-sage-deep)",
+  5: "var(--color-ink)",
 };
 
 export type IepGoal = {
@@ -74,34 +77,40 @@ export type IepGoal = {
   name: string;
 };
 
-export type IepEntry = {
+export type IepComment = {
   id: string;
-  studentId: string;
-  goalId: string;
-  domain: IepDomain;
-  performanceBand: PerformanceBand;
-  /** 0–10 (clamp at the edit boundary). */
-  successCount: number;
-  promptingCode: PromptingCode;
-  note?: string;
-  /** ISO timestamp. */
-  recordedAt: string;
-  recordedBy?: string;
+  text: string;
+  createdAt: string;
+  author?: string;
 };
 
-/** Map: studentId → goalId → entries (newest first). */
-export type IepByStudent = Record<string, Record<string, IepEntry[]>>;
+/** Current state of an IEP item (one student × one goal). Unlike the prior
+ *  history-of-entries shape, this collapses to a single live record plus a
+ *  comments thread — matching the spec's "3 inline fields + notes" model. */
+export type IepItemState = {
+  rating: IepRating | null;
+  successCount: number | null;
+  promptingCode: PromptingCode | null;
+  comments: IepComment[];
+  updatedAt: string | null;
+  updatedBy?: string;
+};
 
-/** "P7V", "C8G", "S10N", "E3H" — same shape regardless of count digits. */
-export function formatIepCode(
-  e: Pick<IepEntry, "performanceBand" | "successCount" | "promptingCode">
-): string {
-  const count = Math.max(0, Math.min(10, Math.round(e.successCount)));
-  return `${e.performanceBand}${count}${e.promptingCode}`;
+/** Map: studentId → goalId → IepItemState */
+export type IepStateByStudent = Record<string, Record<string, IepItemState>>;
+
+export function emptyIepItem(): IepItemState {
+  return {
+    rating: null,
+    successCount: null,
+    promptingCode: null,
+    comments: [],
+    updatedAt: null,
+  };
 }
 
 // -----------------------------------------------------------------------------
-// Seed goals — 2–3 per domain so the grid has something to look at on first
+// Seed goals — 2–3 per domain so the page has something to look at on first
 // load. The UI doesn't yet support adding/editing goals; teachers/therapists
 // will configure these through admin in a follow-up.
 // -----------------------------------------------------------------------------
@@ -153,8 +162,8 @@ export function goalsByDomain(): Record<IepDomain, IepGoal[]> {
 }
 
 // -----------------------------------------------------------------------------
-// Seed entries for a couple of children so the empty state isn't the *only*
-// thing a teacher sees when they first open the page.
+// Seed states + comments for a couple of children so the empty state isn't
+// the only thing a teacher sees when they first open the page.
 // -----------------------------------------------------------------------------
 
 const daysAgo = (n: number): string => {
@@ -163,63 +172,95 @@ const daysAgo = (n: number): string => {
   return d.toISOString();
 };
 
-const seedEntry = (
-  studentId: string,
-  goalId: string,
-  domain: IepDomain,
-  band: PerformanceBand,
-  count: number,
-  prompt: PromptingCode,
-  daysOffset: number,
-  note?: string
-): IepEntry => ({
-  id: `e-${studentId}-${goalId}-${daysOffset}`,
-  studentId,
-  goalId,
-  domain,
-  performanceBand: band,
-  successCount: count,
-  promptingCode: prompt,
-  note,
-  recordedAt: daysAgo(daysOffset),
-  recordedBy: "Ms. Lena",
+const seedComment = (text: string, daysOffset: number, author?: string): IepComment => ({
+  id: `c-${daysOffset}-${Math.random().toString(36).slice(2, 8)}`,
+  text,
+  createdAt: daysAgo(daysOffset),
+  author,
 });
 
-function buildSeed(): IepByStudent {
-  const out: IepByStudent = {};
-  const push = (e: IepEntry) => {
-    out[e.studentId] = out[e.studentId] || {};
-    out[e.studentId][e.goalId] = out[e.studentId][e.goalId] || [];
-    out[e.studentId][e.goalId].push(e);
+function buildSeed(): IepStateByStudent {
+  const out: IepStateByStudent = {};
+  const setItem = (
+    studentId: string,
+    goalId: string,
+    rating: IepRating,
+    successCount: number,
+    prompt: PromptingCode,
+    comments: IepComment[],
+    daysOffset = 0
+  ) => {
+    out[studentId] = out[studentId] || {};
+    out[studentId][goalId] = {
+      rating,
+      successCount,
+      promptingCode: prompt,
+      comments,
+      updatedAt: daysAgo(daysOffset),
+      updatedBy: "Ms. Lena",
+    };
   };
 
   // Ada — early progress on a couple of goals.
-  push(seedEntry("ada", "g-1", "Sensory integration", "P", 7, "V", 0));
-  push(seedEntry("ada", "g-1", "Sensory integration", "P", 5, "V", 2));
-  push(seedEntry("ada", "g-1", "Sensory integration", "E", 4, "G", 5));
-  push(seedEntry("ada", "g-7", "Language and communication skills", "C", 8, "G", 1));
-  push(seedEntry("ada", "g-7", "Language and communication skills", "C", 7, "N", 4));
-  push(
-    seedEntry("ada", "g-13", "Fine motor skills", "P", 6, "V", 0, "Tripod grasp held for full page")
+  setItem(
+    "ada",
+    "g-1",
+    3,
+    7,
+    "V",
+    [
+      seedComment(
+        "Stayed in lunchroom through full meal — used noise-cancelling headphones.",
+        0,
+        "Ms. Lena"
+      ),
+      seedComment("Started covering ears halfway through gym class.", 5, "Ms. Lena"),
+    ],
+    0
+  );
+  setItem(
+    "ada",
+    "g-7",
+    4,
+    8,
+    "G",
+    [seedComment("Used 4-word request at lunch: 'more apple juice please'.", 1, "Ms. Lena")],
+    1
+  );
+  setItem(
+    "ada",
+    "g-13",
+    3,
+    6,
+    "V",
+    [seedComment("Tripod grasp held for full page.", 0, "Ms. Lena")],
+    0
   );
 
   // Diego — further along on academics + self-help.
-  push(seedEntry("dgo", "g-10", "Academics", "S", 10, "N", 0));
-  push(seedEntry("dgo", "g-10", "Academics", "S", 9, "N", 3));
-  push(seedEntry("dgo", "g-19", "Self-help skills", "C", 8, "G", 0));
-  push(seedEntry("dgo", "g-19", "Self-help skills", "P", 6, "V", 4));
+  setItem("dgo", "g-10", 5, 10, "N", [], 0);
+  setItem(
+    "dgo",
+    "g-19",
+    4,
+    8,
+    "G",
+    [seedComment("Hung coat up without prompting on arrival.", 0, "Ms. Lena")],
+    0
+  );
 
   // Levi — earliest stages.
-  push(seedEntry("levi", "g-4", "Social skills", "I", 2, "H", 1));
-  push(seedEntry("levi", "g-13", "Fine motor skills", "E", 3, "H", 0));
+  setItem(
+    "levi",
+    "g-4",
+    1,
+    2,
+    "H",
+    [seedComment("Smiled when peer waved — one second of mutual gaze.", 1, "Ms. Lena")],
+    1
+  );
 
-  // Sort newest first per goal.
-  for (const sid of Object.keys(out)) {
-    for (const gid of Object.keys(out[sid])) {
-      out[sid][gid].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
-    }
-  }
   return out;
 }
 
-export const INITIAL_IEP_BY_STUDENT: IepByStudent = buildSeed();
+export const INITIAL_IEP_STATE: IepStateByStudent = buildSeed();
