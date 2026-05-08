@@ -110,19 +110,35 @@ export async function archiveStudent(
 export async function createGuardian(
   ctx: AdminContext,
   input: {
-    first_name: string;
-    last_name: string;
+    first_name?: string;
+    last_name?: string;
     email?: string;
     phone?: string;
     preferred_contact_method?: "email" | "phone" | "either";
   }
 ) {
+  const email = input.email?.trim() || undefined;
+  let first = (input.first_name ?? "").trim();
+  let last = (input.last_name ?? "").trim();
+  if (email && (!first || !last)) {
+    const local =
+      email
+        .split("@")[0]!
+        .replace(/\+[^@]*$/, "")
+        .replace(/[._]+/g, " ")
+        .trim() || "Guardian";
+    if (!first) first = local.slice(0, 100);
+    if (!last) last = "Family";
+  }
+  if (!first || !last) {
+    throw new AdminError("Guardian needs a valid email or both first and last name", "invalid");
+  }
   return insertReturningId(ctx, "guardians", {
     school_id: ctx.schoolId,
-    first_name: input.first_name,
-    last_name: input.last_name,
-    email: input.email ?? null,
-    phone: input.phone ?? null,
+    first_name: first,
+    last_name: last,
+    email: email ?? null,
+    phone: input.phone?.trim() || null,
     preferred_contact_method: input.preferred_contact_method ?? "either",
   });
 }

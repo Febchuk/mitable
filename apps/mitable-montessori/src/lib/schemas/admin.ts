@@ -32,12 +32,40 @@ export const UpdateStudentSchema = z.object({
   fields: CreateStudentSchema.partial(),
 });
 
-export const CreateGuardianSchema = z.object({
-  first_name: z.string().min(1).max(100),
-  last_name: z.string().min(1).max(100),
-  email: z.string().email().max(254).optional(),
+/** Raw guardian fields (LLM extraction / JSON schema). Use `CreateGuardianSchema` on POST. */
+export const CreateGuardianBaseSchema = z.object({
+  first_name: z.string().max(100).optional(),
+  last_name: z.string().max(100).optional(),
+  email: z.string().max(254).optional(),
   phone: z.string().max(50).optional(),
   preferred_contact_method: z.enum(["email", "phone", "either"]).default("either"),
+});
+
+export const CreateGuardianSchema = CreateGuardianBaseSchema.transform((v) => ({
+  first_name: (v.first_name ?? "").trim(),
+  last_name: (v.last_name ?? "").trim(),
+  email: (v.email ?? "").trim() || undefined,
+  phone: (v.phone ?? "").trim() || undefined,
+  preferred_contact_method: v.preferred_contact_method,
+})).superRefine((v, ctx) => {
+  const hasEmail = Boolean(v.email);
+  const emailOk = hasEmail ? z.string().email().safeParse(v.email).success : false;
+  if (hasEmail && !emailOk) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Invalid email address",
+      path: ["email"],
+    });
+    return;
+  }
+  const hasBothNames = v.first_name.length > 0 && v.last_name.length > 0;
+  if (!emailOk && !hasBothNames) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Provide a valid email or both first and last name",
+      path: ["email"],
+    });
+  }
 });
 export type CreateGuardianInput = z.infer<typeof CreateGuardianSchema>;
 

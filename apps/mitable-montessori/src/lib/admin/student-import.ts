@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type ImportField =
   | "first_name"
   | "last_name"
@@ -6,6 +8,7 @@ export type ImportField =
   | "classroom"
   | "guardian_name"
   | "guardian_email"
+  | "guardian_phone"
   | "guardian_relationship"
   | "ignore";
 
@@ -26,6 +29,8 @@ export interface ExistingStudent {
   id: string;
   name: string;
   birthDate?: string;
+  /** Used to match roster rows when birthday is missing. */
+  classroomId?: string;
 }
 
 export interface StudentImportDraft {
@@ -37,22 +42,24 @@ export interface StudentImportDraft {
   classroomName: string;
   guardianName: string;
   guardianEmail: string;
+  guardianPhone: string;
   guardianRelationship: string;
 }
 
 export interface GuardianImport {
   name: string;
   email: string;
+  phone?: string;
   relationship: string;
 }
 
 export type ImportIssue =
   | { kind: "missing_name" }
-  | { kind: "missing_birth_date" }
   | { kind: "invalid_birth_date"; value: string }
   | { kind: "missing_classroom" }
   | { kind: "unknown_classroom"; value: string; suggestion: ClassroomOption | null }
   | { kind: "guardian_incomplete" }
+  | { kind: "invalid_guardian_email"; value: string }
   | { kind: "duplicate_without_guardian"; name: string };
 
 export interface DraftAnalysis {
@@ -61,7 +68,7 @@ export interface DraftAnalysis {
   dateHint: string | null;
   ready: {
     fullName: string;
-    birthDate: string;
+    birthDate: string | null;
     classroomId: string;
     classroomName: string;
     studentKey: string;
@@ -75,7 +82,7 @@ export interface StudentImportPlan {
     firstName: string;
     lastName: string;
     fullName: string;
-    birthDate: string;
+    birthDate: string | null;
     classroomId: string;
     guardians: GuardianImport[];
   }>;
@@ -86,20 +93,42 @@ export interface StudentImportPlan {
 }
 
 export const STUDENT_IMPORT_TEMPLATE =
-  "first_name,last_name,birth_date,classroom,guardian_name,guardian_email,guardian_relationship\n" +
-  "Maya,Patel,2019-04-15,Primary East,Asha Patel,asha.patel@example.com,Mother\n" +
-  "Maya,Patel,2019-04-15,Primary East,Rohan Patel,rohan.patel@example.com,Father\n" +
-  "Eli,Johansson,15 April 2018,Elementary West,Linnea Johansson,linnea@example.com,Mother\n";
+  "first_name,last_name,birth_date,classroom,guardian_name,guardian_email,guardian_phone,guardian_relationship\n" +
+  "Maya,Patel,2019-04-15,Primary East,Asha Patel,asha.patel@example.com,,Mother\n" +
+  "Maya,Patel,2019-04-15,Primary East,Rohan Patel,rohan.patel@example.com,,Father\n" +
+  "Eli,Johansson,15 April 2018,Elementary West,Linnea Johansson,linnea@example.com,,Mother\n" +
+  "Sam,Taylor,,Primary East,,parent@example.com,555-0100,Guardian\n";
 
 const FIELD_PATTERNS: Record<Exclude<ImportField, "ignore">, RegExp[]> = {
   first_name: [/^first[\s_-]*name$/i, /^first$/i, /^fname$/i, /^given[\s_-]*name$/i],
   last_name: [/^last[\s_-]*name$/i, /^last$/i, /^lname$/i, /^surname$/i, /^family[\s_-]*name$/i],
-  full_name: [/^name$/i, /^full[\s_-]*name$/i, /^child([\s_-]*name)?$/i, /^student([\s_-]*name)?$/i],
+  full_name: [
+    /^name$/i,
+    /^full[\s_-]*name$/i,
+    /^child([\s_-]*name)?$/i,
+    /^student([\s_-]*name)?$/i,
+  ],
   birth_date: [/^birth[\s_-]*date$/i, /^birthday$/i, /^dob$/i, /^date[\s_-]*of[\s_-]*birth$/i],
   classroom: [/^classroom$/i, /^class$/i, /^room$/i, /^classroom[\s_-]*name$/i],
   guardian_name: [/^guardian([\s_-]*name)?$/i, /^parent([\s_-]*name)?$/i, /^carer([\s_-]*name)?$/i],
-  guardian_email: [/^guardian[\s_-]*e?-?mail$/i, /^parent[\s_-]*e?-?mail$/i, /^contact[\s_-]*e?-?mail$/i, /^email$/i],
-  guardian_relationship: [/^guardian[\s_-]*relationship$/i, /^relationship$/i, /^relation$/i, /^parent[\s_-]*relationship$/i],
+  guardian_email: [
+    /^guardian[\s_-]*e?-?mail$/i,
+    /^parent[\s_-]*e?-?mail$/i,
+    /^contact[\s_-]*e?-?mail$/i,
+    /^email$/i,
+  ],
+  guardian_phone: [
+    /^guardian[\s_-]*phone$/i,
+    /^parent[\s_-]*phone$/i,
+    /^contact[\s_-]*phone$/i,
+    /^phone$/i,
+  ],
+  guardian_relationship: [
+    /^guardian[\s_-]*relationship$/i,
+    /^relationship$/i,
+    /^relation$/i,
+    /^parent[\s_-]*relationship$/i,
+  ],
 };
 
 const MONTHS: Record<string, number> = {
@@ -175,6 +204,7 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
     let classroomName = "";
     let guardianName = "";
     let guardianEmail = "";
+    let guardianPhone = "";
     let guardianRelationship = "";
 
     cells.forEach((value, index) => {
@@ -200,6 +230,9 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
         case "guardian_email":
           guardianEmail = value;
           break;
+        case "guardian_phone":
+          guardianPhone = value;
+          break;
         case "guardian_relationship":
           guardianRelationship = value;
           break;
@@ -223,6 +256,7 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
       classroomName,
       guardianName,
       guardianEmail,
+      guardianPhone,
       guardianRelationship,
     };
   });
@@ -240,9 +274,7 @@ export function analyzeImportDraft(
   if (!firstName || !lastName) issues.push({ kind: "missing_name" });
 
   const parsedDate = parseFlexibleDate(draft.birthDate);
-  if (!draft.birthDate.trim()) {
-    issues.push({ kind: "missing_birth_date" });
-  } else if (!parsedDate) {
+  if (draft.birthDate.trim() && !parsedDate) {
     issues.push({ kind: "invalid_birth_date", value: draft.birthDate });
   }
 
@@ -259,25 +291,40 @@ export function analyzeImportDraft(
 
   const guardianName = draft.guardianName.trim();
   const guardianEmail = draft.guardianEmail.trim();
-  const guardian =
-    guardianName && guardianEmail
-      ? {
-          name: guardianName,
-          email: guardianEmail,
-          relationship: draft.guardianRelationship.trim() || "Guardian",
-        }
-      : null;
+  const guardianPhone = draft.guardianPhone.trim();
+  const hasValidEmail = guardianEmail ? z.string().email().safeParse(guardianEmail).success : false;
 
-  if (Boolean(guardianName) !== Boolean(guardianEmail)) issues.push({ kind: "guardian_incomplete" });
+  if (guardianEmail && !hasValidEmail) {
+    issues.push({ kind: "invalid_guardian_email", value: guardianEmail });
+  } else if (guardianName && !hasValidEmail) {
+    issues.push({ kind: "guardian_incomplete" });
+  } else if (
+    !hasValidEmail &&
+    !guardianName &&
+    (guardianPhone || draft.guardianRelationship.trim())
+  ) {
+    issues.push({ kind: "guardian_incomplete" });
+  }
+
+  const guardian: GuardianImport | null = hasValidEmail
+    ? {
+        name: guardianName,
+        email: guardianEmail,
+        phone: guardianPhone || undefined,
+        relationship: draft.guardianRelationship.trim() || "Guardian",
+      }
+    : null;
 
   const ready =
-    issues.length === 0 && parsedDate && classroomMatch.exact
+    issues.length === 0 && classroomMatch.exact
       ? {
           fullName,
-          birthDate: parsedDate.iso,
+          birthDate: parsedDate ? parsedDate.iso : null,
           classroomId: classroomMatch.exact.id,
           classroomName: classroomMatch.exact.name,
-          studentKey: `${fullName.toLowerCase()}|${parsedDate.iso}`,
+          studentKey: parsedDate
+            ? `${fullName.toLowerCase()}|${parsedDate.iso}`
+            : `${fullName.toLowerCase()}|__nodob__|${classroomMatch.exact.id}`,
           guardian,
         }
       : null;
@@ -301,8 +348,12 @@ export function buildStudentImportPlan(
 
   const existingByKey = new Map<string, ExistingStudent>();
   existingStudents.forEach((student) => {
-    if (!student.birthDate) return;
-    existingByKey.set(`${student.name.trim().toLowerCase()}|${student.birthDate}`, student);
+    const nameKey = student.name.trim().toLowerCase();
+    if (student.birthDate) {
+      existingByKey.set(`${nameKey}|${student.birthDate}`, student);
+    } else if (student.classroomId) {
+      existingByKey.set(`${nameKey}|__nodob__|${student.classroomId}`, student);
+    }
   });
 
   const newStudentsByKey = new Map<string, StudentImportPlan["newStudents"][number]>();
@@ -435,13 +486,17 @@ function parseFlexibleDate(input: string): { iso: string; hint: string | null } 
   match = value.match(/^([A-Za-z]+)\s+(\d{1,2})[,\s]+(\d{4})$/);
   if (match) {
     const month = MONTHS[match[1].toLowerCase()];
-    return month ? makeDate(+match[3], month, +match[2], `Read as ${match[1]} ${match[2]}, ${match[3]}.`) : null;
+    return month
+      ? makeDate(+match[3], month, +match[2], `Read as ${match[1]} ${match[2]}, ${match[3]}.`)
+      : null;
   }
 
   match = value.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
   if (match) {
     const month = MONTHS[match[2].toLowerCase()];
-    return month ? makeDate(+match[3], month, +match[1], `Read as ${match[1]} ${match[2]} ${match[3]}.`) : null;
+    return month
+      ? makeDate(+match[3], month, +match[1], `Read as ${match[1]} ${match[2]} ${match[3]}.`)
+      : null;
   }
 
   return null;

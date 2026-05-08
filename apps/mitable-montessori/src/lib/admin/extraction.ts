@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import {
-  CreateGuardianSchema,
+  CreateGuardianBaseSchema,
   CreateStudentSchema,
   CreateClassroomSchema,
   CreateCurriculumSubtopicSchema,
@@ -18,7 +18,7 @@ export type ExtractionEntity = "student" | "guardian" | "classroom" | "subtopic"
 
 const ENTITY_SCHEMAS: Record<ExtractionEntity, z.ZodObject<z.ZodRawShape>> = {
   student: CreateStudentSchema,
-  guardian: CreateGuardianSchema,
+  guardian: CreateGuardianBaseSchema,
   classroom: CreateClassroomSchema,
   subtopic: CreateCurriculumSubtopicSchema,
 };
