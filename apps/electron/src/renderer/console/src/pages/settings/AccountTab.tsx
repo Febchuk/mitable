@@ -37,7 +37,13 @@ function getPasswordStrength(password: string): PasswordStrength {
 }
 
 interface AccountTabProps {
-  user: { name?: string; firstName?: string; email?: string; role?: string } | null;
+  user: {
+    name?: string;
+    firstName?: string;
+    email?: string;
+    role?: string;
+    isLocalAccount?: boolean;
+  } | null;
   organization: { name?: string } | null;
   planLabel: string;
 
@@ -120,16 +126,13 @@ export default function AccountTab({
             [
               { label: "Name", value: user?.name || "Not set" },
               { label: "Email", value: user?.email || "Not available" },
-              {
-                label: "Role",
-                value: user?.role || "Employee",
-                capitalize: true,
-              },
-              {
-                label: "Organization",
-                value: organization?.name || "Not available",
-              },
-              { label: "Plan", value: planLabel },
+              ...(user?.isLocalAccount
+                ? [{ label: "Account", value: "Local (on-device)" }]
+                : [
+                    { label: "Role", value: user?.role || "Employee", capitalize: true },
+                    { label: "Organization", value: organization?.name || "Not available" },
+                    { label: "Plan", value: planLabel },
+                  ]),
             ] as Array<{
               label: string;
               value: string;

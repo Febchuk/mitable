@@ -93,6 +93,50 @@ export interface LocalFeedback {
   createdAt: number;
 }
 
+export interface LocalDocument {
+  id: string;
+  userId: string;
+  filePath: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  pageCount: number;
+  chunkCount: number;
+  status: string;
+  error: string | null;
+  content: string | null;
+  title: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LocalDocChunk {
+  id: string;
+  documentId: string;
+  chunkIndex: number;
+  content: string;
+  charStart: number;
+  charEnd: number;
+  createdAt: number;
+}
+
+export interface LocalAgentConversation {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LocalAgentMessage {
+  id: string;
+  conversationId: string;
+  role: string;
+  content: string;
+  toolCalls: string;
+  createdAt: number;
+}
+
 // ── Phase 2 types: Supabase mirror ──────────────────────────────────────────
 
 export interface LocalOrganization {
@@ -321,6 +365,70 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
   PRIMARY KEY (user_id, key)
 );
+
+CREATE TABLE IF NOT EXISTS local_accounts (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_local_accounts_email ON local_accounts(email);
+
+CREATE TABLE IF NOT EXISTS agent_conversations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT 'New chat',
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_conversations_user ON agent_conversations(user_id);
+
+CREATE TABLE IF NOT EXISTS agent_messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES agent_conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL DEFAULT '',
+  tool_calls TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_messages_convo ON agent_messages(conversation_id);
+
+CREATE TABLE IF NOT EXISTS local_documents (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  file_path TEXT NOT NULL DEFAULT '',
+  file_name TEXT NOT NULL,
+  file_type TEXT NOT NULL,
+  file_size INTEGER NOT NULL DEFAULT 0,
+  page_count INTEGER NOT NULL DEFAULT 1,
+  chunk_count INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  error TEXT,
+  content TEXT,
+  title TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_local_documents_user ON local_documents(user_id);
+
+CREATE TABLE IF NOT EXISTS local_doc_chunks (
+  id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL REFERENCES local_documents(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL,
+  content TEXT NOT NULL DEFAULT '',
+  char_start INTEGER NOT NULL DEFAULT 0,
+  char_end INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_local_doc_chunks_doc ON local_doc_chunks(document_id);
 `;
 
 // better-sqlite3 SELECT * returns snake_case column names;
@@ -389,6 +497,41 @@ class LocalDatabase {
         db.exec(`ALTER TABLE monitoring_sessions ADD COLUMN export_path TEXT`);
         logger.info("Migrated monitoring_sessions table: added export_path column");
       }
+
+      // Migrate: add content + title columns to local_documents if missing
+      const docCols = db.pragma("table_info(local_documents)") as Array<{ name: string }>;
+      if (!docCols.some((c) => c.name === "content")) {
+        db.exec(`ALTER TABLE local_documents ADD COLUMN content TEXT`);
+        logger.info("Migrated local_documents: added content column");
+      }
+      if (!docCols.some((c) => c.name === "title")) {
+        db.exec(`ALTER TABLE local_documents ADD COLUMN title TEXT`);
+        logger.info("Migrated local_documents: added title column");
+      }
+
+      // FTS5 virtual table for document chunk search (idempotent)
+      db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS local_doc_chunks_fts
+        USING fts5(content, content=local_doc_chunks, content_rowid=rowid);
+      `);
+
+      // Triggers to keep FTS5 in sync with local_doc_chunks
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS local_doc_chunks_ai AFTER INSERT ON local_doc_chunks BEGIN
+          INSERT INTO local_doc_chunks_fts(rowid, content) VALUES (new.rowid, new.content);
+        END;
+      `);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS local_doc_chunks_ad AFTER DELETE ON local_doc_chunks BEGIN
+          INSERT INTO local_doc_chunks_fts(local_doc_chunks_fts, rowid, content) VALUES('delete', old.rowid, old.content);
+        END;
+      `);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS local_doc_chunks_au AFTER UPDATE ON local_doc_chunks BEGIN
+          INSERT INTO local_doc_chunks_fts(local_doc_chunks_fts, rowid, content) VALUES('delete', old.rowid, old.content);
+          INSERT INTO local_doc_chunks_fts(rowid, content) VALUES (new.rowid, new.content);
+        END;
+      `);
 
       logger.info("Local database initialized at", this.dbPath);
       return true;
@@ -577,6 +720,15 @@ class LocalDatabase {
     return mapRow<LocalStory>(
       db.prepare(`SELECT * FROM stories WHERE session_id = ?`).get(sessionId)
     );
+  }
+
+  deleteStoryForSession(sessionId: string): void {
+    if (!db) return;
+    try {
+      db.prepare(`DELETE FROM stories WHERE session_id = ?`).run(sessionId);
+    } catch (err) {
+      logger.error("deleteStoryForSession failed:", String(err));
+    }
   }
 
   getAllStories(): LocalStory[] {
@@ -1107,6 +1259,322 @@ class LocalDatabase {
     } catch (err) {
       logger.error(`setUserPreference(${key}) failed:`, String(err));
     }
+  }
+
+  // ── Local Accounts ──────────────────────────────────────────────────────
+
+  createLocalAccount(account: {
+    id: string;
+    email: string;
+    passwordHash: string;
+    firstName: string;
+    lastName: string;
+  }): void {
+    if (!db) throw new Error("DB unavailable");
+    db.prepare(
+      `INSERT INTO local_accounts (id, email, password_hash, first_name, last_name)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(account.id, account.email, account.passwordHash, account.firstName, account.lastName);
+  }
+
+  getLocalAccountByEmail(email: string): {
+    id: string;
+    email: string;
+    passwordHash: string;
+    firstName: string;
+    lastName: string;
+  } | null {
+    if (!db) return null;
+    const row = db
+      .prepare(
+        "SELECT id, email, password_hash, first_name, last_name FROM local_accounts WHERE email = ?"
+      )
+      .get(email) as
+      | { id: string; email: string; password_hash: string; first_name: string; last_name: string }
+      | undefined;
+    if (!row) return null;
+    return {
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      firstName: row.first_name,
+      lastName: row.last_name,
+    };
+  }
+
+  getLocalAccountById(id: string): {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null {
+    if (!db) return null;
+    const row = db
+      .prepare("SELECT id, email, first_name, last_name FROM local_accounts WHERE id = ?")
+      .get(id) as { id: string; email: string; first_name: string; last_name: string } | undefined;
+    if (!row) return null;
+    return { id: row.id, email: row.email, firstName: row.first_name, lastName: row.last_name };
+  }
+
+  getAnyLocalAccount(): { id: string; email: string; firstName: string; lastName: string } | null {
+    if (!db) return null;
+    const row = db
+      .prepare("SELECT id, email, first_name, last_name FROM local_accounts LIMIT 1")
+      .get() as { id: string; email: string; first_name: string; last_name: string } | undefined;
+    if (!row) return null;
+    return { id: row.id, email: row.email, firstName: row.first_name, lastName: row.last_name };
+  }
+
+  getAllLocalAccounts(): Array<{ id: string; email: string; firstName: string; lastName: string }> {
+    if (!db) return [];
+    const rows = db
+      .prepare(
+        "SELECT id, email, first_name, last_name FROM local_accounts ORDER BY created_at DESC"
+      )
+      .all() as Array<{ id: string; email: string; first_name: string; last_name: string }>;
+    return rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      firstName: r.first_name,
+      lastName: r.last_name,
+    }));
+  }
+
+  updateLocalAccountPassword(id: string, passwordHash: string): void {
+    if (!db) throw new Error("DB unavailable");
+    db.prepare(
+      `UPDATE local_accounts SET password_hash = ?, updated_at = unixepoch('now') * 1000 WHERE id = ?`
+    ).run(passwordHash, id);
+  }
+
+  // ── Agent Conversations ────────────────────────────────────────────────
+
+  createAgentConversation(id: string, userId: string, title: string): LocalAgentConversation {
+    if (!db) throw new Error("DB unavailable");
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO agent_conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run(id, userId, title, now, now);
+    return { id, userId, title, createdAt: now, updatedAt: now };
+  }
+
+  listAgentConversations(userId: string): LocalAgentConversation[] {
+    if (!db) return [];
+    return mapRows<LocalAgentConversation>(
+      db
+        .prepare(`SELECT * FROM agent_conversations WHERE user_id = ? ORDER BY updated_at DESC`)
+        .all(userId)
+    );
+  }
+
+  getAgentConversation(id: string, userId: string): LocalAgentConversation | null {
+    if (!db) return null;
+    return mapRow<LocalAgentConversation>(
+      db.prepare(`SELECT * FROM agent_conversations WHERE id = ? AND user_id = ?`).get(id, userId)
+    );
+  }
+
+  updateAgentConversationTitle(id: string, userId: string, title: string): void {
+    if (!db) return;
+    db.prepare(
+      `UPDATE agent_conversations SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+    ).run(title, Date.now(), id, userId);
+  }
+
+  touchAgentConversation(id: string): void {
+    if (!db) return;
+    db.prepare(`UPDATE agent_conversations SET updated_at = ? WHERE id = ?`).run(Date.now(), id);
+  }
+
+  deleteAgentConversation(id: string, userId: string): boolean {
+    if (!db) return false;
+    const result = db
+      .prepare(`DELETE FROM agent_conversations WHERE id = ? AND user_id = ?`)
+      .run(id, userId);
+    return result.changes > 0;
+  }
+
+  // ── Agent Messages ─────────────────────────────────────────────────────
+
+  addAgentMessage(
+    id: string,
+    conversationId: string,
+    role: string,
+    content: string,
+    toolCalls: unknown[] = []
+  ): LocalAgentMessage {
+    if (!db) throw new Error("DB unavailable");
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO agent_messages (id, conversation_id, role, content, tool_calls, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(id, conversationId, role, content, JSON.stringify(toolCalls), now);
+    return {
+      id,
+      conversationId,
+      role,
+      content,
+      toolCalls: JSON.stringify(toolCalls),
+      createdAt: now,
+    };
+  }
+
+  getAgentMessages(conversationId: string): LocalAgentMessage[] {
+    if (!db) return [];
+    return mapRows<LocalAgentMessage>(
+      db
+        .prepare(`SELECT * FROM agent_messages WHERE conversation_id = ? ORDER BY created_at ASC`)
+        .all(conversationId)
+    );
+  }
+
+  // ── Local Documents ────────────────────────────────────────────────────
+
+  insertDocument(doc: Omit<LocalDocument, "createdAt" | "updatedAt">): LocalDocument {
+    if (!db) throw new Error("DB unavailable");
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO local_documents (id, user_id, file_path, file_name, file_type, file_size, page_count, chunk_count, status, error, content, title, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      doc.id,
+      doc.userId,
+      doc.filePath,
+      doc.fileName,
+      doc.fileType,
+      doc.fileSize,
+      doc.pageCount,
+      doc.chunkCount,
+      doc.status,
+      doc.error,
+      doc.content ?? null,
+      doc.title ?? null,
+      now,
+      now
+    );
+    return { ...doc, createdAt: now, updatedAt: now };
+  }
+
+  updateDocumentStatus(
+    id: string,
+    status: string,
+    extra?: { chunkCount?: number; pageCount?: number; error?: string | null }
+  ): void {
+    if (!db) return;
+    const sets = ["status = ?", "updated_at = ?"];
+    const vals: unknown[] = [status, Date.now()];
+    if (extra?.chunkCount !== undefined) {
+      sets.push("chunk_count = ?");
+      vals.push(extra.chunkCount);
+    }
+    if (extra?.pageCount !== undefined) {
+      sets.push("page_count = ?");
+      vals.push(extra.pageCount);
+    }
+    if (extra?.error !== undefined) {
+      sets.push("error = ?");
+      vals.push(extra.error);
+    }
+    vals.push(id);
+    db.prepare(`UPDATE local_documents SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+  }
+
+  updateDocumentContent(id: string, content: string, title?: string): void {
+    if (!db) return;
+    const sets = ["content = ?", "updated_at = ?"];
+    const vals: unknown[] = [content, Date.now()];
+    if (title !== undefined) {
+      sets.push("title = ?");
+      vals.push(title);
+    }
+    vals.push(id);
+    db.prepare(`UPDATE local_documents SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+  }
+
+  listDocuments(userId: string): LocalDocument[] {
+    if (!db) return [];
+    return mapRows<LocalDocument>(
+      db
+        .prepare(`SELECT * FROM local_documents WHERE user_id = ? ORDER BY created_at DESC`)
+        .all(userId)
+    );
+  }
+
+  getDocument(id: string): LocalDocument | null {
+    if (!db) return null;
+    return mapRow<LocalDocument>(db.prepare(`SELECT * FROM local_documents WHERE id = ?`).get(id));
+  }
+
+  deleteDocument(id: string, userId: string): boolean {
+    if (!db) return false;
+    const result = db
+      .prepare(`DELETE FROM local_documents WHERE id = ? AND user_id = ?`)
+      .run(id, userId);
+    return result.changes > 0;
+  }
+
+  // ── Document Chunks ────────────────────────────────────────────────────
+
+  insertDocChunks(
+    chunks: Array<{
+      id: string;
+      documentId: string;
+      chunkIndex: number;
+      content: string;
+      charStart: number;
+      charEnd: number;
+    }>
+  ): void {
+    if (!db || chunks.length === 0) return;
+    const stmt = db.prepare(
+      `INSERT INTO local_doc_chunks (id, document_id, chunk_index, content, char_start, char_end, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const now = Date.now();
+    const insertMany = db.transaction((rows: typeof chunks) => {
+      for (const c of rows) {
+        stmt.run(c.id, c.documentId, c.chunkIndex, c.content, c.charStart, c.charEnd, now);
+      }
+    });
+    insertMany(chunks);
+  }
+
+  getDocChunks(documentId: string): LocalDocChunk[] {
+    if (!db) return [];
+    return mapRows<LocalDocChunk>(
+      db
+        .prepare(`SELECT * FROM local_doc_chunks WHERE document_id = ? ORDER BY chunk_index ASC`)
+        .all(documentId)
+    );
+  }
+
+  deleteDocChunks(documentId: string): void {
+    if (!db) return;
+    db.prepare(`DELETE FROM local_doc_chunks WHERE document_id = ?`).run(documentId);
+  }
+
+  searchDocChunks(
+    query: string,
+    userId: string,
+    limit = 15
+  ): Array<LocalDocChunk & { rank: number; documentName: string }> {
+    if (!db) return [];
+    return mapRows<LocalDocChunk & { rank: number; documentName: string }>(
+      db
+        .prepare(
+          `
+        SELECT c.*, fts.rank, d.file_name AS document_name
+        FROM local_doc_chunks_fts fts
+        JOIN local_doc_chunks c ON c.rowid = fts.rowid
+        JOIN local_documents d ON d.id = c.document_id
+        WHERE d.user_id = ?
+          AND local_doc_chunks_fts MATCH ?
+        ORDER BY fts.rank
+        LIMIT ?
+      `
+        )
+        .all(userId, query, limit)
+    );
   }
 }
 

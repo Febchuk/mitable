@@ -182,6 +182,59 @@ export const IPC_CHANNELS = {
   ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
   ON_DEVICE_READINESS_UPDATE: "on-device:readiness-update",
   ON_DEVICE_NOT_READY: "on-device:not-ready",
+
+  // Inference mode preference (hybrid pipeline testing) — @deprecated Phase 2
+  INFERENCE_MODE_GET: "inference-mode:get",
+  INFERENCE_MODE_SET: "inference-mode:set",
+  INFERENCE_TEST_PROVIDER: "inference:test-provider",
+  /** @deprecated Use INFERENCE_SAVE_CONFIG / INFERENCE_LOAD_CONFIG / INFERENCE_CLEAR_CONFIG instead */
+  INFERENCE_REFRESH_CONFIG: "inference:refresh-config",
+  REPROCESS_SESSION: "session:reprocess",
+
+  // BYOK — direct keyVault operations (no backend)
+  INFERENCE_SAVE_CONFIG: "inference:save-config",
+  INFERENCE_LOAD_CONFIG: "inference:load-config",
+  INFERENCE_CLEAR_CONFIG: "inference:clear-config",
+
+  // Resend (feedback email key)
+  RESEND_SAVE_KEY: "resend:save-key",
+  RESEND_HAS_KEY: "resend:has-key",
+  RESEND_CLEAR_KEY: "resend:clear-key",
+
+  // Local docs (on-device document RAG)
+  LOCAL_DOCS_PICK_FILE: "local-docs:pick-file",
+  LOCAL_DOCS_LIST: "local-docs:list",
+  LOCAL_DOCS_DELETE: "local-docs:delete",
+  LOCAL_DOCS_QUERY: "local-docs:query",
+  LOCAL_DOCS_GET_CHUNKS: "local-docs:get-chunks",
+  LOCAL_DOCS_GENERATE: "local-docs:generate",
+  LOCAL_DOCS_GET: "local-docs:get",
+  LOCAL_DOCS_UPDATE: "local-docs:update",
+  LOCAL_DOCS_REVISE: "local-docs:revise",
+
+  // Local agent (on-device RLM chat)
+  LOCAL_AGENT_ASK: "local-agent:ask",
+  LOCAL_AGENT_LIST_CHATS: "local-agent:list-chats",
+  LOCAL_AGENT_GET_CHAT: "local-agent:get-chat",
+  LOCAL_AGENT_CREATE_CHAT: "local-agent:create-chat",
+  LOCAL_AGENT_RENAME_CHAT: "local-agent:rename-chat",
+  LOCAL_AGENT_DELETE_CHAT: "local-agent:delete-chat",
+  LOCAL_AGENT_ADD_MESSAGE: "local-agent:add-message",
+  LOCAL_AGENT_PROGRESS: "local-agent:progress",
+
+  // Whisper setup
+  WHISPER_STATUS: "whisper:status",
+  WHISPER_RUN_SETUP: "whisper:run-setup",
+  WHISPER_SETUP_PROGRESS: "whisper:setup-progress",
+
+  // Local auth (on-device accounts)
+  LOCAL_AUTH_LIST_ACCOUNTS: "local-auth:list-accounts",
+  LOCAL_AUTH_CREATE: "local-auth:create",
+  LOCAL_AUTH_LOGIN: "local-auth:login",
+  LOCAL_AUTH_LOGOUT: "local-auth:logout",
+  LOCAL_AUTH_GET_USER: "local-auth:get-user",
+  LOCAL_AUTH_HAS_ACCOUNT: "local-auth:has-account",
+  LOCAL_AUTH_RESET_PASSWORD: "local-auth:reset-password",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

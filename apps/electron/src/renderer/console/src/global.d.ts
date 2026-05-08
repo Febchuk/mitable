@@ -433,6 +433,225 @@ interface ConsoleAPI {
   getBlockExportPath: (sessionId: string) => Promise<string | null>;
   getLocalCalendarDays: (startMs: number, endMs: number) => Promise<unknown[]>;
   getLocalSessionDetail: (sessionId: string) => Promise<unknown>;
+
+  // Inference mode preference (hybrid pipeline testing)
+  getInferenceMode?: (userId: string) => Promise<{ mode: "auto" | "local" | "cloud" } | null>;
+  setInferenceMode?: (
+    userId: string,
+    mode: "auto" | "local" | "cloud"
+  ) => Promise<{ success: boolean; error?: string }>;
+
+  // BYOK provider test — with args: tests explicit key; without: tests saved keyVault config
+  testInferenceProvider?: (
+    provider?: string,
+    apiKey?: string
+  ) => Promise<{ ok: boolean; error?: string }>;
+  /** @deprecated Use saveInferenceConfig / loadInferenceConfig / clearInferenceConfig */
+  refreshInferenceConfig?: () => Promise<{ success: boolean; provider?: string; error?: string }>;
+  // Re-run the AI pipeline on a session that failed or has no summary
+  reprocessSession?: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+
+  // BYOK — direct keyVault operations (no backend round-trip)
+  saveInferenceConfig?: (
+    provider: string,
+    apiKey?: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  loadInferenceConfig?: () => Promise<{ provider: string; maskedKey: string } | null>;
+  clearInferenceConfig?: () => Promise<{ success: boolean; error?: string }>;
+
+  // Resend key management
+  saveResendKey?: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
+  hasResendKey?: () => Promise<boolean>;
+  clearResendKey?: () => Promise<{ success: boolean; error?: string }>;
+
+  // Local docs (on-device document RAG)
+  localDocsPickFile?: () => Promise<{
+    document?: unknown;
+    canceled?: boolean;
+    error?: string;
+  }>;
+  localDocsList?: () => Promise<{
+    documents: Array<{
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }>;
+  localDocsDelete?: (docId: string) => Promise<{ success?: boolean; error?: string }>;
+  localDocsQuery?: (question: string) => Promise<{
+    answer?: string;
+    sources?: Array<{ documentName: string; chunkIndex: number }>;
+    error?: string;
+  }>;
+  localDocsGetChunks?: (docId: string) => Promise<{
+    chunks: Array<{
+      id: string;
+      documentId: string;
+      chunkIndex: number;
+      content: string;
+      charStart: number;
+      charEnd: number;
+      createdAt: number;
+    }>;
+  }>;
+
+  localDocsGenerate?: (
+    prompt: string,
+    sessionIds?: string[]
+  ) => Promise<{
+    documentId?: string;
+    title?: string;
+    content?: string;
+    error?: string;
+  }>;
+
+  localDocsGet?: (docId: string) => Promise<{
+    document?: {
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      content: string | null;
+      title: string | null;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }>;
+
+  localDocsUpdate?: (
+    docId: string,
+    data: { content?: string; title?: string }
+  ) => Promise<{
+    success?: boolean;
+    error?: string;
+  }>;
+
+  localDocsRevise?: (
+    instruction: string,
+    currentContent: string
+  ) => Promise<{
+    suggestion?: string;
+    error?: string;
+  }>;
+
+  // Local agent (on-device RLM chat)
+  localAgentAsk?: (data: {
+    message: string;
+    conversationId?: string;
+    timezone?: string;
+  }) => Promise<{ response?: string; error?: string }>;
+  localAgentListChats?: () => Promise<{
+    conversations: Array<{
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }>;
+  localAgentGetChat?: (chatId: string) => Promise<{
+    conversation: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    messages: Array<{
+      id: string;
+      conversationId: string;
+      role: string;
+      content: string;
+      toolCalls: string;
+      createdAt: number;
+    }>;
+  } | null>;
+  localAgentCreateChat?: (data?: { id?: string; title?: string }) => Promise<{
+    conversation?: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }>;
+  localAgentRenameChat?: (
+    chatId: string,
+    title: string
+  ) => Promise<{ success?: boolean; error?: string }>;
+  localAgentDeleteChat?: (chatId: string) => Promise<{ success?: boolean; error?: string }>;
+  onAgentProgress?: (
+    callback: (event: { phase: string; tool?: string; iteration: number }) => void
+  ) => () => void;
+  localAgentAddMessage?: (data: {
+    conversationId: string;
+    role: string;
+    content: string;
+    toolCalls?: unknown[];
+  }) => Promise<{ message?: unknown; error?: string }>;
+
+  // Whisper setup
+  whisperStatus?: () => Promise<{ ready: boolean; downloading: boolean; percent: number }>;
+  whisperRunSetup?: () => Promise<{ success: boolean }>;
+  onWhisperProgress?: (
+    callback: (event: { stage: string; percent: number; label: string }) => void
+  ) => () => void;
+
+  // Local auth (on-device accounts)
+  localAuthListAccounts?: () => Promise<
+    Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    }>
+  >;
+  localAuthCreate?: (data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) => Promise<{ success: boolean; userId?: string; error?: string }>;
+  localAuthLogin?: (
+    email: string,
+    password: string
+  ) => Promise<{
+    success: boolean;
+    userId?: string;
+    firstName?: string;
+    lastName?: string;
+    error?: string;
+  }>;
+  localAuthLogout?: () => Promise<void>;
+  localAuthGetUser?: () => Promise<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null>;
+  localAuthHasAccount?: () => Promise<boolean>;
+  localAuthResetPassword?: (
+    email: string,
+    oldPassword: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {

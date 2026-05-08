@@ -11,6 +11,7 @@ import {
   User,
   Clipboard,
   Check,
+  RotateCw,
 } from "lucide-react";
 import type { WorkBlock } from "./types";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
@@ -274,7 +275,8 @@ export default function ActivityBlock({
 }: ActivityBlockProps) {
   const isSummarizing = block.status === "summarizing";
   const [isExpanded, setIsExpanded] = useState(defaultExpanded || isSummarizing);
-  const progress = usePipelineProgress(block.id, isSummarizing);
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const progress = usePipelineProgress(block.id, isSummarizing || isReprocessing);
   const notReadyMessage = useDeviceNotReady(block.id);
 
   useEffect(() => {
@@ -288,6 +290,17 @@ export default function ActivityBlock({
   const timeRange = `${formatTime(block.startTime)} - ${block.endTime ? formatTime(block.endTime) : "now"}`;
 
   const hasTasks = block.taskBreakdown && block.taskBreakdown.length > 0;
+  const hasSummary = !!block.summary && block.summary.length > 40;
+  const canReprocess =
+    !isActive && !isSummarizing && !isReprocessing && !hasSummary && !hasTasks && !isMeeting;
+
+  const handleReprocess = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.consoleAPI?.reprocessSession) return;
+    setIsReprocessing(true);
+    setIsExpanded(true);
+    await window.consoleAPI.reprocessSession(block.id);
+  };
 
   // Render markdown summary for meeting blocks and task-less session blocks
   const renderedSummaryHtml = useMemo(() => {
@@ -444,6 +457,60 @@ export default function ActivityBlock({
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
               Summarizing
+            </span>
+          ) : canReprocess ? (
+            <button
+              onClick={handleReprocess}
+              style={{
+                padding: "3px 8px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                background: "rgba(var(--mi-accent-rgb), 0.1)",
+                color: "var(--mi-accent)",
+                border: "0.5px solid rgba(var(--mi-accent-rgb), 0.25)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <RotateCw size={10} />
+              Reprocess
+            </button>
+          ) : isReprocessing ? (
+            <span
+              style={{
+                padding: "3px 8px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "rgba(99, 102, 241, 0.14)",
+                color: "#818CF8",
+                border: "0.5px solid rgba(99, 102, 241, 0.28)",
+              }}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ animation: "spin 1s linear infinite" }}
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Reprocessing
             </span>
           ) : (
             <span
@@ -649,7 +716,7 @@ export default function ActivityBlock({
                   </p>
                 </div>
               )}
-              {isSummarizing && !notReadyMessage && (
+              {(isSummarizing || isReprocessing) && !notReadyMessage && (
                 <div style={{ padding: "16px 0 8px" }}>
                   <div
                     style={{

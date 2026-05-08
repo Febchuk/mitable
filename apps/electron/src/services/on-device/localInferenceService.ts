@@ -31,7 +31,6 @@ import { ollamaService } from "./ollamaService";
 import { localDb } from "./localDb";
 import { localAudioService } from "./localAudioService";
 import { whisperCliService } from "./whisperCliService";
-import { sherpaWhisperService } from "./sherpaWhisperService";
 import { sessionTimeline, type TranscriptSegment } from "./sessionTimeline";
 import { runRLMLoop, type CompletionFn } from "./rlm/local-rlm-engine";
 import { StorytellerEnvironment } from "./rlm/storyteller-rlm-environment";
@@ -80,6 +79,27 @@ class LocalInferenceService {
   private currentSessionId: string | null = null;
   private exportPaths = new Map<string, string>();
 
+  // ── Hybrid inference entry point ────────────────────────────────────────
+  /**
+   * Analyze a batch of frames using local Ollama vision.
+   * Called by hybridInferenceService when hardware is capable.
+   */
+  async analyzeBatchLocal(
+    batch: BufferedFrame[],
+    transcriptSegments: string
+  ): Promise<BatchAnalysisResult> {
+    // Run sensor (vision analysis)
+    const sensorResults = await this.runConsecutiveSensor(batch);
+
+    // Run classifier (summarize batch narrative)
+    const batchNarrative = await this.classifyBatch(batch, sensorResults, transcriptSegments);
+
+    return {
+      frameDescriptions: sensorResults.flatMap((s) => s.frameDescriptions),
+      batchNarrative,
+    };
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
   start(sessionId: string): void {
@@ -88,9 +108,6 @@ class LocalInferenceService {
     whisperCliService
       .initialize()
       .catch((err) => logger.warn("whisper-cli pre-init failed:", String(err)));
-    sherpaWhisperService
-      .initialize()
-      .catch((err) => logger.warn("sherpa-whisper fallback pre-init failed:", String(err)));
 
     logger.info("Started local inference for session", sessionId);
   }
@@ -538,16 +555,13 @@ class LocalInferenceService {
     sessionId: string
   ): Promise<string> {
     const useCli = whisperCliService.isReady() || (await whisperCliService.initialize());
-    const useSherpa =
-      !useCli && (sherpaWhisperService.isReady() || (await sherpaWhisperService.initialize()));
 
-    if (!useCli && !useSherpa) {
-      logger.warn("No Whisper engine available — skipping transcription");
+    if (!useCli) {
+      logger.warn("whisper-cli not available — skipping transcription");
       return "";
     }
 
-    const engine = useCli ? "whisper-cli" : "sherpa";
-    logger.info(`Transcribing with ${engine}`);
+    logger.info("Transcribing with whisper-cli");
 
     const parts: string[] = [];
 
@@ -557,9 +571,7 @@ class LocalInferenceService {
 
       const t0 = Date.now();
       try {
-        const transcript = useCli
-          ? await whisperCliService.transcribeChunked(pcm, 25)
-          : sherpaWhisperService.transcribeChunked(pcm, 15);
+        const transcript = await whisperCliService.transcribeChunked(pcm, 25);
 
         const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
@@ -739,7 +751,26 @@ class LocalInferenceService {
       const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
 
       const docsDir = electronApp.getPath("documents");
-      const dayDir = join(docsDir, "Mitable", "blockdata", dayFolder);
+
+      let userFolder = "";
+      try {
+        const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+        logger.info(`[BlockPath] activeLocalUserId = ${activeId || "(empty)"}`);
+        if (activeId) {
+          const account = localDb.getLocalAccountById(activeId);
+          logger.info(`[BlockPath] account email = ${account?.email || "(not found)"}`);
+          if (account?.email) {
+            userFolder = account.email.replace(/[<>:"/\\|?*]/g, "_");
+          }
+        }
+      } catch (err) {
+        logger.warn("[BlockPath] Failed to resolve user folder:", String(err));
+      }
+
+      const baseParts = ["Mitable"];
+      if (userFolder) baseParts.push(userFolder);
+      baseParts.push("blockdata", dayFolder);
+      const dayDir = join(docsDir, ...baseParts);
       await fs.mkdir(dayDir, { recursive: true });
 
       let blockNum = 1;
@@ -956,6 +987,15 @@ export interface OnDeviceSummary {
   taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
   timeBreakdown: Record<string, number> | null;
   modelUsed: string;
+}
+
+export interface BatchAnalysisResult {
+  frameDescriptions: Array<{
+    sequenceNumber: number;
+    description: string;
+    userAction: string | null;
+  }>;
+  batchNarrative: string;
 }
 
 export const localInferenceService = new LocalInferenceService();

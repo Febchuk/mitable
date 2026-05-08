@@ -20,6 +20,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { createLogger } from "../lib/logger";
+import type { IntervalEvidence } from "./activityTracker";
 
 const logger = createLogger("LocalFrameStorage");
 
@@ -33,6 +34,12 @@ export interface FrameMetadata {
   windowTitle: string;
   trigger: "periodic" | "focus_change" | "manual";
   hash: string;
+
+  // Activity evidence captured at frame time
+  intervalEvidence?: IntervalEvidence;
+
+  // Browser context (if applicable)
+  browserContext?: { activeTabUrl: string; activeTabTitle: string; tabCount: number };
 
   // Analysis results (populated later)
   analysisStatus?: "pending" | "analyzed" | "skipped" | "duplicate";

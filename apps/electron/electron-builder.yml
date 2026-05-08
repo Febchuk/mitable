@@ -84,6 +84,11 @@ extraResources:
     to: "resources/tray-icon.png"
   - from: "resources/tray-icon@2x.png"
     to: "resources/tray-icon@2x.png"
+  # Whisper CLI binary (platform-specific, populated by scripts/download-whisper.js)
+  - from: "resources/whisper/${os}"
+    to: "whisper"
+    filter:
+      - "**/*"
 
 # Files to include (electron-vite bundles everything to out/)
 files:
@@ -97,6 +102,8 @@ files:
   - "node_modules/keytar/**/*"
   - "node_modules/uiohook-napi/**/*"
   - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
+  - "node_modules/better-sqlite3/**/*"
+  - "node_modules/bcryptjs/**/*"
   # Exclude everything else
   - "!src"
   - "!**/*.{ts,tsx,map}"
@@ -113,6 +120,7 @@ asarUnpack:
   - "node_modules/keytar/**/*"
   - "node_modules/uiohook-napi/**/*"
   - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
+  - "node_modules/better-sqlite3/**/*"
 
 # Build artifact configuration
 artifactName: "${productName}-${version}-${arch}.${ext}"

@@ -46,9 +46,8 @@ export function registerBeforeQuitHandlers(): void {
     browserBridgeService.stop();
 
     try {
-      const { whisperCliService, sherpaWhisperService } = await import("../../services/on-device");
+      const { whisperCliService } = await import("../../services/on-device");
       whisperCliService.shutdown();
-      sherpaWhisperService.shutdown();
     } catch {
       /* ignore */
     }

@@ -187,21 +187,56 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // Load user from token on mount
   useEffect(() => {
     const loadUser = async () => {
+      // ── Local account check (primary path) ──────────────────────────
+      if (window.consoleAPI?.localAuthGetUser) {
+        try {
+          const localUser = await window.consoleAPI.localAuthGetUser();
+          if (localUser) {
+            authService.clearTokens();
+
+            const fullName = `${localUser.firstName || ""} ${localUser.lastName || ""}`.trim();
+            const newUser: User = {
+              id: localUser.id,
+              name: fullName || localUser.email,
+              firstName: localUser.firstName || "",
+              email: localUser.email,
+              currentWeek: 1,
+              role: "employee",
+              organizationId: "local",
+              isLocalAccount: true,
+            };
+            setUser(newUser);
+            setIsAuthenticated(true);
+            setIsLoading(false);
+
+            if (window.consoleAPI?.setCurrentUser) {
+              window.consoleAPI.setCurrentUser({
+                userId: localUser.id,
+                organizationId: "local",
+                role: "employee",
+                email: localUser.email,
+                firstName: localUser.firstName,
+                lastName: localUser.lastName,
+              });
+            }
+
+            logger.info("Local account authenticated", { userId: localUser.id });
+            return;
+          }
+        } catch (err) {
+          logger.warn("Local account check failed:", err);
+        }
+      }
+
+      // ── Legacy token-based auth (@deprecated — backend auth) ────────
       const token = authService.getAccessToken();
 
-      // In Electron, the main process pushes offline identity via IPC —
-      // don't eagerly hit the backend if the consoleAPI is available.
       const isElectron = !!window.consoleAPI;
 
       if (!token) {
         if (isElectron) {
-          logger.info("No local token — waiting for main process identity (IPC)");
-          setTimeout(() => {
-            setIsLoading((prev) => {
-              if (!authService.getAccessToken()) return false;
-              return prev;
-            });
-          }, 3000);
+          logger.info("No local account or token — sending to login");
+          setIsLoading(false);
           return;
         }
         logger.info("No local token, waiting for keychain restore…");
@@ -321,9 +356,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe?.();
   }, []);
 
-  // Background token refresh - keeps sessions alive for long-running usage
+  /** @deprecated Background token refresh — not needed for local accounts */
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || user?.isLocalAccount) return;
 
     const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
@@ -374,6 +409,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    if (user?.isLocalAccount) {
+      if (window.consoleAPI?.localAuthLogout) {
+        await window.consoleAPI.localAuthLogout();
+      }
+      setUser(null);
+      setOrganization(null);
+      setIsAuthenticated(false);
+      return;
+    }
+
+    /** @deprecated Backend token-based logout */
     const token = authService.getAccessToken();
     if (token) {
       try {

@@ -19,6 +19,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ConsoleLayout from "./components/layout/ConsoleLayout";
 import LoginPage from "./pages/LoginPage";
+import CreateAccountPage from "./pages/CreateAccountPage";
+import SetupPage from "./pages/SetupPage";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
+/** @deprecated Backend auth pages — kept for migration reference */
 import SignupOrganizationPage from "./pages/SignupOrganizationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -29,20 +33,9 @@ import RecapsView from "./components/views/employee/RecapsView";
 import RecapDetail from "./components/views/employee/RecapsView/RecapDetail";
 import { monitoringKeys } from "./hooks/queries/monitoring";
 import DocsView from "./components/views/employee/DocsView";
-import DocDetail from "./components/views/employee/DocsView/DocDetail";
+import LocalDocDetail from "./components/views/employee/DocsView/LocalDocDetail";
 import UserProfilePage from "./pages/settings";
-// DEPRECATED: Admin views hidden — moving to web app. Imports kept for migration reference.
-// import DashboardView from "./components/views/admin/DashboardView";
-// import CustomerDetailView from "./components/views/admin/DashboardView/CustomerDetailView";
-// import PeopleView from "./components/views/admin/PeopleView";
-// import AddNewUser from "./components/views/admin/PeopleView/AddNewUser";
-// import PersonDetail from "./components/views/admin/PeopleView/PersonDetail";
-// import IntegrationsView from "./components/views/admin/IntegrationsView";
 import AgentView from "./components/views/employee/AgentView";
-import MeView from "./components/views/employee/MeView";
-import BragbookView from "./components/views/employee/BragbookView";
-import BenchmarksRouter from "./components/views/shared/BenchmarksRouter";
-import BenchmarkDetailRouter from "./components/views/shared/BenchmarkDetailRouter";
 // DEPRECATED: Admin benchmark views hidden — moving to web app.
 // import PersonBenchmarkView from "./components/views/admin/BenchmarksView/PersonBenchmarkView";
 // import BenchmarkEditor from "./components/views/admin/BenchmarksView/BenchmarkEditor";
@@ -265,8 +258,12 @@ function App() {
                   <DevFlagsProvider>
                     <RecapsProvider>
                       <Routes>
-                        {/* Public routes */}
+                        {/* Public routes — local auth */}
                         <Route path="/login" element={<LoginPage />} />
+                        <Route path="/create-account" element={<CreateAccountPage />} />
+                        <Route path="/setup" element={<SetupPage />} />
+                        <Route path="/change-password" element={<ChangePasswordPage />} />
+                        {/* @deprecated Backend auth routes */}
                         <Route path="/signup-organization" element={<SignupOrganizationPage />} />
                         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                         <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -303,14 +300,18 @@ function App() {
                           <Route path="org-chart" element={<Navigate to="/calendar" replace />} />
                           <Route path="teams" element={<Navigate to="/calendar" replace />} />
 
-                          {/* Employee Routes */}
-                          <Route path="me" element={<MeView />} />
-                          <Route path="bragbook" element={<BragbookView />} />
-                          <Route path="benchmarks" element={<BenchmarksRouter />} />
-                          <Route path="benchmarks/:id" element={<BenchmarkDetailRouter />} />
-                          <Route path="reports/:docId" element={<DocDetail />} />
+                          {/* @deprecated Me/Bragbook/Benchmarks hidden — personal app */}
+                          <Route path="me" element={<Navigate to="/calendar" replace />} />
+                          <Route path="bragbook" element={<Navigate to="/calendar" replace />} />
+                          <Route path="benchmarks" element={<Navigate to="/calendar" replace />} />
+                          <Route
+                            path="benchmarks/:id"
+                            element={<Navigate to="/calendar" replace />}
+                          />
+                          {/* @deprecated reports/docs detail — local docs use inline Q&A */}
+                          <Route path="reports/:docId" element={<Navigate to="/docs" replace />} />
                           <Route path="docs" element={<DocsView />} />
-                          <Route path="docs/:docId" element={<DocDetail />} />
+                          <Route path="docs/:docId" element={<LocalDocDetail />} />
                           {/* Calendar/Journal Routes */}
                           <Route path="calendar" element={<CalendarView />} />
                           <Route path="recaps" element={<RecapsView />} />

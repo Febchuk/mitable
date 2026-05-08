@@ -7,7 +7,7 @@
  * Pascal-era CUDA crashes — whisper small on CPU handles 60s chunks fine.
  *
  * Lifecycle:
- *   1. modelManager downloads the binary zip + model file
+ *   1. whisperSetupService downloads/builds the binary + model file
  *   2. whisperServerService.start() validates paths, marks ready
  *   3. localAudioService calls transcribe(wavBuffer) per ~60s chunk
  *   4. whisperServerService.stop() is a clean no-op
@@ -19,7 +19,7 @@ import { writeFile, unlink, mkdir } from "fs/promises";
 import { randomUUID } from "crypto";
 import { app } from "electron";
 import { createLogger } from "../../lib/logger";
-import { modelManager } from "./modelManager";
+import { whisperSetupService } from "./whisperSetupService";
 
 const logger = createLogger("WhisperCLI");
 
@@ -69,13 +69,10 @@ class WhisperServerService {
     this.config = { ...DEFAULT_CONFIG, ...overrides };
     this.status = "starting";
 
-    const serverPath = modelManager.getWhisperServerPath();
-    if (!serverPath) throw new Error("whisper binaries not installed");
+    const cliPath = whisperSetupService.getCliPath();
+    if (!cliPath) throw new Error("whisper binaries not installed");
 
-    const whisperDir = dirname(serverPath);
-    const cliPath = join(whisperDir, "Release", "whisper-cli.exe");
-
-    this.modelPath = modelManager.getWhisperModelPath();
+    this.modelPath = whisperSetupService.getModelPath();
     if (!this.modelPath) throw new Error("Whisper model not installed");
 
     this.cliBin = cliPath;

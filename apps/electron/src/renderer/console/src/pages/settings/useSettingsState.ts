@@ -1590,31 +1590,10 @@ export function useSettingsState() {
     }
   };
 
-  // API Keys handlers
+  /** @deprecated Backend API keys removed — BYOK keys stored locally via keyVault */
   const loadApiKeys = useCallback(async () => {
-    setIsApiKeysLoading(true);
-    try {
-      const data = await apiRequest<{
-        keys: Array<{
-          id: string;
-          name: string;
-          keyPrefix: string;
-          lastUsedAt: string | null;
-          createdAt: string;
-          revokedAt: string | null;
-        }>;
-      }>("/api-keys");
-      setApiKeys(data.keys.filter((k) => !k.revokedAt));
-    } catch (error) {
-      logger.error("Error loading API keys:", error);
-    } finally {
-      setIsApiKeysLoading(false);
-    }
+    setIsApiKeysLoading(false);
   }, []);
-
-  useEffect(() => {
-    loadApiKeys();
-  }, [loadApiKeys]);
 
   const handleCreateApiKey = async () => {
     if (!newKeyName.trim()) return;
@@ -1711,7 +1690,16 @@ export function useSettingsState() {
     setIsChangingPassword(true);
 
     try {
-      await authService.changePassword(currentPassword, newPassword);
+      if (user?.isLocalAccount && window.consoleAPI?.localAuthResetPassword && user.email) {
+        const result = await window.consoleAPI.localAuthResetPassword(
+          user.email,
+          currentPassword,
+          newPassword
+        );
+        if (!result.success) throw new Error(result.error || "Password change failed");
+      } else {
+        await authService.changePassword(currentPassword, newPassword);
+      }
 
       toast({
         title: "Password changed successfully",

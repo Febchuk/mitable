@@ -1,486 +1,672 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  Cpu,
-  MemoryStick,
-  Monitor,
-  Zap,
-  Loader2,
-  AlertCircle,
-  RefreshCw,
-  CheckCircle2,
-  Circle,
-} from "lucide-react";
-import { useUser } from "../../context/UserContext";
+import { Eye, EyeOff, CheckCircle, XCircle, Loader2, Zap, Mail } from "lucide-react";
+import { createLogger } from "../../../../lib/logger";
 
-interface GpuInfo {
-  name: string;
-  vramMB: number;
-  type: "dedicated" | "integrated";
-  vendor: "nvidia" | "amd" | "intel" | "apple" | "unknown";
+const logger = createLogger("SetupTab");
+
+type ProviderName = "google" | "openai" | "anthropic";
+
+interface SavedConfig {
+  provider?: ProviderName;
+  hasKey?: boolean;
+  maskedKey?: string;
 }
 
-interface SystemInfo {
-  cpu: string;
-  ramMB: number;
-  os: string;
-  gpus: GpuInfo[];
-  platform: string;
-  error?: string;
+function GeminiLogo({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+      <path
+        d="M14 0C14 7.732 7.732 14 0 14c7.732 0 14 6.268 14 14 0-7.732 6.268-14 14-14-7.732 0-14-6.268-14-14Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
-interface AiStatus {
-  serverStatus: string;
-  isSetUp: boolean;
+function OpenAILogo({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.998 5.998 0 0 0-3.998 2.9 6.042 6.042 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073ZM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494ZM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646ZM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872v.024Zm16.597 3.855-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667Zm2.01-3.023-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66v.018Zm-12.64 4.135-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681l-.004 6.722Zm1.098-2.367 2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5-.005-2.999Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
-function formatVram(mb: number): string {
-  if (mb <= 0) return "";
-  if (mb >= 1024) return `${Math.round(mb / 1024)} GB`;
-  return `${mb} MB`;
+function AnthropicLogo({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96Zm-7.258 0H10.172L16.74 20.48h-3.603L6.57 3.52ZM0 20.48h3.603L10.172 3.52H6.569L0 20.48Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
 }
 
-function vendorColor(vendor: GpuInfo["vendor"]): string {
-  switch (vendor) {
-    case "nvidia":
-      return "#76b900";
-    case "amd":
-      return "#ed1c24";
-    case "intel":
-      return "#0071c5";
-    case "apple":
-      return "#a3aaae";
-    default:
-      return "var(--text-tertiary)";
+const KEY_PREFIXES: Record<ProviderName, { prefix: string[]; hint: string }> = {
+  google: { prefix: ["AIza"], hint: "Google keys start with AIza..." },
+  openai: { prefix: ["sk-"], hint: "OpenAI keys start with sk-..." },
+  anthropic: { prefix: ["sk-ant-"], hint: "Anthropic keys start with sk-ant-..." },
+};
+
+function validateKeyForProvider(provider: ProviderName, key: string): string | null {
+  if (!key) return null;
+  const trimmed = key.trim();
+  const { prefix, hint } = KEY_PREFIXES[provider];
+
+  if (provider === "openai" && trimmed.startsWith("sk-ant-")) {
+    return "This looks like an Anthropic key, not an OpenAI key.";
   }
+  if (!prefix.some((p) => trimmed.startsWith(p))) {
+    return `Wrong key format for ${PROVIDERS.find((p) => p.id === provider)?.label}. ${hint}`;
+  }
+  return null;
 }
 
-function vendorLabel(vendor: GpuInfo["vendor"]): string {
-  switch (vendor) {
-    case "nvidia":
-      return "NVIDIA";
-    case "amd":
-      return "AMD";
-    case "intel":
-      return "Intel";
-    case "apple":
-      return "Apple";
-    default:
-      return "";
-  }
-}
+const PROVIDERS: {
+  id: ProviderName;
+  label: string;
+  description: string;
+  logo: React.FC<{ size?: number }>;
+}[] = [
+  { id: "google", label: "Google Gemini", description: "Cheapest, great vision", logo: GeminiLogo },
+  { id: "openai", label: "OpenAI", description: "Reliable all-rounder", logo: OpenAILogo },
+  { id: "anthropic", label: "Anthropic", description: "Fast and accurate", logo: AnthropicLogo },
+];
 
 export default function SetupTab() {
-  const { user } = useUser();
-  const [system, setSystem] = useState<SystemInfo | null>(null);
-  const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
-  const [selectedGpu, setSelectedGpu] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isRemoving, setIsRemoving] = useState(false);
+  // AI Provider state
+  const [selectedProvider, setSelectedProvider] = useState<ProviderName>("google");
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [savedConfig, setSavedConfig] = useState<SavedConfig>({});
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const loadSystemInfo = useCallback(async () => {
+  // Resend state
+  const [resendKey, setResendKey] = useState("");
+  const [showResendKey, setShowResendKey] = useState(false);
+  const [savedResendKey, setSavedResendKey] = useState(false);
+  const [savingResend, setSavingResend] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+
+  const isConnected = !!savedConfig.hasKey;
+
+  const loadConfig = useCallback(async () => {
     try {
-      const info = await window.consoleAPI.onDeviceGetSystemInfo();
-      if (info.error) setError(info.error);
-      setSystem(info);
+      setLoading(true);
+      const config = await window.consoleAPI?.loadInferenceConfig?.();
+      if (config?.provider) {
+        setSavedConfig({
+          provider: config.provider as ProviderName,
+          hasKey: true,
+          maskedKey: config.maskedKey,
+        });
+        setSelectedProvider(config.provider as ProviderName);
+      } else {
+        setSavedConfig({});
+      }
+
+      const hasResend = await window.consoleAPI?.hasResendKey?.();
+      setSavedResendKey(!!hasResend);
     } catch (err) {
-      setError(String(err));
-    }
-  }, []);
-
-  const loadAiStatus = useCallback(async () => {
-    try {
-      const status = await window.consoleAPI.onDeviceGetStatus();
-      setAiStatus({
-        serverStatus: status.serverStatus,
-        isSetUp: status.isSetUp,
-      });
-    } catch {
-      // non-critical
-    }
-  }, []);
-
-  const loadGpuPreference = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const pref = await window.consoleAPI.onDeviceGetGpuPreference(user.id);
-      if (pref) setSelectedGpu(pref);
-    } catch {
-      // fall through to auto-select
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    (async () => {
-      setIsLoading(true);
-      await Promise.all([loadSystemInfo(), loadAiStatus(), loadGpuPreference()]);
-      setIsLoading(false);
-    })();
-  }, [loadSystemInfo, loadAiStatus, loadGpuPreference]);
-
-  // Auto-select the best GPU if no preference is stored
-  useEffect(() => {
-    if (!system || selectedGpu) return;
-    const dedicated = system.gpus.filter((g) => g.type === "dedicated");
-    const best = dedicated.sort((a, b) => b.vramMB - a.vramMB)[0] ?? system.gpus[0];
-    if (best) setSelectedGpu(best.name);
-  }, [system, selectedGpu]);
-
-  // Poll AI status while active
-  useEffect(() => {
-    if (!aiStatus) return;
-    const active =
-      aiStatus.serverStatus !== "stopped" &&
-      aiStatus.serverStatus !== "ready" &&
-      aiStatus.serverStatus !== "error";
-    if (!active) return;
-    const interval = setInterval(loadAiStatus, 2_000);
-    return () => clearInterval(interval);
-  }, [aiStatus, loadAiStatus]);
-
-  const handleGpuSelect = async (gpuName: string) => {
-    setSelectedGpu(gpuName);
-    if (user?.id) {
-      await window.consoleAPI.onDeviceSetGpuPreference(user.id, gpuName);
-    }
-  };
-
-  const handleReinstall = async () => {
-    setIsRemoving(true);
-    try {
-      await window.consoleAPI.onDeviceRemoveAll();
-      await loadAiStatus();
-    } catch (err) {
-      setError(String(err));
+      logger.error("Failed to load config:", err);
     } finally {
-      setIsRemoving(false);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const handleSave = async () => {
+    if (!apiKey && !savedConfig.hasKey) return;
+    if (apiKey) {
+      const err = validateKeyForProvider(selectedProvider, apiKey);
+      if (err) {
+        setKeyError(err);
+        return;
+      }
+    }
+
+    setSaving(true);
+    setSaveMessage(null);
+    setTestResult(null);
+
+    try {
+      const result = await window.consoleAPI?.saveInferenceConfig?.(
+        selectedProvider,
+        apiKey || undefined
+      );
+
+      if (result?.success) {
+        setSaveMessage("Saved! Your AI provider is active.");
+        setApiKey("");
+        await loadConfig();
+      } else {
+        setSaveMessage(`Failed to save: ${result?.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      setSaveMessage(`Failed to save: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const isMac = system?.platform === "darwin";
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    setSaveMessage(null);
+    setTestResult(null);
 
-  if (isLoading) {
+    try {
+      await window.consoleAPI?.clearInferenceConfig?.();
+      setSavedConfig({});
+      setSelectedProvider("google");
+      setApiKey("");
+      setSaveMessage("Provider disconnected.");
+    } catch (err) {
+      setSaveMessage(`Failed to disconnect: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+
+    try {
+      if (!window.consoleAPI?.testInferenceProvider) {
+        setTestResult({ ok: false, error: "Restart the app to enable live provider testing." });
+        return;
+      }
+
+      if (apiKey) {
+        const err = validateKeyForProvider(selectedProvider, apiKey);
+        if (err) {
+          setTestResult({ ok: false, error: err });
+          return;
+        }
+        const result = await window.consoleAPI.testInferenceProvider(selectedProvider, apiKey);
+        setTestResult(result);
+      } else if (savedConfig.hasKey) {
+        const result = await window.consoleAPI.testInferenceProvider();
+        setTestResult(result);
+      } else {
+        setTestResult({ ok: false, error: "Enter an API key first" });
+      }
+    } catch (err) {
+      setTestResult({ ok: false, error: String(err) });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSaveResend = async () => {
+    if (!resendKey.trim()) return;
+    setSavingResend(true);
+    setResendMessage(null);
+
+    try {
+      const result = await window.consoleAPI?.saveResendKey?.(resendKey.trim());
+      if (result?.success) {
+        setResendMessage("Resend key saved! You can now send feedback.");
+        setResendKey("");
+        setSavedResendKey(true);
+      } else {
+        setResendMessage(`Failed: ${result?.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      setResendMessage(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingResend(false);
+    }
+  };
+
+  const handleClearResend = async () => {
+    try {
+      await window.consoleAPI?.clearResendKey?.();
+      setSavedResendKey(false);
+      setResendMessage("Resend key removed.");
+    } catch (err) {
+      setResendMessage(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  if (loading) {
     return (
-      <div style={{ padding: 8 }}>
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-secondary)" }}
-        >
-          <Loader2 size={16} className="animate-spin" />
-          <span style={{ fontSize: 13 }}>Detecting hardware...</span>
-        </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "40px 0",
+          color: "var(--text-tertiary)",
+        }}
+      >
+        <Loader2 size={16} className="animate-spin" />
+        Loading...
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 640 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h2
-          style={{
-            fontSize: 16,
-            fontWeight: 500,
-            color: "var(--text-primary)",
-            margin: "0 0 6px",
-          }}
-        >
-          System
-        </h2>
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5 }}>
-          Mitable uses your hardware to run AI locally. All data stays on your device.
-        </p>
-      </div>
-
-      {error && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 14px",
-            background: "rgba(239, 68, 68, 0.08)",
-            border: "1px solid rgba(239, 68, 68, 0.2)",
-            borderRadius: 8,
-            marginBottom: 20,
-            fontSize: 13,
-            color: "#ef4444",
-          }}
-        >
-          <AlertCircle size={15} />
-          {error}
-        </div>
-      )}
-
-      {/* System overview cards */}
-      <div
+    <div style={{ padding: "20px 0" }}>
+      {/* ── AI Provider Section ── */}
+      <h3
         style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 12,
-          marginBottom: 28,
+          fontFamily: "var(--font-serif)",
+          fontSize: 18,
+          color: "var(--text-primary)",
+          fontWeight: 400,
+          marginBottom: 4,
         }}
       >
-        {/* CPU */}
-        <div
+        AI Provider
+      </h3>
+      <p
+        style={{
+          color: "var(--text-tertiary)",
+          fontSize: 13,
+          marginBottom: 24,
+          lineHeight: 1.5,
+        }}
+      >
+        Choose your AI provider and enter your API key. This powers session analysis, screenshot
+        descriptions, and summaries. Your key is stored securely on this device.
+      </p>
+
+      {/* Provider selector */}
+      <div style={{ marginBottom: 20 }}>
+        <label
           style={{
-            padding: "14px 16px",
-            background: "var(--bg-secondary)",
-            borderRadius: 10,
-            border: "1px solid var(--border-subtle)",
+            display: "block",
+            fontSize: 12,
+            color: "var(--text-secondary)",
+            marginBottom: 8,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <Cpu size={13} style={{ color: "var(--text-tertiary)" }} />
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                color: "var(--text-tertiary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              Processor
-            </span>
-          </div>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              margin: 0,
-              lineHeight: 1.4,
-              wordBreak: "break-word",
-            }}
-          >
-            {system?.cpu ?? "Unknown"}
-          </p>
-        </div>
-
-        {/* RAM */}
-        <div
-          style={{
-            padding: "14px 16px",
-            background: "var(--bg-secondary)",
-            borderRadius: 10,
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <MemoryStick size={13} style={{ color: "var(--text-tertiary)" }} />
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                color: "var(--text-tertiary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              Memory
-            </span>
-          </div>
-          <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
-            {system ? `${Math.round(system.ramMB / 1024)} GB` : "—"}
-          </p>
-        </div>
-
-        {/* OS */}
-        <div
-          style={{
-            padding: "14px 16px",
-            background: "var(--bg-secondary)",
-            borderRadius: 10,
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <Monitor size={13} style={{ color: "var(--text-tertiary)" }} />
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                color: "var(--text-tertiary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              Operating System
-            </span>
-          </div>
-          <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
-            {system?.os ?? "—"}
-          </p>
-        </div>
-      </div>
-
-      {/* Graphics cards */}
-      <div style={{ marginBottom: 28 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 12,
-          }}
-        >
-          <h3 style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
-            Graphics
-          </h3>
-          {!isMac && system && system.gpus.length > 1 && (
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-              Select which GPU Mitable should use
-            </span>
-          )}
-        </div>
-
-        <div
-          style={{
-            borderRadius: 10,
-            border: "1px solid var(--border-subtle)",
-            overflow: "hidden",
-          }}
-        >
-          {system?.gpus.map((gpu, i) => {
-            const isSelected = gpu.name === selectedGpu;
-            const canSelect = !isMac && system.gpus.length > 1;
-            const vram = formatVram(gpu.vramMB);
-
+          Provider
+        </label>
+        <div style={{ display: "flex", gap: 8 }}>
+          {PROVIDERS.map((p) => {
+            const isSelected = selectedProvider === p.id;
+            const isLocked = isConnected && !isSelected;
             return (
-              <div
-                key={`${gpu.name}-${i}`}
-                onClick={canSelect ? () => handleGpuSelect(gpu.name) : undefined}
+              <button
+                key={p.id}
+                disabled={isLocked}
+                onClick={() => {
+                  if (isLocked) return;
+                  setSelectedProvider(p.id);
+                  setTestResult(null);
+                  setSaveMessage(null);
+                  if (apiKey) setKeyError(validateKeyForProvider(p.id, apiKey));
+                }}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "14px 16px",
-                  background: isSelected ? "rgba(34, 197, 94, 0.04)" : "var(--bg-secondary)",
-                  borderBottom:
-                    i < system.gpus.length - 1 ? "1px solid var(--border-subtle)" : "none",
-                  cursor: canSelect ? "pointer" : "default",
-                  transition: "background 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (canSelect && !isSelected)
-                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.04)";
-                }}
-                onMouseLeave={(e) => {
-                  if (canSelect && !isSelected)
-                    e.currentTarget.style.background = "var(--bg-secondary)";
+                  flex: 1,
+                  padding: "14px 14px",
+                  borderRadius: 8,
+                  border: isSelected
+                    ? "1px solid var(--mi-accent)"
+                    : "1px solid rgba(var(--ui-rgb), 0.08)",
+                  background: isSelected ? "rgba(var(--mi-accent-rgb), 0.08)" : "var(--bg-raised)",
+                  color: isSelected ? "var(--mi-accent)" : "var(--text-primary)",
+                  cursor: isLocked ? "not-allowed" : "pointer",
+                  opacity: isLocked ? 0.35 : 1,
+                  textAlign: "left",
+                  transition: "all 0.15s ease",
                 }}
               >
-                {/* Selection indicator */}
-                {canSelect && (
-                  <div style={{ flexShrink: 0 }}>
-                    {isSelected ? (
-                      <CheckCircle2 size={16} style={{ color: "#22c55e" }} />
-                    ) : (
-                      <Circle size={16} style={{ color: "var(--text-tertiary)", opacity: 0.4 }} />
-                    )}
-                  </div>
-                )}
-
-                {/* GPU icon */}
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: `${vendorColor(gpu.vendor)}18`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Zap size={15} style={{ color: vendorColor(gpu.vendor) }} />
-                </div>
-
-                {/* GPU name & vendor */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <p.logo size={18} />
+                  <span
                     style={{
                       fontSize: 13,
                       fontWeight: 500,
-                      color: "var(--text-primary)",
-                      margin: 0,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
+                      color: isSelected ? "var(--mi-accent)" : "var(--text-primary)",
                     }}
                   >
-                    {gpu.name}
-                  </p>
-                  <p style={{ fontSize: 11, color: "var(--text-tertiary)", margin: "2px 0 0" }}>
-                    {vendorLabel(gpu.vendor)}
-                    {vendorLabel(gpu.vendor) && gpu.type ? " · " : ""}
-                    {gpu.type === "dedicated" ? "Dedicated" : "Integrated"}
-                  </p>
+                    {p.label}
+                  </span>
                 </div>
-
-                {/* VRAM badge */}
-                {vram && (
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: "var(--text-secondary)",
-                      background: "rgba(var(--ui-rgb), 0.06)",
-                      padding: "3px 10px",
-                      borderRadius: 6,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {vram}
-                  </span>
-                )}
-
-                {/* Selected label */}
-                {isSelected && canSelect && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: "#22c55e",
-                      flexShrink: 0,
-                    }}
-                  >
-                    Active
-                  </span>
-                )}
-              </div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", paddingLeft: 26 }}>
+                  {p.description}
+                </div>
+              </button>
             );
           })}
         </div>
       </div>
 
-      {/* Actions */}
-      {aiStatus?.isSetUp && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            type="button"
-            onClick={handleReinstall}
-            disabled={isRemoving || aiStatus?.serverStatus === "ready"}
+      {/* API key input */}
+      <div style={{ marginBottom: 20 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: 12,
+            color: "var(--text-secondary)",
+            marginBottom: 8,
+          }}
+        >
+          API Key
+          {savedConfig.maskedKey && (
+            <span style={{ color: "var(--text-tertiary)", marginLeft: 8 }}>
+              (current: {savedConfig.maskedKey})
+            </span>
+          )}
+        </label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <input
+              type={showKey ? "text" : "password"}
+              value={apiKey}
+              onChange={(e) => {
+                const val = e.target.value;
+                setApiKey(val);
+                setKeyError(validateKeyForProvider(selectedProvider, val));
+              }}
+              placeholder={
+                savedConfig.hasKey
+                  ? "Enter new key to replace existing one"
+                  : "Paste your API key here"
+              }
+              style={{
+                width: "100%",
+                padding: "10px 40px 10px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(var(--ui-rgb), 0.12)",
+                background: "var(--bg-raised)",
+                color: "var(--text-primary)",
+                fontSize: 13,
+                fontFamily: "monospace",
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={() => setShowKey(!showKey)}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--text-tertiary)",
+                padding: 4,
+              }}
+            >
+              {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+        {keyError && (
+          <p style={{ color: "var(--status-error)", fontSize: 11, marginTop: 6 }}>{keyError}</p>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button
+          onClick={handleSave}
+          disabled={saving || !!keyError || (!apiKey && !savedConfig.hasKey)}
+          style={{
+            padding: "8px 20px",
+            borderRadius: 6,
+            border: "none",
+            background: "var(--mi-accent)",
+            color: "#1A1916",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: saving ? "wait" : "pointer",
+            opacity: saving || !!keyError || (!apiKey && !savedConfig.hasKey) ? 0.5 : 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          {saving && <Loader2 size={13} className="animate-spin" />}
+          {saving ? "Saving..." : "Save"}
+        </button>
+
+        {isConnected && (
+          <>
+            <button
+              onClick={handleTest}
+              disabled={testing}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 6,
+                border: "1px solid rgba(var(--ui-rgb), 0.12)",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                fontSize: 13,
+                cursor: testing ? "wait" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Zap size={13} />
+              {testing ? "Testing..." : "Test Connection"}
+            </button>
+
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 6,
+                border: "1px solid rgba(232, 116, 116, 0.3)",
+                background: "transparent",
+                color: "var(--status-error)",
+                fontSize: 13,
+                cursor: disconnecting ? "wait" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginLeft: "auto",
+              }}
+            >
+              {disconnecting ? "Disconnecting..." : "Disconnect"}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Status messages */}
+      {saveMessage && (
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: 6,
+            background: saveMessage.startsWith("Failed")
+              ? "rgba(232, 116, 116, 0.08)"
+              : "rgba(58, 155, 107, 0.08)",
+            color: saveMessage.startsWith("Failed")
+              ? "var(--status-error)"
+              : "var(--status-success)",
+            fontSize: 12,
+            marginBottom: 12,
+          }}
+        >
+          {saveMessage}
+        </div>
+      )}
+
+      {testResult && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color: testResult.ok ? "var(--status-success)" : "var(--status-error)",
+            marginBottom: 12,
+          }}
+        >
+          {testResult.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}
+          {testResult.ok ? "Connection successful" : `Connection failed: ${testResult.error}`}
+        </div>
+      )}
+
+      {/* ── Divider ── */}
+      <div
+        style={{
+          borderTop: "1px solid rgba(var(--ui-rgb), 0.08)",
+          margin: "32px 0",
+        }}
+      />
+
+      {/* ── Feedback / Resend Section ── */}
+      <h3
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: 18,
+          color: "var(--text-primary)",
+          fontWeight: 400,
+          marginBottom: 4,
+        }}
+      >
+        Feedback
+      </h3>
+      <p
+        style={{
+          color: "var(--text-tertiary)",
+          fontSize: 13,
+          marginBottom: 20,
+          lineHeight: 1.5,
+        }}
+      >
+        Add a{" "}
+        <a
+          href="https://resend.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "var(--mi-accent)", textDecoration: "none" }}
+        >
+          Resend
+        </a>{" "}
+        API key to send us feedback and feature requests directly from the app.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <input
+            type={showResendKey ? "text" : "password"}
+            value={resendKey}
+            onChange={(e) => setResendKey(e.target.value)}
+            placeholder={savedResendKey ? "Enter new key to replace" : "Paste your Resend API key"}
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 16px",
-              background: "none",
-              color: "var(--text-secondary)",
-              border: "1px solid var(--border-subtle)",
+              width: "100%",
+              padding: "10px 40px 10px 12px",
               borderRadius: 8,
+              border: "1px solid rgba(var(--ui-rgb), 0.12)",
+              background: "var(--bg-raised)",
+              color: "var(--text-primary)",
               fontSize: 13,
-              fontWeight: 500,
-              cursor: isRemoving || aiStatus?.serverStatus === "ready" ? "not-allowed" : "pointer",
-              opacity: isRemoving || aiStatus?.serverStatus === "ready" ? 0.5 : 1,
-              transition: "opacity 0.15s ease",
+              fontFamily: "monospace",
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={() => setShowResendKey(!showResendKey)}
+            style={{
+              position: "absolute",
+              right: 8,
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--text-tertiary)",
+              padding: 4,
             }}
           >
-            {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {isRemoving ? "Reinstalling..." : "Reinstall Models"}
+            {showResendKey ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        <button
+          onClick={handleSaveResend}
+          disabled={savingResend || !resendKey.trim()}
+          style={{
+            padding: "8px 20px",
+            borderRadius: 6,
+            border: "none",
+            background: "var(--mi-accent)",
+            color: "#1A1916",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: savingResend || !resendKey.trim() ? "not-allowed" : "pointer",
+            opacity: savingResend || !resendKey.trim() ? 0.5 : 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Mail size={13} />
+          {savingResend ? "Saving..." : "Save"}
+        </button>
+
+        {savedResendKey && (
+          <button
+            onClick={handleClearResend}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 6,
+              border: "1px solid rgba(232, 116, 116, 0.3)",
+              background: "transparent",
+              color: "var(--status-error)",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Remove
+          </button>
+        )}
+
+        {savedResendKey && (
+          <span
+            style={{
+              fontSize: 12,
+              color: "var(--status-success)",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <CheckCircle size={13} /> Active
+          </span>
+        )}
+      </div>
+
+      {resendMessage && (
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: 6,
+            background: resendMessage.startsWith("Failed")
+              ? "rgba(232, 116, 116, 0.08)"
+              : "rgba(58, 155, 107, 0.08)",
+            color: resendMessage.startsWith("Failed")
+              ? "var(--status-error)"
+              : "var(--status-success)",
+            fontSize: 12,
+          }}
+        >
+          {resendMessage}
         </div>
       )}
     </div>

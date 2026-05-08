@@ -225,7 +225,8 @@ class MonitoringSessionService {
       // Start local inference service if on-device AI is active for this session
       if (localMode) {
         try {
-          const { localInferenceService, localDb } = await import("./on-device");
+          const { localInferenceService, localDb, hybridInferenceService } =
+            await import("./on-device");
           localInferenceService.start(sessionId);
 
           // Write session row to local SQLite (mirrors Supabase monitoring_sessions)
@@ -239,6 +240,19 @@ class MonitoringSessionService {
             selectedWindows: JSON.stringify(initialWindows),
             startedAt,
           });
+
+          // Create block.md file NOW at session start (so transcripts can append during session)
+          const mdPath = await hybridInferenceService.createBlockMarkdown(
+            sessionId,
+            startedAt,
+            config.sessionGoal,
+            config.userId
+          );
+          if (mdPath) {
+            logger.info(`Block markdown ready: ${mdPath}`);
+          } else {
+            logger.warn("Block markdown creation failed - will retry at session end");
+          }
 
           logger.info("On-device session started for session", sessionId);
         } catch (err) {
@@ -474,17 +488,30 @@ class MonitoringSessionService {
     try {
       if (localMode) {
         try {
-          const { localInferenceService } = await import("./on-device");
-          localInferenceService.stop();
+          const { hybridInferenceService, localDb } = await import("./on-device");
+
+          // Check user inference mode preference (for hybrid testing)
+          let inferenceMode = "auto";
+          try {
+            const userId = this.activeSession?.config.userId;
+            if (userId) {
+              inferenceMode = localDb.getUserPreference(userId, "inferenceMode") ?? "auto";
+            }
+          } catch {
+            // Default to auto
+          }
+
+          // If forcing cloud mode, skip Ollama readiness check
+          const forceCloud = inferenceMode === "cloud";
+          const skipOnDeviceCheck = forceCloud;
 
           if (tooShort) {
-            localInferenceService.clear();
             logger.info("Cleared local inference state (short session)");
           } else {
             const sessionDir = localFrameStorage.getSessionPath(sessionId);
 
-            // If models aren't ready yet, queue and notify — process later
-            if (!ctx.onDeviceReady) {
+            // If models aren't ready yet and not forcing cloud, queue and notify
+            if (!ctx.onDeviceReady && !skipOnDeviceCheck) {
               logger.info("On-device AI not ready yet — queuing session for later processing");
               ctx.pendingSessions.push({ sessionId, sessionDir });
               BrowserWindow.getAllWindows().forEach((win) => {
@@ -499,7 +526,9 @@ class MonitoringSessionService {
               return;
             }
 
-            logger.info("Running deferred AI pipeline on all session data...");
+            logger.info(
+              `Running deferred AI pipeline (${forceCloud ? "cloud" : "hybrid"} mode)...`
+            );
 
             const broadcastProgress = (progress: Record<string, unknown>) => {
               BrowserWindow.getAllWindows().forEach((win) => {
@@ -509,9 +538,9 @@ class MonitoringSessionService {
               });
             };
 
-            const timeoutMs = 1_200_000;
+            const timeoutMs = forceCloud ? 600_000 : 1_200_000; // Cloud is faster, shorter timeout
             await Promise.race([
-              localInferenceService.processAllAtEnd(sessionId, sessionDir, broadcastProgress),
+              hybridInferenceService.processAllAtEnd(sessionId, sessionDir, broadcastProgress),
               new Promise<never>((_, reject) =>
                 setTimeout(
                   () => reject(new Error(`processAllAtEnd timed out after ${timeoutMs / 1000}s`)),
@@ -767,6 +796,149 @@ class MonitoringSessionService {
   // ===========================
   // Private Methods
   // ===========================
+
+  private cloudBatchInFlight = false;
+
+  /**
+   * During-session cloud batch: if BYOK is configured, analyze the last 20
+   * frames immediately (non-blocking). Results are appended to block.md.
+   */
+  private async maybeFlushCloudBatch(sessionId: string, captureCount: number): Promise<void> {
+    if (this.cloudBatchInFlight) return;
+
+    try {
+      const { hybridInferenceService } = await import("./on-device");
+      if (!hybridInferenceService.isCloudConfigured()) return;
+
+      this.cloudBatchInFlight = true;
+      const batchIdx = Math.floor((captureCount - 1) / 20);
+
+      logger.info(`Cloud batch flush triggered: batch ${batchIdx} (captureCount=${captureCount})`);
+
+      const manifest = await localFrameStorage.loadManifest(sessionId);
+      if (!manifest) return;
+
+      const startFrame = batchIdx * 20;
+      const batchMeta = manifest.frames.slice(startFrame, startFrame + 20);
+      if (batchMeta.length === 0) return;
+
+      const { localAudioService } = await import("./on-device/localAudioService");
+
+      const sessionStartMs = hybridInferenceService["sessionStartMs"] || Date.now();
+
+      const batch: Array<{
+        frameId: string;
+        sessionId: string;
+        sequenceNumber: number;
+        capturedAt: number;
+        offsetMs: number;
+        imageBase64: string;
+        previousImageBase64: string | null;
+        windowId: string;
+        appName: string;
+        windowTitle: string;
+        intervalEvidence?: any;
+        browserContext?: any;
+      }> = [];
+      for (const frameMeta of batchMeta) {
+        const imageBase64 = await localFrameStorage.getFrameAsDataUrl(
+          sessionId,
+          frameMeta.filename
+        );
+        if (!imageBase64) continue;
+        const capturedAt = new Date(frameMeta.timestamp).getTime();
+        batch.push({
+          frameId: frameMeta.frameId,
+          sessionId,
+          sequenceNumber: frameMeta.sequenceNumber,
+          capturedAt,
+          offsetMs: capturedAt - sessionStartMs,
+          imageBase64,
+          previousImageBase64: null,
+          windowId: frameMeta.windowSourceId,
+          appName: frameMeta.appName,
+          windowTitle: frameMeta.windowTitle,
+          intervalEvidence: frameMeta.intervalEvidence,
+          browserContext: frameMeta.browserContext,
+        });
+      }
+
+      if (batch.length === 0) return;
+
+      const allTranscripts = localAudioService.getAccumulatedTranscripts();
+      const batchStartOffset = batch[0].offsetMs;
+      const batchEndOffset = batch[batch.length - 1].offsetMs;
+      const matchedTranscripts = allTranscripts.filter(
+        (seg) => seg.endOffsetMs > batchStartOffset && seg.startOffsetMs < batchEndOffset
+      );
+      const transcriptText = matchedTranscripts
+        .map((seg) => `${seg.source === "user" ? "User" : "Remote"}: ${seg.text}`)
+        .join("\n");
+
+      // Run the cloud batch analysis via the provider
+      const result = await hybridInferenceService["analyzeBatchCloud"](batch, transcriptText);
+
+      // Write results to block.md
+      const mdPath = hybridInferenceService.getMarkdownPath();
+      if (mdPath) {
+        await hybridInferenceService["appendBatchToMarkdown"](
+          mdPath,
+          batchIdx,
+          batch,
+          result.frameDescriptions,
+          matchedTranscripts,
+          result.batchNarrative,
+          sessionStartMs
+        );
+      }
+
+      // Store in local SQLite
+      const { localDb } = await import("./on-device");
+      const crypto = await import("crypto");
+      for (const frame of batch) {
+        const fd = result.frameDescriptions.find((d) => d.sequenceNumber === frame.sequenceNumber);
+        const ev = frame.intervalEvidence;
+        localDb.insertCapture({
+          id: crypto.randomUUID(),
+          sessionId,
+          frameId: frame.frameId,
+          sequenceNumber: frame.sequenceNumber,
+          capturedAt: frame.capturedAt,
+          windowId: frame.windowId,
+          appName: frame.appName,
+          windowTitle: frame.windowTitle,
+          sensorOutput: fd?.description ?? `[${frame.appName}] ${frame.windowTitle}`,
+          deltaChanged: (ev?.keyboardEventCount ?? 0) > 0 || (ev?.mouseClickCount ?? 0) > 0,
+          changeType:
+            (ev?.keyboardEventCount ?? 0) > 0 || (ev?.mouseClickCount ?? 0) > 0
+              ? "user_interaction"
+              : "passive_view",
+          userAction: fd?.userAction ?? null,
+        });
+      }
+      localDb.insertClassification({
+        id: crypto.randomUUID(),
+        sessionId,
+        batchIndex: batchIdx,
+        startSequence: batch[0].sequenceNumber,
+        endSequence: batch[batch.length - 1].sequenceNumber,
+        activityDescription: result.batchNarrative,
+        activityType: null,
+        onTask: true,
+        taskRelevance: null,
+        importanceScore: 0.5,
+        rawOutput: "",
+      });
+
+      logger.info(
+        `Cloud batch ${batchIdx} processed during session: ${result.batchNarrative.slice(0, 100)}`
+      );
+    } catch (err) {
+      logger.warn("During-session cloud batch failed (non-critical):", String(err));
+    } finally {
+      this.cloudBatchInFlight = false;
+    }
+  }
 
   /**
    * Start the periodic capture loop
@@ -1080,6 +1252,15 @@ class MonitoringSessionService {
         sessionTimeline.recordFrame(frameMetadata.sequenceNumber);
       } catch {
         /* timeline not critical for capture */
+      }
+
+      // BYOK cloud: trigger batch analysis every 20 frames during session
+      if (
+        this.activeSession.localMode &&
+        this.activeSession.captureCount > 0 &&
+        this.activeSession.captureCount % 20 === 0
+      ) {
+        this.maybeFlushCloudBatch(this.activeSession.id, this.activeSession.captureCount);
       }
 
       // Update checkpoint

@@ -150,6 +150,50 @@ const IPC_CHANNELS = {
   ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
   ON_DEVICE_READINESS_UPDATE: "on-device:readiness-update",
   ON_DEVICE_NOT_READY: "on-device:not-ready",
+  // Inference mode preference (hybrid testing)
+  INFERENCE_MODE_GET: "inference-mode:get",
+  INFERENCE_MODE_SET: "inference-mode:set",
+  INFERENCE_TEST_PROVIDER: "inference:test-provider",
+  INFERENCE_REFRESH_CONFIG: "inference:refresh-config",
+  REPROCESS_SESSION: "session:reprocess",
+  // BYOK — direct keyVault operations
+  INFERENCE_SAVE_CONFIG: "inference:save-config",
+  INFERENCE_LOAD_CONFIG: "inference:load-config",
+  INFERENCE_CLEAR_CONFIG: "inference:clear-config",
+  // Resend (feedback email key)
+  RESEND_SAVE_KEY: "resend:save-key",
+  RESEND_HAS_KEY: "resend:has-key",
+  RESEND_CLEAR_KEY: "resend:clear-key",
+  // Local docs (on-device document RAG)
+  LOCAL_DOCS_PICK_FILE: "local-docs:pick-file",
+  LOCAL_DOCS_LIST: "local-docs:list",
+  LOCAL_DOCS_DELETE: "local-docs:delete",
+  LOCAL_DOCS_QUERY: "local-docs:query",
+  LOCAL_DOCS_GET_CHUNKS: "local-docs:get-chunks",
+
+  // Local agent (on-device RLM chat)
+  LOCAL_AGENT_ASK: "local-agent:ask",
+  LOCAL_AGENT_LIST_CHATS: "local-agent:list-chats",
+  LOCAL_AGENT_GET_CHAT: "local-agent:get-chat",
+  LOCAL_AGENT_CREATE_CHAT: "local-agent:create-chat",
+  LOCAL_AGENT_RENAME_CHAT: "local-agent:rename-chat",
+  LOCAL_AGENT_DELETE_CHAT: "local-agent:delete-chat",
+  LOCAL_AGENT_ADD_MESSAGE: "local-agent:add-message",
+  LOCAL_AGENT_PROGRESS: "local-agent:progress",
+
+  // Whisper setup
+  WHISPER_STATUS: "whisper:status",
+  WHISPER_RUN_SETUP: "whisper:run-setup",
+  WHISPER_SETUP_PROGRESS: "whisper:setup-progress",
+
+  // Local auth (on-device accounts)
+  LOCAL_AUTH_LIST_ACCOUNTS: "local-auth:list-accounts",
+  LOCAL_AUTH_CREATE: "local-auth:create",
+  LOCAL_AUTH_LOGIN: "local-auth:login",
+  LOCAL_AUTH_LOGOUT: "local-auth:logout",
+  LOCAL_AUTH_GET_USER: "local-auth:get-user",
+  LOCAL_AUTH_HAS_ACCOUNT: "local-auth:has-account",
+  LOCAL_AUTH_RESET_PASSWORD: "local-auth:reset-password",
   // Offline auth (main → renderer)
   AUTH_OFFLINE_USER: "auth-offline-user",
 } as const;
@@ -952,6 +996,303 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   getLocalSessionDetail: (sessionId: string): Promise<unknown> =>
     ipcRenderer.invoke("get-local-session-detail", sessionId),
+
+  // Inference mode preference (for hybrid pipeline testing)
+  getInferenceMode: (userId: string): Promise<{ mode: "auto" | "local" | "cloud" } | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_MODE_GET, userId),
+
+  setInferenceMode: (
+    userId: string,
+    mode: "auto" | "local" | "cloud"
+  ): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_MODE_SET, userId, mode),
+
+  testInferenceProvider: (
+    provider?: string,
+    apiKey?: string
+  ): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_TEST_PROVIDER, provider, apiKey),
+
+  /** @deprecated Use saveInferenceConfig / loadInferenceConfig / clearInferenceConfig */
+  refreshInferenceConfig: (): Promise<{ success: boolean; provider?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_REFRESH_CONFIG),
+
+  reprocessSession: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.REPROCESS_SESSION, sessionId),
+
+  // BYOK — direct keyVault operations
+  saveInferenceConfig: (
+    provider: string,
+    apiKey?: string
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_SAVE_CONFIG, provider, apiKey),
+
+  loadInferenceConfig: (): Promise<{ provider: string; maskedKey: string } | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LOAD_CONFIG),
+
+  clearInferenceConfig: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_CLEAR_CONFIG),
+
+  // Resend key
+  saveResendKey: (apiKey: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEND_SAVE_KEY, apiKey),
+
+  hasResendKey: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.RESEND_HAS_KEY),
+
+  clearResendKey: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEND_CLEAR_KEY),
+
+  // Local docs (on-device document RAG)
+  localDocsPickFile: (): Promise<{
+    document?: unknown;
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_PICK_FILE),
+
+  localDocsList: (): Promise<{
+    documents: Array<{
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_LIST),
+
+  localDocsDelete: (docId: string): Promise<{ success?: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_DELETE, docId),
+
+  localDocsQuery: (
+    question: string
+  ): Promise<{
+    answer?: string;
+    sources?: Array<{ documentName: string; chunkIndex: number }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_QUERY, question),
+
+  localDocsGetChunks: (
+    docId: string
+  ): Promise<{
+    chunks: Array<{
+      id: string;
+      documentId: string;
+      chunkIndex: number;
+      content: string;
+      charStart: number;
+      charEnd: number;
+      createdAt: number;
+    }>;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_GET_CHUNKS, docId),
+
+  localDocsGenerate: (
+    prompt: string,
+    sessionIds?: string[]
+  ): Promise<{
+    documentId?: string;
+    title?: string;
+    content?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_GENERATE, prompt, sessionIds),
+
+  localDocsGet: (
+    docId: string
+  ): Promise<{
+    document?: {
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      content: string | null;
+      title: string | null;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_GET, docId),
+
+  localDocsUpdate: (
+    docId: string,
+    data: { content?: string; title?: string }
+  ): Promise<{
+    success?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_UPDATE, docId, data),
+
+  localDocsRevise: (
+    instruction: string,
+    currentContent: string
+  ): Promise<{
+    suggestion?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_REVISE, instruction, currentContent),
+
+  // Local agent (on-device RLM chat)
+  localAgentAsk: (data: {
+    message: string;
+    conversationId?: string;
+    timezone?: string;
+  }): Promise<{ response?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_ASK, data),
+
+  localAgentListChats: (): Promise<{
+    conversations: Array<{
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_LIST_CHATS),
+
+  localAgentGetChat: (
+    chatId: string
+  ): Promise<{
+    conversation: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    messages: Array<{
+      id: string;
+      conversationId: string;
+      role: string;
+      content: string;
+      toolCalls: string;
+      createdAt: number;
+    }>;
+  } | null> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_GET_CHAT, chatId),
+
+  localAgentCreateChat: (data?: {
+    id?: string;
+    title?: string;
+  }): Promise<{
+    conversation?: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_CREATE_CHAT, data),
+
+  localAgentRenameChat: (
+    chatId: string,
+    title: string
+  ): Promise<{ success?: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_RENAME_CHAT, chatId, title),
+
+  localAgentDeleteChat: (chatId: string): Promise<{ success?: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_DELETE_CHAT, chatId),
+
+  onAgentProgress: (
+    callback: (event: { phase: string; tool?: string; iteration: number }) => void
+  ) => {
+    const handler = (_: unknown, event: { phase: string; tool?: string; iteration: number }) =>
+      callback(event);
+    ipcRenderer.on(IPC_CHANNELS.LOCAL_AGENT_PROGRESS, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.LOCAL_AGENT_PROGRESS, handler);
+    };
+  },
+
+  localAgentAddMessage: (data: {
+    conversationId: string;
+    role: string;
+    content: string;
+    toolCalls?: unknown[];
+  }): Promise<{
+    message?: {
+      id: string;
+      conversationId: string;
+      role: string;
+      content: string;
+      toolCalls: string;
+      createdAt: number;
+    };
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_ADD_MESSAGE, data),
+
+  // Whisper setup
+  whisperStatus: (): Promise<{ ready: boolean; downloading: boolean; percent: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WHISPER_STATUS),
+
+  whisperRunSetup: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WHISPER_RUN_SETUP),
+
+  onWhisperProgress: (
+    callback: (event: { stage: string; percent: number; label: string }) => void
+  ) => {
+    const handler = (_: unknown, event: { stage: string; percent: number; label: string }) =>
+      callback(event);
+    ipcRenderer.on(IPC_CHANNELS.WHISPER_SETUP_PROGRESS, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.WHISPER_SETUP_PROGRESS, handler);
+    };
+  },
+
+  // Local auth (on-device accounts)
+  localAuthListAccounts: (): Promise<
+    Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_LIST_ACCOUNTS),
+
+  localAuthCreate: (data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<{ success: boolean; userId?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_CREATE, data),
+
+  localAuthLogin: (
+    email: string,
+    password: string
+  ): Promise<{
+    success: boolean;
+    userId?: string;
+    firstName?: string;
+    lastName?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_LOGIN, email, password),
+
+  localAuthLogout: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_LOGOUT),
+
+  localAuthGetUser: (): Promise<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_GET_USER),
+
+  localAuthHasAccount: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_HAS_ACCOUNT),
+
+  localAuthResetPassword: (
+    email: string,
+    oldPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_RESET_PASSWORD, email, oldPassword, newPassword),
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

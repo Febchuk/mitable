@@ -10,7 +10,6 @@ import { initOnDeviceAI, eagerPreloadModels } from "./on-device-init";
 import { restoreAuthOnStartup } from "./startup-auth";
 import { initAnalytics, trackMainEvent } from "../../services/analyticsService";
 import { browserBridgeService } from "../../services/browserBridgeService";
-import { updateService } from "../../services/updateService";
 import { monitoringSessionService } from "../../services/monitoringSessionService";
 import { authManager } from "../../services/authManager";
 import { startNotificationTimer } from "../notifications/nudge-timer";
@@ -104,9 +103,9 @@ export async function onAppReady(opts: AppReadyOptions): Promise<void> {
         "Content-Security-Policy": [
           "default-src 'self';" +
             scriptSrc +
-            " style-src 'self' 'unsafe-inline';" +
+            " style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;" +
             " img-src 'self' data: https: blob:;" +
-            " font-src 'self' data:;" +
+            " font-src 'self' data: https://fonts.gstatic.com;" +
             connectSrc +
             " media-src 'self' blob:;" +
             " worker-src 'self' blob:;",
@@ -123,6 +122,17 @@ export async function onAppReady(opts: AppReadyOptions): Promise<void> {
 
   // ── On-device AI ──────────────────────────────────────────────────────────
   await initOnDeviceAI();
+
+  // Initialize whisper paths (actual download/setup is triggered by the SetupPage)
+  import("../../services/on-device/whisperSetupService")
+    .then(({ whisperSetupService }) => {
+      whisperSetupService.initialize();
+      consoleLogger.info("[Startup] WhisperSetupService initialized (paths ready)");
+    })
+    .catch((err) => {
+      consoleLogger.error("[Startup] WhisperSetupService init error:", String(err));
+    });
+
   eagerPreloadModels().catch((err) => {
     consoleLogger.error("[EagerPreload] Background preload failed:", err);
   });
@@ -154,7 +164,7 @@ export async function onAppReady(opts: AppReadyOptions): Promise<void> {
   await restoreAuthOnStartup();
 
   // ── Periodic services ─────────────────────────────────────────────────────
-  updateService.startPeriodicChecks(240);
+  // @deprecated updateService removed — no backend for auto-updates
   startNotificationTimer();
 
   // ── Stale session cleanup (cloud-only, best-effort) ───────────────────────

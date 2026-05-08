@@ -34,7 +34,10 @@ export default function UserProfilePage() {
       .catch(() => {});
   }, []);
 
-  const tabs = allTabs.filter((t) => !t.macOnly || platform === "darwin");
+  const tabs = allTabs.filter((t) => {
+    if (t.macOnly && platform !== "darwin") return false;
+    return true;
+  });
   const validTabIds = tabs.map((t) => t.id);
 
   const initialTab = validTabIds.includes(searchParams.get("tab") as TabId)

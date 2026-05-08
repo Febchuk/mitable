@@ -7,8 +7,9 @@
  */
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw } from "lucide-react";
+import { Loader2, AlertCircle, Square, Pause, Play, RefreshCw, Settings } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import WeekStrip from "./WeekStrip";
 import ActivityBlock from "./ActivityBlock";
@@ -87,6 +88,7 @@ function getInitialLoadedRange(): CalendarDateRange {
 
 export default function CalendarView() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [weekStart, setWeekStart] = useState<Date>(getStartOfWeek(today));
@@ -94,7 +96,7 @@ export default function CalendarView() {
   const [summarizingBlockIds, setSummarizingBlockIds] = useState<Set<string>>(new Set());
   const [loadedRange, setLoadedRange] = useState<CalendarDateRange>(getInitialLoadedRange);
 
-  const { startSession, isStarting } = useStartSession({
+  const { startSession, isStarting, showProviderModal, dismissProviderModal } = useStartSession({
     navigateOnSuccess: false,
     showToasts: true,
   });
@@ -710,6 +712,71 @@ export default function CalendarView() {
             );
           })()}
       </div>
+
+      {/* No AI provider modal */}
+      {showProviderModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0, 0, 0, 0.5)" }}
+          onClick={dismissProviderModal}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl p-6 space-y-4"
+            style={{
+              background: "var(--bg-raised)",
+              border: "0.5px solid rgba(var(--ui-rgb), 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(var(--mi-accent-rgb), 0.12)" }}
+              >
+                <Settings size={20} style={{ color: "var(--mi-accent)" }} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  AI Provider Required
+                </h3>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  Add your API key to get started
+                </p>
+              </div>
+            </div>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Sessions need an AI provider to analyze your work. Go to{" "}
+              <strong style={{ color: "var(--text-primary)" }}>Settings</strong> and add your API
+              key for Google, OpenAI, or Anthropic.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={dismissProviderModal}
+                className="flex-1 px-4 py-2 text-sm rounded-lg transition-colors"
+                style={{
+                  background: "var(--bg-overlay)",
+                  color: "var(--text-secondary)",
+                  borderWidth: "0.5px",
+                  borderStyle: "solid",
+                  borderColor: "rgba(var(--ui-rgb), 0.10)",
+                }}
+              >
+                Later
+              </button>
+              <button
+                onClick={() => {
+                  dismissProviderModal();
+                  navigate("/profile");
+                }}
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                style={{ background: "var(--mi-accent)", color: "var(--bg-base)" }}
+              >
+                Open Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

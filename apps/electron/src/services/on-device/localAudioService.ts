@@ -300,6 +300,14 @@ class LocalAudioService {
           };
           sessionTimeline.addTranscriptSegment(segment);
           logger.info(`Transcript segment added [${source}]: "${text.slice(0, 80)}..."`);
+
+          // Also append to block.md in real-time (if markdown file exists)
+          try {
+            const { hybridInferenceService } = await import("./hybridInferenceService");
+            await hybridInferenceService.appendTranscript(text, source, startOffsetMs, endOffsetMs);
+          } catch {
+            // Non-critical - transcript will still be in timeline
+          }
         }
       };
 

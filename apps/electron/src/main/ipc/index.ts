@@ -13,12 +13,17 @@ import { registerFeedbackHandlers } from "./feedback-handlers";
 import { registerOnDeviceHandlers } from "./on-device-handlers";
 import { registerPdfExportHandlers } from "./pdf-export-handlers";
 import { registerAgentHandlers } from "./agent-handlers";
+import { registerLocalAuthHandlers } from "./local-auth-handlers";
+import { registerLocalAgentHandlers } from "./local-agent-handlers";
+import { registerLocalDocsHandlers } from "./local-docs-handlers";
+import { registerWhisperHandlers } from "./whisper-handlers";
 
 export function registerAllIpc() {
   ipcLogger.info("Setting up IPC handlers...");
 
   registerConsoleHandlers();
   registerAuthHandlers();
+  registerLocalAuthHandlers();
   registerUserContextHandlers();
   registerScreenshotHandlers();
   registerPillHandlers();
@@ -31,6 +36,9 @@ export function registerAllIpc() {
   registerOnDeviceHandlers();
   registerPdfExportHandlers();
   registerAgentHandlers();
+  registerLocalAgentHandlers();
+  registerLocalDocsHandlers();
+  registerWhisperHandlers();
 
   ipcLogger.info("All IPC handlers registered");
 }

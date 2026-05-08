@@ -38,15 +38,24 @@ export function createWatchingPillEyeDropdown() {
     ctx.watchingPillEyeDropdown.setAlwaysOnTop(true, "normal", 1);
   }
 
-  // Dismiss on blur (click away)
+  // Dismiss on blur (click away) — debounced to avoid race with click-inside
+  let eyeBlurTimer: ReturnType<typeof setTimeout> | null = null;
   ctx.watchingPillEyeDropdown.on("blur", () => {
-    if (ctx.watchingPillEyeDropdown && !ctx.watchingPillEyeDropdown.isDestroyed()) {
-      ctx.watchingPillEyeDropdown.hide();
-      ctx.eyeDropdownLastHidden = Date.now(); // Track when hidden for toggle logic
-      // Notify pill that dropdown closed
-      if (ctx.watchingPillWindow && !ctx.watchingPillWindow.isDestroyed()) {
-        ctx.watchingPillWindow.webContents.send("eye-dropdown-closed");
+    if (eyeBlurTimer) clearTimeout(eyeBlurTimer);
+    eyeBlurTimer = setTimeout(() => {
+      if (ctx.watchingPillEyeDropdown && !ctx.watchingPillEyeDropdown.isDestroyed()) {
+        ctx.watchingPillEyeDropdown.hide();
+        ctx.eyeDropdownLastHidden = Date.now();
+        if (ctx.watchingPillWindow && !ctx.watchingPillWindow.isDestroyed()) {
+          ctx.watchingPillWindow.webContents.send("eye-dropdown-closed");
+        }
       }
+    }, 150);
+  });
+  ctx.watchingPillEyeDropdown.on("focus", () => {
+    if (eyeBlurTimer) {
+      clearTimeout(eyeBlurTimer);
+      eyeBlurTimer = null;
     }
   });
 
@@ -104,15 +113,24 @@ export function createWatchingPillMenuDropdown() {
     ctx.watchingPillMenuDropdown.setAlwaysOnTop(true, "normal", 1);
   }
 
-  // Dismiss on blur (click away)
+  // Dismiss on blur (click away) — debounced to avoid race with click-inside
+  let menuBlurTimer: ReturnType<typeof setTimeout> | null = null;
   ctx.watchingPillMenuDropdown.on("blur", () => {
-    if (ctx.watchingPillMenuDropdown && !ctx.watchingPillMenuDropdown.isDestroyed()) {
-      ctx.watchingPillMenuDropdown.hide();
-      ctx.menuDropdownLastHidden = Date.now(); // Track when hidden for toggle logic
-      // Notify pill that dropdown closed
-      if (ctx.watchingPillWindow && !ctx.watchingPillWindow.isDestroyed()) {
-        ctx.watchingPillWindow.webContents.send("menu-dropdown-closed");
+    if (menuBlurTimer) clearTimeout(menuBlurTimer);
+    menuBlurTimer = setTimeout(() => {
+      if (ctx.watchingPillMenuDropdown && !ctx.watchingPillMenuDropdown.isDestroyed()) {
+        ctx.watchingPillMenuDropdown.hide();
+        ctx.menuDropdownLastHidden = Date.now();
+        if (ctx.watchingPillWindow && !ctx.watchingPillWindow.isDestroyed()) {
+          ctx.watchingPillWindow.webContents.send("menu-dropdown-closed");
+        }
       }
+    }, 150);
+  });
+  ctx.watchingPillMenuDropdown.on("focus", () => {
+    if (menuBlurTimer) {
+      clearTimeout(menuBlurTimer);
+      menuBlurTimer = null;
     }
   });
 

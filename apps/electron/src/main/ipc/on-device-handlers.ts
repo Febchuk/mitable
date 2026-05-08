@@ -1,32 +1,26 @@
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "@mitable/shared";
 import { ctx } from "../context";
+import { authManager } from "../../services/authManager";
 
 export function registerOnDeviceHandlers() {
+  /** @deprecated Ollama removed — returns minimal stub for backward compat */
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
     try {
-      const { modelManager, localDb } = await import("../../services/on-device");
-      const { ollamaService } = await import("../../services/on-device/ollamaService");
-      const { getHardwareProfile } = await import("../../services/on-device/ollamaLifecycle");
-      const { detectHardware } = await import("../../services/on-device/hardwareDetector");
+      const { localDb } = await import("../../services/on-device");
       const sqliteAvailable = localDb.isAvailable() || (await localDb.tryOpen());
-
-      const profile = getHardwareProfile() ?? (await detectHardware());
-
       return {
-        isSetUp: ollamaService.isReady(),
-        serverStatus: ollamaService.getStatus(),
-        model: ollamaService.getLoadedModel(),
-        tier: profile.tier,
-        gpuDescription: profile.gpuName,
-        vramMB: profile.vramMB,
-        hasNativeAudio: profile.hasNativeAudio,
-        recommendedModel: profile.recommendedModel,
-        enabled: modelManager.isEnabled(),
+        isSetUp: false,
+        serverStatus: "stopped",
+        model: null,
+        tier: null,
+        gpuDescription: "",
+        vramMB: 0,
+        hasNativeAudio: false,
+        recommendedModel: null,
+        enabled: false,
         onDeviceAllowed: sqliteAvailable,
-        onDeviceBlockReason: sqliteAvailable
-          ? null
-          : "Local SQLite database is unavailable — run `npm run rebuild-native` in apps/electron.",
+        onDeviceBlockReason: sqliteAvailable ? null : "SQLite unavailable",
         sqliteAvailable,
       };
     } catch (err) {
@@ -47,13 +41,9 @@ export function registerOnDeviceHandlers() {
     }
   });
 
+  /** @deprecated Returns process.platform only — hardware detection removed */
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_PLATFORM, async () => {
-    try {
-      const { detectHardware } = await import("../../services/on-device/hardwareDetector");
-      return await detectHardware();
-    } catch (err) {
-      return { error: String(err) };
-    }
+    return process.platform;
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_DOWNLOAD_SUMMARY, async () => {
@@ -86,15 +76,7 @@ export function registerOnDeviceHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL, async () => {
-    try {
-      const { shutdown } = await import("../../services/on-device/ollamaLifecycle");
-      await shutdown();
-      const { modelManager } = await import("../../services/on-device");
-      await modelManager.setEnabled(false);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+    return { success: false, error: "Ollama removed — BYOK cloud inference only" };
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, async () => {
@@ -102,82 +84,30 @@ export function registerOnDeviceHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_START_SERVER, async () => {
-    try {
-      const { localDb, modelManager } = await import("../../services/on-device");
-      const sqliteOk = localDb.isAvailable() || (await localDb.tryOpen());
-      if (!sqliteOk) {
-        return {
-          success: false,
-          error:
-            "Local SQLite database is unavailable. Run `npm run rebuild-native` in apps/electron to recompile better-sqlite3 for Electron.",
-        };
-      }
-      try {
-        const { initialize } = await import("../../services/on-device/ollamaLifecycle");
-        let lastUiPercent = -1;
-        const profile = await initialize((info) => {
-          const p = info.percent ?? 0;
-          const shouldSend = info.phase !== "pulling" || p !== lastUiPercent;
-          if (!shouldSend) return;
-          lastUiPercent = p;
-          if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-            ctx.consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, {
-              assetId: "ollama",
-              label: info.message,
-              phase: info.phase,
-              bytesDownloaded: 0,
-              totalBytes: 0,
-              percent: p,
-            });
-          }
-        });
-        await modelManager.setEnabled(true);
-        return {
-          success: true,
-          model: profile.recommendedModel,
-          tier: profile.tier,
-        };
-      } catch (startErr) {
-        const { shutdown } = await import("../../services/on-device/ollamaLifecycle");
-        await shutdown();
-        return { success: false, error: String(startErr) };
-      }
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+    return { success: false, error: "Ollama removed — BYOK cloud inference only" };
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_STOP_SERVER, async () => {
-    try {
-      const { shutdown } = await import("../../services/on-device/ollamaLifecycle");
-      const { modelManager } = await import("../../services/on-device");
-      await shutdown();
-      await modelManager.setEnabled(false);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+    return { success: false, error: "Ollama removed — BYOK cloud inference only" };
   });
 
+  /** @deprecated Hardware detection removed — returns minimal stub */
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_SYSTEM_INFO, async () => {
-    try {
-      const { detectFullSystem } = await import("../../services/on-device/hardwareDetector");
-      return await detectFullSystem();
-    } catch (err) {
-      return {
-        cpu: "Unknown",
-        ramMB: 0,
-        os: "Unknown",
-        gpus: [],
-        platform: process.platform,
-        error: String(err),
-      };
-    }
+    return {
+      cpu: "N/A",
+      ramMB: 0,
+      os: process.platform,
+      gpus: [],
+      platform: process.platform,
+    };
   });
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_GPU_PREFERENCE, async (_, userId: string) => {
     try {
       const { localDb } = await import("../../services/on-device");
+      if (!localDb.isAvailable()) {
+        await localDb.tryOpen();
+      }
       return localDb.getUserPreference(userId, "preferredGpu");
     } catch {
       return null;
@@ -189,6 +119,9 @@ export function registerOnDeviceHandlers() {
     async (_, userId: string, gpuName: string) => {
       try {
         const { localDb } = await import("../../services/on-device");
+        if (!localDb.isAvailable()) {
+          await localDb.tryOpen();
+        }
         localDb.setUserPreference(userId, "preferredGpu", gpuName);
         return { success: true };
       } catch (err) {
@@ -217,6 +150,229 @@ export function registerOnDeviceHandlers() {
         parallelMode: false,
         error: String(err),
       };
+    }
+  });
+
+  // Inference mode preference (for hybrid pipeline testing)
+  ipcMain.handle(IPC_CHANNELS.INFERENCE_MODE_GET, async (_, userId: string) => {
+    try {
+      const { localDb } = await import("../../services/on-device");
+      // Ensure DB is initialized
+      if (!localDb.isAvailable()) {
+        await localDb.tryOpen();
+      }
+      const mode = localDb.getUserPreference(userId, "inferenceMode");
+      console.log(`[IPC] INFERENCE_MODE_GET for ${userId}: raw="${mode}"`);
+      // Ensure mode is one of the valid values
+      const validMode = mode === "cloud" || mode === "local" ? mode : "auto";
+      console.log(`[IPC] INFERENCE_MODE_GET returning: "${validMode}"`);
+      return { mode: validMode };
+    } catch (err) {
+      console.error("[IPC] INFERENCE_MODE_GET failed:", err);
+      return { mode: "auto" };
+    }
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.INFERENCE_MODE_SET,
+    async (_, userId: string, mode: "auto" | "local" | "cloud") => {
+      try {
+        const { localDb } = await import("../../services/on-device");
+        // Ensure DB is initialized
+        if (!localDb.isAvailable()) {
+          await localDb.tryOpen();
+        }
+        localDb.setUserPreference(userId, "inferenceMode", mode);
+        console.log(`[IPC] Inference mode set for ${userId}: ${mode}`);
+        return { success: true };
+      } catch (err) {
+        console.error("[IPC] INFERENCE_MODE_SET failed:", err);
+        return { success: false, error: String(err) };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.INFERENCE_TEST_PROVIDER,
+    async (_, provider?: string, apiKey?: string) => {
+      try {
+        const { createProvider } = await import("../../services/on-device/providers");
+
+        // If explicit key provided, test it directly
+        if (provider && apiKey) {
+          const instance = createProvider(provider as any, apiKey);
+          return await instance.testConnection();
+        }
+
+        // Otherwise test the saved keyVault config
+        const { keyVault } = await import("../../services/on-device/keyVault");
+        const config = await keyVault.load();
+        if (!config) {
+          return { ok: false, error: "No saved provider config found" };
+        }
+
+        console.log(
+          `[InferenceTest] keyVault provider=${config.provider}, keyLen=${config.apiKey?.length}, keyPrefix=${config.apiKey?.slice(0, 10)}`
+        );
+
+        const instance = createProvider(config.provider, config.apiKey, config.model);
+        return await instance.testConnection();
+      } catch (err) {
+        return { ok: false, error: String(err) };
+      }
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.INFERENCE_REFRESH_CONFIG, async () => {
+    try {
+      const { keyVault } = await import("../../services/on-device/keyVault");
+      const resp = await authManager.authenticatedFetch("/api/inference/config");
+      if (!resp.ok) {
+        return { success: false, error: `Backend returned ${resp.status}` };
+      }
+      const data = (await resp.json()) as {
+        configured: boolean;
+        provider?: string;
+        apiKey?: string;
+        model?: string;
+      };
+      if (data.configured && data.provider && data.apiKey) {
+        await keyVault.store({
+          provider: data.provider as "google" | "openai" | "anthropic",
+          apiKey: data.apiKey,
+          model: data.model,
+        });
+        return { success: true, provider: data.provider };
+      } else {
+        await keyVault.clear();
+        return { success: true, provider: null };
+      }
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // ── BYOK direct keyVault operations (no backend) ──
+
+  ipcMain.handle(
+    IPC_CHANNELS.INFERENCE_SAVE_CONFIG,
+    async (_, provider: string, apiKey?: string) => {
+      try {
+        const { keyVault } = await import("../../services/on-device/keyVault");
+        const { DEFAULT_MODELS } = await import("../../services/on-device/providers/types");
+
+        // If no new key, just update the provider on existing config
+        if (!apiKey) {
+          const existing = await keyVault.load();
+          if (!existing) return { success: false, error: "No existing key to update" };
+          await keyVault.store({
+            provider: provider as "google" | "openai" | "anthropic",
+            apiKey: existing.apiKey,
+            model: DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS],
+          });
+          return { success: true };
+        }
+
+        await keyVault.store({
+          provider: provider as "google" | "openai" | "anthropic",
+          apiKey,
+          model: DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS],
+        });
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.INFERENCE_LOAD_CONFIG, async () => {
+    try {
+      const { keyVault } = await import("../../services/on-device/keyVault");
+      return await keyVault.loadSafe();
+    } catch (err) {
+      return null;
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.INFERENCE_CLEAR_CONFIG, async () => {
+    try {
+      const { keyVault } = await import("../../services/on-device/keyVault");
+      await keyVault.clear();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // ── Resend key management ──
+
+  ipcMain.handle(IPC_CHANNELS.RESEND_SAVE_KEY, async (_, apiKey: string) => {
+    try {
+      const { keyVault } = await import("../../services/on-device/keyVault");
+      await keyVault.storeResendKey(apiKey);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.RESEND_HAS_KEY, async () => {
+    try {
+      const { keyVault } = await import("../../services/on-device/keyVault");
+      return await keyVault.hasResendKey();
+    } catch {
+      return false;
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.RESEND_CLEAR_KEY, async () => {
+    try {
+      const { keyVault } = await import("../../services/on-device/keyVault");
+      await keyVault.clearResendKey();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // ── Session reprocessing ──
+
+  ipcMain.handle(IPC_CHANNELS.REPROCESS_SESSION, async (_, sessionId: string) => {
+    try {
+      const { hybridInferenceService, localDb } = await import("../../services/on-device");
+      const { localFrameStorage } = await import("../../services/localFrameStorage");
+
+      const sessionDir = localFrameStorage.getSessionPath(sessionId);
+      if (!sessionDir) {
+        return { success: false, error: "Session frame data not found on disk" };
+      }
+
+      // Clear any existing story so it gets regenerated
+      localDb.deleteStoryForSession(sessionId);
+
+      const broadcastProgress = (progress: {
+        sessionId: string;
+        step: string;
+        percent: number;
+        label: string;
+        batchIndex?: number;
+        totalBatches?: number;
+      }) => {
+        if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
+          ctx.consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, progress);
+        }
+      };
+
+      // Run in background — don't block the IPC response
+      hybridInferenceService
+        .processAllAtEnd(sessionId, sessionDir, broadcastProgress)
+        .catch((err) => {
+          console.error("[Reprocess] Pipeline failed:", err);
+        });
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
     }
   });
 }

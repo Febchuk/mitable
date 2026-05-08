@@ -3,10 +3,7 @@ import { IPC_CHANNELS } from "@mitable/shared";
 import { ctx } from "../context";
 import { authLogger, consoleLogger } from "../loggers";
 import { authManager } from "../../services/authManager";
-import { audioWebSocketService } from "../../services/audioWebSocketService";
 import { identifyMainUser } from "../../services/analyticsService";
-import { autoEnablePassiveMonitoring } from "../notifications";
-import { startSessionFromMain, endPassiveSessionFromMain } from "../session";
 
 export function registerUserContextHandlers() {
   ipcMain.on(
@@ -76,12 +73,6 @@ export function registerUserContextHandlers() {
             authLogger.info("Refresh token persisted to keychain after user context set");
           });
       }
-
-      autoEnablePassiveMonitoring(user.userId, {
-        startSession: () => startSessionFromMain("passive"),
-        endSession: (sessionId) => endPassiveSessionFromMain(sessionId),
-        isAudioActive: () => audioWebSocketService.isConnected(),
-      });
     }
   );
 

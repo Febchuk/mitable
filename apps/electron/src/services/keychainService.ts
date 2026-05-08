@@ -94,8 +94,19 @@ class KeychainService {
   }
 
   /**
-   * Find ALL stored refresh tokens for the Mitable service.
-   * Returns account keys so we can clear them on full logout.
+   * Remove a single credential by raw account key.
+   */
+  async clearRefreshTokenByAccount(account: string): Promise<void> {
+    try {
+      const keytar = await getKeytar();
+      await keytar.deletePassword(SERVICE_NAME, account);
+    } catch {
+      // may not exist
+    }
+  }
+
+  /**
+   * Find ALL stored credentials for the Mitable service.
    */
   async findAllCredentials(): Promise<Array<{ account: string; password: string }>> {
     try {

@@ -3,7 +3,6 @@ import { IPC_CHANNELS } from "@mitable/shared";
 import { ctx } from "../context";
 import { authLogger } from "../loggers";
 import { authManager } from "../../services/authManager";
-import { trackMainEvent } from "../../services/analyticsService";
 
 export function registerAuthHandlers() {
   ipcMain.on(IPC_CHANNELS.AUTH_SET_TOKENS, (_event, accessToken: string, refreshToken: string) => {
@@ -29,11 +28,13 @@ export function registerAuthHandlers() {
       ? { orgId: ctx.currentUserContext.organizationId, userId: ctx.currentUserContext.userId }
       : undefined;
 
-    authManager.setTokens(accessToken, refreshToken, userCtx).then(() => {
+    authManager.setTokens(accessToken, refreshToken, userCtx).then(async () => {
       authLogger.info(" Auth manager token state after sync:", {
         managerHasToken: !!authManager.getAccessToken(),
         persistedToKeychain: !!userCtx,
       });
+
+      // BYOK keys are managed locally via keyVault — no backend fetch needed
     });
 
     const allWindows = [ctx.consoleWindow, ctx.watchingPillWindow];
@@ -53,27 +54,8 @@ export function registerAuthHandlers() {
   });
 
   ipcMain.on(IPC_CHANNELS.AUTH_CLEAR, async () => {
-    authLogger.info(" Tokens cleared");
+    authLogger.info("Backend auth tokens cleared (keychain untouched)");
     ctx.authTokens.accessToken = null;
     ctx.authTokens.refreshToken = null;
-
-    const userCtx = ctx.currentUserContext
-      ? { orgId: ctx.currentUserContext.organizationId, userId: ctx.currentUserContext.userId }
-      : undefined;
-
-    await authManager.clearTokens(userCtx);
-    authLogger.info(" Auth manager and keychain cleared");
-
-    if (ctx.currentUserContext?.userId) {
-      trackMainEvent(ctx.currentUserContext.userId, "electron_auth_cleared");
-    }
-    ctx.currentUserContext = null;
-
-    const allWindows = [ctx.consoleWindow, ctx.watchingPillWindow];
-    allWindows.forEach((win) => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send(IPC_CHANNELS.AUTH_TOKEN_UPDATED, null);
-      }
-    });
   });
 }

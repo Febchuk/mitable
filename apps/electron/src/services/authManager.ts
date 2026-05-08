@@ -136,18 +136,22 @@ class AuthManager {
     try {
       const credentials = await keychainService.findAllCredentials();
 
-      if (credentials.length === 0) {
-        logger.info("No stored credentials — fresh start");
+      const authCredentials = credentials.filter((c) => {
+        const [orgId] = c.account.split(":");
+        return orgId !== "inference";
+      });
+
+      if (authCredentials.length === 0) {
+        logger.info("No stored auth credentials — fresh start");
         return null;
       }
 
-      // Use the first credential (single-user assumption)
-      const { account, password: storedRefreshToken } = credentials[0];
+      const { account, password: storedRefreshToken } = authCredentials[0];
       const [orgId, userId] = account.split(":");
 
       if (!orgId || !userId || !storedRefreshToken) {
         logger.warn("Malformed keychain credential, clearing:", { account });
-        await keychainService.clearAll();
+        await keychainService.clearRefreshToken(orgId, userId);
         return null;
       }
 

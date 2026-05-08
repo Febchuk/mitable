@@ -56,7 +56,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
-        <Nav viewMode="employee" />
+        <Nav />
       </nav>
 
       {/* Bottom section */}

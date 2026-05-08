@@ -33,6 +33,10 @@ interface UseStartSessionReturn {
   isStarting: boolean;
   /** Error message if start failed */
   error: string | null;
+  /** True when the user tried to start without a BYOK provider configured */
+  showProviderModal: boolean;
+  /** Dismiss the provider modal */
+  dismissProviderModal: () => void;
 }
 
 /**
@@ -60,8 +64,22 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
+
+  const dismissProviderModal = useCallback(() => setShowProviderModal(false), []);
 
   const startSession = useCallback(async (): Promise<string | null> => {
+    // Check if a BYOK AI provider is configured before starting
+    try {
+      const config = await window.consoleAPI?.loadInferenceConfig?.();
+      if (!config) {
+        setShowProviderModal(true);
+        return null;
+      }
+    } catch {
+      // If the check itself fails, allow session to proceed
+    }
+
     // Validate user is logged in
     if (!user?.id || !user?.organizationId) {
       const errorMsg = "Please log in to start a session";
@@ -157,5 +175,7 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
     startSession,
     isStarting,
     error,
+    showProviderModal,
+    dismissProviderModal,
   };
 }

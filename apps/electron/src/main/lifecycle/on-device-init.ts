@@ -4,31 +4,31 @@ import { consoleLogger } from "../loggers";
 import { ctx } from "../context";
 
 /**
- * Initialize on-device AI module (SQLite + model manager only, no VRAM loading).
- * Ollama model is loaded into VRAM on-demand when a session ends, not at startup.
+ * Initialize on-device module (SQLite only).
+ * Whisper setup is handled separately by whisperSetupService in ready.ts.
  */
 export async function initOnDeviceAI(): Promise<void> {
   try {
-    const { modelManager, localDb } = await import("../../services/on-device");
-    await modelManager.initialize();
+    const { localDb } = await import("../../services/on-device");
     await localDb.initialize();
     consoleLogger.info(
-      `On-device AI module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
+      `On-device module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
     );
-    if (!localDb.isAvailable() && modelManager.isEnabled()) {
+    if (!localDb.isAvailable()) {
       consoleLogger.warn(
-        "On-device AI is enabled but SQLite is unavailable — run `npm run rebuild-native` in apps/electron"
+        "SQLite unavailable — run `npm run rebuild-native` in apps/electron. Preferences will use fallback."
       );
     }
   } catch (err) {
-    consoleLogger.warn("On-device AI init skipped:", String(err));
+    consoleLogger.error("On-device init failed:", String(err));
   }
 }
 
 /**
- * Eagerly preload Ollama model and Whisper CLI in the background.
+ * Eagerly preload Whisper CLI in the background.
  * Non-blocking — the app continues startup while this runs.
  * Once complete, processes any sessions that ended before models were ready.
+ * @deprecated Ollama preload removed — BYOK cloud inference is the only LLM path.
  */
 export async function eagerPreloadModels(): Promise<void> {
   const broadcastReadiness = (ready: boolean, error?: string) => {
@@ -40,16 +40,12 @@ export async function eagerPreloadModels(): Promise<void> {
   };
 
   try {
-    consoleLogger.info("[EagerPreload] Starting background model preload...");
+    consoleLogger.info("[EagerPreload] Starting background preload...");
 
-    // 1. Pull + warm Ollama model (hardware-aware)
-    const { initialize } = await import("../../services/on-device/ollamaLifecycle");
-    await initialize();
-    consoleLogger.info("[EagerPreload] Ollama model pulled and warmed");
-
-    // 2. Download whisper-cli + model if not already installed
-    const { modelManager } = await import("../../services/on-device");
-    await modelManager.ensureWhisperInstalled();
+    // whisperSetupService.ensure() already runs at startup in ready.ts,
+    // but call again here as a safety net (no-ops if already complete)
+    const { whisperSetupService } = await import("../../services/on-device");
+    await whisperSetupService.ensure();
     consoleLogger.info("[EagerPreload] Whisper CLI ensured");
 
     // Mark ready

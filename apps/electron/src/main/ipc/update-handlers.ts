@@ -171,7 +171,13 @@ export function registerUpdateHandlers() {
     try {
       const { localDb } = await import("../../services/on-device");
 
-      const sessions = localDb.getAllSessionsByDateRange(startMs, endMs);
+      const currentUserId =
+        ctx.currentUserContext?.userId ||
+        localDb.getUserPreference("system", "activeLocalUserId") ||
+        undefined;
+      const sessions = localDb
+        .getAllSessionsByDateRange(startMs, endMs)
+        .filter((s) => !currentUserId || s.userId === currentUserId);
 
       // Inject the currently active session (it lives in memory, not yet in SQLite)
       const activeState = monitoringSessionService.getSessionState();

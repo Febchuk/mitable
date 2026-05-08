@@ -4,8 +4,6 @@
  * Barrel export for the Ollama-based local AI pipeline.
  */
 
-export { modelManager } from "./modelManager";
-
 export { ollamaService } from "./ollamaService";
 export type { ChatMessage, ContentPart, OllamaProgressCallback } from "./ollamaService";
 
@@ -45,5 +43,12 @@ export type {
 export { nativeAudioCapture } from "./nativeAudioCapture";
 export type { NativeAudioChunk } from "./nativeAudioCapture";
 
-export { sherpaWhisperService } from "./sherpaWhisperService";
 export { whisperCliService } from "./whisperCliService";
+export { whisperSetupService } from "./whisperSetupService";
+
+export { hybridInferenceService } from "./hybridInferenceService";
+export type { BatchAnalysisResult, InferenceTier } from "./hybridInferenceService";
+
+export { keyVault } from "./keyVault";
+export { createProvider } from "./providers";
+export type { InferenceProvider, ProviderConfig, ProviderName } from "./providers";

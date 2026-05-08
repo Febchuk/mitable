@@ -20,7 +20,7 @@ import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("HardwareDetector");
 
-export type HardwareTier = "integrated" | "constrained" | "capable";
+export type HardwareTier = "cloud" | "integrated" | "constrained" | "capable";
 
 export interface HardwareProfile {
   tier: HardwareTier;
@@ -28,6 +28,8 @@ export interface HardwareProfile {
   gpuName: string;
   recommendedModel: string;
   hasNativeAudio: boolean;
+  /** True if cloud inference should be used (insufficient local VRAM) */
+  useCloudInference: boolean;
 }
 
 export type GpuVendor = "nvidia" | "amd" | "intel" | "apple" | "unknown";
@@ -57,16 +59,21 @@ const CAPABLE_FLOOR_MB = 16_000;
 const MAC_CONSTRAINED_FLOOR_MB = 12_000;
 const MAC_CAPABLE_FLOOR_MB = 16_000;
 
+// Minimum VRAM for local inference (8GB — gemma3:4b-it-qat needs ~4.7GB + headroom)
+const LOCAL_INFERENCE_MIN_VRAM_MB = 8_000;
+
 function classifyTier(vramMB: number): HardwareTier {
   if (vramMB >= CAPABLE_FLOOR_MB) return "capable";
   if (vramMB >= CONSTRAINED_FLOOR_MB) return "constrained";
-  return "integrated";
+  if (vramMB >= LOCAL_INFERENCE_MIN_VRAM_MB) return "integrated";
+  return "cloud"; // Insufficient VRAM for local models
 }
 
 function modelForTier(tier: HardwareTier): string {
   if (tier === "capable") return CAPABLE_MODEL;
   if (tier === "constrained") return CONSTRAINED_MODEL;
-  return INTEGRATED_MODEL;
+  if (tier === "integrated") return INTEGRATED_MODEL;
+  return "cloud"; // No local model for cloud tier
 }
 
 function buildProfile(tier: HardwareTier, vramMB: number, gpuName: string): HardwareProfile {
@@ -76,6 +83,7 @@ function buildProfile(tier: HardwareTier, vramMB: number, gpuName: string): Hard
     gpuName,
     recommendedModel: modelForTier(tier),
     hasNativeAudio: true,
+    useCloudInference: tier === "cloud",
   };
 }
 
@@ -119,7 +127,9 @@ async function detectMacMemory(): Promise<number> {
 function classifyMacTier(memMB: number): HardwareTier {
   if (memMB >= MAC_CAPABLE_FLOOR_MB) return "capable";
   if (memMB >= MAC_CONSTRAINED_FLOOR_MB) return "constrained";
-  return "integrated";
+  // Mac unified memory: if under 8GB effective, use cloud inference
+  if (memMB >= LOCAL_INFERENCE_MIN_VRAM_MB) return "integrated";
+  return "cloud";
 }
 
 export async function detectHardware(): Promise<HardwareProfile> {
@@ -139,9 +149,66 @@ export async function detectHardware(): Promise<HardwareProfile> {
     return profile;
   }
 
-  // nvidia-smi failed → integrated graphics / no discrete GPU
-  logger.warn("No discrete GPU detected, using integrated tier (gemma3:4b-it-qat)");
-  return buildProfile("integrated", 0, "Integrated graphics");
+  // nvidia-smi failed → check for Intel/AMD iGPU via WMI
+  const igpu = await detectIntegratedGpu();
+  if (igpu) {
+    // iGPUs typically have 1-2GB allocated or share system RAM
+    // If under 8GB, use cloud inference
+    const effectiveVram = igpu.vramMB;
+    if (effectiveVram < LOCAL_INFERENCE_MIN_VRAM_MB) {
+      const profile = buildProfile("cloud", effectiveVram, igpu.name);
+      logger.info("Detected low-VRAM iGPU, using cloud inference", profile);
+      return profile;
+    }
+    // Rare: iGPU with 8GB+ (some AMD APUs)
+    const profile = buildProfile("integrated", effectiveVram, igpu.name);
+    logger.info("Detected high-VRAM iGPU, using local inference", profile);
+    return profile;
+  }
+
+  // No GPU detected at all → cloud tier
+  logger.warn("No GPU detected, using cloud inference");
+  return buildProfile("cloud", 0, "No GPU");
+}
+
+/**
+ * Detect Intel/AMD integrated GPU via WMI (Windows) or other methods.
+ * Returns approximate VRAM (often shared system memory).
+ */
+async function detectIntegratedGpu(): Promise<{ vramMB: number; name: string } | null> {
+  if (process.platform !== "win32") {
+    // On Linux, we could check /proc/cpuinfo or lspci, but for now assume cloud
+    // if nvidia-smi failed (discrete GPUs are more common on Linux workstations)
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    execFile(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        'Get-CimInstance Win32_VideoController | Where-Object { $_.AdapterRAM -lt 2147483648 } | Select-Object Name, AdapterRAM | ForEach-Object { "$($_.Name)|$([math]::Round($_.AdapterRAM / 1MB))" }',
+      ],
+      { timeout: 5_000, windowsHide: true },
+      (err, stdout) => {
+        if (err || !stdout.trim()) {
+          resolve(null);
+          return;
+        }
+        // Parse first iGPU found
+        const line = stdout.trim().split("\n")[0];
+        const parts = line.split("|");
+        if (parts.length >= 2) {
+          const name = parts[0].trim();
+          const vramMB = parseInt(parts[1], 10) || 1024; // Default 1GB if parsing fails
+          resolve({ name, vramMB });
+          return;
+        }
+        resolve(null);
+      }
+    );
+  });
 }
 
 /* ------------------------------------------------------------------ */

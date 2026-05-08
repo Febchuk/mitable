@@ -1,0 +1,894 @@
+/**
+ * BYOK Inference Service
+ *
+ * Uses the user's own API key (Google/OpenAI/Anthropic) stored in keyVault
+ * for all AI inference: batch frame analysis and session summarization.
+ *
+ * On-device Whisper handles audio transcription separately.
+ *
+ * If no BYOK key is configured, raw captures and audio are saved but
+ * no AI analysis runs.
+ *
+ * @deprecated Ollama/local inference code is retained but dead-pathed.
+ * It will be removed in Phase 2.
+ */
+
+import { createLogger } from "../../lib/logger";
+import type { BufferedFrame } from "./localInferenceService";
+import { localDb } from "./localDb";
+import { sessionTimeline, type TranscriptSegment } from "./sessionTimeline";
+import { localAudioService } from "./localAudioService";
+import { localFrameStorage } from "../localFrameStorage";
+import { keyVault } from "./keyVault";
+import { createProvider, type InferenceProvider } from "./providers";
+import { promises as fs } from "fs";
+import { join } from "path";
+import { app } from "electron";
+import { randomUUID } from "crypto";
+
+const logger = createLogger("HybridInference");
+
+export interface BatchAnalysisResult {
+  frameDescriptions: Array<{
+    sequenceNumber: number;
+    description: string;
+    userAction: string | null;
+  }>;
+  batchNarrative: string;
+}
+
+export interface InferenceTier {
+  type: "cloud";
+  reason: string;
+}
+
+class HybridInferenceService {
+  private currentTier: InferenceTier | null = null;
+  private currentMdPath: string | null = null;
+  private sessionStartMs: number = 0;
+  private provider: InferenceProvider | null = null;
+
+  private buildBlockBaseParts(): string[] {
+    const parts = ["Mitable"];
+    try {
+      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      if (activeId) {
+        const account = localDb.getLocalAccountById(activeId);
+        if (account?.email) {
+          parts.push(account.email.replace(/[<>:"/\\|?*]/g, "_"));
+        }
+      }
+    } catch {
+      // fallback to no user subfolder
+    }
+    return parts;
+  }
+
+  /**
+   * Create block.md file at SESSION START.
+   * Called early so transcripts and activity can be appended during the session.
+   */
+  async createBlockMarkdown(
+    sessionId: string,
+    startedAt: number,
+    sessionGoal?: string,
+    _userId?: string
+  ): Promise<string | null> {
+    this.sessionStartMs = startedAt;
+
+    try {
+      const sessionDate = new Date(startedAt);
+      const monthName = sessionDate.toLocaleString("en-US", { month: "long" }).toLowerCase();
+      const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
+
+      const docsDir = app.getPath("documents");
+      const dayDir = join(docsDir, ...this.buildBlockBaseParts(), "blockdata", dayFolder);
+
+      await fs.mkdir(dayDir, { recursive: true });
+
+      let blockNum = 1;
+      try {
+        const todayStart = new Date(startedAt);
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = todayStart.getTime() + 24 * 60 * 60 * 1000;
+        const sessions = localDb.getAllSessionsByDateRange(todayStart.getTime(), todayEnd);
+        blockNum = Math.max(sessions.length, 1);
+      } catch {
+        // DB not ready or no sessions - default to 1
+      }
+
+      logger.info(`Creating block_${blockNum}.md in ${dayDir}`);
+
+      const startTime = sessionDate.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+
+      const header = [
+        `# Mitable Block ${blockNum}`,
+        ``,
+        `- **Date:** ${sessionDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`,
+        `- **Started:** ${startTime}`,
+        `- **Session Goal:** ${sessionGoal || "General work session"}`,
+        `- **Session:** ${sessionId}`,
+        ``,
+        `---`,
+        ``,
+        `## Detailed Activity Log`,
+        ``,
+        `*Activity will be recorded as the session progresses...*`,
+        ``,
+      ].join("\n");
+
+      const mdFilePath = join(dayDir, `block_${blockNum}.md`);
+      await fs.writeFile(mdFilePath, header, "utf-8");
+
+      this.currentMdPath = mdFilePath;
+
+      // Update localDb with export path
+      try {
+        localDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
+      } catch {
+        // DB might not be ready yet, that's ok
+      }
+
+      logger.info(`Block markdown created at session start: ${mdFilePath}`);
+      return mdFilePath;
+    } catch (err) {
+      logger.error("Failed to create block markdown at session start:", String(err));
+      return null;
+    }
+  }
+
+  /**
+   * Get the current markdown path (for appending transcripts during session).
+   */
+  getMarkdownPath(): string | null {
+    return this.currentMdPath;
+  }
+
+  /**
+   * Append a transcript segment to block.md during the session.
+   */
+  async appendTranscript(
+    text: string,
+    source: "user" | "remote",
+    startOffsetMs: number,
+    endOffsetMs: number
+  ): Promise<void> {
+    if (!this.currentMdPath) return;
+
+    const wallStart = new Date(this.sessionStartMs + startOffsetMs).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const wallEnd = new Date(this.sessionStartMs + endOffsetMs).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const speaker = source === "user" ? "You" : "Remote";
+
+    const line = `> **Audio (${wallStart} – ${wallEnd}):** ${speaker}: ${text}\n\n`;
+
+    try {
+      await fs.appendFile(this.currentMdPath, line, "utf-8");
+    } catch (err) {
+      logger.warn("Failed to append transcript to markdown:", String(err));
+    }
+  }
+
+  /**
+   * Initialize inference — loads BYOK provider from keyVault.
+   */
+  async initialize(_sessionId: string): Promise<InferenceTier> {
+    const providerConfig = await keyVault.load();
+
+    if (!providerConfig) {
+      this.currentTier = { type: "cloud", reason: "No API key configured" };
+      this.provider = null;
+      logger.warn("No BYOK provider configured — AI analysis will be skipped");
+      return this.currentTier;
+    }
+
+    this.provider = createProvider(
+      providerConfig.provider,
+      providerConfig.apiKey,
+      providerConfig.model
+    );
+    this.currentTier = { type: "cloud", reason: `BYOK: ${providerConfig.provider}` };
+
+    logger.info(`Using BYOK inference (${this.provider.name} / ${this.provider.model})`);
+    return this.currentTier;
+  }
+
+  /**
+   * Process entire session at end — hybrid orchestration.
+   */
+  async processAllAtEnd(
+    sessionId: string,
+    sessionDir: string,
+    onProgress?: (progress: {
+      sessionId: string;
+      step: string;
+      batchIndex?: number;
+      totalBatches?: number;
+      percent: number;
+      label: string;
+    }) => void
+  ): Promise<void> {
+    const t0 = Date.now();
+    logger.info(`Hybrid processAllAtEnd starting for session ${sessionId}`);
+
+    const emit = (
+      step: string,
+      percent: number,
+      label: string,
+      extra?: { batchIndex?: number; totalBatches?: number }
+    ) => {
+      onProgress?.({ sessionId, step, percent, label, ...extra });
+    };
+
+    emit("loading_manifest", 2, "Loading session data...");
+
+    // Load timeline and frame manifest
+    const timeline = sessionTimeline.load(sessionDir) ?? sessionTimeline.get();
+    const manifest = await localFrameStorage.loadManifest(sessionId);
+    if (!manifest || manifest.frames.length === 0) {
+      logger.warn("No frames found for session", sessionId);
+      return;
+    }
+
+    const sessionStartMs = timeline?.sessionStartMs ?? new Date(manifest.startedAt).getTime();
+    this.sessionStartMs = sessionStartMs;
+    const allFrameMeta = manifest.frames;
+    logger.info(`Found ${allFrameMeta.length} frames on disk`);
+
+    // Use existing markdown file (created at session start) or create fallback
+    let mdPath = this.currentMdPath;
+    if (!mdPath) {
+      logger.warn("No markdown file from session start — creating fallback now");
+      mdPath = await this.initMarkdownFile(sessionId, sessionStartMs, allFrameMeta);
+      this.currentMdPath = mdPath;
+    } else {
+      logger.info(`Using existing block.md: ${mdPath}`);
+      // Update the placeholder text now that we have frame count
+      try {
+        const content = await fs.readFile(mdPath, "utf-8");
+        const updated = content.replace(
+          "*Activity will be recorded as the session progresses...*",
+          `*${allFrameMeta.length} frames captured*`
+        );
+        await fs.writeFile(mdPath, updated, "utf-8");
+      } catch {
+        // Non-critical
+      }
+    }
+
+    if (!mdPath) {
+      logger.error("Failed to create block.md — summaries will not be written to disk");
+    }
+
+    emit("loading_model", 5, "Initializing inference...");
+    await this.initialize(sessionId);
+
+    if (!this.provider) {
+      logger.warn("No BYOK provider — skipping AI analysis");
+      emit("complete", 100, "No AI provider configured. Add your API key in Settings.");
+      return;
+    }
+
+    // Get transcript segments
+    const allTranscripts = localAudioService.getAccumulatedTranscripts();
+    const hasStreamedAudio = allTranscripts.length > 0;
+
+    emit("transcribing", 12, "Processing audio transcripts...");
+
+    // Store transcripts in DB if not already there
+    const existingTranscripts = localDb.getTranscriptionsForSession(sessionId);
+    if (existingTranscripts.length === 0 && hasStreamedAudio) {
+      for (let i = 0; i < allTranscripts.length; i++) {
+        const seg = allTranscripts[i];
+        localDb.insertTranscription({
+          id: randomUUID(),
+          sessionId,
+          chunkIndex: i,
+          speakerId: seg.source === "user" ? 0 : 1,
+          transcript: seg.text,
+          startTimeMs: Math.round(seg.startOffsetMs),
+          endTimeMs: Math.round(seg.endOffsetMs),
+          confidence: 0.9,
+          source: seg.source,
+        });
+      }
+    }
+
+    emit("transcribing", 18, "Audio processing complete");
+
+    try {
+      // Process frames in batches
+      const BATCH_SIZE = 20;
+      const totalBatches = Math.ceil(allFrameMeta.length / BATCH_SIZE);
+      const batchNarratives: string[] = [];
+
+      // Check for existing classifications (resumable)
+      const existingClassifications = localDb.getClassificationsForSession(sessionId);
+      const processedBatchIndices = new Set(existingClassifications.map((c) => c.batchIndex));
+
+      if (processedBatchIndices.size > 0) {
+        logger.info(
+          `Resuming: ${processedBatchIndices.size}/${totalBatches} batches already processed`
+        );
+      }
+
+      for (
+        let offset = 0, batchIdx = 0;
+        offset < allFrameMeta.length;
+        offset += BATCH_SIZE, batchIdx++
+      ) {
+        const batchMeta = allFrameMeta.slice(offset, offset + BATCH_SIZE);
+
+        // Skip already processed batches
+        if (processedBatchIndices.has(batchIdx)) {
+          logger.info(`Batch ${batchIdx}: already processed — skipping`);
+          continue;
+        }
+
+        const batchPercent = 20 + Math.round((batchIdx / totalBatches) * 60);
+        emit(
+          "processing_batch",
+          batchPercent,
+          `Analyzing frames (${batchIdx + 1} of ${totalBatches})...`,
+          { batchIndex: batchIdx, totalBatches }
+        );
+
+        // Load frame images
+        const batch: BufferedFrame[] = [];
+        for (const frameMeta of batchMeta) {
+          const imageBase64 = await localFrameStorage.getFrameAsDataUrl(
+            sessionId,
+            frameMeta.filename
+          );
+          if (!imageBase64) {
+            logger.warn(`Skipping frame ${frameMeta.sequenceNumber} — image not found`);
+            continue;
+          }
+          const capturedAt = new Date(frameMeta.timestamp).getTime();
+          batch.push({
+            frameId: frameMeta.frameId,
+            sessionId,
+            sequenceNumber: frameMeta.sequenceNumber,
+            capturedAt,
+            offsetMs: capturedAt - sessionStartMs,
+            imageBase64,
+            previousImageBase64: null,
+            windowId: frameMeta.windowSourceId,
+            appName: frameMeta.appName,
+            windowTitle: frameMeta.windowTitle,
+            intervalEvidence: frameMeta.intervalEvidence,
+            browserContext: frameMeta.browserContext,
+          });
+        }
+
+        if (batch.length === 0) continue;
+
+        logger.info(
+          `Batch ${batchIdx}: ${batch.length} frames (seq ${batch[0].sequenceNumber}-${batch[batch.length - 1].sequenceNumber})`
+        );
+
+        // Match transcript segments
+        const batchStartOffset = batch[0].offsetMs;
+        const batchEndOffset = batch[batch.length - 1].offsetMs;
+        const matchedTranscripts = hasStreamedAudio
+          ? allTranscripts.filter(
+              (seg) => seg.endOffsetMs > batchStartOffset && seg.startOffsetMs < batchEndOffset
+            )
+          : [];
+        const transcriptText = matchedTranscripts
+          .map((seg) => `${seg.source === "user" ? "User" : "Remote"}: ${seg.text}`)
+          .join("\n");
+
+        // Analyze batch (routes to local or cloud)
+        const result = await this.analyzeBatch(batch, transcriptText);
+        batchNarratives.push(result.batchNarrative);
+
+        // Store captures
+        for (const frame of batch) {
+          const frameDesc = result.frameDescriptions.find(
+            (fd) => fd.sequenceNumber === frame.sequenceNumber
+          );
+          const ev = frame.intervalEvidence;
+          localDb.insertCapture({
+            id: randomUUID(),
+            sessionId: frame.sessionId,
+            frameId: frame.frameId,
+            sequenceNumber: frame.sequenceNumber,
+            capturedAt: frame.capturedAt,
+            windowId: frame.windowId,
+            appName: frame.appName,
+            windowTitle: frame.windowTitle,
+            sensorOutput: frameDesc?.description ?? `[${frame.appName}] ${frame.windowTitle}`,
+            deltaChanged: (ev?.keyboardEventCount ?? 0) > 0 || (ev?.mouseClickCount ?? 0) > 0,
+            changeType:
+              (ev?.keyboardEventCount ?? 0) > 0 || (ev?.mouseClickCount ?? 0) > 0
+                ? "user_interaction"
+                : "passive_view",
+            userAction: frameDesc?.userAction ?? null,
+          });
+        }
+
+        // Store classification
+        localDb.insertClassification({
+          id: randomUUID(),
+          sessionId,
+          batchIndex: batchIdx,
+          startSequence: batch[0].sequenceNumber,
+          endSequence: batch[batch.length - 1].sequenceNumber,
+          activityDescription: result.batchNarrative,
+          activityType: null,
+          onTask: true,
+          taskRelevance: null,
+          importanceScore: 0.5,
+          rawOutput: "",
+        });
+
+        // Append batch to markdown
+        if (mdPath) {
+          await this.appendBatchToMarkdown(
+            mdPath,
+            batchIdx,
+            batch,
+            result.frameDescriptions,
+            matchedTranscripts,
+            result.batchNarrative,
+            sessionStartMs
+          );
+        }
+
+        logger.info(`Batch ${batchIdx} complete: ${result.batchNarrative.slice(0, 120)}`);
+      }
+
+      // Generate final summary from the complete block.md
+      const existingStory = localDb.getStoryForSession(sessionId);
+      if (existingStory) {
+        logger.info("Summary already exists — skipping");
+      } else {
+        emit("generating_summary", 85, "Writing summary...");
+        const summary = await this.summarizeBlockMd(mdPath);
+        localDb.insertStory({
+          id: randomUUID(),
+          sessionId,
+          narrative: summary,
+          tasks: "[]",
+          timeBreakdown: null,
+          modelUsed: this.provider?.model ?? "byok",
+        });
+        localDb.checkpoint();
+
+        // Prepend summary to markdown
+        if (mdPath) {
+          await this.prependSummaryToMarkdown(mdPath, sessionId);
+        }
+      }
+
+      emit("complete", 100, "Done");
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      logger.info(`Hybrid processAllAtEnd completed in ${elapsed}s`);
+    } finally {
+      // No cleanup needed for BYOK
+    }
+  }
+
+  /**
+   * Analyze a batch of frames via BYOK provider.
+   */
+  private async analyzeBatch(
+    frames: BufferedFrame[],
+    transcriptSegments: string
+  ): Promise<BatchAnalysisResult> {
+    if (!this.provider) {
+      throw new Error("No BYOK provider configured");
+    }
+    return this.analyzeBatchCloud(frames, transcriptSegments);
+  }
+
+  /**
+   * Generate final session summary by reading the complete block.md file.
+   */
+  private async summarizeBlockMd(mdPath: string | null): Promise<string> {
+    if (!mdPath) {
+      logger.warn("No markdown path available for summarization");
+      return "Session completed.";
+    }
+
+    let blockContent: string;
+    try {
+      blockContent = await fs.readFile(mdPath, "utf-8");
+      logger.info(`Read ${blockContent.length} chars from block.md for summarization`);
+    } catch (err) {
+      logger.error("Failed to read block.md for summarization:", String(err));
+      return "Session completed.";
+    }
+
+    const activityLogStart = blockContent.indexOf("## Detailed Activity Log");
+    const contentToSummarize =
+      activityLogStart !== -1 ? blockContent.slice(activityLogStart) : blockContent;
+
+    const MAX_CHARS = 50_000;
+    const truncatedContent =
+      contentToSummarize.length > MAX_CHARS
+        ? contentToSummarize.slice(0, MAX_CHARS) + "\n\n... [truncated]"
+        : contentToSummarize;
+
+    logger.info(
+      `Sending ${truncatedContent.length} chars to summarizer (original: ${contentToSummarize.length})`
+    );
+
+    return this.summarizeWithProvider(truncatedContent);
+  }
+
+  getCurrentTier(): InferenceTier | null {
+    return this.currentTier;
+  }
+
+  getProvider(): InferenceProvider | null {
+    return this.provider;
+  }
+
+  isCloudConfigured(): boolean {
+    return this.provider !== null;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // BYOK Cloud Path
+  // ──────────────────────────────────────────────────────────────────────────
+
+  private async analyzeBatchCloud(
+    frames: BufferedFrame[],
+    transcriptSegments: string
+  ): Promise<BatchAnalysisResult> {
+    if (!this.provider) {
+      throw new Error("No BYOK provider configured for cloud batch analysis");
+    }
+
+    const metadataLines = frames.map((f, i) => {
+      const ev = f.intervalEvidence;
+      const parts: string[] = [];
+      if (ev?.keyboardEventCount) parts.push(`${ev.keyboardEventCount} keys`);
+      if (ev?.mouseClickCount) parts.push(`${ev.mouseClickCount} clicks`);
+      if (ev?.copyCount) parts.push(`${ev.copyCount} copies`);
+      if (ev?.pasteCount) parts.push(`${ev.pasteCount} pastes`);
+
+      return `Frame ${i + 1}: ${f.appName} - ${f.windowTitle}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+    });
+
+    const promptText = `Analyze ${frames.length} sequential screenshots from a work session.
+
+Per-frame metadata:
+${metadataLines.join("\n")}
+
+${transcriptSegments ? `Audio transcript during this period:\n${transcriptSegments}\n\n` : ""}For each frame, describe what is visible on screen (apps, files, content).
+Then, summarize what changed across all frames — what work was done, what apps were used, any significant activity.
+
+Return JSON:
+{
+  "frameDescriptions": [
+    {"sequenceNumber": 1, "description": "...", "userAction": "typing/editing/etc"},
+    ...
+  ],
+  "batchNarrative": "Summary of work across all frames..."
+}`;
+
+    const imageContent = frames.map((frame) => ({
+      type: "image_url" as const,
+      image_url: {
+        url: frame.imageBase64.startsWith("data:")
+          ? frame.imageBase64
+          : `data:image/png;base64,${frame.imageBase64}`,
+      },
+    }));
+
+    const text = await this.provider.chatCompletion(
+      [
+        {
+          role: "system",
+          content: "You analyze screenshots from work sessions. Return valid JSON only.",
+        },
+        {
+          role: "user",
+          content: [{ type: "text", text: promptText }, ...imageContent],
+        },
+      ],
+      { temperature: 0.2, max_tokens: 2048, format: "json" }
+    );
+
+    try {
+      const parsed = JSON.parse(text) as BatchAnalysisResult;
+      // Remap 1-indexed relative sequenceNumbers to actual frame sequenceNumbers
+      for (let i = 0; i < parsed.frameDescriptions.length; i++) {
+        if (i < frames.length) {
+          parsed.frameDescriptions[i].sequenceNumber = frames[i].sequenceNumber;
+        }
+      }
+      return parsed;
+    } catch {
+      logger.warn("Failed to parse provider JSON response, returning fallback");
+      return {
+        frameDescriptions: frames.map((f) => ({
+          sequenceNumber: f.sequenceNumber,
+          description: `[${f.appName}] ${f.windowTitle}`,
+          userAction: null,
+        })),
+        batchNarrative: "Activity recorded.",
+      };
+    }
+  }
+
+  private async summarizeWithProvider(content: string): Promise<string> {
+    if (!this.provider) {
+      logger.warn("No BYOK provider for summarization, returning truncated content");
+      return content.slice(0, 2000);
+    }
+
+    const result = await this.provider.chatCompletion(
+      [
+        {
+          role: "system",
+          content:
+            "You are a work session summarizer. Write in FIRST PERSON from the user's perspective (e.g. 'I worked on...', 'I reviewed...', 'I discussed...'). You will receive a detailed activity log from a work session. The log contains batch summaries with timestamps, apps used, screenshots described, transcripts, and activity data. Write a concise 2-3 paragraph summary. Focus on: tasks completed, apps/tools used, key discussions or decisions, and significant work blocks.",
+        },
+        {
+          role: "user",
+          content: `Below is a detailed work session activity log. Each section covers ~2-3 minutes of activity with screenshot descriptions, transcripts, and a batch summary.\n\n${content}\n\nWrite a concise 2-3 paragraph first-person summary of what I accomplished in this session.`,
+        },
+      ],
+      { temperature: 0.3, max_tokens: 500 }
+    );
+
+    return result.trim() || "Session completed.";
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Markdown Export (block.md generation)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  private async initMarkdownFile(
+    sessionId: string,
+    sessionStartMs: number,
+    frameMeta: Array<{ timestamp: string; appName: string }>
+  ): Promise<string | null> {
+    try {
+      const sessionDate = new Date(sessionStartMs);
+      const monthName = sessionDate.toLocaleString("en-US", { month: "long" }).toLowerCase();
+      const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
+
+      const docsDir = app.getPath("documents");
+      const dayDir = join(docsDir, ...this.buildBlockBaseParts(), "blockdata", dayFolder);
+      await fs.mkdir(dayDir, { recursive: true });
+
+      let blockNum = 1;
+      try {
+        const todayStart = new Date(sessionStartMs);
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = todayStart.getTime() + 24 * 60 * 60 * 1000;
+        const sessions = localDb.getAllSessionsByDateRange(todayStart.getTime(), todayEnd);
+        blockNum = Math.max(sessions.length, 1);
+      } catch {
+        // DB not ready - default to 1
+      }
+
+      const apps = [...new Set(frameMeta.map((f) => f.appName).filter(Boolean))];
+      const startTime = sessionDate.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+
+      const header = [
+        `# Mitable Block ${blockNum}`,
+        ``,
+        `- **Date:** ${sessionDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`,
+        `- **Started:** ${startTime}`,
+        `- **Frames captured:** ${frameMeta.length}`,
+        `- **Applications used:** ${apps.join(", ") || "Unknown"}`,
+        `- **Session:** ${sessionId}`,
+        ``,
+        `---`,
+        ``,
+        `## Detailed Activity Log`,
+        ``,
+      ].join("\n");
+
+      const mdFilePath = join(dayDir, `block_${blockNum}.md`);
+      await fs.writeFile(mdFilePath, header, "utf-8");
+
+      localDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
+
+      logger.info(`Streaming .md created: ${mdFilePath}`);
+      return mdFilePath;
+    } catch (err) {
+      logger.error("Failed to init markdown file:", String(err));
+      return null;
+    }
+  }
+
+  private async appendBatchToMarkdown(
+    mdPath: string,
+    _batchIdx: number,
+    batch: BufferedFrame[],
+    frameDescriptions: Array<{
+      sequenceNumber: number;
+      description: string;
+      userAction: string | null;
+    }>,
+    transcripts: TranscriptSegment[],
+    batchNarrative: string,
+    sessionStartMs: number
+  ): Promise<void> {
+    try {
+      const batchStart = new Date(batch[0].capturedAt).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      const batchEnd = new Date(batch[batch.length - 1].capturedAt).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      const lines: string[] = [];
+      const engine =
+        this.provider?.name === "google"
+          ? "Gemini"
+          : this.provider?.name === "anthropic"
+            ? "Claude"
+            : this.provider?.name === "openai"
+              ? "GPT"
+              : "AI";
+      lines.push(`### ${batchStart} – ${batchEnd} (${batch.length} frames) — *${engine}*\n`);
+
+      if (batchNarrative) {
+        lines.push(`**Summary:** ${batchNarrative}\n`);
+      }
+
+      // Build chronological events: frame descriptions + transcript segments
+      interface TimeEvent {
+        offsetMs: number;
+        wallClock: string;
+        type: "frame" | "transcript";
+        content: string;
+      }
+
+      const events: TimeEvent[] = [];
+
+      // Add frame descriptions with activity evidence
+      for (const frame of batch) {
+        const fd = frameDescriptions.find((d) => d.sequenceNumber === frame.sequenceNumber);
+        const desc = fd?.description ?? `${frame.appName} — ${frame.windowTitle}`;
+        const action = fd?.userAction ? ` [${fd.userAction}]` : "";
+        const wallClock = new Date(frame.capturedAt).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        // Build activity evidence inline
+        const ev = frame.intervalEvidence;
+        const actParts: string[] = [];
+        if (ev?.keyboardEventCount) actParts.push(`${ev.keyboardEventCount} keys`);
+        if (ev?.mouseClickCount) actParts.push(`${ev.mouseClickCount} clicks`);
+        if (ev?.mouseScrollCount) actParts.push(`${ev.mouseScrollCount} scrolls`);
+        if (ev?.copyCount) actParts.push(`${ev.copyCount} copies`);
+        if (ev?.pasteCount) actParts.push(`${ev.pasteCount} pastes`);
+        const actStr = actParts.length > 0 ? ` (${actParts.join(", ")})` : "";
+
+        events.push({
+          offsetMs: frame.offsetMs,
+          wallClock,
+          type: "frame",
+          content: `- **${wallClock}** | ${frame.appName}${action}${actStr}: ${desc.length > 250 ? desc.slice(0, 250) + "…" : desc}`,
+        });
+      }
+
+      // Add transcript segments
+      for (const seg of transcripts) {
+        const wallStart = new Date(sessionStartMs + seg.startOffsetMs).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const wallEnd = new Date(sessionStartMs + seg.endOffsetMs).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const speaker = seg.source === "user" ? "User" : "Remote";
+        events.push({
+          offsetMs: seg.startOffsetMs,
+          wallClock: wallStart,
+          type: "transcript",
+          content: `> **Audio (${wallStart} – ${wallEnd}):** ${speaker}: ${seg.text}`,
+        });
+      }
+
+      // Sort by offsetMs for chronological order
+      events.sort((a, b) => a.offsetMs - b.offsetMs);
+
+      for (const ev of events) {
+        lines.push(ev.content);
+      }
+
+      lines.push(`\n`);
+
+      await fs.appendFile(mdPath, lines.join("\n"), "utf-8");
+    } catch (err) {
+      logger.error("Failed to append batch to .md:", String(err));
+    }
+  }
+
+  private async prependSummaryToMarkdown(mdPath: string, sessionId: string): Promise<void> {
+    try {
+      const story = localDb.getStoryForSession(sessionId);
+      if (!story || story.narrative.length <= 30) return;
+
+      const existing = await fs.readFile(mdPath, "utf-8");
+
+      // Insert summary after the header, before "## Detailed Activity Log"
+      const insertPoint = existing.indexOf("## Detailed Activity Log");
+      if (insertPoint === -1) {
+        await fs.appendFile(mdPath, `\n## Summary\n\n${story.narrative}\n`, "utf-8");
+        return;
+      }
+
+      const before = existing.slice(0, insertPoint);
+      const after = existing.slice(insertPoint);
+      const withSummary = `${before}## Summary\n\n${story.narrative}\n\n${after}`;
+
+      // Also update the header with final time range
+      const captures = localDb.getCapturesForSession(sessionId);
+      if (captures.length > 0) {
+        const endTime = new Date(captures[captures.length - 1].capturedAt).toLocaleTimeString(
+          "en-US",
+          {
+            hour: "numeric",
+            minute: "2-digit",
+          }
+        );
+        const startTime = new Date(captures[0].capturedAt).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        });
+        const durationMin = Math.round(
+          (captures[captures.length - 1].capturedAt - captures[0].capturedAt) / 60_000
+        );
+        const updatedContent = withSummary
+          .replace(
+            /- \*\*Started:\*\* .+/,
+            `- **Time:** ${startTime} – ${endTime} (${durationMin} min)`
+          )
+          .replace(
+            /- \*\*Session Goal:\*\* .+/,
+            `- **Session Goal:** ${localDb.getMonitoringSession(sessionId)?.sessionGoal ?? "General work session"}`
+          );
+
+        await fs.writeFile(mdPath, updatedContent, "utf-8");
+      } else {
+        await fs.writeFile(mdPath, withSummary, "utf-8");
+      }
+
+      // Append footer
+      await fs.appendFile(
+        mdPath,
+        `---\n\n*Exported by Mitable. Paste this file into any AI assistant to generate reports, summaries, or analysis from your work session.*\n`,
+        "utf-8"
+      );
+
+      logger.info("Summary prepended to .md");
+    } catch (err) {
+      logger.error("Failed to prepend summary to .md:", String(err));
+    }
+  }
+}
+
+export const hybridInferenceService = new HybridInferenceService();

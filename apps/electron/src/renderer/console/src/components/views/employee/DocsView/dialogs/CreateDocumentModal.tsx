@@ -5,12 +5,11 @@
  * No title, no blank doc option. Blocks dropdown shows recent sessions.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ChevronDown, Loader2, Check, ArrowUp, Layers } from "lucide-react";
+import { X, ChevronDown, Loader2, Check, ArrowUp, Layers, Paperclip } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { useGenerateDocumentStream } from "@/console/src/hooks/queries/documents/useGenerateDocumentStream";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
 import type { SessionListItem } from "@/console/src/services/monitoringService";
 import type { DocType } from "@mitable/shared";
@@ -59,8 +58,8 @@ export default function CreateDocumentModal({
   routeBase = "/docs",
   entityLabel = "document",
   promptPlaceholder,
-  defaultTags = [],
-  docType = "knowledge-article",
+  defaultTags: _defaultTags = [],
+  docType: _docType = "knowledge-article",
 }: CreateDocumentModalProps) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -68,9 +67,17 @@ export default function CreateDocumentModal({
   const [input, setInput] = useState("");
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [blocksOpen, setBlocksOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ phase: string; message: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const { generate, isGenerating, documentId, progress, error, reset } =
-    useGenerateDocumentStream();
+  const reset = useCallback(() => {
+    setIsGenerating(false);
+    setDocumentId(null);
+    setProgress(null);
+    setError(null);
+  }, []);
 
   const { data: sessionsData } = useSessions();
   const sessions = sessionsData?.sessions ?? [];
@@ -113,8 +120,27 @@ export default function CreateDocumentModal({
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
-    const sessionIds = selectedSessionIds.size > 0 ? Array.from(selectedSessionIds) : undefined;
-    await generate(input, docType, { sessionIds, tags: defaultTags });
+    setIsGenerating(true);
+    setError(null);
+    setProgress({ phase: "drafting", message: "Generating with AI..." });
+
+    try {
+      const sessionIds = selectedSessionIds.size > 0 ? Array.from(selectedSessionIds) : undefined;
+      const result = await window.consoleAPI.localDocsGenerate?.(input.trim(), sessionIds);
+
+      if (result?.error) {
+        setError(result.error);
+        setIsGenerating(false);
+        return;
+      }
+
+      setDocumentId(result?.documentId ?? null);
+      setProgress({ phase: "complete", message: "Document ready!" });
+      setIsGenerating(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Generation failed");
+      setIsGenerating(false);
+    }
   };
 
   const handleClose = () => {
@@ -409,6 +435,39 @@ export default function CreateDocumentModal({
                   </div>
                 )}
               </div>
+
+              {/* Upload file */}
+              <button
+                onClick={async () => {
+                  const result = await window.consoleAPI.localDocsPickFile?.();
+                  if (result && !result.canceled && !result.error) {
+                    handleClose();
+                  }
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "5px 10px",
+                  borderRadius: 6,
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--text-tertiary)",
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "var(--text-tertiary)";
+                }}
+              >
+                <Paperclip size={13} />
+                Upload
+              </button>
 
               {/* Spacer */}
               <div style={{ flex: 1 }} />

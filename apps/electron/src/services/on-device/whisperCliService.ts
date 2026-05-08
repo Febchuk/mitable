@@ -33,24 +33,24 @@ class WhisperCliService {
   async initialize(): Promise<boolean> {
     if (this.ready) return true;
 
-    // Try modelManager paths first (downloaded to userData by ensureWhisperInstalled)
+    // Try whisperSetupService paths first (downloaded/built at startup)
     try {
-      const { modelManager } = await import("./index");
-      const managedCli = modelManager.getWhisperServerPath();
-      const managedModel = modelManager.getWhisperModelPath();
+      const { whisperSetupService } = await import("./index");
+      const managedCli = whisperSetupService.getCliPath();
+      const managedModel = whisperSetupService.getModelPath();
 
       if (managedCli && existsSync(managedCli) && managedModel && existsSync(managedModel)) {
         this.cliPath = managedCli;
         this.modelPath = managedModel;
         this.tmpDir = join(app.getPath("temp"), "mitable-whisper");
         if (!existsSync(this.tmpDir)) mkdirSync(this.tmpDir, { recursive: true });
-        logger.info("whisper-cli.exe ready (managed):", this.cliPath);
+        logger.info("whisper-cli ready (managed):", this.cliPath);
         logger.info("Model:", this.modelPath);
         this.ready = true;
         return true;
       }
     } catch {
-      // modelManager not available yet, fall through to legacy paths
+      // whisperSetupService not available yet, fall through to legacy paths
     }
 
     // Fallback: legacy source-tree paths (dev only)
