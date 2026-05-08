@@ -64,6 +64,20 @@ export interface ChatPaneProps {
     messageId: string;
   }) => void;
   /**
+   * Insert a brand-new section into the report. Auto-applies on receipt: the
+   * chat shows a confirmation card while the report pane gets the new
+   * section spliced in (after `afterSectionId` if provided, otherwise
+   * appended). `messageId` lets the parent record applied via
+   * /chat/messages/[id]/applied.
+   */
+  onApplyNewSection?: (args: {
+    sectionId: string;
+    heading: string;
+    paragraphs: { id: string; html: string }[];
+    afterSectionId?: string;
+    messageId: string;
+  }) => void;
+  /**
    * Awaits any pending debounced PATCH so the agent's read_report_sections
    * reflects the user's latest typing. Plan §7 single most important
    * integration concern.
@@ -72,7 +86,15 @@ export interface ChatPaneProps {
 }
 
 export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatPane(
-  { reportId, sections, onApplyProposal, onPullObservation, onApplyGhostEdit, flushPendingSave },
+  {
+    reportId,
+    sections,
+    onApplyProposal,
+    onPullObservation,
+    onApplyGhostEdit,
+    onApplyNewSection,
+    flushPendingSave,
+  },
   ref
 ) {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -149,6 +171,27 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
       });
     }
   }, [messages, onApplyGhostEdit]);
+
+  // Same auto-apply pattern for new-section: when the agent emits one and
+  // the parent supplied a handler, splice it into the report pane on
+  // arrival (mirrors ghost-edit). The chat keeps a confirmation card.
+  const appliedNewSectionIdsRef = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    if (!onApplyNewSection) return;
+    for (const m of messages) {
+      if (m.kind !== "new-section") continue;
+      if (m.appliedAt || m.dismissedAt) continue;
+      if (appliedNewSectionIdsRef.current.has(m.id)) continue;
+      appliedNewSectionIdsRef.current.add(m.id);
+      onApplyNewSection({
+        sectionId: m.sectionId,
+        heading: m.heading,
+        paragraphs: m.paragraphs,
+        afterSectionId: m.afterSectionId,
+        messageId: m.id,
+      });
+    }
+  }, [messages, onApplyNewSection]);
 
   // Bind the live camera stream to the inline viewfinder once both exist.
   React.useEffect(() => {
@@ -938,6 +981,9 @@ function MessageView({
   if (message.kind === "ghost-edit") {
     return <GhostEditConfirmationView message={message} />;
   }
+  if (message.kind === "new-section") {
+    return <NewSectionConfirmationView message={message} />;
+  }
   // prose | clarify
   return (
     <div className="rd-msg rd-msg-ai">
@@ -1045,6 +1091,27 @@ function GhostEditConfirmationView({
         <div className="rd-ghost-confirm">
           <span className="rd-label-cap">Suggested addition</span>
           <span className="rd-ghost-confirm-source">{message.ghostEdit.sourceLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NewSectionConfirmationView({
+  message,
+}: {
+  message: Extract<ChatTurnMessage, { kind: "new-section" }>;
+}) {
+  return (
+    <div className="rd-msg rd-msg-ai">
+      <div className="rd-avatar">
+        <SparkleGlyph size={12} />
+      </div>
+      <div className="rd-body">
+        {message.body}
+        <div className="rd-ghost-confirm">
+          <span className="rd-label-cap">New section</span>
+          <span className="rd-ghost-confirm-source">{message.heading}</span>
         </div>
       </div>
     </div>

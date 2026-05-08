@@ -80,6 +80,21 @@ export interface ChatAgentGhostEditPayload {
   tokenized: { body: string; html: string; sourceLabel: string };
 }
 
+export interface ChatAgentNewSectionPayload {
+  /** Detokenized confirmation body shown in chat. */
+  body: string;
+  /** Detokenized heading. */
+  heading: string;
+  /** Detokenized paragraph blocks for the new section, in order. */
+  paragraphs: { id: string; html: string }[];
+  /** When set, insert directly after this existing section. Otherwise append. */
+  afterSectionId?: string;
+  /** Server-stamped id for the new section so the client can address it. */
+  sectionId: string;
+  /** Tokenized snapshots kept for tool_trace. */
+  tokenized: { body: string; heading: string; paragraphs: string[] };
+}
+
 /**
  * Search result returned by the `search_capture_artifacts` tool. The agent
  * sees these tokenized; the route layer is responsible for tokenizing
@@ -141,7 +156,7 @@ interface ChatAgentMeta {
   cacheReadInputTokens: number;
 }
 
-export interface ChatAgentProseOutput extends ChatAgentMeta {
+export interface ChatAgentProseEmission {
   terminalKind: "prose" | "clarify";
   /** Detokenized body, ready for the wire / persistence. */
   body: string;
@@ -149,32 +164,48 @@ export interface ChatAgentProseOutput extends ChatAgentMeta {
   tokenizedBody: string;
 }
 
-export interface ChatAgentProposalOutput extends ChatAgentMeta {
+export interface ChatAgentProposalEmission {
   terminalKind: "proposal";
   proposal: ChatAgentProposalPayload;
 }
 
-export interface ChatAgentChipsOutput extends ChatAgentMeta {
+export interface ChatAgentChipsEmission {
   terminalKind: "chips";
   chips: ChatAgentChipsPayload;
 }
 
-export interface ChatAgentObsRefOutput extends ChatAgentMeta {
+export interface ChatAgentObsRefEmission {
   terminalKind: "obs-ref";
   obsRef: ChatAgentObsRefPayload;
 }
 
-export interface ChatAgentGhostEditOutput extends ChatAgentMeta {
+export interface ChatAgentGhostEditEmission {
   terminalKind: "ghost-edit";
   ghostEdit: ChatAgentGhostEditPayload;
 }
 
-export type ChatAgentOutput =
-  | ChatAgentProseOutput
-  | ChatAgentProposalOutput
-  | ChatAgentChipsOutput
-  | ChatAgentObsRefOutput
-  | ChatAgentGhostEditOutput;
+export interface ChatAgentNewSectionEmission {
+  terminalKind: "new-section";
+  newSection: ChatAgentNewSectionPayload;
+}
+
+export type ChatAgentEmission =
+  | ChatAgentProseEmission
+  | ChatAgentProposalEmission
+  | ChatAgentChipsEmission
+  | ChatAgentObsRefEmission
+  | ChatAgentGhostEditEmission
+  | ChatAgentNewSectionEmission;
+
+/**
+ * The agent may emit multiple terminal tool calls in a single turn (e.g. one
+ * propose_rewrite per paragraph when the teacher's message implies edits to
+ * several paragraphs at once). Each emission becomes its own assistant chat
+ * message; meta is shared across the whole turn.
+ */
+export interface ChatAgentOutput extends ChatAgentMeta {
+  emissions: ChatAgentEmission[];
+}
 
 export class ChatAgentAbortError extends Error {
   constructor(
@@ -274,16 +305,10 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
       }
 
       // Process this turn's tool uses. We expect either a read tool
-      // (read_report_sections, search_capture_artifacts) or one of the
-      // terminal tools.
+      // (read_report_sections, search_capture_artifacts) or one or more
+      // terminal tools (the agent may emit multiple proposals in one turn).
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
-      let terminalEmission:
-        | { kind: "prose" | "clarify"; tokenizedBody: string }
-        | { kind: "proposal"; proposal: ChatAgentProposalPayload }
-        | { kind: "chips"; chips: ChatAgentChipsPayload }
-        | { kind: "obs-ref"; obsRef: ChatAgentObsRefPayload }
-        | { kind: "ghost-edit"; ghostEdit: ChatAgentGhostEditPayload }
-        | null = null;
+      const terminalEmissions: ChatAgentEmission[] = [];
       let validationFailed = false;
 
       for (const block of toolUses) {
@@ -336,10 +361,12 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
             });
             continue;
           }
-          terminalEmission = {
-            kind: block.name === "propose_prose_reply" ? "prose" : "clarify",
+          const kind = block.name === "propose_prose_reply" ? "prose" : "clarify";
+          terminalEmissions.push({
+            terminalKind: kind,
             tokenizedBody,
-          };
+            body: detokenizeReportText(tokenizedBody, input.references),
+          });
           continue;
         }
         if (block.name === "propose_rewrite") {
@@ -398,8 +425,8 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
             });
             continue;
           }
-          terminalEmission = {
-            kind: "proposal",
+          terminalEmissions.push({
+            terminalKind: "proposal",
             proposal: {
               target: { sectionId, paragraphId },
               lead: detokenizeReportText(lead, input.references),
@@ -408,7 +435,7 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
               rationale: rationale ? detokenizeReportText(rationale, input.references) : undefined,
               tokenized: { lead, oldText, newText, rationale },
             },
-          };
+          });
           continue;
         }
         if (block.name === "propose_chips") {
@@ -446,8 +473,8 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
             });
             continue;
           }
-          terminalEmission = {
-            kind: "chips",
+          terminalEmissions.push({
+            terminalKind: "chips",
             chips: {
               body: detokenizeReportText(body, input.references),
               chips: chips.map((c, i) => ({
@@ -457,7 +484,7 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
               })),
               tokenized: { body, chips },
             },
-          };
+          });
           continue;
         }
         if (block.name === "propose_observation_ref") {
@@ -531,8 +558,8 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
               };
             }
           }
-          terminalEmission = {
-            kind: "obs-ref",
+          terminalEmissions.push({
+            terminalKind: "obs-ref",
             obsRef: {
               body: detokenizeReportText(body, input.references),
               obs: {
@@ -545,7 +572,7 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
               suggestedTarget,
               tokenized: { body, quote },
             },
-          };
+          });
           continue;
         }
         if (block.name === "propose_ghost_edit") {
@@ -583,8 +610,8 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
             });
             continue;
           }
-          terminalEmission = {
-            kind: "ghost-edit",
+          terminalEmissions.push({
+            terminalKind: "ghost-edit",
             ghostEdit: {
               body: detokenizeReportText(body, input.references),
               target: { sectionId },
@@ -595,7 +622,81 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
               },
               tokenized: { body, html, sourceLabel },
             },
+          });
+          continue;
+        }
+        if (block.name === "propose_new_section") {
+          const args = block.input as {
+            body?: unknown;
+            heading?: unknown;
+            paragraphs?: unknown;
+            afterSectionId?: unknown;
           };
+          const body = typeof args.body === "string" ? args.body.trim() : "";
+          const heading = typeof args.heading === "string" ? args.heading.trim() : "";
+          const paragraphsRaw = Array.isArray(args.paragraphs) ? args.paragraphs : [];
+          const paragraphs: string[] = [];
+          for (const p of paragraphsRaw) {
+            if (typeof p === "string" && p.trim().length > 0) paragraphs.push(p.trim());
+          }
+          const afterSectionIdRaw =
+            typeof args.afterSectionId === "string" ? args.afterSectionId.trim() : "";
+          // Validate optional afterSectionId only if provided. Empty string = append.
+          let afterSectionId: string | undefined;
+          if (afterSectionIdRaw) {
+            const exists = input.tokenizedSections.some((s) => s.id === afterSectionIdRaw);
+            if (!exists) {
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                is_error: true,
+                content: `Unknown afterSectionId. Use a sectionId from read_report_sections, or omit to append. Got afterSectionId=${afterSectionIdRaw}.`,
+              });
+              continue;
+            }
+            afterSectionId = afterSectionIdRaw;
+          }
+          if (!body || !heading || paragraphs.length === 0) {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content:
+                "propose_new_section requires non-empty body, heading, and at least one paragraph.",
+            });
+            continue;
+          }
+          // Concatenate every prose field for one validator pass — leaks
+          // anywhere abort the whole emission. Heading is included even
+          // though it's usually generic, defense-in-depth.
+          const validation = validateTokenPreservation(
+            [body, heading, ...paragraphs].join("\n"),
+            refs
+          );
+          if (!validation.ok) {
+            validationFailed = true;
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              is_error: true,
+              content: leakReminder(validation),
+            });
+            continue;
+          }
+          terminalEmissions.push({
+            terminalKind: "new-section",
+            newSection: {
+              body: detokenizeReportText(body, input.references),
+              heading: detokenizeReportText(heading, input.references),
+              paragraphs: paragraphs.map((html) => ({
+                id: `p-${cryptoRandomId()}`,
+                html: detokenizeReportText(html, input.references),
+              })),
+              ...(afterSectionId ? { afterSectionId } : {}),
+              sectionId: `s-${cryptoRandomId()}`,
+              tokenized: { body, heading, paragraphs },
+            },
+          });
           continue;
         }
         if (CHAT_TERMINAL_TOOL_NAMES.has(block.name)) {
@@ -615,32 +716,15 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
         }
       }
 
-      if (terminalEmission) {
-        const meta: ChatAgentMeta = {
+      if (terminalEmissions.length > 0) {
+        return {
+          emissions: terminalEmissions,
           turns: turn,
           regenerations: attempts - 1,
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           cacheCreationInputTokens: totalCacheCreation,
           cacheReadInputTokens: totalCacheRead,
-        };
-        if (terminalEmission.kind === "proposal") {
-          return { terminalKind: "proposal", proposal: terminalEmission.proposal, ...meta };
-        }
-        if (terminalEmission.kind === "chips") {
-          return { terminalKind: "chips", chips: terminalEmission.chips, ...meta };
-        }
-        if (terminalEmission.kind === "obs-ref") {
-          return { terminalKind: "obs-ref", obsRef: terminalEmission.obsRef, ...meta };
-        }
-        if (terminalEmission.kind === "ghost-edit") {
-          return { terminalKind: "ghost-edit", ghostEdit: terminalEmission.ghostEdit, ...meta };
-        }
-        return {
-          terminalKind: terminalEmission.kind,
-          tokenizedBody: terminalEmission.tokenizedBody,
-          body: detokenizeReportText(terminalEmission.tokenizedBody, input.references),
-          ...meta,
         };
       }
 

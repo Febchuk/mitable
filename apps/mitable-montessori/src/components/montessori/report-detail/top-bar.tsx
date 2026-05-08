@@ -36,11 +36,13 @@ export function ReportTopBar({
   reportsListHref = "/app/reports",
   isAdmin = false,
   actionBusy = false,
+  hasBeenSubmitted = false,
   onSaveDraft,
   onSubmitForReview,
   onApprove,
   onSendToParents,
   onDeleteClick,
+  onBackClick,
 }: {
   child: ChildLike | undefined;
   status: ReportStatus;
@@ -52,11 +54,15 @@ export function ReportTopBar({
   reportsListHref?: string;
   isAdmin?: boolean;
   actionBusy?: boolean;
+  /** True iff the report has been submitted for review at least once. Drives the "Resubmit" vs "Submit" button label. */
+  hasBeenSubmitted?: boolean;
   onSaveDraft?: () => void;
   onSubmitForReview?: () => void;
   onApprove?: () => void;
   onSendToParents?: () => void;
   onDeleteClick?: () => void;
+  /** When provided, the back chevron renders as a button calling this handler (used to guard unsaved-changes navigation). Otherwise falls back to a plain Link to reportsListHref. */
+  onBackClick?: () => void;
 }) {
   const displayName = child?.name ?? "Report";
   const headingTitle = child ? `${kind} report — ${child.name.split(" ")[0]}` : `${kind} report`;
@@ -64,10 +70,17 @@ export function ReportTopBar({
   return (
     <div className="rd-page-header">
       <div className="rd-page-header-top">
-        <Link href={reportsListHref} className="rd-back-link">
-          <ChevLeft />
-          <span>All reports</span>
-        </Link>
+        {onBackClick ? (
+          <button type="button" className="rd-back-link" onClick={onBackClick}>
+            <ChevLeft />
+            <span>All reports</span>
+          </button>
+        ) : (
+          <Link href={reportsListHref} className="rd-back-link">
+            <ChevLeft />
+            <span>All reports</span>
+          </Link>
+        )}
       </div>
 
       <div className="rd-page-header-row">
@@ -110,6 +123,7 @@ export function ReportTopBar({
             status={status}
             isAdmin={isAdmin}
             actionBusy={actionBusy}
+            hasBeenSubmitted={hasBeenSubmitted}
             onSaveDraft={onSaveDraft}
             onSubmitForReview={onSubmitForReview}
             onApprove={onApprove}
@@ -126,6 +140,7 @@ function TopBarActions({
   status,
   isAdmin,
   actionBusy,
+  hasBeenSubmitted,
   onSaveDraft,
   onSubmitForReview,
   onApprove,
@@ -135,6 +150,7 @@ function TopBarActions({
   status: ReportStatus;
   isAdmin: boolean;
   actionBusy: boolean;
+  hasBeenSubmitted: boolean;
   onSaveDraft?: () => void;
   onSubmitForReview?: () => void;
   onApprove?: () => void;
@@ -246,10 +262,15 @@ function TopBarActions({
           onClick={onSubmitForReview}
         >
           {actionBusy ? (
-            "Submitting…"
+            hasBeenSubmitted ? (
+              "Resubmitting…"
+            ) : (
+              "Submitting…"
+            )
           ) : (
             <>
-              <ArrowRight size={13} strokeWidth={2.5} /> Submit for review
+              <ArrowRight size={13} strokeWidth={2.5} />{" "}
+              {hasBeenSubmitted ? "Resubmit for review" : "Submit for review"}
             </>
           )}
         </button>

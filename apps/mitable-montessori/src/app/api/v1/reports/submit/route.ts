@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { auditLog } from "@/lib/audit/log";
 import { requireUser } from "@/lib/api/auth";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -27,6 +28,10 @@ export async function POST(req: Request) {
       target_table: "reports",
       target_id: parsed.data.reportId,
     });
+    revalidatePath(`/app/reports/${parsed.data.reportId}`);
+    revalidatePath(`/admin/reports/${parsed.data.reportId}`);
+    revalidatePath("/app/reports");
+    revalidatePath("/admin/reports");
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof WorkflowError) {

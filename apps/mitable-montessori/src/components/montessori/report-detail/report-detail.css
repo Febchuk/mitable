@@ -62,6 +62,12 @@ main:has(> .rd-root) {
   color: var(--color-ink-muted);
   text-decoration: none;
   transition: color 140ms ease;
+  /* Reset button-element defaults so the same class works on <a> and <button>. */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
 }
 .rd-back-link:hover {
   color: var(--color-ink);
@@ -460,7 +466,7 @@ main:has(> .rd-root) {
   color: var(--color-sage-deep);
 }
 
-/* Composer (disabled placeholder) */
+/* Composer */
 .rd-composer-wrap {
   padding: 10px 14px 14px;
   border-top: 1px solid var(--color-border);
@@ -474,7 +480,9 @@ main:has(> .rd-root) {
   border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 8px 8px 8px 14px;
-  opacity: 0.7;
+}
+.rd-composer:focus-within {
+  border-color: var(--color-terracotta);
 }
 .rd-composer textarea {
   flex: 1;
@@ -487,9 +495,15 @@ main:has(> .rd-root) {
   max-height: 120px;
   min-height: 22px;
   padding: 4px 0;
-  color: var(--color-ink-secondary);
+  color: var(--color-ink);
   font-family: inherit;
+}
+.rd-composer textarea::placeholder {
+  color: var(--color-ink-secondary);
+}
+.rd-composer textarea:disabled {
   cursor: not-allowed;
+  opacity: 0.6;
 }
 .rd-composer-actions {
   display: flex;
@@ -507,12 +521,26 @@ main:has(> .rd-root) {
   background: transparent;
   border: 0;
   font-family: inherit;
+  cursor: pointer;
+}
+.rd-icon-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-ink);
+}
+.rd-icon-btn:disabled {
   cursor: not-allowed;
+  opacity: 0.5;
 }
 .rd-icon-btn.rd-primary {
   background: var(--color-terracotta);
   color: #fff;
-  opacity: 0.7;
+}
+.rd-icon-btn.rd-primary:hover:not(:disabled) {
+  background: var(--color-terracotta);
+  filter: brightness(0.95);
+}
+.rd-icon-btn.rd-primary:disabled {
+  opacity: 0.5;
 }
 .rd-composer-hints {
   display: flex;
@@ -770,6 +798,32 @@ main:has(> .rd-root) {
   border-color: var(--color-terracotta);
 }
 .rd-section-confirm-yes:hover {
+  background: var(--color-terracotta-deep);
+  border-color: var(--color-terracotta-deep);
+  color: #fff;
+}
+
+/* Paragraph delete confirm — same shape as section confirm but smaller. */
+.rd-para-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 2px 4px 2px 8px;
+}
+.rd-para-confirm-label {
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+}
+.rd-para-confirm-yes {
+  background: var(--color-terracotta);
+  color: #fff;
+  border-color: var(--color-terracotta);
+}
+.rd-para-confirm-yes:hover {
   background: var(--color-terracotta-deep);
   border-color: var(--color-terracotta-deep);
   color: #fff;

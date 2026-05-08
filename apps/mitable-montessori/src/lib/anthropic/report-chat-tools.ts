@@ -225,6 +225,42 @@ export const CHAT_TERMINAL_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "propose_new_section",
+    description:
+      "Add a NEW section to the report — a heading plus one or more paragraphs of initial content. Use this when the teacher asks to add a section (e.g. 'add a section for outdoor', 'we need a math section'), or when the teacher's content clearly belongs in a section that doesn't yet exist. The new section is auto-applied to the report when the proposal arrives; the chat shows a short confirmation. Tokens only — never real names.",
+    input_schema: {
+      type: "object",
+      properties: {
+        body: {
+          type: "string",
+          description:
+            "Short confirmation sentence shown in the chat (≤200 chars), e.g. 'I added an Outdoor section with the morning observation.' Tokens only.",
+        },
+        heading: {
+          type: "string",
+          description:
+            "The section heading (≤60 chars). Plain text, no tokens needed (headings are usually generic like 'Outdoor', 'Math', 'Practical life').",
+        },
+        paragraphs: {
+          type: "array",
+          description:
+            "Initial paragraphs for the new section. At least one. Each paragraph is a single block of prose (no bullets, no nested headings). Tokens only — never real names.",
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: "string",
+          },
+        },
+        afterSectionId: {
+          type: "string",
+          description:
+            "Optional. The new section is inserted directly after this existing section. If omitted, the new section is appended to the end of the report.",
+        },
+      },
+      required: ["body", "heading", "paragraphs"],
+    },
+  },
+  {
     name: "propose_prose_reply",
     description:
       "Reply to the teacher with one short paragraph of prose. Use this for factual questions, confirmations, or when no edit is needed. Body must use tokens for student / subtopic / classroom names — never real names.",
@@ -276,17 +312,22 @@ Workflow:
 2. If the teacher mentions captured photos / notes, OR if you suspect there's an observation that fills a gap, call search_capture_artifacts before proposing.
 3. Decide which terminal tool fits the teacher's request:
    - propose_rewrite: a specific paragraph needs new wording.
-   - propose_ghost_edit: an additive suggestion that should sit BELOW a section, not replace anything.
+   - propose_ghost_edit: an additive suggestion that should sit BELOW an EXISTING section.
+   - propose_new_section: the teacher wants a brand-new section (e.g. "add a section for outdoor", "we need a math section"), OR the content the teacher narrated clearly belongs in a section that does not exist in read_report_sections. Provide a heading and at least one initial paragraph.
    - propose_observation_ref: a captured artifact would fill a gap in the report.
    - propose_chips: short ambiguity with 2–4 plausible answers — let the teacher pick cheaply.
    - propose_prose_reply: factual questions, confirmations, or any reply without an edit.
    - ask_clarifying_question: genuine ambiguity that doesn't fit a small chip set.
-4. Call exactly one terminal tool per turn. Do NOT produce assistant text outside a terminal tool call.
+4. If the teacher's request implies edits to multiple paragraphs or sections, call the appropriate terminal tool ONCE PER EDIT in the same response — e.g. two propose_rewrite calls when paragraphs 1 and 2 both need rewording, or a propose_rewrite + propose_ghost_edit pair when one paragraph needs new wording AND a new observation belongs in a different section. Each tool call still targets a single paragraph or section. Do NOT bundle multiple paragraphs into one tool call.
+5. Do NOT produce assistant text outside a terminal tool call.
 
-Honesty rules — STRICT:
-- Do NOT invent activities, materials, behaviors, peer names, or events. Every concrete claim must be grounded in the report text, a read tool result, or a captured artifact.
-- If the teacher asks you to add a fact you have no evidence for, say so plainly via propose_prose_reply ("I don't see anything in the report about her pencil grip — want me to look at the captured photos?") instead of inventing.
-- "I don't have observations for that" is a valid, expected output. A short honest sentence beats a fluent paragraph of fiction.
+Source-of-truth rules — STRICT:
+- The teacher's chat message IS ground truth. When she says "she worked on the pink tower today" or "add that he had a tough drop-off", treat it as something that happened and incorporate it directly via propose_rewrite or propose_ghost_edit. Do not ask "are you sure?" or "I don't see that in the report" before applying.
+- Read/search tools (read_report_sections, search_capture_artifacts) are SUPPLEMENTAL. Use them to ground existing report text or to surface artifacts the teacher might want — never to gatekeep teacher-asserted facts.
+- The boundary on invention is unchanged: do not extrapolate beyond what the teacher said or what tools returned. But "the teacher just told me X" is itself sufficient evidence for X.
+- search_capture_artifacts is a discovery aid, not a verification step. If the teacher tells you to add something, add it. You may also mention "I also found a photo from Tuesday that fits here" — but the addition does not depend on finding one.
+- Example: teacher says "add that he had a tough drop-off this morning". You call propose_ghost_edit (or propose_rewrite) with prose describing the tough drop-off. You do NOT call propose_prose_reply with "I don't see drop-off mentioned — are you sure?".
+- "I don't have observations for that" is appropriate ONLY when the teacher is asking you to fill a gap she did not narrate (e.g. "what did he do in math?" with no math content in capture or read tools). It is NOT appropriate when she is asserting a fact.
 
 Targeting:
 - The teacher's turn may include a targetRef (e.g. "Scoped to section: Morning"). When present, scope your reply to that section unless the teacher explicitly broadens it.

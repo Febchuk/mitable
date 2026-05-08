@@ -197,7 +197,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   };
 
   const startedAt = Date.now();
-  let assistantMessage: ChatTurnMessage;
+  let assistantMessages: ChatTurnMessage[] = [];
   let toolTrace: Record<string, unknown> | null = null;
   try {
     const result = await runReportChatAgent({
@@ -220,81 +220,103 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       cache_creation_input_tokens: result.cacheCreationInputTokens,
       cache_read_input_tokens: result.cacheReadInputTokens,
     };
-    let assistantPayload: Record<string, unknown>;
-    let assistantToolTrace: Record<string, unknown>;
-    switch (result.terminalKind) {
-      case "proposal": {
-        const headingDisplay = sectionHeadingForId(sections, result.proposal.target.sectionId);
-        assistantPayload = {
-          lead: result.proposal.lead,
-          target: {
-            sectionId: result.proposal.target.sectionId,
-            paragraphId: result.proposal.target.paragraphId,
-            ...(headingDisplay ? { headingDisplay } : {}),
-          },
-          oldText: result.proposal.oldText,
-          newText: result.proposal.newText,
-          ...(result.proposal.rationale ? { rationale: result.proposal.rationale } : {}),
-        };
-        assistantToolTrace = {
-          tokenized: result.proposal.tokenized,
-          target: result.proposal.target,
-          ...meta,
-        };
-        break;
+
+    // The agent may emit multiple terminal tool calls in one turn (e.g. one
+    // propose_rewrite per paragraph when the teacher asked for edits to
+    // several paragraphs). Each emission becomes its own assistant chat row
+    // so the UI can render them as independent cards with their own
+    // Apply/Skip buttons.
+    for (const emission of result.emissions) {
+      let assistantPayload: Record<string, unknown>;
+      let assistantToolTrace: Record<string, unknown>;
+      switch (emission.terminalKind) {
+        case "proposal": {
+          const headingDisplay = sectionHeadingForId(sections, emission.proposal.target.sectionId);
+          assistantPayload = {
+            lead: emission.proposal.lead,
+            target: {
+              sectionId: emission.proposal.target.sectionId,
+              paragraphId: emission.proposal.target.paragraphId,
+              ...(headingDisplay ? { headingDisplay } : {}),
+            },
+            oldText: emission.proposal.oldText,
+            newText: emission.proposal.newText,
+            ...(emission.proposal.rationale ? { rationale: emission.proposal.rationale } : {}),
+          };
+          assistantToolTrace = {
+            tokenized: emission.proposal.tokenized,
+            target: emission.proposal.target,
+            ...meta,
+          };
+          break;
+        }
+        case "chips": {
+          assistantPayload = {
+            body: emission.chips.body,
+            chips: emission.chips.chips,
+          };
+          assistantToolTrace = { tokenized: emission.chips.tokenized, ...meta };
+          break;
+        }
+        case "obs-ref": {
+          assistantPayload = {
+            body: emission.obsRef.body,
+            obs: emission.obsRef.obs,
+            ...(emission.obsRef.suggestedTarget
+              ? { suggestedTarget: emission.obsRef.suggestedTarget }
+              : {}),
+          };
+          assistantToolTrace = { tokenized: emission.obsRef.tokenized, ...meta };
+          break;
+        }
+        case "ghost-edit": {
+          assistantPayload = {
+            body: emission.ghostEdit.body,
+            target: emission.ghostEdit.target,
+            ghostEdit: emission.ghostEdit.ghostEdit,
+          };
+          assistantToolTrace = { tokenized: emission.ghostEdit.tokenized, ...meta };
+          break;
+        }
+        case "new-section": {
+          assistantPayload = {
+            body: emission.newSection.body,
+            sectionId: emission.newSection.sectionId,
+            heading: emission.newSection.heading,
+            paragraphs: emission.newSection.paragraphs,
+            ...(emission.newSection.afterSectionId
+              ? { afterSectionId: emission.newSection.afterSectionId }
+              : {}),
+          };
+          assistantToolTrace = { tokenized: emission.newSection.tokenized, ...meta };
+          break;
+        }
+        case "prose":
+        case "clarify":
+        default: {
+          assistantPayload = { body: emission.body };
+          assistantToolTrace = { tokenized_body: emission.tokenizedBody, ...meta };
+          break;
+        }
       }
-      case "chips": {
-        assistantPayload = {
-          body: result.chips.body,
-          chips: result.chips.chips,
-        };
-        assistantToolTrace = { tokenized: result.chips.tokenized, ...meta };
-        break;
+
+      const assistantRow = await persistMessage(supabase, {
+        report_id: id,
+        role: "assistant",
+        kind: emission.terminalKind,
+        payload: assistantPayload,
+        references: references,
+        target_ref: parsed.data.targetRef ?? null,
+        actor_role: "assistant",
+        created_by_user_id: null,
+        tool_trace: assistantToolTrace,
+      });
+      if (!assistantRow) {
+        return NextResponse.json({ error: "Failed to persist assistant message" }, { status: 500 });
       }
-      case "obs-ref": {
-        assistantPayload = {
-          body: result.obsRef.body,
-          obs: result.obsRef.obs,
-          ...(result.obsRef.suggestedTarget
-            ? { suggestedTarget: result.obsRef.suggestedTarget }
-            : {}),
-        };
-        assistantToolTrace = { tokenized: result.obsRef.tokenized, ...meta };
-        break;
-      }
-      case "ghost-edit": {
-        assistantPayload = {
-          body: result.ghostEdit.body,
-          target: result.ghostEdit.target,
-          ghostEdit: result.ghostEdit.ghostEdit,
-        };
-        assistantToolTrace = { tokenized: result.ghostEdit.tokenized, ...meta };
-        break;
-      }
-      case "prose":
-      case "clarify":
-      default: {
-        assistantPayload = { body: result.body };
-        assistantToolTrace = { tokenized_body: result.tokenizedBody, ...meta };
-        break;
-      }
+      assistantMessages.push(rowToChatMessage(assistantRow));
     }
 
-    const assistantRow = await persistMessage(supabase, {
-      report_id: id,
-      role: "assistant",
-      kind: result.terminalKind,
-      payload: assistantPayload,
-      references: references,
-      target_ref: parsed.data.targetRef ?? null,
-      actor_role: "assistant",
-      created_by_user_id: null,
-      tool_trace: assistantToolTrace,
-    });
-    if (!assistantRow) {
-      return NextResponse.json({ error: "Failed to persist assistant message" }, { status: 500 });
-    }
-    assistantMessage = rowToChatMessage(assistantRow);
     toolTrace = {
       turns: result.turns,
       regenerations: result.regenerations,
@@ -302,7 +324,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       output_tokens: result.outputTokens,
       cache_creation_input_tokens: result.cacheCreationInputTokens,
       cache_read_input_tokens: result.cacheReadInputTokens,
-      terminal_kind: result.terminalKind,
+      terminal_kinds: result.emissions.map((e) => e.terminalKind),
+      emissions_count: result.emissions.length,
       attachments_count: attachments.length,
     };
   } catch (err) {
@@ -332,7 +355,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           { status: 500 }
         );
       }
-      assistantMessage = rowToChatMessage(assistantRow);
+      assistantMessages = [rowToChatMessage(assistantRow)];
       toolTrace = { aborted: true, reason: err.reason };
     } else {
       return NextResponse.json(
@@ -356,7 +379,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   });
 
   return NextResponse.json({
-    messages: [rowToChatMessage(userMessageRow), assistantMessage],
+    messages: [rowToChatMessage(userMessageRow), ...assistantMessages],
   });
 }
 

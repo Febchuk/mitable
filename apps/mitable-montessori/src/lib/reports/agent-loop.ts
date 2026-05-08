@@ -263,8 +263,12 @@ function buildKickoff(input: AgentRunInput): string {
   lines.push("");
 
   if (hasCapture) {
-    lines.push("## Teacher capture (primary narrative source)");
-    lines.push("Ground the report content in this capture. Use tokens only — never real names.");
+    lines.push(
+      "## Teacher capture — AUTHORITATIVE. Write from this. Tools below are supplemental."
+    );
+    lines.push(
+      "Treat this as authoritative — write directly from it. Use tokens only — never real names. The read tools (get_student_commands, get_student_progress_summary) ADD structured detail; they never veto what the teacher said."
+    );
     if (transcripts.length > 0) {
       lines.push("", "Voice transcript(s):");
       transcripts.forEach((t, i) => lines.push(`${i + 1}. ${t}`));

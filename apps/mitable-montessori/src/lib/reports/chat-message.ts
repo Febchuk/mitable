@@ -113,6 +113,27 @@ export function rowToChatMessage(row: StoredChatRow): ChatTurnMessage {
       ...base,
     };
   }
+  if (kind === "new-section") {
+    const paragraphsRaw = Array.isArray(payload.paragraphs) ? payload.paragraphs : [];
+    const paragraphs = paragraphsRaw.map((p, i) => {
+      const pp = p as { id?: string; html?: string };
+      return {
+        id: pp?.id ?? `p-${row.id}-${i}`,
+        html: String(pp?.html ?? ""),
+      };
+    });
+    return {
+      kind: "new-section",
+      body: String(payload.body ?? ""),
+      sectionId: String(payload.sectionId ?? row.id),
+      heading: String(payload.heading ?? ""),
+      paragraphs,
+      ...(typeof payload.afterSectionId === "string"
+        ? { afterSectionId: payload.afterSectionId }
+        : {}),
+      ...base,
+    };
+  }
   return {
     kind: kind as "prose" | "clarify" | "user-text",
     body: String(payload.body ?? ""),
