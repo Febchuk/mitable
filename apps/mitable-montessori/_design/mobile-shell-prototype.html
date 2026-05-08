@@ -1,0 +1,1110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mitable Montessori — Mobile Shell Redesign</title>
+
+    <!--
+      Mobile shell prototype for the Mitable Montessori admin app.
+
+      Two changes from today's mobile UX:
+        1. Bottom tab bar removed → top-left avatar opens a left sidebar drawer
+        2. Persistent terracotta FAB in bottom-right opens an "Ask Mitable" bottom sheet
+
+      Three device frames (iPhone 14 Pro, 390×844):
+        • Today (Dashboard)  — drawer closed, FAB visible
+        • Classrooms         — drawer OPEN with scrim
+        • Curriculum         — chat bottom sheet OPEN over content
+
+      All three frames share state independently and are fully interactive:
+      tap the avatar → drawer slides in; tap nav item or scrim → drawer dismisses;
+      tap FAB → bottom sheet slides up; tap close (×) or scrim → returns underneath.
+
+      Visual language mirrors _design/new-report-mobile-prototype.html
+      (cream canvas, terracotta accent, DM Sans + Caveat, soft borders).
+    -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Caveat:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --color-canvas: #faf6ee;
+        --color-surface: #fffbf3;
+        --color-muted: #f2ede0;
+        --color-ink: #2a2723;
+        --color-ink-secondary: #5c544a;
+        --color-ink-muted: #9c9285;
+        --color-border: #e0d8c8;
+        --color-border-strong: #b89880;
+        --color-terracotta: #c46a4f;
+        --color-terracotta-soft: #f4ddd2;
+        --color-terracotta-deep: #a24a3d;
+        --color-sage: #7a9b7a;
+        --color-sage-soft: #dde7da;
+        --color-sage-deep: #3f5c40;
+        --color-butter: #e8c56a;
+        --color-butter-soft: #f6e8b8;
+        --color-butter-deep: #7a5c0f;
+        --color-dusty-blue: #6b8aa6;
+        --color-dusty-blue-soft: #d2dce5;
+        --color-clay: #b89880;
+        --color-clay-soft: #e5d8c8;
+        --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+        --font-display: "Caveat", ui-serif, serif;
+        --device-w: 390px;
+        --device-h: 844px;
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 30% 12%, color-mix(in srgb, var(--color-clay-soft) 40%, var(--color-canvas)), var(--color-canvas) 56%);
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        font-size: 14px; line-height: 1.45;
+        min-height: 100vh;
+      }
+      body::before {
+        content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      }
+
+      button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+      input, textarea { font-family: inherit; color: inherit; }
+
+      .label-cap { letter-spacing: 0.07em; text-transform: uppercase; font-size: 10.5px; font-weight: 600; color: var(--color-ink-muted); }
+      .tap { transition: transform 120ms ease, background 140ms ease, opacity 140ms ease, box-shadow 180ms ease, border-color 140ms ease, color 140ms ease; }
+      .tap:active { transform: scale(0.97); }
+      .scroll-quiet::-webkit-scrollbar { width: 4px; }
+      .scroll-quiet::-webkit-scrollbar-thumb { background: var(--color-clay-soft); border-radius: 999px; }
+
+      .hand { font-family: var(--font-display); font-weight: 500; color: var(--color-ink-muted); font-size: 22px; line-height: 1; }
+
+      @keyframes pulse-fab {
+        0%   { box-shadow: 0 8px 18px rgba(196,106,79,0.35), 0 0 0 0 rgba(196,106,79,0.45); }
+        70%  { box-shadow: 0 8px 18px rgba(196,106,79,0.35), 0 0 0 14px rgba(196,106,79,0); }
+        100% { box-shadow: 0 8px 18px rgba(196,106,79,0.35), 0 0 0 0 rgba(196,106,79,0); }
+      }
+
+      /* ========= Page header ========= */
+      .page-intro {
+        max-width: 1500px; margin: 0 auto; padding: 56px 32px 8px;
+        position: relative; z-index: 1;
+      }
+      .page-intro .crest {
+        font-family: var(--font-display); font-weight: 600; font-size: 30px;
+        color: var(--color-terracotta); display: inline-block; transform: rotate(-3deg);
+      }
+      .page-intro h1 {
+        font-size: 32px; font-weight: 600; letter-spacing: -0.012em; margin: 4px 0 0;
+      }
+      .page-intro p {
+        max-width: 640px; color: var(--color-ink-secondary); font-size: 15px; margin: 10px 0 0; line-height: 1.55;
+      }
+      .page-intro .meta {
+        display: inline-flex; gap: 8px; align-items: center; margin-top: 18px;
+        font-size: 12px; color: var(--color-ink-muted);
+      }
+      .page-intro .meta .pill {
+        padding: 4px 10px; border-radius: 999px; border: 1px solid var(--color-border);
+        background: var(--color-surface);
+      }
+
+      /* ========= Stage ========= */
+      .stage {
+        position: relative; z-index: 1;
+        padding: 28px 32px 80px;
+        display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+        max-width: 1500px; margin: 0 auto;
+      }
+      .device-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .device-caption {
+        font-size: 12px; color: var(--color-ink-secondary);
+        font-style: italic; letter-spacing: 0.01em;
+        max-width: 360px; text-align: center; line-height: 1.5;
+      }
+      .device-caption b { color: var(--color-ink); font-style: normal; font-weight: 600; }
+
+      /* ========= Device frame ========= */
+      .device {
+        position: relative;
+        width: var(--device-w); height: var(--device-h);
+        background: #1a1715;
+        border-radius: 54px;
+        padding: 12px;
+        box-shadow:
+          0 0 0 2px #2a2724,
+          0 30px 70px rgba(43,38,34,0.28),
+          0 12px 28px rgba(43,38,34,0.15);
+        flex-shrink: 0;
+      }
+      .device-screen {
+        position: relative; width: 100%; height: 100%;
+        border-radius: 44px;
+        background: var(--color-canvas);
+        overflow: hidden;
+      }
+      .device-island {
+        position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+        width: 110px; height: 32px; border-radius: 20px;
+        background: #1a1715; z-index: 50;
+      }
+      .status-bar {
+        position: absolute; top: 0; left: 0; right: 0; z-index: 40;
+        height: 50px;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 24px 0;
+        font-size: 14px; font-weight: 600; color: var(--color-ink);
+        font-feature-settings: "tnum";
+      }
+      .status-bar .icons { display: inline-flex; gap: 5px; align-items: center; opacity: 0.85; }
+      .home-indicator {
+        position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+        width: 130px; height: 4px; border-radius: 999px; background: var(--color-ink); opacity: 0.4;
+        z-index: 60; pointer-events: none;
+      }
+
+      /* ========= App shell inside device ========= */
+      .app {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        padding-top: 50px; /* status bar */
+      }
+
+      /* Top bar — kept lean per spec; left avatar + center title + right action */
+      .topbar {
+        height: 56px; padding: 0 14px 0 12px;
+        display: flex; align-items: center; gap: 10px;
+        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+        background: color-mix(in srgb, var(--color-canvas) 88%, transparent);
+        backdrop-filter: blur(10px);
+        position: relative; z-index: 5;
+      }
+      .topbar .avatar-btn {
+        width: 38px; height: 38px; border-radius: 999px; padding: 0;
+        background: var(--color-clay-soft); color: var(--color-terracotta-deep);
+        display: grid; place-items: center; overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--color-border-strong) 40%, transparent);
+        flex-shrink: 0;
+      }
+      .topbar .avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .topbar .title-block { flex: 1; min-width: 0; }
+      .topbar .title-block .crumb {
+        font-size: 10.5px; font-weight: 600; color: var(--color-ink-muted);
+        letter-spacing: 0.07em; text-transform: uppercase;
+      }
+      .topbar .title-block h2 {
+        margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.005em;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .topbar .actions { display: inline-flex; gap: 4px; }
+      .topbar .icon-btn {
+        width: 36px; height: 36px; border-radius: 12px;
+        display: grid; place-items: center; color: var(--color-ink-secondary);
+      }
+      .topbar .icon-btn:hover { background: var(--color-muted); color: var(--color-ink); }
+
+      /* Content area */
+      .content {
+        flex: 1; overflow-y: auto;
+        padding: 18px 18px 110px; /* extra bottom padding so FAB doesn't cover content */
+      }
+      .content::-webkit-scrollbar { width: 4px; }
+      .content::-webkit-scrollbar-thumb { background: var(--color-clay-soft); border-radius: 999px; }
+
+      .greet { font-family: var(--font-display); font-size: 26px; color: var(--color-terracotta); transform: rotate(-2deg); display: inline-block; }
+      h3.section-title { margin: 14px 0 10px; font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
+
+      .stat-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        margin-bottom: 14px;
+      }
+      .stat {
+        background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px;
+        padding: 14px;
+      }
+      .stat .lbl { font-size: 11px; color: var(--color-ink-muted); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+      .stat .val { font-size: 26px; font-weight: 600; margin-top: 6px; letter-spacing: -0.01em; font-feature-settings: "tnum"; }
+      .stat .delta { font-size: 11.5px; color: var(--color-sage-deep); margin-top: 2px; }
+
+      .card {
+        background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px;
+        padding: 14px; margin-bottom: 10px;
+      }
+      .card.tight { padding: 12px 14px; }
+      .card .row-line {
+        display: flex; align-items: center; gap: 12px; padding: 8px 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+      }
+      .card .row-line:last-child { border-bottom: 0; padding-bottom: 0; }
+      .card .row-line:first-child { padding-top: 0; }
+      .av {
+        width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center;
+        font-weight: 600; font-size: 13px; flex-shrink: 0;
+      }
+      .av.clay { background: var(--color-clay-soft); color: var(--color-terracotta-deep); }
+      .av.sage { background: var(--color-sage-soft); color: var(--color-sage-deep); }
+      .av.butter { background: var(--color-butter-soft); color: var(--color-butter-deep); }
+      .av.blue { background: var(--color-dusty-blue-soft); color: #33526E; }
+      .row-line .name { font-weight: 600; font-size: 14px; }
+      .row-line .sub { font-size: 11.5px; color: var(--color-ink-muted); margin-top: 1px; }
+      .row-line .right { margin-left: auto; font-size: 11.5px; color: var(--color-ink-muted); font-feature-settings: "tnum"; }
+
+      .pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+      .pill-chip {
+        padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 500;
+        background: var(--color-surface); border: 1px solid var(--color-border);
+        color: var(--color-ink-secondary);
+      }
+      .pill-chip.active { background: var(--color-ink); color: var(--color-surface); border-color: var(--color-ink); }
+
+      /* Classroom card */
+      .classroom-card {
+        background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 18px;
+        padding: 16px; margin-bottom: 10px;
+      }
+      .classroom-card .head {
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+      }
+      .classroom-card h4 { margin: 0; font-size: 16px; font-weight: 600; }
+      .classroom-card .agehint { font-size: 11.5px; color: var(--color-ink-muted); margin-top: 2px; }
+      .classroom-card .stats {
+        display: flex; gap: 18px; margin-top: 12px; padding-top: 10px;
+        border-top: 1px dashed color-mix(in srgb, var(--color-border) 80%, transparent);
+      }
+      .classroom-card .stats .stat-mini { font-size: 11px; color: var(--color-ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+      .classroom-card .stats .stat-mini b { display: block; color: var(--color-ink); font-size: 18px; font-weight: 600; margin-top: 2px; letter-spacing: -0.01em; font-feature-settings: "tnum"; }
+      .classroom-card .ribbon {
+        font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px;
+        background: var(--color-sage-soft); color: var(--color-sage-deep);
+      }
+      .classroom-card .ribbon.warm { background: var(--color-butter-soft); color: var(--color-butter-deep); }
+
+      /* Curriculum row */
+      .curr-domain {
+        background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px;
+        padding: 14px; margin-bottom: 10px;
+      }
+      .curr-domain .domain-head {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+      }
+      .curr-domain .domain-head h4 { margin: 0; font-size: 15px; font-weight: 600; }
+      .curr-domain .domain-head .count { font-size: 11.5px; color: var(--color-ink-muted); font-feature-settings: "tnum"; }
+      .progress-track {
+        height: 6px; background: var(--color-muted); border-radius: 999px; overflow: hidden;
+      }
+      .progress-fill { height: 100%; border-radius: 999px; }
+      .progress-fill.terracotta { background: var(--color-terracotta); }
+      .progress-fill.sage { background: var(--color-sage); }
+      .progress-fill.butter { background: var(--color-butter); }
+      .progress-fill.blue { background: var(--color-dusty-blue); }
+      .curr-domain .lessons {
+        margin-top: 12px; display: flex; flex-direction: column; gap: 8px;
+      }
+      .lesson-row {
+        display: flex; align-items: center; gap: 10px; font-size: 13px;
+      }
+      .lesson-row .dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+      .lesson-row .dot.done { background: var(--color-sage); }
+      .lesson-row .dot.progress { background: var(--color-butter); }
+      .lesson-row .dot.todo { background: var(--color-clay-soft); border: 1px solid var(--color-border-strong); }
+      .lesson-row .ttl { flex: 1; }
+      .lesson-row .meta { font-size: 11.5px; color: var(--color-ink-muted); }
+
+      /* ========= FAB ========= */
+      .fab {
+        position: absolute;
+        right: 16px;
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        width: 56px; height: 56px; border-radius: 999px;
+        background: var(--color-terracotta); color: #fff;
+        display: grid; place-items: center;
+        box-shadow: 0 8px 18px rgba(196,106,79,0.35);
+        z-index: 30;
+        animation: pulse-fab 3.6s ease-out infinite;
+        border: 3px solid var(--color-surface);
+      }
+      .fab:hover { background: var(--color-terracotta-deep); }
+      .fab .badge {
+        position: absolute; top: -2px; right: -2px;
+        width: 18px; height: 18px; border-radius: 999px;
+        background: var(--color-ink); color: #fff;
+        font-size: 10px; font-weight: 700;
+        display: grid; place-items: center;
+        border: 2px solid var(--color-surface);
+        font-feature-settings: "tnum";
+      }
+      .fab[data-hidden="true"] {
+        opacity: 0; pointer-events: none; transform: translateY(8px) scale(0.92);
+        transition: opacity 200ms ease, transform 200ms ease;
+        animation: none;
+      }
+
+      /* ========= Scrim (shared by drawer + sheet) ========= */
+      .scrim {
+        position: absolute; inset: 0; z-index: 70;
+        background: rgba(26, 23, 21, 0.42);
+        backdrop-filter: blur(2px);
+        opacity: 0; pointer-events: none;
+        transition: opacity 220ms ease;
+      }
+      .scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+
+      /* ========= Drawer ========= */
+      .drawer {
+        position: absolute; top: 0; bottom: 0; left: 0;
+        width: 304px; max-width: 84%;
+        background: var(--color-surface);
+        z-index: 80;
+        transform: translateX(-105%);
+        transition: transform 280ms cubic-bezier(0.32, 0.72, 0.24, 1);
+        display: flex; flex-direction: column;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+        box-shadow: 16px 0 40px rgba(43,38,34,0.18);
+      }
+      .drawer[data-open="true"] { transform: translateX(0); }
+
+      .drawer .profile {
+        padding: 56px 18px 16px; /* leaves room for status bar */
+        border-bottom: 1px solid var(--color-border);
+        background: linear-gradient(180deg, var(--color-clay-soft) 0%, var(--color-surface) 100%);
+      }
+      .drawer .profile .av-lg {
+        width: 56px; height: 56px; border-radius: 999px; overflow: hidden;
+        border: 2px solid var(--color-surface);
+        box-shadow: 0 4px 12px rgba(43,38,34,0.12);
+      }
+      .drawer .profile .av-lg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .drawer .profile .name { font-size: 16px; font-weight: 600; margin-top: 12px; letter-spacing: -0.005em; }
+      .drawer .profile .role { font-size: 12px; color: var(--color-ink-muted); margin-top: 2px; }
+      .drawer .profile .school {
+        margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+        background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+        border: 1px solid var(--color-border);
+        display: flex; align-items: center; gap: 10px;
+      }
+      .drawer .profile .school .icon {
+        width: 28px; height: 28px; border-radius: 8px; background: var(--color-butter-soft);
+        display: grid; place-items: center; color: var(--color-butter-deep);
+      }
+      .drawer .profile .school .text { font-size: 12.5px; }
+      .drawer .profile .school .text b { display: block; font-weight: 600; color: var(--color-ink); font-size: 13px; }
+      .drawer .profile .school .text span { color: var(--color-ink-muted); font-size: 11px; }
+
+      .drawer-nav {
+        flex: 1; overflow-y: auto;
+        padding: 12px 8px;
+        display: flex; flex-direction: column; gap: 1px;
+      }
+      .drawer-nav .group-label {
+        padding: 14px 14px 6px; font-size: 10.5px; font-weight: 600;
+        color: var(--color-ink-muted); letter-spacing: 0.08em; text-transform: uppercase;
+      }
+      .drawer-nav-item {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 14px; border-radius: 12px;
+        font-size: 14.5px; font-weight: 500; color: var(--color-ink-secondary);
+        text-align: left; width: 100%; position: relative;
+      }
+      .drawer-nav-item:hover { background: var(--color-muted); color: var(--color-ink); }
+      .drawer-nav-item.active {
+        background: var(--color-terracotta-soft); color: var(--color-terracotta-deep);
+        font-weight: 600;
+      }
+      .drawer-nav-item.active::before {
+        content: ""; position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
+        width: 3px; height: 18px; border-radius: 999px; background: var(--color-terracotta);
+      }
+      .drawer-nav-item .icon { width: 22px; display: grid; place-items: center; flex-shrink: 0; color: inherit; }
+      .drawer-nav-item .badge-r {
+        margin-left: auto; font-size: 10.5px; font-weight: 600;
+        background: var(--color-terracotta); color: #fff;
+        padding: 2px 7px; border-radius: 999px; font-feature-settings: "tnum";
+      }
+
+      .drawer-foot {
+        padding: 10px 8px 22px; border-top: 1px solid var(--color-border);
+      }
+      .drawer-foot .role-switch {
+        margin: 8px 6px 12px; padding: 10px 12px; border-radius: 12px;
+        background: var(--color-muted); border: 1px solid var(--color-border);
+        display: flex; align-items: center; gap: 10px; font-size: 12.5px;
+      }
+      .drawer-foot .role-switch .lbl { color: var(--color-ink-muted); }
+      .drawer-foot .role-switch .toggle {
+        margin-left: auto; display: inline-flex; padding: 2px;
+        background: var(--color-canvas); border-radius: 999px; border: 1px solid var(--color-border);
+        font-size: 11px; font-weight: 600;
+      }
+      .drawer-foot .role-switch .toggle span {
+        padding: 4px 9px; border-radius: 999px; color: var(--color-ink-muted);
+      }
+      .drawer-foot .role-switch .toggle span.on { background: var(--color-ink); color: var(--color-surface); }
+      .drawer-foot .signout {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 14px; border-radius: 12px;
+        font-size: 14px; font-weight: 500;
+        color: var(--color-terracotta-deep); width: 100%;
+      }
+      .drawer-foot .signout:hover { background: var(--color-terracotta-soft); }
+
+      /* ========= Bottom sheet (chat) ========= */
+      .sheet {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        height: 85%;
+        background: var(--color-canvas);
+        z-index: 80;
+        border-top-left-radius: 28px; border-top-right-radius: 28px;
+        transform: translateY(105%);
+        transition: transform 320ms cubic-bezier(0.32, 0.72, 0.24, 1);
+        display: flex; flex-direction: column;
+        box-shadow: 0 -16px 40px rgba(43,38,34,0.18);
+      }
+      .sheet[data-open="true"] { transform: translateY(0); }
+      .sheet .grabber {
+        width: 40px; height: 4px; border-radius: 999px;
+        background: var(--color-border-strong); opacity: 0.6;
+        margin: 8px auto 0;
+      }
+      .sheet-head {
+        padding: 14px 18px 10px;
+        display: flex; align-items: center; gap: 10px;
+        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+      }
+      .sheet-head .icon-circle {
+        width: 38px; height: 38px; border-radius: 999px;
+        background: var(--color-terracotta-soft); color: var(--color-terracotta-deep);
+        display: grid; place-items: center;
+      }
+      .sheet-head .ttl { flex: 1; }
+      .sheet-head .ttl h3 { margin: 0; font-size: 16px; font-weight: 600; }
+      .sheet-head .ttl span { font-size: 11.5px; color: var(--color-ink-muted); }
+      .sheet-head .close-btn {
+        width: 36px; height: 36px; border-radius: 12px;
+        display: grid; place-items: center; color: var(--color-ink-secondary);
+      }
+      .sheet-head .close-btn:hover { background: var(--color-muted); color: var(--color-ink); }
+
+      .sheet-body {
+        flex: 1; overflow-y: auto;
+        padding: 18px;
+        display: flex; flex-direction: column; gap: 12px;
+      }
+      .sheet-body::-webkit-scrollbar { width: 4px; }
+      .sheet-body::-webkit-scrollbar-thumb { background: var(--color-clay-soft); border-radius: 999px; }
+
+      .msg {
+        max-width: 84%;
+        padding: 12px 14px; border-radius: 16px; font-size: 14px; line-height: 1.5;
+      }
+      .msg.assistant {
+        align-self: flex-start;
+        background: var(--color-surface); border: 1px solid var(--color-border);
+        color: var(--color-ink); border-bottom-left-radius: 6px;
+      }
+      .msg.user {
+        align-self: flex-end;
+        background: var(--color-terracotta); color: #fff;
+        border-bottom-right-radius: 6px;
+      }
+      .msg .name {
+        font-size: 11px; font-weight: 600; margin-bottom: 4px;
+        color: var(--color-terracotta-deep); letter-spacing: 0.04em; text-transform: uppercase;
+      }
+      .suggestion-row {
+        display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
+      }
+      .suggestion-chip {
+        padding: 8px 12px; border-radius: 999px; font-size: 12.5px;
+        background: var(--color-surface); border: 1px solid var(--color-border);
+        color: var(--color-ink-secondary);
+      }
+      .suggestion-chip:hover { border-color: var(--color-terracotta); color: var(--color-terracotta-deep); }
+
+      .sheet-foot {
+        padding: 10px 14px calc(20px + env(safe-area-inset-bottom, 0px));
+        border-top: 1px solid var(--color-border);
+        background: color-mix(in srgb, var(--color-canvas) 90%, transparent);
+        backdrop-filter: blur(8px);
+      }
+      .composer {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 8px 8px 14px; border-radius: 18px;
+        background: var(--color-surface); border: 1px solid var(--color-border);
+      }
+      .composer:focus-within { border-color: var(--color-terracotta); box-shadow: 0 0 0 4px var(--color-terracotta-soft); }
+      .composer input {
+        flex: 1; border: 0; outline: 0; background: transparent;
+        font-size: 14.5px; padding: 6px 0;
+      }
+      .composer input::placeholder { color: var(--color-ink-muted); }
+      .composer .send-btn {
+        width: 38px; height: 38px; border-radius: 12px;
+        background: var(--color-terracotta); color: #fff;
+        display: grid; place-items: center; flex-shrink: 0;
+      }
+      .composer .icon-btn {
+        width: 36px; height: 36px; border-radius: 12px;
+        display: grid; place-items: center; color: var(--color-ink-muted);
+      }
+      .composer .icon-btn:hover { background: var(--color-muted); color: var(--color-ink); }
+    </style>
+  </head>
+
+  <body>
+    <header class="page-intro">
+      <div class="crest">Mobile shell</div>
+      <h1>Sidebar drawer + persistent chat</h1>
+      <p>
+        Replace the admin bottom tab bar with a left drawer triggered from the top-left avatar,
+        and surface chat as a single floating button pinned to the bottom-right of every route.
+        Three frames below show the same shell on three different routes — drawer slides in,
+        chat sheet slides up, and the FAB is identical everywhere.
+      </p>
+      <div class="meta">
+        <span class="pill">iPhone 14 Pro · 390 × 844</span>
+        <span class="pill">Tap the avatar / FAB to interact</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <!-- =====================================================================
+           Frame 1 — Today (Dashboard). Drawer closed, FAB visible.
+      ====================================================================== -->
+      <div class="device-wrap">
+        <div class="device" data-frame="today">
+          <div class="device-screen">
+            <div class="device-island"></div>
+            <div class="status-bar">
+              <span>9:41</span>
+              <span class="icons">
+                <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="6.5" width="3" height="4" rx="0.5" stroke="#2a2723"/><rect x="5.5" y="4.5" width="3" height="6" rx="0.5" stroke="#2a2723"/><rect x="10.5" y="2.5" width="3" height="8" rx="0.5" fill="#2a2723"/><rect x="15.5" y="0.5" width="2" height="10" rx="0.5" fill="#2a2723"/></svg>
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M8 2C10.5 2 12.7 2.9 14.4 4.4L13 5.9C11.6 4.7 9.9 4 8 4C6.1 4 4.4 4.7 3 5.9L1.6 4.4C3.3 2.9 5.5 2 8 2ZM8 6C9.4 6 10.7 6.5 11.7 7.4L8 11L4.3 7.4C5.3 6.5 6.6 6 8 6Z" fill="#2a2723"/></svg>
+                <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x="0.5" y="0.5" width="22" height="11" rx="2.5" stroke="#2a2723" opacity="0.4"/><rect x="2" y="2" width="17" height="8" rx="1" fill="#2a2723"/><rect x="23" y="4" width="2" height="4" rx="1" fill="#2a2723" opacity="0.4"/></svg>
+              </span>
+            </div>
+
+            <div class="app">
+              <div class="topbar">
+                <button class="avatar-btn tap" data-action="open-drawer" aria-label="Open menu">
+                  <!-- Avatar: Wikimedia Commons / public domain portrait
+                       Source: https://commons.wikimedia.org/wiki/File:Caucasian_woman_with_long_brown_hair_smiling_at_camera.jpg
+                       Replaced with a generic Unsplash people photo for licensing clarity. -->
+                  <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&h=120&fit=crop&crop=faces" alt="Maya Chen" />
+                </button>
+                <div class="title-block">
+                  <div class="crumb">Admin</div>
+                  <h2>Today</h2>
+                </div>
+                <div class="actions">
+                  <button class="icon-btn tap" aria-label="Search">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                  </button>
+                  <button class="icon-btn tap" aria-label="Notifications">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="content scroll-quiet">
+                <div>
+                  <span class="greet">Good morning, Maya</span>
+                  <p style="margin: 6px 0 14px; font-size: 13px; color: var(--color-ink-secondary);">
+                    Three classrooms reporting steady. One nudge waiting on you.
+                  </p>
+                </div>
+
+                <div class="stat-grid">
+                  <div class="stat">
+                    <div class="lbl">Children present</div>
+                    <div class="val">42 / 48</div>
+                    <div class="delta">+3 since yesterday</div>
+                  </div>
+                  <div class="stat">
+                    <div class="lbl">Drafts in review</div>
+                    <div class="val">7</div>
+                    <div class="delta" style="color: var(--color-butter-deep)">2 due Friday</div>
+                  </div>
+                </div>
+
+                <h3 class="section-title">Across classrooms</h3>
+                <div class="card">
+                  <div class="row-line">
+                    <div class="av butter">PR</div>
+                    <div>
+                      <div class="name">Primrose</div>
+                      <div class="sub">Lower elementary · Ms. Devereaux</div>
+                    </div>
+                    <div class="right">14 / 16</div>
+                  </div>
+                  <div class="row-line">
+                    <div class="av sage">FE</div>
+                    <div>
+                      <div class="name">Fern</div>
+                      <div class="sub">Children's House · Mr. Adeyemi</div>
+                    </div>
+                    <div class="right">15 / 18</div>
+                  </div>
+                  <div class="row-line">
+                    <div class="av blue">AC</div>
+                    <div>
+                      <div class="name">Acorn</div>
+                      <div class="sub">Toddler · Ms. Hartwell</div>
+                    </div>
+                    <div class="right">13 / 14</div>
+                  </div>
+                </div>
+
+                <h3 class="section-title">Needs your eye</h3>
+                <div class="card tight">
+                  <div class="row-line">
+                    <div class="av clay">NP</div>
+                    <div>
+                      <div class="name">Nora P. — major report</div>
+                      <div class="sub">Sent for review by Ms. Devereaux</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- FAB -->
+              <button class="fab tap" data-action="open-sheet" aria-label="Ask Mitable">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span class="badge">2</span>
+              </button>
+
+              <!-- Drawer + Scrim -->
+              <div class="scrim" data-action="close-drawer"></div>
+              <aside class="drawer">
+                <!-- (drawer content injected by template — see #drawerTemplate) -->
+              </aside>
+
+              <!-- Bottom sheet -->
+              <div class="sheet">
+                <!-- (sheet content injected by template — see #sheetTemplate) -->
+              </div>
+
+              <div class="home-indicator"></div>
+            </div>
+          </div>
+        </div>
+        <div class="device-caption">
+          <b>Today (Dashboard)</b> · Drawer closed. Tap the avatar in the top-left to slide the menu in. The terracotta FAB stays pinned bottom-right.
+        </div>
+      </div>
+
+      <!-- =====================================================================
+           Frame 2 — Classrooms. Drawer OPEN.
+      ====================================================================== -->
+      <div class="device-wrap">
+        <div class="device" data-frame="classrooms" data-drawer="open">
+          <div class="device-screen">
+            <div class="device-island"></div>
+            <div class="status-bar">
+              <span>9:41</span>
+              <span class="icons">
+                <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="6.5" width="3" height="4" rx="0.5" stroke="#2a2723"/><rect x="5.5" y="4.5" width="3" height="6" rx="0.5" stroke="#2a2723"/><rect x="10.5" y="2.5" width="3" height="8" rx="0.5" fill="#2a2723"/><rect x="15.5" y="0.5" width="2" height="10" rx="0.5" fill="#2a2723"/></svg>
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M8 2C10.5 2 12.7 2.9 14.4 4.4L13 5.9C11.6 4.7 9.9 4 8 4C6.1 4 4.4 4.7 3 5.9L1.6 4.4C3.3 2.9 5.5 2 8 2ZM8 6C9.4 6 10.7 6.5 11.7 7.4L8 11L4.3 7.4C5.3 6.5 6.6 6 8 6Z" fill="#2a2723"/></svg>
+                <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x="0.5" y="0.5" width="22" height="11" rx="2.5" stroke="#2a2723" opacity="0.4"/><rect x="2" y="2" width="17" height="8" rx="1" fill="#2a2723"/><rect x="23" y="4" width="2" height="4" rx="1" fill="#2a2723" opacity="0.4"/></svg>
+              </span>
+            </div>
+
+            <div class="app">
+              <div class="topbar">
+                <button class="avatar-btn tap" data-action="open-drawer" aria-label="Open menu">
+                  <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&h=120&fit=crop&crop=faces" alt="Maya Chen" />
+                </button>
+                <div class="title-block">
+                  <div class="crumb">Admin</div>
+                  <h2>Classrooms</h2>
+                </div>
+                <div class="actions">
+                  <button class="icon-btn tap" aria-label="Filter">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+                  </button>
+                  <button class="icon-btn tap" aria-label="New classroom">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="content scroll-quiet">
+                <div class="pill-row">
+                  <span class="pill-chip active">All 3</span>
+                  <span class="pill-chip">Toddler</span>
+                  <span class="pill-chip">Children's House</span>
+                  <span class="pill-chip">Lower elementary</span>
+                </div>
+
+                <div class="classroom-card">
+                  <div class="head">
+                    <div>
+                      <h4>Primrose</h4>
+                      <div class="agehint">Lower elementary · Ages 6–9</div>
+                    </div>
+                    <span class="ribbon">Steady</span>
+                  </div>
+                  <div class="stats">
+                    <div class="stat-mini">Children<b>16</b></div>
+                    <div class="stat-mini">Present<b>14</b></div>
+                    <div class="stat-mini">Reports MTD<b>9</b></div>
+                  </div>
+                </div>
+
+                <div class="classroom-card">
+                  <div class="head">
+                    <div>
+                      <h4>Fern</h4>
+                      <div class="agehint">Children's House · Ages 3–6</div>
+                    </div>
+                    <span class="ribbon warm">2 nudges</span>
+                  </div>
+                  <div class="stats">
+                    <div class="stat-mini">Children<b>18</b></div>
+                    <div class="stat-mini">Present<b>15</b></div>
+                    <div class="stat-mini">Reports MTD<b>11</b></div>
+                  </div>
+                </div>
+
+                <div class="classroom-card">
+                  <div class="head">
+                    <div>
+                      <h4>Acorn</h4>
+                      <div class="agehint">Toddler · Ages 18m–3</div>
+                    </div>
+                    <span class="ribbon">Steady</span>
+                  </div>
+                  <div class="stats">
+                    <div class="stat-mini">Children<b>14</b></div>
+                    <div class="stat-mini">Present<b>13</b></div>
+                    <div class="stat-mini">Reports MTD<b>6</b></div>
+                  </div>
+                </div>
+              </div>
+
+              <button class="fab tap" data-action="open-sheet" aria-label="Ask Mitable">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span class="badge">2</span>
+              </button>
+
+              <div class="scrim" data-action="close-drawer"></div>
+              <aside class="drawer"></aside>
+              <div class="sheet"></div>
+
+              <div class="home-indicator"></div>
+            </div>
+          </div>
+        </div>
+        <div class="device-caption">
+          <b>Classrooms · drawer open.</b> Profile block on top, primary nav, settings + help, sign out at the foot. Active route gets the terracotta inset rail. Tap any nav item or the scrim to dismiss.
+        </div>
+      </div>
+
+      <!-- =====================================================================
+           Frame 3 — Curriculum. Bottom sheet OPEN.
+      ====================================================================== -->
+      <div class="device-wrap">
+        <div class="device" data-frame="curriculum" data-sheet="open">
+          <div class="device-screen">
+            <div class="device-island"></div>
+            <div class="status-bar">
+              <span>9:41</span>
+              <span class="icons">
+                <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="6.5" width="3" height="4" rx="0.5" stroke="#2a2723"/><rect x="5.5" y="4.5" width="3" height="6" rx="0.5" stroke="#2a2723"/><rect x="10.5" y="2.5" width="3" height="8" rx="0.5" fill="#2a2723"/><rect x="15.5" y="0.5" width="2" height="10" rx="0.5" fill="#2a2723"/></svg>
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M8 2C10.5 2 12.7 2.9 14.4 4.4L13 5.9C11.6 4.7 9.9 4 8 4C6.1 4 4.4 4.7 3 5.9L1.6 4.4C3.3 2.9 5.5 2 8 2ZM8 6C9.4 6 10.7 6.5 11.7 7.4L8 11L4.3 7.4C5.3 6.5 6.6 6 8 6Z" fill="#2a2723"/></svg>
+                <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x="0.5" y="0.5" width="22" height="11" rx="2.5" stroke="#2a2723" opacity="0.4"/><rect x="2" y="2" width="17" height="8" rx="1" fill="#2a2723"/><rect x="23" y="4" width="2" height="4" rx="1" fill="#2a2723" opacity="0.4"/></svg>
+              </span>
+            </div>
+
+            <div class="app">
+              <div class="topbar">
+                <button class="avatar-btn tap" data-action="open-drawer" aria-label="Open menu">
+                  <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&h=120&fit=crop&crop=faces" alt="Maya Chen" />
+                </button>
+                <div class="title-block">
+                  <div class="crumb">Admin</div>
+                  <h2>Curriculum</h2>
+                </div>
+                <div class="actions">
+                  <button class="icon-btn tap" aria-label="Search">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                  </button>
+                  <button class="icon-btn tap" aria-label="Edit">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="content scroll-quiet">
+                <div class="pill-row">
+                  <span class="pill-chip active">All</span>
+                  <span class="pill-chip">Practical life</span>
+                  <span class="pill-chip">Sensorial</span>
+                  <span class="pill-chip">Math</span>
+                  <span class="pill-chip">Language</span>
+                </div>
+
+                <div class="curr-domain">
+                  <div class="domain-head">
+                    <h4>Practical life</h4>
+                    <span class="count">12 / 18 lessons</span>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill terracotta" style="width: 67%"></div></div>
+                  <div class="lessons">
+                    <div class="lesson-row">
+                      <span class="dot done"></span>
+                      <span class="ttl">Pouring water — open vessel</span>
+                      <span class="meta">14 mastered</span>
+                    </div>
+                    <div class="lesson-row">
+                      <span class="dot progress"></span>
+                      <span class="ttl">Polishing brass</span>
+                      <span class="meta">In progress · 4</span>
+                    </div>
+                    <div class="lesson-row">
+                      <span class="dot todo"></span>
+                      <span class="ttl">Folding cloth napkins</span>
+                      <span class="meta">Not started</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="curr-domain">
+                  <div class="domain-head">
+                    <h4>Sensorial</h4>
+                    <span class="count">8 / 14 lessons</span>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill sage" style="width: 57%"></div></div>
+                </div>
+
+                <div class="curr-domain">
+                  <div class="domain-head">
+                    <h4>Math</h4>
+                    <span class="count">6 / 22 lessons</span>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill butter" style="width: 27%"></div></div>
+                </div>
+              </div>
+
+              <button class="fab tap" data-action="open-sheet" aria-label="Ask Mitable">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span class="badge">2</span>
+              </button>
+
+              <div class="scrim" data-action="close-sheet"></div>
+              <aside class="drawer"></aside>
+              <div class="sheet"></div>
+
+              <div class="home-indicator"></div>
+            </div>
+          </div>
+        </div>
+        <div class="device-caption">
+          <b>Curriculum · chat sheet open.</b> The FAB hides while the sheet is up; tapping × or the scrim returns to whatever route was underneath. The shell — top bar, FAB, drawer — is identical across all three routes.
+        </div>
+      </div>
+    </main>
+
+    <!-- =====================================================================
+         Templates: drawer + sheet markup, injected into each frame.
+    ====================================================================== -->
+    <template id="drawerTemplate">
+      <div class="profile">
+        <div class="av-lg">
+          <!-- Avatar: Unsplash, license-free, faces crop
+               Source: https://unsplash.com/photos/woman-in-black-shirt-smiling -->
+          <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&h=160&fit=crop&crop=faces" alt="Maya Chen" />
+        </div>
+        <div class="name">Maya Chen</div>
+        <div class="role">Head of school · Admin</div>
+        <div class="school">
+          <div class="icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div class="text">
+            <b>Riverstone Montessori</b>
+            <span>3 classrooms · 48 children</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="drawer-nav scroll-quiet">
+        <div class="group-label">Workspace</div>
+
+        <button class="drawer-nav-item tap active" data-nav="today">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+          Today
+        </button>
+        <button class="drawer-nav-item tap" data-nav="classrooms">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>
+          Classrooms
+        </button>
+        <button class="drawer-nav-item tap" data-nav="curriculum">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
+          Curriculum
+        </button>
+        <button class="drawer-nav-item tap" data-nav="templates">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></span>
+          Templates
+        </button>
+        <button class="drawer-nav-item tap" data-nav="teachers">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg></span>
+          Teachers
+        </button>
+        <button class="drawer-nav-item tap" data-nav="reports">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M11 14l2 2 4-4"/></svg></span>
+          Reports
+          <span class="badge-r">7</span>
+        </button>
+
+        <div class="group-label">General</div>
+        <button class="drawer-nav-item tap" data-nav="settings">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          Settings
+        </button>
+        <button class="drawer-nav-item tap" data-nav="help">
+          <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+          Help &amp; feedback
+        </button>
+      </nav>
+
+      <div class="drawer-foot">
+        <div class="role-switch">
+          <span class="lbl">View as</span>
+          <span class="toggle">
+            <span class="on">Admin</span>
+            <span>Teacher</span>
+          </span>
+        </div>
+        <button class="signout tap">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </button>
+      </div>
+    </template>
+
+    <template id="sheetTemplate">
+      <div class="grabber"></div>
+      <div class="sheet-head">
+        <div class="icon-circle">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <div class="ttl">
+          <h3>Ask Mitable</h3>
+          <span>Across 3 classrooms · 48 children</span>
+        </div>
+        <button class="close-btn tap" data-action="close-sheet" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body scroll-quiet">
+        <div class="msg assistant">
+          <div class="name">Mitable</div>
+          Morning, Maya. You have <b>7 reports waiting on review</b> — two of them due Friday. Want me to walk through Nora's major report first?
+        </div>
+        <div class="suggestion-row">
+          <span class="suggestion-chip">Show me Nora's report</span>
+          <span class="suggestion-chip">What's overdue?</span>
+          <span class="suggestion-chip">Fern attendance this week</span>
+        </div>
+        <div class="msg user">
+          Which classroom is behind on math lessons?
+        </div>
+        <div class="msg assistant">
+          <div class="name">Mitable</div>
+          <b>Acorn</b> is at 18% on math (avg across the school is 41%). That's expected for the toddler band, but Ms. Hartwell flagged she'd like more bead-cabinet time in May.
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <div class="composer">
+          <button class="icon-btn tap" aria-label="Attach">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="text" placeholder="Ask about anyone, anything…" />
+          <button class="send-btn tap" aria-label="Send">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      // Inject drawer + sheet content into each frame, then wire interactions per frame.
+      const drawerHTML = document.getElementById('drawerTemplate').innerHTML;
+      const sheetHTML  = document.getElementById('sheetTemplate').innerHTML;
+
+      document.querySelectorAll('.device').forEach((device) => {
+        const drawerEl = device.querySelector('.drawer');
+        const sheetEl  = device.querySelector('.sheet');
+        const scrimEl  = device.querySelector('.scrim');
+        const fabEl    = device.querySelector('.fab');
+        const titleEl  = device.querySelector('.title-block h2');
+        if (drawerEl) drawerEl.innerHTML = drawerHTML;
+        if (sheetEl)  sheetEl.innerHTML  = sheetHTML;
+
+        // The "active" indicator in the drawer should match the route the frame is showing.
+        const frame = device.dataset.frame; // 'today' | 'classrooms' | 'curriculum'
+        device.querySelectorAll('.drawer-nav-item').forEach((b) => {
+          b.classList.toggle('active', b.dataset.nav === frame);
+        });
+
+        // Initial open states (per frame static demo state)
+        let drawerOpen = device.dataset.drawer === 'open';
+        let sheetOpen  = device.dataset.sheet  === 'open';
+
+        const render = () => {
+          drawerEl.dataset.open = drawerOpen ? 'true' : 'false';
+          sheetEl.dataset.open  = sheetOpen  ? 'true' : 'false';
+          // Scrim is shared — show it if either is open.
+          scrimEl.dataset.open  = (drawerOpen || sheetOpen) ? 'true' : 'false';
+          // FAB hides when the sheet is up (per spec — pick one and be consistent).
+          fabEl.dataset.hidden  = sheetOpen ? 'true' : 'false';
+          // What the scrim should do depends on what's open.
+          if (sheetOpen)        scrimEl.dataset.action = 'close-sheet';
+          else if (drawerOpen)  scrimEl.dataset.action = 'close-drawer';
+          else                  scrimEl.dataset.action = '';
+        };
+        render();
+
+        // Delegated tap handling within the device
+        device.addEventListener('click', (e) => {
+          const target = e.target.closest('[data-action], [data-nav]');
+          if (!target) return;
+
+          const action = target.dataset.action;
+          if (action === 'open-drawer') { drawerOpen = true;  sheetOpen = false; }
+          if (action === 'close-drawer'){ drawerOpen = false; }
+          if (action === 'open-sheet')  { sheetOpen  = true;  drawerOpen = false; }
+          if (action === 'close-sheet') { sheetOpen  = false; }
+
+          // Tapping a nav item dismisses the drawer (and updates the active indicator
+          // visually inside the drawer, even though we don't actually change route here).
+          if (target.dataset.nav) {
+            device.querySelectorAll('.drawer-nav-item').forEach((b) => {
+              b.classList.toggle('active', b === target);
+            });
+            // Reflect the chosen route in the top-bar title for instant feedback.
+            const labelEl = target.childNodes[target.childNodes.length - 1];
+            // Trim whitespace-only text nodes; pick last non-element text node
+            const navLabels = Array.from(target.childNodes).filter(n => n.nodeType === 3 && n.textContent.trim());
+            const navText = navLabels.length ? navLabels[navLabels.length - 1].textContent.trim() : null;
+            if (navText && titleEl) titleEl.textContent = navText;
+            drawerOpen = false;
+          }
+
+          render();
+        });
+      });
+    </script>
+  </body>
+</html>
