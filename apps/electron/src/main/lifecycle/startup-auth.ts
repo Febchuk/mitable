@@ -6,7 +6,7 @@ import { authManager } from "../../services/authManager";
 /**
  * Restore authentication on startup:
  * 0. Local account check — if a local account is active, use it directly.
- * 1. Instant offline fallback — keychain + SQLite cache so the renderer shows
+ * 1. Instant offline fallback — keychain + PGlite cache so the renderer shows
  *    the logged-in UI immediately.
  * 2. Background token refresh — restoreSession() upgrades to a fully
  *    authenticated session when the backend is reachable.
@@ -14,13 +14,13 @@ import { authManager } from "../../services/authManager";
 export async function restoreAuthOnStartup(): Promise<void> {
   // ── Local account (primary path) ────────────────────────────────────────
   try {
-    const { localDb } = await import("../../services/on-device");
-    if (!localDb.isAvailable()) await localDb.initialize();
+    const { pgDb } = await import("../../services/on-device");
+    if (!pgDb.isAvailable()) await pgDb.initialize();
 
-    if (localDb.isAvailable()) {
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+    if (pgDb.isAvailable()) {
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (activeId) {
-        const localAccount = localDb.getLocalAccountById(activeId);
+        const localAccount = await pgDb.getLocalAccountById(activeId);
         if (localAccount) {
           ctx.currentUserContext = {
             userId: localAccount.id,
@@ -44,12 +44,12 @@ export async function restoreAuthOnStartup(): Promise<void> {
     if (authCreds.length > 0) {
       const [orgId, userId] = authCreds[0].account.split(":");
       if (orgId && userId) {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) {
-          await localDb.initialize();
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) {
+          await pgDb.initialize();
         }
-        if (localDb.isAvailable()) {
-          const cachedUser = localDb.getUser(userId);
+        if (pgDb.isAvailable()) {
+          const cachedUser = await pgDb.getUser(userId);
           if (cachedUser) {
             ctx.currentUserContext = {
               userId,
@@ -59,12 +59,12 @@ export async function restoreAuthOnStartup(): Promise<void> {
             if (cachedUser.role) {
               authManager.setUserRole(cachedUser.role);
             }
-            authLogger.info("Restored identity from local SQLite cache (instant)", {
+            authLogger.info("Restored identity from local PGlite cache (instant)", {
               userId,
               orgId,
             });
 
-            const cachedOrg = localDb.getOrganization(orgId);
+            const cachedOrg = await pgDb.getOrganization(orgId);
             const pushOfflineUser = () => {
               if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
                 ctx.consoleWindow.webContents.send(IPC_CHANNELS.AUTH_OFFLINE_USER, {
@@ -88,7 +88,7 @@ export async function restoreAuthOnStartup(): Promise<void> {
               }
             }
           } else {
-            authLogger.info("Keychain has credentials but no cached user in SQLite", {
+            authLogger.info("Keychain has credentials but no cached user in PGlite", {
               userId,
               orgId,
             });

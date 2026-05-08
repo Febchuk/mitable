@@ -18,14 +18,24 @@ export {
   getHardwareProfile,
 } from "./ollamaLifecycle";
 
-export { localDb } from "./localDb";
+// PGlite database (primary - Postgres WASM)
+export { pgDb } from "./pgDb";
 export type {
   LocalCapture,
   LocalClassification,
   LocalStory,
   LocalTranscription,
   TranscriptionSource,
-} from "./localDb";
+  LocalDocument,
+  LocalDocChunk,
+  LocalAccount,
+  AgentConversation,
+  AgentMessage,
+  LocalMonitoringSession,
+  LocalUser,
+  LocalOrganization,
+  LocalFeedback,
+} from "./pgDb";
 
 export { localInferenceService } from "./localInferenceService";
 export type { BufferedFrame, OnDeviceSummary } from "./localInferenceService";

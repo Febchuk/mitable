@@ -28,14 +28,14 @@
     "lint": "eslint src",
     "clean": "rm -rf out dist",
     "logs": "tail -f ~/Library/Logs/mitable/main.log",
-    "logs:clear": "rm -f ~/Library/Logs/mitable/*.log && echo 'Logs cleared'",
-    "rebuild-native": "npx @electron/rebuild -f -m ../../node_modules/.pnpm/better-sqlite3@12.9.0/node_modules/better-sqlite3"
+    "logs:clear": "rm -f ~/Library/Logs/mitable/*.log && echo 'Logs cleared'"
   },
   "dependencies": {
     "@ai-sdk/react": "^2.0.28",
     "@anthropic-ai/claude-agent-sdk": "^0.2.74",
     "@ariakit/react": "^0.4.20",
     "@deepgram/sdk": "^4.11.3",
+    "@electric-sql/pglite": "^0.4.5",
     "@emoji-mart/data": "^1.2.1",
     "@internationalized/date": "^3.11.0",
     "@mdxeditor/editor": "^3.52.3",
@@ -102,7 +102,6 @@
     "active-win": "^8.2.1",
     "ai": "^5.0.28",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.9.0",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
@@ -172,7 +171,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@types/bcryptjs": "^3.0.0",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/keytar": "^4.4.0",
     "@types/lodash": "^4.17.21",
     "@types/lowlight": "^0.0.7",
@@ -193,7 +191,6 @@
     "postcss": "^8.4.35",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "sql.js": "^1.14.1",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
     "vite": "^5.1.6"

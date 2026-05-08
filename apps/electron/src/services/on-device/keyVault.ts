@@ -6,11 +6,12 @@
  */
 
 import { createLogger } from "../../lib/logger";
+import { KEYCHAIN_SERVICE } from "../../lib/env";
 import type { ProviderConfig, ProviderName } from "./providers/types";
 
 const logger = createLogger("KeyVault");
 
-const SERVICE_NAME = "Mitable";
+const SERVICE_NAME = KEYCHAIN_SERVICE;
 const ACCOUNT_PROVIDER = "inference:provider";
 const ACCOUNT_KEY = "inference:apiKey";
 const ACCOUNT_MODEL = "inference:model";

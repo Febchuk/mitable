@@ -4,20 +4,19 @@ import { consoleLogger } from "../loggers";
 import { ctx } from "../context";
 
 /**
- * Initialize on-device module (SQLite only).
+ * Initialize on-device module (PGlite database).
  * Whisper setup is handled separately by whisperSetupService in ready.ts.
  */
 export async function initOnDeviceAI(): Promise<void> {
   try {
-    const { localDb } = await import("../../services/on-device");
-    await localDb.initialize();
+    const { pgDb } = await import("../../services/on-device");
+    await pgDb.initialize();
     consoleLogger.info(
-      `On-device module initialized (SQLite: ${localDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
+      `On-device module initialized (PGlite: ${pgDb.isAvailable() ? "OK" : "UNAVAILABLE"})`
     );
-    if (!localDb.isAvailable()) {
-      consoleLogger.warn(
-        "SQLite unavailable — run `npm run rebuild-native` in apps/electron. Preferences will use fallback."
-      );
+    if (!pgDb.isAvailable()) {
+      consoleLogger.warn("PGlite unavailable — database functionality will be limited.");
+      return;
     }
   } catch (err) {
     consoleLogger.error("On-device init failed:", String(err));
@@ -56,8 +55,8 @@ export async function eagerPreloadModels(): Promise<void> {
 
     // Recover sessions stuck in "summarizing" from previous app runs
     try {
-      const { localDb } = await import("../../services/on-device");
-      const stuckSessions = localDb.getSessionsByStatus("summarizing");
+      const { pgDb } = await import("../../services/on-device");
+      const stuckSessions = await pgDb.getSessionsByStatus("summarizing");
       if (stuckSessions.length > 0) {
         consoleLogger.info(
           `[EagerPreload] Found ${stuckSessions.length} session(s) stuck in "summarizing" — adding to queue`
@@ -104,12 +103,14 @@ export async function eagerPreloadModels(): Promise<void> {
             ),
           ]);
 
-          // Mark session as ready in SQLite
-          const { localDb } = await import("../../services/on-device");
-          const story = localDb.getStoryForSession(sessionId);
-          localDb.updateMonitoringSessionStatus(sessionId, "ready", {
-            finalSummary: story?.narrative ?? null,
-          });
+          // Mark session as ready in PGlite
+          const { pgDb } = await import("../../services/on-device");
+          const story = await pgDb.getStoryForSession(sessionId);
+          await pgDb.updateMonitoringSessionStatus(
+            sessionId,
+            "ended",
+            story?.narrative ? Date.now() : undefined
+          );
 
           // Broadcast session update so UI refreshes
           BrowserWindow.getAllWindows().forEach((win) => {

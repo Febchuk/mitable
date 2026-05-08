@@ -7,8 +7,8 @@ export function registerOnDeviceHandlers() {
   /** @deprecated Ollama removed — returns minimal stub for backward compat */
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_STATUS, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      const sqliteAvailable = localDb.isAvailable() || (await localDb.tryOpen());
+      const { pgDb } = await import("../../services/on-device");
+      const dbAvailable = pgDb.isAvailable() || (await pgDb.tryOpen());
       return {
         isSetUp: false,
         serverStatus: "stopped",
@@ -19,9 +19,9 @@ export function registerOnDeviceHandlers() {
         hasNativeAudio: false,
         recommendedModel: null,
         enabled: false,
-        onDeviceAllowed: sqliteAvailable,
-        onDeviceBlockReason: sqliteAvailable ? null : "SQLite unavailable",
-        sqliteAvailable,
+        onDeviceAllowed: dbAvailable,
+        onDeviceBlockReason: dbAvailable ? null : "PGlite unavailable",
+        sqliteAvailable: dbAvailable,
       };
     } catch (err) {
       return {
@@ -104,11 +104,11 @@ export function registerOnDeviceHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.ON_DEVICE_GET_GPU_PREFERENCE, async (_, userId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) {
-        await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) {
+        await pgDb.tryOpen();
       }
-      return localDb.getUserPreference(userId, "preferredGpu");
+      return await pgDb.getUserPreference(userId, "preferredGpu");
     } catch {
       return null;
     }
@@ -118,11 +118,11 @@ export function registerOnDeviceHandlers() {
     IPC_CHANNELS.ON_DEVICE_SET_GPU_PREFERENCE,
     async (_, userId: string, gpuName: string) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) {
-          await localDb.tryOpen();
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) {
+          await pgDb.tryOpen();
         }
-        localDb.setUserPreference(userId, "preferredGpu", gpuName);
+        await pgDb.setUserPreference(userId, "preferredGpu", gpuName);
         return { success: true };
       } catch (err) {
         return { success: false, error: String(err) };
@@ -156,12 +156,12 @@ export function registerOnDeviceHandlers() {
   // Inference mode preference (for hybrid pipeline testing)
   ipcMain.handle(IPC_CHANNELS.INFERENCE_MODE_GET, async (_, userId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
+      const { pgDb } = await import("../../services/on-device");
       // Ensure DB is initialized
-      if (!localDb.isAvailable()) {
-        await localDb.tryOpen();
+      if (!pgDb.isAvailable()) {
+        await pgDb.tryOpen();
       }
-      const mode = localDb.getUserPreference(userId, "inferenceMode");
+      const mode = await pgDb.getUserPreference(userId, "inferenceMode");
       console.log(`[IPC] INFERENCE_MODE_GET for ${userId}: raw="${mode}"`);
       // Ensure mode is one of the valid values
       const validMode = mode === "cloud" || mode === "local" ? mode : "auto";
@@ -177,12 +177,12 @@ export function registerOnDeviceHandlers() {
     IPC_CHANNELS.INFERENCE_MODE_SET,
     async (_, userId: string, mode: "auto" | "local" | "cloud") => {
       try {
-        const { localDb } = await import("../../services/on-device");
+        const { pgDb } = await import("../../services/on-device");
         // Ensure DB is initialized
-        if (!localDb.isAvailable()) {
-          await localDb.tryOpen();
+        if (!pgDb.isAvailable()) {
+          await pgDb.tryOpen();
         }
-        localDb.setUserPreference(userId, "inferenceMode", mode);
+        await pgDb.setUserPreference(userId, "inferenceMode", mode);
         console.log(`[IPC] Inference mode set for ${userId}: ${mode}`);
         return { success: true };
       } catch (err) {
@@ -339,7 +339,7 @@ export function registerOnDeviceHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.REPROCESS_SESSION, async (_, sessionId: string) => {
     try {
-      const { hybridInferenceService, localDb } = await import("../../services/on-device");
+      const { hybridInferenceService, pgDb } = await import("../../services/on-device");
       const { localFrameStorage } = await import("../../services/localFrameStorage");
 
       const sessionDir = localFrameStorage.getSessionPath(sessionId);
@@ -348,7 +348,7 @@ export function registerOnDeviceHandlers() {
       }
 
       // Clear any existing story so it gets regenerated
-      localDb.deleteStoryForSession(sessionId);
+      await pgDb.deleteStoryForSession(sessionId);
 
       const broadcastProgress = (progress: {
         sessionId: string;

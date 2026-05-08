@@ -7,13 +7,16 @@ Write-Host ""
 
 $targets = @(
     "$env:APPDATA\@mitable",
+    "$env:APPDATA\@mitable-dev",
     "$env:APPDATA\mitable",
     "$env:APPDATA\Mitable",
     "$env:USERPROFILE\Documents\Mitable",
+    "$env:USERPROFILE\Documents\Mitable_Dev",
     "$env:TEMP\mitable-whisper",
     "$env:USERPROFILE\AppData\Local\mitable",
     "$env:USERPROFILE\AppData\Local\Mitable",
-    "$env:USERPROFILE\AppData\Local\@mitable"
+    "$env:USERPROFILE\AppData\Local\@mitable",
+    "$env:USERPROFILE\AppData\Local\@mitable-dev"
 )
 
 $found = @()

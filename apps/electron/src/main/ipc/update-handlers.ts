@@ -2,6 +2,7 @@ import { app, clipboard, ipcMain } from "electron";
 import { ctx } from "../context";
 import { ipcLogger, updateLogger } from "../loggers";
 import { createLogger } from "../../lib/logger";
+import { DOCUMENTS_FOLDER } from "../../lib/env";
 import { updateService } from "../../services/updateService";
 import { monitoringSessionService } from "../../services/monitoringSessionService";
 import { prepareForQuitAndInstall } from "../tray/tray";
@@ -32,11 +33,11 @@ export function registerUpdateHandlers() {
 
   async function resolveExportPath(sessionId: string): Promise<string | null> {
     const { promises: fs } = await import("fs");
-    const { localInferenceService, localDb } = await import("../../services/on-device");
+    const { localInferenceService, pgDb } = await import("../../services/on-device");
 
     // 1. In-memory cache or persisted DB path
     const cached =
-      localInferenceService.getExportPath(sessionId) || localDb.getExportPath(sessionId);
+      localInferenceService.getExportPath(sessionId) || (await pgDb.getExportPath(sessionId));
     if (cached) {
       try {
         await fs.access(cached);
@@ -51,7 +52,7 @@ export function registerUpdateHandlers() {
       const { app: electronApp } = await import("electron");
       const { join } = await import("path");
       const docsDir = electronApp.getPath("documents");
-      const blockdataDir = join(docsDir, "Mitable", "blockdata");
+      const blockdataDir = join(docsDir, DOCUMENTS_FOLDER, "blockdata");
 
       const dayFolders = await fs.readdir(blockdataDir).catch(() => [] as string[]);
       for (const day of dayFolders.reverse()) {
@@ -65,14 +66,14 @@ export function registerUpdateHandlers() {
           const filePath = join(dayPath, file);
           const content = await fs.readFile(filePath, "utf-8");
           if (content.includes(sessionId)) {
-            localDb.updateMonitoringSessionExportPath(sessionId, filePath);
+            await pgDb.updateMonitoringSessionExportPath(sessionId, filePath);
             return filePath;
           }
         }
       }
 
       // 3. Match by session start time against block file time headers (legacy blocks)
-      const session = localDb.getMonitoringSession(sessionId);
+      const session = await pgDb.getMonitoringSession(sessionId);
       if (session?.startedAt) {
         const sessionStart = new Date(session.startedAt);
         const months = [
@@ -109,7 +110,7 @@ export function registerUpdateHandlers() {
             if (timeMatch) {
               const fileStartTime = timeMatch[1].trim();
               if (fileStartTime === sessionTimeStr) {
-                localDb.updateMonitoringSessionExportPath(sessionId, filePath);
+                await pgDb.updateMonitoringSessionExportPath(sessionId, filePath);
                 return filePath;
               }
             }
@@ -130,7 +131,7 @@ export function registerUpdateHandlers() {
               const fileMins = fileH * 60 + fileM;
               const sessionMins = sessionStart.getHours() * 60 + sessionStart.getMinutes();
               if (Math.abs(fileMins - sessionMins) <= 2) {
-                localDb.updateMonitoringSessionExportPath(sessionId, filePath);
+                await pgDb.updateMonitoringSessionExportPath(sessionId, filePath);
                 return filePath;
               }
             }
@@ -169,15 +170,14 @@ export function registerUpdateHandlers() {
   // ── Local-first data handlers ─────────────────────────────────────────────
   ipcMain.handle("get-local-calendar-days", async (_event, startMs: number, endMs: number) => {
     try {
-      const { localDb } = await import("../../services/on-device");
+      const { pgDb } = await import("../../services/on-device");
 
       const currentUserId =
         ctx.currentUserContext?.userId ||
-        localDb.getUserPreference("system", "activeLocalUserId") ||
+        (await pgDb.getUserPreference("system", "activeLocalUserId")) ||
         undefined;
-      const sessions = localDb
-        .getAllSessionsByDateRange(startMs, endMs)
-        .filter((s) => !currentUserId || s.userId === currentUserId);
+      const allSessions = await pgDb.getAllSessionsByDateRange(startMs, endMs);
+      const sessions = allSessions.filter((s) => !currentUserId || s.userId === currentUserId);
 
       // Inject the currently active session (it lives in memory, not yet in SQLite)
       const activeState = monitoringSessionService.getSessionState();
@@ -213,8 +213,8 @@ export function registerUpdateHandlers() {
         const workBlocks = [];
 
         for (const session of daySessions) {
-          const story = localDb.getStoryForSession(session.id);
-          const captures = localDb.getCapturesForSession(session.id);
+          const story = await pgDb.getStoryForSession(session.id);
+          const captures = await pgDb.getCapturesForSession(session.id);
 
           const startTime = new Date(session.startedAt);
           const endTime = session.endedAt ? new Date(session.endedAt) : null;
@@ -287,14 +287,14 @@ export function registerUpdateHandlers() {
 
   ipcMain.handle("get-local-session-detail", async (_event, sessionId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      const session = localDb.getMonitoringSession(sessionId);
+      const { pgDb } = await import("../../services/on-device");
+      const session = await pgDb.getMonitoringSession(sessionId);
       if (!session) return null;
 
-      const captures = localDb.getCapturesForSession(sessionId);
-      const classifications = localDb.getClassificationsForSession(sessionId);
-      const transcriptions = localDb.getTranscriptionsForSession(sessionId);
-      const story = localDb.getStoryForSession(sessionId);
+      const captures = await pgDb.getCapturesForSession(sessionId);
+      const classifications = await pgDb.getClassificationsForSession(sessionId);
+      const transcriptions = await pgDb.getTranscriptionsForSession(sessionId);
+      const story = await pgDb.getStoryForSession(sessionId);
 
       return { session, captures, classifications, transcriptions, story };
     } catch {

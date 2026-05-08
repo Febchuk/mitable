@@ -1,7 +1,7 @@
 /**
  * LocalDocDetail
  *
- * Local-only version of DocDetail. Uses IPC calls to localDb
+ * Local-only version of DocDetail. Uses IPC calls to pgDb
  * instead of backend API. Supports editing, autosave, PDF export,
  * AI revision panel, and delete.
  */

@@ -14,8 +14,9 @@
  */
 
 import { createLogger } from "../../lib/logger";
+import { DOCUMENTS_FOLDER } from "../../lib/env";
 import type { BufferedFrame } from "./localInferenceService";
-import { localDb } from "./localDb";
+import { pgDb } from "./pgDb";
 import { sessionTimeline, type TranscriptSegment } from "./sessionTimeline";
 import { localAudioService } from "./localAudioService";
 import { localFrameStorage } from "../localFrameStorage";
@@ -48,12 +49,12 @@ class HybridInferenceService {
   private sessionStartMs: number = 0;
   private provider: InferenceProvider | null = null;
 
-  private buildBlockBaseParts(): string[] {
-    const parts = ["Mitable"];
+  private async buildBlockBaseParts(): Promise<string[]> {
+    const parts = [DOCUMENTS_FOLDER];
     try {
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (activeId) {
-        const account = localDb.getLocalAccountById(activeId);
+        const account = await pgDb.getLocalAccountById(activeId);
         if (account?.email) {
           parts.push(account.email.replace(/[<>:"/\\|?*]/g, "_"));
         }
@@ -82,7 +83,8 @@ class HybridInferenceService {
       const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
 
       const docsDir = app.getPath("documents");
-      const dayDir = join(docsDir, ...this.buildBlockBaseParts(), "blockdata", dayFolder);
+      const baseParts = await this.buildBlockBaseParts();
+      const dayDir = join(docsDir, ...baseParts, "blockdata", dayFolder);
 
       await fs.mkdir(dayDir, { recursive: true });
 
@@ -91,7 +93,7 @@ class HybridInferenceService {
         const todayStart = new Date(startedAt);
         todayStart.setHours(0, 0, 0, 0);
         const todayEnd = todayStart.getTime() + 24 * 60 * 60 * 1000;
-        const sessions = localDb.getAllSessionsByDateRange(todayStart.getTime(), todayEnd);
+        const sessions = await pgDb.getAllSessionsByDateRange(todayStart.getTime(), todayEnd);
         blockNum = Math.max(sessions.length, 1);
       } catch {
         // DB not ready or no sessions - default to 1
@@ -125,9 +127,9 @@ class HybridInferenceService {
 
       this.currentMdPath = mdFilePath;
 
-      // Update localDb with export path
+      // Update pgDb with export path
       try {
-        localDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
+        await pgDb.setExportPath(sessionId, mdFilePath);
       } catch {
         // DB might not be ready yet, that's ok
       }
@@ -286,11 +288,11 @@ class HybridInferenceService {
     emit("transcribing", 12, "Processing audio transcripts...");
 
     // Store transcripts in DB if not already there
-    const existingTranscripts = localDb.getTranscriptionsForSession(sessionId);
+    const existingTranscripts = await pgDb.getTranscriptionsForSession(sessionId);
     if (existingTranscripts.length === 0 && hasStreamedAudio) {
       for (let i = 0; i < allTranscripts.length; i++) {
         const seg = allTranscripts[i];
-        localDb.insertTranscription({
+        await pgDb.insertTranscription({
           id: randomUUID(),
           sessionId,
           chunkIndex: i,
@@ -313,7 +315,7 @@ class HybridInferenceService {
       const batchNarratives: string[] = [];
 
       // Check for existing classifications (resumable)
-      const existingClassifications = localDb.getClassificationsForSession(sessionId);
+      const existingClassifications = await pgDb.getClassificationsForSession(sessionId);
       const processedBatchIndices = new Set(existingClassifications.map((c) => c.batchIndex));
 
       if (processedBatchIndices.size > 0) {
@@ -399,7 +401,7 @@ class HybridInferenceService {
             (fd) => fd.sequenceNumber === frame.sequenceNumber
           );
           const ev = frame.intervalEvidence;
-          localDb.insertCapture({
+          await pgDb.insertCapture({
             id: randomUUID(),
             sessionId: frame.sessionId,
             frameId: frame.frameId,
@@ -419,7 +421,7 @@ class HybridInferenceService {
         }
 
         // Store classification
-        localDb.insertClassification({
+        await pgDb.insertClassification({
           id: randomUUID(),
           sessionId,
           batchIndex: batchIdx,
@@ -450,13 +452,13 @@ class HybridInferenceService {
       }
 
       // Generate final summary from the complete block.md
-      const existingStory = localDb.getStoryForSession(sessionId);
+      const existingStory = await pgDb.getStoryForSession(sessionId);
       if (existingStory) {
         logger.info("Summary already exists — skipping");
       } else {
         emit("generating_summary", 85, "Writing summary...");
         const summary = await this.summarizeBlockMd(mdPath);
-        localDb.insertStory({
+        await pgDb.insertStory({
           id: randomUUID(),
           sessionId,
           narrative: summary,
@@ -464,7 +466,6 @@ class HybridInferenceService {
           timeBreakdown: null,
           modelUsed: this.provider?.model ?? "byok",
         });
-        localDb.checkpoint();
 
         // Prepend summary to markdown
         if (mdPath) {
@@ -664,7 +665,8 @@ Return JSON:
       const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
 
       const docsDir = app.getPath("documents");
-      const dayDir = join(docsDir, ...this.buildBlockBaseParts(), "blockdata", dayFolder);
+      const baseParts = await this.buildBlockBaseParts();
+      const dayDir = join(docsDir, ...baseParts, "blockdata", dayFolder);
       await fs.mkdir(dayDir, { recursive: true });
 
       let blockNum = 1;
@@ -672,7 +674,7 @@ Return JSON:
         const todayStart = new Date(sessionStartMs);
         todayStart.setHours(0, 0, 0, 0);
         const todayEnd = todayStart.getTime() + 24 * 60 * 60 * 1000;
-        const sessions = localDb.getAllSessionsByDateRange(todayStart.getTime(), todayEnd);
+        const sessions = await pgDb.getAllSessionsByDateRange(todayStart.getTime(), todayEnd);
         blockNum = Math.max(sessions.length, 1);
       } catch {
         // DB not ready - default to 1
@@ -702,7 +704,7 @@ Return JSON:
       const mdFilePath = join(dayDir, `block_${blockNum}.md`);
       await fs.writeFile(mdFilePath, header, "utf-8");
 
-      localDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
+      await pgDb.setExportPath(sessionId, mdFilePath);
 
       logger.info(`Streaming .md created: ${mdFilePath}`);
       return mdFilePath;
@@ -829,7 +831,7 @@ Return JSON:
 
   private async prependSummaryToMarkdown(mdPath: string, sessionId: string): Promise<void> {
     try {
-      const story = localDb.getStoryForSession(sessionId);
+      const story = await pgDb.getStoryForSession(sessionId);
       if (!story || story.narrative.length <= 30) return;
 
       const existing = await fs.readFile(mdPath, "utf-8");
@@ -846,7 +848,7 @@ Return JSON:
       const withSummary = `${before}## Summary\n\n${story.narrative}\n\n${after}`;
 
       // Also update the header with final time range
-      const captures = localDb.getCapturesForSession(sessionId);
+      const captures = await pgDb.getCapturesForSession(sessionId);
       if (captures.length > 0) {
         const endTime = new Date(captures[captures.length - 1].capturedAt).toLocaleTimeString(
           "en-US",
@@ -862,6 +864,7 @@ Return JSON:
         const durationMin = Math.round(
           (captures[captures.length - 1].capturedAt - captures[0].capturedAt) / 60_000
         );
+        const session = await pgDb.getMonitoringSession(sessionId);
         const updatedContent = withSummary
           .replace(
             /- \*\*Started:\*\* .+/,
@@ -869,7 +872,7 @@ Return JSON:
           )
           .replace(
             /- \*\*Session Goal:\*\* .+/,
-            `- **Session Goal:** ${localDb.getMonitoringSession(sessionId)?.sessionGoal ?? "General work session"}`
+            `- **Session Goal:** ${session?.sessionGoal ?? "General work session"}`
           );
 
         await fs.writeFile(mdPath, updatedContent, "utf-8");

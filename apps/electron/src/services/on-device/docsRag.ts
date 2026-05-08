@@ -2,11 +2,12 @@
  * Docs RAG Service
  *
  * Hybrid retrieval-augmented generation for local documents:
- * 1. FTS5 keyword search over doc chunks (always available)
- * 2. Top-K chunks fed to BYOK provider for answer synthesis
+ * 1. Keyword search over doc chunks (always available)
+ * 2. Vector search with pgvector (when embeddings are available)
+ * 3. Top-K chunks fed to BYOK provider for answer synthesis
  */
 
-import { localDb } from "./localDb";
+import { pgDb } from "./pgDb";
 import { keyVault } from "./keyVault";
 import { createProvider } from "./providers";
 import type { ChatMessage } from "./providers";
@@ -23,8 +24,8 @@ export interface RagResult {
 }
 
 export async function queryDocs(userId: string, question: string): Promise<RagResult> {
-  // 1. Retrieve relevant chunks via FTS5
-  const chunks = localDb.searchDocChunks(question, userId, TOP_K);
+  // 1. Retrieve relevant chunks via keyword search
+  const chunks = await pgDb.searchDocChunks(question, userId, TOP_K);
 
   if (chunks.length === 0) {
     return {

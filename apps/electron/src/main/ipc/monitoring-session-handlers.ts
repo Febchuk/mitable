@@ -10,7 +10,7 @@ import { audioWebSocketService } from "../../services/audioWebSocketService";
 import { passiveMonitorService } from "../../services/passiveMonitorService";
 import { focusWindowTracker } from "../../services/focusWindowTracker";
 import { trackMainEvent } from "../../services/analyticsService";
-import { localDb } from "../../services/on-device/localDb";
+import { pgDb } from "../../services/on-device/pgDb";
 import { installedAppsService } from "../../services/installedAppsService";
 import { createWatchingPillWindow, showPillReliably, startPillCursorTracking } from "../windows";
 import { startSessionFromMain, endPassiveSessionFromMain } from "../session";
@@ -204,8 +204,8 @@ export function registerMonitoringSessionHandlers() {
       // Only forward to backend for cloud sessions.
       let isLocalSession = false;
       try {
-        const { localDb } = await import("../../services/on-device");
-        const session = localDb.getMonitoringSession(sessionId);
+        const { pgDb } = await import("../../services/on-device");
+        const session = await pgDb.getMonitoringSession(sessionId);
         isLocalSession = !!session;
       } catch {
         /* on-device module not available */
@@ -280,10 +280,10 @@ export function registerMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.MONITORING_SESSION_DELETE, async (_event, sessionId: string) => {
     monitoringLogger.info(`Deleting session ${sessionId} locally`);
     try {
-      const { localDb } = await import("../../services/on-device");
+      const { pgDb } = await import("../../services/on-device");
 
       // Delete the exported block .md file (lives in Documents/Mitable/blockdata/)
-      const exportPath = localDb.getExportPath(sessionId);
+      const exportPath = await pgDb.getExportPath(sessionId);
       if (exportPath) {
         try {
           const fsPromises = await import("fs/promises");
@@ -295,7 +295,7 @@ export function registerMonitoringSessionHandlers() {
       }
 
       // Delete all DB records (captures, classifications, stories, transcriptions, session)
-      localDb.deleteMonitoringSession(sessionId);
+      await pgDb.deleteMonitoringSession(sessionId);
 
       // Delete session folder (frames, thumbnails, audio PCM files)
       try {
@@ -319,8 +319,8 @@ export function registerMonitoringSessionHandlers() {
 
     monitoringLogger.info("Resync: pushing local stories to cloud backend");
     try {
-      const { localDb, localInferenceService } = await import("../../services/on-device");
-      const stories = localDb.getAllStories();
+      const { pgDb, localInferenceService } = await import("../../services/on-device");
+      const stories = await pgDb.getAllStories();
       if (stories.length === 0) {
         return { success: true, synced: 0, message: "No local stories to sync" };
       }
@@ -330,7 +330,7 @@ export function registerMonitoringSessionHandlers() {
 
       for (const story of stories) {
         try {
-          const exported = localInferenceService.exportResultsForBackend(story.sessionId, 0);
+          const exported = await localInferenceService.exportResultsForBackend(story.sessionId, 0);
           if (!exported) {
             errors.push(`${story.sessionId.slice(0, 8)}: export failed`);
             continue;
@@ -802,16 +802,16 @@ export function registerMonitoringSessionHandlers() {
     return { success: true };
   });
 
-  // Pill display mode preference — persisted to local SQLite
-  ipcMain.handle(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, (_, userId: string) => {
-    const stored = localDb.getUserPreference(userId, "pillDisplayMode");
+  // Pill display mode preference — persisted to local PGlite
+  ipcMain.handle(IPC_CHANNELS.PILL_DISPLAY_MODE_GET, async (_, userId: string) => {
+    const stored = await pgDb.getUserPreference(userId, "pillDisplayMode");
     return (stored === "expanded" ? "expanded" : "compact") as "compact" | "expanded";
   });
 
   ipcMain.handle(
     IPC_CHANNELS.PILL_DISPLAY_MODE_SET,
-    (_, userId: string, mode: "compact" | "expanded") => {
-      localDb.setUserPreference(userId, "pillDisplayMode", mode);
+    async (_, userId: string, mode: "compact" | "expanded") => {
+      await pgDb.setUserPreference(userId, "pillDisplayMode", mode);
       const allWindows = BrowserWindow.getAllWindows();
       for (const win of allWindows) {
         if (!win.isDestroyed()) {

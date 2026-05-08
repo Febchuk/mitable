@@ -24,9 +24,9 @@ async function clearBackendAuth(): Promise<void> {
 export function registerLocalAuthHandlers() {
   ipcMain.handle(IPC_CHANNELS.LOCAL_AUTH_LIST_ACCOUNTS, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
-      return localDb.getAllLocalAccounts();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
+      return await pgDb.getAllLocalAccounts();
     } catch {
       return [];
     }
@@ -36,10 +36,10 @@ export function registerLocalAuthHandlers() {
     IPC_CHANNELS.LOCAL_AUTH_CREATE,
     async (_, data: { email: string; password: string; firstName: string; lastName: string }) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) await localDb.tryOpen();
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-        const existing = localDb.getLocalAccountByEmail(data.email);
+        const existing = await pgDb.getLocalAccountByEmail(data.email);
         if (existing) {
           return { success: false, error: "An account with this email already exists" };
         }
@@ -48,7 +48,7 @@ export function registerLocalAuthHandlers() {
         const passwordHash = await bcrypt.hash(data.password, 10);
         const userId = randomUUID();
 
-        localDb.createLocalAccount({
+        await pgDb.createLocalAccount({
           id: userId,
           email: data.email.toLowerCase().trim(),
           passwordHash,
@@ -56,7 +56,7 @@ export function registerLocalAuthHandlers() {
           lastName: data.lastName.trim(),
         });
 
-        localDb.setUserPreference("system", "activeLocalUserId", userId);
+        await pgDb.setUserPreference("system", "activeLocalUserId", userId);
         await clearBackendAuth();
 
         return { success: true, userId };
@@ -68,10 +68,10 @@ export function registerLocalAuthHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AUTH_LOGIN, async (_, email: string, password: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      const account = localDb.getLocalAccountByEmail(email.toLowerCase().trim());
+      const account = await pgDb.getLocalAccountByEmail(email.toLowerCase().trim());
       if (!account) {
         return { success: false, error: "No account found with this email" };
       }
@@ -82,7 +82,7 @@ export function registerLocalAuthHandlers() {
         return { success: false, error: "Incorrect password" };
       }
 
-      localDb.setUserPreference("system", "activeLocalUserId", account.id);
+      await pgDb.setUserPreference("system", "activeLocalUserId", account.id);
       await clearBackendAuth();
 
       return {
@@ -98,9 +98,9 @@ export function registerLocalAuthHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AUTH_LOGOUT, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (localDb.isAvailable()) {
-        localDb.setUserPreference("system", "activeLocalUserId", "");
+      const { pgDb } = await import("../../services/on-device");
+      if (pgDb.isAvailable()) {
+        await pgDb.setUserPreference("system", "activeLocalUserId", "");
       }
       const { ctx } = await import("../context");
       ctx.currentUserContext = null;
@@ -111,13 +111,13 @@ export function registerLocalAuthHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AUTH_GET_USER, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return null;
 
-      return localDb.getLocalAccountById(activeId);
+      return await pgDb.getLocalAccountById(activeId);
     } catch {
       return null;
     }
@@ -125,10 +125,10 @@ export function registerLocalAuthHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AUTH_HAS_ACCOUNT, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      return localDb.getAnyLocalAccount() !== null;
+      return (await pgDb.getAnyLocalAccount()) !== null;
     } catch {
       return false;
     }
@@ -138,10 +138,10 @@ export function registerLocalAuthHandlers() {
     IPC_CHANNELS.LOCAL_AUTH_RESET_PASSWORD,
     async (_, email: string, oldPassword: string, newPassword: string) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) await localDb.tryOpen();
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-        const account = localDb.getLocalAccountByEmail(email.toLowerCase().trim());
+        const account = await pgDb.getLocalAccountByEmail(email.toLowerCase().trim());
         if (!account) {
           return { success: false, error: "No account found with this email" };
         }
@@ -153,7 +153,7 @@ export function registerLocalAuthHandlers() {
         }
 
         const newHash = await bcrypt.hash(newPassword, 10);
-        localDb.updateLocalAccountPassword(account.id, newHash);
+        await pgDb.updateLocalAccountPassword(account.id, newHash);
 
         return { success: true };
       } catch (err) {

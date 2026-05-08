@@ -225,20 +225,23 @@ class MonitoringSessionService {
       // Start local inference service if on-device AI is active for this session
       if (localMode) {
         try {
-          const { localInferenceService, localDb, hybridInferenceService } =
+          const { localInferenceService, pgDb, hybridInferenceService } =
             await import("./on-device");
           localInferenceService.start(sessionId);
 
-          // Write session row to local SQLite (mirrors Supabase monitoring_sessions)
-          localDb.insertMonitoringSession({
+          // Write session row to local PGlite (mirrors monitoring_sessions schema)
+          await pgDb.insertMonitoringSession({
             id: sessionId,
             organizationId: config.organizationId,
             userId: config.userId,
             name: config.name,
             sessionGoal: config.sessionGoal,
-            captureIntervalMs: config.captureIntervalMs,
-            selectedWindows: JSON.stringify(initialWindows),
+            sessionType: "focused",
+            status: "active",
             startedAt,
+            endedAt: null,
+            totalPausedMs: 0,
+            finalSummary: null,
           });
 
           // Create block.md file NOW at session start (so transcripts can append during session)
@@ -430,11 +433,8 @@ class MonitoringSessionService {
       this.broadcastSessionUpdate();
 
       try {
-        const { localDb } = await import("./on-device");
-        localDb.updateMonitoringSessionStatus(sessionId, "summarizing", {
-          endedAt: Date.now(),
-          totalPausedMs: this.activeSession.totalPausedMs,
-        });
+        const { pgDb } = await import("./on-device");
+        await pgDb.updateMonitoringSessionStatus(sessionId, "paused", Date.now());
       } catch {
         /* best effort */
       }
@@ -488,14 +488,14 @@ class MonitoringSessionService {
     try {
       if (localMode) {
         try {
-          const { hybridInferenceService, localDb } = await import("./on-device");
+          const { hybridInferenceService, pgDb } = await import("./on-device");
 
           // Check user inference mode preference (for hybrid testing)
           let inferenceMode = "auto";
           try {
             const userId = this.activeSession?.config.userId;
             if (userId) {
-              inferenceMode = localDb.getUserPreference(userId, "inferenceMode") ?? "auto";
+              inferenceMode = (await pgDb.getUserPreference(userId, "inferenceMode")) ?? "auto";
             }
           } catch {
             // Default to auto
@@ -559,7 +559,7 @@ class MonitoringSessionService {
       if (localMode && !storyGenerationFailed && !tooShort) {
         try {
           const { localInferenceService } = await import("./on-device");
-          const exported = localInferenceService.exportResultsForBackend(
+          const exported = await localInferenceService.exportResultsForBackend(
             sessionId,
             activeDurationMs
           );
@@ -589,14 +589,19 @@ class MonitoringSessionService {
       await checkpointService.endSession();
       await localFrameStorage.endSession(sessionId, []);
 
-      // Mark session as "ready" in local SQLite
+      // Mark session as "ready" in local PGlite
       if (localMode) {
         try {
-          const { localDb: db } = await import("./on-device");
-          const story = db.getStoryForSession(sessionId);
-          db.updateMonitoringSessionStatus(sessionId, storyGenerationFailed ? "ended" : "ready", {
-            finalSummary: story?.narrative ?? null,
-          });
+          const { pgDb: db } = await import("./on-device");
+          const story = await db.getStoryForSession(sessionId);
+          await db.updateMonitoringSessionStatus(
+            sessionId,
+            storyGenerationFailed ? "ended" : "ended",
+            story ? Date.now() : undefined
+          );
+          if (story?.narrative) {
+            await db.updateMonitoringSessionSummary(sessionId, story.narrative);
+          }
         } catch {
           /* best effort */
         }
@@ -620,8 +625,8 @@ class MonitoringSessionService {
       if (tooShort) {
         this.cleanupSessionFiles(sessionId);
         try {
-          const { localDb } = await import("./on-device");
-          localDb.deleteMonitoringSession(sessionId);
+          const { pgDb } = await import("./on-device");
+          await pgDb.deleteMonitoringSession(sessionId);
         } catch {
           /* best effort */
         }
@@ -892,13 +897,13 @@ class MonitoringSessionService {
         );
       }
 
-      // Store in local SQLite
-      const { localDb } = await import("./on-device");
+      // Store in local PGlite
+      const { pgDb } = await import("./on-device");
       const crypto = await import("crypto");
       for (const frame of batch) {
         const fd = result.frameDescriptions.find((d) => d.sequenceNumber === frame.sequenceNumber);
         const ev = frame.intervalEvidence;
-        localDb.insertCapture({
+        await pgDb.insertCapture({
           id: crypto.randomUUID(),
           sessionId,
           frameId: frame.frameId,
@@ -916,7 +921,7 @@ class MonitoringSessionService {
           userAction: fd?.userAction ?? null,
         });
       }
-      localDb.insertClassification({
+      await pgDb.insertClassification({
         id: crypto.randomUUID(),
         sessionId,
         batchIndex: batchIdx,

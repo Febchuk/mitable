@@ -1,5 +1,6 @@
 import { IPC_CHANNELS } from "@mitable/shared";
 import { app, session } from "electron";
+import { join } from "path";
 import { ctx } from "../context";
 import { authLogger, consoleLogger, notificationLogger, recoveryLogger } from "../loggers";
 import { initActiveWindowBridge } from "../activeWindowBridge";
@@ -46,6 +47,7 @@ export async function onAppReady(opts: AppReadyOptions): Promise<void> {
 
   if (!app.isPackaged) {
     app.setName("Mitable Dev");
+    app.setPath("userData", join(app.getPath("appData"), "@mitable-dev", "electron"));
   }
 
   // ── Analytics ─────────────────────────────────────────────────────────────

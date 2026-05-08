@@ -102,7 +102,6 @@ files:
   - "node_modules/keytar/**/*"
   - "node_modules/uiohook-napi/**/*"
   - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
-  - "node_modules/better-sqlite3/**/*"
   - "node_modules/bcryptjs/**/*"
   # Exclude everything else
   - "!src"
@@ -120,7 +119,6 @@ asarUnpack:
   - "node_modules/keytar/**/*"
   - "node_modules/uiohook-napi/**/*"
   - "node_modules/@anthropic-ai/claude-agent-sdk/**/*"
-  - "node_modules/better-sqlite3/**/*"
 
 # Build artifact configuration
 artifactName: "${productName}-${version}-${arch}.${ext}"

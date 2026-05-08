@@ -6,17 +6,17 @@
  *
  * ⚠️  MIGRATION NOTE (May 2026)
  * We are progressively moving user-scoped preferences from electron-store
- * to the local SQLite database (localDb.ts → user_preferences table).
+ * to the local PGlite database (pgDb.ts → user_preferences table).
  *
  * Already migrated:
- *   - pillDisplayMode → localDb.getUserPreference / setUserPreference
+ *   - pillDisplayMode → pgDb.getUserPreference / setUserPreference
  *
  * Deprecated (features disabled, call sites still reference these):
  *   - getUserPassiveMonitoringEnabled / setUserPassiveMonitoringEnabled
  *   - getUserAutoRecap / setUserAutoRecap
  *   - getUserNotificationFrequency / setUserNotificationFrequency
  *   - getUserNotificationPreferences
- *   - getUserPillDisplayMode / setUserPillDisplayMode (superseded by SQLite)
+ *   - getUserPillDisplayMode / setUserPillDisplayMode (superseded by PGlite)
  *
  * Still actively needed here:
  *   - Theme (getTheme / setTheme)

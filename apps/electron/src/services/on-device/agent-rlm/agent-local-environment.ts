@@ -1,12 +1,12 @@
 /**
  * Agent Local Environment
  *
- * Local SQLite-backed data access layer for the on-device Agent RLM.
+ * PGlite-backed data access layer for the on-device Agent RLM.
  * Replaces AgentQueryEnvironment (which uses Postgres backend).
  */
 
 import { promises as fs } from "fs";
-import { localDb } from "../localDb";
+import { pgDb } from "../pgDb";
 
 const MAX_BLOCK_MD_CHARS = 15_000;
 
@@ -23,9 +23,8 @@ export class AgentLocalEnvironment {
     const startMs = start.getTime();
     const endMs = end.getTime();
 
-    const sessions = localDb
-      .getAllSessionsByDateRange(startMs, endMs)
-      .filter((s) => s.userId === this.userId);
+    const allSessions = await pgDb.getAllSessionsByDateRange(startMs, endMs);
+    const sessions = allSessions.filter((s) => s.userId === this.userId);
 
     const result: Array<{
       id: string;
@@ -39,7 +38,7 @@ export class AgentLocalEnvironment {
     }> = [];
 
     for (const session of sessions) {
-      const story = localDb.getStoryForSession(session.id);
+      const story = await pgDb.getStoryForSession(session.id);
       const durationMs =
         (session.endedAt ?? Date.now()) - session.startedAt - (session.totalPausedMs ?? 0);
 
@@ -65,11 +64,11 @@ export class AgentLocalEnvironment {
 
   async getActivityDetail(id: string, type: "block" | "session" | "document") {
     if (type === "session" || type === "block") {
-      const session = localDb.getMonitoringSession(id);
+      const session = await pgDb.getMonitoringSession(id);
       if (!session) return { error: "Session not found" };
 
       // Try reading the block.md file — it has everything: summary, frame descriptions, transcripts
-      const exportPath = localDb.getExportPath(id);
+      const exportPath = await pgDb.getExportPath(id);
       if (exportPath) {
         try {
           let content = await fs.readFile(exportPath, "utf-8");
@@ -90,9 +89,9 @@ export class AgentLocalEnvironment {
       }
 
       // Fallback: assemble from DB tables
-      const story = localDb.getStoryForSession(id);
-      const captures = localDb.getCapturesForSession(id);
-      const transcriptions = localDb.getTranscriptionsForSession(id);
+      const story = await pgDb.getStoryForSession(id);
+      const captures = await pgDb.getCapturesForSession(id);
+      const transcriptions = await pgDb.getTranscriptionsForSession(id);
 
       const appCounts = new Map<string, number>();
       for (const cap of captures) {
@@ -130,7 +129,7 @@ export class AgentLocalEnvironment {
   }
 
   async searchDocuments(query: string, limit?: number) {
-    const chunks = localDb.searchDocChunks(query, this.userId, limit || 10);
+    const chunks = await pgDb.searchDocChunks(query, this.userId, limit || 10);
     if (chunks.length === 0) {
       return { results: [], message: "No matching document content found." };
     }
@@ -146,7 +145,7 @@ export class AgentLocalEnvironment {
   }
 
   async listDocuments() {
-    const docs = localDb.listDocuments(this.userId);
+    const docs = await pgDb.listDocuments(this.userId);
     return {
       documents: docs.map((d) => ({
         id: d.id,

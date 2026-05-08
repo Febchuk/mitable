@@ -58,7 +58,7 @@ importers:
         version: 10.1.0
       drizzle-orm:
         specifier: ^0.44.6
-        version: 0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
+        version: 0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
@@ -154,10 +154,10 @@ importers:
         version: 16.6.1
       drizzle-orm:
         specifier: ^0.44.6
-        version: 0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
+        version: 0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
       drizzle-zod:
         specifier: ^0.8.3
-        version: 0.8.3(drizzle-orm@0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1))(zod@3.25.76)
+        version: 0.8.3(drizzle-orm@0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1))(zod@3.25.76)
       express:
         specifier: ^4.18.3
         version: 4.22.1
@@ -303,7 +303,7 @@ importers:
         version: 0.31.10
       drizzle-seed:
         specifier: ^0.3.1
-        version: 0.3.1(drizzle-orm@0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1))
+        version: 0.3.1(drizzle-orm@0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1))
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
@@ -346,6 +346,9 @@ importers:
       "@deepgram/sdk":
         specifier: ^4.11.3
         version: 4.11.3(encoding@0.1.13)
+      "@electric-sql/pglite":
+        specifier: ^0.4.5
+        version: 0.4.5
       "@emoji-mart/data":
         specifier: ^1.2.1
         version: 1.2.1
@@ -544,9 +547,6 @@ importers:
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
-      better-sqlite3:
-        specifier: ^12.9.0
-        version: 12.9.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -685,9 +685,6 @@ importers:
       remark-math:
         specifier: ^6.0.0
         version: 6.0.0
-      sherpa-onnx:
-        specifier: ^1.12.37
-        version: 1.12.37
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -752,9 +749,6 @@ importers:
       "@types/bcryptjs":
         specifier: ^3.0.0
         version: 3.0.0
-      "@types/better-sqlite3":
-        specifier: ^7.6.13
-        version: 7.6.13
       "@types/keytar":
         specifier: ^4.4.0
         version: 4.4.2
@@ -815,9 +809,6 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
-      sql.js:
-        specifier: ^1.14.1
-        version: 1.14.1
       tailwindcss:
         specifier: ^3.4.1
         version: 3.4.19(tsx@4.21.0)(yaml@2.8.4)
@@ -2507,6 +2498,12 @@ packages:
       }
     peerDependencies:
       effect: ^3.17.7
+
+  "@electric-sql/pglite@0.4.5":
+    resolution:
+      {
+        integrity: sha512-aGG2zGEyZzGWKy8P+9ZoNUV0jxt1+hgbeTf+bVAYyxVZZLXg3/9aFlfLxb08AYZVAfAkQlQIysmWjhc5hwDG8g==,
+      }
 
   "@electron/asar@3.4.1":
     resolution:
@@ -16640,7 +16637,6 @@ packages:
         integrity: sha512-1ZeUwSkJ9HHLX2LdbFz3YCfzIajhgw6uVKv8ZgWz92xQ37izRYm1aQHSdGOgwwIhUC1th3COuRhW9Te+A6+rJA==,
       }
     engines: { node: ">=20" }
-    cpu: [x64, arm64]
     os: [darwin, win32]
 
   native-promise-only@0.8.1:
@@ -19184,12 +19180,6 @@ packages:
         integrity: sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==,
       }
     engines: { node: ">= 0.4" }
-
-  sherpa-onnx@1.12.37:
-    resolution:
-      {
-        integrity: sha512-3luwSdHwR8BtJiiFwqHfb15FE2FX0KsN4aOBbfq9Ma23r3w9C3bprFc/WBusXk56nUbzcEN5YczN7t9w1JwdtQ==,
-      }
 
   side-channel-list@1.0.1:
     resolution:
@@ -23071,6 +23061,8 @@ snapshots:
       find-my-way-ts: 0.1.6
       msgpackr: 1.11.12
       multipasta: 0.2.7
+
+  "@electric-sql/pglite@0.4.5": {}
 
   "@electron/asar@3.4.1":
     dependencies:
@@ -27015,6 +27007,7 @@ snapshots:
   "@types/better-sqlite3@7.6.13":
     dependencies:
       "@types/node": 24.12.2
+    optional: true
 
   "@types/body-parser@1.19.6":
     dependencies:
@@ -28093,12 +28086,14 @@ snapshots:
     dependencies:
       bindings: 1.5.0
       prebuild-install: 7.1.3
+    optional: true
 
   binary-extensions@2.3.0: {}
 
   bindings@1.5.0:
     dependencies:
       file-uri-to-path: 1.0.0
+    optional: true
 
   bl@4.1.0:
     dependencies:
@@ -29256,8 +29251,9 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.21.0
 
-  drizzle-orm@0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1):
+  drizzle-orm@0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1):
     optionalDependencies:
+      "@electric-sql/pglite": 0.4.5
       "@opentelemetry/api": 1.9.1
       "@types/better-sqlite3": 7.6.13
       "@types/pg": 8.20.0
@@ -29265,15 +29261,15 @@ snapshots:
       pg: 8.20.0
       sql.js: 1.14.1
 
-  drizzle-seed@0.3.1(drizzle-orm@0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)):
+  drizzle-seed@0.3.1(drizzle-orm@0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)):
     dependencies:
       pure-rand: 6.1.0
     optionalDependencies:
-      drizzle-orm: 0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
+      drizzle-orm: 0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
 
-  drizzle-zod@0.8.3(drizzle-orm@0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1))(zod@3.25.76):
+  drizzle-zod@0.8.3(drizzle-orm@0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1))(zod@3.25.76):
     dependencies:
-      drizzle-orm: 0.44.7(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
+      drizzle-orm: 0.44.7(@electric-sql/pglite@0.4.5)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.9.0)(pg@8.20.0)(sql.js@1.14.1)
       zod: 3.25.76
 
   duck@0.1.12:
@@ -30135,7 +30131,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  file-uri-to-path@1.0.0: {}
+  file-uri-to-path@1.0.0:
+    optional: true
 
   filelist@1.0.6:
     dependencies:
@@ -34816,8 +34813,6 @@ snapshots:
 
   shell-quote@1.8.3: {}
 
-  sherpa-onnx@1.12.37: {}
-
   side-channel-list@1.0.1:
     dependencies:
       es-errors: 1.3.0
@@ -35019,7 +35014,8 @@ snapshots:
 
   sqids@0.3.0: {}
 
-  sql.js@1.14.1: {}
+  sql.js@1.14.1:
+    optional: true
 
   ssf@0.11.2:
     dependencies:

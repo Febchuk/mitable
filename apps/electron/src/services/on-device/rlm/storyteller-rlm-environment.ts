@@ -7,7 +7,7 @@
  */
 
 import type { CompletionFn } from "./local-rlm-engine";
-import type { LocalClassification, LocalTranscription } from "../localDb";
+import type { LocalClassification, LocalTranscription } from "../pgDb";
 
 export interface StoryTask {
   description: string;

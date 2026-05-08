@@ -1,7 +1,7 @@
 /**
  * Local Docs IPC Handlers
  *
- * File picker, parsing, chunking, FTS5 indexing, and RAG query.
+ * File picker, parsing, chunking, indexing, and RAG query.
  */
 
 import { ipcMain, dialog } from "electron";
@@ -15,9 +15,9 @@ export function registerLocalDocsHandlers() {
   // Pick a file, parse it, chunk it, index it
   ipcMain.handle(IPC_CHANNELS.LOCAL_DOCS_PICK_FILE, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
+      const { pgDb } = await import("../../services/on-device");
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return { error: "No active user" };
 
       const { isSupportedFile, getSupportedExtensions } =
@@ -45,8 +45,8 @@ export function registerLocalDocsHandlers() {
       const fileType = path.extname(filePath).toLowerCase().replace(".", "");
 
       // Insert pending document
-      if (!localDb.isAvailable()) await localDb.tryOpen();
-      localDb.insertDocument({
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
+      await pgDb.insertDocument({
         id: docId,
         userId: activeId,
         filePath,
@@ -57,6 +57,8 @@ export function registerLocalDocsHandlers() {
         chunkCount: 0,
         status: "parsing",
         error: null,
+        content: null,
+        title: null,
       });
 
       // Parse and chunk in background
@@ -64,7 +66,7 @@ export function registerLocalDocsHandlers() {
         consoleLogger.error(`[LocalDocs] Failed to process ${fileName}:`, String(err));
       });
 
-      return { document: localDb.getDocument(docId) };
+      return { document: await pgDb.getDocument(docId) };
     } catch (err) {
       return { error: String(err) };
     }
@@ -73,13 +75,13 @@ export function registerLocalDocsHandlers() {
   // List all documents for the current user
   ipcMain.handle(IPC_CHANNELS.LOCAL_DOCS_LIST, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return { documents: [] };
 
-      return { documents: localDb.listDocuments(activeId) };
+      return { documents: await pgDb.listDocuments(activeId) };
     } catch {
       return { documents: [] };
     }
@@ -88,13 +90,13 @@ export function registerLocalDocsHandlers() {
   // Delete a document
   ipcMain.handle(IPC_CHANNELS.LOCAL_DOCS_DELETE, async (_, docId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) return { error: "DB unavailable" };
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) return { error: "DB unavailable" };
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return { error: "No active user" };
 
-      const deleted = localDb.deleteDocument(docId, activeId);
+      const deleted = await pgDb.deleteDocument(docId, activeId);
       return { success: deleted };
     } catch (err) {
       return { error: String(err) };
@@ -104,10 +106,10 @@ export function registerLocalDocsHandlers() {
   // RAG query across all user's docs
   ipcMain.handle(IPC_CHANNELS.LOCAL_DOCS_QUERY, async (_, question: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return { error: "No active user" };
 
       const { queryDocs } = await import("../../services/on-device/docsRag");
@@ -121,10 +123,10 @@ export function registerLocalDocsHandlers() {
   // Get chunks for a specific document
   ipcMain.handle(IPC_CHANNELS.LOCAL_DOCS_GET_CHUNKS, async (_, docId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) return { chunks: [] };
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) return { chunks: [] };
 
-      return { chunks: localDb.getDocChunks(docId) };
+      return { chunks: await pgDb.getDocChunks(docId) };
     } catch {
       return { chunks: [] };
     }
@@ -135,10 +137,10 @@ export function registerLocalDocsHandlers() {
     IPC_CHANNELS.LOCAL_DOCS_GENERATE,
     async (_, prompt: string, sessionIds?: string[]) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) await localDb.tryOpen();
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-        const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+        const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
         if (!activeId) return { error: "No active user" };
 
         const { generateDocument } = await import("../../services/on-device/docGenerator");
@@ -146,7 +148,7 @@ export function registerLocalDocsHandlers() {
         const { content, title } = await generateDocument(prompt, sessionIds);
 
         const docId = randomUUID();
-        localDb.insertDocument({
+        await pgDb.insertDocument({
           id: docId,
           userId: activeId,
           filePath: "",
@@ -161,7 +163,7 @@ export function registerLocalDocsHandlers() {
           title,
         });
 
-        // Chunk the generated content for FTS
+        // Chunk the generated content for search
         const { chunkText } = await import("../../services/on-device/docParser");
         const chunks = chunkText(content);
         const chunkRows = chunks.map((c) => ({
@@ -172,8 +174,8 @@ export function registerLocalDocsHandlers() {
           charStart: c.charStart,
           charEnd: c.charEnd,
         }));
-        localDb.insertDocChunks(chunkRows);
-        localDb.updateDocumentStatus(docId, "ready", { chunkCount: chunks.length });
+        await pgDb.insertDocChunks(chunkRows);
+        await pgDb.updateDocumentStatus(docId, "ready", { chunkCount: chunks.length });
 
         consoleLogger.info(
           `[LocalDocs] Generated document "${title}" (${docId}), ${chunks.length} chunks`
@@ -190,10 +192,10 @@ export function registerLocalDocsHandlers() {
   // Get a single document by ID
   ipcMain.handle(IPC_CHANNELS.LOCAL_DOCS_GET, async (_, docId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      const doc = localDb.getDocument(docId);
+      const doc = await pgDb.getDocument(docId);
       if (!doc) return { error: "Document not found" };
       return { document: doc };
     } catch (err) {
@@ -206,15 +208,15 @@ export function registerLocalDocsHandlers() {
     IPC_CHANNELS.LOCAL_DOCS_UPDATE,
     async (_, docId: string, data: { content?: string; title?: string }) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) return { error: "DB unavailable" };
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) return { error: "DB unavailable" };
 
         if (data.content !== undefined) {
-          localDb.updateDocumentContent(docId, data.content, data.title);
+          await pgDb.updateDocumentContent(docId, data.content, data.title);
 
-          // Re-chunk for FTS
+          // Re-chunk for search
           const { chunkText } = await import("../../services/on-device/docParser");
-          localDb.deleteDocChunks(docId);
+          await pgDb.deleteDocChunks(docId);
 
           const chunks = chunkText(data.content);
           const chunkRows = chunks.map((c) => ({
@@ -225,12 +227,12 @@ export function registerLocalDocsHandlers() {
             charStart: c.charStart,
             charEnd: c.charEnd,
           }));
-          localDb.insertDocChunks(chunkRows);
-          localDb.updateDocumentStatus(docId, "ready", { chunkCount: chunks.length });
+          await pgDb.insertDocChunks(chunkRows);
+          await pgDb.updateDocumentStatus(docId, "ready", { chunkCount: chunks.length });
         } else if (data.title !== undefined) {
           // Title-only update: read current content to preserve it
-          const existing = localDb.getDocument(docId);
-          localDb.updateDocumentContent(docId, existing?.content ?? "", data.title);
+          const existing = await pgDb.getDocument(docId);
+          await pgDb.updateDocumentContent(docId, existing?.content ?? "", data.title);
         }
 
         return { success: true };
@@ -256,7 +258,7 @@ export function registerLocalDocsHandlers() {
 }
 
 async function processDocument(docId: string, filePath: string): Promise<void> {
-  const { localDb } = await import("../../services/on-device");
+  const { pgDb } = await import("../../services/on-device");
   const { parseDocument, chunkText } = await import("../../services/on-device/docParser");
 
   try {
@@ -273,9 +275,9 @@ async function processDocument(docId: string, filePath: string): Promise<void> {
       charEnd: c.charEnd,
     }));
 
-    localDb.insertDocChunks(chunkRows);
+    await pgDb.insertDocChunks(chunkRows);
 
-    localDb.updateDocumentStatus(docId, "ready", {
+    await pgDb.updateDocumentStatus(docId, "ready", {
       chunkCount: chunks.length,
       pageCount: parsed.pageCount,
       error: null,
@@ -285,7 +287,7 @@ async function processDocument(docId: string, filePath: string): Promise<void> {
       `[LocalDocs] Indexed ${path.basename(filePath)}: ${parsed.pageCount} pages, ${chunks.length} chunks`
     );
   } catch (err) {
-    localDb.updateDocumentStatus(docId, "error", {
+    await pgDb.updateDocumentStatus(docId, "error", {
       error: String(err),
     });
     throw err;

@@ -12,10 +12,11 @@
  */
 
 import { createLogger } from "../lib/logger";
+import { KEYCHAIN_SERVICE } from "../lib/env";
 
 const logger = createLogger("KeychainService");
 
-const SERVICE_NAME = "Mitable";
+const SERVICE_NAME = KEYCHAIN_SERVICE;
 
 // Lazy-load keytar to avoid blocking the main process at import time.
 // keytar is a native module that may take time to initialize.

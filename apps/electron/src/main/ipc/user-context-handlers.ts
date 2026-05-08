@@ -36,15 +36,18 @@ export function registerUserContextHandlers() {
       }
 
       import("../../services/on-device")
-        .then(({ localDb }) => {
-          if (!localDb.isAvailable()) return;
-          localDb.upsertOrganization({
+        .then(async ({ pgDb }) => {
+          if (!pgDb.isAvailable()) return;
+          await pgDb.upsertOrganization({
             id: user.organizationId,
             name: user.organizationName || "",
             domain: user.organizationDomain ?? null,
             settings: "{}",
+            isInternal: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
           });
-          localDb.upsertUser({
+          await pgDb.upsertUser({
             id: user.userId,
             organizationId: user.organizationId,
             email: user.email || "",
@@ -52,13 +55,23 @@ export function registerUserContextHandlers() {
             lastName: user.lastName ?? null,
             role: user.role || "member",
             avatarUrl: user.avatarUrl ?? null,
+            currentWeek: 1,
+            startDate: null,
             status: "active",
             jobTitle: user.jobTitle ?? null,
+            regularTasks: "[]",
+            regularApps: "[]",
+            additionalContext: null,
+            managerId: null,
+            teamId: null,
+            department: null,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
           });
-          authLogger.info("User identity cached to local SQLite");
+          authLogger.info("User identity cached to local PGlite");
         })
         .catch((err) => {
-          authLogger.warn("Failed to cache identity to local SQLite:", err);
+          authLogger.warn("Failed to cache identity to local PGlite:", err);
         });
 
       const refreshTok = ctx.authTokens.refreshToken ?? authManager.getRefreshToken();

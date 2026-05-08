@@ -2,7 +2,7 @@
  * Local Agent IPC Handlers
  *
  * Routes for the on-device Agent RLM: chat CRUD + the query loop.
- * All data lives in local SQLite; inference uses BYOK provider via keyVault.
+ * All data lives in local PGlite; inference uses BYOK provider via keyVault.
  */
 
 import { ipcMain, BrowserWindow } from "electron";
@@ -17,19 +17,19 @@ export function registerLocalAgentHandlers() {
     IPC_CHANNELS.LOCAL_AGENT_ASK,
     async (_, data: { message: string; conversationId?: string; timezone?: string }) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) await localDb.tryOpen();
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-        const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+        const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
         if (!activeId) return { error: "No active user" };
 
-        const account = localDb.getLocalAccountById(activeId);
+        const account = await pgDb.getLocalAccountById(activeId);
         const userName = account?.firstName || "there";
 
         // Load conversation history if continuing a chat
         let conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
         if (data.conversationId) {
-          const msgs = localDb.getAgentMessages(data.conversationId);
+          const msgs = await pgDb.getAgentMessages(data.conversationId);
           conversationHistory = msgs
             .filter((m) => m.role === "user" || m.role === "assistant")
             .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
@@ -56,13 +56,13 @@ export function registerLocalAgentHandlers() {
 
         // Auto-title the conversation from the first user message
         if (data.conversationId) {
-          const convo = localDb.getAgentConversation(data.conversationId, activeId);
+          const convo = await pgDb.getAgentConversation(data.conversationId);
           if (convo?.title === "New chat") {
             const title =
               data.message.length > 60 ? data.message.slice(0, 57) + "..." : data.message;
-            localDb.updateAgentConversationTitle(data.conversationId, activeId, title);
+            await pgDb.updateAgentConversationTitle(data.conversationId, title);
           }
-          localDb.touchAgentConversation(data.conversationId);
+          await pgDb.touchAgentConversation(data.conversationId);
         }
 
         return { response: result.response };
@@ -77,13 +77,13 @@ export function registerLocalAgentHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AGENT_LIST_CHATS, async () => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return { conversations: [] };
 
-      return { conversations: localDb.listAgentConversations(activeId) };
+      return { conversations: await pgDb.listAgentConversations(activeId) };
     } catch (err) {
       consoleLogger.error("[LocalAgent] List chats failed:", String(err));
       return { conversations: [] };
@@ -92,16 +92,16 @@ export function registerLocalAgentHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AGENT_GET_CHAT, async (_, chatId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) await localDb.tryOpen();
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return null;
 
-      const conversation = localDb.getAgentConversation(chatId, activeId);
-      if (!conversation) return null;
+      const conversation = await pgDb.getAgentConversation(chatId);
+      if (!conversation || conversation.userId !== activeId) return null;
 
-      const messages = localDb.getAgentMessages(chatId);
+      const messages = await pgDb.getAgentMessages(chatId);
       return { conversation, messages };
     } catch {
       return null;
@@ -112,15 +112,16 @@ export function registerLocalAgentHandlers() {
     IPC_CHANNELS.LOCAL_AGENT_CREATE_CHAT,
     async (_, data?: { id?: string; title?: string }) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) await localDb.tryOpen();
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) await pgDb.tryOpen();
 
-        const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+        const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
         if (!activeId) return { error: "No active user" };
 
         const id = data?.id || randomUUID();
         const title = data?.title || "New chat";
-        const conversation = localDb.createAgentConversation(id, activeId, title);
+        await pgDb.createAgentConversation({ id, userId: activeId, title });
+        const conversation = await pgDb.getAgentConversation(id);
         return { conversation };
       } catch (err) {
         return { error: String(err) };
@@ -130,13 +131,13 @@ export function registerLocalAgentHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AGENT_RENAME_CHAT, async (_, chatId: string, title: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) return { error: "DB unavailable" };
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) return { error: "DB unavailable" };
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return { error: "No active user" };
 
-      localDb.updateAgentConversationTitle(chatId, activeId, title);
+      await pgDb.updateAgentConversationTitle(chatId, title);
       return { success: true };
     } catch (err) {
       return { error: String(err) };
@@ -145,14 +146,14 @@ export function registerLocalAgentHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.LOCAL_AGENT_DELETE_CHAT, async (_, chatId: string) => {
     try {
-      const { localDb } = await import("../../services/on-device");
-      if (!localDb.isAvailable()) return { error: "DB unavailable" };
+      const { pgDb } = await import("../../services/on-device");
+      if (!pgDb.isAvailable()) return { error: "DB unavailable" };
 
-      const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (!activeId) return { error: "No active user" };
 
-      const deleted = localDb.deleteAgentConversation(chatId, activeId);
-      return { success: deleted };
+      await pgDb.deleteAgentConversation(chatId);
+      return { success: true };
     } catch (err) {
       return { error: String(err) };
     }
@@ -165,11 +166,11 @@ export function registerLocalAgentHandlers() {
       data: { conversationId: string; role: string; content: string; toolCalls?: unknown[] }
     ) => {
       try {
-        const { localDb } = await import("../../services/on-device");
-        if (!localDb.isAvailable()) return { error: "DB unavailable" };
+        const { pgDb } = await import("../../services/on-device");
+        if (!pgDb.isAvailable()) return { error: "DB unavailable" };
 
         const id = randomUUID();
-        const message = localDb.addAgentMessage(
+        const message = await pgDb.addAgentMessage(
           id,
           data.conversationId,
           data.role,

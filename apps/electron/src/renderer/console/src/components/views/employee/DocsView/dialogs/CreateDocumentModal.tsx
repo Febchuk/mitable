@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ChevronDown, Loader2, Check, ArrowUp, Layers, Paperclip } from "lucide-react";
+import { X, ChevronDown, Loader2, Check, ArrowUp, Layers, Paperclip, Settings } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useSessions } from "@/console/src/hooks/queries/monitoring";
@@ -71,6 +71,7 @@ export default function CreateDocumentModal({
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ phase: string; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
 
   const reset = useCallback(() => {
     setIsGenerating(false);
@@ -104,6 +105,7 @@ export default function CreateDocumentModal({
       setInput("");
       setSelectedSessionIds(new Set());
       setBlocksOpen(false);
+      setShowProviderModal(false);
     }
   }, [open]);
 
@@ -120,6 +122,18 @@ export default function CreateDocumentModal({
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
+
+    // Check if AI provider is configured
+    try {
+      const config = await window.consoleAPI?.loadInferenceConfig?.();
+      if (!config) {
+        setShowProviderModal(true);
+        return;
+      }
+    } catch {
+      // Allow to proceed if check fails
+    }
+
     setIsGenerating(true);
     setError(null);
     setProgress({ phase: "drafting", message: "Generating with AI..." });
@@ -165,7 +179,7 @@ export default function CreateDocumentModal({
     });
   };
 
-  const showForm = !isGenerating && !isComplete && !error;
+  const showForm = !isGenerating && !isComplete && !error && !showProviderModal;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -596,6 +610,104 @@ export default function CreateDocumentModal({
               >
                 Try again
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── AI Provider Required Modal ────────────────────────── */}
+        {showProviderModal && (
+          <div
+            style={{
+              padding: "24px 20px",
+            }}
+          >
+            <div
+              style={{
+                padding: "20px",
+                borderRadius: 12,
+                background: "var(--bg-raised)",
+                border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(var(--mi-accent-rgb), 0.12)",
+                  }}
+                >
+                  <Settings size={20} style={{ color: "var(--mi-accent)" }} />
+                </div>
+                <div>
+                  <h3
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      margin: 0,
+                    }}
+                  >
+                    AI Provider Required
+                  </h3>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "2px 0 0" }}>
+                    Add your API key to get started
+                  </p>
+                </div>
+              </div>
+              <p
+                style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}
+              >
+                Document generation needs an AI provider to work. Go to{" "}
+                <strong style={{ color: "var(--text-primary)" }}>Settings</strong> and add your API
+                key for Google, OpenAI, or Anthropic.
+              </p>
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <button
+                  onClick={() => setShowProviderModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 16px",
+                    fontSize: 13,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    color: "var(--text-secondary)",
+                    border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProviderModal(false);
+                    handleClose();
+                    navigate("/profile");
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "8px 16px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    borderRadius: 8,
+                    background: "var(--mi-accent)",
+                    color: "var(--bg-base)",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Open Settings
+                </button>
+              </div>
             </div>
           </div>
         )}

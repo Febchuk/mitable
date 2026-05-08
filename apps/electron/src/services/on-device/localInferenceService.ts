@@ -27,8 +27,9 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { createLogger } from "../../lib/logger";
+import { DOCUMENTS_FOLDER } from "../../lib/env";
 import { ollamaService } from "./ollamaService";
-import { localDb } from "./localDb";
+import { pgDb } from "./pgDb";
 import { localAudioService } from "./localAudioService";
 import { whisperCliService } from "./whisperCliService";
 import { sessionTimeline, type TranscriptSegment } from "./sessionTimeline";
@@ -194,14 +195,14 @@ class LocalInferenceService {
     emit("transcribing", 12, "Processing audio transcripts...");
 
     // Deduplicate: skip transcription if already done in a previous run
-    const existingTranscripts = localDb.getTranscriptionsForSession(sessionId);
+    const existingTranscripts = await pgDb.getTranscriptionsForSession(sessionId);
     if (existingTranscripts.length > 0) {
       logger.info(`Skipping transcription — ${existingTranscripts.length} segments already in DB`);
     } else if (hasStreamedAudio) {
       logger.info(`Using ${allTranscripts.length} streaming transcript segments`);
       for (let i = 0; i < allTranscripts.length; i++) {
         const seg = allTranscripts[i];
-        localDb.insertTranscription({
+        await pgDb.insertTranscription({
           id: randomUUID(),
           sessionId,
           chunkIndex: i,
@@ -229,8 +230,8 @@ class LocalInferenceService {
       let batchIndex = 0;
 
       // Deduplicate: determine which batches are already fully processed
-      const existingCaptures = localDb.getCapturesForSession(sessionId);
-      const existingClassifications = localDb.getClassificationsForSession(sessionId);
+      const existingCaptures = await pgDb.getCapturesForSession(sessionId);
+      const existingClassifications = await pgDb.getClassificationsForSession(sessionId);
       const processedSeqNumbers = new Set(existingCaptures.map((c) => c.sequenceNumber));
       const processedBatchIndices = new Set(existingClassifications.map((c) => c.batchIndex));
 
@@ -303,7 +304,7 @@ class LocalInferenceService {
           const frameDesc = sensorResults
             .flatMap((s) => s.frameDescriptions)
             .find((fd) => fd.sequenceNumber === frame.sequenceNumber);
-          localDb.insertCapture({
+          await pgDb.insertCapture({
             id: randomUUID(),
             sessionId: frame.sessionId,
             frameId: frame.frameId,
@@ -343,7 +344,7 @@ class LocalInferenceService {
 
         // 4c. Classify batch with sensor + transcript
         const chunkNarrative = await this.classifyBatch(batch, sensorResults, transcriptText);
-        localDb.insertClassification({
+        await pgDb.insertClassification({
           id: randomUUID(),
           sessionId,
           batchIndex: batchIdx,
@@ -374,7 +375,7 @@ class LocalInferenceService {
       }
 
       // ── Step 5: RLM Storyteller ──────────────────────────────────────
-      const existingStory = localDb.getStoryForSession(sessionId);
+      const existingStory = await pgDb.getStoryForSession(sessionId);
       if (existingStory) {
         logger.info("Summary already exists — skipping storyteller");
       } else {
@@ -579,7 +580,7 @@ class LocalInferenceService {
           const speaker = source === "user" ? "User" : "Remote participant";
           parts.push(`${speaker}: ${transcript}`);
 
-          localDb.insertTranscription({
+          await pgDb.insertTranscription({
             id: randomUUID(),
             sessionId,
             chunkIndex: 0,
@@ -639,12 +640,12 @@ class LocalInferenceService {
   // ── Session-end summary (RLM storyteller) ───────────────────────────────
 
   async generateSummary(sessionId: string, totalMinutes?: number): Promise<string> {
-    const classifications = localDb.getClassificationsForSession(sessionId);
-    const transcriptions = localDb.getTranscriptionsForSession(sessionId);
+    const classifications = await pgDb.getClassificationsForSession(sessionId);
+    const transcriptions = await pgDb.getTranscriptionsForSession(sessionId);
 
     if (classifications.length === 0 && transcriptions.length === 0) {
       const narrative = "No activity was recorded during this session.";
-      localDb.insertStory({
+      await pgDb.insertStory({
         id: randomUUID(),
         sessionId,
         narrative,
@@ -703,7 +704,7 @@ class LocalInferenceService {
       }
     }
 
-    localDb.insertStory({
+    await pgDb.insertStory({
       id: randomUUID(),
       sessionId,
       narrative,
@@ -712,7 +713,7 @@ class LocalInferenceService {
       modelUsed: ollamaService.getLoadedModel() ?? "gemma4",
     });
 
-    localDb.checkpoint();
+    await pgDb.checkpoint();
 
     logger.info(
       `Summary generated for session ${sessionId}: ${narrative.length} chars, ${result.iterations} iterations`
@@ -722,8 +723,11 @@ class LocalInferenceService {
 
   // ── Export for backend ──────────────────────────────────────────────────
 
-  exportResultsForBackend(sessionId: string, _activeDurationMs: number): OnDeviceSummary | null {
-    const story = localDb.getStoryForSession(sessionId);
+  async exportResultsForBackend(
+    sessionId: string,
+    _activeDurationMs: number
+  ): Promise<OnDeviceSummary | null> {
+    const story = await pgDb.getStoryForSession(sessionId);
     if (!story) return null;
 
     return {
@@ -754,10 +758,10 @@ class LocalInferenceService {
 
       let userFolder = "";
       try {
-        const activeId = localDb.getUserPreference("system", "activeLocalUserId");
+        const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
         logger.info(`[BlockPath] activeLocalUserId = ${activeId || "(empty)"}`);
         if (activeId) {
-          const account = localDb.getLocalAccountById(activeId);
+          const account = await pgDb.getLocalAccountById(activeId);
           logger.info(`[BlockPath] account email = ${account?.email || "(not found)"}`);
           if (account?.email) {
             userFolder = account.email.replace(/[<>:"/\\|?*]/g, "_");
@@ -767,7 +771,7 @@ class LocalInferenceService {
         logger.warn("[BlockPath] Failed to resolve user folder:", String(err));
       }
 
-      const baseParts = ["Mitable"];
+      const baseParts = [DOCUMENTS_FOLDER];
       if (userFolder) baseParts.push(userFolder);
       baseParts.push("blockdata", dayFolder);
       const dayDir = join(docsDir, ...baseParts);
@@ -814,7 +818,7 @@ class LocalInferenceService {
 
       this.currentMdPath = mdFilePath;
       this.exportPaths.set(sessionId, mdFilePath);
-      localDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
+      await pgDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
 
       logger.info(`Streaming .md created: ${mdFilePath}`);
       return mdFilePath;
@@ -920,7 +924,7 @@ class LocalInferenceService {
 
   private async prependSummaryToMarkdown(mdPath: string, sessionId: string): Promise<void> {
     try {
-      const story = localDb.getStoryForSession(sessionId);
+      const story = await pgDb.getStoryForSession(sessionId);
       if (!story || story.narrative.length <= 30) return;
 
       const existing = await fs.readFile(mdPath, "utf-8");
@@ -937,7 +941,7 @@ class LocalInferenceService {
       const withSummary = `${before}## Summary\n\n${story.narrative}\n\n${after}`;
 
       // Also update the header with final time range
-      const captures = localDb.getCapturesForSession(sessionId);
+      const captures = await pgDb.getCapturesForSession(sessionId);
       if (captures.length > 0) {
         const endTime = new Date(captures[captures.length - 1].capturedAt).toLocaleTimeString(
           "en-US",

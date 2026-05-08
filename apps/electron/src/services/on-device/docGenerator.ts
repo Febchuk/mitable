@@ -10,7 +10,7 @@ import { readFile } from "fs/promises";
 import { keyVault } from "./keyVault";
 import { createProvider } from "./providers";
 import type { ChatMessage } from "./providers";
-import { localDb } from "./index";
+import { pgDb } from "./pgDb";
 import { consoleLogger } from "../../main/loggers";
 
 const MAX_CONTEXT_CHARS = 40_000;
@@ -34,7 +34,7 @@ async function gatherSessionContext(sessionIds: string[]): Promise<string> {
   for (const sid of sessionIds) {
     if (totalChars >= MAX_CONTEXT_CHARS) break;
 
-    const exportPath = localDb.getExportPath(sid);
+    const exportPath = await pgDb.getExportPath(sid);
     if (exportPath) {
       try {
         const raw = await readFile(exportPath, "utf-8");
@@ -48,7 +48,7 @@ async function gatherSessionContext(sessionIds: string[]): Promise<string> {
       }
     }
 
-    const session = localDb.getMonitoringSession(sid);
+    const session = await pgDb.getMonitoringSession(sid);
     if (session) {
       const snippet = JSON.stringify({
         name: session.name,

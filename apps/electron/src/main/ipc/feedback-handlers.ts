@@ -298,10 +298,10 @@ export function registerFeedbackHandlers() {
 
       const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      // 1. Persist to local SQLite (always succeeds if DB is up)
+      // 1. Persist to local PGlite (always succeeds if DB is up)
       try {
-        const { localDb } = await import("../../services/on-device/localDb");
-        localDb.insertFeedback({
+        const { pgDb } = await import("../../services/on-device/pgDb");
+        await pgDb.insertFeedback({
           id: feedbackId,
           message: message.trim(),
           logAnalysis,
@@ -342,8 +342,8 @@ export function registerFeedbackHandlers() {
           if (res.ok) {
             feedbackLogger.info(`Feedback email relay succeeded for ${feedbackId}`);
             try {
-              const { localDb } = await import("../../services/on-device/localDb");
-              localDb.markFeedbackEmailSent(feedbackId);
+              const { pgDb } = await import("../../services/on-device/pgDb");
+              await pgDb.markFeedbackEmailSent(feedbackId);
             } catch {
               /* best-effort DB update */
             }
