@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { AppBootstrap } from "@/components/app/AppBootstrap";
 import { UserMenu } from "@/components/app/UserMenu";
-import { MontessoriBottomNav } from "@/components/montessori/bottom-nav";
 import { InstallBanner } from "@/components/montessori/install-banner";
-import { MobileTopRight } from "@/components/montessori/mobile-controls";
+import { MontessoriMobileShell } from "@/components/montessori/mobile-shell";
 import { ToastHost } from "@/components/montessori/primitives";
 import { MontessoriSidebar } from "@/components/montessori/sidebar";
 import { MontessoriProvider } from "@/components/montessori/store";
@@ -42,6 +41,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             position: "relative",
           }}
         >
+          <MontessoriMobileShell
+            variant="admin"
+            firstName={ctx.firstName}
+            email={ctx.email}
+            schoolName={ctx.schoolName ?? "School"}
+            schoolSubtitle="Admin workspace"
+            classroomId={null}
+            schoolId={ctx.schoolId}
+            userId={ctx.userId}
+          />
           <main
             className="scroll-quiet"
             style={{
@@ -50,14 +59,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               paddingBottom: 96,
             }}
           >
-            <MobileTopRight>
-              <UserMenu email={ctx.email} />
-            </MobileTopRight>
             {children}
           </main>
         </div>
       </div>
-      <MontessoriBottomNav variant="admin" />
       <ToastHost />
       <InstallBanner />
       <AppBootstrap />

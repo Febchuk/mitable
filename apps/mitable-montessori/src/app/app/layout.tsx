@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import { AppBootstrap } from "@/components/app/AppBootstrap";
 import { UserMenu } from "@/components/app/UserMenu";
-import { MontessoriBottomNav } from "@/components/montessori/bottom-nav";
 import { ChatDock } from "@/components/montessori/chat-dock";
 import { InstallBanner } from "@/components/montessori/install-banner";
-import { MobileTopRight } from "@/components/montessori/mobile-controls";
+import { MontessoriMobileShell } from "@/components/montessori/mobile-shell";
 import { ToastHost } from "@/components/montessori/primitives";
 import { MontessoriSidebar } from "@/components/montessori/sidebar";
 import { MontessoriProvider } from "@/components/montessori/store";
@@ -53,6 +52,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             position: "relative",
           }}
         >
+          <MontessoriMobileShell
+            variant={isAdmin ? "admin" : "teacher"}
+            firstName={ctx.firstName}
+            email={ctx.email}
+            schoolName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
+            schoolSubtitle={isAdmin ? "Admin workspace" : undefined}
+            classroomId={isAdmin ? null : (classroom?.id ?? null)}
+            classroomName={classroomName}
+            schoolId={ctx.schoolId}
+            userId={ctx.userId}
+          />
           <main
             className="scroll-quiet"
             style={{
@@ -61,14 +71,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               paddingBottom: 96,
             }}
           >
-            <MobileTopRight>
-              <UserMenu email={ctx.email} />
-            </MobileTopRight>
             {children}
           </main>
         </div>
       </div>
-      <MontessoriBottomNav variant={isAdmin ? "admin" : "teacher"} />
       {!isAdmin && (
         <ChatDock
           classroomId={classroom?.id ?? null}
