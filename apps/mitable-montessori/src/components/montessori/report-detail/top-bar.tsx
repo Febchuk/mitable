@@ -2,24 +2,26 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, FileText, Trash2 } from "lucide-react";
+import { ArrowRight, Check, FileText, Mail, Send, Trash2 } from "lucide-react";
 import type { Tone } from "../data";
 import { initialsFor } from "../data";
 
-type ReportStatus = "draft" | "review" | "sent";
+type ReportStatus = "draft" | "review" | "approved" | "sent";
 type ChildLike = { name: string; tone: Tone };
-import { Avatar, ToastBus } from "../primitives";
+import { Avatar } from "../primitives";
 import { ChevLeft } from "../child-detail/icons";
 
 const STATUS_LABEL: Record<ReportStatus, string> = {
   draft: "Draft",
-  review: "Submitted for review",
-  sent: "Approved · sent",
+  review: "Awaiting review",
+  approved: "Approved",
+  sent: "Sent to parents",
 };
 
 const STATUS_CLASS: Record<ReportStatus, string> = {
   draft: "rd-pill-draft",
   review: "rd-pill-submitted",
+  approved: "rd-pill-approved",
   sent: "rd-pill-approved",
 };
 
@@ -32,6 +34,12 @@ export function ReportTopBar({
   savedMeta,
   savedMetaDirty = false,
   reportsListHref = "/app/reports",
+  isAdmin = false,
+  actionBusy = false,
+  onSaveDraft,
+  onSubmitForReview,
+  onApprove,
+  onSendToParents,
   onDeleteClick,
 }: {
   child: ChildLike | undefined;
@@ -41,17 +49,17 @@ export function ReportTopBar({
   classroom?: string;
   savedMeta: string;
   savedMetaDirty?: boolean;
-  /** Back link target — `/admin/reports` on admin report detail. */
   reportsListHref?: string;
-  /** Opens delete confirmation (parent owns dialog). */
+  isAdmin?: boolean;
+  actionBusy?: boolean;
+  onSaveDraft?: () => void;
+  onSubmitForReview?: () => void;
+  onApprove?: () => void;
+  onSendToParents?: () => void;
   onDeleteClick?: () => void;
 }) {
   const displayName = child?.name ?? "Report";
   const headingTitle = child ? `${kind} report — ${child.name.split(" ")[0]}` : `${kind} report`;
-
-  const onSaveDraft = () =>
-    ToastBus.push({ message: "Saving drafts isn't wired up yet — coming soon." });
-  const onSubmit = () => ToastBus.push({ message: "Submitting for review is coming soon." });
 
   return (
     <div className="rd-page-header">
@@ -98,27 +106,166 @@ export function ReportTopBar({
         </div>
 
         <div className="rd-page-header-actions">
-          <button type="button" className="rd-btn rd-btn-secondary" onClick={onSaveDraft}>
-            <FileText size={14} strokeWidth={2} />
-            Save draft
-          </button>
-          <button type="button" className="rd-btn rd-btn-primary" onClick={onSubmit}>
-            Submit for review
-            <ArrowRight size={13} strokeWidth={2.5} />
-          </button>
-          {onDeleteClick ? (
-            <button
-              type="button"
-              className="rd-btn rd-btn-danger-ghost"
-              onClick={onDeleteClick}
-              aria-label="Delete report"
-            >
-              <Trash2 size={14} strokeWidth={2} />
-              Delete
-            </button>
-          ) : null}
+          <TopBarActions
+            status={status}
+            isAdmin={isAdmin}
+            actionBusy={actionBusy}
+            onSaveDraft={onSaveDraft}
+            onSubmitForReview={onSubmitForReview}
+            onApprove={onApprove}
+            onSendToParents={onSendToParents}
+            onDeleteClick={onDeleteClick}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function TopBarActions({
+  status,
+  isAdmin,
+  actionBusy,
+  onSaveDraft,
+  onSubmitForReview,
+  onApprove,
+  onSendToParents,
+  onDeleteClick,
+}: {
+  status: ReportStatus;
+  isAdmin: boolean;
+  actionBusy: boolean;
+  onSaveDraft?: () => void;
+  onSubmitForReview?: () => void;
+  onApprove?: () => void;
+  onSendToParents?: () => void;
+  onDeleteClick?: () => void;
+}) {
+  if (status === "sent") {
+    return (
+      <>
+        <span className="rd-btn rd-btn-secondary" style={{ cursor: "default", opacity: 0.7 }}>
+          <Mail size={14} strokeWidth={2} />
+          Sent to parents
+        </span>
+        {onDeleteClick && (
+          <button
+            type="button"
+            className="rd-btn rd-btn-danger-ghost"
+            onClick={onDeleteClick}
+            aria-label="Delete report"
+          >
+            <Trash2 size={14} strokeWidth={2} />
+            Delete
+          </button>
+        )}
+      </>
+    );
+  }
+
+  if (status === "approved" && isAdmin) {
+    return (
+      <>
+        <button
+          type="button"
+          className="rd-btn rd-btn-primary"
+          disabled={actionBusy}
+          onClick={onSendToParents}
+        >
+          {actionBusy ? (
+            "Sending…"
+          ) : (
+            <>
+              <Send size={13} strokeWidth={2.5} /> Send to parents
+            </>
+          )}
+        </button>
+        {onDeleteClick && (
+          <button
+            type="button"
+            className="rd-btn rd-btn-danger-ghost"
+            disabled={actionBusy}
+            onClick={onDeleteClick}
+            aria-label="Delete report"
+          >
+            <Trash2 size={14} strokeWidth={2} />
+            Delete
+          </button>
+        )}
+      </>
+    );
+  }
+
+  if (status === "review" && isAdmin) {
+    return (
+      <>
+        <button
+          type="button"
+          className="rd-btn rd-btn-primary"
+          disabled={actionBusy}
+          onClick={onApprove}
+        >
+          {actionBusy ? (
+            "Approving…"
+          ) : (
+            <>
+              <Check size={13} strokeWidth={2.5} /> Approve
+            </>
+          )}
+        </button>
+        {onDeleteClick && (
+          <button
+            type="button"
+            className="rd-btn rd-btn-danger-ghost"
+            disabled={actionBusy}
+            onClick={onDeleteClick}
+            aria-label="Delete report"
+          >
+            <Trash2 size={14} strokeWidth={2} />
+            Delete
+          </button>
+        )}
+      </>
+    );
+  }
+
+  // draft or changes_requested — teacher actions
+  return (
+    <>
+      {onSaveDraft && (
+        <button type="button" className="rd-btn rd-btn-secondary" onClick={onSaveDraft}>
+          <FileText size={14} strokeWidth={2} />
+          Save draft
+        </button>
+      )}
+      {onSubmitForReview && (
+        <button
+          type="button"
+          className="rd-btn rd-btn-primary"
+          disabled={actionBusy}
+          onClick={onSubmitForReview}
+        >
+          {actionBusy ? (
+            "Submitting…"
+          ) : (
+            <>
+              <ArrowRight size={13} strokeWidth={2.5} /> Submit for review
+            </>
+          )}
+        </button>
+      )}
+      {onDeleteClick && (
+        <button
+          type="button"
+          className="rd-btn rd-btn-danger-ghost"
+          disabled={actionBusy}
+          onClick={onDeleteClick}
+          aria-label="Delete report"
+        >
+          <Trash2 size={14} strokeWidth={2} />
+          Delete
+        </button>
+      )}
+    </>
   );
 }

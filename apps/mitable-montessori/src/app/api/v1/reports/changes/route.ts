@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auditLog } from "@/lib/audit/log";
 import { requireUser } from "@/lib/api/auth";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { RequestReportChangesSchema } from "@/lib/schemas/report";
 import { requestReportChanges, WorkflowError } from "@/lib/reports/workflow";
 
@@ -14,8 +13,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
   try {
     await requestReportChanges(
       {

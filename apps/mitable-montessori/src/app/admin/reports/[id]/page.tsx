@@ -10,5 +10,5 @@ export default async function AdminReportDetailPage({
   const { id } = await params;
   const report = await getReport(id);
   if (!report) notFound();
-  return <ReportDetail report={report} backToReportsHref="/admin/reports" />;
+  return <ReportDetail report={report} backToReportsHref="/admin/reports" isAdmin />;
 }

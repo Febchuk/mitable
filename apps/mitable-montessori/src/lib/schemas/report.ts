@@ -128,4 +128,5 @@ export const ApproveReportSchema = z.object({
 export const SendReportSchema = z.object({
   reportId: z.string().uuid(),
   guardianRefs: z.array(z.string().uuid()).min(1).max(10),
+  messageBody: z.string().max(2000).optional(),
 });

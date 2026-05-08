@@ -134,10 +134,12 @@ function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail 
 export function ReportDetail({
   report,
   backToReportsHref = "/app/reports",
+  isAdmin = false,
 }: {
   report: ReportDetailRow;
   /** Where "All reports" and post-delete navigation go (`/admin/reports` for admin). */
   backToReportsHref?: string;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const locale = useUiLocale();
@@ -537,6 +539,9 @@ export function ReportDetail({
     locale,
   ]);
 
+  const [actionBusy, setActionBusy] = React.useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
+
   const savedMeta = isSaving
     ? SAVING_LABEL
     : isDrafting
@@ -545,16 +550,63 @@ export function ReportDetail({
         ? DIRTY_LABEL
         : detail.savedMeta;
 
-  // Map DB status onto the topbar's narrower vocabulary.
   const topbarStatus =
-    report.status === "sent" || report.status === "approved"
+    report.status === "sent"
       ? "sent"
-      : report.status === "draft"
-        ? "draft"
-        : "review";
+      : report.status === "approved"
+        ? "approved"
+        : report.status === "draft" || report.status === "changes_requested"
+          ? "draft"
+          : "review";
 
   const topbarKind =
     report.reportType === "daily" ? "Daily" : report.reportType === "major" ? "Major" : "Incident";
+
+  const handleSubmitForReview = React.useCallback(async () => {
+    setActionBusy(true);
+    try {
+      const res = await fetch("/api/v1/reports/submit", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reportId: report.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        ToastBus.push({ message: data.error || "Couldn't submit for review." });
+        return;
+      }
+      ToastBus.push({ message: "Report submitted for review." });
+      router.refresh();
+    } finally {
+      setActionBusy(false);
+    }
+  }, [report.id, router]);
+
+  const handleApprove = React.useCallback(async () => {
+    setActionBusy(true);
+    try {
+      const res = await fetch("/api/v1/reports/approve", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reportId: report.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        ToastBus.push({ message: data.error || "Couldn't approve this report." });
+        return;
+      }
+      ToastBus.push({ message: "Report approved." });
+      router.refresh();
+    } finally {
+      setActionBusy(false);
+    }
+  }, [report.id, router]);
+
+  const handleSendToParents = React.useCallback(() => {
+    setSendDialogOpen(true);
+  }, []);
 
   return (
     <>
@@ -568,6 +620,22 @@ export function ReportDetail({
           savedMeta={savedMeta}
           savedMetaDirty={isDirty || isDrafting || isSaving}
           reportsListHref={backToReportsHref}
+          isAdmin={isAdmin}
+          actionBusy={actionBusy}
+          onSaveDraft={
+            topbarStatus === "draft"
+              ? () => {
+                  const pending = pendingSaveRef.current;
+                  if (pending) void performSave(pending);
+                  else ToastBus.push({ message: "No changes to save." });
+                }
+              : undefined
+          }
+          onSubmitForReview={
+            topbarStatus === "draft" ? () => void handleSubmitForReview() : undefined
+          }
+          onApprove={topbarStatus === "review" && isAdmin ? () => void handleApprove() : undefined}
+          onSendToParents={topbarStatus === "approved" && isAdmin ? handleSendToParents : undefined}
           onDeleteClick={() => setDeleteDialogOpen(true)}
         />
         <div className="rd-workspace">
@@ -624,6 +692,243 @@ export function ReportDetail({
           </div>
         </DialogContent>
       </Dialog>
+
+      {sendDialogOpen && (
+        <SendToParentsDialog
+          reportId={report.id}
+          studentId={report.studentId}
+          studentName={report.studentName}
+          open={sendDialogOpen}
+          onOpenChange={setSendDialogOpen}
+          onSent={() => {
+            setSendDialogOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Send-to-parents dialog (two-step: recipients → message)           */
+/* ------------------------------------------------------------------ */
+
+type GuardianRow = {
+  guardianId: string;
+  name: string;
+  email: string | null;
+  relationship: string | null;
+};
+
+type SendStep = "recipients" | "message";
+
+function SendToParentsDialog({
+  reportId,
+  studentId,
+  studentName,
+  open,
+  onOpenChange,
+  onSent,
+}: {
+  reportId: string;
+  studentId: string;
+  studentName: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSent: () => void;
+}) {
+  const [step, setStep] = React.useState<SendStep>("recipients");
+  const [guardians, setGuardians] = React.useState<GuardianRow[] | null>(null);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [messageBody, setMessageBody] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    setStep("recipients");
+    setMessageBody("");
+    setError(null);
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/v1/students/${studentId}/guardians?receivesReports=true`, {
+        credentials: "include",
+      });
+      if (cancelled) return;
+      if (!res.ok) {
+        setError("Couldn't load guardians.");
+        return;
+      }
+      const data = (await res.json()) as { guardians: GuardianRow[] };
+      setGuardians(data.guardians);
+      setSelected(new Set(data.guardians.filter((g) => g.email).map((g) => g.guardianId)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, studentId]);
+
+  const toggleGuardian = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSend = async () => {
+    if (selected.size === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const sendRes = await fetch("/api/v1/reports/send", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          reportId,
+          guardianRefs: [...selected],
+          messageBody: messageBody.trim() || undefined,
+        }),
+      });
+      const sendData = (await sendRes.json().catch(() => ({}))) as { error?: string };
+      if (!sendRes.ok) {
+        setError(sendData.error || "Couldn't mark report as sent.");
+        return;
+      }
+
+      await fetch("/api/admin/reports/drain-emails", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      ToastBus.push({ message: `Report sent to ${selected.size} guardian(s).` });
+      onSent();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const eligible = guardians?.filter((g) => g.email) ?? [];
+  const firstName = studentName.split(" ")[0];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="border-ink/10 bg-canvas">
+        {step === "recipients" ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Send report to parents</DialogTitle>
+              <DialogDescription>
+                Choose which of {firstName}&apos;s guardians should receive this report by email.
+              </DialogDescription>
+            </DialogHeader>
+
+            {guardians === null && !error && (
+              <p className="py-4 text-center text-sm text-ink-secondary">Loading guardians…</p>
+            )}
+
+            {error && <p className="py-2 text-sm text-status-error">{error}</p>}
+
+            {guardians !== null && eligible.length === 0 && (
+              <p className="py-4 text-sm text-ink-secondary">
+                No guardians with email addresses are linked to this student.
+              </p>
+            )}
+
+            {eligible.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {eligible.map((g) => (
+                  <label
+                    key={g.guardianId}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-ink/10 px-3 py-2.5 transition-colors hover:bg-ink/5"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.has(g.guardianId)}
+                      onChange={() => toggleGuardian(g.guardianId)}
+                      className="size-4 accent-accent"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-ink">{g.name}</div>
+                      <div className="truncate text-xs text-ink-secondary">
+                        {g.email}
+                        {g.relationship && ` · ${g.relationship}`}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rd-btn rd-btn-secondary"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rd-btn rd-btn-primary"
+                disabled={selected.size === 0}
+                onClick={() => setStep("message")}
+              >
+                Next
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Add a note for parents</DialogTitle>
+              <DialogDescription>
+                This message will appear in the email body alongside the report PDF attachment.
+                Leave blank to send without a personal note.
+              </DialogDescription>
+            </DialogHeader>
+
+            {error && <p className="py-2 text-sm text-status-error">{error}</p>}
+
+            <div className="mt-2">
+              <textarea
+                value={messageBody}
+                onChange={(e) => setMessageBody(e.target.value)}
+                placeholder={`Hi! Here is ${firstName}'s latest report. Please don't hesitate to reach out if you have any questions.`}
+                rows={5}
+                className="w-full resize-none rounded-lg border border-ink/10 bg-transparent px-3 py-2.5 text-sm text-ink placeholder:text-ink-tertiary focus:border-accent focus:outline-none"
+              />
+              <p className="mt-1.5 text-xs text-ink-tertiary">
+                Sending to {selected.size} guardian(s). The report will be attached as a PDF.
+              </p>
+            </div>
+
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rd-btn rd-btn-secondary"
+                disabled={busy}
+                onClick={() => setStep("recipients")}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="rd-btn rd-btn-primary"
+                disabled={busy}
+                onClick={() => void handleSend()}
+              >
+                {busy ? "Sending…" : `Send to ${selected.size} guardian(s)`}
+              </button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
