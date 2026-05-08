@@ -27,7 +27,6 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { createLogger } from "../../lib/logger";
-import { DOCUMENTS_FOLDER } from "../../lib/env";
 import { ollamaService } from "./ollamaService";
 import { pgDb } from "./pgDb";
 import { localAudioService } from "./localAudioService";
@@ -77,7 +76,6 @@ interface SensorResult {
 // ── Service ─────────────────────────────────────────────────────────────────
 
 class LocalInferenceService {
-  private currentSessionId: string | null = null;
   private exportPaths = new Map<string, string>();
 
   // ── Hybrid inference entry point ────────────────────────────────────────
@@ -104,8 +102,6 @@ class LocalInferenceService {
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
   start(sessionId: string): void {
-    this.currentSessionId = sessionId;
-
     whisperCliService
       .initialize()
       .catch((err) => logger.warn("whisper-cli pre-init failed:", String(err)));
@@ -114,7 +110,6 @@ class LocalInferenceService {
   }
 
   stop(): void {
-    this.currentSessionId = null;
     logger.info("Stopped local inference");
   }
 
@@ -593,13 +588,15 @@ class LocalInferenceService {
           });
 
           logger.info(
-            `[${source}] ${engine} transcribed ${durationSec}s in ${elapsed}s: "${transcript.slice(0, 120)}..."`
+            `[${source}] whisper-cli transcribed ${durationSec}s in ${elapsed}s: "${transcript.slice(0, 120)}..."`
           );
         } else {
-          logger.info(`[${source}] ${durationSec}s audio — ${engine} returned empty (${elapsed}s)`);
+          logger.info(
+            `[${source}] ${durationSec}s audio — whisper-cli returned empty (${elapsed}s)`
+          );
         }
       } catch (err) {
-        logger.warn(`[${source}] ${engine} transcription failed:`, String(err));
+        logger.warn(`[${source}] whisper-cli transcription failed:`, String(err));
       }
     }
 
@@ -639,11 +636,19 @@ class LocalInferenceService {
 
   // ── Session-end summary (RLM storyteller) ───────────────────────────────
 
-  async generateSummary(sessionId: string, totalMinutes?: number): Promise<string> {
-    const classifications = await pgDb.getClassificationsForSession(sessionId);
-    const transcriptions = await pgDb.getTranscriptionsForSession(sessionId);
+  async generateSummary(sessionId: string, _totalMinutes?: number): Promise<string> {
+    const mdPath = this.currentMdPath;
+    let blockContent = "";
 
-    if (classifications.length === 0 && transcriptions.length === 0) {
+    if (mdPath) {
+      try {
+        blockContent = await fs.readFile(mdPath, "utf-8");
+      } catch {
+        logger.warn("Could not read block.md for storyteller");
+      }
+    }
+
+    if (blockContent.length < 100) {
       const narrative = "No activity was recorded during this session.";
       await pgDb.insertStory({
         id: randomUUID(),
@@ -663,17 +668,11 @@ class LocalInferenceService {
         format: "json",
       });
 
-    const env = new StorytellerEnvironment({
-      sessionId,
-      classifications,
-      transcriptions,
-      completionFn,
-      totalMinutes,
-    });
+    const env = new StorytellerEnvironment({ sessionId, blockContent });
 
     const result = await runRLMLoop<StorytellerEnvironment, { narrative: string }>(
       getStorytellerSystemPrompt(),
-      getStorytellerUserPrompt(classifications.length),
+      getStorytellerUserPrompt(env.metadata.totalLines),
       STORYTELLER_TOOLS,
       env,
       {
@@ -685,8 +684,7 @@ class LocalInferenceService {
       }
     );
 
-    const story = env.getFinalStory() ?? result.result;
-    let narrative = story?.narrative || "";
+    let narrative = result.result?.narrative || "";
 
     narrative = narrative
       .replace(/[",}\s]*<\/?tool_call\|?>.*$/s, "")
@@ -695,13 +693,7 @@ class LocalInferenceService {
       .trim();
 
     if (narrative.length < 30) {
-      const chunks = classifications.map((c) => c.activityDescription).filter(Boolean);
-      if (chunks.length > 0) {
-        narrative = chunks.join(" ").slice(0, 2000);
-        logger.warn("RLM narrative too short, using stitched classifications as fallback");
-      } else {
-        narrative = "Session completed.";
-      }
+      narrative = "Session completed.";
     }
 
     await pgDb.insertStory({
@@ -712,8 +704,6 @@ class LocalInferenceService {
       timeBreakdown: null,
       modelUsed: ollamaService.getLoadedModel() ?? "gemma4",
     });
-
-    await pgDb.checkpoint();
 
     logger.info(
       `Summary generated for session ${sessionId}: ${narrative.length} chars, ${result.iterations} iterations`
@@ -741,7 +731,6 @@ class LocalInferenceService {
   // ── Streaming Markdown — file grows as batches complete ──────────────────
 
   private currentMdPath: string | null = null;
-  private currentBlockNum = 0;
 
   private async initMarkdownFile(
     sessionId: string,
@@ -751,30 +740,26 @@ class LocalInferenceService {
     try {
       const { app: electronApp } = await import("electron");
       const sessionDate = new Date(sessionStartMs);
-      const monthName = sessionDate.toLocaleString("en-US", { month: "long" }).toLowerCase();
-      const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
+      const yyyy = sessionDate.getFullYear();
+      const mm = String(sessionDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(sessionDate.getDate()).padStart(2, "0");
+      const dayFolder = `${yyyy}-${mm}-${dd}`;
 
-      const docsDir = electronApp.getPath("documents");
-
-      let userFolder = "";
+      const userDataDir = electronApp.getPath("userData");
+      const parts = [userDataDir, "block_data"];
       try {
         const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
-        logger.info(`[BlockPath] activeLocalUserId = ${activeId || "(empty)"}`);
         if (activeId) {
           const account = await pgDb.getLocalAccountById(activeId);
-          logger.info(`[BlockPath] account email = ${account?.email || "(not found)"}`);
           if (account?.email) {
-            userFolder = account.email.replace(/[<>:"/\\|?*]/g, "_");
+            parts.push(account.email.replace(/[<>:"/\\|?*]/g, "_"));
           }
         }
       } catch (err) {
         logger.warn("[BlockPath] Failed to resolve user folder:", String(err));
       }
-
-      const baseParts = [DOCUMENTS_FOLDER];
-      if (userFolder) baseParts.push(userFolder);
-      baseParts.push("blockdata", dayFolder);
-      const dayDir = join(docsDir, ...baseParts);
+      parts.push(dayFolder);
+      const dayDir = join(...parts);
       await fs.mkdir(dayDir, { recursive: true });
 
       let blockNum = 1;
@@ -791,7 +776,6 @@ class LocalInferenceService {
         /* fresh directory */
       }
 
-      this.currentBlockNum = blockNum;
       const apps = [...new Set(frameMeta.map((f) => f.appName).filter(Boolean))];
       const startTime = sessionDate.toLocaleTimeString("en-US", {
         hour: "numeric",
@@ -818,7 +802,7 @@ class LocalInferenceService {
 
       this.currentMdPath = mdFilePath;
       this.exportPaths.set(sessionId, mdFilePath);
-      await pgDb.updateMonitoringSessionExportPath(sessionId, mdFilePath);
+      await pgDb.setExportPath(sessionId, mdFilePath);
 
       logger.info(`Streaming .md created: ${mdFilePath}`);
       return mdFilePath;
@@ -830,7 +814,7 @@ class LocalInferenceService {
 
   private async appendBatchToMarkdown(
     mdPath: string,
-    batchIdx: number,
+    _batchIdx: number,
     batch: BufferedFrame[],
     sensorResults: SensorResult[],
     transcripts: TranscriptSegment[],

@@ -145,7 +145,7 @@ export interface LocalMonitoringSession {
   id: string;
   userId: string;
   organizationId: string;
-  status: "active" | "paused" | "ended";
+  status: "active" | "paused" | "summarizing" | "ended" | "ready";
   sessionType: string;
   startedAt: number;
   endedAt: number | null;
@@ -1308,7 +1308,7 @@ class PgDatabase {
 
   async updateMonitoringSessionStatus(
     id: string,
-    status: "active" | "paused" | "ended",
+    status: "active" | "paused" | "summarizing" | "ended" | "ready",
     endedAt?: number
   ): Promise<void> {
     if (!db) return;
@@ -1534,7 +1534,8 @@ class PgDatabase {
     );
     const tracked = mapRows<LocalMonitoringSession>(result.rows as Record<string, unknown>[]);
 
-    // Fallback: reconstruct from captures for legacy sessions
+    // Fallback: reconstruct from captures for legacy sessions that have
+    // no monitoring_sessions row at all (pre-migration data only).
     const trackedIds = new Set(tracked.map((s) => s.id));
     const legacyResult = await db.query(
       `SELECT session_id,
@@ -1553,6 +1554,11 @@ class PgDatabase {
       last_capture: string;
     }>) {
       if (trackedIds.has(row.session_id)) continue;
+
+      // Skip if this session exists in monitoring_sessions (just outside date range)
+      const existing = await this.getMonitoringSession(row.session_id);
+      if (existing) continue;
+
       const story = await this.getStoryForSession(row.session_id);
       tracked.push({
         id: row.session_id,

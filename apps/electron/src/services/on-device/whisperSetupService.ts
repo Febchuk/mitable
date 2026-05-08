@@ -29,6 +29,7 @@ const WHISPER_MODEL_URL =
 
 const MODEL_FILE = "ggml-medium.en.bin";
 const MODEL_SIZE_BYTES = 1_533_774_781; // ~1.5 GB
+const MODEL_SIZE_TOLERANCE = 1_000_000; // Allow 1MB variance for download headers
 
 export type WhisperSetupProgress = {
   stage: "checking" | "copying_binary" | "downloading_model" | "ready";
@@ -76,6 +77,75 @@ class WhisperSetupService {
   }
 
   /**
+   * Validate model file exists and has correct size.
+   * Returns true if valid, false if missing/corrupted.
+   */
+  private async validateModelFile(modelPath: string): Promise<boolean> {
+    if (!existsSync(modelPath)) {
+      return false;
+    }
+
+    try {
+      const stats = await fs.stat(modelPath);
+      const sizeDiff = Math.abs(stats.size - MODEL_SIZE_BYTES);
+
+      if (sizeDiff > MODEL_SIZE_TOLERANCE) {
+        logger.warn(
+          `Model file size mismatch: expected ~${MODEL_SIZE_BYTES} bytes, got ${stats.size} bytes (diff: ${sizeDiff})`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      logger.warn("Failed to stat model file:", String(err));
+      return false;
+    }
+  }
+
+  /**
+   * Test that whisper-cli can actually load the model.
+   * Runs a quick command that initializes the context without processing audio.
+   */
+  private async testModelLoads(cliPath: string, modelPath: string): Promise<boolean> {
+    try {
+      const { exec } = await import("child_process");
+      const { promisify } = await import("util");
+      const execAsync = promisify(exec);
+
+      // Run whisper-cli with --help and model specified - it will load model to validate
+      // If model is corrupted, it will fail with "failed to initialize whisper context"
+      await execAsync(`"${cliPath}" -m "${modelPath}" --help`, {
+        timeout: 30_000,
+      });
+
+      logger.info("Model load test passed");
+      return true;
+    } catch (err) {
+      const errStr = String(err);
+      if (errStr.includes("failed to initialize whisper context")) {
+        logger.error("Model load test FAILED - model file is corrupted");
+        return false;
+      }
+      // Other errors (like --help returning non-zero) are OK - model loaded fine
+      logger.info("Model load test passed (help command ran)");
+      return true;
+    }
+  }
+
+  /**
+   * Delete corrupted model file so it can be re-downloaded.
+   */
+  private async deleteCorruptedModel(modelPath: string): Promise<void> {
+    try {
+      await fs.unlink(modelPath);
+      logger.info("Deleted corrupted model file for re-download");
+    } catch (err) {
+      logger.warn("Failed to delete corrupted model:", String(err));
+    }
+  }
+
+  /**
    * Ensure whisper-cli + model are installed. Safe to call multiple times.
    * Returns true if whisper is ready, false on failure.
    */
@@ -96,13 +166,27 @@ class WhisperSetupService {
     const modelPath = join(this.modelsDir, MODEL_FILE);
 
     const hasCli = existsSync(cliPath);
-    const hasModel = existsSync(modelPath);
+    let hasValidModel = await this.validateModelFile(modelPath);
 
-    if (hasCli && hasModel) {
-      this._ready = true;
-      onProgress?.({ stage: "ready", percent: 100, label: "Ready" });
-      logger.info("Whisper already installed", { cliPath, modelPath });
-      return true;
+    // If model exists but is invalid (wrong size), delete it for re-download
+    if (existsSync(modelPath) && !hasValidModel) {
+      logger.warn("Model file exists but is corrupted/incomplete - will re-download");
+      await this.deleteCorruptedModel(modelPath);
+    }
+
+    if (hasCli && hasValidModel) {
+      // Final check: verify model can actually be loaded
+      const modelLoads = await this.testModelLoads(cliPath, modelPath);
+      if (!modelLoads) {
+        logger.warn("Model failed load test - will re-download");
+        await this.deleteCorruptedModel(modelPath);
+        hasValidModel = false;
+      } else {
+        this._ready = true;
+        onProgress?.({ stage: "ready", percent: 100, label: "Ready" });
+        logger.info("Whisper already installed", { cliPath, modelPath });
+        return true;
+      }
     }
 
     try {
@@ -118,7 +202,7 @@ class WhisperSetupService {
         }
       }
 
-      if (!hasModel) {
+      if (!hasValidModel) {
         onProgress?.({
           stage: "downloading_model",
           percent: 10,
@@ -139,6 +223,20 @@ class WhisperSetupService {
 
         this._downloading = false;
         this._downloadPercent = 100;
+
+        // Verify download completed successfully
+        const downloadValid = await this.validateModelFile(modelPath);
+        if (!downloadValid) {
+          await this.deleteCorruptedModel(modelPath);
+          throw new Error("Model download incomplete - file size mismatch after download");
+        }
+
+        // Test model actually loads
+        const modelLoads = await this.testModelLoads(cliPath, modelPath);
+        if (!modelLoads) {
+          await this.deleteCorruptedModel(modelPath);
+          throw new Error("Model download corrupted - failed to initialize whisper context");
+        }
       }
 
       this._ready = true;

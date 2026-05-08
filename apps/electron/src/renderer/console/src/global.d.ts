@@ -433,6 +433,17 @@ interface ConsoleAPI {
   getBlockExportPath: (sessionId: string) => Promise<string | null>;
   getLocalCalendarDays: (startMs: number, endMs: number) => Promise<unknown[]>;
   getLocalSessionDetail: (sessionId: string) => Promise<unknown>;
+  getRecentSessions: () => Promise<
+    Array<{
+      id: string;
+      name: string | null;
+      status: string;
+      startedAt: number;
+      endedAt: number | null;
+      captureCount: number;
+      duration: number;
+    }>
+  >;
 
   // Inference mode preference (hybrid pipeline testing)
   getInferenceMode?: (userId: string) => Promise<{ mode: "auto" | "local" | "cloud" } | null>;

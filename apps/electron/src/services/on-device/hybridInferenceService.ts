@@ -14,7 +14,6 @@
  */
 
 import { createLogger } from "../../lib/logger";
-import { DOCUMENTS_FOLDER } from "../../lib/env";
 import type { BufferedFrame } from "./localInferenceService";
 import { pgDb } from "./pgDb";
 import { sessionTimeline, type TranscriptSegment } from "./sessionTimeline";
@@ -22,6 +21,13 @@ import { localAudioService } from "./localAudioService";
 import { localFrameStorage } from "../localFrameStorage";
 import { keyVault } from "./keyVault";
 import { createProvider, type InferenceProvider } from "./providers";
+import { runRLMLoop, type CompletionFn } from "./rlm/local-rlm-engine";
+import { StorytellerEnvironment } from "./rlm/storyteller-rlm-environment";
+import { STORYTELLER_TOOLS } from "./rlm/storyteller-rlm-tools";
+import {
+  getStorytellerSystemPrompt,
+  getStorytellerUserPrompt,
+} from "./rlm/storyteller-rlm-prompts";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { app } from "electron";
@@ -49,8 +55,14 @@ class HybridInferenceService {
   private sessionStartMs: number = 0;
   private provider: InferenceProvider | null = null;
 
-  private async buildBlockBaseParts(): Promise<string[]> {
-    const parts = [DOCUMENTS_FOLDER];
+  private async getBlockDataDir(sessionDate: Date): Promise<string> {
+    const userDataDir = app.getPath("userData");
+    const yyyy = sessionDate.getFullYear();
+    const mm = String(sessionDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(sessionDate.getDate()).padStart(2, "0");
+    const dayFolder = `${yyyy}-${mm}-${dd}`;
+
+    const parts = [userDataDir, "block_data"];
     try {
       const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
       if (activeId) {
@@ -62,7 +74,8 @@ class HybridInferenceService {
     } catch {
       // fallback to no user subfolder
     }
-    return parts;
+    parts.push(dayFolder);
+    return join(...parts);
   }
 
   /**
@@ -79,12 +92,7 @@ class HybridInferenceService {
 
     try {
       const sessionDate = new Date(startedAt);
-      const monthName = sessionDate.toLocaleString("en-US", { month: "long" }).toLowerCase();
-      const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
-
-      const docsDir = app.getPath("documents");
-      const baseParts = await this.buildBlockBaseParts();
-      const dayDir = join(docsDir, ...baseParts, "blockdata", dayFolder);
+      const dayDir = await this.getBlockDataDir(sessionDate);
 
       await fs.mkdir(dayDir, { recursive: true });
 
@@ -451,13 +459,13 @@ class HybridInferenceService {
         logger.info(`Batch ${batchIdx} complete: ${result.batchNarrative.slice(0, 120)}`);
       }
 
-      // Generate final summary from the complete block.md
+      // Generate final summary via storyteller RLM (iterative tool loop)
       const existingStory = await pgDb.getStoryForSession(sessionId);
       if (existingStory) {
         logger.info("Summary already exists — skipping");
       } else {
         emit("generating_summary", 85, "Writing summary...");
-        const summary = await this.summarizeBlockMd(mdPath);
+        const summary = await this.generateStorytellerSummary(sessionId);
         await pgDb.insertStory({
           id: randomUUID(),
           sessionId,
@@ -467,7 +475,6 @@ class HybridInferenceService {
           modelUsed: this.provider?.model ?? "byok",
         });
 
-        // Prepend summary to markdown
         if (mdPath) {
           await this.prependSummaryToMarkdown(mdPath, sessionId);
         }
@@ -495,38 +502,80 @@ class HybridInferenceService {
   }
 
   /**
-   * Generate final session summary by reading the complete block.md file.
+   * Generate session summary using the storyteller RLM (iterative tool loop).
+   * Reads block.md via tools, synthesizes a narrative — no sub-LLM calls.
    */
-  private async summarizeBlockMd(mdPath: string | null): Promise<string> {
+  private async generateStorytellerSummary(sessionId: string): Promise<string> {
+    if (!this.provider) {
+      logger.warn("No BYOK provider for storyteller RLM");
+      return "Session completed.";
+    }
+
+    const mdPath = this.currentMdPath;
     if (!mdPath) {
-      logger.warn("No markdown path available for summarization");
+      logger.warn("No block.md path — cannot run storyteller");
       return "Session completed.";
     }
 
     let blockContent: string;
     try {
       blockContent = await fs.readFile(mdPath, "utf-8");
-      logger.info(`Read ${blockContent.length} chars from block.md for summarization`);
+      logger.info(`Storyteller: read ${blockContent.length} chars from ${mdPath}`);
     } catch (err) {
-      logger.error("Failed to read block.md for summarization:", String(err));
+      logger.error("Failed to read block.md for storyteller:", String(err));
       return "Session completed.";
     }
 
-    const activityLogStart = blockContent.indexOf("## Detailed Activity Log");
-    const contentToSummarize =
-      activityLogStart !== -1 ? blockContent.slice(activityLogStart) : blockContent;
+    if (blockContent.length < 100) {
+      return "No activity was recorded during this session.";
+    }
 
-    const MAX_CHARS = 50_000;
-    const truncatedContent =
-      contentToSummarize.length > MAX_CHARS
-        ? contentToSummarize.slice(0, MAX_CHARS) + "\n\n... [truncated]"
-        : contentToSummarize;
+    const env = new StorytellerEnvironment({ sessionId, blockContent });
 
     logger.info(
-      `Sending ${truncatedContent.length} chars to summarizer (original: ${contentToSummarize.length})`
+      `Storyteller RLM: ${env.metadata.totalLines} lines, ${env.metadata.batchCount} batches, ${env.metadata.transcriptCount} transcripts`
     );
 
-    return this.summarizeWithProvider(truncatedContent);
+    const provider = this.provider;
+    const completionFn: CompletionFn = async (msgs, opts) => {
+      return provider.chatCompletion(
+        msgs.map((m) => ({ role: m.role, content: m.content })),
+        {
+          temperature: opts?.temperature ?? 0.2,
+          max_tokens: opts?.max_tokens ?? 2048,
+        }
+      );
+    };
+
+    const result = await runRLMLoop<StorytellerEnvironment, { narrative: string }>(
+      getStorytellerSystemPrompt(),
+      getStorytellerUserPrompt(env.metadata.totalLines),
+      STORYTELLER_TOOLS,
+      env,
+      {
+        maxIterations: 15,
+        doneResultField: "summary",
+        temperature: 0.3,
+        maxTokens: 4096,
+        completionFn,
+      }
+    );
+
+    let narrative = result.result?.narrative || "";
+
+    narrative = narrative
+      .replace(/[",}\s]*<\/?tool_call\|?>.*$/s, "")
+      .replace(/[",}\s]*\}\s*\}\s*$/, "")
+      .replace(/\\n/g, "\n")
+      .trim();
+
+    if (narrative.length < 30) {
+      logger.warn("RLM narrative too short, using block.md header as fallback");
+      narrative = "Session completed.";
+    }
+
+    logger.info(`Storyteller RLM produced ${narrative.length} char narrative`);
+    return narrative;
   }
 
   getCurrentTier(): InferenceTier | null {
@@ -569,8 +618,20 @@ class HybridInferenceService {
 Per-frame metadata:
 ${metadataLines.join("\n")}
 
-${transcriptSegments ? `Audio transcript during this period:\n${transcriptSegments}\n\n` : ""}For each frame, describe what is visible on screen (apps, files, content).
-Then, summarize what changed across all frames — what work was done, what apps were used, any significant activity.
+${transcriptSegments ? `Audio transcript during this period:\n${transcriptSegments}\n\n` : ""}For each frame, describe what you see on screen in detail. Read the CONTENT, not just the container:
+
+- VIDEO/MEDIA: Read the video title, channel name, topic. What is the content about?
+- CODE EDITOR: Read file names in tabs/sidebar, function/class names visible in code, language. Is there a terminal with errors, build output, or test results? Is there an AI chat panel (Cursor, Copilot, ChatGPT) — what's the conversation about?
+- IDE CONTEXT: What's in the file explorer? Any git diff views? What branch? What files changed?
+- MEETINGS/CALLS: Who's on the call? What app? Any shared screen, presentation, or agenda visible?
+- BROWSER: What site and page? Article titles, search queries, form content, documentation topics?
+- EMAIL/MESSAGING: Who's the conversation with? Subject line? What's being discussed?
+- ISSUE TRACKERS: Jira/Linear/GitHub issue title and number? Status?
+- DOCUMENTS: Document title, section headings, content being edited?
+
+Scale detail to richness: a static idle screen = 1 sentence. A rich IDE with code, terminal, sidebar, and chat = 3-4 sentences covering each visible element.
+
+Then write a batchNarrative summarizing WHAT was being worked on across all frames — the subject matter, not just which apps were open.
 
 Return JSON:
 {
@@ -578,7 +639,7 @@ Return JSON:
     {"sequenceNumber": 1, "description": "...", "userAction": "typing/editing/etc"},
     ...
   ],
-  "batchNarrative": "Summary of work across all frames..."
+  "batchNarrative": "Summary of what was being worked on across all frames..."
 }`;
 
     const imageContent = frames.map((frame) => ({
@@ -594,14 +655,15 @@ Return JSON:
       [
         {
           role: "system",
-          content: "You analyze screenshots from work sessions. Return valid JSON only.",
+          content:
+            "You are a detailed screen analyst. Read everything visible: text, titles, names, code, UI elements. Return valid JSON only.",
         },
         {
           role: "user",
           content: [{ type: "text", text: promptText }, ...imageContent],
         },
       ],
-      { temperature: 0.2, max_tokens: 2048, format: "json" }
+      { temperature: 0.2, max_tokens: 4096, format: "json" }
     );
 
     try {
@@ -626,30 +688,6 @@ Return JSON:
     }
   }
 
-  private async summarizeWithProvider(content: string): Promise<string> {
-    if (!this.provider) {
-      logger.warn("No BYOK provider for summarization, returning truncated content");
-      return content.slice(0, 2000);
-    }
-
-    const result = await this.provider.chatCompletion(
-      [
-        {
-          role: "system",
-          content:
-            "You are a work session summarizer. Write in FIRST PERSON from the user's perspective (e.g. 'I worked on...', 'I reviewed...', 'I discussed...'). You will receive a detailed activity log from a work session. The log contains batch summaries with timestamps, apps used, screenshots described, transcripts, and activity data. Write a concise 2-3 paragraph summary. Focus on: tasks completed, apps/tools used, key discussions or decisions, and significant work blocks.",
-        },
-        {
-          role: "user",
-          content: `Below is a detailed work session activity log. Each section covers ~2-3 minutes of activity with screenshot descriptions, transcripts, and a batch summary.\n\n${content}\n\nWrite a concise 2-3 paragraph first-person summary of what I accomplished in this session.`,
-        },
-      ],
-      { temperature: 0.3, max_tokens: 500 }
-    );
-
-    return result.trim() || "Session completed.";
-  }
-
   // ──────────────────────────────────────────────────────────────────────────
   // Markdown Export (block.md generation)
   // ──────────────────────────────────────────────────────────────────────────
@@ -661,12 +699,7 @@ Return JSON:
   ): Promise<string | null> {
     try {
       const sessionDate = new Date(sessionStartMs);
-      const monthName = sessionDate.toLocaleString("en-US", { month: "long" }).toLowerCase();
-      const dayFolder = `${monthName}_${sessionDate.getDate()}_${sessionDate.getFullYear()}`;
-
-      const docsDir = app.getPath("documents");
-      const baseParts = await this.buildBlockBaseParts();
-      const dayDir = join(docsDir, ...baseParts, "blockdata", dayFolder);
+      const dayDir = await this.getBlockDataDir(sessionDate);
       await fs.mkdir(dayDir, { recursive: true });
 
       let blockNum = 1;

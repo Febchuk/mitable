@@ -92,10 +92,17 @@ export default function DocsView() {
 
   const loadDocs = useCallback(async () => {
     try {
-      const result = await window.consoleAPI.localDocsList?.();
+      if (!window.consoleAPI?.localDocsList) {
+        console.warn("[DocsView] consoleAPI.localDocsList not available");
+        setDocuments([]);
+        setIsLoading(false);
+        return;
+      }
+      const result = await window.consoleAPI.localDocsList();
       setDocuments((result?.documents as LocalDoc[]) ?? []);
       setError(null);
     } catch (err) {
+      console.error("[DocsView] Failed to load docs:", err);
       setError(String(err));
     } finally {
       setIsLoading(false);

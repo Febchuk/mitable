@@ -1,70 +1,67 @@
 /**
  * Storyteller RLM Environment
  *
- * Holds all classifications and transcriptions for a session. The storyteller
- * peeks via tools, summarizes in chunks, and merges into a final narrative.
- * Caches intermediate chunk summaries to avoid re-processing.
+ * Holds the block.md content for a session. The storyteller reads it via
+ * tools (get_block_overview, read_block, get_transcripts) and produces
+ * a summary narrative — no sub-LLM calls needed.
  */
 
-import type { CompletionFn } from "./local-rlm-engine";
-import type { LocalClassification, LocalTranscription } from "../pgDb";
+export interface BlockMetadata {
+  totalLines: number;
+  totalChars: number;
+  batchCount: number;
+  apps: string[];
+  duration: string | null;
+  hasTranscripts: boolean;
+  transcriptCount: number;
+}
 
-export interface StoryTask {
-  description: string;
-  minutes: number;
+export interface TranscriptLine {
+  lineNumber: number;
+  text: string;
 }
 
 export class StorytellerEnvironment {
   public readonly sessionId: string;
-  public readonly classifications: LocalClassification[];
-  public readonly transcriptions: LocalTranscription[];
-  public readonly completionFn: CompletionFn;
-  public readonly totalMinutes: number;
+  public readonly lines: string[];
+  public readonly transcriptLines: TranscriptLine[];
+  public readonly metadata: BlockMetadata;
 
-  private chunkSummaryCache = new Map<string, string>();
-  private finalStory: { narrative: string; tasks: StoryTask[] } | null = null;
-
-  constructor(opts: {
-    sessionId: string;
-    classifications: LocalClassification[];
-    transcriptions: LocalTranscription[];
-    completionFn: CompletionFn;
-    totalMinutes?: number;
-  }) {
+  constructor(opts: { sessionId: string; blockContent: string }) {
     this.sessionId = opts.sessionId;
-    this.classifications = opts.classifications;
-    this.transcriptions = opts.transcriptions;
-    this.completionFn = opts.completionFn;
-    this.totalMinutes = opts.totalMinutes ?? this.computeTotalMinutes();
-  }
+    this.lines = opts.blockContent.split("\n");
 
-  private computeTotalMinutes(): number {
-    if (this.classifications.length < 2) return 1;
-    const first = this.classifications[0].createdAt;
-    const last = this.classifications[this.classifications.length - 1].createdAt;
-    return Math.max(1, Math.round((last - first) / 60_000));
-  }
+    this.transcriptLines = [];
+    for (let i = 0; i < this.lines.length; i++) {
+      if (this.lines[i].startsWith("> **Audio")) {
+        this.transcriptLines.push({ lineNumber: i + 1, text: this.lines[i] });
+      }
+    }
 
-  cacheChunkSummary(key: string, summary: string): void {
-    this.chunkSummaryCache.set(key, summary);
-  }
+    const batchHeaders = this.lines.filter((l) => l.startsWith("### "));
+    const apps = new Set<string>();
+    for (const line of this.lines) {
+      const appMatch = line.match(/\| ([A-Za-z][\w\s.]+?) \[/);
+      if (appMatch) apps.add(appMatch[1].trim());
+    }
 
-  getChunkSummary(key: string): string | undefined {
-    return this.chunkSummaryCache.get(key);
-  }
+    let duration: string | null = null;
+    for (const line of this.lines) {
+      const durMatch = line.match(/\*\*Time:\*\*\s*(.+)/);
+      if (durMatch) {
+        duration = durMatch[1].trim();
+        break;
+      }
+    }
 
-  getAllChunkSummaries(): Array<{ key: string; summary: string }> {
-    return [...this.chunkSummaryCache.entries()].map(([key, summary]) => ({
-      key,
-      summary,
-    }));
-  }
-
-  setFinalStory(story: { narrative: string; tasks: StoryTask[] }): void {
-    this.finalStory = story;
-  }
-
-  getFinalStory(): { narrative: string; tasks: StoryTask[] } | null {
-    return this.finalStory;
+    this.metadata = {
+      totalLines: this.lines.length,
+      totalChars: opts.blockContent.length,
+      batchCount: batchHeaders.length,
+      apps: [...apps],
+      duration,
+      hasTranscripts: this.transcriptLines.length > 0,
+      transcriptCount: this.transcriptLines.length,
+    };
   }
 }

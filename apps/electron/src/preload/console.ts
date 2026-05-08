@@ -997,6 +997,18 @@ contextBridge.exposeInMainWorld("consoleAPI", {
   getLocalSessionDetail: (sessionId: string): Promise<unknown> =>
     ipcRenderer.invoke("get-local-session-detail", sessionId),
 
+  getRecentSessions: (): Promise<
+    Array<{
+      id: string;
+      name: string | null;
+      status: string;
+      startedAt: number;
+      endedAt: number | null;
+      captureCount: number;
+      duration: number;
+    }>
+  > => ipcRenderer.invoke("get-recent-sessions"),
+
   // Inference mode preference (for hybrid pipeline testing)
   getInferenceMode: (userId: string): Promise<{ mode: "auto" | "local" | "cloud" } | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_MODE_GET, userId),

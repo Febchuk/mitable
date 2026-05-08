@@ -837,8 +837,10 @@ export default function ActivityBlock({
                 </>
               ) : null}
 
-              {/* AI export prompt — session blocks only */}
-              {!isMeeting && block.status === "ready" && <BlockExportPath block={block} />}
+              {/* AI export prompt — any completed session block with an export */}
+              {!isMeeting && (block.status === "ready" || block.status === "ended") && (
+                <BlockExportPath block={block} />
+              )}
 
               {/* App breakdown section */}
               {block.appBreakdown && block.appBreakdown.length > 0 && (
@@ -940,22 +942,14 @@ export default function ActivityBlock({
 }
 
 function BlockExportPath({ block }: { block: WorkBlock }) {
-  const [exportPath, setExportPath] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!block.id) return;
-    (window as any).consoleAPI
-      ?.getBlockExportPath?.(block.id)
-      .then((path: string | null) => setExportPath(path));
-  }, [block.id]);
-
-  if (!exportPath) return null;
+  if (!block.exportPath) return null;
 
   const handleCopy = async () => {
     if (copied) return;
     try {
-      await (window as any).consoleAPI?.copyFileToClipboard?.(exportPath);
+      await (window as any).consoleAPI?.copyFileToClipboard?.(block.exportPath);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {

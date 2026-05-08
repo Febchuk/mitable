@@ -2,7 +2,7 @@
  * OpenAI Provider
  *
  * Uses chat completions API with vision support.
- * Model: gpt-4.1-mini — good balance of cost and capability.
+ * Model: gpt-5.4-mini — comparable to Haiku/Gemini Flash tier.
  */
 
 import { createLogger } from "../../../lib/logger";

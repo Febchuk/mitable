@@ -845,5 +845,30 @@ export function registerMonitoringSessionHandlers() {
     return result;
   });
 
+  // Get recent sessions for doc generation dropdown
+  ipcMain.handle("get-recent-sessions", async () => {
+    try {
+      const now = Date.now();
+      const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+      const sessions = await pgDb.getAllSessionsByDateRange(thirtyDaysAgo, now);
+
+      return sessions
+        .filter((s) => s.status !== "active" && s.status !== "paused")
+        .slice(0, 20)
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          status: s.status,
+          startedAt: s.startedAt,
+          endedAt: s.endedAt,
+          captureCount: 0, // Will be populated if needed
+          duration: s.endedAt ? s.endedAt - s.startedAt - (s.totalPausedMs ?? 0) : 0,
+        }));
+    } catch (err) {
+      monitoringLogger.error("Failed to get recent sessions:", String(err));
+      return [];
+    }
+  });
+
   ipcLogger.info(" Monitoring session handlers registered successfully");
 }

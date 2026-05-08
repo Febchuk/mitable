@@ -10,9 +10,17 @@ import { useNavigate } from "react-router-dom";
 import { X, ChevronDown, Loader2, Check, ArrowUp, Layers, Paperclip, Settings } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { useSessions } from "@/console/src/hooks/queries/monitoring";
-import type { SessionListItem } from "@/console/src/services/monitoringService";
 import type { DocType } from "@mitable/shared";
+
+interface LocalSession {
+  id: string;
+  name: string | null;
+  status: string;
+  startedAt: number;
+  endedAt: number | null;
+  captureCount: number;
+  duration: number;
+}
 
 interface CreateDocumentModalProps {
   open: boolean;
@@ -31,8 +39,8 @@ function formatDuration(ms: number): string {
   return `${minutes}m`;
 }
 
-function formatRelativeDate(dateString: string): string {
-  const date = new Date(dateString);
+function formatRelativeDate(timestamp: number | string): string {
+  const date = new Date(timestamp);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
@@ -80,10 +88,22 @@ export default function CreateDocumentModal({
     setError(null);
   }, []);
 
-  const { data: sessionsData } = useSessions();
-  const sessions = sessionsData?.sessions ?? [];
+  // Fetch local sessions via IPC instead of backend
+  const [sessions, setSessions] = useState<LocalSession[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const result = await window.consoleAPI?.getRecentSessions?.();
+        setSessions(result ?? []);
+      } catch {
+        setSessions([]);
+      }
+    })();
+  }, [open]);
+
   const completedSessions = sessions.filter(
-    (s: SessionListItem) => ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
+    (s) => ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
   );
 
   const entityLabelTitle = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
@@ -435,7 +455,7 @@ export default function CreateDocumentModal({
                             <span
                               style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}
                             >
-                              {formatDuration(session.duration.totalMs)}
+                              {formatDuration(session.duration)}
                             </span>
                             <span
                               style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}

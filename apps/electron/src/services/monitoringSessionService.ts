@@ -434,7 +434,7 @@ class MonitoringSessionService {
 
       try {
         const { pgDb } = await import("./on-device");
-        await pgDb.updateMonitoringSessionStatus(sessionId, "paused", Date.now());
+        await pgDb.updateMonitoringSessionStatus(sessionId, "summarizing", Date.now());
       } catch {
         /* best effort */
       }
@@ -596,7 +596,7 @@ class MonitoringSessionService {
           const story = await db.getStoryForSession(sessionId);
           await db.updateMonitoringSessionStatus(
             sessionId,
-            storyGenerationFailed ? "ended" : "ended",
+            storyGenerationFailed ? "ended" : "ready",
             story ? Date.now() : undefined
           );
           if (story?.narrative) {

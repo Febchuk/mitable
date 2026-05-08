@@ -43,8 +43,8 @@ export interface InferenceProvider {
 
 export const DEFAULT_MODELS: Record<ProviderName, string> = {
   google: "gemini-2.5-flash-lite-preview-06-2025",
-  openai: "gpt-4.1-mini",
-  anthropic: "claude-haiku-4-5-20241022",
+  openai: "gpt-5.4-mini",
+  anthropic: "claude-haiku-4-5-20251001",
 };
 
 export const PROVIDER_LABELS: Record<ProviderName, string> = {

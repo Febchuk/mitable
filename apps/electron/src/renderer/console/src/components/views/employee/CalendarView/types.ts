@@ -76,6 +76,8 @@ export interface WorkBlock {
   source?: WorkBlockSource;
   subscriberName?: string; // Customer/subscriber name (from Granola attendee extraction)
   participants?: { name: string; email: string }[];
+
+  exportPath?: string | null;
 }
 
 export interface ActivityDay {

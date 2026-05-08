@@ -2,7 +2,7 @@ import { app, clipboard, ipcMain } from "electron";
 import { ctx } from "../context";
 import { ipcLogger, updateLogger } from "../loggers";
 import { createLogger } from "../../lib/logger";
-import { DOCUMENTS_FOLDER } from "../../lib/env";
+
 import { updateService } from "../../services/updateService";
 import { monitoringSessionService } from "../../services/monitoringSessionService";
 import { prepareForQuitAndInstall } from "../tray/tray";
@@ -31,125 +31,10 @@ export function registerUpdateHandlers() {
     return true;
   });
 
-  async function resolveExportPath(sessionId: string): Promise<string | null> {
-    const { promises: fs } = await import("fs");
-    const { localInferenceService, pgDb } = await import("../../services/on-device");
-
-    // 1. In-memory cache or persisted DB path
-    const cached =
-      localInferenceService.getExportPath(sessionId) || (await pgDb.getExportPath(sessionId));
-    if (cached) {
-      try {
-        await fs.access(cached);
-        return cached;
-      } catch {
-        /* file moved/deleted */
-      }
-    }
-
-    // 2. Scan blockdata for session ID in file content (new blocks)
-    try {
-      const { app: electronApp } = await import("electron");
-      const { join } = await import("path");
-      const docsDir = electronApp.getPath("documents");
-      const blockdataDir = join(docsDir, DOCUMENTS_FOLDER, "blockdata");
-
-      const dayFolders = await fs.readdir(blockdataDir).catch(() => [] as string[]);
-      for (const day of dayFolders.reverse()) {
-        const dayPath = join(blockdataDir, day);
-        const stat = await fs.stat(dayPath);
-        if (!stat.isDirectory()) continue;
-
-        const files = await fs.readdir(dayPath);
-        for (const file of files) {
-          if (!file.endsWith(".md")) continue;
-          const filePath = join(dayPath, file);
-          const content = await fs.readFile(filePath, "utf-8");
-          if (content.includes(sessionId)) {
-            await pgDb.updateMonitoringSessionExportPath(sessionId, filePath);
-            return filePath;
-          }
-        }
-      }
-
-      // 3. Match by session start time against block file time headers (legacy blocks)
-      const session = await pgDb.getMonitoringSession(sessionId);
-      if (session?.startedAt) {
-        const sessionStart = new Date(session.startedAt);
-        const months = [
-          "january",
-          "february",
-          "march",
-          "april",
-          "may",
-          "june",
-          "july",
-          "august",
-          "september",
-          "october",
-          "november",
-          "december",
-        ];
-        const dayFolder = `${months[sessionStart.getMonth()]}_${sessionStart.getDate()}_${sessionStart.getFullYear()}`;
-        const targetDayPath = join(blockdataDir, dayFolder);
-
-        try {
-          const files = await fs.readdir(targetDayPath);
-          // Format as "H:MM AM/PM" to match the block header format
-          const sessionHour = sessionStart.getHours();
-          const sessionMin = sessionStart.getMinutes();
-          const ampm = sessionHour >= 12 ? "PM" : "AM";
-          const h12 = sessionHour % 12 || 12;
-          const sessionTimeStr = `${h12}:${String(sessionMin).padStart(2, "0")} ${ampm}`;
-
-          for (const file of files) {
-            if (!file.endsWith(".md")) continue;
-            const filePath = join(targetDayPath, file);
-            const content = await fs.readFile(filePath, "utf-8");
-            const timeMatch = content.match(/\*\*Time:\*\*\s*(.+?)\s*[–—-]/);
-            if (timeMatch) {
-              const fileStartTime = timeMatch[1].trim();
-              if (fileStartTime === sessionTimeStr) {
-                await pgDb.updateMonitoringSessionExportPath(sessionId, filePath);
-                return filePath;
-              }
-            }
-          }
-
-          // Fuzzy match: allow +/- 2 minute drift between session start and first capture
-          for (const file of files) {
-            if (!file.endsWith(".md")) continue;
-            const filePath = join(targetDayPath, file);
-            const content = await fs.readFile(filePath, "utf-8");
-            const timeMatch = content.match(/\*\*Time:\*\*\s*(\d{1,2}):(\d{2})\s*(AM|PM)/);
-            if (timeMatch) {
-              let fileH = parseInt(timeMatch[1], 10);
-              const fileM = parseInt(timeMatch[2], 10);
-              const fileAmpm = timeMatch[3];
-              if (fileAmpm === "PM" && fileH !== 12) fileH += 12;
-              if (fileAmpm === "AM" && fileH === 12) fileH = 0;
-              const fileMins = fileH * 60 + fileM;
-              const sessionMins = sessionStart.getHours() * 60 + sessionStart.getMinutes();
-              if (Math.abs(fileMins - sessionMins) <= 2) {
-                await pgDb.updateMonitoringSessionExportPath(sessionId, filePath);
-                return filePath;
-              }
-            }
-          }
-        } catch {
-          /* day folder doesn't exist */
-        }
-      }
-    } catch {
-      /* scan failed */
-    }
-
-    return null;
-  }
-
   ipcMain.handle("get-block-export-path", async (_event, sessionId: string) => {
     try {
-      return await resolveExportPath(sessionId);
+      const { pgDb } = await import("../../services/on-device");
+      return await pgDb.getExportPath(sessionId);
     } catch {
       return null;
     }
@@ -157,7 +42,8 @@ export function registerUpdateHandlers() {
 
   ipcMain.handle("get-block-export-content", async (_event, sessionId: string) => {
     try {
-      const filePath = await resolveExportPath(sessionId);
+      const { pgDb } = await import("../../services/on-device");
+      const filePath = await pgDb.getExportPath(sessionId);
       if (!filePath) return null;
       const { promises: fs } = await import("fs");
       const content = await fs.readFile(filePath, "utf-8");
@@ -252,6 +138,7 @@ export function registerUpdateHandlers() {
             status: session.status as string,
             finalSummary: session.finalSummary ?? story?.narrative ?? undefined,
             source: "session",
+            exportPath: session.exportPath ?? null,
           });
         }
 
