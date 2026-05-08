@@ -43,6 +43,8 @@ export interface AgentRunInput {
    * "Report" section.
    */
   templateSections?: { heading: string; guidance: string }[];
+  /** School tone / voice — included in the kickoff only (not sent as an image). */
+  writingStyle?: string;
 }
 
 export interface AgentRunOutput {
@@ -239,10 +241,20 @@ function buildKickoff(input: AgentRunInput): string {
     `Classroom token: ${input.classroomToken}`,
     `Period: ${input.periodStart} → ${input.periodEnd}`,
     "",
+  ];
+
+  const tone = (input.writingStyle ?? "").trim();
+  if (tone.length > 0) {
+    lines.push("## Writing style (tone and voice for every section)");
+    lines.push(tone);
+    lines.push("");
+  }
+
+  lines.push(
     "## Sections to fill (in this exact order)",
     "Write one prose block per section. Match each heading verbatim. Follow each section's guidance.",
-    "",
-  ];
+    ""
+  );
 
   templateSections.forEach((s, i) => {
     const guidance = s.guidance?.trim().length ? s.guidance.trim() : "(no specific guidance)";

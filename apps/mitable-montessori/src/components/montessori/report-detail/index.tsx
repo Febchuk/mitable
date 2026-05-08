@@ -41,6 +41,7 @@ type LocalDetail = {
   sources: { voiceNotes: number; photos: number; worksheets: number };
   visibleTo: string[];
   sections: LocalSection[];
+  templateLogoUrl?: string | null;
 };
 
 /** Calendar line for the report — uses `locale` via `useUiLocale` for hydration-safe Intl. */
@@ -126,6 +127,7 @@ function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail 
     sources: { voiceNotes: 0, photos: 0, worksheets: 0 },
     visibleTo: [`${report.studentName.split(" ")[0]}'s parents`, "Lead teacher"],
     sections,
+    templateLogoUrl: report.templateLogoUrl ?? null,
   };
 }
 
@@ -531,6 +533,7 @@ export function ReportDetail({
     report.reportDate,
     report.studentName,
     report.sections,
+    report.templateLogoUrl,
     locale,
   ]);
 

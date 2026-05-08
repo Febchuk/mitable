@@ -7,6 +7,7 @@ import { runReportAgent, AgentAbortError } from "@/lib/reports/agent-loop";
 import { SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
 import { DraftFromCaptureRequestSchema } from "@/lib/schemas/report";
 import { detokenizeReportText } from "@/lib/reports/detokenize";
+import { fetchTemplateLogoUrl } from "@/lib/queries/reports";
 
 /**
  * Draft an existing reports row (created by /api/v1/reports). Pulls the row,
@@ -95,10 +96,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // Resolve template sections + guidance. If the report has no template_id,
   // the agent falls back to a single "Report" section (handled in agent-loop).
   let templateSections: { heading: string; guidance: string }[] = [];
+  let writingStyle = "";
   if (report.template_id) {
     const { data: tpl } = await supabase
       .from("report_templates")
-      .select("sections, section_guidance, school_id")
+      .select("sections, section_guidance, school_id, writing_style")
       .eq("id", report.template_id as string)
       .maybeSingle();
     if (tpl && (tpl.school_id as string) === auth.user.schoolId) {
@@ -108,6 +110,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         heading,
         guidance: guidance[heading] ?? "",
       }));
+      writingStyle = ((tpl.writing_style as string | null) ?? "").trim();
     }
   }
 
@@ -249,6 +252,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       captureNotes: input.notes,
       seedReferences,
       templateSections,
+      writingStyle,
     });
 
     // De-tokenize the draft and shape it for the editor. We persist the
@@ -305,6 +309,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         { status: 500 }
       );
     }
+    const templateLogoUrl = await fetchTemplateLogoUrl(
+      supabase,
+      fresh.template_id as string | null,
+      auth.user.schoolId
+    );
     const reportPayload = {
       id: fresh.id,
       studentId: fresh.student_id,
@@ -319,6 +328,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       body: fresh.body,
       sections: fresh.sections,
       templateId: fresh.template_id,
+      templateLogoUrl,
       createdByUserId: fresh.created_by_user_id,
       approvedByUserId: fresh.approved_by_user_id,
       approvedAt: fresh.approved_at,

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, MessageSquare, Users } from "lucide-react";
+import { Book, Building2, LayoutTemplate, MessageSquare, Users } from "lucide-react";
 import { HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { useMontessori } from "./store";
 
@@ -68,6 +68,12 @@ const ADMIN_TABS: Tab[] = [
     renderIcon: (size) => <Book size={size} strokeWidth={1.5} />,
   },
   {
+    id: "templates",
+    label: "Templates",
+    href: "/admin/report-templates",
+    renderIcon: (size) => <LayoutTemplate size={size} strokeWidth={1.5} />,
+  },
+  {
     id: "teachers",
     label: "Teachers",
     href: "/admin/teachers",
@@ -102,7 +108,7 @@ export function MontessoriBottomNav({ variant = "teacher" }: { variant?: "teache
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
           background: "var(--color-surface)",
           borderTop: "1px solid var(--color-border)",
-          gridTemplateColumns: "repeat(5, 1fr)",
+          gridTemplateColumns: "repeat(6, 1fr)",
           alignItems: "center",
           gap: 4,
           zIndex: 30,

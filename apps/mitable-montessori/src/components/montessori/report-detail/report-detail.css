@@ -620,6 +620,13 @@ main:has(> .rd-root) {
   margin: 0 auto;
   padding: 0 24px;
 }
+.rd-report-logo {
+  display: block;
+  max-height: 56px;
+  width: auto;
+  object-fit: contain;
+  margin: 0 0 18px;
+}
 @media (min-width: 768px) {
   .rd-report-paper {
     padding: 0 56px;

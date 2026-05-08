@@ -19,6 +19,13 @@ import {
   type Report,
 } from "./data";
 import type { ClassroomProgress } from "@/lib/queries/classroom-progress";
+import {
+  INITIAL_IEP_BY_STUDENT,
+  type IepByStudent,
+  type IepEntry,
+  type PerformanceBand,
+  type PromptingCode,
+} from "./iep/data";
 import { HandCheck, ToastBus } from "./primitives";
 
 export type WebRoute = "today" | "roster" | "progress" | "attendance" | "reports" | "curriculum";
@@ -93,6 +100,21 @@ export type MontessoriStore = {
     status: ProgressMark;
     note?: string;
   }) => Promise<void>;
+
+  // IEP progress (student-scoped). Stored as studentId → goalId → entries
+  // (newest first). The class-mode `progressByTopic` map is independent.
+  iepByStudent: IepByStudent;
+  upsertIepEntry: (args: {
+    entryId?: string;
+    studentId: string;
+    goalId: string;
+    domain: IepEntry["domain"];
+    performanceBand: PerformanceBand;
+    successCount: number;
+    promptingCode: PromptingCode;
+    note?: string;
+  }) => void;
+  removeIepEntry: (args: { studentId: string; goalId: string; entryId: string }) => void;
   clearAll: () => void;
 };
 
@@ -170,6 +192,7 @@ export function MontessoriProvider({
   >({});
   const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>([]);
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
+  const [iepByStudent, setIepByStudent] = React.useState<IepByStudent>(INITIAL_IEP_BY_STUDENT);
 
   const [reportsFilter, setReportsFilter] = React.useState("All");
   const [rosterFilter, setRosterFilter] = React.useState("All");
@@ -386,7 +409,77 @@ export function MontessoriProvider({
     setNotesByTopic({});
     setRecentUpdates([]);
     setAttendance(INITIAL_ATTENDANCE);
+    setIepByStudent(INITIAL_IEP_BY_STUDENT);
   }, [initialClassroomProgress]);
+
+  const upsertIepEntry = React.useCallback(
+    (args: {
+      entryId?: string;
+      studentId: string;
+      goalId: string;
+      domain: IepEntry["domain"];
+      performanceBand: PerformanceBand;
+      successCount: number;
+      promptingCode: PromptingCode;
+      note?: string;
+    }) => {
+      const clamped = Math.max(0, Math.min(10, Math.round(args.successCount)));
+      const trimmedNote = args.note?.trim() ? args.note.trim() : undefined;
+      setIepByStudent((prev) => {
+        const studentRow = { ...(prev[args.studentId] || {}) };
+        const list = studentRow[args.goalId] ? [...studentRow[args.goalId]] : [];
+
+        if (args.entryId) {
+          const idx = list.findIndex((e) => e.id === args.entryId);
+          if (idx >= 0) {
+            list[idx] = {
+              ...list[idx],
+              performanceBand: args.performanceBand,
+              successCount: clamped,
+              promptingCode: args.promptingCode,
+              note: trimmedNote,
+            };
+            studentRow[args.goalId] = list;
+            return { ...prev, [args.studentId]: studentRow };
+          }
+        }
+
+        const next: IepEntry = {
+          id: `e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+          studentId: args.studentId,
+          goalId: args.goalId,
+          domain: args.domain,
+          performanceBand: args.performanceBand,
+          successCount: clamped,
+          promptingCode: args.promptingCode,
+          note: trimmedNote,
+          recordedAt: new Date().toISOString(),
+        };
+        // Newest-first ordering — UI reads in this order.
+        list.unshift(next);
+        studentRow[args.goalId] = list;
+        return { ...prev, [args.studentId]: studentRow };
+      });
+    },
+    []
+  );
+
+  const removeIepEntry = React.useCallback(
+    (args: { studentId: string; goalId: string; entryId: string }) => {
+      setIepByStudent((prev) => {
+        const studentRow = prev[args.studentId];
+        if (!studentRow) return prev;
+        const list = studentRow[args.goalId];
+        if (!list) return prev;
+        const next = list.filter((e) => e.id !== args.entryId);
+        return {
+          ...prev,
+          [args.studentId]: { ...studentRow, [args.goalId]: next },
+        };
+      });
+    },
+    []
+  );
 
   const approveReport = React.useCallback(
     (id: string) => {
@@ -471,6 +564,9 @@ export function MontessoriProvider({
     createReport,
     toggleAttendance,
     applyBulkProgress,
+    iepByStudent,
+    upsertIepEntry,
+    removeIepEntry,
     clearAll,
   };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { z } from "zod";
 import {
   AlertTriangle,
   Check,
@@ -8,6 +9,7 @@ import {
   Download,
   Plus,
   Search,
+  Trash2,
   Upload,
   Users,
   X,
@@ -17,7 +19,13 @@ import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { Avatar } from "@/components/montessori/primitives";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -165,6 +173,7 @@ const FIELD_LABELS: Record<ImportField, string> = {
   classroom: "Classroom",
   guardian_name: "Guardian name",
   guardian_email: "Guardian email",
+  guardian_phone: "Guardian phone",
   guardian_relationship: "Guardian relation",
   ignore: "Ignore",
 };
@@ -177,6 +186,7 @@ const FIELD_OPTIONS: ImportField[] = [
   "classroom",
   "guardian_name",
   "guardian_email",
+  "guardian_phone",
   "guardian_relationship",
   "ignore",
 ];
@@ -189,6 +199,8 @@ export default function AdminClassroomsPage() {
   const [loadState, setLoadState] = React.useState<"idle" | "loading" | "error">("loading");
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [mutationError, setMutationError] = React.useState<string | null>(null);
+  const [pendingArchiveChild, setPendingArchiveChild] = React.useState<AdminChild | null>(null);
+  const [archiveBusy, setArchiveBusy] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [createClassroomOpen, setCreateClassroomOpen] = React.useState(false);
   const [addChildOpen, setAddChildOpen] = React.useState(false);
@@ -245,7 +257,13 @@ export default function AdminClassroomsPage() {
   const totalInClassroom = selectedClassroom ? (counts.get(selectedClassroom.id) ?? 0) : 0;
 
   const existingStudents = React.useMemo(
-    () => children.map((child) => ({ id: child.id, name: child.name, birthDate: child.birthDate })),
+    () =>
+      children.map((child) => ({
+        id: child.id,
+        name: child.name,
+        birthDate: child.birthDate,
+        classroomId: child.classroomId,
+      })),
     [children]
   );
 
@@ -258,20 +276,23 @@ export default function AdminClassroomsPage() {
           body: JSON.stringify({
             first_name: s.firstName,
             last_name: s.lastName,
-            birth_date: s.birthDate,
+            ...(s.birthDate ? { birth_date: s.birthDate } : {}),
             classroom_id: s.classroomId,
           }),
         });
         const studentId = created.id;
         for (const g of s.guardians) {
-          if (!(g.name ?? "").trim()) continue;
-          const gn = splitPersonName(g.name);
+          const email = (g.email ?? "").trim();
+          const name = (g.name ?? "").trim();
+          if (!email && !name) continue;
+          const gn = name ? splitPersonName(name) : { first_name: "", last_name: "" };
           const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
             method: "POST",
             body: JSON.stringify({
-              first_name: gn.first_name,
-              last_name: gn.last_name || gn.first_name,
-              email: (g.email ?? "").trim() || undefined,
+              first_name: gn.first_name.trim() || undefined,
+              last_name: gn.last_name.trim() || undefined,
+              email: email || undefined,
+              phone: (g.phone ?? "").trim() || undefined,
               preferred_contact_method: "either",
             }),
           });
@@ -288,13 +309,16 @@ export default function AdminClassroomsPage() {
         }
       }
       for (const item of plan.guardiansForExisting) {
-        const gn = splitPersonName(item.guardian.name);
+        const email = (item.guardian.email ?? "").trim();
+        const name = (item.guardian.name ?? "").trim();
+        const gn = name ? splitPersonName(name) : { first_name: "", last_name: "" };
         const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
           method: "POST",
           body: JSON.stringify({
-            first_name: gn.first_name,
-            last_name: gn.last_name || gn.first_name,
-            email: (item.guardian.email ?? "").trim() || undefined,
+            first_name: gn.first_name.trim() || undefined,
+            last_name: gn.last_name.trim() || undefined,
+            email: email || undefined,
+            phone: (item.guardian.phone ?? "").trim() || undefined,
             preferred_contact_method: "either",
           }),
         });
@@ -347,36 +371,58 @@ export default function AdminClassroomsPage() {
     }
   };
 
+  const confirmArchiveChild = React.useCallback(async () => {
+    if (!pendingArchiveChild) return;
+    setArchiveBusy(true);
+    setMutationError(null);
+    try {
+      await apiJson<{ ok: boolean }>(`/api/admin/students/${pendingArchiveChild.id}`, {
+        method: "DELETE",
+      });
+      setPendingArchiveChild(null);
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not remove child");
+    } finally {
+      setArchiveBusy(false);
+    }
+  }, [pendingArchiveChild, reload]);
+
   const addChildManually = async (input: {
     firstName: string;
     lastName: string;
-    birthDate: string;
+    birthDate?: string;
     guardianFirstName?: string;
     guardianLastName?: string;
     guardianEmail?: string;
+    guardianPhone?: string;
   }) => {
     if (!selectedClassroomId) return;
     setMutationError(null);
     try {
+      const bd = input.birthDate?.trim();
       const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
         method: "POST",
         body: JSON.stringify({
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
-          birth_date: input.birthDate,
+          ...(bd ? { birth_date: bd } : {}),
           classroom_id: selectedClassroomId,
         }),
       });
       const gfn = input.guardianFirstName?.trim();
       const gln = input.guardianLastName?.trim();
       const gem = input.guardianEmail?.trim();
-      if (gfn && gln && gem) {
+      const gphone = input.guardianPhone?.trim();
+      const emailOk = gem ? z.string().email().safeParse(gem).success : false;
+      if (emailOk || (gfn && gln)) {
         const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
           method: "POST",
           body: JSON.stringify({
-            first_name: gfn,
-            last_name: gln,
-            email: gem,
+            first_name: gfn || undefined,
+            last_name: gln || undefined,
+            email: gem || undefined,
+            phone: gphone || undefined,
             preferred_contact_method: "either",
           }),
         });
@@ -568,7 +614,7 @@ export default function AdminClassroomsPage() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.6fr 0.6fr 0.9fr 1.4fr 24px",
+                      gridTemplateColumns: "1.6fr 0.6fr 0.9fr 1.4fr 40px",
                       padding: "12px 20px",
                       borderBottom: "1px solid var(--color-border)",
                     }}
@@ -584,13 +630,22 @@ export default function AdminClassroomsPage() {
                     ))}
                   </div>
                   {selectedChildren.map((child) => (
-                    <RosterRow key={child.id} child={child} />
+                    <RosterRow
+                      key={child.id}
+                      child={child}
+                      onRemove={() => setPendingArchiveChild(child)}
+                    />
                   ))}
                 </div>
 
                 <div className="lg:hidden">
                   {selectedChildren.map((child, index) => (
-                    <RosterMobileRow key={child.id} child={child} index={index} />
+                    <RosterMobileRow
+                      key={child.id}
+                      child={child}
+                      index={index}
+                      onRemove={() => setPendingArchiveChild(child)}
+                    />
                   ))}
                 </div>
 
@@ -646,6 +701,49 @@ export default function AdminClassroomsPage() {
         classroomName={selectedClassroom?.name ?? "Classroom"}
         onAdd={addChildManually}
       />
+
+      <Dialog
+        open={!!pendingArchiveChild}
+        onOpenChange={(open) => !open && setPendingArchiveChild(null)}
+      >
+        <DialogContent className="border-ink/10 bg-canvas">
+          <DialogHeader>
+            <DialogTitle>Remove this child from the roster?</DialogTitle>
+            <DialogDescription>
+              {pendingArchiveChild ? (
+                <>
+                  This removes{" "}
+                  <span className="font-medium text-ink">{pendingArchiveChild.name}</span> from
+                  class lists for teachers. The record stays in the database (soft archive) and can
+                  be restored by support if needed.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-ink/15 bg-canvas px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas-muted"
+              disabled={archiveBusy}
+              onClick={() => setPendingArchiveChild(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+              style={{
+                borderColor: "rgba(232, 116, 116, 0.45)",
+                color: "var(--status-error, #e87474)",
+              }}
+              disabled={archiveBusy}
+              onClick={() => void confirmArchiveChild()}
+            >
+              {archiveBusy ? "Removing…" : "Remove from roster"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -811,10 +909,11 @@ function AddChildDialog({
   onAdd: (input: {
     firstName: string;
     lastName: string;
-    birthDate: string;
+    birthDate?: string;
     guardianFirstName?: string;
     guardianLastName?: string;
     guardianEmail?: string;
+    guardianPhone?: string;
   }) => void | Promise<void>;
 }) {
   const [firstName, setFirstName] = React.useState("");
@@ -823,6 +922,7 @@ function AddChildDialog({
   const [guardianFirstName, setGuardianFirstName] = React.useState("");
   const [guardianLastName, setGuardianLastName] = React.useState("");
   const [guardianEmail, setGuardianEmail] = React.useState("");
+  const [guardianPhone, setGuardianPhone] = React.useState("");
 
   React.useEffect(() => {
     if (!open) {
@@ -832,20 +932,20 @@ function AddChildDialog({
       setGuardianFirstName("");
       setGuardianLastName("");
       setGuardianEmail("");
+      setGuardianPhone("");
     }
   }, [open]);
 
   const gf = guardianFirstName.trim();
   const gl = guardianLastName.trim();
   const ge = guardianEmail.trim();
-  const guardianFilled = Boolean(gf || gl || ge);
-  const guardianComplete = Boolean(gf && gl && ge);
-  const guardianHalf = guardianFilled && !guardianComplete;
-  const canSubmit =
-    firstName.trim().length > 0 &&
-    lastName.trim().length > 0 &&
-    birthDate.trim().length > 0 &&
-    !guardianHalf;
+  const gp = guardianPhone.trim();
+  const emailOk = ge.length > 0 ? z.string().email().safeParse(ge).success : false;
+  const oneNameOnly = Boolean(gf) !== Boolean(gl);
+  const guardianPartial =
+    oneNameOnly || (ge.length > 0 && !emailOk) || (Boolean(gp) && !emailOk && !(gf && gl));
+
+  const canSubmit = firstName.trim().length > 0 && lastName.trim().length > 0 && !guardianPartial;
 
   // Calendar picker icon — push to far right and keep the date text left aligned
   // so the field doesn't look like the icon is floating in the middle.
@@ -879,7 +979,7 @@ function AddChildDialog({
             </FieldLabel>
           </div>
 
-          <FieldLabel label="Birthday">
+          <FieldLabel label="Birthday (optional)">
             <Input
               type="date"
               value={birthDate}
@@ -913,7 +1013,7 @@ function AddChildDialog({
                 />
               </FieldLabel>
             </div>
-            <div className="mt-3">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <FieldLabel label="Guardian email">
                 <Input
                   type="email"
@@ -922,10 +1022,20 @@ function AddChildDialog({
                   className="h-10 bg-canvas"
                 />
               </FieldLabel>
+              <FieldLabel label="Guardian phone (optional)">
+                <Input
+                  type="tel"
+                  value={guardianPhone}
+                  onChange={(event) => setGuardianPhone(event.target.value)}
+                  className="h-10 bg-canvas"
+                />
+              </FieldLabel>
             </div>
-            {guardianHalf && (
+            {guardianPartial && (
               <p className="mt-2 text-xs text-terracotta">
-                Add a guardian name and email, or leave them all blank.
+                Use a valid email (names optional with email), or both first and last name, or leave
+                guardian fields blank. Add a phone only together with a valid email or with both
+                names.
               </p>
             )}
           </div>
@@ -943,10 +1053,11 @@ function AddChildDialog({
               void onAdd({
                 firstName,
                 lastName,
-                birthDate,
+                birthDate: birthDate.trim() || undefined,
                 guardianFirstName: gf || undefined,
                 guardianLastName: gl || undefined,
                 guardianEmail: ge || undefined,
+                guardianPhone: gp || undefined,
               });
               onOpenChange(false);
             }}
@@ -994,17 +1105,14 @@ function SelectInput({
   );
 }
 
-function RosterRow({ child }: { child: AdminChild }) {
+function RosterRow({ child, onRemove }: { child: AdminChild; onRemove: () => void }) {
   return (
-    <button
-      type="button"
-      className="tap"
+    <div
       style={{
         display: "grid",
-        gridTemplateColumns: "1.6fr 0.6fr 0.9fr 1.4fr 24px",
+        gridTemplateColumns: "1.6fr 0.6fr 0.9fr 1.4fr 40px",
         alignItems: "center",
         padding: "12px 20px",
-        cursor: "pointer",
         width: "100%",
         textAlign: "left",
         background: "transparent",
@@ -1021,16 +1129,35 @@ function RosterRow({ child }: { child: AdminChild }) {
       </div>
       <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>{child.enrolled}</div>
       <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>{child.recent}</div>
-      <ChevronRight size={14} strokeWidth={1.5} />
-    </button>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          className="tap rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"
+          title="Remove child from roster"
+          aria-label={`Remove ${child.name} from roster`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <Trash2 size={16} strokeWidth={1.5} />
+        </button>
+      </div>
+    </div>
   );
 }
 
-function RosterMobileRow({ child, index }: { child: AdminChild; index: number }) {
+function RosterMobileRow({
+  child,
+  index,
+  onRemove,
+}: {
+  child: AdminChild;
+  index: number;
+  onRemove: () => void;
+}) {
   return (
-    <button
-      type="button"
-      className="tap"
+    <div
       style={{
         width: "100%",
         textAlign: "left",
@@ -1062,8 +1189,16 @@ function RosterMobileRow({ child, index }: { child: AdminChild; index: number })
       <div className="font-numeric" style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
         {child.age}
       </div>
-      <ChevronRight size={16} strokeWidth={1.5} />
-    </button>
+      <button
+        type="button"
+        className="tap shrink-0 rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"
+        title="Remove child from roster"
+        aria-label={`Remove ${child.name} from roster`}
+        onClick={() => onRemove()}
+      >
+        <Trash2 size={18} strokeWidth={1.5} />
+      </button>
+    </div>
   );
 }
 
@@ -1077,7 +1212,7 @@ function StudentImportDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   classrooms: ClassroomOption[];
-  existingStudents: Array<{ id: string; name: string; birthDate?: string }>;
+  existingStudents: Array<{ id: string; name: string; birthDate?: string; classroomId?: string }>;
   onImport: (plan: StudentImportPlan) => void | Promise<void>;
 }) {
   const [rawData, setRawData] = React.useState<RawImportData | null>(null);
@@ -1379,7 +1514,7 @@ function ImportDraftCard({
           onChange={(value) => onUpdate(draft.id, { lastName: value })}
         />
         <MiniInput
-          label="Birthday"
+          label="Birthday (optional)"
           value={draft.birthDate}
           onChange={(value) => onUpdate(draft.id, { birthDate: value })}
         />
@@ -1390,7 +1525,7 @@ function ImportDraftCard({
         />
       </div>
 
-      <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1.3fr_130px]">
+      <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1.3fr_130px_130px]">
         <MiniInput
           label="Guardian"
           value={draft.guardianName}
@@ -1400,6 +1535,11 @@ function ImportDraftCard({
           label="Guardian email"
           value={draft.guardianEmail}
           onChange={(value) => onUpdate(draft.id, { guardianEmail: value })}
+        />
+        <MiniInput
+          label="Phone (optional)"
+          value={draft.guardianPhone}
+          onChange={(value) => onUpdate(draft.id, { guardianPhone: value })}
         />
         <MiniInput
           label="Relation"
@@ -1471,19 +1611,27 @@ function IssueMessage({
 
   if (issue.kind === "missing_name")
     return <div className={shell}>Add both a first name and a last name.</div>;
-  if (issue.kind === "missing_birth_date")
-    return <div className={shell}>Add a birthday for this child.</div>;
   if (issue.kind === "invalid_birth_date") {
     return (
       <div className={shell}>
         Birthday &quot;{issue.value}&quot; could not be read. Try 2019-04-15, 15 April 2019, or
-        04/15/2019.
+        04/15/2019 — or clear the field.
+      </div>
+    );
+  }
+  if (issue.kind === "invalid_guardian_email") {
+    return (
+      <div className={shell}>
+        Guardian email &quot;{issue.value}&quot; is not valid. Fix it or clear the email field.
       </div>
     );
   }
   if (issue.kind === "guardian_incomplete") {
     return (
-      <div className={shell}>Guardian needs both a name and an email, or leave both blank.</div>
+      <div className={shell}>
+        Add a valid guardian email (name optional), or both guardian first and last name with a
+        valid email, or clear guardian fields. Phone is optional and needs email or both names.
+      </div>
     );
   }
   if (issue.kind === "duplicate_without_guardian") {
