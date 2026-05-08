@@ -7,14 +7,16 @@ import { Avatar, ToastBus } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
 import {
   IEP_DOMAINS,
+  IEP_GOALS,
+  emptyIepItem,
   goalsByDomain,
-  type IepEntry,
   type IepGoal,
-  type PerformanceBand,
-  type PromptingCode,
+  type IepItemState,
 } from "./data";
-import { IepEntryModal } from "./iep-entry-modal";
-import { IepGoalRow } from "./iep-grid";
+import { IepCommentBar, type IepCommentBarApply } from "./iep-comment-bar";
+import { IepCommentsDrawer } from "./iep-comments-drawer";
+import { IepItemRow } from "./iep-grid";
+import styles from "./iep.module.css";
 
 const initialsFor = (name: string) =>
   name
@@ -22,91 +24,97 @@ const initialsFor = (name: string) =>
     .map((w) => w[0])
     .join("");
 
-type ModalState =
-  | { mode: "closed" }
-  | { mode: "create"; goal: IepGoal }
-  | { mode: "edit"; goal: IepGoal; entry: IepEntry };
-
 export function IepProgressFeature() {
   const store = useMontessori();
   const presentChildren = React.useMemo(() => CHILDREN.filter((c) => c.present), []);
   const [studentId, setStudentId] = React.useState<string>(
     () => presentChildren[0]?.id ?? CHILDREN[0]?.id ?? ""
   );
-  const [modal, setModal] = React.useState<ModalState>({ mode: "closed" });
+  const [selectedGoalId, setSelectedGoalId] = React.useState<string | null>(null);
 
   const student = React.useMemo(
     () => CHILDREN.find((c) => c.id === studentId) ?? CHILDREN[0],
     [studentId]
   );
-  const studentEntries = store.iepByStudent[studentId] || {};
+  const studentRow = store.iepState[studentId] ?? {};
   const grouped = React.useMemo(() => goalsByDomain(), []);
+  const goalsById = React.useMemo(() => {
+    const m = new Map<string, IepGoal>();
+    for (const g of IEP_GOALS) m.set(g.id, g);
+    return m;
+  }, []);
 
-  // Header counts: total entries logged for this student across all goals.
-  const totalEntries = React.useMemo(() => {
+  // Switching students closes any open item — comments would otherwise jump.
+  React.useEffect(() => {
+    setSelectedGoalId(null);
+  }, [studentId]);
+
+  const totalComments = React.useMemo(() => {
     let n = 0;
-    for (const list of Object.values(studentEntries)) n += list.length;
+    for (const item of Object.values(studentRow)) n += item.comments.length;
     return n;
-  }, [studentEntries]);
+  }, [studentRow]);
 
-  const onAdd = React.useCallback((goal: IepGoal) => {
-    setModal({ mode: "create", goal });
+  const selectedGoal = selectedGoalId ? (goalsById.get(selectedGoalId) ?? null) : null;
+  const selectedItem: IepItemState =
+    (selectedGoalId && studentRow[selectedGoalId]) || emptyIepItem();
+
+  const onSelect = React.useCallback((goalId: string) => {
+    setSelectedGoalId((prev) => (prev === goalId ? null : goalId));
   }, []);
 
-  const onEdit = React.useCallback((goal: IepGoal, entry: IepEntry) => {
-    setModal({ mode: "edit", goal, entry });
-  }, []);
-
-  const onSave = React.useCallback(
-    (args: {
-      entryId?: string;
-      performanceBand: PerformanceBand;
-      successCount: number;
-      promptingCode: PromptingCode;
-      note?: string;
-    }) => {
-      if (modal.mode === "closed") return;
-      const goal = modal.goal;
-      store.upsertIepEntry({
-        entryId: args.entryId,
-        studentId,
-        goalId: goal.id,
-        domain: goal.domain,
-        performanceBand: args.performanceBand,
-        successCount: args.successCount,
-        promptingCode: args.promptingCode,
-        note: args.note,
-      });
+  const onApplyBar = React.useCallback(
+    (next: IepCommentBarApply) => {
+      if (!selectedGoal) return;
+      const fieldsChanged =
+        next.rating !== selectedItem.rating ||
+        next.successCount !== selectedItem.successCount ||
+        next.promptingCode !== selectedItem.promptingCode;
+      if (fieldsChanged) {
+        store.setIepItemFields({
+          studentId,
+          goalId: selectedGoal.id,
+          domain: selectedGoal.domain,
+          rating: next.rating,
+          successCount: next.successCount,
+          promptingCode: next.promptingCode,
+        });
+      }
+      const trimmed = next.comment.trim();
+      if (trimmed) {
+        store.addIepComment({
+          studentId,
+          goalId: selectedGoal.id,
+          domain: selectedGoal.domain,
+          text: trimmed,
+        });
+      }
+      const firstName = student.name.split(" ")[0];
       ToastBus.push({
-        message: args.entryId
-          ? `Entry updated for ${student.name.split(" ")[0]}`
-          : `Logged for ${student.name.split(" ")[0]} · ${goal.name}`,
+        message: trimmed
+          ? `Updated · comment saved for ${firstName}`
+          : fieldsChanged
+            ? `Updated · ${firstName}`
+            : "No changes",
       });
-      setModal({ mode: "closed" });
+      setSelectedGoalId(null);
     },
-    [modal, store, studentId, student]
+    [selectedGoal, selectedItem, store, studentId, student]
   );
 
-  const onDelete = React.useCallback(
-    (entryId: string) => {
-      if (modal.mode !== "edit") return;
-      store.removeIepEntry({
-        studentId,
-        goalId: modal.goal.id,
-        entryId,
-      });
-      ToastBus.push({ message: "Entry deleted" });
-      setModal({ mode: "closed" });
+  const onRemoveComment = React.useCallback(
+    (args: { goalId: string; commentId: string }) => {
+      store.removeIepComment({ studentId, goalId: args.goalId, commentId: args.commentId });
     },
-    [modal, store, studentId]
+    [store, studentId]
   );
 
   return (
-    <div>
+    <div className={styles.iepRoot}>
       <PageHeader
         overline={`IEP progress · ${student.name.split(" ")[0]}`}
-        title="IEP progress"
-        subtitle={`${student.name} · ${totalEntries} ${totalEntries === 1 ? "entry" : "entries"} logged`}
+        title="Progress"
+        subtitle={`${student.name} · ${totalComments} ${totalComments === 1 ? "comment" : "comments"} on file`}
       />
 
       {/* Student picker — horizontal scroll of avatars/chips. */}
@@ -150,83 +158,65 @@ export function IepProgressFeature() {
         })}
       </div>
 
-      {/* Domain sections */}
-      <div style={{ padding: "12px 16px 96px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {IEP_DOMAINS.map((domain) => {
-          const goals = grouped[domain] || [];
-          if (goals.length === 0) return null;
-          const domainEntryCount = goals.reduce(
-            (n, goal) => n + (studentEntries[goal.id]?.length ?? 0),
-            0
-          );
-          return (
-            <section
-              key={domain}
-              style={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 14,
-                overflow: "hidden",
-              }}
-            >
-              <header
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  padding: "12px 16px",
-                  borderBottom: "1px solid var(--color-border)",
-                  background: "var(--color-canvas)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "var(--color-ink)",
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  {domain}
+      <div className={styles.iepLayout}>
+        <div className={styles.iepMain}>
+          {IEP_DOMAINS.map((domain) => {
+            const goals = grouped[domain] || [];
+            if (goals.length === 0) return null;
+            const domainCommentCount = goals.reduce(
+              (n, goal) => n + (studentRow[goal.id]?.comments.length ?? 0),
+              0
+            );
+            return (
+              <section key={domain} className={styles.iepDomain}>
+                <header className={styles.iepDomainHeader}>
+                  <div className={styles.iepDomainName}>{domain}</div>
+                  <div className={styles.iepDomainMeta}>
+                    {goals.length} {goals.length === 1 ? "item" : "items"}
+                    {domainCommentCount > 0 ? ` · ${domainCommentCount} comments` : ""}
+                  </div>
+                </header>
+                <div>
+                  {goals.map((goal) => {
+                    const state = studentRow[goal.id] ?? emptyIepItem();
+                    return (
+                      <IepItemRow
+                        key={goal.id}
+                        goal={goal}
+                        state={state}
+                        selected={selectedGoalId === goal.id}
+                        onSelect={() => onSelect(goal.id)}
+                      />
+                    );
+                  })}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-                  {goals.length} {goals.length === 1 ? "goal" : "goals"}
-                  {domainEntryCount > 0 ? ` · ${domainEntryCount} logged` : ""}
-                </div>
-              </header>
-              <div>
-                {goals.map((goal) => (
-                  <IepGoalRow
-                    key={goal.id}
-                    goal={goal}
-                    entries={studentEntries[goal.id] || []}
-                    onAdd={onAdd}
-                    onEdit={onEdit}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
+              </section>
+            );
+          })}
+        </div>
+
+        <aside className={styles.iepDrawer}>
+          <IepCommentsDrawer
+            studentId={studentId}
+            studentName={student.name}
+            goalsById={goalsById}
+            iepState={store.iepState}
+            selectedGoalId={selectedGoalId}
+            onClearFilter={() => setSelectedGoalId(null)}
+            onRemoveComment={onRemoveComment}
+          />
+        </aside>
       </div>
 
-      <IepEntryModal
-        open={modal.mode !== "closed"}
-        studentName={student.name}
-        goal={modal.mode === "closed" ? FALLBACK_GOAL : modal.goal}
-        entry={modal.mode === "edit" ? modal.entry : null}
-        onClose={() => setModal({ mode: "closed" })}
-        onSave={onSave}
-        onDelete={modal.mode === "edit" ? onDelete : undefined}
-      />
+      {selectedGoal && (
+        <IepCommentBar
+          goal={selectedGoal}
+          studentName={student.name}
+          state={selectedItem}
+          onApply={onApplyBar}
+          onCancel={() => setSelectedGoalId(null)}
+        />
+      )}
     </div>
   );
 }
-
-// Modal is gated by `open`, but the prop type wants a goal regardless. This
-// stand-in goal never reaches the screen.
-const FALLBACK_GOAL: IepGoal = {
-  id: "fallback",
-  domain: "Sensory integration",
-  name: "",
-};

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminWriteRoute } from "@/lib/admin/route-helper";
-import { CreateClassroomSchema } from "@/lib/schemas/admin";
-import { createClassroom } from "@/lib/admin/crud";
+import { CreateClassroomSchema, UpdateClassroomProgramsSchema } from "@/lib/schemas/admin";
+import { createClassroom, updateClassroomPrograms } from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { createClient } from "@/utils/supabase/server";
 
@@ -16,7 +16,7 @@ export async function GET() {
 
   const { data: classrooms, error: cErr } = await supabase
     .from("classrooms")
-    .select("id, name, code, status, curriculum_id")
+    .select("id, name, code, status, curriculum_id, program_types")
     .eq("school_id", schoolId)
     .eq("status", "active")
     .order("name");
@@ -94,6 +94,14 @@ export async function GET() {
     }));
     const lead = assigns.find((a) => a.classroom_role === "lead") ?? assigns[0] ?? null;
 
+    const rawPrograms = (r as { program_types?: string[] | null }).program_types;
+    const programTypes =
+      Array.isArray(rawPrograms) && rawPrograms.length > 0
+        ? (rawPrograms.filter((p) => ["montessori", "iep", "session_notes"].includes(p)) as Array<
+            "montessori" | "iep" | "session_notes"
+          >)
+        : (["montessori"] as const);
+
     return {
       id,
       name: r.name as string,
@@ -103,6 +111,7 @@ export async function GET() {
         : null,
       teachers,
       leadTeacherId: lead?.teacher_user_id ?? null,
+      programTypes,
     };
   });
 
@@ -257,6 +266,18 @@ export async function POST(req: Request) {
     async (input, ctx) => {
       const id = await createClassroom(ctx, input);
       return { id };
+    }
+  );
+}
+
+export async function PATCH(req: Request) {
+  return adminWriteRoute(
+    req,
+    UpdateClassroomProgramsSchema,
+    "admin_update_classroom_programs",
+    async (input, ctx) => {
+      await updateClassroomPrograms(ctx, input);
+      return { id: input.classroom_id };
     }
   );
 }

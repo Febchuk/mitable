@@ -2,6 +2,9 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
+import type { ProgressProgram } from "@/lib/queries/progress-programs";
+
+export type { ProgressProgram };
 
 export type ClassroomProgressSubject = {
   id: string;
@@ -36,6 +39,10 @@ export type ClassroomProgress = {
   classroomName: string;
   /** False when the active classroom has classrooms.curriculum_id IS NULL. */
   curriculumAssigned: boolean;
+  /** Programs this classroom supports. Drives which mode(s) the Progress
+   *  route exposes. Defaults to ["montessori"] when not declared on the
+   *  classroom row. */
+  programs: ProgressProgram[];
   subjects: ClassroomProgressSubject[];
   topics: ClassroomProgressTopic[];
   subtopics: ClassroomProgressSubtopic[];
@@ -93,13 +100,22 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // Look up the classroom's curriculum_id. RLS allows any school member to read.
+  // Look up the classroom's curriculum_id + programs. RLS allows any school
+  // member to read.
   const classroomResp = await supabase
     .from("classrooms")
-    .select("curriculum_id")
+    .select("curriculum_id, program_types")
     .eq("id", classroom.id)
     .maybeSingle();
   const curriculumId = (classroomResp.data?.curriculum_id as string | null) ?? null;
+  const rawPrograms = (classroomResp.data as { program_types?: string[] | null } | null)
+    ?.program_types;
+  const programs: ProgressProgram[] =
+    Array.isArray(rawPrograms) && rawPrograms.length > 0
+      ? rawPrograms.filter((p): p is ProgressProgram =>
+          (["montessori", "iep", "session_notes"] as const).includes(p as ProgressProgram)
+        )
+      : ["montessori"];
 
   // Always fetch the roster — even when curriculum is unassigned, we want to
   // render an empty-state UI with the right children visible.
@@ -131,6 +147,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
       classroomId: classroom.id,
       classroomName: classroom.name,
       curriculumAssigned: false,
+      programs,
       subjects: [],
       topics: [],
       subtopics: [],
@@ -203,6 +220,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     classroomId: classroom.id,
     classroomName: classroom.name,
     curriculumAssigned: true,
+    programs,
     subjects,
     topics,
     subtopics,
