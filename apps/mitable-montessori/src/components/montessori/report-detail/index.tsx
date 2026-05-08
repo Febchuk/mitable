@@ -7,7 +7,9 @@ import { ToastBus } from "../primitives";
 import { ChatPane, type ChatPaneHandle } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
+import { useMediaQuery } from "./use-media-query";
 import "./report-detail.css";
+import { MessageSquare, Sparkles, X } from "lucide-react";
 import {
   clearStoredDraftCapture,
   readStoredDraftCapture,
@@ -620,6 +622,32 @@ export function ReportDetail({
   const [actionBusy, setActionBusy] = React.useState(false);
   const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
 
+  // Mobile-only: ChatPane lives inside this bottom sheet on <lg. The desktop
+  // split-view ChatPane and the mobile sheet ChatPane are mutually exclusive
+  // (gated by useMediaQuery below) so the chat thread only ever has one mount.
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const [mobileChatOpen, setMobileChatOpen] = React.useState(false);
+
+  // Esc closes the mobile chat sheet.
+  React.useEffect(() => {
+    if (!mobileChatOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileChatOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileChatOpen]);
+
+  // Lock body scroll while the mobile chat sheet is up.
+  React.useEffect(() => {
+    if (!mobileChatOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileChatOpen]);
+
   const savedMeta = isSaving
     ? SAVING_LABEL
     : isDrafting
@@ -741,16 +769,18 @@ export function ReportDetail({
         />
         <div className="rd-workspace">
           <div className="rd-split">
-            <ChatPane
-              ref={chatPaneRef}
-              reportId={report.id}
-              sections={detail.sections}
-              flushPendingSave={flushPendingSave}
-              onApplyProposal={onApplyProposalFromChat}
-              onPullObservation={onPullObservation}
-              onApplyGhostEdit={onApplyGhostEdit}
-              onApplyNewSection={onApplyNewSection}
-            />
+            {isDesktop ? (
+              <ChatPane
+                ref={chatPaneRef}
+                reportId={report.id}
+                sections={detail.sections}
+                flushPendingSave={flushPendingSave}
+                onApplyProposal={onApplyProposalFromChat}
+                onPullObservation={onPullObservation}
+                onApplyGhostEdit={onApplyGhostEdit}
+                onApplyNewSection={onApplyNewSection}
+              />
+            ) : null}
             <ReportPane
               detail={detail}
               onChange={onChange}
@@ -763,6 +793,77 @@ export function ReportDetail({
           </div>
         </div>
       </div>
+
+      {/*
+        Mobile (<lg): the report editor's report-scoped chat lives in a bottom
+        sheet, opened by a terracotta FAB. The MontessoriMobileShell hides its
+        own generic FAB on report-detail routes so there's only one FAB on screen.
+        ChatPane is lazy-mounted only when the sheet is open the first time, so
+        we don't load /api/v1/reports/{id}/chat on every report visit.
+      */}
+      {!isDesktop && (
+        <>
+          <button
+            type="button"
+            className="lg:hidden tap rd-mobile-fab"
+            onClick={() => setMobileChatOpen(true)}
+            aria-label="Open report chat"
+            aria-hidden={mobileChatOpen}
+            data-hidden={mobileChatOpen ? "true" : "false"}
+          >
+            <MessageSquare size={22} strokeWidth={1.8} />
+          </button>
+
+          <div
+            className="lg:hidden rd-mobile-scrim"
+            role="presentation"
+            onClick={() => setMobileChatOpen(false)}
+            aria-hidden={!mobileChatOpen}
+            data-open={mobileChatOpen ? "true" : "false"}
+          />
+
+          <div
+            className="lg:hidden rd-mobile-sheet"
+            role="dialog"
+            aria-label="Report chat"
+            aria-hidden={!mobileChatOpen}
+            data-open={mobileChatOpen ? "true" : "false"}
+          >
+            <div className="rd-mobile-sheet-grabber" aria-hidden />
+            <div className="rd-mobile-sheet-head">
+              <div className="rd-mobile-sheet-head-icon">
+                <Sparkles size={16} strokeWidth={1.6} />
+              </div>
+              <div className="rd-mobile-sheet-head-text">
+                <div className="rd-mobile-sheet-head-title">Report chat</div>
+                <div className="rd-mobile-sheet-head-sub">{report.studentName}</div>
+              </div>
+              <button
+                type="button"
+                className="tap rd-mobile-sheet-close"
+                onClick={() => setMobileChatOpen(false)}
+                aria-label="Close report chat"
+              >
+                <X size={18} strokeWidth={1.6} />
+              </button>
+            </div>
+            <div className="rd-mobile-sheet-body">
+              {mobileChatOpen ? (
+                <ChatPane
+                  ref={chatPaneRef}
+                  reportId={report.id}
+                  sections={detail.sections}
+                  flushPendingSave={flushPendingSave}
+                  onApplyProposal={onApplyProposalFromChat}
+                  onPullObservation={onPullObservation}
+                  onApplyGhostEdit={onApplyGhostEdit}
+                  onApplyNewSection={onApplyNewSection}
+                />
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="border-ink/10 bg-canvas">
