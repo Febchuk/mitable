@@ -149,6 +149,10 @@ export function ReportDetail({
   const [isDrafting, setIsDrafting] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = React.useState(false);
+  /** href captured when the user attempted to navigate while dirty; consumed by the leave dialog. */
+  const pendingNavRef = React.useRef<string | null>(null);
+  const [leaveBusy, setLeaveBusy] = React.useState(false);
   const draftKickedRef = React.useRef(false);
   /** Set while a /draft request is in flight so the overlay can abort it. */
   const draftAbortRef = React.useRef<AbortController | null>(null);
@@ -267,6 +271,7 @@ export function ReportDetail({
         try {
           const res = await fetch(`/api/v1/reports/${report.id}`, {
             method: "PATCH",
+            credentials: "include",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               title: next.title,
@@ -338,6 +343,20 @@ export function ReportDetail({
     };
   }, []);
 
+  // beforeunload guard: warn the user if they try to close the tab, refresh,
+  // or browser-back to a non-Next URL while there are pending edits the
+  // 800ms autosave hasn't drained yet.
+  React.useEffect(() => {
+    if (!isDirty && !isSaving) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers ignore the returned string but require the assignment.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty, isSaving]);
+
   // ----- Phase 3: chat-driven proposal apply + discuss-from-paragraph -----
   const chatPaneRef = React.useRef<ChatPaneHandle>(null);
 
@@ -379,6 +398,64 @@ export function ReportDetail({
   /** Tracks which originating chat-message id seeded each section's ghost so
    *  Accept/Reject can post the editorial action to the right row. */
   const ghostMessageIdsRef = React.useRef(new Map<string, string>());
+
+  /**
+   * Chat agent emitted a new-section — splice into detail.sections at the
+   * requested position (after `afterSectionId` if provided, otherwise
+   * append). Auto-applies on receipt; dirties the report so the debounced
+   * PATCH picks it up. Posts to /applied so the chat row records that the
+   * change landed.
+   */
+  const onApplyNewSection = React.useCallback(
+    ({
+      sectionId,
+      heading,
+      paragraphs,
+      afterSectionId,
+      messageId,
+    }: {
+      sectionId: string;
+      heading: string;
+      paragraphs: { id: string; html: string }[];
+      afterSectionId?: string;
+      messageId: string;
+    }) => {
+      setDetail((prev) => {
+        // Idempotent: skip if a section with this id already exists (the
+        // auto-apply effect can fire twice in strict mode).
+        if (prev.sections.some((s) => s.id === sectionId)) return prev;
+        const newSection = { id: sectionId, heading, paragraphs };
+        let sections: typeof prev.sections;
+        if (afterSectionId) {
+          const idx = prev.sections.findIndex((s) => s.id === afterSectionId);
+          if (idx >= 0) {
+            sections = [
+              ...prev.sections.slice(0, idx + 1),
+              newSection,
+              ...prev.sections.slice(idx + 1),
+            ];
+          } else {
+            sections = [...prev.sections, newSection];
+          }
+        } else {
+          sections = [...prev.sections, newSection];
+        }
+        const next = { ...prev, sections };
+        setIsDirty(true);
+        queueSave(next);
+        return next;
+      });
+      void fetch(`/api/v1/reports/${report.id}/chat/messages/${messageId}/applied`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "applied" }),
+      }).catch(() => {
+        // Non-fatal — the local mutation already happened.
+      });
+    },
+    [queueSave, report.id]
+  );
 
   /** Chat agent emitted a ghost-edit — merge into the section's slot. */
   const onApplyGhostEdit = React.useCallback(
@@ -535,6 +612,7 @@ export function ReportDetail({
     report.reportDate,
     report.studentName,
     report.sections,
+    report.status,
     report.templateLogoUrl,
     locale,
   ]);
@@ -608,6 +686,27 @@ export function ReportDetail({
     setSendDialogOpen(true);
   }, []);
 
+  // Unsaved-changes guard for in-app navigation. When the user clicks the
+  // back-to-reports link with dirty/in-flight edits, capture the intended
+  // href and open the leave dialog. Clean nav (no dirty state) goes through
+  // immediately.
+  const guardedNavigate = React.useCallback(
+    (href: string) => {
+      if (isDirty || isSaving) {
+        pendingNavRef.current = href;
+        setLeaveDialogOpen(true);
+      } else {
+        router.push(href);
+      }
+    },
+    [isDirty, isSaving, router]
+  );
+
+  const handleBackClick = React.useCallback(
+    () => guardedNavigate(backToReportsHref),
+    [guardedNavigate, backToReportsHref]
+  );
+
   return (
     <>
       <div className="rd-root">
@@ -622,6 +721,8 @@ export function ReportDetail({
           reportsListHref={backToReportsHref}
           isAdmin={isAdmin}
           actionBusy={actionBusy}
+          hasBeenSubmitted={report.hasBeenSubmitted}
+          onBackClick={handleBackClick}
           onSaveDraft={
             topbarStatus === "draft"
               ? () => {
@@ -648,6 +749,7 @@ export function ReportDetail({
               onApplyProposal={onApplyProposalFromChat}
               onPullObservation={onPullObservation}
               onApplyGhostEdit={onApplyGhostEdit}
+              onApplyNewSection={onApplyNewSection}
             />
             <ReportPane
               detail={detail}
@@ -688,6 +790,68 @@ export function ReportDetail({
               onClick={() => void confirmDeleteReport()}
             >
               {deleteBusy ? "Deleting…" : "Delete report"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={leaveDialogOpen}
+        onOpenChange={(open) => {
+          setLeaveDialogOpen(open);
+          if (!open) pendingNavRef.current = null;
+        }}
+      >
+        <DialogContent className="border-ink/10 bg-canvas">
+          <DialogHeader>
+            <DialogTitle>You have unsaved changes</DialogTitle>
+            <DialogDescription>
+              Save your edits before leaving so the next person sees the latest version.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rd-btn rd-btn-secondary"
+              disabled={leaveBusy}
+              onClick={() => {
+                pendingNavRef.current = null;
+                setLeaveDialogOpen(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rd-btn rd-btn-danger-ghost"
+              disabled={leaveBusy}
+              onClick={() => {
+                const href = pendingNavRef.current;
+                pendingNavRef.current = null;
+                setLeaveDialogOpen(false);
+                if (href) router.push(href);
+              }}
+            >
+              Leave anyway
+            </button>
+            <button
+              type="button"
+              className="rd-btn rd-btn-primary"
+              disabled={leaveBusy}
+              onClick={async () => {
+                setLeaveBusy(true);
+                try {
+                  await flushPendingSave();
+                } finally {
+                  setLeaveBusy(false);
+                }
+                const href = pendingNavRef.current;
+                pendingNavRef.current = null;
+                setLeaveDialogOpen(false);
+                if (href) router.push(href);
+              }}
+            >
+              {leaveBusy ? "Saving…" : "Save and leave"}
             </button>
           </div>
         </DialogContent>

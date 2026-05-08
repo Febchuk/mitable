@@ -67,6 +67,13 @@ export type ReportDetail = ReportListRow & {
   approvedByUserId: string | null;
   approvedAt: string | null;
   sentAt: string | null;
+  /**
+   * True iff the report has been submitted for review at least once. Drives
+   * the topbar action button label ("Resubmit for review" vs the initial
+   * "Submit for review"). Source: count of `report_review_actions` rows
+   * with action_type="submitted".
+   */
+  hasBeenSubmitted: boolean;
 };
 
 type ReportsRow = {
@@ -158,7 +165,14 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   }
   if (!data) return null;
   const row = data as unknown as ReportsRow;
-  const templateLogoUrl = await fetchTemplateLogoUrl(supabase, row.template_id, ctx.schoolId);
+  const [templateLogoUrl, { count: priorSubmissionCount }] = await Promise.all([
+    fetchTemplateLogoUrl(supabase, row.template_id, ctx.schoolId),
+    supabase
+      .from("report_review_actions")
+      .select("id", { count: "exact", head: true })
+      .eq("report_id", id)
+      .eq("action_type", "submitted"),
+  ]);
   return {
     id: row.id,
     studentId: row.student_id,
@@ -180,5 +194,6 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     sentAt: row.sent_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    hasBeenSubmitted: (priorSubmissionCount ?? 0) > 0,
   };
 }

@@ -61,6 +61,7 @@ const ADA_REPORT: ReportDetailRow = {
   sentAt: null,
   createdAt: "2026-05-02T09:00:00Z",
   updatedAt: "2026-05-02T12:00:00Z",
+  hasBeenSubmitted: false,
 };
 
 const EMPTY_REPORT: ReportDetailRow = {

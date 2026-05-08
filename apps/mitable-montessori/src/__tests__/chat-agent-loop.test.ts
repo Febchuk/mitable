@@ -125,12 +125,14 @@ describe("runReportChatAgent — Phase 2", () => {
     ]);
 
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "prose") throw new Error(`expected prose, got ${out.terminalKind}`);
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "prose")
+      throw new Error(`expected prose, got ${emission.terminalKind}`);
 
-    expect(out.body).toBe(
+    expect(emission.body).toBe(
       "Ada Okafor settled into the morning by reaching for the pink tower without a prompt."
     );
-    expect(out.tokenizedBody).toContain("[STUDENT_1]");
+    expect(emission.tokenizedBody).toContain("[STUDENT_1]");
     expect(out.turns).toBe(2);
     expect(out.regenerations).toBe(0);
 
@@ -157,10 +159,11 @@ describe("runReportChatAgent — Phase 2", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "clarify") {
-      throw new Error(`expected clarify, got ${out.terminalKind}`);
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "clarify") {
+      throw new Error(`expected clarify, got ${emission.terminalKind}`);
     }
-    expect(out.body).toBe("Should I focus only on Ada Okafor or include peers?");
+    expect(emission.body).toBe("Should I focus only on Ada Okafor or include peers?");
   });
 
   it("regenerates once when the agent leaks a real name, then succeeds", async () => {
@@ -192,8 +195,10 @@ describe("runReportChatAgent — Phase 2", () => {
     ]);
 
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "prose") throw new Error(`expected prose, got ${out.terminalKind}`);
-    expect(out.body).toBe("Ada Okafor had a steady morning with the pink tower.");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "prose")
+      throw new Error(`expected prose, got ${emission.terminalKind}`);
+    expect(emission.body).toBe("Ada Okafor had a steady morning with the pink tower.");
     expect(out.regenerations).toBe(1);
   });
 
@@ -320,21 +325,22 @@ describe("runReportChatAgent — Phase 2", () => {
     ]);
 
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "proposal") {
-      throw new Error(`expected proposal, got ${out.terminalKind}`);
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "proposal") {
+      throw new Error(`expected proposal, got ${emission.terminalKind}`);
     }
 
-    expect(out.proposal.target).toEqual({
+    expect(emission.proposal.target).toEqual({
       sectionId: "morning",
       paragraphId: "morning-p1",
     });
-    expect(out.proposal.lead).toBe("Here's a warmer take:");
-    expect(out.proposal.oldText).toContain("Ada Okafor");
-    expect(out.proposal.newText).toContain("Ada Okafor");
-    expect(out.proposal.rationale).toBe("Same facts, warmer tone.");
+    expect(emission.proposal.lead).toBe("Here's a warmer take:");
+    expect(emission.proposal.oldText).toContain("Ada Okafor");
+    expect(emission.proposal.newText).toContain("Ada Okafor");
+    expect(emission.proposal.rationale).toBe("Same facts, warmer tone.");
     // Tokenized snapshot kept for tool_trace.
-    expect(out.proposal.tokenized.newText).toContain("[STUDENT_1]");
-    expect(out.proposal.tokenized.newText).not.toContain("Ada Okafor");
+    expect(emission.proposal.tokenized.newText).toContain("[STUDENT_1]");
+    expect(emission.proposal.tokenized.newText).not.toContain("Ada Okafor");
   });
 
   it("rejects propose_rewrite with an unknown sectionId+paragraphId pair", async () => {
@@ -371,8 +377,9 @@ describe("runReportChatAgent — Phase 2", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "proposal") throw new Error("expected proposal");
-    expect(out.proposal.target.sectionId).toBe("morning");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "proposal") throw new Error("expected proposal");
+    expect(emission.proposal.target.sectionId).toBe("morning");
     expect(out.turns).toBe(2);
     // Recovered without a regeneration (the bad target was a tool-error response,
     // not a token-leak validation failure).
@@ -413,8 +420,9 @@ describe("runReportChatAgent — Phase 2", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "proposal") throw new Error("expected proposal");
-    expect(out.proposal.newText).toBe("Ada Okafor came in calm.");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "proposal") throw new Error("expected proposal");
+    expect(emission.proposal.newText).toBe("Ada Okafor came in calm.");
     expect(out.regenerations).toBe(1);
   });
 });
@@ -480,15 +488,16 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "chips") throw new Error("expected chips");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "chips") throw new Error("expected chips");
 
-    expect(out.chips.body).toBe("Two ways to handle Ada Okafor today:");
-    expect(out.chips.chips).toHaveLength(2);
-    expect(out.chips.chips[0].label).toBe("Keep focus on Ada Okafor");
-    expect(out.chips.chips[0].prefill).toBe("Keep focus on Ada Okafor.");
-    expect(out.chips.chips[0].id).toBeTypeOf("string");
+    expect(emission.chips.body).toBe("Two ways to handle Ada Okafor today:");
+    expect(emission.chips.chips).toHaveLength(2);
+    expect(emission.chips.chips[0].label).toBe("Keep focus on Ada Okafor");
+    expect(emission.chips.chips[0].prefill).toBe("Keep focus on Ada Okafor.");
+    expect(emission.chips.chips[0].id).toBeTypeOf("string");
     // Tokenized snapshot kept for tool_trace.
-    expect(out.chips.tokenized.body).toContain("[STUDENT_1]");
+    expect(emission.chips.tokenized.body).toContain("[STUDENT_1]");
   });
 
   it("rejects propose_chips with fewer than 2 chips", async () => {
@@ -523,8 +532,9 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "chips") throw new Error("expected chips");
-    expect(out.chips.chips).toHaveLength(2);
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "chips") throw new Error("expected chips");
+    expect(emission.chips.chips).toHaveLength(2);
     expect(out.turns).toBe(2);
   });
 
@@ -550,15 +560,16 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
 
-    expect(out.obsRef.body).toContain("Ada Okafor");
-    expect(out.obsRef.obs.artifactId).toBe("a-123");
-    expect(out.obsRef.obs.quote).toContain("Ada Okafor");
-    expect(out.obsRef.obs.when).toBe("10:14 AM");
-    expect(out.obsRef.obs.area).toBe("Language area");
-    expect(out.obsRef.suggestedTarget?.sectionId).toBe("morning");
-    expect(out.obsRef.suggestedTarget?.position).toBe("append");
+    expect(emission.obsRef.body).toContain("Ada Okafor");
+    expect(emission.obsRef.obs.artifactId).toBe("a-123");
+    expect(emission.obsRef.obs.quote).toContain("Ada Okafor");
+    expect(emission.obsRef.obs.when).toBe("10:14 AM");
+    expect(emission.obsRef.obs.area).toBe("Language area");
+    expect(emission.obsRef.suggestedTarget?.sectionId).toBe("morning");
+    expect(emission.obsRef.suggestedTarget?.position).toBe("append");
   });
 
   it("propose_observation_ref drops a suggestedTarget that points at a missing section", async () => {
@@ -578,8 +589,9 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
-    expect(out.obsRef.suggestedTarget).toBeUndefined();
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
+    expect(emission.obsRef.suggestedTarget).toBeUndefined();
   });
 
   it("propose_ghost_edit returns a ghost payload scoped to a real section", async () => {
@@ -602,12 +614,13 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
-    expect(out.ghostEdit.target.sectionId).toBe("morning");
-    expect(out.ghostEdit.ghostEdit.html).toContain("Ada Okafor");
-    expect(out.ghostEdit.ghostEdit.sourceLabel).toBe("10:14 AM photo");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
+    expect(emission.ghostEdit.target.sectionId).toBe("morning");
+    expect(emission.ghostEdit.ghostEdit.html).toContain("Ada Okafor");
+    expect(emission.ghostEdit.ghostEdit.sourceLabel).toBe("10:14 AM photo");
     // Server-stamped id so the report pane can address the slot.
-    expect(out.ghostEdit.ghostEdit.id.length).toBeGreaterThan(0);
+    expect(emission.ghostEdit.ghostEdit.id.length).toBeGreaterThan(0);
   });
 
   it("propose_ghost_edit rejects a missing section", async () => {
@@ -641,7 +654,8 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
       },
     ]);
     const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
-    if (out.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
     expect(out.turns).toBe(2);
   });
 
@@ -679,9 +693,10 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
       anthropic: stub.sdk,
       searchArtifacts: search,
     });
-    if (out.terminalKind !== "prose") throw new Error("expected prose");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "prose") throw new Error("expected prose");
     expect(search).toHaveBeenCalledWith({ query: "letter S", limit: 5 });
-    expect(out.body).toContain("Ada Okafor");
+    expect(emission.body).toContain("Ada Okafor");
 
     // Inspect the second SDK call for the tool_result block — the agent
     // should have received the artifacts list verbatim.
@@ -735,10 +750,11 @@ describe("runReportChatAgent — Phase 6 regression", () => {
       anthropic: stub.sdk,
       references: fallbackRefs,
     });
-    if (out.terminalKind !== "prose") {
-      throw new Error(`expected prose, got ${out.terminalKind}`);
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "prose") {
+      throw new Error(`expected prose, got ${emission.terminalKind}`);
     }
-    expect(out.body).toContain("morning section");
+    expect(emission.body).toContain("morning section");
     expect(out.regenerations).toBe(0);
   });
 });

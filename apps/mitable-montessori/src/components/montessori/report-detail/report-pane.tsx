@@ -85,6 +85,15 @@ export function ReportPane({
     onChange({ ...detail, sections });
   };
 
+  const onDeleteParagraph = (sectionId: string, paragraphId: string) => {
+    const sections = detail.sections.map((section) => {
+      if (section.id !== sectionId) return section;
+      const paragraphs = section.paragraphs.filter((p) => p.id !== paragraphId);
+      return { ...section, paragraphs };
+    });
+    onChange({ ...detail, sections });
+  };
+
   const clearPendingFocus = React.useCallback(() => setPendingFocusParagraphId(null), []);
 
   return (
@@ -121,6 +130,7 @@ export function ReportPane({
                 onParagraphCommit(section.id, paragraphId, html)
               }
               onDelete={() => onDeleteSection(section.id)}
+              onDeleteParagraph={(paragraphId) => onDeleteParagraph(section.id, paragraphId)}
               onDiscussParagraph={
                 onDiscussParagraph
                   ? (paragraphId) => onDiscussParagraph(section.id, paragraphId)
@@ -241,6 +251,7 @@ function SectionBlock({
   onParagraphFocused,
   onParagraphCommit,
   onDelete,
+  onDeleteParagraph,
   onDiscussParagraph,
   onAcceptGhostEdit,
   onDismissGhostEdit,
@@ -250,11 +261,15 @@ function SectionBlock({
   onParagraphFocused: () => void;
   onParagraphCommit: (paragraphId: string, html: string) => void;
   onDelete: () => void;
+  onDeleteParagraph: (paragraphId: string) => void;
   onDiscussParagraph?: (paragraphId: string) => void;
   onAcceptGhostEdit?: () => void;
   onDismissGhostEdit?: () => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+  const [confirmingDeleteParagraphId, setConfirmingDeleteParagraphId] = React.useState<
+    string | null
+  >(null);
   const showGhost = !!section.ghostEdit;
 
   return (
@@ -304,19 +319,58 @@ function SectionBlock({
       {section.paragraphs.map((p) => (
         <div className="rd-para-block" key={p.id}>
           <div className="rd-para-actions">
-            <button
-              type="button"
-              className="rd-para-action"
-              onClick={() =>
-                onDiscussParagraph
-                  ? onDiscussParagraph(p.id)
-                  : toast("Open the editing assistant on the left to discuss this paragraph.")
-              }
-              title="Discuss this paragraph in the chat"
-            >
-              <MessageSquare size={11} strokeWidth={2} />
-              Discuss
-            </button>
+            {confirmingDeleteParagraphId === p.id ? (
+              <span className="rd-para-confirm" role="group" aria-label="Confirm delete paragraph">
+                <span className="rd-para-confirm-label">Delete this paragraph?</span>
+                <button
+                  type="button"
+                  className="rd-para-action rd-para-confirm-yes"
+                  onClick={() => {
+                    onDeleteParagraph(p.id);
+                    setConfirmingDeleteParagraphId(null);
+                    ToastBus.push({ message: "Paragraph deleted" });
+                  }}
+                  aria-label="Confirm delete paragraph"
+                >
+                  <Check size={11} strokeWidth={2.5} />
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  className="rd-para-action"
+                  onClick={() => setConfirmingDeleteParagraphId(null)}
+                  aria-label="Cancel delete paragraph"
+                >
+                  <X size={11} strokeWidth={2.5} />
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="rd-para-action"
+                  onClick={() =>
+                    onDiscussParagraph
+                      ? onDiscussParagraph(p.id)
+                      : toast("Open the editing assistant on the left to discuss this paragraph.")
+                  }
+                  title="Discuss this paragraph in the chat"
+                >
+                  <MessageSquare size={11} strokeWidth={2} />
+                  Discuss
+                </button>
+                <button
+                  type="button"
+                  className="rd-para-action"
+                  onClick={() => setConfirmingDeleteParagraphId(p.id)}
+                  title="Delete this paragraph"
+                  aria-label="Delete paragraph"
+                >
+                  <Trash2 size={11} strokeWidth={2} />
+                </button>
+              </>
+            )}
           </div>
           <EditableParagraph
             html={p.html}

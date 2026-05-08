@@ -166,8 +166,9 @@ describe("Phase 6 — chat agent end-to-end", () => {
       anthropic: stub.sdk,
       userMessage: "Make the morning warmer.",
     });
-    if (out.terminalKind !== "proposal") throw new Error("expected proposal");
-    expect(out.proposal.newText).toBe(
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "proposal") throw new Error("expected proposal");
+    expect(emission.proposal.newText).toBe(
       "Ada Okafor came in calmly and chose the pink tower without prompting."
     );
     expect(out.regenerations).toBe(1);
@@ -226,11 +227,12 @@ describe("Phase 6 — chat agent end-to-end", () => {
       searchArtifacts: search,
       userMessage: "Anything in the captures about her pencil grip?",
     });
-    if (out.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "obs-ref") throw new Error("expected obs-ref");
     expect(search).toHaveBeenCalledOnce();
-    expect(out.obsRef.body).toContain("Ada Okafor");
-    expect(out.obsRef.obs.quote).toContain("Ada Okafor");
-    expect(out.obsRef.suggestedTarget?.sectionId).toBe("morning");
+    expect(emission.obsRef.body).toContain("Ada Okafor");
+    expect(emission.obsRef.obs.quote).toContain("Ada Okafor");
+    expect(emission.obsRef.suggestedTarget?.sectionId).toBe("morning");
   });
 
   it("turn 3: propose_chips with multi-word display tokenization", async () => {
@@ -257,11 +259,12 @@ describe("Phase 6 — chat agent end-to-end", () => {
       anthropic: stub.sdk,
       userMessage: "Should I mention Mateo here?",
     });
-    if (out.terminalKind !== "chips") throw new Error("expected chips");
-    expect(out.chips.body).toBe("Two ways to handle Ada Okafor today:");
-    expect(out.chips.chips).toHaveLength(3);
-    expect(out.chips.chips[0].label).toBe("Keep Ada Okafor focused");
-    expect(out.chips.chips[0].prefill).toBe("Keep focus on Ada Okafor.");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "chips") throw new Error("expected chips");
+    expect(emission.chips.body).toBe("Two ways to handle Ada Okafor today:");
+    expect(emission.chips.chips).toHaveLength(3);
+    expect(emission.chips.chips[0].label).toBe("Keep Ada Okafor focused");
+    expect(emission.chips.chips[0].prefill).toBe("Keep focus on Ada Okafor.");
   });
 
   it("turn 4: propose_ghost_edit emits a server-stamped id and detokenized html", async () => {
@@ -288,11 +291,12 @@ describe("Phase 6 — chat agent end-to-end", () => {
       anthropic: stub.sdk,
       userMessage: "Add a sentence about her pencil grip below morning.",
     });
-    if (out.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
-    expect(out.ghostEdit.target.sectionId).toBe("morning");
-    expect(out.ghostEdit.ghostEdit.html).toContain("Ada Okafor");
-    expect(out.ghostEdit.ghostEdit.id.length).toBeGreaterThan(0);
-    expect(out.ghostEdit.ghostEdit.sourceLabel).toBe("10:14 AM photo");
+    const emission = out.emissions[0];
+    if (emission.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
+    expect(emission.ghostEdit.target.sectionId).toBe("morning");
+    expect(emission.ghostEdit.ghostEdit.html).toContain("Ada Okafor");
+    expect(emission.ghostEdit.ghostEdit.id.length).toBeGreaterThan(0);
+    expect(emission.ghostEdit.ghostEdit.sourceLabel).toBe("10:14 AM photo");
   });
 });
 

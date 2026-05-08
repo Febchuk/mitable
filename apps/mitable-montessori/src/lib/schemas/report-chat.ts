@@ -119,6 +119,23 @@ export const ChatGhostEditMessageSchema = z.object({
   ...baseFields,
 });
 
+export const ChatNewSectionParagraphSchema = z.object({
+  id: z.string(),
+  html: z.string().min(1).max(4000),
+});
+
+export const ChatNewSectionMessageSchema = z.object({
+  kind: z.literal("new-section"),
+  body: z.string().min(1).max(500),
+  /** Stable id stamped server-side for the new section so the client can address it. */
+  sectionId: z.string(),
+  heading: z.string().min(1).max(120),
+  paragraphs: z.array(ChatNewSectionParagraphSchema).min(1).max(4),
+  /** When set, the new section is inserted directly after this section. Otherwise append. */
+  afterSectionId: z.string().optional(),
+  ...baseFields,
+});
+
 export const ChatTurnMessageSchema = z.discriminatedUnion("kind", [
   ChatProseMessageSchema,
   ChatClarifyMessageSchema,
@@ -127,6 +144,7 @@ export const ChatTurnMessageSchema = z.discriminatedUnion("kind", [
   ChatChipsMessageSchema,
   ChatObsRefMessageSchema,
   ChatGhostEditMessageSchema,
+  ChatNewSectionMessageSchema,
 ]);
 export type ChatTurnMessage = z.infer<typeof ChatTurnMessageSchema>;
 

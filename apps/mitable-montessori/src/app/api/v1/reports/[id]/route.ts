@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireTeacherForClassroom, requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
@@ -56,12 +57,30 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (parsed.data.body !== undefined) update.body = parsed.data.body;
   if (parsed.data.sections !== undefined) update.sections = parsed.data.sections;
 
+  // Editing a report that's awaiting review pulls it back to draft so the
+  // reviewer doesn't see a moving target. Logged as an `edited` review
+  // action with notes that explain the auto-revert.
+  const revertedFromReview =
+    (existing as unknown as { status: string }).status === "submitted_for_review";
+  if (revertedFromReview) {
+    update.status = "draft";
+  }
+
   const { error } = await supabase.from("reports").update(update).eq("id", id);
   if (error) {
     return NextResponse.json(
       { error: "Failed to update report", details: error.message },
       { status: 500 }
     );
+  }
+
+  if (revertedFromReview) {
+    await supabase.from("report_review_actions").insert({
+      report_id: id,
+      action_by_user_id: auth.user.userId,
+      action_type: "edited",
+      notes: "Teacher edited while awaiting review; reverted to draft for resubmission.",
+    });
   }
 
   await auditLog({
@@ -72,10 +91,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     target_id: id,
     metadata: {
       fields: Object.keys(parsed.data),
+      reverted_from_review: revertedFromReview,
     },
   });
 
-  return NextResponse.json({ ok: true });
+  revalidatePath(`/app/reports/${id}`);
+  revalidatePath(`/admin/reports/${id}`);
+
+  return NextResponse.json({ ok: true, revertedFromReview });
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -143,6 +166,9 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     target_id: id,
     metadata: {},
   });
+
+  revalidatePath("/app/reports");
+  revalidatePath("/admin/reports");
 
   return NextResponse.json({ ok: true });
 }
