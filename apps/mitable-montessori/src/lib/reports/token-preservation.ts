@@ -3,6 +3,12 @@
  * reference students / subtopics / classrooms ONLY by tokens like
  * [STUDENT_1] / [SUBTOPIC_3] / [CLASSROOM_0]. Real names must never appear.
  *
+ * Track B (PII tokenization migration, May 2026) extended this validator to
+ * also recognize the new `{{kind:UUID}}` grammar emitted by the general chat
+ * agent. The two formats coexist during the migration window — the validator
+ * tolerates either, and a token from either format counts as "preserved" so
+ * long as it's in the supplied reference set's tokens.
+ *
  * The validator runs against the union of (drafted text, known reference
  * names). It cannot detect every possible PII leak (e.g. an invented name the
  * agent hallucinated), but it pins the contract for the names we *do* know
@@ -10,7 +16,10 @@
  * out of context and rendering it back as the original string.
  */
 
-const TOKEN_RE = /\[(STUDENT|SUBTOPIC|CLASSROOM|GUARDIAN|USER|TOPIC|CURRICULUM)_\d+\]/g;
+const LEGACY_TOKEN_RE = /\[(STUDENT|SUBTOPIC|CLASSROOM|GUARDIAN|USER|TOPIC|CURRICULUM)_\d+\]/g;
+const UUID_TOKEN_RE =
+  /\{\{(student|subtopic|classroom|guardian):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}\}/gi;
+const TOKEN_RE = new RegExp(`${LEGACY_TOKEN_RE.source}|${UUID_TOKEN_RE.source}`, "gi");
 
 /**
  * Common English words that can appear inside a multi-word display string

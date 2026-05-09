@@ -125,3 +125,37 @@ describe("validateTokenPreservation — unknown tokens", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe("validateTokenPreservation — Track B coexistence with {{kind:UUID}} grammar", () => {
+  // Track B (May 2026) extended the validator regex to also recognize the
+  // new general-agent token format. Mixed-format text is allowed during the
+  // migration window — both legacy and new tokens count as "preserved" so
+  // long as they're in the supplied refs.
+  const ADA_UUID = "7e1c8a3b-2f4d-4d6c-9a3e-12abcd34ef56";
+  const REF_ADA_UUID = {
+    id: ADA_UUID,
+    token: `{{student:${ADA_UUID}}}`,
+    display: "Ada Okafor",
+    kind: "student" as const,
+  };
+
+  it("accepts the new {{student:UUID}} format when in refs", () => {
+    const r = validateTokenPreservation(`{{student:${ADA_UUID}}} had a steady morning.`, [
+      REF_ADA_UUID,
+    ]);
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects an invented UUID under the new format", () => {
+    const fake = "99999999-9999-9999-9999-999999999999";
+    const r = validateTokenPreservation(`{{student:${fake}}} arrived.`, [REF_ADA_UUID]);
+    expect(r.ok).toBe(false);
+    expect(r.unknownTokens).toContain(`{{student:${fake}}}`);
+  });
+
+  it("still catches name leaks under the new format", () => {
+    const r = validateTokenPreservation("Ada Okafor had a steady morning.", [REF_ADA_UUID]);
+    expect(r.ok).toBe(false);
+    expect(r.leakedNames).toContain("Ada Okafor");
+  });
+});
