@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, X } from "lucide-react";
-import { ChatThread } from "@/components/chat/ChatThread";
+import { AgentThread } from "@/components/agent/AgentThread";
 
 export interface MobileChatShellProps {
   classroomId: string | null;
@@ -14,7 +14,6 @@ export interface MobileChatShellProps {
 
 export function MobileChatShell(props: MobileChatShellProps) {
   const router = useRouter();
-  const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
 
   return (
     <div
@@ -91,9 +90,9 @@ export function MobileChatShell(props: MobileChatShellProps) {
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {props.classroomId ? (
-          <ChatThread
-            threadId={threadId}
+          <AgentThread
             classroomId={props.classroomId}
+            classroomName={props.classroomName}
             schoolId={props.schoolId}
             userId={props.userId}
           />

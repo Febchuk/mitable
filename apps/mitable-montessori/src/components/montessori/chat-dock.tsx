@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { MessageSquare, Sparkles, X } from "lucide-react";
-import { ChatThread } from "@/components/chat/ChatThread";
+import { AgentThread } from "@/components/agent/AgentThread";
 import { useMontessori } from "./store";
 
 export interface ChatDockProps {
@@ -15,7 +15,6 @@ export interface ChatDockProps {
 export function ChatDock(props: ChatDockProps) {
   const store = useMontessori();
   const isOpen = store.webChatMode === "open";
-  const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
 
   return (
     <div className="hidden lg:block">
@@ -92,9 +91,9 @@ export function ChatDock(props: ChatDockProps) {
           </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             {props.classroomId ? (
-              <ChatThread
-                threadId={threadId}
+              <AgentThread
                 classroomId={props.classroomId}
+                classroomName={props.classroomName}
                 schoolId={props.schoolId}
                 userId={props.userId}
               />
