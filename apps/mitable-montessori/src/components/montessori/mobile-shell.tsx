@@ -95,21 +95,17 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
 
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const store = useMontessori();
-  const sheetOpen = !isReportDetail && store.webChatMode === "open";
-  const setWebChatMode = store.setWebChatMode;
-  const setSheetOpen = React.useCallback(
-    (v: boolean) => setWebChatMode(v ? "open" : "pill"),
-    [setWebChatMode]
-  );
+  const sheetOpen = !isReportDetail && store.mobileChatOpen;
+  const setMobileChatOpen = store.setMobileChatOpen;
+  const setSheetOpen = React.useCallback((v: boolean) => setMobileChatOpen(v), [setMobileChatOpen]);
 
   // If the user navigates onto a report-detail route while the generic sheet
-  // was left open, force it back to "pill" so the desktop ChatDock and the
-  // store stay consistent — the report editor's own chat takes over here.
+  // was left open, force it closed — the report editor's own chat takes over here.
   React.useEffect(() => {
-    if (isReportDetail && store.webChatMode === "open") {
-      setWebChatMode("pill");
+    if (isReportDetail && store.mobileChatOpen) {
+      setMobileChatOpen(false);
     }
-  }, [isReportDetail, store.webChatMode, setWebChatMode]);
+  }, [isReportDetail, store.mobileChatOpen, setMobileChatOpen]);
 
   // Close drawer on Escape
   React.useEffect(() => {
@@ -621,58 +617,63 @@ function ActiveRail() {
 
 function MobileChatFab({ hidden, onClick }: { hidden: boolean; onClick: () => void }) {
   const store = useMontessori();
+  // Wrapper is `lg:hidden` so above `lg` Tailwind's `display:none` reliably
+  // beats the button's inline `display:grid` and the FAB never coexists with
+  // the desktop ChatDock pill.
   return (
-    <button
-      type="button"
-      className="lg:hidden tap"
-      onClick={onClick}
-      aria-label="Ask Mitable"
-      aria-hidden={hidden}
-      style={{
-        position: "fixed",
-        right: 16,
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
-        width: 56,
-        height: 56,
-        borderRadius: 999,
-        background: "var(--color-terracotta)",
-        color: "#fff",
-        display: "grid",
-        placeItems: "center",
-        boxShadow: "0 8px 18px rgba(196,106,79,0.35)",
-        border: "3px solid var(--color-surface)",
-        zIndex: 30,
-        cursor: "pointer",
-        opacity: hidden ? 0 : 1,
-        pointerEvents: hidden ? "none" : "auto",
-        transform: hidden ? "translateY(8px) scale(0.92)" : "translateY(0) scale(1)",
-        transition: "opacity 200ms ease, transform 200ms ease",
-      }}
-    >
-      <MessageSquare size={22} strokeWidth={1.8} />
-      {store.pendingObs > 0 ? (
-        <span
-          style={{
-            position: "absolute",
-            top: -2,
-            right: -2,
-            width: 18,
-            height: 18,
-            borderRadius: 999,
-            background: "var(--color-ink)",
-            color: "#fff",
-            fontSize: 10,
-            fontWeight: 700,
-            display: "grid",
-            placeItems: "center",
-            border: "2px solid var(--color-surface)",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {store.pendingObs}
-        </span>
-      ) : null}
-    </button>
+    <div className="lg:hidden">
+      <button
+        type="button"
+        className="tap"
+        onClick={onClick}
+        aria-label="Ask Mitable"
+        aria-hidden={hidden}
+        style={{
+          position: "fixed",
+          right: 16,
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+          width: 56,
+          height: 56,
+          borderRadius: 999,
+          background: "var(--color-terracotta)",
+          color: "#fff",
+          display: "grid",
+          placeItems: "center",
+          boxShadow: "0 8px 18px rgba(196,106,79,0.35)",
+          border: "3px solid var(--color-surface)",
+          zIndex: 30,
+          cursor: "pointer",
+          opacity: hidden ? 0 : 1,
+          pointerEvents: hidden ? "none" : "auto",
+          transform: hidden ? "translateY(8px) scale(0.92)" : "translateY(0) scale(1)",
+          transition: "opacity 200ms ease, transform 200ms ease",
+        }}
+      >
+        <MessageSquare size={22} strokeWidth={1.8} />
+        {store.pendingObs > 0 ? (
+          <span
+            style={{
+              position: "absolute",
+              top: -2,
+              right: -2,
+              width: 18,
+              height: 18,
+              borderRadius: 999,
+              background: "var(--color-ink)",
+              color: "#fff",
+              fontSize: 10,
+              fontWeight: 700,
+              display: "grid",
+              placeItems: "center",
+              border: "2px solid var(--color-surface)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {store.pendingObs}
+          </span>
+        ) : null}
+      </button>
+    </div>
   );
 }
 
@@ -693,128 +694,131 @@ function MobileChatSheet({
 }) {
   const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
 
+  // Outer wrapper carries `lg:hidden` so above `lg` the sheet is fully removed
+  // from layout regardless of the inner inline `display: flex`.
   return (
-    <div
-      className="lg:hidden"
-      role="dialog"
-      aria-label="Ask Mitable"
-      aria-hidden={!open}
-      style={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: "85vh",
-        zIndex: 80,
-        background: "var(--color-canvas)",
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        boxShadow: "0 -16px 40px rgba(43,38,34,0.18)",
-        transform: open ? "translateY(0)" : "translateY(105%)",
-        transition: "transform 320ms cubic-bezier(0.32, 0.72, 0.24, 1)",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className="lg:hidden">
       <div
-        aria-hidden
+        role="dialog"
+        aria-label="Ask Mitable"
+        aria-hidden={!open}
         style={{
-          width: 40,
-          height: 4,
-          borderRadius: 999,
-          background: "var(--color-border-strong)",
-          opacity: 0.6,
-          margin: "8px auto 0",
-        }}
-      />
-      <div
-        style={{
-          padding: "12px 16px 10px",
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: "85vh",
+          zIndex: 80,
+          background: "var(--color-canvas)",
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          boxShadow: "0 -16px 40px rgba(43,38,34,0.18)",
+          transform: open ? "translateY(0)" : "translateY(105%)",
+          transition: "transform 320ms cubic-bezier(0.32, 0.72, 0.24, 1)",
           display: "flex",
-          alignItems: "center",
-          gap: 12,
-          borderBottom: "1px solid color-mix(in srgb, var(--color-border) 60%, transparent)",
+          flexDirection: "column",
         }}
       >
         <div
+          aria-hidden
           style={{
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 4,
             borderRadius: 999,
-            background: "var(--color-terracotta-soft)",
-            color: "var(--color-terracotta-deep)",
-            display: "grid",
-            placeItems: "center",
-            flexShrink: 0,
+            background: "var(--color-border-strong)",
+            opacity: 0.6,
+            margin: "8px auto 0",
           }}
-        >
-          <Sparkles size={16} strokeWidth={1.6} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.005em" }}>
-            Ask Mitable
-          </div>
-          <div
-            style={{
-              fontSize: 11.5,
-              color: "var(--color-ink-muted)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            Capture &amp; review · {classroomName}
-          </div>
-        </div>
-        <button
-          type="button"
-          className="tap"
-          onClick={onClose}
-          aria-label="Close"
+        />
+        <div
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 12,
-            border: 0,
-            background: "transparent",
-            color: "var(--color-ink-secondary)",
-            display: "grid",
-            placeItems: "center",
-            cursor: "pointer",
+            padding: "12px 16px 10px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            borderBottom: "1px solid color-mix(in srgb, var(--color-border) 60%, transparent)",
           }}
         >
-          <X size={18} strokeWidth={1.6} />
-        </button>
-      </div>
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {classroomId ? (
-          // Only mount the live thread once it's been opened — avoids paying the
-          // network/render cost on every page load when the sheet is closed.
-          open ? (
-            <ChatThread
-              threadId={threadId}
-              classroomId={classroomId}
-              schoolId={schoolId}
-              userId={userId}
-            />
-          ) : null
-        ) : (
           <div
             style={{
-              flex: 1,
+              width: 38,
+              height: 38,
+              borderRadius: 999,
+              background: "var(--color-terracotta-soft)",
+              color: "var(--color-terracotta-deep)",
               display: "grid",
               placeItems: "center",
-              padding: 24,
-              textAlign: "center",
-              fontSize: 13,
-              color: "var(--color-ink-muted)",
-              lineHeight: 1.5,
+              flexShrink: 0,
             }}
           >
-            You aren&apos;t assigned to a classroom yet. Ask an admin to add you to one before
-            capturing observations.
+            <Sparkles size={16} strokeWidth={1.6} />
           </div>
-        )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.005em" }}>
+              Ask Mitable
+            </div>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--color-ink-muted)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              Capture &amp; review · {classroomName}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="tap"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 12,
+              border: 0,
+              background: "transparent",
+              color: "var(--color-ink-secondary)",
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+            }}
+          >
+            <X size={18} strokeWidth={1.6} />
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          {classroomId ? (
+            // Only mount the live thread once it's been opened — avoids paying the
+            // network/render cost on every page load when the sheet is closed.
+            open ? (
+              <ChatThread
+                threadId={threadId}
+                classroomId={classroomId}
+                schoolId={schoolId}
+                userId={userId}
+              />
+            ) : null
+          ) : (
+            <div
+              style={{
+                flex: 1,
+                display: "grid",
+                placeItems: "center",
+                padding: 24,
+                textAlign: "center",
+                fontSize: 13,
+                color: "var(--color-ink-muted)",
+                lineHeight: 1.5,
+              }}
+            >
+              You aren&apos;t assigned to a classroom yet. Ask an admin to add you to one before
+              capturing observations.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

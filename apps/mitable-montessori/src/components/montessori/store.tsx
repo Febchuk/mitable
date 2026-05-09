@@ -43,6 +43,8 @@ export type MontessoriStore = {
   setWebRoute: (r: WebRoute) => void;
   webChatMode: ChatMode;
   setWebChatMode: (m: ChatMode) => void;
+  mobileChatOpen: boolean;
+  setMobileChatOpen: (v: boolean) => void;
 
   // data
   chat: ChatMessage[];
@@ -179,6 +181,7 @@ export function MontessoriProvider({
 }) {
   const [webRoute, setWebRouteState] = React.useState<WebRoute>("today");
   const [webChatMode, setWebChatMode] = React.useState<ChatMode>("pill");
+  const [mobileChatOpen, setMobileChatOpen] = React.useState<boolean>(false);
   const [chat, setChat] = React.useState<ChatMessage[]>(INITIAL_CHAT);
   const [reports, setReports] = React.useState<Report[]>(INITIAL_REPORTS);
   const [classroomProgress, setClassroomProgress] = React.useState<ClassroomProgress | null>(
@@ -535,6 +538,8 @@ export function MontessoriProvider({
     setWebRoute,
     webChatMode,
     setWebChatMode,
+    mobileChatOpen,
+    setMobileChatOpen,
     chat,
     reports,
     classroomProgress,
