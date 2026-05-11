@@ -1,15 +1,40 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { LEVEL_TONES, stateMeta, type Level, type SubtopicState } from "../mock-data";
 import { SectionHeading } from "../section-heading";
-import type { ActivityFeedEntry } from "@/lib/queries/activity";
+import type { ActivityFeedEntry, ReportStatus } from "@/lib/queries/activity";
 
 const cardStyle: React.CSSProperties = {
   background: "var(--color-surface)",
   border: "1px solid var(--color-border)",
   borderRadius: 16,
   boxShadow: "0 1px 2px rgba(42,39,35,0.04)",
+};
+
+const REPORT_STATUS_LABEL: Record<ReportStatus, string> = {
+  draft: "Draft",
+  submitted_for_review: "In review",
+  in_review: "In review",
+  changes_requested: "Changes requested",
+  approved: "Approved",
+  sent: "Sent",
+};
+
+const REPORT_STATUS_COLOR: Record<ReportStatus, { bg: string; fg: string }> = {
+  draft: { bg: "var(--color-muted)", fg: "var(--color-ink-muted)" },
+  submitted_for_review: {
+    bg: "var(--color-butter-soft, #fef9eb)",
+    fg: "var(--color-butter-deep, #92700a)",
+  },
+  in_review: { bg: "var(--color-butter-soft, #fef9eb)", fg: "var(--color-butter-deep, #92700a)" },
+  changes_requested: {
+    bg: "var(--color-terracotta-soft, #fdf1ee)",
+    fg: "var(--color-terracotta-deep, #9b3a2a)",
+  },
+  approved: { bg: "var(--color-sage-soft, #eef6f1)", fg: "var(--color-sage-deep, #1f6b42)" },
+  sent: { bg: "var(--color-sage-soft, #eef6f1)", fg: "var(--color-sage-deep, #1f6b42)" },
 };
 
 const TRANSITION_LABEL: Record<"introduced" | "practicing" | "mastered", string> = {
@@ -219,6 +244,91 @@ function WholeChildEntry({
   );
 }
 
+function ReportEntry({
+  e,
+  mobile,
+}: {
+  e: Extract<ActivityFeedEntry, { kind: "report" }>;
+  mobile: boolean;
+}) {
+  const statusColor = REPORT_STATUS_COLOR[e.status];
+  const displayTitle =
+    e.title ??
+    (e.reportType === "daily"
+      ? "Daily report"
+      : e.reportType === "incident"
+        ? "Incident report"
+        : "Major report");
+  return (
+    <Link
+      href={`/app/reports/${e.id}`}
+      style={{
+        display: "block",
+        background: mobile ? "var(--color-canvas)" : "transparent",
+        border: mobile ? "1px solid var(--color-border)" : "0",
+        borderRadius: mobile ? 12 : 0,
+        padding: mobile ? "12px 14px" : "12px 0",
+        borderBottom: mobile ? undefined : "1px solid var(--color-border)",
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+          marginBottom: 6,
+          flexWrap: "wrap",
+        }}
+      >
+        <span className="label-cap" style={{ color: "var(--color-ink-secondary)" }}>
+          Report · {e.reportType.charAt(0).toUpperCase() + e.reportType.slice(1)}
+        </span>
+        <span
+          className="font-numeric"
+          style={{ fontSize: 11, color: "var(--color-ink-muted)" }}
+          title={e.createdAt}
+        >
+          {formatRelative(e.createdAt)}
+        </span>
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-ink)", lineHeight: 1.4 }}>
+        {displayTitle}
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-block",
+            fontSize: 10.5,
+            fontWeight: 500,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            padding: "3px 8px",
+            borderRadius: 999,
+            color: statusColor.fg,
+            background: statusColor.bg,
+            border: "1px solid currentColor",
+          }}
+        >
+          {REPORT_STATUS_LABEL[e.status]}
+        </span>
+        {e.authorName && (
+          <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{e.authorName}</span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 export function ActivityView({
   mobile,
   entries,
@@ -244,7 +354,7 @@ export function ActivityView({
               Activity feed
             </div>
             <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-ink)" }}>
-              Curriculum + whole-child events
+              Curriculum, whole-child &amp; reports
             </div>
             <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 2 }}>
               {entries.length} {entries.length === 1 ? "entry" : "entries"} total
@@ -255,8 +365,10 @@ export function ActivityView({
             {visible.map((e) =>
               e.kind === "curriculum" ? (
                 <CurriculumEntry key={`c-${e.id}`} e={e} mobile={mobile} />
-              ) : (
+              ) : e.kind === "whole-child" ? (
                 <WholeChildEntry key={`w-${e.id}`} e={e} mobile={mobile} />
+              ) : (
+                <ReportEntry key={`r-${e.id}`} e={e} mobile={mobile} />
               )
             )}
           </div>

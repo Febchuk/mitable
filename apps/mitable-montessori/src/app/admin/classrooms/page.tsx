@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { z } from "zod";
 import {
   AlertTriangle,
@@ -1341,10 +1342,19 @@ function RosterRow({ child, onRemove }: { child: AdminChild; onRemove: () => voi
         borderTop: "1px solid var(--color-border)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <Link
+        href={`/app/children/${child.id}`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          textDecoration: "none",
+          color: "inherit",
+        }}
+      >
         <Avatar initials={initialsFor(child.name)} tone={child.tone} size={34} />
         <div style={{ fontWeight: 600, fontSize: 14, color: "var(--color-ink)" }}>{child.name}</div>
-      </div>
+      </Link>
       <div className="font-numeric" style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
         {child.age || "-"}
       </div>
@@ -1381,35 +1391,47 @@ function RosterMobileRow({
     <div
       style={{
         width: "100%",
-        textAlign: "left",
         display: "flex",
         alignItems: "center",
         gap: 12,
         padding: "14px 16px",
-        background: "transparent",
-        border: 0,
         borderTop: index ? "1px solid var(--color-border)" : "0",
       }}
     >
-      <Avatar initials={initialsFor(child.name)} tone={child.tone} size={40} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 15, color: "var(--color-ink)" }}>{child.name}</div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--color-ink-secondary)",
-            marginTop: 2,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {child.recent}
+      <Link
+        href={`/app/children/${child.id}`}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          textDecoration: "none",
+          color: "inherit",
+        }}
+      >
+        <Avatar initials={initialsFor(child.name)} tone={child.tone} size={40} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: "var(--color-ink)" }}>
+            {child.name}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--color-ink-secondary)",
+              marginTop: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {child.recent}
+          </div>
         </div>
-      </div>
-      <div className="font-numeric" style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
-        {child.age}
-      </div>
+        <div className="font-numeric" style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
+          {child.age}
+        </div>
+      </Link>
       <button
         type="button"
         className="tap shrink-0 rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"

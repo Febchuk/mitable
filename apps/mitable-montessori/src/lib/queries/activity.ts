@@ -7,6 +7,14 @@ import type { AxisLevel } from "./whole-child";
 export type CurriculumTransition = "introduced" | "practicing" | "mastered";
 
 /** A teacher entry in the activity feed — either a curriculum or whole-child event. */
+export type ReportStatus =
+  | "draft"
+  | "submitted_for_review"
+  | "in_review"
+  | "changes_requested"
+  | "approved"
+  | "sent";
+
 export type ActivityFeedEntry =
   | {
       kind: "curriculum";
@@ -26,6 +34,15 @@ export type ActivityFeedEntry =
       fromLevel: AxisLevel | null;
       toLevel: AxisLevel | null;
       note: string;
+      authorName: string | null;
+      createdAt: string;
+    }
+  | {
+      kind: "report";
+      id: string;
+      title: string | null;
+      reportType: string;
+      status: ReportStatus;
       authorName: string | null;
       createdAt: string;
     };
@@ -53,6 +70,15 @@ type WholeChildObsDbRow = {
   users: { first_name: string | null; last_name: string | null } | null;
 };
 
+type ReportDbRow = {
+  id: string;
+  title: string | null;
+  report_type: string;
+  status: ReportStatus;
+  created_at: string;
+  users: { first_name: string | null; last_name: string | null } | null;
+};
+
 function authorName(u: { first_name: string | null; last_name: string | null } | null) {
   if (!u) return null;
   return [u.first_name, u.last_name].filter(Boolean).join(" ") || null;
@@ -64,7 +90,9 @@ function authorName(u: { first_name: string | null; last_name: string | null } |
  * client-side — the row counts are small enough that DB-side UNION isn't worth
  * the schema gymnastics.
  *
- * RLS on both source tables confines results to students the caller can see.
+ * RLS on each source table confines rows to students the caller can see
+ * (curriculum/whole-child: teacher classroom scope + admin school scope;
+ * reports: same after migration 0035 — teachers were previously school_id-only).
  *
  * `axes` doesn't have an FK from whole_child_observations.axis_key (axes are
  * keyed by `key` text, not `id`), so the join below is a manual lookup against
@@ -78,7 +106,7 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
   const ctx = await getCurrentUserContext();
   const schoolId = ctx?.schoolId ?? null;
 
-  const [eventsResp, obsResp, axes] = await Promise.all([
+  const [eventsResp, obsResp, reportsResp, axes] = await Promise.all([
     supabase
       .from("curriculum_events")
       .select(
@@ -100,6 +128,15 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
       .order("created_at", { ascending: false })
       .limit(100)
       .returns<Omit<WholeChildObsDbRow, "axes">[]>(),
+    supabase
+      .from("reports")
+      .select(
+        "id, title, report_type, status, created_at, users:created_by_user_id(first_name, last_name)"
+      )
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false })
+      .limit(100)
+      .returns<ReportDbRow[]>(),
     getAxesForSchool(schoolId),
   ]);
 
@@ -128,7 +165,17 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
     createdAt: o.created_at,
   }));
 
-  return [...curriculumEntries, ...wholeChildEntries].sort((a, b) =>
+  const reportEntries: ActivityFeedEntry[] = (reportsResp.data ?? []).map((r) => ({
+    kind: "report",
+    id: r.id,
+    title: r.title,
+    reportType: r.report_type,
+    status: r.status,
+    authorName: authorName(r.users),
+    createdAt: r.created_at,
+  }));
+
+  return [...curriculumEntries, ...wholeChildEntries, ...reportEntries].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt)
   );
 }
