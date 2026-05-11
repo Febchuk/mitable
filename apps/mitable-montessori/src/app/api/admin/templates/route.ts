@@ -7,6 +7,11 @@ import { auditLog } from "@/lib/audit/log";
 import { toAdminTemplateDto } from "@/lib/report-templates/admin-dto";
 import { rowsToDb, TemplateSectionsSchema } from "@/lib/report-templates/sections";
 
+const REPORTING_PERIOD_ENUM = z
+  .enum(["daily", "weekly", "biweekly", "monthly", "quarterly", "end_of_term"])
+  .nullable()
+  .optional();
+
 const CreateTemplateSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(400).nullable().optional(),
@@ -14,6 +19,8 @@ const CreateTemplateSchema = z.object({
   templateSections: TemplateSectionsSchema,
   writingStyle: z.string().max(8000).optional().default(""),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).default("clay"),
+  reportingPeriod: REPORTING_PERIOD_ENUM,
+  contextModeDefault: z.enum(["history", "input_only"]).optional().default("history"),
 });
 
 export async function GET() {
@@ -27,7 +34,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("report_templates")
     .select(
-      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
+      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, reporting_period, context_mode_default, created_at, updated_at"
     )
     .order("created_at", { ascending: true });
   if (error) {
@@ -71,6 +78,8 @@ export async function POST(req: Request) {
       section_meta,
       writing_style: input.writingStyle ?? "",
       icon_tone: input.iconTone,
+      reporting_period: input.reportingPeriod ?? null,
+      context_mode_default: input.contextModeDefault ?? "history",
       created_by_user_id: auth.user.userId,
     })
     .select("id")

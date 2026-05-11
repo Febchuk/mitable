@@ -4,7 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2, X } from "lucide-react";
-import type { AdminReportTemplateDto } from "@/lib/report-templates/admin-dto";
+import type {
+  AdminReportTemplateDto,
+  ReportingPeriod,
+  ContextModeDefault,
+} from "@/lib/report-templates/admin-dto";
+import { REPORTING_PERIOD_LABEL, REPORTING_PERIOD_VALUES } from "@/lib/report-templates/admin-dto";
 import type { TemplateSectionRow } from "@/lib/report-templates/sections";
 import { PageHeader, cardHeaderStyle, cardStyle } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
@@ -34,6 +39,8 @@ export function ReportTemplateEditor({
   const [kind, setKind] = React.useState<(typeof KINDS)[number]>("Daily");
   const [iconTone, setIconTone] = React.useState<(typeof ICON_TONES)[number]>("clay");
   const [writingStyle, setWritingStyle] = React.useState("");
+  const [reportingPeriod, setReportingPeriod] = React.useState<ReportingPeriod | null>(null);
+  const [contextMode, setContextMode] = React.useState<ContextModeDefault>("history");
   const [rows, setRows] = React.useState<TemplateSectionRow[]>([emptySection()]);
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -60,6 +67,8 @@ export function ReportTemplateEditor({
         setKind(t.kind as (typeof KINDS)[number]);
         setIconTone(t.iconTone as (typeof ICON_TONES)[number]);
         setWritingStyle(t.writingStyle ?? "");
+        setReportingPeriod(t.reportingPeriod ?? null);
+        setContextMode(t.contextModeDefault ?? "history");
         setRows(t.templateSections.length ? t.templateSections : [emptySection()]);
         setLogoUrl(t.logoUrl);
       } finally {
@@ -117,6 +126,8 @@ export function ReportTemplateEditor({
     kind,
     iconTone,
     writingStyle: writingStyle.trim(),
+    reportingPeriod: reportingPeriod ?? null,
+    contextModeDefault: contextMode,
     templateSections: rows.map((r) => ({
       section: r.section.trim(),
       description: (r.description ?? "").trim(),
@@ -312,6 +323,38 @@ export function ReportTemplateEditor({
                       {t}
                     </option>
                   ))}
+                </select>
+              </label>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                  Reporting period
+                </span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
+                  value={reportingPeriod ?? ""}
+                  onChange={(e) => setReportingPeriod((e.target.value as ReportingPeriod) || null)}
+                >
+                  <option value="">None</option>
+                  {REPORTING_PERIOD_VALUES.map((p) => (
+                    <option key={p} value={p}>
+                      {REPORTING_PERIOD_LABEL[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                  AI context
+                </span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
+                  value={contextMode}
+                  onChange={(e) => setContextMode(e.target.value as ContextModeDefault)}
+                >
+                  <option value="history">Child history</option>
+                  <option value="input_only">Current input only</option>
                 </select>
               </label>
             </div>

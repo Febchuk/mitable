@@ -4,6 +4,44 @@ import {
   type TemplateSectionRow,
 } from "@/lib/report-templates/sections";
 
+export type ReportingPeriod =
+  | "daily"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "end_of_term";
+
+export const REPORTING_PERIOD_LABEL: Record<ReportingPeriod, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  biweekly: "Bi-weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  end_of_term: "End of term",
+};
+
+export const REPORTING_PERIOD_VALUES: ReportingPeriod[] = [
+  "daily",
+  "weekly",
+  "biweekly",
+  "monthly",
+  "quarterly",
+  "end_of_term",
+];
+
+/** Number of days of history to pull for each reporting period. */
+export const REPORTING_PERIOD_DAYS: Record<ReportingPeriod, number> = {
+  daily: 1,
+  weekly: 7,
+  biweekly: 14,
+  monthly: 30,
+  quarterly: 91,
+  end_of_term: 120,
+};
+
+export type ContextModeDefault = "history" | "input_only";
+
 export type AdminReportTemplateDto = {
   id: string;
   name: string;
@@ -17,6 +55,8 @@ export type AdminReportTemplateDto = {
   logoUrl: string | null;
   iconTone: string;
   isActive: boolean;
+  reportingPeriod: ReportingPeriod | null;
+  contextModeDefault: ContextModeDefault;
   createdAt: string;
   updatedAt: string;
 };
@@ -38,6 +78,9 @@ export function toAdminTemplateDto(row: Record<string, unknown>): AdminReportTem
     logoUrl: (row.logo_url as string | null) ?? null,
     iconTone: row.icon_tone as string,
     isActive: row.is_active as boolean,
+    reportingPeriod: (row.reporting_period as ReportingPeriod | null) ?? null,
+    contextModeDefault: ((row.context_mode_default as string | null) ??
+      "history") as ContextModeDefault,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };

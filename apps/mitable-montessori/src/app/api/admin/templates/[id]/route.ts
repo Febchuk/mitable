@@ -35,6 +35,11 @@ const UpdateTemplateSchema = z.object({
   writingStyle: z.string().max(8000).optional(),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).optional(),
   isActive: z.boolean().optional(),
+  reportingPeriod: z
+    .enum(["daily", "weekly", "biweekly", "monthly", "quarterly", "end_of_term"])
+    .nullable()
+    .optional(),
+  contextModeDefault: z.enum(["history", "input_only"]).optional(),
   /** Set `true` to remove the logo file and clear `logo_url`. */
   clearLogo: z.boolean().optional(),
 });
@@ -51,7 +56,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { data, error } = await supabase
     .from("report_templates")
     .select(
-      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
+      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, reporting_period, context_mode_default, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -110,6 +115,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (parsed.data.writingStyle !== undefined) update.writing_style = parsed.data.writingStyle;
   if (parsed.data.iconTone !== undefined) update.icon_tone = parsed.data.iconTone;
   if (parsed.data.isActive !== undefined) update.is_active = parsed.data.isActive;
+  if (parsed.data.reportingPeriod !== undefined)
+    update.reporting_period = parsed.data.reportingPeriod;
+  if (parsed.data.contextModeDefault !== undefined)
+    update.context_mode_default = parsed.data.contextModeDefault;
 
   if (parsed.data.clearLogo) {
     await removeLogoObjectIfAny(admin, (existing.logo_url as string | null) ?? null);
