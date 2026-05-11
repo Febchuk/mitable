@@ -113,8 +113,13 @@ export function ReportTemplateEditor({
       ToastBus.push({ message: "Section titles must be unique." });
       return false;
     }
-    if (filled.some((r) => r.fieldType === "checklist" && r.options.length === 0)) {
-      ToastBus.push({ message: "Checklists need at least one option." });
+    if (
+      filled.some(
+        (r) =>
+          (r.fieldType === "checklist" || r.fieldType === "single_select") && r.options.length === 0
+      )
+    ) {
+      ToastBus.push({ message: "Option lists need at least one option." });
       return false;
     }
     return true;
@@ -133,7 +138,7 @@ export function ReportTemplateEditor({
       description: (r.description ?? "").trim(),
       fieldType: r.fieldType ?? "text",
       options:
-        r.fieldType === "checklist"
+        r.fieldType === "checklist" || r.fieldType === "single_select"
           ? (r.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0)
           : [],
     })),
@@ -555,7 +560,10 @@ export function ReportTemplateEditor({
                             ? {
                                 ...p,
                                 fieldType: next,
-                                options: next === "checklist" ? (p.options ?? []) : [],
+                                options:
+                                  next === "checklist" || next === "single_select"
+                                    ? (p.options ?? [])
+                                    : [],
                               }
                             : p
                         )
@@ -563,10 +571,11 @@ export function ReportTemplateEditor({
                     }}
                   >
                     <option value="text">Text</option>
-                    <option value="checklist">Checklist</option>
+                    <option value="checklist">Checklist (multi-select)</option>
+                    <option value="single_select">Single-select</option>
                   </select>
                 </div>
-                {row.fieldType === "checklist" ? (
+                {row.fieldType === "checklist" || row.fieldType === "single_select" ? (
                   <ChecklistOptionsEditor
                     options={row.options ?? []}
                     onChange={(next) =>
