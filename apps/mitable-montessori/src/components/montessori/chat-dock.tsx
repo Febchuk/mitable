@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { MessageSquare, Sparkles, X } from "lucide-react";
-import { AgentThread } from "@/components/agent/AgentThread";
+import { UnifiedChatThread } from "@/components/chat/UnifiedChatThread";
 import { useMontessori } from "./store";
 
 export interface ChatDockProps {
@@ -15,6 +15,7 @@ export interface ChatDockProps {
 export function ChatDock(props: ChatDockProps) {
   const store = useMontessori();
   const isOpen = store.webChatMode === "open";
+  const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
 
   return (
     <div className="hidden lg:block">
@@ -91,9 +92,9 @@ export function ChatDock(props: ChatDockProps) {
           </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             {props.classroomId ? (
-              <AgentThread
+              <UnifiedChatThread
+                threadId={threadId}
                 classroomId={props.classroomId}
-                classroomName={props.classroomName}
                 schoolId={props.schoolId}
                 userId={props.userId}
               />
@@ -155,20 +156,6 @@ export function ChatDock(props: ChatDockProps) {
             <MessageSquare size={18} strokeWidth={1.5} />
           </div>
           <span>Ask Mitable</span>
-          {store.pendingObs > 0 && (
-            <span
-              style={{
-                background: "var(--color-surface)",
-                color: "var(--color-terracotta)",
-                borderRadius: 999,
-                padding: "1px 8px",
-                fontSize: 11,
-                fontWeight: 600,
-              }}
-            >
-              {store.pendingObs}
-            </span>
-          )}
         </button>
       )}
     </div>

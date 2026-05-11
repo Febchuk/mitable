@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
-import { ChatThread } from "@/components/chat/ChatThread";
+import { UnifiedChatThread } from "@/components/chat/UnifiedChatThread";
 import { clearDb } from "@/lib/db/schema";
 import { clearSessionKeys } from "@/lib/crypto/session-key";
 import { OnlineToggle } from "./online-toggle";
@@ -27,7 +27,7 @@ import { useMontessori } from "./store";
  *
  *   1. Top bar with a left-side avatar that opens a left sliding drawer.
  *   2. Persistent terracotta chat FAB at bottom-right that opens a bottom
- *      sheet hosting the existing ChatThread.
+ *      sheet hosting the unified chat thread.
  *
  * Replaces the previous mobile bottom-tab navigation. Visible on `<lg`
  * screens only — desktop continues to use MontessoriSidebar.
@@ -192,53 +192,55 @@ function MobileTopBar({
   const initial = (firstName?.[0] || email[0] || "?").toUpperCase();
 
   return (
-    // lg:hidden so the bar never appears alongside the desktop sidebar.
+    // Wrapper carries `lg:hidden` so above `lg` the bar is fully removed from
+    // layout regardless of the inner `<header>`'s inline `display: flex`.
     // Route titles + subtitles are owned by <PageHeader> in the body — this
     // bar deliberately carries no title to avoid a duplicated heading.
-    <header
-      className="lg:hidden"
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 20,
-        height: 52,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "0 12px",
-        background: "color-mix(in srgb, var(--color-canvas) 90%, transparent)",
-        backdropFilter: "blur(10px)",
-        borderBottom: "1px solid color-mix(in srgb, var(--color-border) 60%, transparent)",
-      }}
-    >
-      <button
-        type="button"
-        className="tap"
-        onClick={onAvatarClick}
-        aria-label="Open menu"
+    <div className="lg:hidden">
+      <header
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 999,
-          padding: 0,
-          border: "1px solid var(--color-border)",
-          background: "var(--color-clay-soft)",
-          color: "var(--color-terracotta-deep)",
-          display: "grid",
-          placeItems: "center",
-          fontSize: 13.5,
-          fontWeight: 600,
-          flexShrink: 0,
-          cursor: "pointer",
-          letterSpacing: "0.01em",
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          height: 52,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "0 12px",
+          background: "color-mix(in srgb, var(--color-canvas) 90%, transparent)",
+          backdropFilter: "blur(10px)",
+          borderBottom: "1px solid color-mix(in srgb, var(--color-border) 60%, transparent)",
         }}
       >
-        {initial}
-      </button>
-      {/* Spacer — the page body's <PageHeader> carries the route title. */}
-      <div style={{ flex: 1 }} />
-      <OnlineToggle compact />
-    </header>
+        <button
+          type="button"
+          className="tap"
+          onClick={onAvatarClick}
+          aria-label="Open menu"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 999,
+            padding: 0,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-clay-soft)",
+            color: "var(--color-terracotta-deep)",
+            display: "grid",
+            placeItems: "center",
+            fontSize: 13.5,
+            fontWeight: 600,
+            flexShrink: 0,
+            cursor: "pointer",
+            letterSpacing: "0.01em",
+          }}
+        >
+          {initial}
+        </button>
+        {/* Spacer — the page body's <PageHeader> carries the route title. */}
+        <div style={{ flex: 1 }} />
+        <OnlineToggle compact />
+      </header>
+    </div>
   );
 }
 
@@ -248,22 +250,23 @@ function MobileTopBar({
 
 function MobileScrim({ open, onClick }: { open: boolean; onClick: () => void }) {
   return (
-    <div
-      className="lg:hidden"
-      role="presentation"
-      onClick={onClick}
-      aria-hidden={!open}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 70,
-        background: "rgba(26, 23, 21, 0.42)",
-        backdropFilter: "blur(2px)",
-        opacity: open ? 1 : 0,
-        pointerEvents: open ? "auto" : "none",
-        transition: "opacity 220ms ease",
-      }}
-    />
+    <div className="lg:hidden">
+      <div
+        role="presentation"
+        onClick={onClick}
+        aria-hidden={!open}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 70,
+          background: "rgba(26, 23, 21, 0.42)",
+          backdropFilter: "blur(2px)",
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? "auto" : "none",
+          transition: "opacity 220ms ease",
+        }}
+      />
+    </div>
   );
 }
 
@@ -323,237 +326,238 @@ function MobileDrawer({
   }
 
   return (
-    <aside
-      className="lg:hidden"
-      role="dialog"
-      aria-label="Navigation"
-      aria-hidden={!open}
-      style={{
-        position: "fixed",
-        top: 0,
-        bottom: 0,
-        left: 0,
-        width: 304,
-        maxWidth: "84%",
-        zIndex: 80,
-        background: "var(--color-surface)",
-        boxShadow: "16px 0 40px rgba(43,38,34,0.18)",
-        transform: open ? "translateX(0)" : "translateX(-105%)",
-        transition: "transform 280ms cubic-bezier(0.32, 0.72, 0.24, 1)",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/*
+    <div className="lg:hidden">
+      <aside
+        role="dialog"
+        aria-label="Navigation"
+        aria-hidden={!open}
+        style={{
+          position: "fixed",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: 304,
+          maxWidth: "84%",
+          zIndex: 80,
+          background: "var(--color-surface)",
+          boxShadow: "16px 0 40px rgba(43,38,34,0.18)",
+          transform: open ? "translateX(0)" : "translateX(-105%)",
+          transition: "transform 280ms cubic-bezier(0.32, 0.72, 0.24, 1)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/*
         Profile block — sits in a slightly warmer wash (--color-muted) than
         the drawer body (--color-surface), separated by a hairline. Mirrors the
         rhythm of the desktop sidebar's brand block + school card pairing.
       */}
-      <div
-        style={{
-          padding: "20px 18px 16px",
-          paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
-          background: "var(--color-muted)",
-          borderBottom: "1px solid var(--color-border)",
-        }}
-      >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
+            padding: "20px 18px 16px",
+            paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
+            background: "var(--color-muted)",
+            borderBottom: "1px solid var(--color-border)",
           }}
         >
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 999,
-              background: "var(--color-clay-soft)",
-              color: "var(--color-terracotta-deep)",
-              display: "grid",
-              placeItems: "center",
-              fontSize: 16,
-              fontWeight: 600,
-              border: "1px solid var(--color-border)",
-              flexShrink: 0,
-              letterSpacing: "0.01em",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
             }}
           >
-            {initial}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                fontSize: 14.5,
+                width: 44,
+                height: 44,
+                borderRadius: 999,
+                background: "var(--color-clay-soft)",
+                color: "var(--color-terracotta-deep)",
+                display: "grid",
+                placeItems: "center",
+                fontSize: 16,
                 fontWeight: 600,
-                color: "var(--color-ink)",
-                letterSpacing: "-0.005em",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                border: "1px solid var(--color-border)",
+                flexShrink: 0,
+                letterSpacing: "0.01em",
               }}
             >
-              {displayName}
+              {initial}
             </div>
-            <div style={{ marginTop: 1, fontSize: 11.5, color: "var(--color-ink-muted)" }}>
-              {roleLabel}
-            </div>
-          </div>
-        </div>
-
-        {/* School card — steps back onto the lighter surface so it nests inside the muted wash. */}
-        <div
-          style={{
-            marginTop: 14,
-            padding: "9px 11px",
-            borderRadius: 10,
-            border: "1px solid var(--color-border)",
-            background: "var(--color-surface)",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 8,
-              background: "var(--color-terracotta-soft)",
-              color: "var(--color-terracotta-deep)",
-              display: "grid",
-              placeItems: "center",
-              flexShrink: 0,
-            }}
-          >
-            <HouseSimple size={13} weight="regular" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--color-ink)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {schoolName}
-            </div>
-            {schoolSubtitle ? (
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: 11,
-                  color: "var(--color-ink-muted)",
+                  fontSize: 14.5,
+                  fontWeight: 600,
+                  color: "var(--color-ink)",
+                  letterSpacing: "-0.005em",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                 }}
               >
-                {schoolSubtitle}
+                {displayName}
               </div>
-            ) : null}
+              <div style={{ marginTop: 1, fontSize: 11.5, color: "var(--color-ink-muted)" }}>
+                {roleLabel}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Nav */}
-      <nav
-        className="scroll-quiet"
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "12px 8px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 1,
-        }}
-      >
-        <DrawerGroupLabel>Workspace</DrawerGroupLabel>
-        {items.map((it) => {
-          const isActive = pathname.startsWith(it.href);
-          const showBadge = it.withDraftBadge && draftCount > 0;
-          return (
-            <Link
-              key={it.href}
-              href={it.href}
-              onClick={onDismiss}
-              className="tap"
-              style={drawerItemStyle(isActive)}
+          {/* School card — steps back onto the lighter surface so it nests inside the muted wash. */}
+          <div
+            style={{
+              marginTop: 14,
+              padding: "9px 11px",
+              borderRadius: 10,
+              border: "1px solid var(--color-border)",
+              background: "var(--color-surface)",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 8,
+                background: "var(--color-terracotta-soft)",
+                color: "var(--color-terracotta-deep)",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+              }}
             >
-              <span style={{ width: 22, display: "grid", placeItems: "center" }}>{it.icon}</span>
-              <span style={{ flex: 1 }}>{it.label}</span>
-              {showBadge ? (
-                <span
+              <HouseSimple size={13} weight="regular" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--color-ink)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {schoolName}
+              </div>
+              {schoolSubtitle ? (
+                <div
                   style={{
-                    background: "var(--color-terracotta)",
-                    color: "#fff",
-                    fontSize: 10.5,
-                    fontWeight: 600,
-                    padding: "2px 7px",
-                    borderRadius: 999,
-                    fontVariantNumeric: "tabular-nums",
+                    fontSize: 11,
+                    color: "var(--color-ink-muted)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
                   }}
                 >
-                  {draftCount}
-                </span>
+                  {schoolSubtitle}
+                </div>
               ) : null}
-              {isActive ? <ActiveRail /> : null}
-            </Link>
-          );
-        })}
+            </div>
+          </div>
+        </div>
 
-        <DrawerGroupLabel>General</DrawerGroupLabel>
-        <button type="button" onClick={onDismiss} className="tap" style={drawerItemStyle(false)}>
-          <span style={{ width: 22, display: "grid", placeItems: "center" }}>
-            <Settings size={18} strokeWidth={1.6} />
-          </span>
-          <span style={{ flex: 1, textAlign: "left" }}>Settings</span>
-        </button>
-        <button type="button" onClick={onDismiss} className="tap" style={drawerItemStyle(false)}>
-          <span style={{ width: 22, display: "grid", placeItems: "center" }}>
-            <HelpCircle size={18} strokeWidth={1.6} />
-          </span>
-          <span style={{ flex: 1, textAlign: "left" }}>Help &amp; feedback</span>
-        </button>
-      </nav>
-
-      {/* Foot */}
-      <div
-        style={{
-          padding: "10px 8px",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
-          borderTop: "1px solid var(--color-border)",
-          background: "var(--color-surface)",
-        }}
-      >
-        <button
-          type="button"
-          className="tap"
-          onClick={handleSignOut}
-          disabled={signingOut}
+        {/* Nav */}
+        <nav
+          className="scroll-quiet"
           style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "12px 8px",
             display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 14px",
-            width: "100%",
-            borderRadius: 12,
-            background: "transparent",
-            color: "var(--color-terracotta-deep)",
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: "pointer",
-            opacity: signingOut ? 0.6 : 1,
+            flexDirection: "column",
+            gap: 1,
           }}
         >
-          <LogOut size={18} strokeWidth={1.6} />
-          {signingOut ? "Signing out…" : "Sign out"}
-        </button>
-      </div>
-    </aside>
+          <DrawerGroupLabel>Workspace</DrawerGroupLabel>
+          {items.map((it) => {
+            const isActive = pathname.startsWith(it.href);
+            const showBadge = it.withDraftBadge && draftCount > 0;
+            return (
+              <Link
+                key={it.href}
+                href={it.href}
+                onClick={onDismiss}
+                className="tap"
+                style={drawerItemStyle(isActive)}
+              >
+                <span style={{ width: 22, display: "grid", placeItems: "center" }}>{it.icon}</span>
+                <span style={{ flex: 1 }}>{it.label}</span>
+                {showBadge ? (
+                  <span
+                    style={{
+                      background: "var(--color-terracotta)",
+                      color: "#fff",
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      padding: "2px 7px",
+                      borderRadius: 999,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {draftCount}
+                  </span>
+                ) : null}
+                {isActive ? <ActiveRail /> : null}
+              </Link>
+            );
+          })}
+
+          <DrawerGroupLabel>General</DrawerGroupLabel>
+          <button type="button" onClick={onDismiss} className="tap" style={drawerItemStyle(false)}>
+            <span style={{ width: 22, display: "grid", placeItems: "center" }}>
+              <Settings size={18} strokeWidth={1.6} />
+            </span>
+            <span style={{ flex: 1, textAlign: "left" }}>Settings</span>
+          </button>
+          <button type="button" onClick={onDismiss} className="tap" style={drawerItemStyle(false)}>
+            <span style={{ width: 22, display: "grid", placeItems: "center" }}>
+              <HelpCircle size={18} strokeWidth={1.6} />
+            </span>
+            <span style={{ flex: 1, textAlign: "left" }}>Help &amp; feedback</span>
+          </button>
+        </nav>
+
+        {/* Foot */}
+        <div
+          style={{
+            padding: "10px 8px",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
+            borderTop: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
+          }}
+        >
+          <button
+            type="button"
+            className="tap"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "12px 14px",
+              width: "100%",
+              borderRadius: 12,
+              background: "transparent",
+              color: "var(--color-terracotta-deep)",
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+              opacity: signingOut ? 0.6 : 1,
+            }}
+          >
+            <LogOut size={18} strokeWidth={1.6} />
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
+      </aside>
+    </div>
   );
 }
 
@@ -616,7 +620,6 @@ function ActiveRail() {
 /* ────────────────────────────────────────────────────────────────────────── */
 
 function MobileChatFab({ hidden, onClick }: { hidden: boolean; onClick: () => void }) {
-  const store = useMontessori();
   // Wrapper is `lg:hidden` so above `lg` Tailwind's `display:none` reliably
   // beats the button's inline `display:grid` and the FAB never coexists with
   // the desktop ChatDock pill.
@@ -650,28 +653,6 @@ function MobileChatFab({ hidden, onClick }: { hidden: boolean; onClick: () => vo
         }}
       >
         <MessageSquare size={22} strokeWidth={1.8} />
-        {store.pendingObs > 0 ? (
-          <span
-            style={{
-              position: "absolute",
-              top: -2,
-              right: -2,
-              width: 18,
-              height: 18,
-              borderRadius: 999,
-              background: "var(--color-ink)",
-              color: "#fff",
-              fontSize: 10,
-              fontWeight: 700,
-              display: "grid",
-              placeItems: "center",
-              border: "2px solid var(--color-surface)",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {store.pendingObs}
-          </span>
-        ) : null}
       </button>
     </div>
   );
@@ -794,7 +775,7 @@ function MobileChatSheet({
             // Only mount the live thread once it's been opened — avoids paying the
             // network/render cost on every page load when the sheet is closed.
             open ? (
-              <ChatThread
+              <UnifiedChatThread
                 threadId={threadId}
                 classroomId={classroomId}
                 schoolId={schoolId}

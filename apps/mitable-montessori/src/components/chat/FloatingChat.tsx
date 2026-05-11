@@ -4,7 +4,7 @@ import { useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ChatThread } from "@/components/chat/ChatThread";
+import { UnifiedChatThread } from "@/components/chat/UnifiedChatThread";
 
 export interface FloatingChatProps {
   classroomId: string;
@@ -36,7 +36,7 @@ export function FloatingChat(props: FloatingChatProps) {
           </p>
         </SheetHeader>
         <div className="flex-1 min-h-0">
-          <ChatThread
+          <UnifiedChatThread
             threadId={threadId}
             classroomId={props.classroomId}
             schoolId={props.schoolId}
