@@ -30,7 +30,7 @@ async function removeLogoObjectIfAny(
 const UpdateTemplateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   description: z.string().max(400).nullable().optional(),
-  kind: z.enum(["Daily", "Major", "Incident"]).optional(),
+  kind: z.enum(["Daily", "Major", "Incident", "Session note"]).optional(),
   templateSections: TemplateSectionsSchema.optional(),
   writingStyle: z.string().max(8000).optional(),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).optional(),
@@ -51,7 +51,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { data, error } = await supabase
     .from("report_templates")
     .select(
-      "id, name, description, kind, sections, section_guidance, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
+      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -105,6 +105,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const db = rowsToDb(parsed.data.templateSections);
     update.sections = db.sections;
     update.section_guidance = db.section_guidance;
+    update.section_meta = db.section_meta;
   }
   if (parsed.data.writingStyle !== undefined) update.writing_style = parsed.data.writingStyle;
   if (parsed.data.iconTone !== undefined) update.icon_tone = parsed.data.iconTone;

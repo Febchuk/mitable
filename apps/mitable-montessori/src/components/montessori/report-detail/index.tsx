@@ -136,13 +136,23 @@ function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail 
 export function ReportDetail({
   report,
   backToReportsHref = "/app/reports",
-  isAdmin = false,
+  isAdmin: isAdminProp = false,
+  hideBackLink = false,
+  variant,
+  onReportChanged,
 }: {
   report: ReportDetailRow;
   /** Where "All reports" and post-delete navigation go (`/admin/reports` for admin). */
   backToReportsHref?: string;
   isAdmin?: boolean;
+  /** When true (embedded in the rail view), suppresses the back-link and post-delete nav. */
+  hideBackLink?: boolean;
+  /** String alias for isAdmin — "admin" ⇒ isAdmin. Existing callers can keep using isAdmin directly. */
+  variant?: "teacher" | "admin";
+  /** Called after server-side mutations so the parent can refresh without a full page reload. */
+  onReportChanged?: () => void;
 }) {
+  const isAdmin = isAdminProp || variant === "admin";
   const router = useRouter();
   const locale = useUiLocale();
   const [detail, setDetail] = React.useState<LocalDetail>(() => buildLocalDetail(report, locale));
@@ -683,11 +693,11 @@ export function ReportDetail({
         return;
       }
       ToastBus.push({ message: "Report submitted for review." });
-      router.refresh();
+      onReportChanged ? onReportChanged() : router.refresh();
     } finally {
       setActionBusy(false);
     }
-  }, [report.id, router]);
+  }, [report.id, router, onReportChanged]);
 
   const handleApprove = React.useCallback(async () => {
     setActionBusy(true);
@@ -704,11 +714,11 @@ export function ReportDetail({
         return;
       }
       ToastBus.push({ message: "Report approved." });
-      router.refresh();
+      onReportChanged ? onReportChanged() : router.refresh();
     } finally {
       setActionBusy(false);
     }
-  }, [report.id, router]);
+  }, [report.id, router, onReportChanged]);
 
   const handleSendToParents = React.useCallback(() => {
     setSendDialogOpen(true);
@@ -746,11 +756,11 @@ export function ReportDetail({
           classroom={detail.classroom}
           savedMeta={savedMeta}
           savedMetaDirty={isDirty || isDrafting || isSaving}
-          reportsListHref={backToReportsHref}
+          reportsListHref={hideBackLink ? undefined : backToReportsHref}
           isAdmin={isAdmin}
           actionBusy={actionBusy}
           hasBeenSubmitted={report.hasBeenSubmitted}
-          onBackClick={handleBackClick}
+          onBackClick={hideBackLink ? undefined : handleBackClick}
           onSaveDraft={
             topbarStatus === "draft"
               ? () => {
@@ -761,9 +771,13 @@ export function ReportDetail({
               : undefined
           }
           onSubmitForReview={
-            topbarStatus === "draft" ? () => void handleSubmitForReview() : undefined
+            topbarStatus === "draft" && !isAdmin ? () => void handleSubmitForReview() : undefined
           }
-          onApprove={topbarStatus === "review" && isAdmin ? () => void handleApprove() : undefined}
+          onApprove={
+            (topbarStatus === "draft" || topbarStatus === "review") && isAdmin
+              ? () => void handleApprove()
+              : undefined
+          }
           onSendToParents={topbarStatus === "approved" && isAdmin ? handleSendToParents : undefined}
           onDeleteClick={() => setDeleteDialogOpen(true)}
         />
@@ -967,7 +981,7 @@ export function ReportDetail({
           onOpenChange={setSendDialogOpen}
           onSent={() => {
             setSendDialogOpen(false);
-            router.refresh();
+            onReportChanged ? onReportChanged() : router.refresh();
           }}
         />
       )}

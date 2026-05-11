@@ -10,7 +10,7 @@ import { rowsToDb, TemplateSectionsSchema } from "@/lib/report-templates/section
 const CreateTemplateSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(400).nullable().optional(),
-  kind: z.enum(["Daily", "Major", "Incident"]),
+  kind: z.enum(["Daily", "Major", "Incident", "Session note"]),
   templateSections: TemplateSectionsSchema,
   writingStyle: z.string().max(8000).optional().default(""),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).default("clay"),
@@ -27,7 +27,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("report_templates")
     .select(
-      "id, name, description, kind, sections, section_guidance, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
+      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, created_at, updated_at"
     )
     .order("created_at", { ascending: true });
   if (error) {
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     );
   }
   const input = parsed.data;
-  const { sections, section_guidance } = rowsToDb(input.templateSections);
+  const { sections, section_guidance, section_meta } = rowsToDb(input.templateSections);
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
@@ -68,6 +68,7 @@ export async function POST(req: Request) {
       kind: input.kind,
       sections,
       section_guidance,
+      section_meta,
       writing_style: input.writingStyle ?? "",
       icon_tone: input.iconTone,
       created_by_user_id: auth.user.userId,

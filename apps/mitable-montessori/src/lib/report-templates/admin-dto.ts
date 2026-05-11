@@ -1,4 +1,8 @@
-import { dbToRows, type TemplateSectionRow } from "@/lib/report-templates/sections";
+import {
+  dbToRows,
+  type SectionMeta,
+  type TemplateSectionRow,
+} from "@/lib/report-templates/sections";
 
 export type AdminReportTemplateDto = {
   id: string;
@@ -7,6 +11,7 @@ export type AdminReportTemplateDto = {
   kind: string;
   sections: string[];
   sectionGuidance: Record<string, string>;
+  sectionMeta: SectionMeta;
   templateSections: TemplateSectionRow[];
   writingStyle: string;
   logoUrl: string | null;
@@ -19,6 +24,7 @@ export type AdminReportTemplateDto = {
 export function toAdminTemplateDto(row: Record<string, unknown>): AdminReportTemplateDto {
   const sections = (row.sections as string[] | null) ?? [];
   const sectionGuidance = (row.section_guidance as Record<string, string> | null) ?? {};
+  const sectionMeta = (row.section_meta as SectionMeta | null) ?? {};
   return {
     id: row.id as string,
     name: row.name as string,
@@ -26,7 +32,8 @@ export function toAdminTemplateDto(row: Record<string, unknown>): AdminReportTem
     kind: row.kind as string,
     sections,
     sectionGuidance,
-    templateSections: dbToRows(sections, sectionGuidance),
+    sectionMeta,
+    templateSections: dbToRows(sections, sectionGuidance, sectionMeta),
     writingStyle: (row.writing_style as string | null) ?? "",
     logoUrl: (row.logo_url as string | null) ?? null,
     iconTone: row.icon_tone as string,

@@ -1,12 +1,16 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
+import type { SectionMeta } from "@/lib/report-templates/sections";
+
+export type ReportTemplateKind = "Daily" | "Major" | "Incident" | "Session note";
 
 export type ReportTemplate = {
   id: string;
   name: string;
   description: string | null;
-  kind: "Daily" | "Major" | "Incident";
+  kind: ReportTemplateKind;
   sections: string[];
+  sectionMeta: SectionMeta;
   iconTone: "clay" | "butter" | "blue" | "sage";
   isActive: boolean;
 };
@@ -20,7 +24,7 @@ export async function listTemplates(): Promise<ReportTemplate[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("report_templates")
-    .select("id, name, description, kind, sections, icon_tone, is_active")
+    .select("id, name, description, kind, sections, section_meta, icon_tone, is_active")
     .eq("school_id", ctx.schoolId)
     .eq("is_active", true)
     .order("created_at", { ascending: true });
@@ -34,6 +38,7 @@ export async function listTemplates(): Promise<ReportTemplate[]> {
     description: (row.description as string | null) ?? null,
     kind: row.kind as ReportTemplate["kind"],
     sections: (row.sections as string[] | null) ?? [],
+    sectionMeta: (row.section_meta as SectionMeta | null) ?? {},
     iconTone: row.icon_tone as ReportTemplate["iconTone"],
     isActive: row.is_active as boolean,
   }));

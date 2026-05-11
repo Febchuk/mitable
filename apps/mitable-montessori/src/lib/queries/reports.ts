@@ -35,6 +35,7 @@ export type ReportListRow = {
   studentId: string;
   studentName: string;
   classroomId: string;
+  classroomName: string | null;
   reportType: "daily" | "major" | "incident";
   reportDate: string | null;
   periodStart: string | null;
@@ -102,6 +103,8 @@ type ReportsRow = {
     preferred_name: string | null;
     school_id: string;
   } | null;
+  classrooms: { id: string; name: string | null } | null;
+  report_templates: { logo_url: string | null; school_id: string } | null;
 };
 
 function fullName(s: ReportsRow["students"]): string {
@@ -113,18 +116,24 @@ function fullName(s: ReportsRow["students"]): string {
 
 /** All reports the caller can see (school-scoped via explicit filter on
  *  the joined students.school_id column). Most recent first. */
-export async function listReports(): Promise<ReportListRow[]> {
+export async function listReports(opts?: { classroomIds?: string[] }): Promise<ReportListRow[]> {
   const ctx = await getCurrentUserContext();
   if (!ctx) return [];
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name)"
     )
     .eq("students.school_id", ctx.schoolId)
     .order("created_at", { ascending: false });
+
+  if (opts?.classroomIds?.length) {
+    query = query.in("classroom_id", opts.classroomIds);
+  }
+
+  const { data, error } = await query;
   if (error) {
     console.error("listReports failed", error);
     return [];
@@ -134,6 +143,7 @@ export async function listReports(): Promise<ReportListRow[]> {
     studentId: row.student_id,
     studentName: fullName(row.students),
     classroomId: row.classroom_id,
+    classroomName: row.classrooms?.name ?? null,
     reportType: row.report_type,
     reportDate: row.report_date,
     periodStart: row.period_start,
@@ -154,7 +164,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id)"
     )
     .eq("id", id)
     .eq("students.school_id", ctx.schoolId)
@@ -178,6 +188,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     studentId: row.student_id,
     studentName: fullName(row.students),
     classroomId: row.classroom_id,
+    classroomName: row.classrooms?.name ?? null,
     reportType: row.report_type,
     reportDate: row.report_date,
     periodStart: row.period_start,

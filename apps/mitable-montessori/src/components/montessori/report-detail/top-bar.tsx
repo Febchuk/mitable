@@ -75,12 +75,12 @@ export function ReportTopBar({
             <ChevLeft />
             <span>All reports</span>
           </button>
-        ) : (
+        ) : reportsListHref ? (
           <Link href={reportsListHref} className="rd-back-link">
             <ChevLeft />
             <span>All reports</span>
           </Link>
-        )}
+        ) : null}
       </div>
 
       <div className="rd-page-header-row">
@@ -212,7 +212,7 @@ function TopBarActions({
     );
   }
 
-  if (status === "review" && isAdmin) {
+  if ((status === "draft" || status === "review") && isAdmin) {
     return (
       <>
         <button

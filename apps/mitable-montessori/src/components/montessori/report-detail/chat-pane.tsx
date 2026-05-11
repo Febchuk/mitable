@@ -1,7 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Camera, Check, Clock, Mic, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
+import {
+  Camera,
+  Check,
+  Clock,
+  Mic,
+  PanelLeftClose,
+  Plus,
+  RotateCcw,
+  Send,
+  Undo2,
+  X,
+} from "lucide-react";
 import { ToastBus } from "../primitives";
 import { SparkleGlyph } from "./icons";
 import type {
@@ -83,6 +94,12 @@ export interface ChatPaneProps {
    * integration concern.
    */
   flushPendingSave?: () => Promise<void>;
+  /**
+   * When provided, the chat header renders a "Hide" button that calls this.
+   * Lets the host (eg. the inline reports rail view) collapse the chat pane
+   * without owning chat internals.
+   */
+  onCollapse?: () => void;
 }
 
 export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatPane(
@@ -94,6 +111,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     onApplyGhostEdit,
     onApplyNewSection,
     flushPendingSave,
+    onCollapse,
   },
   ref
 ) {
@@ -677,7 +695,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
   return (
     <aside className="rd-pane rd-chat-pane" aria-label="Editing assistant">
       <div className="rd-chat-header">
-        <div>
+        <div className="rd-chat-header-left">
           <div className="rd-chat-title">
             <span className="rd-ai-glyph">
               <SparkleGlyph size={12} />
@@ -688,14 +706,27 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
             Discuss edits, pull from today&rsquo;s observations
           </div>
         </div>
-        <button
-          type="button"
-          className="rd-icon-btn"
-          title={HISTORY_HIDDEN}
-          onClick={() => ToastBus.push({ message: HISTORY_HIDDEN })}
-        >
-          <Clock size={16} strokeWidth={2} />
-        </button>
+        <div className="rd-chat-header-right">
+          <button
+            type="button"
+            className="rd-icon-btn"
+            title={HISTORY_HIDDEN}
+            onClick={() => ToastBus.push({ message: HISTORY_HIDDEN })}
+          >
+            <Clock size={16} strokeWidth={2} />
+          </button>
+          {onCollapse && (
+            <button
+              type="button"
+              className="rd-panel-toggle"
+              title="Collapse assistant"
+              aria-label="Collapse assistant"
+              onClick={onCollapse}
+            >
+              <PanelLeftClose size={16} strokeWidth={1.8} />
+            </button>
+          )}
+        </div>
       </div>
 
       {undo ? (
