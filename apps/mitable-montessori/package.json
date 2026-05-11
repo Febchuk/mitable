@@ -11,7 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf .next out tsconfig.tsbuildinfo",
-    "supabase:seed": "tsx supabase/seed.ts"
+    "supabase:seed": "tsx supabase/seed.ts",
+    "supabase:link": "supabase link",
+    "supabase:migration:list": "supabase migration list",
+    "supabase:db:push": "supabase db push",
+    "supabase:db:push:dry": "supabase db push --dry-run",
+    "supabase:db:push:all": "supabase db push --include-all",
+    "supabase:db:push:all:dry": "supabase db push --include-all --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
