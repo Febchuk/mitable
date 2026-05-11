@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import type { AdminReportTemplateDto } from "@/lib/report-templates/admin-dto";
 import type { TemplateSectionRow } from "@/lib/report-templates/sections";
 import { PageHeader, cardHeaderStyle, cardStyle } from "@/components/montessori/page-header";
@@ -12,11 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { HandDivider, ToastBus } from "@/components/montessori/primitives";
 
-const KINDS = ["Daily", "Major", "Incident"] as const;
+const KINDS = ["Daily", "Major", "Incident", "Session note"] as const;
 const ICON_TONES = ["clay", "butter", "blue", "sage"] as const;
 
 function emptySection(): TemplateSectionRow {
-  return { section: "", description: "" };
+  return { section: "", description: "", fieldType: "text", options: [] };
 }
 
 export function ReportTemplateEditor({
@@ -92,6 +92,8 @@ export function ReportTemplateEditor({
     const filled = rows.map((r) => ({
       section: r.section.trim(),
       description: (r.description ?? "").trim(),
+      fieldType: r.fieldType ?? "text",
+      options: (r.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0),
     }));
     if (filled.some((r) => !r.section)) {
       ToastBus.push({ message: "Every section needs a title." });
@@ -100,6 +102,10 @@ export function ReportTemplateEditor({
     const titles = filled.map((r) => r.section);
     if (new Set(titles).size !== titles.length) {
       ToastBus.push({ message: "Section titles must be unique." });
+      return false;
+    }
+    if (filled.some((r) => r.fieldType === "checklist" && r.options.length === 0)) {
+      ToastBus.push({ message: "Checklists need at least one option." });
       return false;
     }
     return true;
@@ -114,6 +120,11 @@ export function ReportTemplateEditor({
     templateSections: rows.map((r) => ({
       section: r.section.trim(),
       description: (r.description ?? "").trim(),
+      fieldType: r.fieldType ?? "text",
+      options:
+        r.fieldType === "checklist"
+          ? (r.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0)
+          : [],
     })),
   });
 
@@ -478,17 +489,60 @@ export function ReportTemplateEditor({
                   placeholder="Section heading"
                   className="mb-2"
                 />
-                <Textarea
-                  value={row.description}
-                  onChange={(e) =>
-                    setRows((prev) =>
-                      prev.map((p, j) => (j === i ? { ...p, description: e.target.value } : p))
-                    )
-                  }
-                  placeholder="What should the assistant write here? Facts to include, length, tone for this block."
-                  rows={4}
-                  className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
-                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                    Field type
+                  </span>
+                  <select
+                    className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-ink)]"
+                    value={row.fieldType ?? "text"}
+                    onChange={(e) => {
+                      const next = e.target.value as TemplateSectionRow["fieldType"];
+                      setRows((prev) =>
+                        prev.map((p, j) =>
+                          j === i
+                            ? {
+                                ...p,
+                                fieldType: next,
+                                options: next === "checklist" ? (p.options ?? []) : [],
+                              }
+                            : p
+                        )
+                      );
+                    }}
+                  >
+                    <option value="text">Text</option>
+                    <option value="checklist">Checklist</option>
+                  </select>
+                </div>
+                {row.fieldType === "checklist" ? (
+                  <ChecklistOptionsEditor
+                    options={row.options ?? []}
+                    onChange={(next) =>
+                      setRows((prev) => prev.map((p, j) => (j === i ? { ...p, options: next } : p)))
+                    }
+                  />
+                ) : (
+                  <Textarea
+                    value={row.description}
+                    onChange={(e) =>
+                      setRows((prev) =>
+                        prev.map((p, j) => (j === i ? { ...p, description: e.target.value } : p))
+                      )
+                    }
+                    placeholder="What should the assistant write here? Facts to include, length, tone for this block."
+                    rows={4}
+                    className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -502,6 +556,91 @@ export function ReportTemplateEditor({
             <Link href="/admin/report-templates">Cancel</Link>
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ChecklistOptionsEditor({
+  options,
+  onChange,
+}: {
+  options: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = React.useState("");
+  const addOption = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (options.includes(v)) {
+      ToastBus.push({ message: "That option is already on the list." });
+      return;
+    }
+    onChange([...options, v]);
+    setDraft("");
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+        Checklist options
+      </span>
+      {options.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {options.map((opt, idx) => (
+            <span
+              key={`${opt}-${idx}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "5px 8px 5px 10px",
+                borderRadius: 999,
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                fontSize: 12.5,
+                color: "var(--color-ink)",
+              }}
+            >
+              {opt}
+              <button
+                type="button"
+                aria-label={`Remove ${opt}`}
+                onClick={() => onChange(options.filter((_, j) => j !== idx))}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 18,
+                  height: 18,
+                  borderRadius: 999,
+                  border: 0,
+                  background: "transparent",
+                  color: "var(--color-ink-muted)",
+                  cursor: "pointer",
+                }}
+              >
+                <X size={12} strokeWidth={2} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addOption();
+            }
+          }}
+          placeholder="Add an option (e.g. Modeling, Visual schedule)"
+          className="h-9 bg-surface"
+        />
+        <Button type="button" size="sm" onClick={addOption} disabled={!draft.trim()}>
+          Add
+        </Button>
       </div>
     </div>
   );

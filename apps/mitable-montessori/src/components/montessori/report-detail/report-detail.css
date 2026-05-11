@@ -23,7 +23,7 @@ body:has(.rd-root) > div:has(.rd-root) {
 body:has(.rd-root) > div:has(.rd-root) > div:has(.rd-root) {
   min-height: 0;
 }
-main:has(> .rd-root) {
+main:has(.rd-root) {
   padding-bottom: 0 !important;
   display: flex;
   flex-direction: column;
@@ -238,11 +238,59 @@ main:has(> .rd-root) {
   display: grid;
   grid-template-columns: 1fr;
   min-height: 0;
+  position: relative; /* host for the floating "Show assistant" button */
 }
 @media (min-width: 1024px) {
   .rd-split {
     grid-template-columns: 35fr 65fr;
   }
+  .rd-split.rd-split-chat-collapsed {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Panel-toggle icon — a single quiet square button used to collapse the
+   assistant (in the chat header) and to re-open it (anchored top-left
+   of the editor pane when collapsed). Mirrors the ChatGPT/Claude pattern
+   of a stable side-panel toggle, no labels, no shadows. */
+.rd-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.rd-panel-toggle:hover {
+  background: var(--color-muted);
+  color: var(--color-ink);
+}
+.rd-panel-toggle:focus-visible {
+  outline: none;
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+}
+
+/* Floating variant: shown in the editor pane when the assistant is
+   collapsed. Anchored top-left, matches Claude's collapsed-sidebar look. */
+.rd-panel-toggle-floating {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+.rd-panel-toggle-floating:hover {
+  background: var(--color-canvas);
+  border-color: var(--color-border-strong);
 }
 .rd-pane {
   overflow: hidden;
@@ -268,6 +316,16 @@ main:has(> .rd-root) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+.rd-chat-header-left {
+  min-width: 0;
+}
+.rd-chat-header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 .rd-chat-title {
   display: flex;

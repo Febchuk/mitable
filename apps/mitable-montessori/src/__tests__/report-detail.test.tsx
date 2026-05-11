@@ -24,6 +24,7 @@ const ADA_REPORT: ReportDetailRow = {
   studentId: "ada",
   studentName: "Ada Okafor",
   classroomId: "c1",
+  classroomName: "Primary 1",
   reportType: "daily",
   reportDate: "2026-05-02",
   periodStart: "2026-05-02",

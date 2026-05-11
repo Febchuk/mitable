@@ -1,0 +1,255 @@
+/* Reports — flat list rail on the left, embedded report editor on the right.
+   Reuses the report-detail editor verbatim; this file only owns the
+   rail-and-frame layout. */
+
+.rrRoot {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.rrLayout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+@media (min-width: 1024px) {
+  .rrLayout {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+/* ---------- left rail ---------- */
+.rrRail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  /* On mobile we stack rail + main; on desktop the rail fills its grid cell. */
+  max-height: 50vh;
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  .rrRail {
+    max-height: none;
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+.rrRailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.rrFilterBar {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.rrList {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.rrEmpty {
+  padding: 18px 14px;
+  font-size: 12.5px;
+  color: var(--color-ink-muted);
+  line-height: 1.4;
+}
+
+.rrRow {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 100ms ease;
+}
+.rrRow:hover {
+  background: var(--color-canvas);
+}
+.rrRow[data-active="true"] {
+  background: color-mix(in srgb, var(--color-butter) 22%, var(--color-surface));
+  box-shadow: inset 3px 0 0 var(--color-ink);
+}
+.rrRow:last-child {
+  border-bottom: 0;
+}
+
+.rrRowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rrRowTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.rrRowName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rrRowDate {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  flex-shrink: 0;
+}
+.rrRowTitle {
+  font-size: 12.5px;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rrRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.rrRowKind {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rrRowStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ---------- right pane ---------- */
+.rrMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.rrEmptyState {
+  margin: 32px auto;
+  padding: 32px 24px;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  max-width: 480px;
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+}
+
+/* Skeleton wrapper — mirrors the editor's vertical layout so the header
+   pops in at the same position as the real report, with a quiet body
+   loader underneath. Borrows .rd-page-header styles from report-detail.css
+   so the header reads identically to the loaded view. */
+.rrSkeleton {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.rrSkeletonBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--color-ink-secondary);
+  font-size: 13.5px;
+}
+
+/* Stale-while-revalidate loader for first-time report fetches. */
+@keyframes rrSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.rrLoadingSpinner {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-terracotta);
+  animation: rrSpin 0.75s linear infinite;
+}
+
+/* ---------- Admin classroom scope dropdown ---------- */
+.rrScope {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  max-width: 220px;
+}
+.rrScopeSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 100%;
+  padding: 6px 26px 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 180ms ease;
+}
+.rrScopeSelect:hover {
+  border-color: var(--color-border-strong);
+}
+.rrScopeSelect:focus {
+  outline: none;
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+}
+.rrScopeChev {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--color-ink-muted);
+}
