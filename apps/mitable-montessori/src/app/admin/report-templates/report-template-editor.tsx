@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { HandDivider, ToastBus } from "@/components/montessori/primitives";
 
-const KINDS = ["Daily", "Major", "Incident", "Session note"] as const;
+const KINDS = ["Daily", "Major", "Incident"] as const;
 const ICON_TONES = ["clay", "butter", "blue", "sage"] as const;
 
 function emptySection(): TemplateSectionRow {

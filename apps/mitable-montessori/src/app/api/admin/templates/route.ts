@@ -10,7 +10,7 @@ import { rowsToDb, TemplateSectionsSchema } from "@/lib/report-templates/section
 const CreateTemplateSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(400).nullable().optional(),
-  kind: z.enum(["Daily", "Major", "Incident", "Session note"]),
+  kind: z.enum(["Daily", "Major", "Incident"]),
   templateSections: TemplateSectionsSchema,
   writingStyle: z.string().max(8000).optional().default(""),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).default("clay"),

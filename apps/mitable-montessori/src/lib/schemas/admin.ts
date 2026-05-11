@@ -69,7 +69,7 @@ export const CreateGuardianSchema = CreateGuardianBaseSchema.transform((v) => ({
 });
 export type CreateGuardianInput = z.infer<typeof CreateGuardianSchema>;
 
-export const ProgressProgramSchema = z.enum(["montessori", "iep", "session_notes"]);
+export const ProgressProgramSchema = z.enum(["montessori", "iep"]);
 
 export const CreateClassroomSchema = z.object({
   name: z.string().min(1).max(200),

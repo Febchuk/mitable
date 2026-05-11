@@ -30,7 +30,7 @@ async function removeLogoObjectIfAny(
 const UpdateTemplateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   description: z.string().max(400).nullable().optional(),
-  kind: z.enum(["Daily", "Major", "Incident", "Session note"]).optional(),
+  kind: z.enum(["Daily", "Major", "Incident"]).optional(),
   templateSections: TemplateSectionsSchema.optional(),
   writingStyle: z.string().max(8000).optional(),
   iconTone: z.enum(["clay", "butter", "blue", "sage"]).optional(),
