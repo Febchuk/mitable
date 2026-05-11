@@ -693,7 +693,8 @@ export function ReportDetail({
         return;
       }
       ToastBus.push({ message: "Report submitted for review." });
-      onReportChanged ? onReportChanged() : router.refresh();
+      if (onReportChanged) onReportChanged();
+      else router.refresh();
     } finally {
       setActionBusy(false);
     }
@@ -714,7 +715,8 @@ export function ReportDetail({
         return;
       }
       ToastBus.push({ message: "Report approved." });
-      onReportChanged ? onReportChanged() : router.refresh();
+      if (onReportChanged) onReportChanged();
+      else router.refresh();
     } finally {
       setActionBusy(false);
     }
@@ -981,7 +983,8 @@ export function ReportDetail({
           onOpenChange={setSendDialogOpen}
           onSent={() => {
             setSendDialogOpen(false);
-            onReportChanged ? onReportChanged() : router.refresh();
+            if (onReportChanged) onReportChanged();
+            else router.refresh();
           }}
         />
       )}
