@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
+import type { IepProgress, PromptingCode } from "@/components/montessori/iep/data";
 
 export type IepPlanComment = {
   id: string;
@@ -15,9 +16,9 @@ export type IepPlanItem = {
   domainId: string;
   name: string;
   position: number;
-  rating: number | null;
-  successCount: number | null;
-  promptingCode: "N" | "G" | "V" | "H" | "F" | null;
+  progress: IepProgress | null;
+  accuracy: number | null;
+  prompting: PromptingCode | null;
   updatedAt: string | null;
   comments: IepPlanComment[];
 };
@@ -31,8 +32,7 @@ export type IepPlanDomain = {
 
 /**
  * Loads the full IEP plan for one child with current state + comments per
- * item. Mirrors the shape the teacher view used to compute from in-memory
- * seeds. Auth: teacher must be able to see this student via RLS; admin must
+ * item. Auth: teacher must be able to see this student via RLS; admin must
  * be in the same school.
  */
 export async function GET(req: Request) {
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         .order("created_at", { ascending: true }),
       supabase
         .from("iep_item_states")
-        .select("item_id, rating, success_count, prompting_code, updated_at")
+        .select("item_id, progress, accuracy, prompting, updated_at")
         .eq("student_id", studentId),
       supabase
         .from("iep_comments")
@@ -85,20 +85,21 @@ export async function GET(req: Request) {
   const stateByItem = new Map<
     string,
     {
-      rating: number | null;
-      successCount: number | null;
-      promptingCode: string | null;
+      progress: IepProgress | null;
+      accuracy: number | null;
+      prompting: PromptingCode | null;
       updatedAt: string | null;
     }
   >();
   for (const r of stateRows ?? []) {
     stateByItem.set(r.item_id as string, {
-      rating: (r.rating as number | null) ?? null,
-      successCount: (r.success_count as number | null) ?? null,
-      promptingCode: (r.prompting_code as string | null) ?? null,
+      progress: (r.progress as IepProgress | null) ?? null,
+      accuracy: (r.accuracy as number | null) ?? null,
+      prompting: (r.prompting as PromptingCode | null) ?? null,
       updatedAt: (r.updated_at as string | null) ?? null,
     });
   }
+
   const commentsByItem = new Map<string, IepPlanComment[]>();
   for (const c of commentRows ?? []) {
     const arr = commentsByItem.get(c.item_id as string) ?? [];
@@ -120,9 +121,9 @@ export async function GET(req: Request) {
       domainId: it.domain_id as string,
       name: it.name as string,
       position: (it.position as number) ?? 0,
-      rating: state?.rating ?? null,
-      successCount: state?.successCount ?? null,
-      promptingCode: (state?.promptingCode as IepPlanItem["promptingCode"]) ?? null,
+      progress: state?.progress ?? null,
+      accuracy: state?.accuracy ?? null,
+      prompting: state?.prompting ?? null,
       updatedAt: state?.updatedAt ?? null,
       comments: commentsByItem.get(it.id as string) ?? [],
     };

@@ -4,13 +4,13 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
 
 const StateSchema = z.object({
-  rating: z.number().int().min(1).max(5).nullable().optional(),
-  successCount: z.number().int().min(0).max(10).nullable().optional(),
-  promptingCode: z.enum(["N", "G", "V", "H", "F"]).nullable().optional(),
+  progress: z.enum(["M", "SP", "IP", "NP", "NI"]).nullable().optional(),
+  accuracy: z.number().int().min(0).max(100).nullable().optional(),
+  prompting: z.enum(["I", "VS", "GE", "VB", "MO", "PP", "FP"]).nullable().optional(),
 });
 
 /**
- * Upsert the current state (rating/completion/prompt) for one IEP item.
+ * Upsert the current state (progress/accuracy/prompting) for one IEP item.
  * Teachers + admins can write. Auth gate verifies the item's student is in
  * the caller's school; RLS does the same belt-and-braces.
  */
@@ -50,9 +50,9 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
     updated_by: auth.user.userId,
     updated_at: new Date().toISOString(),
   };
-  if (parsed.data.rating !== undefined) row.rating = parsed.data.rating;
-  if (parsed.data.successCount !== undefined) row.success_count = parsed.data.successCount;
-  if (parsed.data.promptingCode !== undefined) row.prompting_code = parsed.data.promptingCode;
+  if (parsed.data.progress !== undefined) row.progress = parsed.data.progress;
+  if (parsed.data.accuracy !== undefined) row.accuracy = parsed.data.accuracy;
+  if (parsed.data.prompting !== undefined) row.prompting = parsed.data.prompting;
 
   const { error } = await supabase.from("iep_item_states").upsert(row, { onConflict: "item_id" });
   if (error) {
