@@ -2,28 +2,24 @@
 
 import * as React from "react";
 import { Filter, Trash2, X } from "lucide-react";
-import { type IepGoal, type IepStateByStudent } from "./data";
 import styles from "./iep.module.css";
 
-export type IepCommentsDrawerProps = {
-  studentId: string;
-  studentName: string;
-  goalsById: Map<string, IepGoal>;
-  iepState: IepStateByStudent;
-  /** When set, only show comments for this goal. */
-  selectedGoalId: string | null;
-  /** Called when the user clears the selected-goal filter. */
-  onClearFilter: () => void;
-  onRemoveComment: (args: { goalId: string; commentId: string }) => void;
+export type DrawerComment = {
+  itemId: string;
+  itemName: string;
+  commentId: string;
+  body: string;
+  createdAt: string;
+  author?: string | null;
 };
 
-type FlatComment = {
-  goalId: string;
-  goalName: string;
-  commentId: string;
-  text: string;
-  createdAt: string;
-  author?: string;
+export type IepCommentsDrawerProps = {
+  studentName: string;
+  comments: DrawerComment[];
+  selectedItemId: string | null;
+  selectedItemName: string | null;
+  onClearFilter: () => void;
+  onRemoveComment: (commentId: string) => void;
 };
 
 function formatRelative(iso: string): string {
@@ -43,38 +39,15 @@ function formatRelative(iso: string): string {
 }
 
 export function IepCommentsDrawer({
-  studentId,
   studentName,
-  goalsById,
-  iepState,
-  selectedGoalId,
+  comments,
+  selectedItemId,
+  selectedItemName,
   onClearFilter,
   onRemoveComment,
 }: IepCommentsDrawerProps) {
-  const flat = React.useMemo<FlatComment[]>(() => {
-    const studentRow = iepState[studentId] ?? {};
-    const out: FlatComment[] = [];
-    for (const [goalId, item] of Object.entries(studentRow)) {
-      if (selectedGoalId && goalId !== selectedGoalId) continue;
-      const goalName = goalsById.get(goalId)?.name ?? "Goal";
-      for (const c of item.comments) {
-        out.push({
-          goalId,
-          goalName,
-          commentId: c.id,
-          text: c.text,
-          createdAt: c.createdAt,
-          author: c.author,
-        });
-      }
-    }
-    // Newest first across all goals.
-    out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return out;
-  }, [iepState, studentId, selectedGoalId, goalsById]);
-
-  const filtered = selectedGoalId !== null;
-  const filterGoalName = filtered ? (goalsById.get(selectedGoalId)?.name ?? "Selected item") : null;
+  const filtered = selectedItemId !== null;
+  const visible = filtered ? comments.filter((c) => c.itemId === selectedItemId) : comments;
   const firstName = studentName.split(" ")[0];
 
   return (
@@ -84,7 +57,7 @@ export function IepCommentsDrawer({
           {filtered ? "Item comments" : "Recent comments"}
         </div>
         <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-          {flat.length} {flat.length === 1 ? "note" : "notes"} · {firstName}
+          {visible.length} {visible.length === 1 ? "note" : "notes"} · {firstName}
         </div>
       </div>
 
@@ -99,7 +72,7 @@ export function IepCommentsDrawer({
           <span
             style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}
           >
-            Filtered to: <strong>{filterGoalName}</strong>
+            Filtered to: <strong>{selectedItemName ?? "Selected item"}</strong>
           </span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
             Show all
@@ -108,7 +81,7 @@ export function IepCommentsDrawer({
         </button>
       )}
 
-      {flat.length === 0 ? (
+      {visible.length === 0 ? (
         <div className={styles.drawerEmpty}>
           {filtered
             ? "No comments yet on this item — open the bar below to add one."
@@ -116,11 +89,11 @@ export function IepCommentsDrawer({
         </div>
       ) : (
         <div>
-          {flat.map((c) => (
+          {visible.map((c) => (
             <div key={c.commentId} className={styles.drawerCommentRow}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
-                <div className={styles.drawerCommentGoal} title={c.goalName}>
-                  {c.goalName}
+                <div className={styles.drawerCommentGoal} title={c.itemName}>
+                  {c.itemName}
                 </div>
                 <div style={{ fontSize: 10.5, color: "var(--color-ink-muted)" }}>
                   · {formatRelative(c.createdAt)}
@@ -128,7 +101,7 @@ export function IepCommentsDrawer({
                 <button
                   type="button"
                   className="tap"
-                  onClick={() => onRemoveComment({ goalId: c.goalId, commentId: c.commentId })}
+                  onClick={() => onRemoveComment(c.commentId)}
                   aria-label="Delete comment"
                   style={{
                     marginLeft: "auto",
@@ -147,7 +120,7 @@ export function IepCommentsDrawer({
                 className="font-display"
                 style={{ fontSize: 16, lineHeight: 1.3, color: "var(--color-ink)" }}
               >
-                &ldquo;{c.text}&rdquo;
+                &ldquo;{c.body}&rdquo;
               </div>
               {c.author && (
                 <div style={{ fontSize: 10.5, color: "var(--color-ink-muted)", marginTop: 4 }}>

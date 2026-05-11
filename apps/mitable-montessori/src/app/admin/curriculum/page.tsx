@@ -6,10 +6,8 @@ import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  DEFAULT_CURRICULA,
-  type DefaultCurriculum,
-} from "@/lib/admin/curriculum-data";
+import { DEFAULT_CURRICULA, type DefaultCurriculum } from "@/lib/admin/curriculum-data";
+import { IepAdminTab } from "./iep-tab";
 
 type AdminSubtopic = { id: string; name: string };
 
@@ -63,21 +61,20 @@ function topicCount(curriculum: AdminCurriculum): number {
 
 function subtopicCount(curriculum: AdminCurriculum): number {
   return curriculum.subjects.reduce(
-    (sum, subject) =>
-      sum + subject.topics.reduce((s, topic) => s + topic.subtopics.length, 0),
+    (sum, subject) => sum + subject.topics.reduce((s, topic) => s + topic.subtopics.length, 0),
     0
   );
 }
 
+type AdminCurriculumTab = "curricula" | "iep";
+
 export default function AdminCurriculumPage() {
-  const [curricula, setCurricula] = React.useState<AdminCurriculum[]>(() =>
-    initialCurricula()
-  );
+  const [activeTab, setActiveTab] = React.useState<AdminCurriculumTab>("curricula");
+  const [curricula, setCurricula] = React.useState<AdminCurriculum[]>(() => initialCurricula());
   const [selectedId, setSelectedId] = React.useState(curricula[0]?.id ?? "");
   const [createOpen, setCreateOpen] = React.useState(false);
 
-  const selected =
-    curricula.find((curriculum) => curriculum.id === selectedId) ?? curricula[0];
+  const selected = curricula.find((curriculum) => curriculum.id === selectedId) ?? curricula[0];
 
   const updateCurriculum = (
     id: string,
@@ -137,10 +134,7 @@ export default function AdminCurriculumPage() {
     if (!name.trim()) return;
     updateCurriculum(curriculumId, (curriculum) => ({
       ...curriculum,
-      subjects: [
-        ...curriculum.subjects,
-        { id: uid("subject"), name: name.trim(), topics: [] },
-      ],
+      subjects: [...curriculum.subjects, { id: uid("subject"), name: name.trim(), topics: [] }],
     }));
   };
 
@@ -173,24 +167,14 @@ export default function AdminCurriculumPage() {
     }));
   };
 
-  const renameTopic = (
-    curriculumId: string,
-    subjectId: string,
-    topicId: string,
-    name: string
-  ) => {
+  const renameTopic = (curriculumId: string, subjectId: string, topicId: string, name: string) => {
     updateTopic(curriculumId, subjectId, topicId, (topic) => ({
       ...topic,
       name: name.trim() || topic.name,
     }));
   };
 
-  const addSubtopic = (
-    curriculumId: string,
-    subjectId: string,
-    topicId: string,
-    name: string
-  ) => {
+  const addSubtopic = (curriculumId: string, subjectId: string, topicId: string, name: string) => {
     if (!name.trim()) return;
     updateTopic(curriculumId, subjectId, topicId, (topic) => ({
       ...topic,
@@ -220,9 +204,7 @@ export default function AdminCurriculumPage() {
     updateTopic(curriculumId, subjectId, topicId, (topic) => ({
       ...topic,
       subtopics: topic.subtopics.map((subtopic) =>
-        subtopic.id === subtopicId
-          ? { ...subtopic, name: name.trim() || subtopic.name }
-          : subtopic
+        subtopic.id === subtopicId ? { ...subtopic, name: name.trim() || subtopic.name } : subtopic
       ),
     }));
   };
@@ -233,101 +215,143 @@ export default function AdminCurriculumPage() {
         title="Curriculum"
         subtitle="View and modify curricula."
         actions={
-          <Button variant="default" onClick={() => setCreateOpen(true)}>
-            <Plus size={16} strokeWidth={1.7} /> Add curriculum
-          </Button>
+          activeTab === "curricula" ? (
+            <Button variant="default" onClick={() => setCreateOpen(true)}>
+              <Plus size={16} strokeWidth={1.7} /> Add curriculum
+            </Button>
+          ) : null
         }
       />
 
       <div
         style={{
-          padding: "20px 24px 64px",
-          display: "grid",
-          gridTemplateColumns: "minmax(240px, 320px) minmax(0, 1fr)",
-          gap: 18,
-          alignItems: "start",
+          display: "flex",
+          gap: 4,
+          padding: "0 24px",
+          borderBottom: "1px solid var(--color-border)",
         }}
       >
-        <aside style={cardStyle}>
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--color-border)" }}>
-            <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-              Curricula
-            </div>
-          </div>
-          {curricula.map((curriculum, index) => {
-            const active = curriculum.id === selected?.id;
-            const sCount = curriculum.subjects.length;
-            const tCount = topicCount(curriculum);
-            return (
-              <button
-                key={curriculum.id}
-                type="button"
-                className="tap"
-                onClick={() => setSelectedId(curriculum.id)}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "14px 16px",
-                  border: 0,
-                  borderTop: index ? "1px solid var(--color-border)" : 0,
-                  background: active ? "var(--color-terracotta-soft)" : "transparent",
-                  textAlign: "left",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
-                    {curriculum.name}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
-                    {curriculum.ageRange
-                      ? `${curriculum.ageRange} · ${sCount} subjects · ${tCount} topics`
-                      : `${sCount} subjects · ${tCount} topics`}
-                  </div>
-                </div>
-                <ChevronRight size={15} strokeWidth={1.5} />
-              </button>
-            );
-          })}
-        </aside>
-
-        <section style={cardStyle}>
-          {selected ? (
-            <CurriculumDetail
-              curriculum={selected}
-              topicCount={topicCount(selected)}
-              subtopicCount={subtopicCount(selected)}
-              onAddSubject={(name) => addSubject(selected.id, name)}
-              onRemoveSubject={(subjectId) => removeSubject(selected.id, subjectId)}
-              onRenameSubject={(subjectId, name) =>
-                renameSubject(selected.id, subjectId, name)
-              }
-              onAddTopic={(subjectId, name) => addTopic(selected.id, subjectId, name)}
-              onRemoveTopic={(subjectId, topicId) =>
-                removeTopic(selected.id, subjectId, topicId)
-              }
-              onRenameTopic={(subjectId, topicId, name) =>
-                renameTopic(selected.id, subjectId, topicId, name)
-              }
-              onAddSubtopic={(subjectId, topicId, name) =>
-                addSubtopic(selected.id, subjectId, topicId, name)
-              }
-              onRemoveSubtopic={(subjectId, topicId, subtopicId) =>
-                removeSubtopic(selected.id, subjectId, topicId, subtopicId)
-              }
-              onRenameSubtopic={(subjectId, topicId, subtopicId, name) =>
-                renameSubtopic(selected.id, subjectId, topicId, subtopicId, name)
-              }
-              onRemoveCurriculum={() => removeCurriculum(selected.id)}
-            />
-          ) : (
-            <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
-              No curricula yet. Add one to get started.
-            </div>
-          )}
-        </section>
+        {(
+          [
+            { id: "curricula", label: "Curricula" },
+            { id: "iep", label: "IEP" },
+          ] as const
+        ).map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: "10px 14px",
+                border: 0,
+                background: "transparent",
+                color: active ? "var(--color-ink)" : "var(--color-ink-muted)",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                borderBottom: `2px solid ${active ? "var(--color-ink)" : "transparent"}`,
+                marginBottom: -1,
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
+
+      {activeTab === "iep" ? <IepAdminTab /> : null}
+
+      {activeTab === "curricula" ? (
+        <div
+          style={{
+            padding: "20px 24px 64px",
+            display: "grid",
+            gridTemplateColumns: "minmax(240px, 320px) minmax(0, 1fr)",
+            gap: 18,
+            alignItems: "start",
+          }}
+        >
+          <aside style={cardStyle}>
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--color-border)" }}>
+              <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                Curricula
+              </div>
+            </div>
+            {curricula.map((curriculum, index) => {
+              const active = curriculum.id === selected?.id;
+              const sCount = curriculum.subjects.length;
+              const tCount = topicCount(curriculum);
+              return (
+                <button
+                  key={curriculum.id}
+                  type="button"
+                  className="tap"
+                  onClick={() => setSelectedId(curriculum.id)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "14px 16px",
+                    border: 0,
+                    borderTop: index ? "1px solid var(--color-border)" : 0,
+                    background: active ? "var(--color-terracotta-soft)" : "transparent",
+                    textAlign: "left",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
+                      {curriculum.name}
+                    </div>
+                    <div
+                      style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}
+                    >
+                      {curriculum.ageRange
+                        ? `${curriculum.ageRange} · ${sCount} subjects · ${tCount} topics`
+                        : `${sCount} subjects · ${tCount} topics`}
+                    </div>
+                  </div>
+                  <ChevronRight size={15} strokeWidth={1.5} />
+                </button>
+              );
+            })}
+          </aside>
+
+          <section style={cardStyle}>
+            {selected ? (
+              <CurriculumDetail
+                curriculum={selected}
+                topicCount={topicCount(selected)}
+                subtopicCount={subtopicCount(selected)}
+                onAddSubject={(name) => addSubject(selected.id, name)}
+                onRemoveSubject={(subjectId) => removeSubject(selected.id, subjectId)}
+                onRenameSubject={(subjectId, name) => renameSubject(selected.id, subjectId, name)}
+                onAddTopic={(subjectId, name) => addTopic(selected.id, subjectId, name)}
+                onRemoveTopic={(subjectId, topicId) => removeTopic(selected.id, subjectId, topicId)}
+                onRenameTopic={(subjectId, topicId, name) =>
+                  renameTopic(selected.id, subjectId, topicId, name)
+                }
+                onAddSubtopic={(subjectId, topicId, name) =>
+                  addSubtopic(selected.id, subjectId, topicId, name)
+                }
+                onRemoveSubtopic={(subjectId, topicId, subtopicId) =>
+                  removeSubtopic(selected.id, subjectId, topicId, subtopicId)
+                }
+                onRenameSubtopic={(subjectId, topicId, subtopicId, name) =>
+                  renameSubtopic(selected.id, subjectId, topicId, subtopicId, name)
+                }
+                onRemoveCurriculum={() => removeCurriculum(selected.id)}
+              />
+            ) : (
+              <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
+                No curricula yet. Add one to get started.
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       <CreateCurriculumDialog
         open={createOpen}
@@ -364,12 +388,7 @@ function CurriculumDetail({
   onRenameTopic: (subjectId: string, topicId: string, name: string) => void;
   onAddSubtopic: (subjectId: string, topicId: string, name: string) => void;
   onRemoveSubtopic: (subjectId: string, topicId: string, subtopicId: string) => void;
-  onRenameSubtopic: (
-    subjectId: string,
-    topicId: string,
-    subtopicId: string,
-    name: string
-  ) => void;
+  onRenameSubtopic: (subjectId: string, topicId: string, subtopicId: string, name: string) => void;
   onRemoveCurriculum: () => void;
 }) {
   const [showAddSubject, setShowAddSubject] = React.useState(false);
@@ -401,8 +420,8 @@ function CurriculumDetail({
             {curriculum.name}
           </h2>
           <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
-            {curriculum.subjects.length} subjects · {topicCount} topics · {subtopicCount}{" "}
-            lessons{curriculum.ageRange ? ` · ${curriculum.ageRange}` : ""}
+            {curriculum.subjects.length} subjects · {topicCount} topics · {subtopicCount} lessons
+            {curriculum.ageRange ? ` · ${curriculum.ageRange}` : ""}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -523,7 +542,8 @@ function EmptyCurriculumState({ onAddSubject }: { onAddSubject: () => void }) {
             maxWidth: 360,
           }}
         >
-          Add a subject to get started — for example &quot;Practical Life&quot; or &quot;Mathematics&quot;.
+          Add a subject to get started — for example &quot;Practical Life&quot; or
+          &quot;Mathematics&quot;.
         </div>
       </div>
       <Button onClick={onAddSubject}>
@@ -590,8 +610,8 @@ function SubjectCard({
           textStyle={{ fontSize: 16, fontWeight: 700, color: "var(--color-ink)" }}
         />
         <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
-          {subject.topics.length} topic{subject.topics.length === 1 ? "" : "s"} ·{" "}
-          {totalSubtopics} lesson{totalSubtopics === 1 ? "" : "s"}
+          {subject.topics.length} topic{subject.topics.length === 1 ? "" : "s"} · {totalSubtopics}{" "}
+          lesson{totalSubtopics === 1 ? "" : "s"}
         </span>
         <div style={{ flex: 1 }} />
         <Button variant="ghost" size="sm" onClick={() => setShowAddTopic(true)}>
@@ -688,9 +708,7 @@ function SubjectCard({
               onRemove={() => onRemoveTopic(topic.id)}
               onAddSubtopic={(name) => onAddSubtopic(topic.id, name)}
               onRemoveSubtopic={(subtopicId) => onRemoveSubtopic(topic.id, subtopicId)}
-              onRenameSubtopic={(subtopicId, name) =>
-                onRenameSubtopic(topic.id, subtopicId, name)
-              }
+              onRenameSubtopic={(subtopicId, name) => onRenameSubtopic(topic.id, subtopicId, name)}
             />
           ))
         )}

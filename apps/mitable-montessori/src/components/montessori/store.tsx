@@ -20,15 +20,6 @@ import {
 } from "./data";
 import type { ClassroomProgress } from "@/lib/queries/classroom-progress";
 import {
-  INITIAL_IEP_STATE,
-  emptyIepItem,
-  type IepComment,
-  type IepDomain,
-  type IepRating,
-  type IepStateByStudent,
-  type PromptingCode,
-} from "./iep/data";
-import {
   INITIAL_SESSION_NOTES,
   type SessionNote,
   type SessionNoteDraft,
@@ -108,30 +99,6 @@ export type MontessoriStore = {
     status: ProgressMark;
     note?: string;
   }) => Promise<void>;
-
-  // IEP progress (student-scoped). One IepItemState per student × goal —
-  // current rating + completion + prompting + comments thread. The
-  // class-mode `progressByTopic` map is independent.
-  iepState: IepStateByStudent;
-  /** Patch any subset of {rating, successCount, promptingCode} on an item.
-   *  Initializes the item if it doesn't exist yet. */
-  setIepItemFields: (args: {
-    studentId: string;
-    goalId: string;
-    domain: IepDomain;
-    rating?: IepRating | null;
-    successCount?: number | null;
-    promptingCode?: PromptingCode | null;
-  }) => void;
-  /** Append a comment to an IEP item, creating it if needed. */
-  addIepComment: (args: {
-    studentId: string;
-    goalId: string;
-    domain: IepDomain;
-    text: string;
-    author?: string;
-  }) => void;
-  removeIepComment: (args: { studentId: string; goalId: string; commentId: string }) => void;
 
   // Session notes (student-scoped). One ordered list per student, newest
   // first. Stored client-side for now; persisted later via the existing
@@ -218,7 +185,6 @@ export function MontessoriProvider({
   >({});
   const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>([]);
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
-  const [iepState, setIepState] = React.useState<IepStateByStudent>(INITIAL_IEP_STATE);
   const [sessionNotes, setSessionNotes] =
     React.useState<SessionNotesByStudent>(INITIAL_SESSION_NOTES);
 
@@ -437,93 +403,8 @@ export function MontessoriProvider({
     setNotesByTopic({});
     setRecentUpdates([]);
     setAttendance(INITIAL_ATTENDANCE);
-    setIepState(INITIAL_IEP_STATE);
     setSessionNotes(INITIAL_SESSION_NOTES);
   }, [initialClassroomProgress]);
-
-  const setIepItemFields = React.useCallback(
-    (args: {
-      studentId: string;
-      goalId: string;
-      domain: IepDomain;
-      rating?: IepRating | null;
-      successCount?: number | null;
-      promptingCode?: PromptingCode | null;
-    }) => {
-      setIepState((prev) => {
-        const studentRow = { ...(prev[args.studentId] || {}) };
-        const cur = studentRow[args.goalId] ?? emptyIepItem();
-        const nextSuccess =
-          args.successCount === undefined
-            ? cur.successCount
-            : args.successCount === null
-              ? null
-              : Math.max(0, Math.min(10, Math.round(args.successCount)));
-        studentRow[args.goalId] = {
-          ...cur,
-          rating: args.rating === undefined ? cur.rating : args.rating,
-          successCount: nextSuccess,
-          promptingCode: args.promptingCode === undefined ? cur.promptingCode : args.promptingCode,
-          updatedAt: new Date().toISOString(),
-        };
-        return { ...prev, [args.studentId]: studentRow };
-      });
-    },
-    []
-  );
-
-  const addIepComment = React.useCallback(
-    (args: {
-      studentId: string;
-      goalId: string;
-      domain: IepDomain;
-      text: string;
-      author?: string;
-    }) => {
-      const text = args.text.trim();
-      if (!text) return;
-      setIepState((prev) => {
-        const studentRow = { ...(prev[args.studentId] || {}) };
-        const cur = studentRow[args.goalId] ?? emptyIepItem();
-        const comment: IepComment = {
-          id: `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-          text,
-          createdAt: new Date().toISOString(),
-          author: args.author,
-        };
-        // Newest-first ordering keeps the drawer cheap to render.
-        studentRow[args.goalId] = {
-          ...cur,
-          comments: [comment, ...cur.comments],
-          updatedAt: comment.createdAt,
-        };
-        return { ...prev, [args.studentId]: studentRow };
-      });
-    },
-    []
-  );
-
-  const removeIepComment = React.useCallback(
-    (args: { studentId: string; goalId: string; commentId: string }) => {
-      setIepState((prev) => {
-        const studentRow = prev[args.studentId];
-        if (!studentRow) return prev;
-        const cur = studentRow[args.goalId];
-        if (!cur) return prev;
-        return {
-          ...prev,
-          [args.studentId]: {
-            ...studentRow,
-            [args.goalId]: {
-              ...cur,
-              comments: cur.comments.filter((c) => c.id !== args.commentId),
-            },
-          },
-        };
-      });
-    },
-    []
-  );
 
   const addSessionNote = React.useCallback(
     (args: { studentId: string; draft: SessionNoteDraft }): SessionNote => {
@@ -649,10 +530,6 @@ export function MontessoriProvider({
     createReport,
     toggleAttendance,
     applyBulkProgress,
-    iepState,
-    setIepItemFields,
-    addIepComment,
-    removeIepComment,
     sessionNotes,
     addSessionNote,
     updateSessionNote,
