@@ -19,12 +19,6 @@ import {
   type Report,
 } from "./data";
 import type { ClassroomProgress } from "@/lib/queries/classroom-progress";
-import {
-  INITIAL_SESSION_NOTES,
-  type SessionNote,
-  type SessionNoteDraft,
-  type SessionNotesByStudent,
-} from "./session-notes/data";
 import { HandCheck, ToastBus } from "./primitives";
 
 export type WebRoute = "today" | "roster" | "progress" | "attendance" | "reports" | "curriculum";
@@ -99,14 +93,6 @@ export type MontessoriStore = {
     status: ProgressMark;
     note?: string;
   }) => Promise<void>;
-
-  // Session notes (student-scoped). One ordered list per student, newest
-  // first. Stored client-side for now; persisted later via the existing
-  // /api/v1/reports endpoint with a `session_note` template.
-  sessionNotes: SessionNotesByStudent;
-  addSessionNote: (args: { studentId: string; draft: SessionNoteDraft }) => SessionNote;
-  updateSessionNote: (args: { studentId: string; noteId: string; draft: SessionNoteDraft }) => void;
-  removeSessionNote: (args: { studentId: string; noteId: string }) => void;
 
   clearAll: () => void;
 };
@@ -185,8 +171,6 @@ export function MontessoriProvider({
   >({});
   const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>([]);
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
-  const [sessionNotes, setSessionNotes] =
-    React.useState<SessionNotesByStudent>(INITIAL_SESSION_NOTES);
 
   const [reportsFilter, setReportsFilter] = React.useState("All");
   const [rosterFilter, setRosterFilter] = React.useState("All");
@@ -403,49 +387,7 @@ export function MontessoriProvider({
     setNotesByTopic({});
     setRecentUpdates([]);
     setAttendance(INITIAL_ATTENDANCE);
-    setSessionNotes(INITIAL_SESSION_NOTES);
   }, [initialClassroomProgress]);
-
-  const addSessionNote = React.useCallback(
-    (args: { studentId: string; draft: SessionNoteDraft }): SessionNote => {
-      const note: SessionNote = {
-        id: `sn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-        studentId: args.studentId,
-        ...args.draft,
-        createdAt: new Date().toISOString(),
-      };
-      setSessionNotes((prev) => ({
-        ...prev,
-        [args.studentId]: [note, ...(prev[args.studentId] ?? [])],
-      }));
-      return note;
-    },
-    []
-  );
-
-  const updateSessionNote = React.useCallback(
-    (args: { studentId: string; noteId: string; draft: SessionNoteDraft }) => {
-      setSessionNotes((prev) => {
-        const list = prev[args.studentId];
-        if (!list) return prev;
-        return {
-          ...prev,
-          [args.studentId]: list.map((n) =>
-            n.id === args.noteId ? { ...n, ...args.draft, updatedAt: new Date().toISOString() } : n
-          ),
-        };
-      });
-    },
-    []
-  );
-
-  const removeSessionNote = React.useCallback((args: { studentId: string; noteId: string }) => {
-    setSessionNotes((prev) => {
-      const list = prev[args.studentId];
-      if (!list) return prev;
-      return { ...prev, [args.studentId]: list.filter((n) => n.id !== args.noteId) };
-    });
-  }, []);
 
   const approveReport = React.useCallback(
     (id: string) => {
@@ -530,10 +472,6 @@ export function MontessoriProvider({
     createReport,
     toggleAttendance,
     applyBulkProgress,
-    sessionNotes,
-    addSessionNote,
-    updateSessionNote,
-    removeSessionNote,
     clearAll,
   };
 
