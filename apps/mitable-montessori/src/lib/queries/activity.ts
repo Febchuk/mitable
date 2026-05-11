@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 import { getAxesForSchool } from "./axes";
 import type { AxisLevel } from "./whole-child";
@@ -90,9 +91,11 @@ function authorName(u: { first_name: string | null; last_name: string | null } |
  * client-side — the row counts are small enough that DB-side UNION isn't worth
  * the schema gymnastics.
  *
- * RLS on each source table confines rows to students the caller can see
- * (curriculum/whole-child: teacher classroom scope + admin school scope;
- * reports: same after migration 0035 — teachers were previously school_id-only).
+ * Curriculum + whole-child use the cookie Supabase client (RLS). Reports use
+ * the service-role client with the same school filter pattern as listReports:
+ * we only read reports after confirming the caller can read this student row,
+ * then filter by students.school_id so staff without users.school_id still see
+ * the feed (RLS-only report SELECT was failing for those accounts).
  *
  * `axes` doesn't have an FK from whole_child_observations.axis_key (axes are
  * keyed by `key` text, not `id`), so the join below is a manual lookup against
@@ -106,7 +109,8 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
   const ctx = await getCurrentUserContext();
   const schoolId = ctx?.schoolId ?? null;
 
-  const [eventsResp, obsResp, reportsResp, axes] = await Promise.all([
+  const [studentResp, eventsResp, obsResp, axes] = await Promise.all([
+    supabase.from("students").select("school_id").eq("id", studentId).maybeSingle(),
     supabase
       .from("curriculum_events")
       .select(
@@ -128,17 +132,25 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
       .order("created_at", { ascending: false })
       .limit(100)
       .returns<Omit<WholeChildObsDbRow, "axes">[]>(),
-    supabase
-      .from("reports")
-      .select(
-        "id, title, report_type, status, created_at, users:created_by_user_id(first_name, last_name)"
-      )
-      .eq("student_id", studentId)
-      .order("created_at", { ascending: false })
-      .limit(100)
-      .returns<ReportDbRow[]>(),
     getAxesForSchool(schoolId),
   ]);
+
+  const studentSchoolId = (studentResp.data?.school_id as string | undefined) ?? null;
+
+  const admin = createAdminClient();
+  const reportsResult =
+    studentSchoolId != null
+      ? await admin
+          .from("reports")
+          .select(
+            "id, title, report_type, status, created_at, students!inner(school_id), " +
+              "users:created_by_user_id(first_name, last_name)"
+          )
+          .eq("student_id", studentId)
+          .eq("students.school_id", studentSchoolId)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      : { data: [] as ReportDbRow[], error: null as null };
 
   const axisLabels = new Map(axes.map((a) => [a.key, a.label]));
 
@@ -165,7 +177,9 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
     createdAt: o.created_at,
   }));
 
-  const reportEntries: ActivityFeedEntry[] = (reportsResp.data ?? []).map((r) => ({
+  const reportRows: ReportDbRow[] =
+    reportsResult.error != null ? [] : ((reportsResult.data ?? []) as ReportDbRow[]);
+  const reportEntries: ActivityFeedEntry[] = reportRows.map((r) => ({
     kind: "report",
     id: r.id,
     title: r.title,

@@ -247,9 +247,11 @@ function WholeChildEntry({
 function ReportEntry({
   e,
   mobile,
+  reportsRailBasePath,
 }: {
   e: Extract<ActivityFeedEntry, { kind: "report" }>;
   mobile: boolean;
+  reportsRailBasePath: string;
 }) {
   const statusColor = REPORT_STATUS_COLOR[e.status];
   const displayTitle =
@@ -261,7 +263,7 @@ function ReportEntry({
         : "Major report");
   return (
     <Link
-      href={`/app/reports/${e.id}`}
+      href={`${reportsRailBasePath}?open=${encodeURIComponent(e.id)}`}
       style={{
         display: "block",
         background: mobile ? "var(--color-canvas)" : "transparent",
@@ -332,9 +334,11 @@ function ReportEntry({
 export function ActivityView({
   mobile,
   entries,
+  reportsRailBasePath,
 }: {
   mobile: boolean;
   entries: ActivityFeedEntry[];
+  reportsRailBasePath: string;
 }) {
   const [shown, setShown] = React.useState(8);
   const visible = entries.slice(0, shown);
@@ -368,7 +372,12 @@ export function ActivityView({
               ) : e.kind === "whole-child" ? (
                 <WholeChildEntry key={`w-${e.id}`} e={e} mobile={mobile} />
               ) : (
-                <ReportEntry key={`r-${e.id}`} e={e} mobile={mobile} />
+                <ReportEntry
+                  key={`r-${e.id}`}
+                  e={e}
+                  mobile={mobile}
+                  reportsRailBasePath={reportsRailBasePath}
+                />
               )
             )}
           </div>

@@ -144,7 +144,7 @@ export function NewReportTrigger() {
             : "Drafting new report…",
         });
         setOpen(false);
-        router.push(`/app/reports/${json.reportId}`);
+        router.push(`/app/reports?open=${encodeURIComponent(json.reportId)}`);
       } finally {
         setSubmitting(false);
       }

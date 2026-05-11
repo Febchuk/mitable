@@ -3,8 +3,16 @@ import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import { listReports } from "@/lib/queries/reports";
 import { ReportsRailView } from "./reports-rail-view";
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ open?: string | string[] }>;
+}) {
   const ctx = await getCurrentUserContext();
+  const sp = await searchParams;
+  const rawOpen = sp?.open;
+  const openParam =
+    typeof rawOpen === "string" ? rawOpen : Array.isArray(rawOpen) ? rawOpen[0] : undefined;
 
   let classroomIds: string[] | undefined;
   if (ctx) {
@@ -19,5 +27,7 @@ export default async function ReportsPage() {
   }
 
   const reports = await listReports({ classroomIds });
-  return <ReportsRailView reports={reports} />;
+  const initialOpenReportId =
+    openParam && reports.some((r) => r.id === openParam) ? openParam : null;
+  return <ReportsRailView reports={reports} initialOpenReportId={initialOpenReportId} />;
 }

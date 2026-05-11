@@ -73,6 +73,20 @@ const FILTERS = ["All", "Drafts", "Awaiting review", "Sent", "Daily", "Major", "
 
 const ALL_CLASSROOMS = "__ALL__";
 
+function firstSelectableReportId(
+  rows: ReportListRow[],
+  variant: "teacher" | "admin",
+  classroomScope: string,
+  filter: string
+): string | null {
+  const isAdmin = variant === "admin";
+  const scoped =
+    !isAdmin || classroomScope === ALL_CLASSROOMS
+      ? rows
+      : rows.filter((r) => r.classroomId === classroomScope);
+  return applyFilter(scoped, filter)[0]?.id ?? null;
+}
+
 function applyFilter(rows: ReportListRow[], filter: string): ReportListRow[] {
   return rows.filter((r) => {
     if (filter === "All") return true;
@@ -90,9 +104,12 @@ function applyFilter(rows: ReportListRow[], filter: string): ReportListRow[] {
 export function ReportsRailView({
   reports,
   variant = "teacher",
+  initialOpenReportId = null,
 }: {
   reports: ReportListRow[];
   variant?: "teacher" | "admin";
+  /** Deep-link from activity feed etc. — opens this report in the rail when present in `reports`. */
+  initialOpenReportId?: string | null;
 }) {
   const locale = useUiLocale();
   const isAdmin = variant === "admin";
@@ -123,7 +140,19 @@ export function ReportsRailView({
   const filtered = React.useMemo(() => applyFilter(scopedReports, filter), [scopedReports, filter]);
 
   // Selection: keep stable across reorders + filter changes when possible.
-  const [selectedId, setSelectedId] = React.useState<string | null>(filtered[0]?.id ?? null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(() => {
+    if (initialOpenReportId && reports.some((r) => r.id === initialOpenReportId)) {
+      return initialOpenReportId;
+    }
+    return firstSelectableReportId(reports, variant, ALL_CLASSROOMS, "All");
+  });
+
+  React.useEffect(() => {
+    if (!initialOpenReportId || !reports.some((r) => r.id === initialOpenReportId)) return;
+    setFilter("All");
+    if (isAdmin) setClassroomScope(ALL_CLASSROOMS);
+    setSelectedId(initialOpenReportId);
+  }, [initialOpenReportId, reports, isAdmin]);
 
   // The currently selected list row — drives the loading skeleton header
   // so the editor pane shows the right student/status while the full
