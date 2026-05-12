@@ -200,13 +200,12 @@ function MobileTopBar({
     // Route titles + subtitles are owned by <PageHeader> in the body — this
     // bar deliberately carries no title to avoid a duplicated heading.
     <header
-      className="lg:hidden"
+      className="flex lg:hidden"
       style={{
         position: "sticky",
         top: 0,
         zIndex: 20,
         height: 52,
-        display: "flex",
         alignItems: "center",
         gap: 10,
         padding: "0 12px",
@@ -328,7 +327,7 @@ function MobileDrawer({
 
   return (
     <aside
-      className="lg:hidden"
+      className="flex lg:hidden"
       role="dialog"
       aria-label="Navigation"
       aria-hidden={!open}
@@ -344,7 +343,6 @@ function MobileDrawer({
         boxShadow: "16px 0 40px rgba(43,38,34,0.18)",
         transform: open ? "translateX(0)" : "translateX(-105%)",
         transition: "transform 280ms cubic-bezier(0.32, 0.72, 0.24, 1)",
-        display: "flex",
         flexDirection: "column",
       }}
     >
@@ -624,7 +622,7 @@ function MobileChatFab({ hidden, onClick }: { hidden: boolean; onClick: () => vo
   return (
     <button
       type="button"
-      className="lg:hidden tap"
+      className="grid lg:hidden tap"
       onClick={onClick}
       aria-label="Ask Mitable"
       aria-hidden={hidden}
@@ -637,7 +635,6 @@ function MobileChatFab({ hidden, onClick }: { hidden: boolean; onClick: () => vo
         borderRadius: 999,
         background: "var(--color-terracotta)",
         color: "#fff",
-        display: "grid",
         placeItems: "center",
         boxShadow: "0 8px 18px rgba(196,106,79,0.35)",
         border: "3px solid var(--color-surface)",
@@ -695,7 +692,7 @@ function MobileChatSheet({
 
   return (
     <div
-      className="lg:hidden"
+      className="flex lg:hidden"
       role="dialog"
       aria-label="Ask Mitable"
       aria-hidden={!open}
@@ -712,7 +709,6 @@ function MobileChatSheet({
         boxShadow: "0 -16px 40px rgba(43,38,34,0.18)",
         transform: open ? "translateY(0)" : "translateY(105%)",
         transition: "transform 320ms cubic-bezier(0.32, 0.72, 0.24, 1)",
-        display: "flex",
         flexDirection: "column",
       }}
     >
