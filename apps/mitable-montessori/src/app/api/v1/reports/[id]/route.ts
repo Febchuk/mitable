@@ -5,6 +5,7 @@ import { requireTeacherForClassroom, requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { getReport } from "@/lib/queries/reports";
 import { UpdateReportRequestSchema } from "@/lib/schemas/report";
+import { scoreAndPersistReport } from "@/lib/reports/score-and-persist";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireUser();
@@ -99,6 +100,19 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   revalidatePath(`/admin/reports/${id}`);
   revalidatePath("/app/reports");
   revalidatePath("/admin/reports");
+  revalidatePath("/app/reports-v2");
+  revalidatePath("/admin/reports-v2");
+
+  // Fire-and-forget re-score on content edits. Only triggers when body or
+  // sections changed (title-only edits don't move the score). We don't
+  // await — autosave must stay fast; the score will land on the next
+  // refresh.
+  const contentChanged = parsed.data.body !== undefined || parsed.data.sections !== undefined;
+  if (contentChanged) {
+    scoreAndPersistReport({ supabase, reportId: id }).catch((err) => {
+      console.error("autosave re-score failed", err);
+    });
+  }
 
   return NextResponse.json({ ok: true, revertedFromReview });
 }

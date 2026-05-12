@@ -30,6 +30,12 @@ export async function fetchTemplateLogoUrl(
  * RLS continues to enforce policy.
  */
 
+export type AiFlag = {
+  kind: "tone" | "evidence" | "pii" | "template";
+  status: "ok" | "warn" | "fail";
+  note: string;
+};
+
 export type ReportListRow = {
   id: string;
   studentId: string;
@@ -50,6 +56,13 @@ export type ReportListRow = {
   title: string | null;
   createdAt: string;
   updatedAt: string;
+  /** AI scoring fields — populated by lib/reports/scorer.ts on /submit and
+   *  fire-and-forget on autosave. All null until the report is scored
+   *  at least once. */
+  aiScore: number | null;
+  aiFlags: AiFlag[] | null;
+  aiReasoning: string[] | null;
+  aiScoredAt: string | null;
 };
 
 export type ReportSection = {
@@ -94,6 +107,10 @@ type ReportsRow = {
   approved_by_user_id: string | null;
   approved_at: string | null;
   sent_at: string | null;
+  ai_score: number | null;
+  ai_flags: AiFlag[] | null;
+  ai_reasoning: string[] | null;
+  ai_scored_at: string | null;
   created_at: string;
   updated_at: string;
   students: {
@@ -124,7 +141,7 @@ export async function listReports(opts?: { classroomIds?: string[] }): Promise<R
   let query = supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name)"
     )
     .eq("students.school_id", ctx.schoolId)
     .order("created_at", { ascending: false });
@@ -150,9 +167,218 @@ export async function listReports(opts?: { classroomIds?: string[] }): Promise<R
     periodEnd: row.period_end,
     status: row.status,
     title: row.title,
+    aiScore: row.ai_score,
+    aiFlags: row.ai_flags,
+    aiReasoning: row.ai_reasoning,
+    aiScoredAt: row.ai_scored_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+}
+
+// ============================================================================
+// Reports v2 (redesign) — additional shape on top of ReportListRow with the
+// fields the new UI needs: derived tab, AI score (stubbed until Phase 4 lands
+// the scorer), reviewer ticks (from report_review_actions), and a placeholder
+// completeness % until the scorer fills it in.
+// ============================================================================
+
+export type ReportV2Tab = "drafts" | "review" | "approved" | "sent";
+
+export type ReportReviewerRow = {
+  reviewerUserId: string;
+  status: "pending" | "approved" | "changes_requested";
+  /** Display name pulled from users.first_name + last_name when available.
+   *  Falls back to email. Null when the user has been deleted (orphaned
+   *  reviewer rows). */
+  reviewerName: string | null;
+};
+
+export type ReportListRowV2 = ReportListRow & {
+  tab: ReportV2Tab;
+  /** UI-friendly display score. Defaults to a deterministic placeholder
+   *  when the real `aiScore` is null (un-scored), so the UI always has a
+   *  number to render. Use `aiScored: boolean` to distinguish. */
+  displayScore: number;
+  /** True iff the row has a real persisted score (i.e. `aiScore !== null`). */
+  aiScored: boolean;
+  /** % of expected sections filled in. Heuristic; Phase 4.1 may replace. */
+  completenessPercent: number;
+  /** Per-reviewer assignment rows from report_reviewers. Empty when no one
+   *  has been assigned (the report is either still a draft, or submitted
+   *  without a named reviewer list). */
+  reviewers: ReportReviewerRow[];
+  /** Convenience: counts derived from `reviewers`. */
+  reviewerTicks: { approved: number; total: number };
+  /** Most recent submission timestamp ("4h ago" relative) — null if never sent. */
+  lastSubmittedAt: string | null;
+  /** Email delivery state for reports in the Sent tab. Counts come from
+   *  report_recipients.delivery_status. "Read" tracking doesn't exist yet so
+   *  `delivered` is the strongest signal we surface. */
+  delivery: { delivered: number; pending: number; failed: number };
+};
+
+/** Status → tab. `changes_requested` lives in Drafts (the teacher's queue). */
+function statusToTab(status: ReportListRow["status"]): ReportV2Tab {
+  switch (status) {
+    case "draft":
+    case "changes_requested":
+      return "drafts";
+    case "submitted_for_review":
+    case "in_review":
+      return "review";
+    case "approved":
+      return "approved";
+    case "sent":
+      return "sent";
+  }
+}
+
+/**
+ * Stubbed AI score. Will be replaced by the real scorer in Phase 4. For now
+ * we hash the report id to get a deterministic-looking score so the UI
+ * doesn't flicker between renders, and tilt toward green so demo data feels
+ * realistic (most reports approved without re-reading).
+ */
+function stubAiScore(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  const bucket = Math.abs(h) % 100;
+  if (bucket < 60) return 85 + (bucket % 13); // 85–97 (green)
+  if (bucket < 85) return 65 + (bucket % 18); // 65–82 (amber)
+  return 35 + (bucket % 22); // 35–56 (red)
+}
+
+function stubCompleteness(score: number): number {
+  // Completeness loosely follows score — Phase 4 will use the scorer's own
+  // completeness signal directly.
+  if (score >= 85) return 90 + (score % 8);
+  if (score >= 60) return 60 + (score % 15);
+  return 40 + (score % 15);
+}
+
+export async function listReportsV2(opts?: {
+  classroomIds?: string[];
+}): Promise<ReportListRowV2[]> {
+  const baseRows = await listReports(opts);
+  if (baseRows.length === 0) return [];
+
+  // Two enrichment queries in parallel:
+  //   1. report_review_actions — tick counts + last-submitted timestamp.
+  //   2. report_recipients — delivered/pending/failed counts for Sent rows.
+  // Both share the same report_id IN-list so they're cheap to run alongside.
+  const supabase = createAdminClient();
+  const ids = baseRows.map((r) => r.id);
+  const [actionsResp, recipientsResp, reviewersResp] = await Promise.all([
+    supabase
+      .from("report_review_actions")
+      .select("report_id, action_type, created_at")
+      .in("report_id", ids),
+    supabase.from("report_recipients").select("report_id, delivery_status").in("report_id", ids),
+    supabase
+      .from("report_reviewers")
+      .select("report_id, reviewer_user_id, status, acted_at")
+      .in("report_id", ids),
+  ]);
+
+  // Last-submitted timestamp comes from the chronological action log —
+  // we don't track it on the reviewer assignment.
+  const lastSubmittedByReport = new Map<string, string>();
+  for (const a of (actionsResp.data ?? []) as Array<{
+    report_id: string;
+    action_type: string;
+    created_at: string;
+  }>) {
+    if (a.action_type === "submitted") {
+      const prev = lastSubmittedByReport.get(a.report_id);
+      if (!prev || a.created_at > prev) {
+        lastSubmittedByReport.set(a.report_id, a.created_at);
+      }
+    }
+  }
+
+  // Resolve reviewer display names with a single follow-up query over
+  // distinct user ids. The reviewers query already constrained us to
+  // school-scoped reports via RLS, so we don't need a second
+  // school_id filter — the result set is naturally scoped.
+  const distinctReviewerIds = Array.from(
+    new Set(
+      (reviewersResp.data ?? []).map((r) => (r as { reviewer_user_id: string }).reviewer_user_id)
+    )
+  );
+  const nameByUserId = new Map<string, string>();
+  if (distinctReviewerIds.length > 0) {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, first_name, last_name, email")
+      .in("id", distinctReviewerIds);
+    for (const u of (users ?? []) as Array<{
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+    }>) {
+      const full = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+      nameByUserId.set(u.id, full || u.email || "");
+    }
+  }
+
+  // Reviewer assignments — the source of truth for "who's reviewing and
+  // have they ticked." Replaces the older "count distinct approvers in the
+  // action log" heuristic.
+  const reviewersByReport = new Map<string, ReportReviewerRow[]>();
+  for (const r of (reviewersResp.data ?? []) as Array<{
+    report_id: string;
+    reviewer_user_id: string;
+    status: "pending" | "approved" | "changes_requested";
+  }>) {
+    const list = reviewersByReport.get(r.report_id) ?? [];
+    list.push({
+      reviewerUserId: r.reviewer_user_id,
+      status: r.status,
+      reviewerName: nameByUserId.get(r.reviewer_user_id) || null,
+    });
+    reviewersByReport.set(r.report_id, list);
+  }
+
+  const deliveryByReport = new Map<
+    string,
+    { delivered: number; pending: number; failed: number }
+  >();
+  for (const r of (recipientsResp.data ?? []) as Array<{
+    report_id: string;
+    delivery_status: "pending" | "sent" | "failed";
+  }>) {
+    const cur = deliveryByReport.get(r.report_id) ?? {
+      delivered: 0,
+      pending: 0,
+      failed: 0,
+    };
+    if (r.delivery_status === "sent") cur.delivered += 1;
+    else if (r.delivery_status === "pending") cur.pending += 1;
+    else cur.failed += 1;
+    deliveryByReport.set(r.report_id, cur);
+  }
+
+  return baseRows.map((row) => {
+    const reviewers = reviewersByReport.get(row.id) ?? [];
+    const approvedCount = reviewers.filter((r) => r.status === "approved").length;
+    // Real score when present; deterministic placeholder otherwise so the
+    // chip color is stable across renders for un-scored rows.
+    const aiScored = row.aiScore !== null;
+    const displayScore = aiScored ? (row.aiScore as number) : stubAiScore(row.id);
+    return {
+      ...row,
+      tab: statusToTab(row.status),
+      aiScored,
+      displayScore,
+      completenessPercent: stubCompleteness(displayScore),
+      reviewers,
+      reviewerTicks: { approved: approvedCount, total: reviewers.length },
+      lastSubmittedAt: lastSubmittedByReport.get(row.id) ?? null,
+      delivery: deliveryByReport.get(row.id) ?? { delivered: 0, pending: 0, failed: 0 },
+    };
+  });
 }
 
 /** Single-report read for the editor page. Filtered by school. */
@@ -164,7 +390,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id)"
     )
     .eq("id", id)
     .eq("students.school_id", ctx.schoolId)
@@ -203,6 +429,10 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     approvedByUserId: row.approved_by_user_id,
     approvedAt: row.approved_at,
     sentAt: row.sent_at,
+    aiScore: row.ai_score,
+    aiFlags: row.ai_flags,
+    aiReasoning: row.ai_reasoning,
+    aiScoredAt: row.ai_scored_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     hasBeenSubmitted: (priorSubmissionCount ?? 0) > 0,
