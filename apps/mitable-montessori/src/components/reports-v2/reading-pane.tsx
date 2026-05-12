@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { MockReport, V2Tab, V2Tone } from "./mock-data";
 import { Icon } from "./icons";
 import styles from "./reports-v2.module.css";
@@ -51,6 +52,7 @@ export function ReadingPane({
   isAdmin,
   embeddedPaneTabs,
   sections,
+  busy = false,
   onSendForReview,
   onApprove,
   onOverrideApprove,
@@ -65,6 +67,8 @@ export function ReadingPane({
   /** Real report body. When null/undefined, the pane renders a placeholder
    *  body so demo / empty states still look right. */
   sections?: RenderedSection[] | null;
+  /** Mid-flight action — strip + header actions disabled. */
+  busy?: boolean;
   onSendForReview?: () => void;
   onApprove?: () => void;
   onOverrideApprove?: () => void;
@@ -101,6 +105,8 @@ export function ReadingPane({
               type="button"
               className={`${styles.btn} ${styles.btnSecondary}`}
               onClick={onRequestChanges}
+              disabled={busy}
+              style={busy ? { opacity: 0.6 } : undefined}
             >
               <Icon.RotateCcw size={12} /> Request changes
             </button>
@@ -108,8 +114,10 @@ export function ReadingPane({
               type="button"
               className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSage}`}
               onClick={onApprove}
+              disabled={busy}
+              style={busy ? { opacity: 0.6 } : undefined}
             >
-              <Icon.Check size={12} /> Approve
+              <Icon.Check size={12} /> {busy ? "Approving…" : "Approve"}
             </button>
           </div>
         </div>
@@ -123,15 +131,17 @@ export function ReadingPane({
             </span>
           </div>
           <div className={styles.reviewStripActions}>
-            <button type="button" className={`${styles.btn} ${styles.btnSecondary}`}>
+            <button type="button" className={`${styles.btn} ${styles.btnSecondary}`} disabled>
               Reschedule
             </button>
             <button
               type="button"
               className={`${styles.btn} ${styles.btnPrimary}`}
               onClick={onSendNow}
+              disabled={busy}
+              style={busy ? { opacity: 0.6 } : undefined}
             >
-              <Icon.Send size={12} /> Send now
+              <Icon.Send size={12} /> {busy ? "Sending…" : "Send now"}
             </button>
           </div>
         </div>
@@ -187,15 +197,21 @@ export function ReadingPane({
             )}
             {tab === "drafts" && (
               <>
-                <button type="button" className={`${styles.btn} ${styles.btnSecondary}`}>
+                <Link
+                  href={`/app/reports/${report.id}`}
+                  className={`${styles.btn} ${styles.btnSecondary}`}
+                  style={{ textDecoration: "none" }}
+                >
                   <Icon.Edit size={12} /> Edit
-                </button>
+                </Link>
                 <button
                   type="button"
                   className={`${styles.btn} ${styles.btnPrimary}`}
                   onClick={onSendForReview}
+                  disabled={busy}
+                  style={busy ? { opacity: 0.6 } : undefined}
                 >
-                  <Icon.Send size={13} /> Send for review
+                  <Icon.Send size={13} /> {busy ? "Sending…" : "Send for review"}
                 </button>
               </>
             )}
@@ -204,8 +220,10 @@ export function ReadingPane({
                 type="button"
                 className={`${styles.btn} ${styles.btnSecondary}`}
                 onClick={onOverrideApprove}
+                disabled={busy}
+                style={busy ? { opacity: 0.6 } : undefined}
               >
-                <Icon.Check size={11} /> Override approve
+                <Icon.Check size={11} /> {busy ? "Approving…" : "Override approve"}
               </button>
             )}
           </div>

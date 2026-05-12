@@ -115,6 +115,7 @@ export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher")
 
   // The list-row summary line. Today we have no synopsis stored on `reports`,
   // so we synthesize one from status. Phase 4 surfaces the scorer's tl;dr.
+  const totalRecipients = row.delivery.delivered + row.delivery.pending + row.delivery.failed;
   const summary =
     row.tab === "drafts"
       ? "Draft saved · ready to send for review when complete."
@@ -122,10 +123,18 @@ export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher")
         ? `${row.reviewerTicks.approved} of ${row.reviewerTicks.total} reviewers approved.`
         : row.tab === "approved"
           ? "Cleared by admin · awaiting delivery to parents."
-          : "Delivered to guardians.";
+          : totalRecipients === 0
+            ? "Sent — no recipients on file."
+            : row.delivery.failed > 0
+              ? `Delivered to ${row.delivery.delivered} of ${totalRecipients} · ${row.delivery.failed} failed.`
+              : row.delivery.pending > 0
+                ? `Delivered to ${row.delivery.delivered} of ${totalRecipients} · ${row.delivery.pending} pending.`
+                : `Delivered to ${row.delivery.delivered} guardian${row.delivery.delivered === 1 ? "" : "s"}.`;
 
   return {
     id: row.id,
+    studentId: row.studentId,
+    rawStatus: row.status,
     childName: row.studentName,
     childInitials: initialsOf(row.studentName),
     childTone: tone,
@@ -140,8 +149,11 @@ export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher")
     completenessPercent: row.tab === "drafts" ? row.completenessPercent : undefined,
     reviewers,
     scheduledSend: row.tab === "approved" ? "Fri · 4:00p" : undefined,
-    deliveryRead: row.tab === "sent" ? 1 : undefined,
-    deliveryTotal: row.tab === "sent" ? 1 : undefined,
+    deliveryRead: row.tab === "sent" ? row.delivery.delivered : undefined,
+    deliveryTotal:
+      row.tab === "sent"
+        ? row.delivery.delivered + row.delivery.pending + row.delivery.failed
+        : undefined,
     hasReply: false,
 
     lastEditedAgo: row.tab === "drafts" ? relativeTime(row.updatedAt) : undefined,

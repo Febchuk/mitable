@@ -39,12 +39,15 @@ export function ListRow({
   tab,
   onSelect,
   onQuickApprove,
+  busy = false,
 }: {
   report: MockReport;
   selected: boolean;
   tab: V2Tab;
   onSelect: () => void;
   onQuickApprove?: () => void;
+  /** Mid-flight action — row dims + buttons disable. */
+  busy?: boolean;
 }) {
   const score = report.aiScore;
   const showScore = tab === "drafts" || tab === "review";
@@ -112,6 +115,7 @@ export function ListRow({
       type="button"
       className={`${styles.row} ${selected ? styles.rowSelected : ""}`}
       onClick={onSelect}
+      style={busy ? { opacity: 0.5, pointerEvents: "none" } : undefined}
     >
       <div className={`${styles.av} ${TONE_CLASS[report.childTone]}`}>{report.childInitials}</div>
       <div>

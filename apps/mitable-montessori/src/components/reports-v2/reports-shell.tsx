@@ -1,14 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import { ToastBus } from "@/components/montessori/primitives";
 import type { MockReport, V2Tab } from "./mock-data";
 import { tabCounts } from "./mock-data";
 import { ListRow } from "./list-row";
 import { ReadingPane, type RenderedSection } from "./reading-pane";
 import { ChatRail } from "./chat-rail";
 import { SendForReviewDrawer, SendForReviewMobileSheet } from "./send-for-review";
+import { RequestChangesDialog } from "./request-changes-dialog";
+import { SendToParentsDialog } from "./send-to-parents-dialog";
 import { Icon } from "./icons";
+import { approveReport, requestChanges, submitReport, ReportsApiError } from "@/lib/reports-v2/api";
 import styles from "./reports-v2.module.css";
 
 type Variant = "teacher" | "admin";
@@ -20,26 +25,36 @@ const TABS: { id: V2Tab; label: string; sub: string }[] = [
   { id: "sent", label: "Sent", sub: "delivered this week" },
 ];
 
+/** UI mode for in-flight action — drives spinner placement + which dialog is open. */
+type Modal =
+  | null
+  | "send-for-review"
+  | "send-for-review-mobile"
+  | "request-changes"
+  | "send-to-parents";
+
 export function ReportsV2Shell({
   reports,
   variant,
   initialSelectedId,
   selectedSections,
+  classrooms,
+  activeClassroomId,
 }: {
   reports: MockReport[];
   variant: Variant;
-  /** Server pre-resolved selection (from ?open=…). */
   initialSelectedId?: string | null;
-  /** Body of the pre-resolved report. Server-fetched. */
   selectedSections?: RenderedSection[] | null;
+  /** Admin-only: list of classrooms for the filter chip. Omit for teachers. */
+  classrooms?: { id: string; name: string | null }[];
+  /** Admin-only: currently-selected classroom from ?classroom=. */
+  activeClassroomId?: string | null;
 }) {
   const isAdmin = variant === "admin";
   const router = useRouter();
   const pathname = usePathname();
+  const [, startTransition] = useTransition();
 
-  // Default tab: derive from the initially-selected report so the user lands
-  // on the right tab when navigating via ?open=. If there's no selection,
-  // start on Drafts (the most common entry point for teachers).
   const initialTab: V2Tab = useMemo(() => {
     if (initialSelectedId) {
       const sel = reports.find((r) => r.id === initialSelectedId);
@@ -51,8 +66,9 @@ export function ReportsV2Shell({
   const [tab, setTab] = useState<V2Tab>(initialTab);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
-  const [sendDrawerOpen, setSendDrawerOpen] = useState(false);
-  const [sendSheetOpen, setSendSheetOpen] = useState(false);
+  const [modal, setModal] = useState<Modal>(null);
+  /** ids that are mid-flight (spinner + disable). Cleared after revalidate. */
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
 
   const counts = tabCounts(reports);
   const visible = useMemo(() => reports.filter((r) => r.tab === tab), [reports, tab]);
@@ -60,20 +76,86 @@ export function ReportsV2Shell({
     () => visible.find((r) => r.id === selectedId) ?? visible[0],
     [visible, selectedId]
   );
+  const isSelectedBusy = selected ? busyIds.has(selected.id) : false;
 
-  // Selecting a new row updates the URL with ?open=… so the server can
-  // re-fetch that report's sections. This matches the existing /app/reports
-  // pattern.
   const onSelect = (id: string) => {
     setSelectedId(id);
     router.push(`${pathname}?open=${encodeURIComponent(id)}`, { scroll: false });
   };
 
-  // Sections only apply when the URL-resolved id matches the in-memory
-  // selection. If the user clicked a different row, sections are stale until
-  // the route round-trip completes — show the row summary as fallback.
   const sectionsForSelected =
     selected && selected.id === initialSelectedId ? selectedSections : null;
+
+  /**
+   * Run an action against a report, with optimistic busy state + a router
+   * refresh on success. Errors surface via ToastBus + an error message in any
+   * dialog that owns the call.
+   */
+  const runAction = async (
+    reportId: string,
+    fn: () => Promise<unknown>,
+    successMessage: string
+  ): Promise<void> => {
+    setBusyIds((s) => new Set(s).add(reportId));
+    try {
+      await fn();
+      ToastBus.push({ message: successMessage });
+      // Re-fetch reports + sections so the row moves to the right tab.
+      startTransition(() => router.refresh());
+    } catch (err) {
+      const msg =
+        err instanceof ReportsApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Something went wrong";
+      ToastBus.push({ message: msg });
+      // Re-throw so dialogs keep their error UI populated.
+      throw err;
+    } finally {
+      setBusyIds((s) => {
+        const next = new Set(s);
+        next.delete(reportId);
+        return next;
+      });
+    }
+  };
+
+  const handleApprove = async (report: MockReport) => {
+    await runAction(report.id, () => approveReport(report.id), `Approved ${report.childName}`);
+  };
+
+  const handleSendForReview = async (
+    report: MockReport,
+    _args: { reviewerInitials: string[]; note: string }
+  ): Promise<void> => {
+    // Phase 3 ships submit only — reviewer assignment + note persistence lands
+    // with the report_reviewers table (Phase 3.5). We close the drawer on
+    // success either way.
+    await runAction(
+      report.id,
+      () => submitReport(report.id),
+      `Sent ${report.childName}'s report for review`
+    );
+    setModal(null);
+  };
+
+  const handleRequestChanges = async (report: MockReport, notes: string): Promise<void> => {
+    await runAction(
+      report.id,
+      () => requestChanges(report.id, notes),
+      `Sent back to ${report.childName}'s author with notes`
+    );
+    setModal(null);
+  };
+
+  const handleSentToParents = async (report: MockReport, count: number) => {
+    ToastBus.push({
+      message: `${report.childName}'s report sent to ${count} guardian${count === 1 ? "" : "s"}`,
+    });
+    startTransition(() => router.refresh());
+    setModal(null);
+  };
 
   return (
     <div className={styles.shell}>
@@ -83,6 +165,21 @@ export function ReportsV2Shell({
             <h1>Reports</h1>
             {isAdmin && <span className={styles.adminBadge}>Admin</span>}
           </div>
+          {isAdmin && classrooms && classrooms.length > 0 && (
+            <ClassroomFilter
+              classrooms={classrooms}
+              activeId={activeClassroomId ?? null}
+              onChange={(id) => {
+                const params = new URLSearchParams();
+                if (id) params.set("classroom", id);
+                startTransition(() =>
+                  router.push(params.size > 0 ? `${pathname}?${params}` : pathname, {
+                    scroll: false,
+                  })
+                );
+              }}
+            />
+          )}
         </div>
         <div className={styles.topBarRight}>
           <div className={styles.tabs}>
@@ -101,9 +198,14 @@ export function ReportsV2Shell({
               </button>
             ))}
           </div>
-          <button type="button" className={`${styles.btn} ${styles.btnSecondary}`}>
+          <Link
+            href="/app/reports"
+            className={`${styles.btn} ${styles.btnSecondary}`}
+            style={{ textDecoration: "none" }}
+            title="Open the legacy reports page to create a new draft (Phase 3.5 brings creation inline)"
+          >
             <Icon.Plus size={13} /> New report
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -114,7 +216,9 @@ export function ReportsV2Shell({
             counts={counts}
             visible={visible}
             selected={selected}
+            busyIds={busyIds}
             onSelect={onSelect}
+            onQuickApprove={isAdmin ? handleApprove : undefined}
             compact
           />
           <div style={{ position: "relative", minWidth: 0 }}>
@@ -125,18 +229,23 @@ export function ReportsV2Shell({
                 isAdmin={isAdmin}
                 embeddedPaneTabs={false}
                 sections={sectionsForSelected}
-                onSendForReview={() => setSendDrawerOpen(true)}
-                onApprove={() => alert("Approve (Phase 3 wires this)")}
-                onOverrideApprove={() => alert("Admin override (Phase 5)")}
-                onRequestChanges={() => alert("Request changes (Phase 3)")}
-                onComment={() => alert("Comment (Phase 3)")}
-                onSendNow={() => alert("Send now (Phase 5)")}
+                busy={isSelectedBusy}
+                onSendForReview={() => setModal("send-for-review")}
+                onApprove={() => handleApprove(selected)}
+                onOverrideApprove={() => handleApprove(selected)}
+                onRequestChanges={() => setModal("request-changes")}
+                onComment={() => setChatCollapsed(false)}
+                onSendNow={() => setModal("send-to-parents")}
               />
             ) : (
               <EmptyState tab={tab} />
             )}
-            {sendDrawerOpen && selected && (
-              <SendForReviewDrawer report={selected} onClose={() => setSendDrawerOpen(false)} />
+            {modal === "send-for-review" && selected && (
+              <SendForReviewDrawer
+                report={selected}
+                onClose={() => setModal(null)}
+                onSubmit={(args) => handleSendForReview(selected, args)}
+              />
             )}
           </div>
           <ChatRail
@@ -146,8 +255,34 @@ export function ReportsV2Shell({
         </div>
       </div>
 
-      {sendSheetOpen && selected && (
-        <SendForReviewMobileSheet report={selected} onClose={() => setSendSheetOpen(false)} />
+      {modal === "send-for-review-mobile" && selected && (
+        <SendForReviewMobileSheet
+          report={selected}
+          onClose={() => setModal(null)}
+          onSubmit={(args) => handleSendForReview(selected, args)}
+        />
+      )}
+
+      {modal === "request-changes" && selected && (
+        <RequestChangesDialog
+          open
+          reportTitle={selected.title}
+          childName={selected.childName}
+          onCancel={() => setModal(null)}
+          onSubmit={(notes) => handleRequestChanges(selected, notes)}
+        />
+      )}
+
+      {modal === "send-to-parents" && selected && selected.studentId && (
+        <SendToParentsDialog
+          open
+          reportId={selected.id}
+          studentId={selected.studentId}
+          reportTitle={selected.title}
+          childName={selected.childName}
+          onCancel={() => setModal(null)}
+          onSent={(count) => handleSentToParents(selected, count)}
+        />
       )}
     </div>
   );
@@ -189,19 +324,82 @@ function EmptyState({ tab }: { tab: V2Tab }) {
   );
 }
 
+function ClassroomFilter({
+  classrooms,
+  activeId,
+  onChange,
+}: {
+  classrooms: { id: string; name: string | null }[];
+  activeId: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const active = classrooms.find((c) => c.id === activeId) ?? null;
+  return (
+    <label
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        marginLeft: 12,
+        padding: "5px 6px 5px 11px",
+        borderRadius: 999,
+        border: "1px solid var(--color-border)",
+        background: active
+          ? "color-mix(in srgb, var(--color-terracotta-soft) 50%, var(--color-surface))"
+          : "var(--color-surface)",
+        fontSize: 11.5,
+        fontWeight: 600,
+        color: active ? "var(--color-terracotta-deep)" : "var(--color-ink-secondary)",
+      }}
+    >
+      <span style={{ letterSpacing: "0.04em", textTransform: "uppercase", fontSize: 10 }}>
+        Classroom
+      </span>
+      <select
+        value={activeId ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        style={{
+          appearance: "none",
+          background: "transparent",
+          border: "none",
+          fontFamily: "inherit",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "inherit",
+          padding: "2px 4px",
+          cursor: "pointer",
+          outline: "none",
+        }}
+      >
+        <option value="">All</option>
+        {classrooms.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name ?? "Unnamed"}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function ListColumn({
   tab,
   counts,
   visible,
   selected,
+  busyIds,
   onSelect,
+  onQuickApprove,
   compact,
 }: {
   tab: V2Tab;
   counts: Record<V2Tab, number>;
   visible: MockReport[];
   selected: MockReport | undefined;
+  busyIds: Set<string>;
   onSelect: (id: string) => void;
+  /** Quick approve, only wired for admin. */
+  onQuickApprove?: (report: MockReport) => Promise<void> | void;
   compact?: boolean;
 }) {
   const TAB_META = TABS.find((t) => t.id === tab);
@@ -222,10 +420,9 @@ function ListColumn({
             selected={selected?.id === r.id}
             onSelect={() => onSelect(r.id)}
             onQuickApprove={
-              tab === "review"
-                ? () => alert(`Quick approve ${r.childName} (Phase 3 wires this)`)
-                : undefined
+              tab === "review" && onQuickApprove ? () => onQuickApprove(r) : undefined
             }
+            busy={busyIds.has(r.id)}
           />
         ))}
       </div>

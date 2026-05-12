@@ -174,6 +174,10 @@ export type ReportListRowV2 = ReportListRow & {
   reviewerTicks: { approved: number; total: number };
   /** Most recent submission timestamp ("4h ago" relative) — null if never sent. */
   lastSubmittedAt: string | null;
+  /** Email delivery state for reports in the Sent tab. Counts come from
+   *  report_recipients.delivery_status. "Read" tracking doesn't exist yet so
+   *  `delivered` is the strongest signal we surface. */
+  delivery: { delivered: number; pending: number; failed: number };
 };
 
 /** Status → tab. `changes_requested` lives in Drafts (the teacher's queue). */
@@ -221,22 +225,23 @@ export async function listReportsV2(opts?: {
   const baseRows = await listReports(opts);
   if (baseRows.length === 0) return [];
 
-  // Pull approval-tick counts in one query. Each row counts distinct
-  // approvers; we only count `approved` action_types so comments and edits
-  // don't inflate the tick number. Phase 3 introduces `report_reviewers` and
-  // this query switches to that join.
+  // Two enrichment queries in parallel:
+  //   1. report_review_actions — tick counts + last-submitted timestamp.
+  //   2. report_recipients — delivered/pending/failed counts for Sent rows.
+  // Both share the same report_id IN-list so they're cheap to run alongside.
   const supabase = createAdminClient();
-  const { data: actions } = await supabase
-    .from("report_review_actions")
-    .select("report_id, action_by_user_id, action_type, created_at")
-    .in(
-      "report_id",
-      baseRows.map((r) => r.id)
-    );
+  const ids = baseRows.map((r) => r.id);
+  const [actionsResp, recipientsResp] = await Promise.all([
+    supabase
+      .from("report_review_actions")
+      .select("report_id, action_by_user_id, action_type, created_at")
+      .in("report_id", ids),
+    supabase.from("report_recipients").select("report_id, delivery_status").in("report_id", ids),
+  ]);
 
   const ticksByReport = new Map<string, Set<string>>();
   const lastSubmittedByReport = new Map<string, string>();
-  for (const a of (actions ?? []) as Array<{
+  for (const a of (actionsResp.data ?? []) as Array<{
     report_id: string;
     action_by_user_id: string;
     action_type: string;
@@ -253,6 +258,25 @@ export async function listReportsV2(opts?: {
         lastSubmittedByReport.set(a.report_id, a.created_at);
       }
     }
+  }
+
+  const deliveryByReport = new Map<
+    string,
+    { delivered: number; pending: number; failed: number }
+  >();
+  for (const r of (recipientsResp.data ?? []) as Array<{
+    report_id: string;
+    delivery_status: "pending" | "sent" | "failed";
+  }>) {
+    const cur = deliveryByReport.get(r.report_id) ?? {
+      delivered: 0,
+      pending: 0,
+      failed: 0,
+    };
+    if (r.delivery_status === "sent") cur.delivered += 1;
+    else if (r.delivery_status === "pending") cur.pending += 1;
+    else cur.failed += 1;
+    deliveryByReport.set(r.report_id, cur);
   }
 
   // Phase 3 makes `total` configurable per-report (the # of assigned
@@ -272,6 +296,7 @@ export async function listReportsV2(opts?: {
         total: DEFAULT_REVIEWER_TOTAL,
       },
       lastSubmittedAt: lastSubmittedByReport.get(row.id) ?? null,
+      delivery: deliveryByReport.get(row.id) ?? { delivered: 0, pending: 0, failed: 0 },
     };
   });
 }

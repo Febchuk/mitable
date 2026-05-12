@@ -28,6 +28,19 @@ export type V2Reviewer = {
 
 export type MockReport = {
   id: string;
+  /** Real DB student id for downstream lookups (e.g. fetching guardians).
+   *  Optional on the legacy fixtures — required when the row comes from the
+   *  adapter. */
+  studentId?: string;
+  /** Raw DB status. Lets action handlers pick the right endpoint without
+   *  re-deriving from the tab. Optional on fixtures. */
+  rawStatus?:
+    | "draft"
+    | "submitted_for_review"
+    | "in_review"
+    | "changes_requested"
+    | "approved"
+    | "sent";
   childName: string;
   childInitials: string;
   childTone: V2Tone;
