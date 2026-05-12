@@ -2,7 +2,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 
-export type ReportTemplateKind = "Daily" | "Major" | "Incident" | "Session note";
+export type ReportTemplateKind = "Daily" | "Major" | "Incident";
 
 export type ReportTemplate = {
   id: string;

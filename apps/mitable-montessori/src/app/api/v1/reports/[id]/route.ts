@@ -97,6 +97,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   revalidatePath(`/app/reports/${id}`);
   revalidatePath(`/admin/reports/${id}`);
+  revalidatePath("/app/reports");
+  revalidatePath("/admin/reports");
 
   return NextResponse.json({ ok: true, revertedFromReview });
 }

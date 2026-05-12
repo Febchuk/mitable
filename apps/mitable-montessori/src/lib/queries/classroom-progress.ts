@@ -113,7 +113,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
   const programs: ProgressProgram[] =
     Array.isArray(rawPrograms) && rawPrograms.length > 0
       ? rawPrograms.filter((p): p is ProgressProgram =>
-          (["montessori", "iep", "session_notes"] as const).includes(p as ProgressProgram)
+          (["montessori", "iep"] as const).includes(p as ProgressProgram)
         )
       : ["montessori"];
 

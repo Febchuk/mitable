@@ -20,6 +20,8 @@ export type ChildDetailProps = {
   observations: WholeChildObservation[];
   curriculum: CurriculumByTopic[];
   activity: ActivityFeedEntry[];
+  /** Base path for report links from the activity feed (teacher vs admin rail). */
+  reportsRailBasePath: string;
 };
 
 export function ChildDetail({
@@ -28,6 +30,7 @@ export function ChildDetail({
   observations,
   curriculum,
   activity,
+  reportsRailBasePath,
 }: ChildDetailProps) {
   const mobile = useIsMobile();
   const [pageView, setPageView] = React.useState<PageView>("activity");
@@ -48,7 +51,13 @@ export function ChildDetail({
         <WholeChildView mobile={mobile} profile={profile} axes={axes} observations={observations} />
       )}
       {pageView === "curriculum" && <CurriculumView mobile={mobile} topics={curriculum} />}
-      {pageView === "activity" && <ActivityView mobile={mobile} entries={activity} />}
+      {pageView === "activity" && (
+        <ActivityView
+          mobile={mobile}
+          entries={activity}
+          reportsRailBasePath={reportsRailBasePath}
+        />
+      )}
       <NewObservationModal
         open={newObsOpen}
         pageView={pageView}

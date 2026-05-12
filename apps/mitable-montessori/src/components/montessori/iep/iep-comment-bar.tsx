@@ -3,25 +3,23 @@
 import * as React from "react";
 import progress from "@/components/montessori/progress/progress.module.css";
 import {
+  IEP_PROGRESS_BG,
+  IEP_PROGRESS_FG,
+  IEP_PROGRESS_LABEL,
+  IEP_PROGRESS_VALUES,
   PROMPTING_CODES,
   PROMPTING_LABEL,
-  RATING_BG,
-  RATING_FG,
-  RATING_LABEL,
-  RATINGS,
-  type IepItemState,
   type IepGoal,
-  type IepRating,
+  type IepItemState,
+  type IepProgress,
   type PromptingCode,
 } from "./data";
 import styles from "./iep.module.css";
 
-const COUNTS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
-
 export type IepCommentBarApply = {
-  rating: IepRating | null;
-  successCount: number | null;
-  promptingCode: PromptingCode | null;
+  progress: IepProgress | null;
+  accuracy: number | null;
+  prompting: PromptingCode | null;
   comment: string;
 };
 
@@ -33,33 +31,31 @@ export type IepCommentBarProps = {
   onCancel: () => void;
 };
 
-/** Black bottom comment bar for IEP items. Reuses `progress.module.css ::
- *  .bulkBar` so it matches the Montessori comment-entry visual exactly,
- *  with IEP-specific controls slotted in.
- *
- *  Layout: actions stacked on the LEFT (Apply on top, Cancel below); option
- *  clusters stacked vertically on the right with equal spacing — Rating,
- *  Completion, Prompting, Comment. Every chip click is a draft change;
- *  Apply commits all four fields at once. */
+/** Black bottom comment bar for IEP items. Layout: actions stacked on the
+ *  LEFT (Apply on top, Cancel below); option clusters stacked vertically on
+ *  the right — Progress, Accuracy, Prompting, Comment. Every chip click is
+ *  a draft change; Apply commits all fields at once. */
 export function IepCommentBar({ goal, studentName, state, onApply, onCancel }: IepCommentBarProps) {
-  // Draft state — committed only on Apply.
-  const [rating, setRating] = React.useState<IepRating | null>(state.rating);
-  const [count, setCount] = React.useState<number | null>(state.successCount);
-  const [prompt, setPrompt] = React.useState<PromptingCode | null>(state.promptingCode);
+  const [prog, setProg] = React.useState<IepProgress | null>(state.progress);
+  const [accuracy, setAccuracy] = React.useState<number | null>(state.accuracy);
+  const [prompt, setPrompt] = React.useState<PromptingCode | null>(state.prompting);
   const [comment, setComment] = React.useState("");
+  const [accuracyInput, setAccuracyInput] = React.useState(
+    state.accuracy !== null ? String(state.accuracy) : ""
+  );
 
-  // Re-seed the draft each time the bar mounts on a different item.
   React.useEffect(() => {
-    setRating(state.rating);
-    setCount(state.successCount);
-    setPrompt(state.promptingCode);
+    setProg(state.progress);
+    setAccuracy(state.accuracy);
+    setAccuracyInput(state.accuracy !== null ? String(state.accuracy) : "");
+    setPrompt(state.prompting);
     setComment("");
-  }, [goal.id, state.rating, state.successCount, state.promptingCode]);
+  }, [goal.id, state.progress, state.accuracy, state.prompting]);
 
   const dirty =
-    rating !== state.rating ||
-    count !== state.successCount ||
-    prompt !== state.promptingCode ||
+    prog !== state.progress ||
+    accuracy !== state.accuracy ||
+    prompt !== state.prompting ||
     comment.trim().length > 0;
 
   const apply = React.useCallback(() => {
@@ -67,10 +63,9 @@ export function IepCommentBar({ goal, studentName, state, onApply, onCancel }: I
       onCancel();
       return;
     }
-    onApply({ rating, successCount: count, promptingCode: prompt, comment: comment.trim() });
-  }, [dirty, rating, count, prompt, comment, onApply, onCancel]);
+    onApply({ progress: prog, accuracy, prompting: prompt, comment: comment.trim() });
+  }, [dirty, prog, accuracy, prompt, comment, onApply, onCancel]);
 
-  // Cmd/Ctrl-Enter applies; Esc cancels.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -87,13 +82,22 @@ export function IepCommentBar({ goal, studentName, state, onApply, onCancel }: I
     return () => window.removeEventListener("keydown", onKey);
   }, [apply, onCancel]);
 
+  const onAccuracyChange = (raw: string) => {
+    setAccuracyInput(raw);
+    const n = parseInt(raw, 10);
+    if (raw === "" || raw === "-") {
+      setAccuracy(null);
+    } else if (!isNaN(n) && n >= 0 && n <= 100) {
+      setAccuracy(n);
+    }
+  };
+
   return (
     <div
       className={`${progress.bulkBar} ${styles.commentBar}`}
       role="dialog"
       aria-label={`Edit IEP item · ${goal.name}`}
     >
-      {/* header: student + goal, no actions here — actions live in the left column */}
       <div className={styles.barHeader}>
         <div className={styles.barOverline}>
           {studentName} · {goal.domain}
@@ -104,7 +108,6 @@ export function IepCommentBar({ goal, studentName, state, onApply, onCancel }: I
       </div>
 
       <div className={styles.barLayout}>
-        {/* LEFT: stacked action buttons */}
         <div className={styles.barActions}>
           <button
             type="button"
@@ -123,56 +126,60 @@ export function IepCommentBar({ goal, studentName, state, onApply, onCancel }: I
           </button>
         </div>
 
-        {/* RIGHT: option clusters stacked vertically with equal spacing */}
         <div className={styles.barClusters}>
-          <Cluster label="Rating" hint={rating !== null ? RATING_LABEL[rating] : "Pick 1–5"}>
+          <Cluster label="Progress" hint={prog !== null ? IEP_PROGRESS_LABEL[prog] : "Pick one"}>
             <div className={styles.barChipRow}>
-              {RATINGS.map((r) => {
-                const active = rating === r;
+              {IEP_PROGRESS_VALUES.map((p) => {
+                const active = prog === p;
                 return (
                   <button
-                    key={r}
+                    key={p}
                     type="button"
                     className={`${styles.barChip} tap`}
                     data-active={active ? "true" : "false"}
-                    onClick={() => setRating(r)}
-                    aria-label={`${r} — ${RATING_LABEL[r]}`}
-                    title={RATING_LABEL[r]}
+                    onClick={() => setProg(p)}
+                    aria-label={IEP_PROGRESS_LABEL[p]}
+                    title={IEP_PROGRESS_LABEL[p]}
                     style={{
-                      background: active ? RATING_BG[r] : "rgba(255,251,243,0.1)",
-                      color: active ? RATING_FG[r] : "rgba(255,251,243,0.92)",
+                      background: active ? IEP_PROGRESS_BG[p] : "rgba(255,251,243,0.1)",
+                      color: active ? IEP_PROGRESS_FG[p] : "rgba(255,251,243,0.92)",
                       borderColor: active ? "rgba(255,251,243,0.55)" : "transparent",
                     }}
                   >
-                    <span className={styles.barChipKey}>{r}</span>
-                    <span className={styles.barChipHint}>{RATING_LABEL[r]}</span>
+                    <span className={styles.barChipKey}>{p}</span>
+                    <span className={styles.barChipHint}>{IEP_PROGRESS_LABEL[p]}</span>
                   </button>
                 );
               })}
             </div>
           </Cluster>
 
-          <Cluster label="Completion" hint={count !== null ? `${count} / 10` : "Pick a count"}>
-            <div className={styles.barCountRow}>
-              {COUNTS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={`${styles.barCountBtn} tap`}
-                  data-active={count === n ? "true" : "false"}
-                  onClick={() => setCount(n)}
-                  aria-label={`${n} of 10`}
-                >
-                  {n}
-                </button>
-              ))}
+          <Cluster label="Accuracy" hint={accuracy !== null ? `${accuracy}%` : "0–100 %"}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={accuracyInput}
+                onChange={(e) => onAccuracyChange(e.target.value)}
+                placeholder="0–100"
+                style={{
+                  width: 72,
+                  padding: "5px 8px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(255,251,243,0.25)",
+                  background: "rgba(255,251,243,0.08)",
+                  color: "rgba(255,251,243,0.92)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  outline: "none",
+                }}
+              />
+              <span style={{ fontSize: 13, color: "rgba(255,251,243,0.55)" }}>%</span>
             </div>
           </Cluster>
 
-          <Cluster
-            label="Prompting"
-            hint={prompt ? PROMPTING_LABEL[prompt] : "Single primary value"}
-          >
+          <Cluster label="Prompting" hint={prompt ? PROMPTING_LABEL[prompt] : "Pick level"}>
             <div className={styles.barChipRow}>
               {PROMPTING_CODES.map((p) => (
                 <button
@@ -193,7 +200,7 @@ export function IepCommentBar({ goal, studentName, state, onApply, onCancel }: I
 
           <Cluster label="Comment" hint="Saved with this Apply · ⌘↵">
             <textarea
-              placeholder="What stood out today? Threads to the comments drawer on the right."
+              placeholder="What stood out today?"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={2}

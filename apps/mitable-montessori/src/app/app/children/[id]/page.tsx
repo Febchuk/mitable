@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { ChildDetail } from "@/components/montessori/child-detail";
 import { createClient } from "@/utils/supabase/server";
+import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import { listActivityFeed } from "@/lib/queries/activity";
 import { listCurriculumProgress } from "@/lib/queries/curriculum";
 import { getStudentProfile } from "@/lib/queries/student-profile";
@@ -19,6 +20,9 @@ export default async function ChildDetailPage({ params }: { params: Promise<{ id
   const profile = await getStudentProfile(id);
   if (!profile) notFound();
 
+  const ctx = await getCurrentUserContext();
+  const reportsRailBasePath = ctx?.role === "admin" ? "/admin/reports" : "/app/reports";
+
   const [axes, observations, curriculum, activity] = await Promise.all([
     listAxesWithAssessment(id),
     listWholeChildObservations(id),
@@ -33,6 +37,7 @@ export default async function ChildDetailPage({ params }: { params: Promise<{ id
       observations={observations}
       curriculum={curriculum}
       activity={activity}
+      reportsRailBasePath={reportsRailBasePath}
     />
   );
 }

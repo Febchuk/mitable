@@ -1,52 +1,58 @@
-// IEP types — narrow scales used by the comment bar and grid components.
+// IEP types — standardized scales used by the comment bar and grid components.
 //
-// Domain names and item lists used to live here as static seeds. They now
-// come from the per-child plan stored in iep_domains / iep_items (admin
-// curriculum → IEP tab) and are loaded via /api/v1/iep/plan. The teacher view
-// owns its loaded state; this file is just the shared type lexicon.
+// Progress scale replaces the old 1–5 rating.
+// Accuracy (0–100 %) replaces the old 0–10 success count.
+// Prompting uses the full 7-level therapist hierarchy.
 
-export type IepRating = 1 | 2 | 3 | 4 | 5;
-export type PromptingCode = "N" | "G" | "V" | "H" | "F";
+export type IepProgress = "M" | "SP" | "IP" | "NP" | "NI";
+export type PromptingCode = "I" | "VS" | "GE" | "VB" | "MO" | "PP" | "FP";
 
-/** Domain names are admin-configured strings now (not a closed enum). */
 export type IepDomain = string;
 
-export const RATING_LABEL: Record<IepRating, string> = {
-  1: "Introduced",
-  2: "Emerging",
-  3: "Progressing",
-  4: "Consistent",
-  5: "Self-sufficient",
+export const IEP_PROGRESS_VALUES: IepProgress[] = ["M", "SP", "IP", "NP", "NI"];
+
+export const IEP_PROGRESS_LABEL: Record<IepProgress, string> = {
+  M: "Mastered",
+  SP: "Sufficient Progress",
+  IP: "Insufficient Progress",
+  NP: "No Progress",
+  NI: "Not Introduced",
 };
 
-export const RATINGS: IepRating[] = [1, 2, 3, 4, 5];
+export const IEP_PROGRESS_SHORT: Record<IepProgress, string> = {
+  M: "Mastered",
+  SP: "Suff. Progress",
+  IP: "Insuff. Progress",
+  NP: "No Progress",
+  NI: "Not Introduced",
+};
+
+export const IEP_PROGRESS_BG: Record<IepProgress, string> = {
+  M: "var(--color-sage)",
+  SP: "var(--color-sage-soft)",
+  IP: "var(--color-butter)",
+  NP: "var(--color-clay)",
+  NI: "var(--color-clay-soft)",
+};
+
+export const IEP_PROGRESS_FG: Record<IepProgress, string> = {
+  M: "var(--color-ink)",
+  SP: "var(--color-sage-deep)",
+  IP: "var(--color-ink)",
+  NP: "var(--color-ink)",
+  NI: "var(--color-terracotta-deep)",
+};
+
+export const PROMPTING_CODES: PromptingCode[] = ["I", "VS", "GE", "VB", "MO", "PP", "FP"];
 
 export const PROMPTING_LABEL: Record<PromptingCode, string> = {
-  N: "None",
-  G: "Gestural",
-  V: "Verbal",
-  H: "Partial physical",
-  F: "Full physical",
-};
-
-export const PROMPTING_CODES: PromptingCode[] = ["N", "G", "V", "H", "F"];
-
-// Rating tints — kept for the comment-bar picker, where the active chip
-// gets coloured to give feedback. Not used by the inline row anymore.
-export const RATING_BG: Record<IepRating, string> = {
-  1: "var(--color-clay-soft)",
-  2: "var(--color-clay)",
-  3: "var(--color-butter)",
-  4: "var(--color-sage-soft)",
-  5: "var(--color-sage)",
-};
-
-export const RATING_FG: Record<IepRating, string> = {
-  1: "var(--color-terracotta-deep)",
-  2: "var(--color-ink)",
-  3: "var(--color-ink)",
-  4: "var(--color-sage-deep)",
-  5: "var(--color-ink)",
+  I: "Independent",
+  VS: "Visual",
+  GE: "Gesture",
+  VB: "Verbal",
+  MO: "Model",
+  PP: "Partial Physical",
+  FP: "Full Physical",
 };
 
 export type IepGoal = {
@@ -64,9 +70,9 @@ export type IepComment = {
 
 /** Current state of an IEP item (one student × one goal). */
 export type IepItemState = {
-  rating: IepRating | null;
-  successCount: number | null;
-  promptingCode: PromptingCode | null;
+  progress: IepProgress | null;
+  accuracy: number | null;
+  prompting: PromptingCode | null;
   comments: IepComment[];
   updatedAt: string | null;
   updatedBy?: string;
@@ -74,9 +80,9 @@ export type IepItemState = {
 
 export function emptyIepItem(): IepItemState {
   return {
-    rating: null,
-    successCount: null,
-    promptingCode: null,
+    progress: null,
+    accuracy: null,
+    prompting: null,
     comments: [],
     updatedAt: null,
   };

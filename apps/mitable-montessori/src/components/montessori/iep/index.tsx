@@ -10,7 +10,7 @@ import {
   emptyIepItem,
   type IepGoal,
   type IepItemState,
-  type IepRating,
+  type IepProgress,
   type PromptingCode,
 } from "./data";
 import { IepCommentBar, type IepCommentBarApply } from "./iep-comment-bar";
@@ -51,9 +51,9 @@ type LoadedItem = {
   domainId: string;
   name: string;
   position: number;
-  rating: IepRating | null;
-  successCount: number | null;
-  promptingCode: PromptingCode | null;
+  progress: IepProgress | null;
+  accuracy: number | null;
+  prompting: PromptingCode | null;
   updatedAt: string | null;
   comments: LoadedComment[];
 };
@@ -87,9 +87,9 @@ function rosterFromMock(): StudentLite[] {
 
 function itemToState(item: LoadedItem): IepItemState {
   return {
-    rating: item.rating,
-    successCount: item.successCount,
-    promptingCode: item.promptingCode,
+    progress: item.progress,
+    accuracy: item.accuracy,
+    prompting: item.prompting,
     comments: item.comments.map((c) => ({
       id: c.id,
       text: c.body,
@@ -190,9 +190,9 @@ export function IepProgressFeature() {
     async (
       itemId: string,
       patch: {
-        rating: IepRating | null;
-        successCount: number | null;
-        promptingCode: PromptingCode | null;
+        progress: IepProgress | null;
+        accuracy: number | null;
+        prompting: PromptingCode | null;
       }
     ): Promise<boolean> => {
       const res = await fetch(`/api/v1/iep/items/${itemId}/state`, {
@@ -231,15 +231,15 @@ export function IepProgressFeature() {
       if (!selectedRecord || !student) return;
       const itemId = selectedRecord.item.id;
       const fieldsChanged =
-        next.rating !== selectedRecord.item.rating ||
-        next.successCount !== selectedRecord.item.successCount ||
-        next.promptingCode !== selectedRecord.item.promptingCode;
+        next.progress !== selectedRecord.item.progress ||
+        next.accuracy !== selectedRecord.item.accuracy ||
+        next.prompting !== selectedRecord.item.prompting;
 
       if (fieldsChanged) {
         const ok = await persistState(itemId, {
-          rating: next.rating,
-          successCount: next.successCount,
-          promptingCode: next.promptingCode,
+          progress: next.progress,
+          accuracy: next.accuracy,
+          prompting: next.prompting,
         });
         if (!ok) {
           ToastBus.push({ message: "Couldn't save fields." });
@@ -255,9 +255,9 @@ export function IepProgressFeature() {
                     it.id === itemId
                       ? {
                           ...it,
-                          rating: next.rating,
-                          successCount: next.successCount,
-                          promptingCode: next.promptingCode,
+                          progress: next.progress,
+                          accuracy: next.accuracy,
+                          prompting: next.prompting,
                           updatedAt: new Date().toISOString(),
                         }
                       : it

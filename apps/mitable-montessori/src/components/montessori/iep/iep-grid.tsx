@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { MessageSquare } from "lucide-react";
-import { PROMPTING_LABEL, type IepItemState, type IepGoal } from "./data";
+import { IEP_PROGRESS_LABEL, PROMPTING_LABEL, type IepItemState, type IepGoal } from "./data";
 import styles from "./iep.module.css";
 
 export type IepItemRowProps = {
@@ -13,15 +13,12 @@ export type IepItemRowProps = {
 };
 
 /** A single IEP item row — one student × one goal. Shows the 3 standard
- *  fields inline as verbatim "field: value" chips (rating, completion,
- *  prompt). Tapping the row opens the black comment bar
- *  (see iep-comment-bar.tsx). */
+ *  fields inline as verbatim "field: value" chips (progress, accuracy,
+ *  prompting). Tapping the row opens the black comment bar. */
 export function IepItemRow({ goal, state, selected, onSelect }: IepItemRowProps) {
-  const ratingValue = state.rating !== null ? String(state.rating) : "—";
-  const completionValue = state.successCount !== null ? `${state.successCount}/10` : "—/10";
-  const promptValue = state.promptingCode
-    ? PROMPTING_LABEL[state.promptingCode].toLowerCase()
-    : "—";
+  const progressValue = state.progress !== null ? IEP_PROGRESS_LABEL[state.progress] : "—";
+  const accuracyValue = state.accuracy !== null ? `${state.accuracy}%` : "—";
+  const promptValue = state.prompting ? PROMPTING_LABEL[state.prompting] : "—";
   const commentCount = state.comments.length;
 
   return (
@@ -44,9 +41,9 @@ export function IepItemRow({ goal, state, selected, onSelect }: IepItemRowProps)
         )}
       </div>
       <div className={styles.itemFields}>
-        <FieldChip name="rating" value={ratingValue} />
-        <FieldChip name="completion" value={completionValue} />
-        <FieldChip name="prompt" value={promptValue} />
+        <FieldChip name="progress" value={progressValue} />
+        <FieldChip name="accuracy" value={accuracyValue} />
+        <FieldChip name="prompting" value={promptValue} />
       </div>
     </button>
   );

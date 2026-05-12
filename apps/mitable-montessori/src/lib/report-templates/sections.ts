@@ -10,7 +10,7 @@ import { z } from "zod";
  * so existing templates render without a backfill.
  */
 
-export const TEMPLATE_FIELD_TYPES = ["text", "checklist"] as const;
+export const TEMPLATE_FIELD_TYPES = ["text", "checklist", "single_select"] as const;
 export type TemplateFieldType = (typeof TEMPLATE_FIELD_TYPES)[number];
 
 export const TemplateSectionRowSchema = z
@@ -21,11 +21,14 @@ export const TemplateSectionRowSchema = z
     options: z.array(z.string().min(1).max(120)).max(40).optional().default([]),
   })
   .superRefine((row, ctx) => {
-    if (row.fieldType === "checklist" && row.options.length === 0) {
+    if (
+      (row.fieldType === "checklist" || row.fieldType === "single_select") &&
+      row.options.length === 0
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["options"],
-        message: "Checklists need at least one option",
+        message: "This field type needs at least one option",
       });
     }
   });
@@ -40,7 +43,10 @@ export const TemplateSectionsSchema = z
 
 export type TemplateSectionRow = z.infer<typeof TemplateSectionRowSchema>;
 
-export type SectionMetaEntry = { type: "text" } | { type: "checklist"; options: string[] };
+export type SectionMetaEntry =
+  | { type: "text" }
+  | { type: "checklist"; options: string[] }
+  | { type: "single_select"; options: string[] };
 
 export type SectionMeta = Record<string, SectionMetaEntry>;
 
@@ -53,10 +59,12 @@ export function rowsToDb(rows: TemplateSectionRow[]): {
   for (const r of rows) {
     if (r.fieldType === "checklist") {
       section_meta[r.section] = { type: "checklist", options: r.options };
+    } else if (r.fieldType === "single_select") {
+      section_meta[r.section] = { type: "single_select", options: r.options };
     }
     // Plain text sections are left out of section_meta — the reader
     // resolves missing entries to { type: 'text' }, keeping the column
-    // small for templates that don't use checklists.
+    // small for templates that don't need option lists.
   }
   return {
     sections: rows.map((r) => r.section),
@@ -78,14 +86,22 @@ export function dbToRows(
       return {
         section,
         description: g[section] ?? "",
-        fieldType: "checklist",
+        fieldType: "checklist" as const,
+        options: entry.options ?? [],
+      };
+    }
+    if (entry?.type === "single_select") {
+      return {
+        section,
+        description: g[section] ?? "",
+        fieldType: "single_select" as const,
         options: entry.options ?? [],
       };
     }
     return {
       section,
       description: g[section] ?? "",
-      fieldType: "text",
+      fieldType: "text" as const,
       options: [],
     };
   });

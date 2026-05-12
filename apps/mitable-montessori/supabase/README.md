@@ -16,12 +16,43 @@ NEXT_PUBLIC_APP_NAME=mitable-montessori
 
 ## 3. Apply migrations
 
-In the Supabase Studio SQL editor, paste and run each migration in order:
+Use the [Supabase CLI](https://supabase.com/docs/guides/cli) from **`apps/mitable-montessori`** (this folder now has `supabase/config.toml` from `supabase init`).
 
-1. `migrations/0001_init.sql` — 18 tables (17 from the spec + `school_crypto_salts`)
-2. `migrations/0002_rls.sql` — RLS policies (school-scoped reads, teacher command insert, immutability, admin writes, guardian reads)
-3. `migrations/0003_triggers.sql` — `commands` AFTER INSERT trigger that updates `attendance_records`, `student_progress`, `student_progress_history`
-4. `migrations/0004_jwt_claims.sql` — `custom_access_token_hook` PL/pgSQL function
+1. **Log in once:** `supabase login`
+2. **Link this repo to your Supabase project** (project ref is the subdomain in `https://<project-ref>.supabase.co`):
+   ```bash
+   npm run supabase:link --workspace=@mitable/mitable-montessori
+   ```
+3. **Push every migration that is not yet recorded on the remote** (safe day-to-day command):
+   ```bash
+   npm run supabase:db:push --workspace=@mitable/mitable-montessori
+   ```
+   Preview only: `npm run supabase:db:push:dry --workspace=@mitable/mitable-montessori`  
+   See local vs remote: `npm run supabase:migration:list --workspace=@mitable/mitable-montessori`
+
+**If `db push` fails with “Found local migration files to be inserted before the last migration on remote”** (common after Studio pastes, `migration repair`, or two files sharing the same numeric prefix): apply the backlog explicitly:
+
+```bash
+npm run supabase:db:push:all --workspace=@mitable/mitable-montessori
+```
+
+That runs `supabase db push --include-all`. Preview with `supabase:db:push:all:dry`. Migrations here use idempotent DDL (`if not exists`, etc.) where possible so re-running is usually safe; if a statement errors because the object already exists, fix that migration or mark it applied via `migration repair --status applied <version>`.
+
+**If `db push` fails with duplicate key on `schema_migrations_pkey`:** Supabase stores one row per **numeric prefix** (`0027`, `0036`, …). Two files like `0027_foo.sql` and `0027_bar.sql` are invalid — rename one to the next free number (see `0036_report_recipients_message_body.sql`).
+
+**If `db push` fails with “duplicate … already exists”** (you ran SQL in Studio earlier): mark those migration versions as already applied on the remote, then push again — [`supabase migration repair --status applied`](https://supabase.com/docs/reference/cli/supabase-migration-repair).
+
+**If `db push` fails with “Remote migration versions not found in local migrations directory”** (the linked project lists version numbers that have no matching `supabase/migrations/NNNN_*.sql` file in git — e.g. an old branch renamed or deleted migrations): from `apps/mitable-montessori`, remove those orphan rows from the remote history, then push. The CLI prints the exact versions; a common case is missing `0028` / `0030` while this repo goes `0027_*` → `0029_*` and `0029_*` → `0031_*`:
+
+```bash
+cd apps/mitable-montessori
+supabase migration repair --status reverted 0028 0030
+npm run supabase:db:push
+```
+
+`reverted` here only fixes the **tracking table** on Supabase (`supabase_migrations.schema_migrations`); it does not roll back DDL. Use this when those version numbers are mistakes or obsolete. If `0028` / `0030` were real one-off SQL you still need in the database, recover that SQL from backup or history before repairing.
+
+**Fallback:** you can still paste `supabase/migrations/*.sql` files into the Studio SQL editor in numeric order; the CLI is just repeatable and records what ran.
 
 ## 4. Register the JWT hook
 

@@ -1,14 +1,11 @@
-import { notFound } from "next/navigation";
-import { ReportDetail } from "@/components/montessori/report-detail";
-import { getReport } from "@/lib/queries/reports";
+import { redirect } from "next/navigation";
 
-// Status (draft / awaiting review / approved / sent) changes frequently and
-// stale views are confusing — always render fresh on the server.
-export const dynamic = "force-dynamic";
-
-export default async function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
+/** Full-page report UI — use the rail workspace instead. */
+export default async function ReportDetailPageRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
-  const report = await getReport(id);
-  if (!report) notFound();
-  return <ReportDetail report={report} />;
+  redirect(`/app/reports?open=${encodeURIComponent(id)}`);
 }

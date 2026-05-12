@@ -64,6 +64,7 @@ describe("ChildDetail", () => {
         observations={observations}
         curriculum={curriculum}
         activity={activity}
+        reportsRailBasePath="/app/reports"
       />
     );
 
@@ -81,6 +82,7 @@ describe("ChildDetail", () => {
         observations={observations}
         curriculum={curriculum}
         activity={activity}
+        reportsRailBasePath="/app/reports"
       />
     );
 

@@ -325,7 +325,7 @@ export default function TodayClient({
             {drafts.map((d) => (
               <Link
                 key={d.id}
-                href={`/app/reports/${d.id}`}
+                href={`/app/reports?open=${encodeURIComponent(d.id)}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
