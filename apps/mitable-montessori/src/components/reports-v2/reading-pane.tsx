@@ -5,6 +5,14 @@ import type { MockReport, V2Tab, V2Tone } from "./mock-data";
 import { Icon } from "./icons";
 import styles from "./reports-v2.module.css";
 
+/** Minimal shape of `ReportDetail.sections` (defined in queries/reports.ts).
+ *  Kept inline so this component stays usable without a query import. */
+export type RenderedSection = {
+  id: string;
+  heading: string;
+  paragraphs: { id: string; html: string }[];
+};
+
 const TONE_CLASS: Record<V2Tone, string> = {
   clay: styles.avClay,
   sage: styles.avSage,
@@ -42,6 +50,7 @@ export function ReadingPane({
   tab,
   isAdmin,
   embeddedPaneTabs,
+  sections,
   onSendForReview,
   onApprove,
   onOverrideApprove,
@@ -53,6 +62,9 @@ export function ReadingPane({
   tab: V2Tab;
   isAdmin: boolean;
   embeddedPaneTabs: boolean;
+  /** Real report body. When null/undefined, the pane renders a placeholder
+   *  body so demo / empty states still look right. */
+  sections?: RenderedSection[] | null;
   onSendForReview?: () => void;
   onApprove?: () => void;
   onOverrideApprove?: () => void;
@@ -278,28 +290,31 @@ export function ReadingPane({
             </div>
           )}
 
-          <div className={styles.readingSection}>
-            <h3>What happened</h3>
-            <p>{report.summary}</p>
-            <p>
-              Placeholder narrative body — Phase 2 wires this to <code>ReportDetail.sections</code>{" "}
-              from the real fetch.
-            </p>
-          </div>
-          <div className={styles.readingSection}>
-            <h3>In her own words</h3>
-            <div className={styles.quote}>
-              &ldquo;I see — this one is smaller. It needs to be up there with the babies.&rdquo;
-            </div>
-          </div>
-          <div className={styles.readingSection}>
-            <h3>Evidence</h3>
-            <div className={styles.photoGrid}>
-              <div className={`${styles.photo} ${styles.p1}`}>9:21a</div>
-              <div className={`${styles.photo} ${styles.p2}`}>9:33a</div>
-              <div className={`${styles.photo} ${styles.p3}`}>9:42a</div>
-            </div>
-          </div>
+          {sections && sections.length > 0 ? (
+            sections.map((section) => (
+              <div key={section.id} className={styles.readingSection}>
+                <h3>{section.heading}</h3>
+                {section.paragraphs.map((p) => (
+                  // Sections come from `ReportDetail.sections` which is
+                  // server-trimmed + tokenized. Safe to render the html
+                  // through dangerouslySetInnerHTML — same trust boundary the
+                  // existing report-pane.tsx editor uses. We don't surface
+                  // PII tokens here; that's stripped by the writer.
+                  <p key={p.id} dangerouslySetInnerHTML={{ __html: p.html }} />
+                ))}
+              </div>
+            ))
+          ) : (
+            <>
+              <div className={styles.readingSection}>
+                <h3>What happened</h3>
+                <p>{report.summary}</p>
+                <p style={{ color: "var(--color-ink-muted)", fontStyle: "italic" }}>
+                  This report has no body yet — open the editor to draft it.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
 

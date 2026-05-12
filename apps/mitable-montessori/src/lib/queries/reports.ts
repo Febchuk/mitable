@@ -155,6 +155,127 @@ export async function listReports(opts?: { classroomIds?: string[] }): Promise<R
   }));
 }
 
+// ============================================================================
+// Reports v2 (redesign) — additional shape on top of ReportListRow with the
+// fields the new UI needs: derived tab, AI score (stubbed until Phase 4 lands
+// the scorer), reviewer ticks (from report_review_actions), and a placeholder
+// completeness % until the scorer fills it in.
+// ============================================================================
+
+export type ReportV2Tab = "drafts" | "review" | "approved" | "sent";
+
+export type ReportListRowV2 = ReportListRow & {
+  tab: ReportV2Tab;
+  /** 0-100 composite. Phase 4 wires the real scorer; today this is stubbed. */
+  aiScore: number;
+  /** % of expected sections filled in. Stubbed until Phase 4. */
+  completenessPercent: number;
+  /** Reviewer ticks aggregated from report_review_actions. */
+  reviewerTicks: { approved: number; total: number };
+  /** Most recent submission timestamp ("4h ago" relative) — null if never sent. */
+  lastSubmittedAt: string | null;
+};
+
+/** Status → tab. `changes_requested` lives in Drafts (the teacher's queue). */
+function statusToTab(status: ReportListRow["status"]): ReportV2Tab {
+  switch (status) {
+    case "draft":
+    case "changes_requested":
+      return "drafts";
+    case "submitted_for_review":
+    case "in_review":
+      return "review";
+    case "approved":
+      return "approved";
+    case "sent":
+      return "sent";
+  }
+}
+
+/**
+ * Stubbed AI score. Will be replaced by the real scorer in Phase 4. For now
+ * we hash the report id to get a deterministic-looking score so the UI
+ * doesn't flicker between renders, and tilt toward green so demo data feels
+ * realistic (most reports approved without re-reading).
+ */
+function stubAiScore(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  const bucket = Math.abs(h) % 100;
+  if (bucket < 60) return 85 + (bucket % 13); // 85–97 (green)
+  if (bucket < 85) return 65 + (bucket % 18); // 65–82 (amber)
+  return 35 + (bucket % 22); // 35–56 (red)
+}
+
+function stubCompleteness(score: number): number {
+  // Completeness loosely follows score — Phase 4 will use the scorer's own
+  // completeness signal directly.
+  if (score >= 85) return 90 + (score % 8);
+  if (score >= 60) return 60 + (score % 15);
+  return 40 + (score % 15);
+}
+
+export async function listReportsV2(opts?: {
+  classroomIds?: string[];
+}): Promise<ReportListRowV2[]> {
+  const baseRows = await listReports(opts);
+  if (baseRows.length === 0) return [];
+
+  // Pull approval-tick counts in one query. Each row counts distinct
+  // approvers; we only count `approved` action_types so comments and edits
+  // don't inflate the tick number. Phase 3 introduces `report_reviewers` and
+  // this query switches to that join.
+  const supabase = createAdminClient();
+  const { data: actions } = await supabase
+    .from("report_review_actions")
+    .select("report_id, action_by_user_id, action_type, created_at")
+    .in(
+      "report_id",
+      baseRows.map((r) => r.id)
+    );
+
+  const ticksByReport = new Map<string, Set<string>>();
+  const lastSubmittedByReport = new Map<string, string>();
+  for (const a of (actions ?? []) as Array<{
+    report_id: string;
+    action_by_user_id: string;
+    action_type: string;
+    created_at: string;
+  }>) {
+    if (a.action_type === "approved") {
+      const set = ticksByReport.get(a.report_id) ?? new Set<string>();
+      set.add(a.action_by_user_id);
+      ticksByReport.set(a.report_id, set);
+    }
+    if (a.action_type === "submitted") {
+      const prev = lastSubmittedByReport.get(a.report_id);
+      if (!prev || a.created_at > prev) {
+        lastSubmittedByReport.set(a.report_id, a.created_at);
+      }
+    }
+  }
+
+  // Phase 3 makes `total` configurable per-report (the # of assigned
+  // reviewers). For now we default to 3 — matches the prototype's "2 of 3" feel
+  // — so the chip renders sensibly until reviewer assignment ships.
+  const DEFAULT_REVIEWER_TOTAL = 3;
+
+  return baseRows.map((row) => {
+    const aiScore = stubAiScore(row.id);
+    return {
+      ...row,
+      tab: statusToTab(row.status),
+      aiScore,
+      completenessPercent: stubCompleteness(aiScore),
+      reviewerTicks: {
+        approved: ticksByReport.get(row.id)?.size ?? 0,
+        total: DEFAULT_REVIEWER_TOTAL,
+      },
+      lastSubmittedAt: lastSubmittedByReport.get(row.id) ?? null,
+    };
+  });
+}
+
 /** Single-report read for the editor page. Filtered by school. */
 export async function getReport(id: string): Promise<ReportDetail | null> {
   const ctx = await getCurrentUserContext();
