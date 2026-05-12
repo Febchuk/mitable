@@ -16,23 +16,34 @@ export async function GET() {
   if (!auth.ok) return auth.response;
 
   const supabase = createAdminClient();
+  // `users` stores first_name + last_name separately; there's no full_name
+  // column. We assemble it client-side and fall back to email when names
+  // are missing (invited-but-not-yet-profiled accounts).
   const { data, error } = await supabase
     .from("users")
-    .select("id, email, full_name, role, school_id")
+    .select("id, email, first_name, last_name, role, school_id, status")
     .eq("school_id", auth.user.schoolId)
     .in("role", ["teacher", "admin"])
     .neq("id", auth.user.userId)
-    .order("full_name", { ascending: true });
+    .neq("status", "disabled")
+    .order("last_name", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   const candidates = (data ?? []).map((u) => {
-    const row = u as { id: string; email: string | null; full_name: string | null; role: string };
+    const row = u as {
+      id: string;
+      email: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      role: string;
+    };
+    const fullName = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
     return {
       userId: row.id,
-      name: row.full_name?.trim() || row.email || "Unnamed",
+      name: fullName || row.email || "Unnamed",
       email: row.email,
       role: row.role as "teacher" | "admin",
     };
