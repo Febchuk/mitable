@@ -30,6 +30,12 @@ export async function fetchTemplateLogoUrl(
  * RLS continues to enforce policy.
  */
 
+export type AiFlag = {
+  kind: "tone" | "evidence" | "pii" | "template";
+  status: "ok" | "warn" | "fail";
+  note: string;
+};
+
 export type ReportListRow = {
   id: string;
   studentId: string;
@@ -50,6 +56,13 @@ export type ReportListRow = {
   title: string | null;
   createdAt: string;
   updatedAt: string;
+  /** AI scoring fields — populated by lib/reports/scorer.ts on /submit and
+   *  fire-and-forget on autosave. All null until the report is scored
+   *  at least once. */
+  aiScore: number | null;
+  aiFlags: AiFlag[] | null;
+  aiReasoning: string[] | null;
+  aiScoredAt: string | null;
 };
 
 export type ReportSection = {
@@ -94,6 +107,10 @@ type ReportsRow = {
   approved_by_user_id: string | null;
   approved_at: string | null;
   sent_at: string | null;
+  ai_score: number | null;
+  ai_flags: AiFlag[] | null;
+  ai_reasoning: string[] | null;
+  ai_scored_at: string | null;
   created_at: string;
   updated_at: string;
   students: {
@@ -124,7 +141,7 @@ export async function listReports(opts?: { classroomIds?: string[] }): Promise<R
   let query = supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name)"
     )
     .eq("students.school_id", ctx.schoolId)
     .order("created_at", { ascending: false });
@@ -150,6 +167,10 @@ export async function listReports(opts?: { classroomIds?: string[] }): Promise<R
     periodEnd: row.period_end,
     status: row.status,
     title: row.title,
+    aiScore: row.ai_score,
+    aiFlags: row.ai_flags,
+    aiReasoning: row.ai_reasoning,
+    aiScoredAt: row.ai_scored_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
@@ -171,9 +192,13 @@ export type ReportReviewerRow = {
 
 export type ReportListRowV2 = ReportListRow & {
   tab: ReportV2Tab;
-  /** 0-100 composite. Phase 4 wires the real scorer; today this is stubbed. */
-  aiScore: number;
-  /** % of expected sections filled in. Stubbed until Phase 4. */
+  /** UI-friendly display score. Defaults to a deterministic placeholder
+   *  when the real `aiScore` is null (un-scored), so the UI always has a
+   *  number to render. Use `aiScored: boolean` to distinguish. */
+  displayScore: number;
+  /** True iff the row has a real persisted score (i.e. `aiScore !== null`). */
+  aiScored: boolean;
+  /** % of expected sections filled in. Heuristic; Phase 4.1 may replace. */
   completenessPercent: number;
   /** Per-reviewer assignment rows from report_reviewers. Empty when no one
    *  has been assigned (the report is either still a draft, or submitted
@@ -302,14 +327,18 @@ export async function listReportsV2(opts?: {
   }
 
   return baseRows.map((row) => {
-    const aiScore = stubAiScore(row.id);
     const reviewers = reviewersByReport.get(row.id) ?? [];
     const approvedCount = reviewers.filter((r) => r.status === "approved").length;
+    // Real score when present; deterministic placeholder otherwise so the
+    // chip color is stable across renders for un-scored rows.
+    const aiScored = row.aiScore !== null;
+    const displayScore = aiScored ? (row.aiScore as number) : stubAiScore(row.id);
     return {
       ...row,
       tab: statusToTab(row.status),
-      aiScore,
-      completenessPercent: stubCompleteness(aiScore),
+      aiScored,
+      displayScore,
+      completenessPercent: stubCompleteness(displayScore),
       reviewers,
       reviewerTicks: { approved: approvedCount, total: reviewers.length },
       lastSubmittedAt: lastSubmittedByReport.get(row.id) ?? null,
@@ -327,7 +356,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id)"
     )
     .eq("id", id)
     .eq("students.school_id", ctx.schoolId)
@@ -366,6 +395,10 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     approvedByUserId: row.approved_by_user_id,
     approvedAt: row.approved_at,
     sentAt: row.sent_at,
+    aiScore: row.ai_score,
+    aiFlags: row.ai_flags,
+    aiReasoning: row.ai_reasoning,
+    aiScoredAt: row.ai_scored_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     hasBeenSubmitted: (priorSubmissionCount ?? 0) > 0,

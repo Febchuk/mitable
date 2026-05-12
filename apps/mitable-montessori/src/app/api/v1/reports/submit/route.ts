@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/api/auth";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { SubmitReportSchema } from "@/lib/schemas/report";
 import { submitReportForReview, WorkflowError } from "@/lib/reports/workflow";
+import { scoreAndPersistReport } from "@/lib/reports/score-and-persist";
 
 export async function POST(req: Request) {
   const auth = await requireUser();
@@ -44,13 +45,25 @@ export async function POST(req: Request) {
       }
     }
 
+    // Score synchronously so reviewers see a fresh score the moment the
+    // report lands in their queue. Best-effort: a scoring failure must NOT
+    // roll back the submit transition — the report is already in
+    // submitted_for_review by this point.
+    let scoredOk = true;
+    try {
+      await scoreAndPersistReport({ supabase, reportId });
+    } catch (scoreErr) {
+      scoredOk = false;
+      console.error("scoreAndPersistReport on submit failed", scoreErr);
+    }
+
     await auditLog({
       actor_id: auth.user.userId,
       actor_role: auth.user.role,
       action: "submit_report_for_review",
       target_table: "reports",
       target_id: reportId,
-      metadata: { reviewer_count: reviewerIds.length },
+      metadata: { reviewer_count: reviewerIds.length, scored_ok: scoredOk },
     });
     revalidatePath(`/app/reports/${reportId}`);
     revalidatePath(`/admin/reports/${reportId}`);

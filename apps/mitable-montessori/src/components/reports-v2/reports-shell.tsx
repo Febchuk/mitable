@@ -16,6 +16,7 @@ import { Icon } from "./icons";
 import {
   approveReport,
   requestChanges,
+  rescoreReport,
   submitReport,
   tickReviewer,
   ReportsApiError,
@@ -205,6 +206,10 @@ export function ReportsV2Shell({
   const handleRequestChanges = (report: MockReport, notes: string) =>
     handleRequestChangesFromReviewer(report, notes);
 
+  const handleRescore = async (report: MockReport) => {
+    await runAction(report.id, () => rescoreReport(report.id), `Re-scored ${report.childName}`);
+  };
+
   const handleSentToParents = async (report: MockReport, count: number) => {
     ToastBus.push({
       message: `${report.childName}'s report sent to ${count} guardian${count === 1 ? "" : "s"}`,
@@ -292,6 +297,7 @@ export function ReportsV2Shell({
                 onRequestChanges={() => setModal("request-changes")}
                 onComment={() => setChatCollapsed(false)}
                 onSendNow={() => setModal("send-to-parents")}
+                onRescore={() => handleRescore(selected)}
               />
             ) : (
               <EmptyState tab={tab} />

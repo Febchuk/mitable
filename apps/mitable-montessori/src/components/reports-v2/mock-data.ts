@@ -54,6 +54,10 @@ export type MockReport = {
   summary: string;
   tab: V2Tab;
   aiScore: number; // 0-100
+  /** True iff the row has a real persisted AI score. False (or undefined)
+   *  means the chip is showing a placeholder; the UI labels it
+   *  "Calculating…" until the scorer writes back. */
+  aiScored?: boolean;
   aiFlags: AIFlag[];
   aiReasoning: string[];
   // tab-specific signals

@@ -111,6 +111,30 @@ export async function sendReport(args: {
 // body). Not wired here — surfaces as a disabled UI affordance until the
 // endpoint lands.
 
+/** Re-run the AI scorer on a report. Used by the "↻ Re-score now" button
+ *  in the AI callout reasoning panel. Returns the fresh score so the caller
+ *  can update the UI without a router refresh. */
+export async function rescoreReport(reportId: string): Promise<{
+  score: number;
+  flags: {
+    kind: "tone" | "evidence" | "pii" | "template";
+    status: "ok" | "warn" | "fail";
+    note: string;
+  }[];
+  reasoning: string[];
+}> {
+  const data = (await postJson(`/api/v1/reports/${reportId}/score`, {})) as {
+    score?: number;
+    flags?: unknown;
+    reasoning?: unknown;
+  };
+  return {
+    score: typeof data.score === "number" ? data.score : 0,
+    flags: Array.isArray(data.flags) ? (data.flags as never) : [],
+    reasoning: Array.isArray(data.reasoning) ? (data.reasoning as string[]) : [],
+  };
+}
+
 export type Guardian = {
   guardianId: string;
   name: string;

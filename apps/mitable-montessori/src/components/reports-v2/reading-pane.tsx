@@ -59,6 +59,7 @@ export function ReadingPane({
   onRequestChanges,
   onComment,
   onSendNow,
+  onRescore,
 }: {
   report: MockReport;
   tab: V2Tab;
@@ -75,6 +76,7 @@ export function ReadingPane({
   onRequestChanges?: () => void;
   onComment?: () => void;
   onSendNow?: () => void;
+  onRescore?: () => void;
 }) {
   const [paneTab, setPaneTab] = useState<PaneTab>("report");
   const [showReasoning, setShowReasoning] = useState(false);
@@ -180,19 +182,31 @@ export function ReadingPane({
           </div>
           <div className={styles.readingHeadActions}>
             {showAiCallout && (
-              <span className={`${styles.score} ${scoreClass(report.aiScore)}`}>
-                <span className={styles.scoreBubble}>{report.aiScore}</span>
-                {tab === "drafts"
-                  ? report.aiScore >= 85
-                    ? "Ready to send"
-                    : report.aiScore >= 60
-                      ? "Tighten before sending"
-                      : "Needs more work"
-                  : report.aiScore >= 85
-                    ? "High confidence"
-                    : report.aiScore >= 60
-                      ? "Worth a closer look"
-                      : "Don't fast-approve"}
+              <span
+                className={`${styles.score} ${scoreClass(report.aiScore)}`}
+                style={report.aiScored === false ? { opacity: 0.6 } : undefined}
+                title={
+                  report.aiScored === false
+                    ? "AI score will appear after the first auto-score completes."
+                    : undefined
+                }
+              >
+                <span className={styles.scoreBubble}>
+                  {report.aiScored === false ? "·" : report.aiScore}
+                </span>
+                {report.aiScored === false
+                  ? "Calculating…"
+                  : tab === "drafts"
+                    ? report.aiScore >= 85
+                      ? "Ready to send"
+                      : report.aiScore >= 60
+                        ? "Tighten before sending"
+                        : "Needs more work"
+                    : report.aiScore >= 85
+                      ? "High confidence"
+                      : report.aiScore >= 60
+                        ? "Worth a closer look"
+                        : "Don't fast-approve"}
               </span>
             )}
             {tab === "drafts" && (
@@ -262,15 +276,22 @@ export function ReadingPane({
       {(!embeddedPaneTabs || paneTab === "report") && (
         <div className={styles.readingBody}>
           {showAiCallout && (
-            <div className={`${styles.aiCallout} ${calloutClass(report.aiScore)}`}>
+            <div
+              className={`${styles.aiCallout} ${calloutClass(report.aiScore)}`}
+              style={report.aiScored === false ? { opacity: 0.6 } : undefined}
+            >
               <div className={styles.aiRow}>
                 <span className={`${styles.score} ${scoreClass(report.aiScore)}`}>
-                  <span className={styles.scoreBubble}>{report.aiScore}</span>
-                  {report.aiScore >= 85
-                    ? "High confidence — ready to send"
-                    : report.aiScore >= 60
-                      ? "Worth a closer look"
-                      : "Needs more work"}
+                  <span className={styles.scoreBubble}>
+                    {report.aiScored === false ? "·" : report.aiScore}
+                  </span>
+                  {report.aiScored === false
+                    ? "Calculating score…"
+                    : report.aiScore >= 85
+                      ? "High confidence — ready to send"
+                      : report.aiScore >= 60
+                        ? "Worth a closer look"
+                        : "Needs more work"}
                 </span>
                 {report.aiFlags.map((f, i) => (
                   <span
@@ -303,6 +324,17 @@ export function ReadingPane({
                       <li key={i}>{line}</li>
                     ))}
                   </ul>
+                  {onRescore && (
+                    <button
+                      type="button"
+                      className={styles.reasonToggle}
+                      onClick={onRescore}
+                      disabled={busy}
+                      style={{ marginTop: 8 }}
+                    >
+                      {busy ? "Re-scoring…" : "↻ Re-score now"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

@@ -145,6 +145,12 @@ export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher")
                 ? `Delivered to ${row.delivery.delivered} of ${totalRecipients} · ${row.delivery.pending} pending.`
                 : `Delivered to ${row.delivery.delivered} guardian${row.delivery.delivered === 1 ? "" : "s"}.`;
 
+  // Use the scorer's real output when available. Fall back to score-band
+  // defaults so un-scored rows still render coherently. The UI distinguishes
+  // via the `aiScored` boolean (passed via the chip's "Calculating…" state).
+  const realFlags = row.aiFlags && row.aiFlags.length > 0 ? row.aiFlags : null;
+  const realReasoning = row.aiReasoning && row.aiReasoning.length > 0 ? row.aiReasoning : null;
+
   return {
     id: row.id,
     studentId: row.studentId,
@@ -157,9 +163,10 @@ export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher")
     title,
     summary,
     tab: row.tab,
-    aiScore: row.aiScore,
-    aiFlags: defaultFlags(row.aiScore),
-    aiReasoning: defaultReasoning(row.aiScore),
+    aiScore: row.displayScore,
+    aiScored: row.aiScored,
+    aiFlags: realFlags ?? defaultFlags(row.displayScore),
+    aiReasoning: realReasoning ?? defaultReasoning(row.displayScore),
 
     completenessPercent: row.tab === "drafts" ? row.completenessPercent : undefined,
     reviewers,
