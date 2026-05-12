@@ -106,10 +106,37 @@ export async function sendReport(args: {
   return { recipientCount: data.recipientCount ?? 0 };
 }
 
-// NOTE: "Send back to draft" needs a dedicated endpoint (the existing PATCH
-// route only auto-reverts from `submitted_for_review` and requires non-empty
-// body). Not wired here — surfaces as a disabled UI affordance until the
-// endpoint lands.
+/** Admin-only: revert a report (in any non-draft state) back to draft. Wipes
+ *  reviewer assignments + clears approval metadata. Optional note is logged
+ *  in the action history. */
+export async function sendBackToDraft(reportId: string, note?: string): Promise<void> {
+  await postJson(`/api/v1/reports/${reportId}/send-back-to-draft`, { note });
+}
+
+export type BulkApproveOutcome = {
+  reportId: string;
+  ok: boolean;
+  error?: string;
+};
+
+/** Admin-only: approve a batch of reports (the "Approve all green" affordance).
+ *  Returns per-id outcomes so the UI can show which ones failed. */
+export async function bulkApprove(reportIds: string[]): Promise<{
+  approved: number;
+  failed: number;
+  outcomes: BulkApproveOutcome[];
+}> {
+  const data = (await postJson("/api/v1/reports/bulk-approve", { reportIds })) as {
+    approved?: number;
+    failed?: number;
+    outcomes?: BulkApproveOutcome[];
+  };
+  return {
+    approved: data.approved ?? 0,
+    failed: data.failed ?? 0,
+    outcomes: data.outcomes ?? [],
+  };
+}
 
 /** Re-run the AI scorer on a report. Used by the "↻ Re-score now" button
  *  in the AI callout reasoning panel. Returns the fresh score so the caller

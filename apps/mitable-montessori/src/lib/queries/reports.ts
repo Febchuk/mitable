@@ -188,6 +188,10 @@ export type ReportV2Tab = "drafts" | "review" | "approved" | "sent";
 export type ReportReviewerRow = {
   reviewerUserId: string;
   status: "pending" | "approved" | "changes_requested";
+  /** Display name pulled from users.first_name + last_name when available.
+   *  Falls back to email. Null when the user has been deleted (orphaned
+   *  reviewer rows). */
+  reviewerName: string | null;
 };
 
 export type ReportListRowV2 = ReportListRow & {
@@ -293,6 +297,32 @@ export async function listReportsV2(opts?: {
     }
   }
 
+  // Resolve reviewer display names with a single follow-up query over
+  // distinct user ids. The reviewers query already constrained us to
+  // school-scoped reports via RLS, so we don't need a second
+  // school_id filter — the result set is naturally scoped.
+  const distinctReviewerIds = Array.from(
+    new Set(
+      (reviewersResp.data ?? []).map((r) => (r as { reviewer_user_id: string }).reviewer_user_id)
+    )
+  );
+  const nameByUserId = new Map<string, string>();
+  if (distinctReviewerIds.length > 0) {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, first_name, last_name, email")
+      .in("id", distinctReviewerIds);
+    for (const u of (users ?? []) as Array<{
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+    }>) {
+      const full = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+      nameByUserId.set(u.id, full || u.email || "");
+    }
+  }
+
   // Reviewer assignments — the source of truth for "who's reviewing and
   // have they ticked." Replaces the older "count distinct approvers in the
   // action log" heuristic.
@@ -303,7 +333,11 @@ export async function listReportsV2(opts?: {
     status: "pending" | "approved" | "changes_requested";
   }>) {
     const list = reviewersByReport.get(r.report_id) ?? [];
-    list.push({ reviewerUserId: r.reviewer_user_id, status: r.status });
+    list.push({
+      reviewerUserId: r.reviewer_user_id,
+      status: r.status,
+      reviewerName: nameByUserId.get(r.reviewer_user_id) || null,
+    });
     reviewersByReport.set(r.report_id, list);
   }
 

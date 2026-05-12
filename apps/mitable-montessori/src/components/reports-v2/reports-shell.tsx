@@ -12,11 +12,14 @@ import { ChatRail } from "./chat-rail";
 import { SendForReviewDrawer, SendForReviewMobileSheet } from "./send-for-review";
 import { RequestChangesDialog } from "./request-changes-dialog";
 import { SendToParentsDialog } from "./send-to-parents-dialog";
+import { ReassignReviewersDialog } from "./reassign-reviewers-dialog";
 import { Icon } from "./icons";
 import {
   approveReport,
+  bulkApprove,
   requestChanges,
   rescoreReport,
+  sendBackToDraft,
   submitReport,
   tickReviewer,
   ReportsApiError,
@@ -38,7 +41,8 @@ type Modal =
   | "send-for-review"
   | "send-for-review-mobile"
   | "request-changes"
-  | "send-to-parents";
+  | "send-to-parents"
+  | "reassign-reviewers";
 
 export function ReportsV2Shell({
   reports,
@@ -210,6 +214,68 @@ export function ReportsV2Shell({
     await runAction(report.id, () => rescoreReport(report.id), `Re-scored ${report.childName}`);
   };
 
+  const handleReassignSaved = async (report: MockReport, count: number) => {
+    ToastBus.push({
+      message:
+        count === 0
+          ? `Cleared reviewer assignments on ${report.childName}'s report`
+          : `Assigned ${count} reviewer${count === 1 ? "" : "s"} to ${report.childName}'s report`,
+    });
+    startTransition(() => router.refresh());
+    setModal(null);
+  };
+
+  const handleSendBackToDraft = async (report: MockReport) => {
+    await runAction(
+      report.id,
+      () => sendBackToDraft(report.id),
+      `Sent ${report.childName}'s report back to draft`
+    );
+  };
+
+  /** Bulk approve all green-scored (≥85) rows in the current tab. Admin-only.
+   *  Confirms before firing because it's a multi-row mutation. */
+  const handleBulkApproveGreen = async () => {
+    const greenIds = visible.filter((r) => r.aiScore >= 85).map((r) => r.id);
+    if (greenIds.length === 0) {
+      ToastBus.push({ message: "No green-scored reports in this view." });
+      return;
+    }
+    const proceed = window.confirm(
+      `Approve ${greenIds.length} green-scored report${greenIds.length === 1 ? "" : "s"}? They'll move to Approved immediately.`
+    );
+    if (!proceed) return;
+    setBusyIds((s) => {
+      const next = new Set(s);
+      for (const id of greenIds) next.add(id);
+      return next;
+    });
+    try {
+      const { approved, failed } = await bulkApprove(greenIds);
+      ToastBus.push({
+        message:
+          failed === 0
+            ? `Approved ${approved} report${approved === 1 ? "" : "s"}`
+            : `Approved ${approved} of ${approved + failed} · ${failed} failed`,
+      });
+      startTransition(() => router.refresh());
+    } catch (err) {
+      const msg =
+        err instanceof ReportsApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Bulk approve failed";
+      ToastBus.push({ message: msg });
+    } finally {
+      setBusyIds((s) => {
+        const next = new Set(s);
+        for (const id of greenIds) next.delete(id);
+        return next;
+      });
+    }
+  };
+
   const handleSentToParents = async (report: MockReport, count: number) => {
     ToastBus.push({
       message: `${report.childName}'s report sent to ${count} guardian${count === 1 ? "" : "s"}`,
@@ -280,6 +346,7 @@ export function ReportsV2Shell({
             busyIds={busyIds}
             onSelect={onSelect}
             onQuickApprove={isAdmin ? handleApprove : undefined}
+            onBulkApproveGreen={isAdmin ? handleBulkApproveGreen : undefined}
             compact
           />
           <div style={{ position: "relative", minWidth: 0 }}>
@@ -298,6 +365,8 @@ export function ReportsV2Shell({
                 onComment={() => setChatCollapsed(false)}
                 onSendNow={() => setModal("send-to-parents")}
                 onRescore={() => handleRescore(selected)}
+                onReassignReviewers={isAdmin ? () => setModal("reassign-reviewers") : undefined}
+                onSendBackToDraft={isAdmin ? () => handleSendBackToDraft(selected) : undefined}
               />
             ) : (
               <EmptyState tab={tab} />
@@ -344,6 +413,15 @@ export function ReportsV2Shell({
           childName={selected.childName}
           onCancel={() => setModal(null)}
           onSent={(count) => handleSentToParents(selected, count)}
+        />
+      )}
+
+      {modal === "reassign-reviewers" && selected && (
+        <ReassignReviewersDialog
+          open
+          report={selected}
+          onCancel={() => setModal(null)}
+          onSaved={(count) => handleReassignSaved(selected, count)}
         />
       )}
     </div>
@@ -452,6 +530,7 @@ function ListColumn({
   busyIds,
   onSelect,
   onQuickApprove,
+  onBulkApproveGreen,
   compact,
 }: {
   tab: V2Tab;
@@ -462,9 +541,13 @@ function ListColumn({
   onSelect: (id: string) => void;
   /** Quick approve, only wired for admin. */
   onQuickApprove?: (report: MockReport) => Promise<void> | void;
+  /** "Approve all green" — admin only, In Review tab only. */
+  onBulkApproveGreen?: () => Promise<void> | void;
   compact?: boolean;
 }) {
   const TAB_META = TABS.find((t) => t.id === tab);
+  const greenCount =
+    tab === "review" && onBulkApproveGreen ? visible.filter((r) => r.aiScore >= 85).length : 0;
   return (
     <aside className={styles.listRail}>
       <div className={styles.listToolbar} style={compact ? { padding: "12px 14px 10px" } : {}}>
@@ -472,6 +555,30 @@ function ListColumn({
         <div className={styles.sub}>
           {counts[tab]} report{counts[tab] === 1 ? "" : "s"} · {TAB_META?.sub}
         </div>
+        {greenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => onBulkApproveGreen?.()}
+            style={{
+              marginTop: 10,
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--color-sage-deep)",
+              background: "color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface))",
+              color: "var(--color-sage-deep)",
+              fontFamily: "inherit",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+            title="Approve every report with AI score ≥ 85 in this view."
+          >
+            ✓ Approve all green ({greenCount})
+          </button>
+        )}
       </div>
       <div className={styles.rows}>
         {visible.map((r) => (

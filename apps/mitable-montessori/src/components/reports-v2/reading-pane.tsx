@@ -60,6 +60,8 @@ export function ReadingPane({
   onComment,
   onSendNow,
   onRescore,
+  onReassignReviewers,
+  onSendBackToDraft,
 }: {
   report: MockReport;
   tab: V2Tab;
@@ -77,6 +79,10 @@ export function ReadingPane({
   onComment?: () => void;
   onSendNow?: () => void;
   onRescore?: () => void;
+  /** Admin-only: open the reassign reviewers dialog. */
+  onReassignReviewers?: () => void;
+  /** Admin-only: send the report back to draft (clears reviewer state). */
+  onSendBackToDraft?: () => void;
 }) {
   const [paneTab, setPaneTab] = useState<PaneTab>("report");
   const [showReasoning, setShowReasoning] = useState(false);
@@ -230,14 +236,45 @@ export function ReadingPane({
               </>
             )}
             {tab === "review" && isAdmin && (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnSecondary}`}
+                  onClick={onReassignReviewers}
+                  disabled={busy}
+                  style={busy ? { opacity: 0.6 } : undefined}
+                >
+                  Reassign
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnSecondary}`}
+                  onClick={onSendBackToDraft}
+                  disabled={busy}
+                  style={busy ? { opacity: 0.6 } : undefined}
+                >
+                  <Icon.RotateCcw size={11} /> Back to draft
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnSecondary}`}
+                  onClick={onOverrideApprove}
+                  disabled={busy}
+                  style={busy ? { opacity: 0.6 } : undefined}
+                >
+                  <Icon.Check size={11} /> {busy ? "Approving…" : "Override approve"}
+                </button>
+              </>
+            )}
+            {tab === "approved" && isAdmin && (
               <button
                 type="button"
                 className={`${styles.btn} ${styles.btnSecondary}`}
-                onClick={onOverrideApprove}
+                onClick={onSendBackToDraft}
                 disabled={busy}
                 style={busy ? { opacity: 0.6 } : undefined}
               >
-                <Icon.Check size={11} /> {busy ? "Approving…" : "Override approve"}
+                <Icon.RotateCcw size={11} /> Back to draft
               </button>
             )}
           </div>

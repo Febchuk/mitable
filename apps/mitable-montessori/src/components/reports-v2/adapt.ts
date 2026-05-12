@@ -101,19 +101,22 @@ function defaultReasoning(score: number): string[] {
 export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher"): MockReport {
   const tone = toneFor(row.studentId);
 
-  // Visual reviewer chips on the list row. We don't have reviewer names on
-  // the row here (they live on `users` and require a separate join — the
-  // candidates fetch already covers that for the drawer). Fall back to a
-  // generic "TR" initial sourced from the reviewer's user id hash so the
-  // chip stays stable across renders without leaking names.
+  // Visual reviewer chips on the list row. Names + initials come from the
+  // `users` join performed inside listReportsV2; we fall back to a stable
+  // user-id-derived placeholder when a reviewer row has no name (deleted
+  // user, or pre-Phase-5 data).
   const reviewers: V2Reviewer[] | undefined =
     row.tab === "review" && row.reviewers.length > 0
       ? row.reviewers.map((r, i) => {
-          const hash = (r.reviewerUserId.charCodeAt(0) ?? 65) + i;
-          const letter = String.fromCharCode(65 + (hash % 26));
+          const initials = r.reviewerName
+            ? initialsOf(r.reviewerName)
+            : (() => {
+                const hash = (r.reviewerUserId.charCodeAt(0) ?? 65) + i;
+                return String.fromCharCode(65 + (hash % 26)) + "R";
+              })();
           return {
-            initials: `${letter}R`,
-            name: "Reviewer",
+            initials,
+            name: r.reviewerName ?? "Reviewer",
             tone: TONE_ROTATION[i % TONE_ROTATION.length],
             ticked: r.status === "approved",
           };
