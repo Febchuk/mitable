@@ -14,24 +14,50 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
+  const { reportId, reviewerIds = [], note } = parsed.data;
   const supabase = createAdminClient();
   try {
     await submitReportForReview({
       supabase,
-      reportId: parsed.data.reportId,
+      reportId,
       actorUserId: auth.user.userId,
     });
+
+    // Seed report_reviewers with the author's selection. Idempotent thanks
+    // to the (report_id, reviewer_user_id) unique constraint — we wipe any
+    // prior assignments first so re-submits reflect the latest list.
+    if (reviewerIds.length > 0) {
+      await supabase.from("report_reviewers").delete().eq("report_id", reportId);
+      const rows = reviewerIds.map((reviewerUserId) => ({
+        report_id: reportId,
+        reviewer_user_id: reviewerUserId,
+        assigned_by_user_id: auth.user.userId,
+        status: "pending" as const,
+        note: note ?? null,
+      }));
+      const { error: insertErr } = await supabase.from("report_reviewers").insert(rows);
+      if (insertErr) {
+        // Don't fail the submit if reviewer seeding fails — the submit
+        // transition already landed and we want the workflow to be robust
+        // to permission edge cases. Log it loudly so we can investigate.
+        console.error("report_reviewers seed failed", insertErr);
+      }
+    }
+
     await auditLog({
       actor_id: auth.user.userId,
       actor_role: auth.user.role,
       action: "submit_report_for_review",
       target_table: "reports",
-      target_id: parsed.data.reportId,
+      target_id: reportId,
+      metadata: { reviewer_count: reviewerIds.length },
     });
-    revalidatePath(`/app/reports/${parsed.data.reportId}`);
-    revalidatePath(`/admin/reports/${parsed.data.reportId}`);
+    revalidatePath(`/app/reports/${reportId}`);
+    revalidatePath(`/admin/reports/${reportId}`);
     revalidatePath("/app/reports");
     revalidatePath("/admin/reports");
+    revalidatePath("/app/reports-v2");
+    revalidatePath("/admin/reports-v2");
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof WorkflowError) {

@@ -101,15 +101,29 @@ function defaultReasoning(score: number): string[] {
 export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher"): MockReport {
   const tone = toneFor(row.studentId);
 
+  // Visual reviewer chips on the list row. We don't have reviewer names on
+  // the row here (they live on `users` and require a separate join — the
+  // candidates fetch already covers that for the drawer). Fall back to a
+  // generic "TR" initial sourced from the reviewer's user id hash so the
+  // chip stays stable across renders without leaking names.
   const reviewers: V2Reviewer[] | undefined =
-    row.tab === "review"
-      ? Array.from({ length: row.reviewerTicks.total }, (_, i) => ({
-          initials: ["MW", "DR", "JT"][i] ?? "??",
-          name: ["Mei Wong", "Diego Ruiz", "Jamie Tao"][i] ?? "Reviewer",
-          tone: TONE_ROTATION[i % TONE_ROTATION.length],
-          ticked: i < row.reviewerTicks.approved,
-        }))
+    row.tab === "review" && row.reviewers.length > 0
+      ? row.reviewers.map((r, i) => {
+          const hash = (r.reviewerUserId.charCodeAt(0) ?? 65) + i;
+          const letter = String.fromCharCode(65 + (hash % 26));
+          return {
+            initials: `${letter}R`,
+            name: "Reviewer",
+            tone: TONE_ROTATION[i % TONE_ROTATION.length],
+            ticked: r.status === "approved",
+          };
+        })
       : undefined;
+
+  const reviewerRows = row.reviewers.map((r) => ({
+    userId: r.reviewerUserId,
+    status: r.status,
+  }));
 
   const title = row.title ?? `${TYPE_TO_UI[row.reportType]} report`;
 
@@ -135,6 +149,7 @@ export function adaptReportListRow(row: ReportListRowV2, authorName = "Teacher")
     id: row.id,
     studentId: row.studentId,
     rawStatus: row.status,
+    reviewerRows,
     childName: row.studentName,
     childInitials: initialsOf(row.studentName),
     childTone: tone,

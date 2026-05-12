@@ -164,13 +164,22 @@ export async function listReports(opts?: { classroomIds?: string[] }): Promise<R
 
 export type ReportV2Tab = "drafts" | "review" | "approved" | "sent";
 
+export type ReportReviewerRow = {
+  reviewerUserId: string;
+  status: "pending" | "approved" | "changes_requested";
+};
+
 export type ReportListRowV2 = ReportListRow & {
   tab: ReportV2Tab;
   /** 0-100 composite. Phase 4 wires the real scorer; today this is stubbed. */
   aiScore: number;
   /** % of expected sections filled in. Stubbed until Phase 4. */
   completenessPercent: number;
-  /** Reviewer ticks aggregated from report_review_actions. */
+  /** Per-reviewer assignment rows from report_reviewers. Empty when no one
+   *  has been assigned (the report is either still a draft, or submitted
+   *  without a named reviewer list). */
+  reviewers: ReportReviewerRow[];
+  /** Convenience: counts derived from `reviewers`. */
   reviewerTicks: { approved: number; total: number };
   /** Most recent submission timestamp ("4h ago" relative) — null if never sent. */
   lastSubmittedAt: string | null;
@@ -231,33 +240,46 @@ export async function listReportsV2(opts?: {
   // Both share the same report_id IN-list so they're cheap to run alongside.
   const supabase = createAdminClient();
   const ids = baseRows.map((r) => r.id);
-  const [actionsResp, recipientsResp] = await Promise.all([
+  const [actionsResp, recipientsResp, reviewersResp] = await Promise.all([
     supabase
       .from("report_review_actions")
-      .select("report_id, action_by_user_id, action_type, created_at")
+      .select("report_id, action_type, created_at")
       .in("report_id", ids),
     supabase.from("report_recipients").select("report_id, delivery_status").in("report_id", ids),
+    supabase
+      .from("report_reviewers")
+      .select("report_id, reviewer_user_id, status, acted_at")
+      .in("report_id", ids),
   ]);
 
-  const ticksByReport = new Map<string, Set<string>>();
+  // Last-submitted timestamp comes from the chronological action log —
+  // we don't track it on the reviewer assignment.
   const lastSubmittedByReport = new Map<string, string>();
   for (const a of (actionsResp.data ?? []) as Array<{
     report_id: string;
-    action_by_user_id: string;
     action_type: string;
     created_at: string;
   }>) {
-    if (a.action_type === "approved") {
-      const set = ticksByReport.get(a.report_id) ?? new Set<string>();
-      set.add(a.action_by_user_id);
-      ticksByReport.set(a.report_id, set);
-    }
     if (a.action_type === "submitted") {
       const prev = lastSubmittedByReport.get(a.report_id);
       if (!prev || a.created_at > prev) {
         lastSubmittedByReport.set(a.report_id, a.created_at);
       }
     }
+  }
+
+  // Reviewer assignments — the source of truth for "who's reviewing and
+  // have they ticked." Replaces the older "count distinct approvers in the
+  // action log" heuristic.
+  const reviewersByReport = new Map<string, ReportReviewerRow[]>();
+  for (const r of (reviewersResp.data ?? []) as Array<{
+    report_id: string;
+    reviewer_user_id: string;
+    status: "pending" | "approved" | "changes_requested";
+  }>) {
+    const list = reviewersByReport.get(r.report_id) ?? [];
+    list.push({ reviewerUserId: r.reviewer_user_id, status: r.status });
+    reviewersByReport.set(r.report_id, list);
   }
 
   const deliveryByReport = new Map<
@@ -279,22 +301,17 @@ export async function listReportsV2(opts?: {
     deliveryByReport.set(r.report_id, cur);
   }
 
-  // Phase 3 makes `total` configurable per-report (the # of assigned
-  // reviewers). For now we default to 3 — matches the prototype's "2 of 3" feel
-  // — so the chip renders sensibly until reviewer assignment ships.
-  const DEFAULT_REVIEWER_TOTAL = 3;
-
   return baseRows.map((row) => {
     const aiScore = stubAiScore(row.id);
+    const reviewers = reviewersByReport.get(row.id) ?? [];
+    const approvedCount = reviewers.filter((r) => r.status === "approved").length;
     return {
       ...row,
       tab: statusToTab(row.status),
       aiScore,
       completenessPercent: stubCompleteness(aiScore),
-      reviewerTicks: {
-        approved: ticksByReport.get(row.id)?.size ?? 0,
-        total: DEFAULT_REVIEWER_TOTAL,
-      },
+      reviewers,
+      reviewerTicks: { approved: approvedCount, total: reviewers.length },
       lastSubmittedAt: lastSubmittedByReport.get(row.id) ?? null,
       delivery: deliveryByReport.get(row.id) ?? { delivered: 0, pending: 0, failed: 0 },
     };

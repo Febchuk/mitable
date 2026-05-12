@@ -114,6 +114,26 @@ export type DraftReportToolCallT = z.infer<typeof DraftReportToolCall>;
 
 export const SubmitReportSchema = z.object({
   reportId: z.string().uuid(),
+  /** Optional list of user ids assigned as reviewers. Persisted to
+   *  report_reviewers. When omitted, the report is submitted with no
+   *  assignees — anyone with access can still approve. */
+  reviewerIds: z.array(z.string().uuid()).max(10).optional(),
+  /** Optional note from the author to the reviewers — stored alongside
+   *  the reviewer assignment for now (Phase 3.5 surfaces it in the UI). */
+  note: z.string().max(2000).optional(),
+});
+
+/** Body for POST /api/v1/reports/[id]/reviewers — replaces the full
+ *  reviewer set for a report. Omitted/empty list clears all assignments. */
+export const AssignReviewersSchema = z.object({
+  reviewerIds: z.array(z.string().uuid()).max(10),
+});
+
+/** Body for POST /api/v1/reports/[id]/reviewers/tick — current user marks
+ *  themselves as having approved (or requested changes). */
+export const TickReviewerSchema = z.object({
+  status: z.enum(["approved", "changes_requested"]),
+  note: z.string().max(2000).optional(),
 });
 
 export const RequestReportChangesSchema = z.object({

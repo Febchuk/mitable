@@ -51,6 +51,7 @@ export default async function ReportsV2Page({
       variant="teacher"
       initialSelectedId={initialSelectedId}
       selectedSections={detail?.sections ?? null}
+      currentUserId={ctx?.userId ?? null}
     />
   );
 }

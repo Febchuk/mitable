@@ -32,6 +32,11 @@ export type MockReport = {
    *  Optional on the legacy fixtures — required when the row comes from the
    *  adapter. */
   studentId?: string;
+  /** Raw per-reviewer rows from report_reviewers. Empty when none assigned.
+   *  Optional on fixtures. The visual `reviewers` field below is derived
+   *  from this — the raw rows are used by the action layer to decide
+   *  whether the current user can tick. */
+  reviewerRows?: { userId: string; status: "pending" | "approved" | "changes_requested" }[];
   /** Raw DB status. Lets action handlers pick the right endpoint without
    *  re-deriving from the tab. Optional on fixtures. */
   rawStatus?:

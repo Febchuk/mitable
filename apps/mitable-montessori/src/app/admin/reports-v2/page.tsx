@@ -58,6 +58,7 @@ export default async function AdminReportsV2Page({
       selectedSections={detail?.sections ?? null}
       classrooms={classrooms}
       activeClassroomId={classroomFilter ?? null}
+      currentUserId={ctx?.userId ?? null}
     />
   );
 }

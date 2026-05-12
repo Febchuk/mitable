@@ -13,7 +13,13 @@ import { SendForReviewDrawer, SendForReviewMobileSheet } from "./send-for-review
 import { RequestChangesDialog } from "./request-changes-dialog";
 import { SendToParentsDialog } from "./send-to-parents-dialog";
 import { Icon } from "./icons";
-import { approveReport, requestChanges, submitReport, ReportsApiError } from "@/lib/reports-v2/api";
+import {
+  approveReport,
+  requestChanges,
+  submitReport,
+  tickReviewer,
+  ReportsApiError,
+} from "@/lib/reports-v2/api";
 import styles from "./reports-v2.module.css";
 
 type Variant = "teacher" | "admin";
@@ -40,6 +46,7 @@ export function ReportsV2Shell({
   selectedSections,
   classrooms,
   activeClassroomId,
+  currentUserId,
 }: {
   reports: MockReport[];
   variant: Variant;
@@ -49,6 +56,11 @@ export function ReportsV2Shell({
   classrooms?: { id: string; name: string | null }[];
   /** Admin-only: currently-selected classroom from ?classroom=. */
   activeClassroomId?: string | null;
+  /** Current authenticated user's id. Used to decide whether `Approve` on a
+   *  row should call tickReviewer (assigned reviewer) or approveReport
+   *  (admin override). null when unauthenticated (page should already have
+   *  redirected, but the shell stays robust). */
+  currentUserId?: string | null;
 }) {
   const isAdmin = variant === "admin";
   const router = useRouter();
@@ -121,33 +133,77 @@ export function ReportsV2Shell({
     }
   };
 
+  /** Approve action — picks the right endpoint based on user's relationship
+   *  to the report:
+   *    - If the user is an assigned pending reviewer, calls tickReviewer.
+   *      That records their ✓ on report_reviewers, leaving final sign-off
+   *      to an admin.
+   *    - Otherwise (admin override, or no reviewers assigned), calls
+   *      approveReport which flips the report to `approved` directly. */
   const handleApprove = async (report: MockReport) => {
-    await runAction(report.id, () => approveReport(report.id), `Approved ${report.childName}`);
+    const myAssignment =
+      currentUserId && report.reviewerRows
+        ? report.reviewerRows.find((r) => r.userId === currentUserId)
+        : null;
+    const shouldTick = myAssignment && myAssignment.status === "pending";
+
+    if (shouldTick) {
+      await runAction(
+        report.id,
+        () => tickReviewer({ reportId: report.id, status: "approved" }),
+        `Approved ${report.childName} — waiting on admin sign-off`
+      );
+    } else {
+      await runAction(report.id, () => approveReport(report.id), `Approved ${report.childName}`);
+    }
+  };
+
+  const handleRequestChangesFromReviewer = async (report: MockReport, notes: string) => {
+    // If the current user is an assigned reviewer, tick with "changes_requested"
+    // rather than transitioning the whole report. Otherwise fall through to
+    // the workflow endpoint that flips the report status. The two share UX
+    // (same dialog) so the caller doesn't have to branch.
+    const myAssignment =
+      currentUserId && report.reviewerRows
+        ? report.reviewerRows.find((r) => r.userId === currentUserId)
+        : null;
+    const shouldTick = myAssignment && myAssignment.status === "pending";
+
+    if (shouldTick) {
+      await runAction(
+        report.id,
+        () => tickReviewer({ reportId: report.id, status: "changes_requested", note: notes }),
+        `Sent ${report.childName} back to author with notes`
+      );
+    } else {
+      await runAction(
+        report.id,
+        () => requestChanges(report.id, notes),
+        `Sent back to ${report.childName}'s author with notes`
+      );
+    }
+    setModal(null);
   };
 
   const handleSendForReview = async (
     report: MockReport,
-    _args: { reviewerInitials: string[]; note: string }
+    args: { reviewerIds: string[]; note: string }
   ): Promise<void> => {
-    // Phase 3 ships submit only — reviewer assignment + note persistence lands
-    // with the report_reviewers table (Phase 3.5). We close the drawer on
-    // success either way.
     await runAction(
       report.id,
-      () => submitReport(report.id),
-      `Sent ${report.childName}'s report for review`
+      () =>
+        submitReport({
+          reportId: report.id,
+          reviewerIds: args.reviewerIds.length > 0 ? args.reviewerIds : undefined,
+          note: args.note || undefined,
+        }),
+      `Sent ${report.childName}'s report to ${args.reviewerIds.length} reviewer${args.reviewerIds.length === 1 ? "" : "s"}`
     );
     setModal(null);
   };
 
-  const handleRequestChanges = async (report: MockReport, notes: string): Promise<void> => {
-    await runAction(
-      report.id,
-      () => requestChanges(report.id, notes),
-      `Sent back to ${report.childName}'s author with notes`
-    );
-    setModal(null);
-  };
+  const handleRequestChanges = (report: MockReport, notes: string) =>
+    handleRequestChangesFromReviewer(report, notes);
 
   const handleSentToParents = async (report: MockReport, count: number) => {
     ToastBus.push({

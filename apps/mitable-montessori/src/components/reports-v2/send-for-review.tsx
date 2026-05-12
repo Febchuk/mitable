@@ -2,36 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { MockReport } from "./mock-data";
+import { fetchReviewerCandidates, type ReviewerCandidate } from "@/lib/reports-v2/api";
 import { Icon } from "./icons";
 import styles from "./reports-v2.module.css";
 
-type Reviewer = {
-  initials: string;
-  name: string;
-  role: string;
-  tone: "clay" | "sage" | "butter" | "blue";
-};
-
-/**
- * NOTE: Phase 3 wires the `Send for review` button to POST /api/v1/reports/submit.
- * The reviewer multi-select is a UI affordance — the existing `submit` endpoint
- * has no concept of named reviewers (it just transitions status). Phase 3.5
- * adds the `report_reviewers` table and persists this selection. Until then,
- * the picker captures intent but doesn't write per-reviewer rows.
- */
-const AVAILABLE_REVIEWERS: Reviewer[] = [
-  { initials: "MW", name: "Mei Wong", role: "Lead · Bluebell room", tone: "sage" },
-  { initials: "DR", name: "Diego Ruiz", role: "Assistant · Bluebell", tone: "clay" },
-  { initials: "JT", name: "Jamie Tao", role: "Lead · Robin room", tone: "butter" },
-  { initials: "RS", name: "Rita Singh", role: "Floater", tone: "blue" },
-];
-
-const TONE_CLASS: Record<Reviewer["tone"], string> = {
-  clay: styles.avClay,
-  sage: styles.avSage,
-  butter: styles.avButter,
-  blue: styles.avBlue,
-};
+const TONE_ROTATION = [styles.avSage, styles.avClay, styles.avButter, styles.avBlue] as const;
 
 function scoreClass(score: number) {
   if (score >= 85) return styles.scoreGreen;
@@ -39,9 +14,24 @@ function scoreClass(score: number) {
   return styles.scoreRed;
 }
 
+function initialsOf(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "??"
+  );
+}
+
 /** Shared form body for both web drawer + mobile sheet. */
 function SendForReviewForm({
   report,
+  candidates,
+  loadingCandidates,
+  loadError,
   selected,
   onToggle,
   note,
@@ -50,8 +40,11 @@ function SendForReviewForm({
   busy,
 }: {
   report: MockReport;
+  candidates: ReviewerCandidate[];
+  loadingCandidates: boolean;
+  loadError: string | null;
   selected: Set<string>;
-  onToggle: (initials: string) => void;
+  onToggle: (userId: string) => void;
   note: string;
   onNoteChange: (next: string) => void;
   error: string | null;
@@ -81,34 +74,58 @@ function SendForReviewForm({
       </div>
 
       <div>
-        <label className={styles.fieldLabel}>Assign reviewers · pick 1–3</label>
-        <div className={styles.reviewerGrid}>
-          {AVAILABLE_REVIEWERS.map((r) => (
-            <button
-              key={r.initials}
-              type="button"
-              className={`${styles.reviewerCard} ${
-                selected.has(r.initials) ? styles.reviewerCardSelected : ""
-              }`}
-              onClick={() => onToggle(r.initials)}
-              disabled={busy}
-            >
-              <div className={`${styles.av} ${styles.avSm} ${TONE_CLASS[r.tone]}`}>
-                {r.initials}
-              </div>
-              <div className={styles.info}>
-                <span className={styles.nm}>{r.name}</span>
-                <span className={styles.role}>{r.role}</span>
-              </div>
-              <div className={styles.reviewerCheck}>
-                <Icon.Check size={11} />
-              </div>
-            </button>
-          ))}
-        </div>
+        <label className={styles.fieldLabel}>Assign reviewers · pick 1–10</label>
+        {loadingCandidates ? (
+          <div style={{ padding: "12px 0", fontSize: 12.5, color: "var(--color-ink-muted)" }}>
+            Loading reviewers…
+          </div>
+        ) : loadError ? (
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: "var(--color-terracotta-soft)",
+              color: "var(--color-terracotta-deep)",
+              fontSize: 12.5,
+            }}
+          >
+            {loadError}
+          </div>
+        ) : candidates.length === 0 ? (
+          <div style={{ padding: "10px 0", fontSize: 12.5, color: "var(--color-ink-muted)" }}>
+            No other teachers or admins in this school yet. Submit without assignees — anyone with
+            access can still approve.
+          </div>
+        ) : (
+          <div className={styles.reviewerGrid}>
+            {candidates.map((c, i) => (
+              <button
+                key={c.userId}
+                type="button"
+                className={`${styles.reviewerCard} ${
+                  selected.has(c.userId) ? styles.reviewerCardSelected : ""
+                }`}
+                onClick={() => onToggle(c.userId)}
+                disabled={busy}
+              >
+                <div
+                  className={`${styles.av} ${styles.avSm} ${TONE_ROTATION[i % TONE_ROTATION.length]}`}
+                >
+                  {initialsOf(c.name)}
+                </div>
+                <div className={styles.info}>
+                  <span className={styles.nm}>{c.name}</span>
+                  <span className={styles.role}>{c.role === "admin" ? "Admin" : "Teacher"}</span>
+                </div>
+                <div className={styles.reviewerCheck}>
+                  <Icon.Check size={11} />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
         <div style={{ marginTop: 9, fontSize: 11.5, color: "var(--color-ink-muted)" }}>
-          Parallel review — any of them can tick first. Reviewer-specific notifications come in
-          Phase 3.5.
+          Parallel review — any of them can tick first.
         </div>
       </div>
 
@@ -141,6 +158,34 @@ function SendForReviewForm({
   );
 }
 
+/** Hook: load reviewer candidates once when the drawer opens. */
+function useReviewerCandidates() {
+  const [candidates, setCandidates] = useState<ReviewerCandidate[]>([]);
+  const [loadingCandidates, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    fetchReviewerCandidates()
+      .then((rows) => {
+        if (cancelled) return;
+        setCandidates(rows);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setLoadError((e as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return { candidates, loadingCandidates, loadError };
+}
+
 /** Web right-side drawer. Positioned inside the reading pane (absolute). */
 export function SendForReviewDrawer({
   report,
@@ -150,12 +195,13 @@ export function SendForReviewDrawer({
   report: MockReport;
   onClose: () => void;
   /** Async submit. Drawer closes on success; caller toasts. */
-  onSubmit: (args: { reviewerInitials: string[]; note: string }) => Promise<void>;
+  onSubmit: (args: { reviewerIds: string[]; note: string }) => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set(["MW", "DR"]));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { candidates, loadingCandidates, loadError } = useReviewerCandidates();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -169,7 +215,7 @@ export function SendForReviewDrawer({
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({ reviewerInitials: [...selected], note: note.trim() });
+      await onSubmit({ reviewerIds: [...selected], note: note.trim() });
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -201,12 +247,15 @@ export function SendForReviewDrawer({
         <div className={styles.drawerBody}>
           <SendForReviewForm
             report={report}
+            candidates={candidates}
+            loadingCandidates={loadingCandidates}
+            loadError={loadError}
             selected={selected}
-            onToggle={(initials) =>
+            onToggle={(userId) =>
               setSelected((s) => {
                 const next = new Set(s);
-                if (next.has(initials)) next.delete(initials);
-                else next.add(initials);
+                if (next.has(userId)) next.delete(userId);
+                else next.add(userId);
                 return next;
               })
             }
@@ -228,12 +277,16 @@ export function SendForReviewDrawer({
           <button
             type="button"
             className={`${styles.btn} ${styles.btnPrimary}`}
-            disabled={busy || selected.size === 0}
-            style={{ opacity: busy || selected.size === 0 ? 0.6 : 1 }}
+            disabled={busy}
+            style={{ opacity: busy ? 0.6 : 1 }}
             onClick={submit}
           >
             <Icon.Send size={13} />
-            {busy ? "Sending…" : `Send to ${selected.size}`}
+            {busy
+              ? "Sending…"
+              : selected.size === 0
+                ? "Send without assignees"
+                : `Send to ${selected.size}`}
           </button>
         </div>
       </aside>
@@ -249,12 +302,13 @@ export function SendForReviewMobileSheet({
 }: {
   report: MockReport;
   onClose: () => void;
-  onSubmit: (args: { reviewerInitials: string[]; note: string }) => Promise<void>;
+  onSubmit: (args: { reviewerIds: string[]; note: string }) => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set(["MW", "DR"]));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { candidates, loadingCandidates, loadError } = useReviewerCandidates();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -268,7 +322,7 @@ export function SendForReviewMobileSheet({
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({ reviewerInitials: [...selected], note: note.trim() });
+      await onSubmit({ reviewerIds: [...selected], note: note.trim() });
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -301,12 +355,15 @@ export function SendForReviewMobileSheet({
         <div className={styles.sheetBody}>
           <SendForReviewForm
             report={report}
+            candidates={candidates}
+            loadingCandidates={loadingCandidates}
+            loadError={loadError}
             selected={selected}
-            onToggle={(initials) =>
+            onToggle={(userId) =>
               setSelected((s) => {
                 const next = new Set(s);
-                if (next.has(initials)) next.delete(initials);
-                else next.add(initials);
+                if (next.has(userId)) next.delete(userId);
+                else next.add(userId);
                 return next;
               })
             }
@@ -328,12 +385,16 @@ export function SendForReviewMobileSheet({
           <button
             type="button"
             className={`${styles.btn} ${styles.btnPrimary}`}
-            disabled={busy || selected.size === 0}
-            style={{ opacity: busy || selected.size === 0 ? 0.6 : 1 }}
+            disabled={busy}
+            style={{ opacity: busy ? 0.6 : 1 }}
             onClick={submit}
           >
             <Icon.Send size={13} />
-            {busy ? "Sending…" : `Send to ${selected.size}`}
+            {busy
+              ? "Sending…"
+              : selected.size === 0
+                ? "Send without assignees"
+                : `Send to ${selected.size}`}
           </button>
         </div>
       </div>

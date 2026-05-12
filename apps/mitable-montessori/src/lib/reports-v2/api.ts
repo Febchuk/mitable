@@ -38,9 +38,49 @@ async function postJson(url: string, body: unknown): Promise<unknown> {
   return data;
 }
 
-/** Transition: draft → submitted_for_review. */
-export async function submitReport(reportId: string): Promise<void> {
-  await postJson("/api/v1/reports/submit", { reportId });
+/** Transition: draft → submitted_for_review. Optionally seeds
+ *  report_reviewers with the author's reviewer picks. */
+export async function submitReport(args: {
+  reportId: string;
+  reviewerIds?: string[];
+  note?: string;
+}): Promise<void> {
+  await postJson("/api/v1/reports/submit", args);
+}
+
+/** Replace the reviewer assignment list for a report. Used by admin
+ *  reassign UI. Server-side wipes existing assignments before insert. */
+export async function assignReviewers(reportId: string, reviewerIds: string[]): Promise<void> {
+  await postJson(`/api/v1/reports/${reportId}/reviewers`, { reviewerIds });
+}
+
+/** Current user marks themselves as approved or changes-requested on the
+ *  report. 403s if they're not in report_reviewers for this report. */
+export async function tickReviewer(args: {
+  reportId: string;
+  status: "approved" | "changes_requested";
+  note?: string;
+}): Promise<void> {
+  const { reportId, ...body } = args;
+  await postJson(`/api/v1/reports/${reportId}/reviewers/tick`, body);
+}
+
+export type ReviewerCandidate = {
+  userId: string;
+  name: string;
+  email: string | null;
+  role: "teacher" | "admin";
+};
+
+/** Eligible reviewer pool — all teachers + admins in the school except me. */
+export async function fetchReviewerCandidates(): Promise<ReviewerCandidate[]> {
+  const res = await fetch("/api/v1/reports/reviewer-candidates", { cache: "no-store" });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ReportsApiError(data.error ?? `Could not load reviewers (${res.status})`, res.status);
+  }
+  const data = (await res.json()) as { candidates?: ReviewerCandidate[] };
+  return data.candidates ?? [];
 }
 
 /** Transition: draft|submitted_for_review|in_review → approved. */
