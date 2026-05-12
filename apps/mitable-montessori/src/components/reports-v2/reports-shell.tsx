@@ -380,6 +380,7 @@ export function ReportsV2Shell({
             )}
           </div>
           <ChatRail
+            reportId={selected?.id ?? null}
             collapsed={chatCollapsed}
             onToggleCollapsed={() => setChatCollapsed((v) => !v)}
           />

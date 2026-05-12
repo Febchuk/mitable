@@ -169,6 +169,44 @@ export type Guardian = {
   relationship: string | null;
 };
 
+// ============================================================================
+// Report chat
+// ============================================================================
+
+/** A chat message as the rail renders it. Re-uses the canonical
+ *  `ChatTurnMessage` discriminated union from the schemas package. */
+import type { ChatTurnMessage } from "@/lib/schemas/report-chat";
+export type { ChatTurnMessage };
+
+/** Load the full chat history for a report (oldest first). The endpoint
+ *  applies no caps — callers can rely on having every persisted message. */
+export async function fetchReportChat(reportId: string): Promise<ChatTurnMessage[]> {
+  const res = await fetch(`/api/v1/reports/${reportId}/chat`, { cache: "no-store" });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ReportsApiError(data.error ?? `Could not load chat (${res.status})`, res.status);
+  }
+  const data = (await res.json()) as { messages?: ChatTurnMessage[] };
+  return data.messages ?? [];
+}
+
+/** Send a chat turn. The server runs the tool-calling agent and returns
+ *  the user message + every assistant message produced in the turn (1-N
+ *  depending on whether the agent ended with a clarify, a proposal, etc).
+ *
+ *  Phase 6 only sends free-text messages — no targetRef, no attachments.
+ *  Both fields are supported by the endpoint and can land later when the
+ *  v2 reading-pane gains inline section selection + photo capture. */
+export async function postReportChatTurn(args: {
+  reportId: string;
+  userMessage: string;
+}): Promise<ChatTurnMessage[]> {
+  const data = (await postJson(`/api/v1/reports/${args.reportId}/chat/turn`, {
+    userMessage: args.userMessage,
+  })) as { messages?: ChatTurnMessage[] };
+  return data.messages ?? [];
+}
+
 /** Lookup eligible guardians for the send-to-parents flow. */
 export async function fetchEligibleGuardians(studentId: string): Promise<Guardian[]> {
   const res = await fetch(`/api/v1/students/${studentId}/guardians?receivesReports=true`, {
