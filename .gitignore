@@ -85,3 +85,8 @@ apps/electron/resources/whisper/
 
 # User specific files
 *cursor-rules.mdc.claude-flow/
+
+# Dev scripts (local-only backfill, shims, DB inspection)
+scripts/backfill-blocks.ts
+scripts/check-db.ts
+scripts/shims/

@@ -32,6 +32,7 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { app } from "electron";
 import { randomUUID } from "crypto";
+import { aggregateSession } from "./blockAggregator";
 
 const logger = createLogger("HybridInference");
 
@@ -480,6 +481,25 @@ class HybridInferenceService {
         }
       }
 
+      // Aggregate classifications into structured activity blocks + daily summary
+      emit("aggregating_blocks", 92, "Building activity blocks...");
+      try {
+        const blockCompletionFn: CompletionFn | null = this.provider
+          ? async (msgs, opts) => {
+              return this.provider!.chatCompletion(
+                msgs.map((m) => ({ role: m.role, content: m.content })),
+                {
+                  temperature: opts?.temperature ?? 0.1,
+                  max_tokens: opts?.max_tokens ?? 2048,
+                }
+              );
+            }
+          : null;
+        await aggregateSession(sessionId, blockCompletionFn);
+      } catch (err) {
+        logger.error("Block aggregation failed (non-fatal):", String(err));
+      }
+
       emit("complete", 100, "Done");
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
       logger.info(`Hybrid processAllAtEnd completed in ${elapsed}s`);
@@ -628,6 +648,7 @@ ${transcriptSegments ? `Audio transcript during this period:\n${transcriptSegmen
 - EMAIL/MESSAGING: Who's the conversation with? Subject line? What's being discussed?
 - ISSUE TRACKERS: Jira/Linear/GitHub issue title and number? Status?
 - DOCUMENTS: Document title, section headings, content being edited?
+- CLIENT/CUSTOMER CONTEXT: Any visible client or company names, logos, project names, Slack channel names (e.g., #acme-support), ticket prefixes, or other indicators of who this work is for?
 
 Scale detail to richness: a static idle screen = 1 sentence. A rich IDE with code, terminal, sidebar, and chat = 3-4 sentences covering each visible element.
 

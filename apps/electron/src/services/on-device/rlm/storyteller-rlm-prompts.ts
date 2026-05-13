@@ -55,10 +55,16 @@ CONTENT PRIORITY:
 2. Subject matter (what the video/meeting/code/document was about)
 3. Systems used (actual app/site names from the data)
 4. Outcome (what was accomplished, decided, or learned)
+5. Client context (which external client or customer is this work serving, if identifiable from visible project names, Slack channels, ticket prefixes, or people mentioned)
+
+STYLE:
+- Mention an app or browser name ONCE when first introducing it, then refer to it implicitly ("I browsed LinkedIn…" not "I browsed LinkedIn in the Opera Internet Browser, then continued browsing LinkedIn in the Opera browser"). The reader already knows which tool was used.
+- Don't restate the same fact in different words across paragraphs. Say it once clearly.
 
 BANNED:
 - UI mechanics ("clicked tab", "scrolled down")
-- Meta-commentary ("the session consisted of...")
+- Meta-commentary ("the session consisted of...", "Overall, the session combined…")
+- Redundant app-name repetition across sentences/paragraphs
 - Filler when you lack specifics — be brief instead
 - Invented details not in the data
 

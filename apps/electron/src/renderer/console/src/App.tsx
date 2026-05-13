@@ -45,6 +45,7 @@ import { useTheme } from "./hooks/useTheme";
 // import TeamsView from "./components/views/admin/TeamsView";
 // import OrgSetupView from "./components/views/admin/OrgSetupView";
 import OnDeviceAIView from "./components/views/employee/OnDeviceAIView";
+import MeView from "./components/views/employee/MeView";
 
 // Applies stored theme class to <html> on mount and syncs across windows
 function ThemeInitializer() {
@@ -300,8 +301,8 @@ function App() {
                           <Route path="org-chart" element={<Navigate to="/calendar" replace />} />
                           <Route path="teams" element={<Navigate to="/calendar" replace />} />
 
-                          {/* @deprecated Me/Bragbook/Benchmarks hidden — personal app */}
-                          <Route path="me" element={<Navigate to="/calendar" replace />} />
+                          <Route path="me" element={<MeView />} />
+                          {/* @deprecated Bragbook/Benchmarks hidden — personal app */}
                           <Route path="bragbook" element={<Navigate to="/calendar" replace />} />
                           <Route path="benchmarks" element={<Navigate to="/calendar" replace />} />
                           <Route

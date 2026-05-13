@@ -8,7 +8,6 @@ import { monitoringSessionService } from "../../services/monitoringSessionServic
 import { focusWindowTracker } from "../../services/focusWindowTracker";
 import { preferencesService } from "../../services/preferencesService";
 import { isBlockedByPolicy, getCapturePolicy } from "../../services/capturePolicy";
-import { preferencesService } from "../../services/preferencesService";
 import { authManager } from "../../services/authManager";
 import {
   createConsoleWindow,

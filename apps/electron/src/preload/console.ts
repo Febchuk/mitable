@@ -170,6 +170,10 @@ const IPC_CHANNELS = {
   LOCAL_DOCS_DELETE: "local-docs:delete",
   LOCAL_DOCS_QUERY: "local-docs:query",
   LOCAL_DOCS_GET_CHUNKS: "local-docs:get-chunks",
+  LOCAL_DOCS_GENERATE: "local-docs:generate",
+  LOCAL_DOCS_GET: "local-docs:get",
+  LOCAL_DOCS_UPDATE: "local-docs:update",
+  LOCAL_DOCS_REVISE: "local-docs:revise",
 
   // Local agent (on-device RLM chat)
   LOCAL_AGENT_ASK: "local-agent:ask",
@@ -194,6 +198,11 @@ const IPC_CHANNELS = {
   LOCAL_AUTH_GET_USER: "local-auth:get-user",
   LOCAL_AUTH_HAS_ACCOUNT: "local-auth:has-account",
   LOCAL_AUTH_RESET_PASSWORD: "local-auth:reset-password",
+  // Me Activity (local activity blocks + daily summaries)
+  ME_ACTIVITY_GET: "me-activity:get",
+  ME_ACTIVITY_BLOCKS: "me-activity:blocks",
+  ME_ACTIVITY_DAILY_SUMMARIES: "me-activity:daily-summaries",
+  ME_ACTIVITY_UPDATED: "me-activity:updated",
   // Offline auth (main → renderer)
   AUTH_OFFLINE_USER: "auth-offline-user",
 } as const;
@@ -1305,6 +1314,25 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     newPassword: string
   ): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_RESET_PASSWORD, email, oldPassword, newPassword),
+
+  // Me Activity
+  getMyActivity: (userId: string, period: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ME_ACTIVITY_GET, userId, period),
+
+  getMyActivityBlocks: (userId: string, startDate: string, endDate: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ME_ACTIVITY_BLOCKS, userId, startDate, endDate),
+
+  getMyDailySummaries: (userId: string, startDate: string, endDate: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ME_ACTIVITY_DAILY_SUMMARIES, userId, startDate, endDate),
+
+  onMeActivityUpdated: (callback: (data: { sessionId: string; date: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { sessionId: string; date: string }) =>
+      callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ME_ACTIVITY_UPDATED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.ME_ACTIVITY_UPDATED, handler);
+    };
+  },
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

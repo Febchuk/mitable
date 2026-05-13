@@ -35,6 +35,8 @@ export type {
   LocalUser,
   LocalOrganization,
   LocalFeedback,
+  LocalActivityBlock,
+  LocalDailySummary,
 } from "./pgDb";
 
 export { localInferenceService } from "./localInferenceService";
@@ -62,3 +64,5 @@ export type { BatchAnalysisResult, InferenceTier } from "./hybridInferenceServic
 export { keyVault } from "./keyVault";
 export { createProvider } from "./providers";
 export type { InferenceProvider, ProviderConfig, ProviderName } from "./providers";
+
+export { aggregateSession } from "./blockAggregator";

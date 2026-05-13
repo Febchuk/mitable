@@ -342,6 +342,28 @@ interface ConsoleAPI {
     rendererLogs: string;
     error?: string;
   }>;
+  analyzeLogsLocally?: (args: {
+    message: string;
+    mainLogs: string;
+    rendererLogs: string;
+  }) => Promise<{
+    success: boolean;
+    analysis: string;
+    diagnostics: string;
+    error?: string;
+  }>;
+  submitFeedback?: (args: {
+    message: string;
+    logAnalysis: string;
+    ollamaDiagnostics: string;
+    mainLogs: string;
+    rendererLogs: string;
+    userName: string;
+    userEmail: string;
+    token: string | null;
+    apiBaseUrl: string;
+    isAnonymous: boolean;
+  }) => Promise<{ success: boolean; error?: string }>;
 
   // On-Device AI (Ollama + Gemma 4)
   onDeviceGetStatus: () => Promise<{
@@ -663,6 +685,72 @@ interface ConsoleAPI {
     oldPassword: string,
     newPassword: string
   ) => Promise<{ success: boolean; error?: string }>;
+
+  // Me Activity (local activity blocks + daily summaries)
+  getMyActivity?: (
+    userId: string,
+    period: string
+  ) => Promise<{
+    totalActiveMs: number;
+    categoryBreakdown: Record<string, number>;
+    appBreakdown: Record<string, number>;
+    clientBreakdown: Record<string, number>;
+    dailySummaries: Array<{
+      date: string;
+      totalActiveMs: number;
+      sessionCount: number;
+      categoryBreakdown: Record<string, number>;
+    }>;
+    recentBlocks: Array<{
+      id: string;
+      sessionId: string;
+      narrative: string;
+      startMs: number;
+      endMs: number;
+      durationMs: number;
+      date: string;
+      topCategory: string | null;
+      topApp: string | null;
+    }>;
+    period: string;
+    startDate: string;
+    endDate: string;
+  }>;
+  getMyActivityBlocks?: (
+    userId: string,
+    startDate: string,
+    endDate: string
+  ) => Promise<
+    Array<{
+      id: string;
+      sessionId: string;
+      category: string;
+      appName: string;
+      description: string;
+      clientName: string | null;
+      startMs: number;
+      endMs: number;
+      durationMs: number;
+      blockType: string;
+      date: string;
+    }>
+  >;
+  getMyDailySummaries?: (
+    userId: string,
+    startDate: string,
+    endDate: string
+  ) => Promise<
+    Array<{
+      date: string;
+      totalActiveMs: number;
+      sessionCount: number;
+      categoryBreakdown: string;
+      appBreakdown: string;
+    }>
+  >;
+  onMeActivityUpdated?: (
+    callback: (data: { sessionId: string; date: string }) => void
+  ) => () => void;
 }
 
 declare global {

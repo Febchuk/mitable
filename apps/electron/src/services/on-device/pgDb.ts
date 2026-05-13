@@ -188,6 +188,33 @@ export interface LocalOrganization {
   updatedAt: number;
 }
 
+export interface LocalActivityBlock {
+  id: string;
+  sessionId: string;
+  userId: string;
+  date: string;
+  category: string;
+  appName: string;
+  description: string;
+  clientName: string | null;
+  startMs: number;
+  endMs: number;
+  durationMs: number;
+  blockType: string;
+  createdAt: number;
+}
+
+export interface LocalDailySummary {
+  id: string;
+  userId: string;
+  date: string;
+  totalActiveMs: number;
+  sessionCount: number;
+  categoryBreakdown: string;
+  appBreakdown: string;
+  updatedAt: number;
+}
+
 // ── Postgres Schema ─────────────────────────────────────────────────────────
 
 const SCHEMA_SQL = `
@@ -420,6 +447,39 @@ CREATE TABLE IF NOT EXISTS local_doc_chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_local_doc_chunks_doc ON local_doc_chunks(document_id);
+
+CREATE TABLE IF NOT EXISTS activity_blocks (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other',
+  app_name TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  client_name TEXT,
+  start_ms BIGINT NOT NULL,
+  end_ms BIGINT NOT NULL,
+  duration_ms BIGINT NOT NULL DEFAULT 0,
+  block_type TEXT NOT NULL DEFAULT 'work',
+  created_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_blocks_session ON activity_blocks(session_id);
+CREATE INDEX IF NOT EXISTS idx_activity_blocks_user_date ON activity_blocks(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_activity_blocks_date ON activity_blocks(date);
+
+CREATE TABLE IF NOT EXISTS daily_summaries (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  date TEXT NOT NULL UNIQUE,
+  total_active_ms BIGINT NOT NULL DEFAULT 0,
+  session_count INTEGER NOT NULL DEFAULT 0,
+  category_breakdown TEXT NOT NULL DEFAULT '{}',
+  app_breakdown TEXT NOT NULL DEFAULT '{}',
+  updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_summaries_user_date ON daily_summaries(user_id, date);
 `;
 
 // Vector index SQL (created separately after extension is loaded)
@@ -1359,6 +1419,7 @@ class PgDatabase {
     if (!db) return;
     try {
       // Delete related data first
+      await db.query(`DELETE FROM activity_blocks WHERE session_id = $1`, [id]);
       await db.query(`DELETE FROM captures WHERE session_id = $1`, [id]);
       await db.query(`DELETE FROM classifications WHERE session_id = $1`, [id]);
       await db.query(`DELETE FROM stories WHERE session_id = $1`, [id]);
@@ -1367,6 +1428,144 @@ class PgDatabase {
     } catch (err) {
       logger.error("deleteMonitoringSession failed:", String(err));
     }
+  }
+
+  // ── Activity Blocks ─────────────────────────────────────────────────────
+
+  async insertActivityBlock(block: Omit<LocalActivityBlock, "createdAt">): Promise<void> {
+    if (!db) {
+      logger.error("insertActivityBlock: DB unavailable");
+      return;
+    }
+    try {
+      await db.query(
+        `INSERT INTO activity_blocks
+          (id, session_id, user_id, date, category, app_name, description,
+           client_name, start_ms, end_ms, duration_ms, block_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (id) DO UPDATE SET
+           category = EXCLUDED.category,
+           description = EXCLUDED.description,
+           client_name = EXCLUDED.client_name,
+           duration_ms = EXCLUDED.duration_ms`,
+        [
+          block.id,
+          block.sessionId,
+          block.userId,
+          block.date,
+          block.category,
+          block.appName,
+          block.description,
+          block.clientName,
+          block.startMs,
+          block.endMs,
+          block.durationMs,
+          block.blockType,
+        ]
+      );
+    } catch (err) {
+      logger.error("insertActivityBlock failed:", String(err));
+    }
+  }
+
+  async getActivityBlocksForDate(userId: string, date: string): Promise<LocalActivityBlock[]> {
+    if (!db) return [];
+    const result = await db.query(
+      `SELECT * FROM activity_blocks WHERE user_id = $1 AND date = $2 ORDER BY start_ms ASC`,
+      [userId, date]
+    );
+    return mapRows<LocalActivityBlock>(result.rows as Record<string, unknown>[]);
+  }
+
+  async getActivityBlocksForDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<LocalActivityBlock[]> {
+    if (!db) return [];
+    const result = await db.query(
+      `SELECT * FROM activity_blocks
+       WHERE user_id = $1 AND date >= $2 AND date <= $3
+       ORDER BY start_ms ASC`,
+      [userId, startDate, endDate]
+    );
+    return mapRows<LocalActivityBlock>(result.rows as Record<string, unknown>[]);
+  }
+
+  async getActivityBlocksForSession(sessionId: string): Promise<LocalActivityBlock[]> {
+    if (!db) return [];
+    const result = await db.query(
+      `SELECT * FROM activity_blocks WHERE session_id = $1 ORDER BY start_ms ASC`,
+      [sessionId]
+    );
+    return mapRows<LocalActivityBlock>(result.rows as Record<string, unknown>[]);
+  }
+
+  async deleteActivityBlocksForSession(sessionId: string): Promise<void> {
+    if (!db) return;
+    try {
+      await db.query(`DELETE FROM activity_blocks WHERE session_id = $1`, [sessionId]);
+    } catch (err) {
+      logger.error("deleteActivityBlocksForSession failed:", String(err));
+    }
+  }
+
+  // ── Daily Summaries ────────────────────────────────────────────────────
+
+  async upsertDailySummary(summary: Omit<LocalDailySummary, "updatedAt">): Promise<void> {
+    if (!db) {
+      logger.error("upsertDailySummary: DB unavailable");
+      return;
+    }
+    try {
+      await db.query(
+        `INSERT INTO daily_summaries
+          (id, user_id, date, total_active_ms, session_count, category_breakdown, app_breakdown, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (id) DO UPDATE SET
+           total_active_ms = EXCLUDED.total_active_ms,
+           session_count = EXCLUDED.session_count,
+           category_breakdown = EXCLUDED.category_breakdown,
+           app_breakdown = EXCLUDED.app_breakdown,
+           updated_at = EXCLUDED.updated_at`,
+        [
+          summary.id,
+          summary.userId,
+          summary.date,
+          summary.totalActiveMs,
+          summary.sessionCount,
+          summary.categoryBreakdown,
+          summary.appBreakdown,
+          Date.now(),
+        ]
+      );
+    } catch (err) {
+      logger.error("upsertDailySummary failed:", String(err));
+    }
+  }
+
+  async getDailySummary(userId: string, date: string): Promise<LocalDailySummary | null> {
+    if (!db) return null;
+    const result = await db.query(
+      `SELECT * FROM daily_summaries WHERE user_id = $1 AND date = $2`,
+      [userId, date]
+    );
+    return mapRow<LocalDailySummary>(result.rows[0] as Record<string, unknown> | undefined);
+  }
+
+  async getDailySummariesForRange(
+    userId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<LocalDailySummary[]> {
+    if (!db) return [];
+    const result = await db.query(
+      `SELECT * FROM daily_summaries
+       WHERE user_id = $1 AND date >= $2 AND date <= $3
+       ORDER BY date ASC`,
+      [userId, startDate, endDate]
+    );
+    return mapRows<LocalDailySummary>(result.rows as Record<string, unknown>[]);
   }
 
   // ── Feedback ────────────────────────────────────────────────────────────

@@ -291,9 +291,6 @@ export function registerFeedbackHandlers() {
         rendererLogs,
         userName,
         userEmail,
-        token,
-        apiBaseUrl,
-        isAnonymous,
       } = args;
 
       const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -314,33 +311,54 @@ export function registerFeedbackHandlers() {
         feedbackLogger.error("Failed to persist feedback locally:", String(err));
       }
 
-      // 2. Fire-and-forget: send to backend for email relay (non-blocking)
+      // 2. Fire-and-forget: send email directly via Resend API (on-device)
       (async () => {
         try {
-          const endpoint = isAnonymous
-            ? `${apiBaseUrl}/api/feedback/unauth`
-            : `${apiBaseUrl}/api/feedback`;
+          const { keyVault } = await import("../../services/on-device/keyVault");
+          const resendKey = await keyVault.loadResendKey();
+          if (!resendKey) {
+            feedbackLogger.warn(`No Resend API key — skipping email for ${feedbackId}`);
+            return;
+          }
 
-          const res = await fetch(endpoint, {
+          const subject = `Mitable Feedback — ${userName} (${userEmail})`;
+
+          let htmlBody = `<h2>Feedback from ${userName}</h2>`;
+          htmlBody += `<p><strong>Email:</strong> ${userEmail}</p>`;
+          htmlBody += `<p><strong>Message:</strong></p><pre>${message.trim()}</pre>`;
+          if (logAnalysis) {
+            htmlBody += `<h3>Log Analysis</h3><pre>${logAnalysis}</pre>`;
+          }
+          if (ollamaDiagnostics) {
+            htmlBody += `<h3>Diagnostics</h3><pre>${ollamaDiagnostics}</pre>`;
+          }
+          if (mainLogs) {
+            const truncated = mainLogs.length > 50_000 ? mainLogs.slice(-50_000) : mainLogs;
+            htmlBody += `<h3>Main Process Logs (tail)</h3><pre>${truncated}</pre>`;
+          }
+          if (rendererLogs) {
+            const truncated =
+              rendererLogs.length > 50_000 ? rendererLogs.slice(-50_000) : rendererLogs;
+            htmlBody += `<h3>Renderer Logs (tail)</h3><pre>${truncated}</pre>`;
+          }
+
+          const res = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              ...(!isAnonymous && token ? { Authorization: `Bearer ${token}` } : {}),
+              Authorization: `Bearer ${resendKey}`,
             },
             body: JSON.stringify({
-              message: message.trim(),
-              mainLogs,
-              rendererLogs,
-              logAnalysis,
-              ollamaDiagnostics,
-              userName,
-              userEmail,
+              from: "Mitable Feedback <feedback@mitable.ai>",
+              to: ["aurel@mitable.ai"],
+              subject,
+              html: htmlBody,
             }),
             signal: AbortSignal.timeout(15_000),
           });
 
           if (res.ok) {
-            feedbackLogger.info(`Feedback email relay succeeded for ${feedbackId}`);
+            feedbackLogger.info(`Feedback email sent via Resend for ${feedbackId}`);
             try {
               const { pgDb } = await import("../../services/on-device/pgDb");
               await pgDb.markFeedbackEmailSent(feedbackId);
@@ -348,10 +366,11 @@ export function registerFeedbackHandlers() {
               /* best-effort DB update */
             }
           } else {
-            feedbackLogger.warn(`Feedback email relay failed (${res.status}) for ${feedbackId}`);
+            const body = await res.text().catch(() => "");
+            feedbackLogger.warn(`Resend API error (${res.status}) for ${feedbackId}: ${body}`);
           }
         } catch (err) {
-          feedbackLogger.warn(`Feedback email relay unreachable for ${feedbackId}:`, String(err));
+          feedbackLogger.warn(`Resend email failed for ${feedbackId}:`, String(err));
         }
       })();
 

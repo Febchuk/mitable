@@ -17,6 +17,7 @@ import { registerLocalAuthHandlers } from "./local-auth-handlers";
 import { registerLocalAgentHandlers } from "./local-agent-handlers";
 import { registerLocalDocsHandlers } from "./local-docs-handlers";
 import { registerWhisperHandlers } from "./whisper-handlers";
+import { registerMeActivityHandlers } from "./me-activity-handlers";
 
 export function registerAllIpc() {
   ipcLogger.info("Setting up IPC handlers...");
@@ -39,6 +40,7 @@ export function registerAllIpc() {
   registerLocalAgentHandlers();
   registerLocalDocsHandlers();
   registerWhisperHandlers();
+  registerMeActivityHandlers();
 
   ipcLogger.info("All IPC handlers registered");
 }

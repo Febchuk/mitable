@@ -490,7 +490,9 @@ export function registerMonitoringSessionHandlers() {
   ipcMain.handle(IPC_CHANNELS.BLOCK_LIST_GET_ALL_APPS, async (_, forceRefresh?: boolean) => {
     try {
       const allApps = await windowDetectionService.getAllBlockableApps(forceRefresh ?? false);
-      const withIcons = await installedAppsService.extractIcons(allApps);
+      const withIcons = await installedAppsService.extractIcons(
+        allApps as unknown as Parameters<typeof installedAppsService.extractIcons>[0]
+      );
       return { success: true, apps: withIcons };
     } catch (error) {
       ipcLogger.error("Error getting all blockable apps:", error);
@@ -502,7 +504,9 @@ export function registerMonitoringSessionHandlers() {
     try {
       await windowDetectionService.refreshInstalledApps();
       const allApps = await windowDetectionService.getAllBlockableApps(false);
-      const withIcons = await installedAppsService.extractIcons(allApps);
+      const withIcons = await installedAppsService.extractIcons(
+        allApps as unknown as Parameters<typeof installedAppsService.extractIcons>[0]
+      );
       return { success: true, apps: withIcons };
     } catch (error) {
       ipcLogger.error("Error refreshing installed apps:", error);
