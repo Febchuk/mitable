@@ -882,8 +882,7 @@ router.post(
           modelUsed: onDeviceSummary.modelUsed,
         });
 
-        const sessionTitle =
-          onDeviceSummary.taskBreakdown?.[0]?.shortTitle || "Work session";
+        const sessionTitle = onDeviceSummary.taskBreakdown?.[0]?.shortTitle || "Work session";
 
         await db.insert(schema.sessionSummaries).values({
           sessionId: id,
@@ -3339,10 +3338,10 @@ router.put(
         })
         .where(eq(schema.monitoringSessions.id, id));
 
-      logger.info("On-device summary re-synced", {
-        sessionId: id,
-        taskCount: onDeviceSummary.taskBreakdown?.length ?? 0,
-      });
+      logger.info(
+        { sessionId: id, taskCount: onDeviceSummary.taskBreakdown?.length ?? 0 },
+        "On-device summary re-synced"
+      );
 
       res.json({
         success: true,
@@ -3350,7 +3349,7 @@ router.put(
         taskCount: onDeviceSummary.taskBreakdown?.length ?? 0,
       });
     } catch (error) {
-      logger.error("Error re-syncing on-device summary:", error);
+      logger.error({ err: error }, "Error re-syncing on-device summary");
       res.status(500).json({
         error: "Failed to re-sync on-device summary",
         message: error instanceof Error ? error.message : "Unknown error",
