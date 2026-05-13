@@ -78,6 +78,10 @@ class WindowDetectionService {
   private lastMissingLogTime: Map<string, number> = new Map();
   private static readonly MISSING_LOG_THROTTLE_MS = 60_000;
 
+  // Grace period: track when a non-RDP window was first observed as missing
+  private firstMissingAt: Map<string, number> = new Map();
+  private static readonly CLOSED_GRACE_MS = 30_000;
+
   // Track apps that have been detected (for block list management)
   // Key: normalized app name (lowercase), Value: original app name
   private detectedApps: Map<string, string> = new Map();
@@ -343,11 +347,11 @@ class WindowDetectionService {
       .replace(/\.AppImage$/i, ""); // Linux AppImage
   }
 
-  // Apps always excluded from detection/watch list (includes-based for helper processes)
+  // Apps always excluded from detection/watch list (includes-based for helper processes).
+  // Mitable's own windows are already caught by MITABLE_WINDOW_TITLES (exact title match),
+  // so "electron" is NOT listed here to avoid blocking Electron-based apps (Cursor, VS Code, etc.).
   private static readonly ALWAYS_EXCLUDED_APPS: { pattern: string; reason: string }[] = [
     { pattern: "mitable", reason: "Mitable app" },
-    { pattern: "electron", reason: "Electron window" },
-    { pattern: "messages", reason: "Messages app" },
     { pattern: "whatsapp", reason: "WhatsApp app" },
     { pattern: "spotify", reason: "Spotify app" },
     { pattern: "imessage", reason: "iMessage app" },
@@ -646,17 +650,9 @@ class WindowDetectionService {
   }
 
   /**
-   * Check for closed windows and remove them from watch list
-   * Returns the list of windows that were removed (closed)
-   *
-   * NOTE: We no longer auto-remove windows based on get-windows enumeration failures.
-   * Windows stay in the watch list until:
-   * 1. User manually removes them (X button)
-   * 2. Focus tracker's TTL expires (10 minutes for auto-tracked windows)
-   *
-   * This prevents false removals when:
-   * - User interacts with Mitable UI (watch pill dropdown) causing brief focus shifts
-   * - get-windows has intermittent enumeration issues with Citrix/RDP/VM windows
+   * Check for closed windows and remove them from the watch list after a
+   * 30-second grace period. RDP/Citrix windows are excluded because
+   * get-windows cannot enumerate them reliably.
    */
   async checkForClosedWindows(): Promise<SelectedWindowInfo[]> {
     if (this.selectedWindows.size === 0) {
@@ -689,39 +685,55 @@ class WindowDetectionService {
         return rdpPatterns.some((p) => lower.includes(p));
       };
 
+      const now = Date.now();
+
       for (const [windowId, windowInfo] of this.selectedWindows) {
-        if (!openWindowIds.has(windowId)) {
-          // Skip RDP/Citrix — get-windows can't see them even when open
-          if (isRdpApp(windowInfo.appName)) {
-            // Log only once per window to avoid spam (checkForClosedWindows runs every 2s)
-            if (!this.rdpWindowsLogged.has(windowId)) {
-              this.rdpWindowsLogged.add(windowId);
-              logger.info(
-                `[WindowDetectionService] Keeping RDP/Citrix window (invisible to get-windows): ${windowInfo.appName} [${windowId}]`
-              );
-            }
-            continue;
-          }
-          // NOTE: We no longer auto-remove windows based on get-windows enumeration failures.
-          // Windows stay in the watch list until:
-          // 1. User manually removes them (X button)
-          // 2. Focus tracker's TTL expires (10 minutes for auto-tracked windows)
-          //
-          // This handles cases where windows are temporarily invisible (e.g. other Spaces, full-screen)
-          // or get-windows fails to enumerate them reliably.
-          const now = Date.now();
-          const lastLog = this.lastMissingLogTime.get(windowId) ?? 0;
-          if (now - lastLog >= WindowDetectionService.MISSING_LOG_THROTTLE_MS) {
-            this.lastMissingLogTime.set(windowId, now);
+        if (openWindowIds.has(windowId)) {
+          // Window is still open — clear any missing tracking
+          this.firstMissingAt.delete(windowId);
+          continue;
+        }
+
+        // Skip RDP/Citrix — get-windows can't see them even when open
+        if (isRdpApp(windowInfo.appName)) {
+          if (!this.rdpWindowsLogged.has(windowId)) {
+            this.rdpWindowsLogged.add(windowId);
             logger.info(
-              `[WindowDetectionService] Window not found in enumeration (keeping it): ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
+              `[WindowDetectionService] Keeping RDP/Citrix window (invisible to get-windows): ${windowInfo.appName} [${windowId}]`
             );
           }
           continue;
         }
+
+        // Grace period: record when first observed as missing
+        if (!this.firstMissingAt.has(windowId)) {
+          this.firstMissingAt.set(windowId, now);
+        }
+
+        const missingFor = now - this.firstMissingAt.get(windowId)!;
+
+        if (missingFor >= WindowDetectionService.CLOSED_GRACE_MS) {
+          logger.info(
+            `[WindowDetectionService] Removing closed window after ${Math.round(missingFor / 1000)}s grace: ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
+          );
+          closedWindows.push(windowInfo);
+          this.firstMissingAt.delete(windowId);
+          this.lastMissingLogTime.delete(windowId);
+        } else {
+          const lastLog = this.lastMissingLogTime.get(windowId) ?? 0;
+          if (now - lastLog >= WindowDetectionService.MISSING_LOG_THROTTLE_MS) {
+            this.lastMissingLogTime.set(windowId, now);
+            logger.info(
+              `[WindowDetectionService] Window not found in enumeration (grace ${Math.round(missingFor / 1000)}s/${WindowDetectionService.CLOSED_GRACE_MS / 1000}s): ${windowInfo.appName} (${windowInfo.windowTitle}) [${windowId}]`
+            );
+          }
+        }
       }
 
-      // Never auto-remove windows - they stay until manually removed or focus tracker TTL expires
+      for (const closed of closedWindows) {
+        this.selectedWindows.delete(closed.windowId);
+      }
+
       return closedWindows;
     } catch (error) {
       // Only log once to avoid spam (permission issues will persist)

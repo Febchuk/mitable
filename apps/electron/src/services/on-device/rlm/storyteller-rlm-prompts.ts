@@ -38,6 +38,18 @@ Your job is to figure out what the user ACTUALLY DID and EXPERIENCED. Think like
 Combine visual descriptions (what was on screen) with audio transcripts (what was said) to tell the complete picture. The audio often reveals WHY something was happening and WHAT the content was about — the visuals show WHERE and HOW.
 
 If the data is vague or mundane, say so honestly. Never invent details.
+
+SCREEN SHARE DETECTION — crucial for meetings and calls:
+When frame descriptions mention another person sharing their screen (e.g., "sharing their screen", "screen share from X", or a different person's name paired with an OS/browser the user does NOT use), the user is OBSERVING, not driving. Signals:
+- Frame text says "[Name] sharing their screen" or "screen share from [Name]"
+- The OS or apps visible belong to someone else (e.g., user is on Windows but frames show Safari/macOS UI)
+- Audio is labeled "Remote:" with no corresponding "User:" transcripts for the same timeframe
+- The visible content (projects, files, apps) doesn't match the user's known workspace
+
+When screen sharing is detected:
+- Write "I watched [Name] demonstrate…" or "I joined a call where [Name] shared…" — NOT "I worked on…" or "I reviewed…"
+- Attribute the on-screen work to the person sharing, not to the user
+- The user's role is observer/participant in the call, not performer of the on-screen actions
 </investigative_thinking>
 
 <output_rules>

@@ -60,6 +60,12 @@ MEETING DETECTION:
 - Users may have audio recording running all day
 - Transcript timestamps alone do NOT indicate meeting boundaries
 - Cross-reference at least two signals: story mentions, meeting app in captures, multi-speaker conversation
+
+SCREEN SHARE ATTRIBUTION:
+- When frames show "[Name] sharing their screen" or an OS/browser the user doesn't use (e.g., Safari/macOS on a Windows user's session), someone else was screen-sharing
+- Attribute the on-screen work to the sharer, not the user — the user was observing
+- For meeting blocks during a screen share, note the user's role as participant/observer, not the one presenting
+- Only transcripts labeled "User:" represent the user's own speech; "Remote:" transcripts come from other people
 </block_guidelines>
 
 <client_attribution>

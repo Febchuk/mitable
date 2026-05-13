@@ -102,7 +102,7 @@ const defaults: PreferencesSchema = {
   users: {},
 };
 
-const DEFAULT_BLOCKED_APPS = ["electron", "messages", "whatsapp", "spotify", "imessage"];
+const DEFAULT_BLOCKED_APPS = ["whatsapp", "spotify", "imessage"];
 
 class PreferencesService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

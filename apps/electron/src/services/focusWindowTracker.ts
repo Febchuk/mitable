@@ -107,8 +107,6 @@ function normalizeAppName(appName: string): string {
 // (e.g. "WhatsApp Helper (Renderer)" still matches "whatsapp").
 const ALWAYS_EXCLUDED_APPS: { pattern: string; reason: string }[] = [
   { pattern: "mitable", reason: "Mitable app" },
-  { pattern: "electron", reason: "Electron window" },
-  { pattern: "messages", reason: "Messages app" },
   { pattern: "whatsapp", reason: "WhatsApp app" },
   { pattern: "spotify", reason: "Spotify app" },
   { pattern: "imessage", reason: "iMessage app" },

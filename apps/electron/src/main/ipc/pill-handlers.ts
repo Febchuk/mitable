@@ -261,6 +261,15 @@ export function registerPillHandlers() {
             return { success: false, error: "No active session" };
           }
 
+          if (sessionState.status === "ending" || sessionState.status === "summarizing") {
+            monitoringLogger.warn(
+              ` Session already ${sessionState.status}, ignoring duplicate end`
+            );
+            return { success: true, background: true };
+          }
+
+          monitoringSessionService.setStatus("ending");
+
           monitoringLogger.info(" Ending session from pill with stored defaults");
           const summaryDefaults = preferencesService.getSummaryDefaults();
 

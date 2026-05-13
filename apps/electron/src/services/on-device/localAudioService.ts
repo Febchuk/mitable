@@ -31,7 +31,7 @@ const FLUSH_INTERVAL_MS = 15_000;
 const FLUSH_SIZE_THRESHOLD = 5 * 1024 * 1024; // 5 MB
 const TRANSCRIBE_INTERVAL_MS = 30_000;
 
-const MIC_ENERGY_GATE_THRESHOLD = 800;
+const MIC_ENERGY_GATE_THRESHOLD = 300;
 const ENERGY_WINDOW_SECS = 5;
 const ENERGY_WINDOW_BYTES = ENERGY_WINDOW_SECS * SAMPLE_RATE * BYTES_PER_SAMPLE;
 
@@ -112,6 +112,16 @@ class LocalAudioService {
         logger.debug("Streaming transcription tick failed:", String(err))
       );
     }, TRANSCRIBE_INTERVAL_MS);
+
+    if (!result.micStarted) {
+      logger.error(
+        `[MIC DIAGNOSTIC] Microphone capture FAILED to start for session ${sessionId}. ` +
+          `User audio will not be transcribed. Check ffmpeg availability and DirectShow devices.`
+      );
+    }
+    if (!result.systemStarted) {
+      logger.warn(`[MIC DIAGNOSTIC] System audio capture failed for session ${sessionId}`);
+    }
 
     logger.info(
       `Started audio capture for session ${sessionId} ` +
@@ -328,12 +338,17 @@ class LocalAudioService {
     const totalWindows = Math.ceil(pcm.length / ENERGY_WINDOW_BYTES);
     const kept: Buffer[] = [];
     let skipped = 0;
+    let maxRms = 0;
+    let minRms = Infinity;
 
     for (let i = 0; i < totalWindows; i++) {
       const start = i * ENERGY_WINDOW_BYTES;
       const end = Math.min(start + ENERGY_WINDOW_BYTES, pcm.length);
       const window = pcm.subarray(start, end);
       const rms = LocalAudioService.computeRMS(window);
+
+      if (rms > maxRms) maxRms = rms;
+      if (rms < minRms) minRms = rms;
 
       if (rms >= MIC_ENERGY_GATE_THRESHOLD) {
         kept.push(Buffer.from(window));
@@ -343,8 +358,8 @@ class LocalAudioService {
     }
 
     logger.info(
-      `Energy gate: ${totalWindows} windows, ${kept.length} passed, ` +
-        `${skipped} skipped (threshold=${MIC_ENERGY_GATE_THRESHOLD})`
+      `Energy gate: ${totalWindows} windows, ${kept.length} passed, ${skipped} skipped ` +
+        `(threshold=${MIC_ENERGY_GATE_THRESHOLD}, rms min=${Math.round(minRms)} max=${Math.round(maxRms)})`
     );
 
     if (kept.length === 0) return Buffer.alloc(0);

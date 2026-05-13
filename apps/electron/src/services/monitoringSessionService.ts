@@ -662,6 +662,15 @@ class MonitoringSessionService {
   }
 
   /**
+   * Update session status and broadcast to all UIs immediately.
+   */
+  setStatus(status: MonitoringSessionStatus): void {
+    if (!this.activeSession) return;
+    this.activeSession.status = status;
+    this.broadcastSessionUpdate();
+  }
+
+  /**
    * Get current session state for UI
    */
   getSessionState(): MonitoringSessionState | null {

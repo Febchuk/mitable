@@ -318,6 +318,11 @@ export default function App() {
             {isPaused && (
               <div className="absolute top-0 right-0 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
             )}
+
+            {/* Ending/summarizing indicator - blue dot */}
+            {(sessionState?.status === "ending" || sessionState?.status === "summarizing") && (
+              <div className="absolute top-0 right-0 w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+            )}
           </button>
 
           {/* Expandable section — visible on hover */}
