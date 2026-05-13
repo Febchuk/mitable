@@ -77,7 +77,8 @@ ${knownClientNames.length > 0 ? knownClientNames.map((c) => `  - ${c}`).join("\n
 - You may discover new client names if evidence is clear
 - When reusing a known client name, use it EXACTLY as listed above
 - For new clients, use their full official name
-- Leave client empty ONLY for genuinely internal activities (internal meetings with no client context, personal development, timesheets)
+- IMPORTANT: If a meeting, call, or work session is clearly about a specific product or project (even the user's own company product), attribute it to that product/project name. A Slack call discussing "Mitable" features = client is "Mitable". A code review for "Acme" = client is "Acme".
+- Leave client empty ONLY when there is no identifiable product, project, or customer focus (e.g., general admin, personal development, timesheets)
 </client_attribution>
 
 <rules>

@@ -17,6 +17,102 @@ function toIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+interface TrendBucket {
+  label: string;
+  hours: number;
+}
+
+function buildTrendData(
+  period: string,
+  blocks: { startMs: number; endMs: number; durationMs: number; date: string }[],
+  summaries: { date: string; totalActiveMs: number }[]
+): TrendBucket[] {
+  switch (period) {
+    case "yesterday": {
+      // 24 hourly buckets (6 AM – 11 PM shown, but allocate all 24)
+      const buckets = Array.from({ length: 24 }, (_, i) => ({
+        label: `${i === 0 ? 12 : i > 12 ? i - 12 : i}${i < 12 ? "a" : "p"}`,
+        hours: 0,
+      }));
+      for (const b of blocks) {
+        // Split block time across hour boundaries
+        let cursor = b.startMs;
+        const end = b.endMs || cursor + b.durationMs;
+        while (cursor < end) {
+          const hour = new Date(cursor).getHours();
+          const nextHourMs = new Date(cursor).setMinutes(0, 0, 0) + 3_600_000;
+          const sliceEnd = Math.min(end, nextHourMs);
+          buckets[hour]!.hours += (sliceEnd - cursor) / 3_600_000;
+          cursor = sliceEnd;
+        }
+      }
+      return buckets
+        .filter((b) => b.hours > 0 || true)
+        .map((b) => ({
+          ...b,
+          hours: Math.round(b.hours * 100) / 100,
+        }));
+    }
+    case "week": {
+      const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const buckets: TrendBucket[] = dayNames.map((d) => ({ label: d, hours: 0 }));
+      for (const s of summaries) {
+        const d = new Date(s.date + "T12:00:00");
+        const jsDay = d.getDay(); // 0=Sun
+        const idx = jsDay === 0 ? 6 : jsDay - 1; // Mon=0
+        buckets[idx]!.hours += s.totalActiveMs / 3_600_000;
+      }
+      return buckets.map((b) => ({ ...b, hours: Math.round(b.hours * 100) / 100 }));
+    }
+    case "month": {
+      // Weeks of the month (Week 1 – Week 5)
+      const weekBuckets = new Map<number, number>();
+      for (const s of summaries) {
+        const d = new Date(s.date + "T12:00:00");
+        const weekNum = Math.ceil(d.getDate() / 7);
+        weekBuckets.set(weekNum, (weekBuckets.get(weekNum) ?? 0) + s.totalActiveMs / 3_600_000);
+      }
+      const maxWeek = Math.max(5, ...weekBuckets.keys());
+      return Array.from({ length: maxWeek }, (_, i) => ({
+        label: `Wk ${i + 1}`,
+        hours: Math.round((weekBuckets.get(i + 1) ?? 0) * 100) / 100,
+      }));
+    }
+    case "quarter": {
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const now = new Date();
+      const qStart = Math.floor(now.getMonth() / 3) * 3;
+      const buckets: TrendBucket[] = Array.from({ length: 3 }, (_, i) => ({
+        label: monthNames[qStart + i]!,
+        hours: 0,
+      }));
+      for (const s of summaries) {
+        const d = new Date(s.date + "T12:00:00");
+        const mIdx = d.getMonth() - qStart;
+        if (mIdx >= 0 && mIdx < 3) {
+          buckets[mIdx]!.hours += s.totalActiveMs / 3_600_000;
+        }
+      }
+      return buckets.map((b) => ({ ...b, hours: Math.round(b.hours * 100) / 100 }));
+    }
+    default:
+      return [];
+  }
+}
+
 function getDateRange(period: string): { startDate: string; endDate: string } {
   const now = new Date();
 
@@ -149,6 +245,8 @@ export function registerMeActivityHandlers() {
 
       recentSessions.sort((a, b) => b.startMs - a.startMs);
 
+      const trendData = buildTrendData(period, blocks, summaries);
+
       return {
         totalActiveMs,
         categoryBreakdown: categoryMs,
@@ -160,6 +258,7 @@ export function registerMeActivityHandlers() {
           sessionCount: s.sessionCount,
           categoryBreakdown: JSON.parse(s.categoryBreakdown || "{}"),
         })),
+        trendData,
         recentBlocks: recentSessions.slice(0, 20),
         period,
         startDate,
@@ -173,6 +272,7 @@ export function registerMeActivityHandlers() {
         appBreakdown: {},
         clientBreakdown: {},
         dailySummaries: [],
+        trendData: [],
         recentBlocks: [],
         period,
         startDate: "",

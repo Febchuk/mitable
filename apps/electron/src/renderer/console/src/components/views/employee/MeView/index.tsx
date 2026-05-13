@@ -1,6 +1,18 @@
 import { useMemo, useState } from "react";
 import { Clock, Monitor, Video } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  type TooltipProps,
+} from "recharts";
 import {
   useLocalActivity,
   type MeActivityPeriod,
@@ -24,6 +36,24 @@ const CLIENT_COLORS = [
   "rgba(var(--mi-accent-rgb), 0.35)",
   "rgba(var(--mi-accent-rgb), 0.2)",
 ];
+
+const TREND_TITLES: Record<MeActivityPeriod, string> = {
+  yesterday: "Hourly Trend",
+  week: "Daily Trend",
+  month: "Weekly Trend",
+  quarter: "Monthly Trend",
+};
+
+function TrendTooltip({ active, payload, label }: TooltipProps<number, string>) {
+  if (!active || !payload?.[0]) return null;
+  const hrs = payload[0].value as number;
+  return (
+    <div className="bg-canvas-overlay border border-stroke-subtle rounded-lg px-3 py-2 text-xs shadow-lg">
+      <span className="text-text-primary font-medium">{label}</span>
+      <span className="text-text-secondary ml-2">{hrs.toFixed(1)}h</span>
+    </div>
+  );
+}
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -410,51 +440,34 @@ export default function MeView() {
         </Card>
       </div>
 
-      {/* Daily Trend */}
-      {data!.dailySummaries.length > 0 && (
-        <Card title="Daily Trend">
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-end",
-              gap: 6,
-              height: 120,
-              padding: "0 4px",
-            }}
-          >
-            {data!.dailySummaries.map((day) => {
-              const maxMs = Math.max(...data!.dailySummaries.map((d) => d.totalActiveMs), 1);
-              const heightPct = Math.max(4, (day.totalActiveMs / maxMs) * 100);
-              return (
-                <div
-                  key={day.date}
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "100%",
-                      maxWidth: 32,
-                      height: `${heightPct}%`,
-                      background: "var(--mi-accent)",
-                      borderRadius: 4,
-                      minHeight: 4,
-                      transition: "height 0.3s ease",
-                    }}
-                    title={`${formatBlockDate(day.date)}: ${formatDuration(day.totalActiveMs)}`}
-                  />
-                  <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
-                    {formatBlockDate(day.date)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+      {/* Activity Trend */}
+      {data!.trendData && data!.trendData.length > 0 && (
+        <Card title={TREND_TITLES[period]}>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={data!.trendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgba(var(--ui-rgb), 0.06)"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "var(--text-tertiary)" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) => `${Math.round(v)}h`}
+                domain={[0, (max: number) => Math.max(1, Math.ceil(max))]}
+                allowDecimals={false}
+              />
+              <Tooltip content={<TrendTooltip />} cursor={{ fill: "rgba(var(--ui-rgb), 0.04)" }} />
+              <Bar dataKey="hours" radius={[3, 3, 0, 0]} fill="var(--mi-accent)" maxBarSize={32} />
+            </BarChart>
+          </ResponsiveContainer>
         </Card>
       )}
 

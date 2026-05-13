@@ -32,12 +32,18 @@ export interface DailySummaryEntry {
   categoryBreakdown: Record<string, number>;
 }
 
+export interface TrendBucket {
+  label: string;
+  hours: number;
+}
+
 export interface MeActivityData {
   totalActiveMs: number;
   categoryBreakdown: Record<string, number>;
   appBreakdown: Record<string, number>;
   clientBreakdown: Record<string, number>;
   dailySummaries: DailySummaryEntry[];
+  trendData: TrendBucket[];
   recentBlocks: ActivityBlock[];
   period: string;
   startDate: string;
@@ -72,6 +78,7 @@ export function useLocalActivity(period: MeActivityPeriod = "week") {
           appBreakdown: {},
           clientBreakdown: {},
           dailySummaries: [],
+          trendData: [],
           recentBlocks: [],
           period,
           startDate: "",
