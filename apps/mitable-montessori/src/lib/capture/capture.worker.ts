@@ -136,19 +136,51 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
   const t0 = performance.now();
   try {
     await loadOcr();
-    const blob = new Blob([payload], { type: mime || "image/png" });
-    const result = await ocrWorker!.recognize(blob);
-    const words = (result.data.words ?? []).map((w) => ({
-      text: w.text,
-      confidence: w.confidence,
-      bbox: { x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1 },
-    }));
+    const sourceBlob = new Blob([payload], { type: mime || "image/png" });
+
+    // Multi-pass preprocessing (greyscale+sharpen, aggressive contrast, 2× upscale)
+    // mirrors the backend's Sharp pipeline from pii-redaction.service.ts.
+    const { preprocessForOCR } = await import("./preprocess-image");
+    const variants = await preprocessForOCR(sourceBlob);
+
+    send({
+      type: "status",
+      status: { state: "running" },
+    });
+
+    let bestText = "";
+    let bestConfidence = 0;
+    let bestWords: Array<{
+      text: string;
+      confidence: number;
+      bbox: { x0: number; y0: number; x1: number; y1: number };
+    }> = [];
+
+    for (const variant of variants) {
+      const result = await ocrWorker!.recognize(variant.blob);
+      const conf = result.data.confidence ?? 0;
+      if (conf > bestConfidence || (conf === bestConfidence && (result.data.text ?? "").trim().length > bestText.length)) {
+        bestConfidence = conf;
+        bestText = (result.data.text ?? "").trim();
+        bestWords = (result.data.words ?? []).map((w) => ({
+          text: w.text,
+          confidence: w.confidence,
+          bbox: {
+            x0: Math.round(w.bbox.x0 / variant.scale),
+            y0: Math.round(w.bbox.y0 / variant.scale),
+            x1: Math.round(w.bbox.x1 / variant.scale),
+            y1: Math.round(w.bbox.y1 / variant.scale),
+          },
+        }));
+      }
+    }
+
     send({
       type: "recognize-result",
       jobId,
-      text: (result.data.text ?? "").trim(),
-      confidence: result.data.confidence,
-      words,
+      text: bestText,
+      confidence: bestConfidence,
+      words: bestWords,
       durationMs: performance.now() - t0,
     });
   } catch (err) {
