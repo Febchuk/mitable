@@ -12,6 +12,7 @@ import {
   Search,
   Trash2,
   Upload,
+  UserMinus,
   Users,
   X,
 } from "lucide-react";
@@ -66,20 +67,31 @@ type AdminChild = {
 
 type AdminClassroom = ClassroomOption & {
   level?: string;
+  curriculumId?: string | null;
   curriculumName?: string | null;
   mainTeacherId?: string;
   programTypes: ProgressProgram[];
+  teachers: ApiClassroomTeacher[];
 };
 
 type ApiTeacher = { id: string; name: string };
+
+type ApiClassroomTeacher = {
+  assignmentId: string;
+  userId: string;
+  name: string;
+  role: string;
+};
 
 type ApiClassroom = {
   id: string;
   name: string;
   code: string | null;
+  curriculumId: string | null;
   curriculumName: string | null;
   leadTeacherId: string | null;
   programTypes: ProgressProgram[];
+  teachers: ApiClassroomTeacher[];
 };
 
 type ApiRosterStudent = {
@@ -102,6 +114,7 @@ type OverviewResponse = {
   classrooms: ApiClassroom[];
   teachers: ApiTeacher[];
   roster: ApiRosterStudent[];
+  montessoriCurricula: Array<{ id: string; name: string }>;
 };
 
 const LEVEL_OPTIONS = ["Toddler", "Primary", "Lower Elementary", "Upper Elementary"];
@@ -213,18 +226,24 @@ export default function AdminClassroomsPage() {
   const [createClassroomOpen, setCreateClassroomOpen] = React.useState(false);
   const [addChildOpen, setAddChildOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [montessoriCurricula, setMontessoriCurricula] = React.useState<
+    Array<{ id: string; name: string }>
+  >([]);
 
   const reload = React.useCallback(async () => {
     setLoadState("loading");
     setLoadError(null);
     try {
       const data = await apiJson<OverviewResponse>("/api/admin/classrooms");
+      setMontessoriCurricula(data.montessoriCurricula ?? []);
       const mappedClassrooms: AdminClassroom[] = data.classrooms.map((c) => ({
         id: c.id,
         name: c.name,
         level: c.code ?? "",
+        curriculumId: c.curriculumId,
         curriculumName: c.curriculumName,
         mainTeacherId: c.leadTeacherId ?? undefined,
+        teachers: Array.isArray(c.teachers) ? c.teachers : [],
         programTypes:
           Array.isArray(c.programTypes) && c.programTypes.length > 0
             ? c.programTypes
@@ -407,6 +426,19 @@ export default function AdminClassroomsPage() {
     }
   };
 
+  const setClassroomCurriculum = async (classroomId: string, curriculumId: string | null) => {
+    setMutationError(null);
+    try {
+      await apiJson("/api/admin/classrooms", {
+        method: "PATCH",
+        body: JSON.stringify({ classroom_id: classroomId, curriculum_id: curriculumId }),
+      });
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not update curriculum");
+    }
+  };
+
   const confirmArchiveChild = React.useCallback(async () => {
     if (!pendingArchiveChild) return;
     setArchiveBusy(true);
@@ -476,6 +508,44 @@ export default function AdminClassroomsPage() {
       await reload();
     } catch (e) {
       setMutationError(e instanceof Error ? e.message : "Could not add child");
+    }
+  };
+
+  const assignTeacherToRoom = async (
+    classroomId: string,
+    teacherUserId: string,
+    role: "lead" | "support" | "assistant"
+  ) => {
+    setMutationError(null);
+    try {
+      await apiJson("/api/admin/classroom-teachers", {
+        method: "POST",
+        body: JSON.stringify({
+          classroom_id: classroomId,
+          teacher_user_id: teacherUserId,
+          classroom_role: role,
+          start_date: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not add teacher");
+    }
+  };
+
+  const removeTeacherFromRoom = async (assignmentId: string) => {
+    setMutationError(null);
+    try {
+      await apiJson("/api/admin/classroom-teachers", {
+        method: "DELETE",
+        body: JSON.stringify({
+          assignment_id: assignmentId,
+          end_date: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not remove teacher");
     }
   };
 
@@ -637,9 +707,25 @@ export default function AdminClassroomsPage() {
                     </span>
                   ) : null}
                 </div>
+                <ClassroomStaffPanel
+                  classroomId={selectedClassroom.id}
+                  teachers={selectedClassroom.teachers}
+                  teacherPool={teacherPool}
+                  onAdd={(teacherUserId, role) =>
+                    void assignTeacherToRoom(selectedClassroom.id, teacherUserId, role)
+                  }
+                  onRemove={(assignmentId) => void removeTeacherFromRoom(assignmentId)}
+                />
                 <ProgramTypesEditor
                   value={selectedClassroom.programTypes}
                   onSave={(next) => setClassroomPrograms(selectedClassroom.id, next)}
+                />
+                <MontessoriCurriculumPicker
+                  programTypes={selectedClassroom.programTypes}
+                  curriculumId={selectedClassroom.curriculumId ?? null}
+                  curriculumName={selectedClassroom.curriculumName ?? null}
+                  options={montessoriCurricula}
+                  onPick={(next) => setClassroomCurriculum(selectedClassroom.id, next)}
                 />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -812,6 +898,176 @@ export default function AdminClassroomsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function classroomRoleLabel(role: string): string {
+  if (role === "lead") return "Lead";
+  if (role === "assistant") return "Assistant";
+  return "Support";
+}
+
+function ClassroomStaffPanel({
+  classroomId,
+  teachers,
+  teacherPool,
+  onAdd,
+  onRemove,
+}: {
+  classroomId: string;
+  teachers: ApiClassroomTeacher[];
+  teacherPool: ApiTeacher[];
+  onAdd: (teacherUserId: string, role: "lead" | "support" | "assistant") => void | Promise<void>;
+  onRemove: (assignmentId: string) => void | Promise<void>;
+}) {
+  const [pickId, setPickId] = React.useState("");
+  const [pickRole, setPickRole] = React.useState<"lead" | "support" | "assistant">("support");
+  const [busyKey, setBusyKey] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setPickId("");
+    setPickRole("support");
+    setBusyKey(null);
+  }, [classroomId]);
+
+  const assigned = React.useMemo(() => new Set(teachers.map((t) => t.userId)), [teachers]);
+  const available = React.useMemo(
+    () => teacherPool.filter((t) => !assigned.has(t.id)),
+    [teacherPool, assigned]
+  );
+
+  const canAdd = pickId.length > 0 && available.some((t) => t.id === pickId);
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        paddingTop: 14,
+        borderTop: "1px solid var(--color-border)",
+      }}
+    >
+      <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
+        Teachers
+      </div>
+      {teachers.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--color-ink-secondary)", marginBottom: 10 }}>
+          No teachers assigned yet. Add staff from the list below (invite teachers under Staff if
+          the list is empty).
+        </div>
+      ) : (
+        <ul style={{ listStyle: "none", margin: "0 0 12px", padding: 0 }}>
+          {teachers.map((t, index) => (
+            <li
+              key={t.assignmentId}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                padding: "8px 0",
+                borderTop: index ? "1px solid var(--color-border)" : undefined,
+                fontSize: 14,
+              }}
+            >
+              <span style={{ fontWeight: 600, color: "var(--color-ink)" }}>{t.name}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: "var(--color-canvas)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-ink-muted)",
+                  }}
+                >
+                  {classroomRoleLabel(t.role)}
+                </span>
+                <button
+                  type="button"
+                  className="tap rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"
+                  title={`Remove ${t.name} from this classroom`}
+                  aria-label={`Remove ${t.name} from this classroom`}
+                  disabled={busyKey !== null}
+                  onClick={() => {
+                    setBusyKey(t.assignmentId);
+                    void Promise.resolve(onRemove(t.assignmentId)).finally(() => setBusyKey(null));
+                  }}
+                >
+                  <UserMinus size={16} strokeWidth={1.5} />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {available.length === 0 ? (
+        <div style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
+          {teacherPool.length === 0
+            ? "No teachers in your school yet. Add them under Staff."
+            : "Every active teacher is already assigned to this classroom."}
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "flex-end",
+            gap: 10,
+            marginTop: 4,
+          }}
+        >
+          <label style={{ flex: "1 1 200px", minWidth: 0 }}>
+            <div className="label-cap mb-1" style={{ color: "var(--color-ink-muted)" }}>
+              Add teacher
+            </div>
+            <select
+              value={pickId}
+              onChange={(e) => setPickId(e.target.value)}
+              className="h-10 w-full rounded-md border border-ink/15 bg-canvas px-2 text-sm text-ink"
+            >
+              <option value="">Choose…</option>
+              {available.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ flex: "0 1 140px" }}>
+            <div className="label-cap mb-1" style={{ color: "var(--color-ink-muted)" }}>
+              Role
+            </div>
+            <select
+              value={pickRole}
+              onChange={(e) => setPickRole(e.target.value as "lead" | "support" | "assistant")}
+              className="h-10 w-full rounded-md border border-ink/15 bg-canvas px-2 text-sm text-ink"
+            >
+              <option value="support">Support</option>
+              <option value="assistant">Assistant</option>
+              <option value="lead">Lead</option>
+            </select>
+          </label>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!canAdd || busyKey !== null}
+            onClick={() => {
+              if (!canAdd) return;
+              setBusyKey("add");
+              void Promise.resolve(onAdd(pickId, pickRole)).finally(() => {
+                setBusyKey(null);
+                setPickId("");
+              });
+            }}
+          >
+            Add to classroom
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1201,6 +1457,91 @@ function ProgramPicker({
   );
 }
 
+function MontessoriCurriculumPicker({
+  programTypes,
+  curriculumId,
+  curriculumName,
+  options,
+  onPick,
+}: {
+  programTypes: ProgressProgram[];
+  curriculumId: string | null;
+  curriculumName: string | null;
+  options: Array<{ id: string; name: string }>;
+  onPick: (curriculumId: string | null) => Promise<void>;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const montessoriOn = programTypes.includes("montessori");
+
+  const selectOptions = React.useMemo(() => {
+    if (curriculumId && !options.some((o) => o.id === curriculumId)) {
+      return [
+        { id: curriculumId, name: curriculumName?.trim() ? curriculumName : "Assigned curriculum" },
+        ...options,
+      ];
+    }
+    return options;
+  }, [curriculumId, curriculumName, options]);
+
+  if (!montessoriOn) return null;
+
+  return (
+    <div style={{ marginTop: 10, maxWidth: 360 }}>
+      <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+        Montessori curriculum
+      </div>
+      {selectOptions.length === 0 ? (
+        <p
+          style={{ margin: 0, fontSize: 12, color: "var(--color-ink-secondary)", lineHeight: 1.45 }}
+        >
+          No active Montessori curriculum exists for your school yet. Teachers need one to use the
+          Progress grid.{" "}
+          <Link href="/admin/curriculum" className="underline">
+            Open Curriculum
+          </Link>
+          .
+        </p>
+      ) : (
+        <select
+          className="tap"
+          disabled={busy}
+          value={curriculumId ?? ""}
+          onChange={(event) => {
+            const v = event.target.value;
+            const next = v === "" ? null : v;
+            setBusy(true);
+            void (async () => {
+              try {
+                await onPick(next);
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+          style={{
+            width: "100%",
+            maxWidth: 340,
+            fontSize: 13,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-canvas)",
+            color: "var(--color-ink)",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="">None — Progress grid hidden for this class</option>
+          {selectOptions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
 function ProgramTypesEditor({
   value,
   onSave,
@@ -1343,7 +1684,7 @@ function RosterRow({ child, onRemove }: { child: AdminChild; onRemove: () => voi
       }}
     >
       <Link
-        href={`/app/children/${child.id}`}
+        href={`/app/children/${child.id}?from=admin-classrooms`}
         style={{
           display: "flex",
           alignItems: "center",
@@ -1399,7 +1740,7 @@ function RosterMobileRow({
       }}
     >
       <Link
-        href={`/app/children/${child.id}`}
+        href={`/app/children/${child.id}?from=admin-classrooms`}
         style={{
           flex: 1,
           minWidth: 0,

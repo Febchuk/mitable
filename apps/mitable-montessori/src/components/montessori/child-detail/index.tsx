@@ -22,6 +22,8 @@ export type ChildDetailProps = {
   activity: ActivityFeedEntry[];
   /** Base path for report links from the activity feed (teacher vs admin rail). */
   reportsRailBasePath: string;
+  /** Back link in the page header (roster vs admin classrooms, etc.). */
+  rosterBackLink?: { href: string; label: string };
 };
 
 export function ChildDetail({
@@ -31,6 +33,7 @@ export function ChildDetail({
   curriculum,
   activity,
   reportsRailBasePath,
+  rosterBackLink = { href: "/app/roster", label: "All children" },
 }: ChildDetailProps) {
   const mobile = useIsMobile();
   const [pageView, setPageView] = React.useState<PageView>("activity");
@@ -41,6 +44,8 @@ export function ChildDetail({
       <ChildPageHeader
         profile={profile}
         mobile={mobile}
+        backHref={rosterBackLink.href}
+        backLabel={rosterBackLink.label}
         onNewObservation={() => setNewObsOpen(true)}
         onGenerateReport={() =>
           ToastBus.push({ message: "Report drafting from this view is coming soon" })

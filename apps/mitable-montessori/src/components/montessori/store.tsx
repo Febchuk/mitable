@@ -44,6 +44,8 @@ export type MontessoriStore = {
    *  Null when the page that owns the provider didn't pass an initial payload
    *  (mock-only surfaces) or when there's no active classroom. */
   classroomProgress: ClassroomProgress | null;
+  /** When false, the Progress screen hides the IEP mode (Montessori-only rooms). */
+  showIepProgressTab: boolean;
   progressByTopic: ProgressByTopic;
   notesByTopic: Record<string, Record<string, CellNote[]>>;
   recentUpdates: RecentUpdateEntry[];
@@ -152,9 +154,11 @@ function progressFromClassroom(initial: ClassroomProgress): ProgressByTopic {
 export function MontessoriProvider({
   children,
   initialClassroomProgress = null,
+  showIepProgressTab = false,
 }: {
   children: React.ReactNode;
   initialClassroomProgress?: ClassroomProgress | null;
+  showIepProgressTab?: boolean;
 }) {
   const [webRoute, setWebRouteState] = React.useState<WebRoute>("today");
   const [webChatMode, setWebChatMode] = React.useState<ChatMode>("pill");
@@ -446,6 +450,7 @@ export function MontessoriProvider({
     chat,
     reports,
     classroomProgress,
+    showIepProgressTab,
     progressByTopic,
     notesByTopic,
     recentUpdates,

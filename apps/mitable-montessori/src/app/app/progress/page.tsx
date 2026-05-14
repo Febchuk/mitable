@@ -3,16 +3,22 @@
 import * as React from "react";
 import { IepProgressFeature } from "@/components/montessori/iep";
 import { ProgressFeature } from "@/components/montessori/progress";
+import { useMontessori } from "@/components/montessori/store";
 
 type ProgressMode = "class" | "iep";
 
 export default function ProgressPage() {
+  const { showIepProgressTab } = useMontessori();
   const [mode, setMode] = React.useState<ProgressMode>("class");
+
+  React.useEffect(() => {
+    if (!showIepProgressTab && mode === "iep") setMode("class");
+  }, [showIepProgressTab, mode]);
 
   return (
     <>
-      <ProgressModeToggle mode={mode} onChange={setMode} />
-      {mode === "class" ? <ProgressFeature /> : <IepProgressFeature />}
+      {showIepProgressTab ? <ProgressModeToggle mode={mode} onChange={setMode} /> : null}
+      {mode === "class" || !showIepProgressTab ? <ProgressFeature /> : <IepProgressFeature />}
     </>
   );
 }

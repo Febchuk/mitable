@@ -3,6 +3,10 @@ import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { auditLog } from "@/lib/audit/log";
+import {
+  deleteAllCurriculaForSchool,
+  ensureDefaultMontessoriCurricula,
+} from "@/lib/curriculum/seed-default-montessori-curricula";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -175,6 +179,30 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(
       { error: userErr.message ?? "Could not create admin user" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    await ensureDefaultMontessoriCurricula(admin, {
+      schoolId: school.id,
+      createdByUserId: authUserId,
+    });
+  } catch (seedErr) {
+    await deleteAllCurriculaForSchool(admin, school.id).catch(() => {});
+    await admin.from("users").delete().eq("id", authUserId);
+    await admin.from("school_crypto_salts").delete().eq("school_id", school.id);
+    await admin.from("schools").delete().eq("id", school.id);
+    if (createdAuthUser) {
+      await admin.auth.admin.deleteUser(authUserId).catch(() => {});
+    }
+    return NextResponse.json(
+      {
+        error:
+          seedErr instanceof Error
+            ? seedErr.message
+            : "Could not seed default Montessori curricula",
+      },
       { status: 500 }
     );
   }

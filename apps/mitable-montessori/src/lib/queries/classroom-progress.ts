@@ -39,6 +39,8 @@ export type ClassroomProgress = {
   classroomName: string;
   /** False when the active classroom has classrooms.curriculum_id IS NULL. */
   curriculumAssigned: boolean;
+  /** Name of the assigned curriculum row, when `curriculumAssigned`. */
+  curriculumName: string | null;
   /** Programs this classroom supports. Drives which mode(s) the Progress
    *  route exposes. Defaults to ["montessori"] when not declared on the
    *  classroom row. */
@@ -117,6 +119,16 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
         )
       : ["montessori"];
 
+  let curriculumName: string | null = null;
+  if (curriculumId) {
+    const { data: curRow } = await supabase
+      .from("curricula")
+      .select("name")
+      .eq("id", curriculumId)
+      .maybeSingle();
+    curriculumName = (curRow?.name as string | null) ?? null;
+  }
+
   // Always fetch the roster — even when curriculum is unassigned, we want to
   // render an empty-state UI with the right children visible.
   const studentsResp = await supabase
@@ -147,6 +159,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
       classroomId: classroom.id,
       classroomName: classroom.name,
       curriculumAssigned: false,
+      curriculumName: null,
       programs,
       subjects: [],
       topics: [],
@@ -220,6 +233,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     classroomId: classroom.id,
     classroomName: classroom.name,
     curriculumAssigned: true,
+    curriculumName,
     programs,
     subjects,
     topics,

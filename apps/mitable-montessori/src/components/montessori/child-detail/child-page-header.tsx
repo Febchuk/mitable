@@ -352,11 +352,15 @@ function GuardianChip({ profile }: { profile: StudentProfile }) {
 export function ChildPageHeader({
   profile,
   mobile,
+  backHref = "/app/roster",
+  backLabel = "All children",
   onNewObservation,
   onGenerateReport,
 }: {
   profile: StudentProfile;
   mobile: boolean;
+  backHref?: string;
+  backLabel?: string;
   onNewObservation: () => void;
   onGenerateReport: () => void;
 }) {
@@ -380,7 +384,7 @@ export function ChildPageHeader({
         }}
       >
         <Link
-          href="/app/roster"
+          href={backHref}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -391,7 +395,7 @@ export function ChildPageHeader({
           }}
         >
           <ChevLeft />
-          <span>All children</span>
+          <span>{backLabel}</span>
         </Link>
         {mobile && (
           <MobileKebabMenu
