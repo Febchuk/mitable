@@ -14,6 +14,7 @@ import {
 import type { ReportReferenceSet } from "@/lib/reports/data-adapter";
 import { rowToChatMessage, type StoredChatRow } from "@/lib/reports/chat-message";
 import { auditLog } from "@/lib/audit/log";
+import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
 
 export const runtime = "nodejs";
 
@@ -116,7 +117,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     heading: tokenizeText(s.heading, references),
     paragraphs: s.paragraphs.map((p) => ({
       id: p.id,
-      html: tokenizeText(stripHtml(p.html), references),
+      html: tokenizeText(fieldPayloadToReadableText(p.html), references),
     })),
   }));
   const tokenizedTitle = tokenizeText((report.title as string | null) ?? "", references);
@@ -419,10 +420,6 @@ async function persistMessage(
     return null;
   }
   return data as StoredChatRow;
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, "").trim();
 }
 
 function tokenizeText(text: string, refs: ReportReferenceSet): string {

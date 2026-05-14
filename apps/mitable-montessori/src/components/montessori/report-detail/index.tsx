@@ -15,6 +15,11 @@ import {
   readStoredDraftCapture,
 } from "@/lib/capture/draft-capture-storage";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
+import type { SectionMeta } from "@/lib/report-templates/sections";
+import {
+  fieldPayloadToReadableText,
+  paragraphHasTeacherContent,
+} from "@/lib/reports/template-field-payload";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +49,7 @@ type LocalDetail = {
   visibleTo: string[];
   sections: LocalSection[];
   templateLogoUrl?: string | null;
+  templateSectionMeta: SectionMeta;
 };
 
 /** Calendar line for the report — uses `locale` via `useUiLocale` for hydration-safe Intl. */
@@ -91,21 +97,13 @@ function sectionsToBody(sections: LocalSection[]): string {
     .map((s) => {
       const heading = s.heading ? `# ${s.heading}\n\n` : "";
       const body = s.paragraphs
-        .map((p) => p.html.replace(/<[^>]+>/g, "").trim())
+        .map((p) => fieldPayloadToReadableText(p.html).trim())
         .filter((p) => p.length > 0)
         .join("\n\n");
       return heading + body;
     })
     .filter((block) => block.trim().length > 0)
     .join("\n\n");
-}
-
-/** True if sections exist but every paragraph is still blank (template shell). */
-function sectionsAreOnlyPlaceholders(sections: ReportDetailRow["sections"]): boolean {
-  if (!sections?.length) return true;
-  return !sections.some((s) =>
-    s.paragraphs.some((p) => p.html.replace(/<[^>]+>/g, "").trim().length > 0)
-  );
 }
 
 function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail {
@@ -130,6 +128,7 @@ function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail 
     visibleTo: [`${report.studentName.split(" ")[0]}'s parents`, "Lead teacher"],
     sections,
     templateLogoUrl: report.templateLogoUrl ?? null,
+    templateSectionMeta: report.templateSectionMeta ?? {},
   };
 }
 
@@ -176,7 +175,8 @@ export function ReportDetail({
 
   const empty =
     !report.body?.trim() &&
-    (!report.sections?.length || sectionsAreOnlyPlaceholders(report.sections));
+    (!report.sections?.length ||
+      !report.sections.some((s) => s.paragraphs.some((p) => paragraphHasTeacherContent(p.html))));
 
   // Auto-trigger draft for fresh empty drafts. The new-report flow creates a
   // row with status='draft' and empty body; the editor opens here and
@@ -627,6 +627,7 @@ export function ReportDetail({
     report.sections,
     report.status,
     report.templateLogoUrl,
+    JSON.stringify(report.templateSectionMeta ?? {}),
     locale,
   ]);
 

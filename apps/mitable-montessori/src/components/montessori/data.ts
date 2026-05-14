@@ -1,3 +1,5 @@
+import type { SectionMeta } from "@/lib/report-templates/sections";
+
 export type Tone = "clay" | "sage" | "butter" | "blue" | "terracotta";
 export type ProgressMark = "m" | "p" | "i" | "-";
 export type AttendanceMark = "p" | "a" | "t" | "-";
@@ -50,6 +52,8 @@ export type ReportDetail = {
   sections: ReportSection[];
   /** Crest from the school's report template — display only. */
   templateLogoUrl?: string | null;
+  /** When the report uses a template: per-heading checklist / single-select config. */
+  templateSectionMeta: SectionMeta;
 };
 
 export type Report = {
@@ -586,6 +590,7 @@ const ADA_DETAIL: ReportDetail = {
   savedMeta: "Saved 3 min ago",
   sources: { voiceNotes: 4, photos: 2, worksheets: 1 },
   visibleTo: ["Ada's parents", "Lead teacher"],
+  templateSectionMeta: {},
   sections: [
     {
       id: "morning",
@@ -653,6 +658,7 @@ const DIEGO_DETAIL: ReportDetail = {
   savedMeta: "Saved 12 min ago",
   sources: { voiceNotes: 2, photos: 1, worksheets: 0 },
   visibleTo: ["Diego's parents", "Lead teacher"],
+  templateSectionMeta: {},
   sections: [
     {
       id: "morning",
@@ -701,6 +707,7 @@ const BEA_DETAIL: ReportDetail = {
   savedMeta: "Saved yesterday",
   sources: { voiceNotes: 18, photos: 9, worksheets: 4 },
   visibleTo: ["Bea's parent", "Lead teacher", "Head of school"],
+  templateSectionMeta: {},
   sections: [
     {
       id: "overview",

@@ -1516,3 +1516,39 @@ main:has(.rd-root) {
   border-right: 0;
   background: var(--color-canvas);
 }
+
+/* Template checklist / single-select (report template section_meta) */
+.rd-template-field {
+  margin: 2px 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: color-mix(in srgb, var(--color-canvas) 96%, var(--color-ink) 4%);
+}
+.rd-template-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rd-template-field-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.rd-template-field-row input {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--color-accent, #82c0cc);
+}
+.rd-template-field-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
