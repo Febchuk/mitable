@@ -36,6 +36,7 @@ type StudentLite = {
   name: string;
   preferredName: string | null;
   tone: Tone;
+  iepItemCount?: number;
 };
 
 type LoadedComment = {
@@ -72,6 +73,7 @@ function rosterFromClassroom(students: ClassroomProgressStudent[]): StudentLite[
       name: s.fullName,
       preferredName: s.preferredName,
       tone: toneFor(s.id),
+      iepItemCount: s.iepItemCount,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -112,14 +114,28 @@ export function IepProgressFeature() {
     [cp]
   );
 
-  const [studentId, setStudentId] = React.useState<string | null>(roster[0]?.id ?? null);
+  const iepFilterEligible = Boolean(cp?.programs.includes("iep"));
+  const [onlyWithIepGoals, setOnlyWithIepGoals] = React.useState(true);
+  const displayRoster = React.useMemo(() => {
+    if (!iepFilterEligible || !onlyWithIepGoals) return roster;
+    return roster.filter((s) => (s.iepItemCount ?? 0) > 0);
+  }, [roster, iepFilterEligible, onlyWithIepGoals]);
+
+  const [studentId, setStudentId] = React.useState<string | null>(null);
   const [domains, setDomains] = React.useState<LoadedDomain[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [selectedItemId, setSelectedItemId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!studentId && roster.length > 0) setStudentId(roster[0].id);
-  }, [roster, studentId]);
+    if (displayRoster.length === 0) {
+      setStudentId(null);
+      return;
+    }
+    setStudentId((cur) => {
+      if (cur && displayRoster.some((s) => s.id === cur)) return cur;
+      return displayRoster[0].id;
+    });
+  }, [displayRoster]);
 
   const refreshPlan = React.useCallback(async (sid: string) => {
     setLoading(true);
@@ -145,7 +161,7 @@ export function IepProgressFeature() {
     void refreshPlan(studentId);
   }, [studentId, refreshPlan]);
 
-  const student = roster.find((s) => s.id === studentId) ?? null;
+  const student = displayRoster.find((s) => s.id === studentId) ?? null;
 
   const allItems = React.useMemo(() => domains.flatMap((d) => d.items), [domains]);
   const itemsById = React.useMemo(() => {
@@ -330,45 +346,75 @@ export function IepProgressFeature() {
         }
       />
 
-      <div
-        style={{
-          padding: "12px 16px 4px",
-          display: "flex",
-          gap: 8,
-          overflowX: "auto",
-          scrollbarWidth: "thin",
-        }}
-      >
-        {roster.map((s) => {
-          const active = s.id === studentId;
-          const label = s.preferredName ?? s.name.split(" ")[0];
-          return (
-            <button
-              key={s.id}
-              type="button"
-              className="tap"
-              onClick={() => setStudentId(s.id)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "6px 10px 6px 6px",
-                borderRadius: 999,
-                border: `1px solid ${active ? "var(--color-ink)" : "var(--color-border)"}`,
-                background: active ? "var(--color-ink)" : "var(--color-surface)",
-                color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-            >
-              <Avatar initials={initialsFor(s.name)} tone={s.tone} size={24} />
-              {label}
-            </button>
-          );
-        })}
+      <div style={{ padding: "12px 16px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {iepFilterEligible && roster.length > 0 ? (
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12.5,
+              color: "var(--color-ink-secondary)",
+              cursor: "pointer",
+              userSelect: "none",
+              width: "fit-content",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={onlyWithIepGoals}
+              onChange={(e) => setOnlyWithIepGoals(e.target.checked)}
+            />
+            Only show children with IEP goals
+          </label>
+        ) : null}
+        {displayRoster.length === 0 &&
+        roster.length > 0 &&
+        onlyWithIepGoals &&
+        iepFilterEligible ? (
+          <div style={{ fontSize: 12.5, color: "var(--color-ink-muted)" }}>
+            No one in this class has IEP goals yet. Turn off the filter above to pick any child.
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            scrollbarWidth: "thin",
+          }}
+        >
+          {displayRoster.map((s) => {
+            const active = s.id === studentId;
+            const label = s.preferredName ?? s.name.split(" ")[0];
+            return (
+              <button
+                key={s.id}
+                type="button"
+                className="tap"
+                onClick={() => setStudentId(s.id)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 10px 6px 6px",
+                  borderRadius: 999,
+                  border: `1px solid ${active ? "var(--color-ink)" : "var(--color-border)"}`,
+                  background: active ? "var(--color-ink)" : "var(--color-surface)",
+                  color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                <Avatar initials={initialsFor(s.name)} tone={s.tone} size={24} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className={styles.iepLayout}>
