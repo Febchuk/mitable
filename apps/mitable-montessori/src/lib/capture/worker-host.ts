@@ -1,6 +1,6 @@
 "use client";
 
-import type { WorkerStatus } from "@/lib/capture/types";
+import type { OcrWord, WorkerStatus } from "@/lib/capture/types";
 
 export type HostInbound =
   | { type: "init"; modelUrl?: string }
@@ -24,6 +24,7 @@ export type HostOutbound =
       text: string;
       durationMs: number;
       confidence?: number;
+      words?: OcrWord[];
     }
   | {
       type: "classify-result";
@@ -163,7 +164,7 @@ export class WorkerHost {
   async recognize(
     payload: ArrayBuffer,
     mime: string
-  ): Promise<{ text: string; durationMs: number; confidence?: number }> {
+  ): Promise<{ text: string; durationMs: number; confidence?: number; words?: OcrWord[] }> {
     const w = await this.ensureWorker();
     const jobId = `r-${++pendingId}`;
     this.setStatus({ state: "running" });
@@ -172,7 +173,12 @@ export class WorkerHost {
         resolve: (m) => {
           if (m.type !== "recognize-result") return reject(new Error("unexpected reply"));
           this.setStatus({ state: "ready" });
-          resolve({ text: m.text, durationMs: m.durationMs, confidence: m.confidence });
+          resolve({
+            text: m.text,
+            durationMs: m.durationMs,
+            confidence: m.confidence,
+            words: m.words,
+          });
         },
         reject,
       });

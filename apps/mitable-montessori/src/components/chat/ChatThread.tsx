@@ -24,6 +24,7 @@ interface ThreadEntry {
   text?: string;
   proposal?: ChatProposalRow;
   rawTranscript?: string;
+  redactedImageUrl?: string;
 }
 
 export function ChatThread(props: ChatThreadProps) {
@@ -41,6 +42,7 @@ export function ChatThread(props: ChatThreadProps) {
       createdAt: string;
       rawTranscript: string;
       mode: CaptureMode;
+      redactedImageUrl?: string;
     }>
   >([]);
 
@@ -52,6 +54,7 @@ export function ChatThread(props: ChatThreadProps) {
       createdAt: m.createdAt,
       text: m.text,
       rawTranscript: m.rawTranscript,
+      redactedImageUrl: m.redactedImageUrl,
     })),
     ...proposals.map<ThreadEntry>((p) => ({
       kind: "proposal",
@@ -95,8 +98,15 @@ export function ChatThread(props: ChatThreadProps) {
                 return (
                   <div
                     key={e.id}
-                    className="ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-ink/5 px-3 py-2 text-sm"
+                    className="ml-auto flex max-w-[80%] flex-col gap-1.5 rounded-2xl rounded-br-sm bg-ink/5 px-3 py-2 text-sm"
                   >
+                    {e.redactedImageUrl ? (
+                      <img
+                        src={e.redactedImageUrl}
+                        alt="Captured notes (PII redacted)"
+                        className="w-full rounded-lg"
+                      />
+                    ) : null}
                     {e.text}
                   </div>
                 );
@@ -133,6 +143,7 @@ export function ChatThread(props: ChatThreadProps) {
               createdAt: new Date().toISOString(),
               rawTranscript: emit.message,
               mode: emit.mode,
+              redactedImageUrl: emit.redactedImageUrl,
             },
           ]);
         }}

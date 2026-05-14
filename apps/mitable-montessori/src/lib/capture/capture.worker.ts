@@ -26,7 +26,19 @@ let asrPipeline:
   | ((audio: Float32Array, opts?: Record<string, unknown>) => Promise<{ text: string }>)
   | null = null;
 let ocrWorker: {
-  recognize: (img: Blob | ImageBitmap) => Promise<{ data: { text: string; confidence: number } }>;
+  recognize: (
+    img: Blob | ImageBitmap
+  ) => Promise<{
+    data: {
+      text: string;
+      confidence: number;
+      words: Array<{
+        text: string;
+        confidence: number;
+        bbox: { x0: number; y0: number; x1: number; y1: number };
+      }>;
+    };
+  }>;
   terminate: () => Promise<void>;
 } | null = null;
 
@@ -95,12 +107,7 @@ async function loadOcr() {
           status: { state: "loading", progress: m.progress, message: m.status },
         });
       },
-    })) as {
-      recognize: (
-        img: Blob | ImageBitmap
-      ) => Promise<{ data: { text: string; confidence: number } }>;
-      terminate: () => Promise<void>;
-    };
+    })) as typeof ocrWorker;
     ocrWorker = worker;
   } catch (err) {
     throw new Error(
@@ -131,11 +138,17 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
     await loadOcr();
     const blob = new Blob([payload], { type: mime || "image/png" });
     const result = await ocrWorker!.recognize(blob);
+    const words = (result.data.words ?? []).map((w) => ({
+      text: w.text,
+      confidence: w.confidence,
+      bbox: { x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1 },
+    }));
     send({
       type: "recognize-result",
       jobId,
       text: (result.data.text ?? "").trim(),
       confidence: result.data.confidence,
+      words,
       durationMs: performance.now() - t0,
     });
   } catch (err) {
