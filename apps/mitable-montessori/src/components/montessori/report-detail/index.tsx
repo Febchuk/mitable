@@ -8,6 +8,9 @@ import { ChatPane, type ChatPaneHandle } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
 import { useMediaQuery } from "./use-media-query";
+import { ViewModeToggle, type ViewMode } from "./view-mode-toggle";
+import { PdfPreviewPane } from "./pdf-preview-pane";
+import { localDetailToPdfData } from "@/lib/pdf/local-detail-to-pdf-data";
 import "./report-detail.css";
 import { MessageSquare, Sparkles, X } from "lucide-react";
 import {
@@ -638,6 +641,12 @@ export function ReportDetail({
 
   const [actionBusy, setActionBusy] = React.useState(false);
   const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<ViewMode>("editor");
+
+  const pdfData = React.useMemo(
+    () => localDetailToPdfData({ title: detail.title, sections: detail.sections }, report),
+    [detail.title, detail.sections, report]
+  );
 
   // Mobile-only: ChatPane lives inside this bottom sheet on <lg. The desktop
   // split-view ChatPane and the mobile sheet ChatPane are mutually exclusive
@@ -769,6 +778,7 @@ export function ReportDetail({
           isAdmin={isAdmin}
           actionBusy={actionBusy}
           hasBeenSubmitted={report.hasBeenSubmitted}
+          viewModeSlot={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
           onBackClick={hideBackLink ? undefined : handleBackClick}
           onSaveDraft={
             topbarStatus === "draft"
@@ -804,15 +814,18 @@ export function ReportDetail({
                 onApplyNewSection={onApplyNewSection}
               />
             ) : null}
-            <ReportPane
-              detail={detail}
-              onChange={onChange}
-              isDrafting={isDrafting}
-              onCancelDrafting={cancelDraftGeneration}
-              onDiscussParagraph={onDiscussParagraph}
-              onAcceptGhostEdit={onAcceptGhostEdit}
-              onDismissGhostEdit={onDismissGhostEdit}
-            />
+            <div className={viewMode === "editor" ? "rd-pane-wrap" : "rd-pane-wrap rd-pane-hidden"}>
+              <ReportPane
+                detail={detail}
+                onChange={onChange}
+                isDrafting={isDrafting}
+                onCancelDrafting={cancelDraftGeneration}
+                onDiscussParagraph={onDiscussParagraph}
+                onAcceptGhostEdit={onAcceptGhostEdit}
+                onDismissGhostEdit={onDismissGhostEdit}
+              />
+            </div>
+            {viewMode === "preview" && <PdfPreviewPane data={pdfData} />}
           </div>
         </div>
       </div>

@@ -24,6 +24,7 @@ export interface EmailJob {
   reportDate: string | null;
   studentName: string | null;
   reportType: string | null;
+  classroomName: string | null;
   messageBody: string | null;
 }
 
@@ -48,7 +49,7 @@ export async function drainPendingReports(
   const { data: rows, error } = await supabase
     .from("report_recipients")
     .select(
-      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, status, report_date, report_type, students(first_name, last_name))"
+      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, status, report_date, report_type, students(first_name, last_name), classrooms(name))"
     )
     .eq("delivery_status", "pending")
     .limit(limit);
@@ -77,6 +78,7 @@ export async function drainPendingReports(
               | { first_name: string; last_name: string }
               | { first_name: string; last_name: string }[]
               | null;
+            classrooms: { name: string | null } | { name: string | null }[] | null;
           }
         | {
             title: string | null;
@@ -89,6 +91,7 @@ export async function drainPendingReports(
               | { first_name: string; last_name: string }
               | { first_name: string; last_name: string }[]
               | null;
+            classrooms: { name: string | null } | { name: string | null }[] | null;
           }[]
         | null;
     };
@@ -121,6 +124,12 @@ export async function drainPendingReports(
         : report.students
       : null;
 
+    const classroom = report.classrooms
+      ? Array.isArray(report.classrooms)
+        ? report.classrooms[0]
+        : report.classrooms
+      : null;
+
     const sendResult = await sender.send({
       recipientId: row.id,
       reportId: row.report_id,
@@ -132,6 +141,7 @@ export async function drainPendingReports(
       reportDate: report.report_date,
       studentName: student ? `${student.first_name} ${student.last_name}` : null,
       reportType: report.report_type,
+      classroomName: classroom?.name ?? null,
       messageBody: row.message_body,
     });
 

@@ -37,6 +37,7 @@ export function ReportTopBar({
   isAdmin = false,
   actionBusy = false,
   hasBeenSubmitted = false,
+  viewModeSlot,
   onSaveDraft,
   onSubmitForReview,
   onApprove,
@@ -56,6 +57,8 @@ export function ReportTopBar({
   actionBusy?: boolean;
   /** True iff the report has been submitted for review at least once. Drives the "Resubmit" vs "Submit" button label. */
   hasBeenSubmitted?: boolean;
+  /** Optional segmented toggle rendered left of the action buttons. Used for the Editor/Preview PDF switch. */
+  viewModeSlot?: React.ReactNode;
   onSaveDraft?: () => void;
   onSubmitForReview?: () => void;
   onApprove?: () => void;
@@ -119,6 +122,7 @@ export function ReportTopBar({
         </div>
 
         <div className="rd-page-header-actions">
+          {viewModeSlot}
           <TopBarActions
             status={status}
             isAdmin={isAdmin}

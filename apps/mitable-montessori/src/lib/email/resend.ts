@@ -152,7 +152,7 @@ export class ResendEmailSender implements EmailSender {
         title: job.reportTitle ?? `${reportType} Report`,
         studentName,
         reportDate: job.reportDate,
-        classroom: "",
+        classroom: job.classroomName ?? "",
         reportType: job.reportType ?? "daily",
         sections: job.reportSections ?? [],
         body: job.reportBody,
