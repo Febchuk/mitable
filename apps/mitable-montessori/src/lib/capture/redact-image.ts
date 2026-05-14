@@ -64,8 +64,10 @@ function findPiiRegions(
   const candidates: Array<{ phrase: string }> = [];
   for (const r of roster) {
     const parts = r.name.split(/\s+/).filter(Boolean);
+    // Match first name, last name, or full name — any hit counts.
     if (parts.length > 0) candidates.push({ phrase: parts[0] });
-    candidates.push({ phrase: r.name });
+    if (parts.length > 1) candidates.push({ phrase: parts[parts.length - 1] });
+    if (parts.length > 1) candidates.push({ phrase: r.name });
   }
 
   const fuse = new Fuse(candidates, {

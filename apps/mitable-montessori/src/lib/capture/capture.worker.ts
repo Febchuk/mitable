@@ -150,7 +150,7 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
 
     let bestText = "";
     let bestConfidence = 0;
-    let bestWords: Array<{
+    const allWords: Array<{
       text: string;
       confidence: number;
       bbox: { x0: number; y0: number; x1: number; y1: number };
@@ -159,10 +159,20 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
     for (const variant of variants) {
       const result = await ocrWorker!.recognize(variant.blob);
       const conf = result.data.confidence ?? 0;
-      if (conf > bestConfidence || (conf === bestConfidence && (result.data.text ?? "").trim().length > bestText.length)) {
+
+      // Track best pass for the text sent to the LLM.
+      if (
+        conf > bestConfidence ||
+        (conf === bestConfidence &&
+          (result.data.text ?? "").trim().length > bestText.length)
+      ) {
         bestConfidence = conf;
         bestText = (result.data.text ?? "").trim();
-        bestWords = (result.data.words ?? []).map((w) => ({
+      }
+
+      // Accumulate words from ALL passes for PII redaction.
+      for (const w of result.data.words ?? []) {
+        allWords.push({
           text: w.text,
           confidence: w.confidence,
           bbox: {
@@ -171,7 +181,7 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
             x1: Math.round(w.bbox.x1 / variant.scale),
             y1: Math.round(w.bbox.y1 / variant.scale),
           },
-        }));
+        });
       }
     }
 
@@ -180,7 +190,7 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
       jobId,
       text: bestText,
       confidence: bestConfidence,
-      words: bestWords,
+      words: allWords,
       durationMs: performance.now() - t0,
     });
   } catch (err) {
