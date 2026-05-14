@@ -45,23 +45,32 @@ export async function GET() {
 
   const assignsByRoom = new Map<
     string,
-    Array<{ teacher_user_id: string; classroom_role: string | null }>
+    Array<{
+      id: string;
+      teacher_user_id: string;
+      classroom_role: string | null;
+    }>
   >();
   if (roomIds.length > 0) {
     const { data: assigns } = await supabase
       .from("classroom_teacher_assignments")
-      .select("classroom_id, classroom_role, teacher_user_id")
+      .select("id, classroom_id, classroom_role, teacher_user_id")
       .in("classroom_id", roomIds)
       .is("end_date", null);
 
     for (const a of assigns ?? []) {
       const row = a as {
+        id: string;
         classroom_id: string;
         classroom_role: string | null;
         teacher_user_id: string;
       };
       const list = assignsByRoom.get(row.classroom_id) ?? [];
-      list.push({ teacher_user_id: row.teacher_user_id, classroom_role: row.classroom_role });
+      list.push({
+        id: row.id,
+        teacher_user_id: row.teacher_user_id,
+        classroom_role: row.classroom_role,
+      });
       assignsByRoom.set(row.classroom_id, list);
     }
   }
@@ -88,6 +97,7 @@ export async function GET() {
     const id = r.id as string;
     const assigns = assignsByRoom.get(id) ?? [];
     const teachers = assigns.map((a) => ({
+      assignmentId: a.id,
       userId: a.teacher_user_id,
       name: teacherNameById.get(a.teacher_user_id) ?? "Teacher",
       role: a.classroom_role ?? "support",

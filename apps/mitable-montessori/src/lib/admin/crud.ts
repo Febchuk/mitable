@@ -223,10 +223,39 @@ export async function assignTeacherToClassroom(
     start_date: string;
   }
 ) {
+  const { data: room } = await ctx.supabase
+    .from("classrooms")
+    .select("id")
+    .eq("id", input.classroom_id)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (!room) throw new AdminError("Classroom not found", "not_found");
+
+  const { data: teacherUser } = await ctx.supabase
+    .from("users")
+    .select("id")
+    .eq("id", input.teacher_user_id)
+    .eq("school_id", ctx.schoolId)
+    .eq("role", "teacher")
+    .eq("status", "active")
+    .maybeSingle();
+  if (!teacherUser) throw new AdminError("Teacher not found in this school", "not_found");
+
+  const role = input.classroom_role ?? "support";
+  if (role === "lead") {
+    const { error: demoteErr } = await ctx.supabase
+      .from("classroom_teacher_assignments")
+      .update({ classroom_role: "support" })
+      .eq("classroom_id", input.classroom_id)
+      .eq("classroom_role", "lead")
+      .is("end_date", null);
+    if (demoteErr) throw new AdminError(demoteErr.message, "db_error");
+  }
+
   return insertReturningId(ctx, "classroom_teacher_assignments", {
     teacher_user_id: input.teacher_user_id,
     classroom_id: input.classroom_id,
-    classroom_role: input.classroom_role ?? "support",
+    classroom_role: role,
     start_date: input.start_date,
     end_date: null,
   });
@@ -237,10 +266,29 @@ export async function unassignTeacherFromClassroom(
   assignmentId: string,
   endDate: string
 ): Promise<void> {
+  const { data: row, error: fetchErr } = await ctx.supabase
+    .from("classroom_teacher_assignments")
+    .select("id, classroom_id, end_date")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  if (fetchErr) throw new AdminError(fetchErr.message, "db_error");
+  if (!row || row.end_date !== null) {
+    throw new AdminError("Active assignment not found", "not_found");
+  }
+
+  const { data: room } = await ctx.supabase
+    .from("classrooms")
+    .select("id")
+    .eq("id", row.classroom_id as string)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (!room) throw new AdminError("Active assignment not found", "not_found");
+
   const { error } = await ctx.supabase
     .from("classroom_teacher_assignments")
     .update({ end_date: endDate })
-    .eq("id", assignmentId);
+    .eq("id", assignmentId)
+    .is("end_date", null);
   if (error) throw new AdminError(error.message, "db_error");
 }
 

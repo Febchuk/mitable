@@ -8,8 +8,15 @@ import { listCurriculumProgress } from "@/lib/queries/curriculum";
 import { getStudentProfile } from "@/lib/queries/student-profile";
 import { listAxesWithAssessment, listWholeChildObservations } from "@/lib/queries/whole-child";
 
-export default async function ChildDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ChildDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const {
@@ -30,6 +37,11 @@ export default async function ChildDetailPage({ params }: { params: Promise<{ id
     listActivityFeed(id),
   ]);
 
+  const rosterBackLink =
+    sp.from === "admin-classrooms"
+      ? { href: "/admin/classrooms", label: "Classrooms" }
+      : { href: "/app/roster", label: "All children" };
+
   return (
     <ChildDetail
       profile={profile}
@@ -38,6 +50,7 @@ export default async function ChildDetailPage({ params }: { params: Promise<{ id
       curriculum={curriculum}
       activity={activity}
       reportsRailBasePath={reportsRailBasePath}
+      rosterBackLink={rosterBackLink}
     />
   );
 }
