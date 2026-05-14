@@ -114,13 +114,33 @@
   min-height: 0;
 }
 .nr-foot {
-  padding: 14px 28px;
+  padding: 12px 28px 14px;
   border-top: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-canvas) 82%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.nr-foot-capture {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-clay-soft);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 70%, transparent);
+}
+.nr-foot-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.nr-foot-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   flex-shrink: 0;
 }
 .nr-foot-meta {
@@ -130,6 +150,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
 }
 .nr-foot-meta b {
   color: var(--color-ink);
@@ -170,6 +191,36 @@
   color: var(--color-ink-muted);
   font-size: 19px;
   line-height: 1;
+}
+
+.nr-capture-only-label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+.nr-capture-only-label--footer {
+  color: var(--color-ink-secondary);
+}
+.nr-capture-only-label input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.nr-capture-only-label--footer > span:last-child {
+  display: block;
+  min-width: 0;
+}
+.nr-capture-only-kicker {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--color-terracotta-deep);
+  margin-bottom: 2px;
 }
 
 .nr-with-hand-label {
@@ -881,6 +932,37 @@
   gap: 10px;
   align-items: center;
   flex-shrink: 0;
+}
+.nr-m-foot--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.nr-m-capture-only-foot {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-clay-soft);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.nr-m-capture-only-foot input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.nr-m-capture-only-foot-kicker {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--color-terracotta-deep);
+  margin-bottom: 2px;
 }
 .nr-m-btn-primary {
   flex: 1;

@@ -17,6 +17,8 @@ export type StoredDraftCapture = {
   notes: string[];
   /** Roster tokens for every name fuzzy-matched in capture (multi-student transcripts). */
   tokenMap: TokenMapEntry[];
+  /** When set, draft API skips progress/commands reads. */
+  captureOnly?: boolean;
 };
 
 export function writeStoredDraftCapture(reportId: string, data: StoredDraftCapture): void {
@@ -49,7 +51,8 @@ export function readStoredDraftCapture(reportId: string): StoredDraftCapture | n
         if (p.success) tokenMap.push(p.data);
       }
     }
-    return { transcripts, notes, tokenMap };
+    const captureOnly = o.captureOnly === true;
+    return { transcripts, notes, tokenMap, captureOnly };
   } catch {
     return null;
   }

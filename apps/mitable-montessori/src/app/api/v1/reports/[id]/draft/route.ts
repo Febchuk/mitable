@@ -199,7 +199,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // nothing to draft from. Skip the agent run — the editor will render
   // the template's empty sections and the teacher fills them in (or
   // re-drafts later once observations exist).
-  if (input.transcripts.length === 0 && input.notes.length === 0) {
+  // Capture-only skips this: the teacher explicitly asked not to use
+  // tracked progress, so we still run the agent (template-only or capture-only).
+  if (!input.captureOnly && input.transcripts.length === 0 && input.notes.length === 0) {
     const studentRef = report.student_id as string;
     const periodEndDay = `${periodEnd}T23:59:59`;
     const [{ count: cmdCount }, { count: progCount }] = await Promise.all([
@@ -253,6 +255,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       seedReferences,
       templateSections,
       writingStyle,
+      captureOnly: input.captureOnly,
     });
 
     // De-tokenize the draft and shape it for the editor. We persist the

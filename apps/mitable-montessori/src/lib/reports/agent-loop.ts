@@ -1,5 +1,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { REPORT_SYSTEM_PROMPT, REPORT_TOOLS } from "@/lib/anthropic/report-tools";
+import {
+  REPORT_SYSTEM_PROMPT,
+  REPORT_SYSTEM_PROMPT_CAPTURE_ONLY,
+  reportToolsForCaptureMode,
+} from "@/lib/anthropic/report-tools";
 import { DraftReportToolCall, type DraftReportToolCallT } from "@/lib/schemas/report";
 import {
   mergeReferenceSets,
@@ -45,6 +49,8 @@ export interface AgentRunInput {
   templateSections?: { heading: string; guidance: string }[];
   /** School tone / voice — included in the kickoff only (not sent as an image). */
   writingStyle?: string;
+  /** When true, omit read tools — draft only from capture + template (no stored progress). */
+  captureOnly?: boolean;
 }
 
 export interface AgentRunOutput {
@@ -98,11 +104,14 @@ export async function runReportAgent(input: AgentRunInput): Promise<AgentRunOutp
 
     while (turn < MAX_AGENT_TURNS) {
       turn++;
+      const captureOnly = !!input.captureOnly;
       const resp = await input.anthropic.messages.create({
         model: input.model,
         max_tokens: 4096,
-        system: REPORT_SYSTEM_PROMPT,
-        tools: REPORT_TOOLS,
+        system: captureOnly
+          ? `${REPORT_SYSTEM_PROMPT}${REPORT_SYSTEM_PROMPT_CAPTURE_ONLY}`
+          : REPORT_SYSTEM_PROMPT,
+        tools: reportToolsForCaptureMode(captureOnly),
         messages: conv,
       });
 
@@ -230,6 +239,7 @@ function buildKickoff(input: AgentRunInput): string {
   const transcripts = (input.captureTranscripts ?? []).filter((t) => t.trim().length > 0);
   const notes = (input.captureNotes ?? []).filter((t) => t.trim().length > 0);
   const hasCapture = transcripts.length > 0 || notes.length > 0;
+  const captureOnly = !!input.captureOnly;
   const templateSections =
     input.templateSections && input.templateSections.length > 0
       ? input.templateSections
@@ -242,6 +252,14 @@ function buildKickoff(input: AgentRunInput): string {
     `Period: ${input.periodStart} → ${input.periodEnd}`,
     "",
   ];
+
+  if (captureOnly) {
+    lines.push(
+      "## Capture-only mode",
+      "The teacher chose not to use saved daily progress or stored observations for this draft. Do not infer events from tracking data — it is out of scope even if it exists in the product elsewhere.",
+      ""
+    );
+  }
 
   const tone = (input.writingStyle ?? "").trim();
   if (tone.length > 0) {
@@ -262,7 +280,31 @@ function buildKickoff(input: AgentRunInput): string {
   });
   lines.push("");
 
-  if (hasCapture) {
+  if (captureOnly) {
+    if (hasCapture) {
+      lines.push(
+        "## Teacher capture — sole factual source for this draft",
+        "Write from this text only (plus the section guidance above). Use tokens only — never real names.",
+        ""
+      );
+      if (transcripts.length > 0) {
+        lines.push("Voice transcript(s):");
+        transcripts.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+        lines.push("");
+      }
+      if (notes.length > 0) {
+        lines.push("Written notes / OCR:");
+        notes.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+        lines.push("");
+      }
+    } else {
+      lines.push(
+        "## No voice or handwritten notes attached",
+        "Draft from the section headings and guidance only. Where specifics are missing, write one short honest sentence per section — do not invent classroom events or pull from any tracking system.",
+        ""
+      );
+    }
+  } else if (hasCapture) {
     lines.push(
       "## Teacher capture — AUTHORITATIVE. Write from this. Tools below are supplemental."
     );

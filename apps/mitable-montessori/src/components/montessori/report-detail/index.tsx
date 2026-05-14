@@ -204,6 +204,7 @@ export function ReportDetail({
         transcripts: stash?.transcripts ?? [],
         notes: stash?.notes ?? [],
         tokenMap: stash?.tokenMap ?? [],
+        captureOnly: stash?.captureOnly === true,
       }),
       signal: ac.signal,
     })

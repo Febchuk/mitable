@@ -136,6 +136,7 @@ export function NewReportTrigger() {
           transcripts: parsed.transcripts,
           notes: parsed.notes,
           tokenMap: parsed.tokenMap,
+          captureOnly: payload.captureOnly,
         });
         const child = roster.find((c) => c.id === payload.childId);
         ToastBus.push({
