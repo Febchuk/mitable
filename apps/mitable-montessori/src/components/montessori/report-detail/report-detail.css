@@ -238,15 +238,7 @@ main:has(.rd-root) {
   display: grid;
   grid-template-columns: 1fr;
   min-height: 0;
-  position: relative; /* host for the floating "Show assistant" button */
-}
-@media (min-width: 1024px) {
-  .rd-split {
-    grid-template-columns: 35fr 65fr;
-  }
-  .rd-split.rd-split-chat-collapsed {
-    grid-template-columns: 1fr;
-  }
+  position: relative;
 }
 
 /* Panel-toggle icon — a single quiet square button used to collapse the
