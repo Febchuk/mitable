@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { initialsFor, type Tone } from "@/components/montessori/data";
 import type { ReportDetail as ReportDetailRow, ReportListRow } from "@/lib/queries/reports";
-import { FilterChips, PageHeader } from "@/components/montessori/page-header";
+import { PageHeader } from "@/components/montessori/page-header";
 import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck } from "@/components/montessori/primitives";
 import { ReportDetail } from "@/components/montessori/report-detail";
@@ -71,22 +71,22 @@ function kindLabel(t: ReportListRow["reportType"]): string {
  * .list-head: section h2 reflects the active filter; sub line shows the
  * count + a contextual hint. Kept here so the component stays declarative.
  */
-function railHeading(filter: string, rows: ReportListRow[]): { title: string; sub: string } {
+function railHeading(filter: StatusFilter, rows: ReportListRow[]): { title: string; sub: string } {
   const count = rows.length;
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  if (filter === "Drafts") {
+  if (filter === "drafts") {
     return { title: "Drafts", sub: plural(count, "draft", "drafts") };
   }
-  if (filter === "Awaiting review") {
+  if (filter === "review") {
+    return { title: "In Review", sub: plural(count, "report in review", "reports in review") };
+  }
+  if (filter === "approved") {
     return {
-      title: "Awaiting review",
-      sub: plural(count, "report awaiting review", "reports awaiting review"),
+      title: "Approved",
+      sub: plural(count, "approved report", "approved reports"),
     };
   }
-  if (filter === "Sent") {
-    return { title: "Sent", sub: plural(count, "sent report", "sent reports") };
-  }
-  return { title: "All reports", sub: plural(count, "report", "reports") };
+  return { title: "Sent", sub: plural(count, "sent report", "sent reports") };
 }
 
 function formatWhen(row: ReportListRow, locale: string): string {
@@ -103,7 +103,21 @@ function toneFor(id: string): Tone {
   return TONES[h % TONES.length];
 }
 
-const FILTERS = ["All", "Drafts", "Awaiting review", "Sent"];
+/** Status filter is fixed to the four lifecycle buckets in the prototype. */
+type StatusFilter = "drafts" | "review" | "approved" | "sent";
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: "drafts", label: "Drafts" },
+  { id: "review", label: "In Review" },
+  { id: "approved", label: "Approved" },
+  { id: "sent", label: "Sent" },
+];
+
+function statusBucket(status: ReportListRow["status"]): StatusFilter {
+  if (status === "draft" || status === "changes_requested") return "drafts";
+  if (status === "submitted_for_review" || status === "in_review") return "review";
+  if (status === "approved") return "approved";
+  return "sent";
+}
 
 const ALL_CLASSROOMS = "__ALL__";
 
@@ -111,7 +125,7 @@ function firstSelectableReportId(
   rows: ReportListRow[],
   variant: "teacher" | "admin",
   classroomScope: string,
-  filter: string
+  filter: StatusFilter
 ): string | null {
   const isAdmin = variant === "admin";
   const scoped =
@@ -121,15 +135,8 @@ function firstSelectableReportId(
   return applyFilter(scoped, filter)[0]?.id ?? null;
 }
 
-function applyFilter(rows: ReportListRow[], filter: string): ReportListRow[] {
-  return rows.filter((r) => {
-    if (filter === "All") return true;
-    if (filter === "Drafts") return r.status === "draft";
-    if (filter === "Awaiting review")
-      return r.status === "submitted_for_review" || r.status === "in_review";
-    if (filter === "Sent") return r.status === "sent" || r.status === "approved";
-    return true;
-  });
+function applyFilter(rows: ReportListRow[], filter: StatusFilter): ReportListRow[] {
+  return rows.filter((r) => statusBucket(r.status) === filter);
 }
 
 export function ReportsRailView({
@@ -161,7 +168,7 @@ export function ReportsRailView({
   }, [reports]);
 
   const [classroomScope, setClassroomScope] = React.useState<string>(ALL_CLASSROOMS);
-  const [filter, setFilter] = React.useState("All");
+  const [filter, setFilter] = React.useState<StatusFilter>("drafts");
 
   const scopedReports = React.useMemo(() => {
     if (!isAdmin || classroomScope === ALL_CLASSROOMS) return reports;
@@ -175,12 +182,14 @@ export function ReportsRailView({
     if (initialOpenReportId && reports.some((r) => r.id === initialOpenReportId)) {
       return initialOpenReportId;
     }
-    return firstSelectableReportId(reports, variant, ALL_CLASSROOMS, "All");
+    return firstSelectableReportId(reports, variant, ALL_CLASSROOMS, "drafts");
   });
 
   React.useEffect(() => {
-    if (!initialOpenReportId || !reports.some((r) => r.id === initialOpenReportId)) return;
-    setFilter("All");
+    if (!initialOpenReportId) return;
+    const target = reports.find((r) => r.id === initialOpenReportId);
+    if (!target) return;
+    setFilter(statusBucket(target.status));
     if (isAdmin) setClassroomScope(ALL_CLASSROOMS);
     setSelectedId(initialOpenReportId);
   }, [initialOpenReportId, reports, isAdmin]);
@@ -298,15 +307,22 @@ export function ReportsRailView({
       });
   }, []);
 
-  const drafts = scopedReports.filter((r) => r.status === "draft").length;
-  const awaiting = scopedReports.filter(
-    (r) => r.status === "submitted_for_review" || r.status === "in_review"
-  ).length;
-  const sent = scopedReports.filter((r) => r.status === "sent" || r.status === "approved").length;
+  // Per-bucket counts drive both the page-header subtitle and the segmented
+  // status tabs in the rail head, so they stay in sync without re-deriving.
+  const counts = React.useMemo<Record<StatusFilter, number>>(() => {
+    const acc: Record<StatusFilter, number> = {
+      drafts: 0,
+      review: 0,
+      approved: 0,
+      sent: 0,
+    };
+    for (const r of scopedReports) acc[statusBucket(r.status)] += 1;
+    return acc;
+  }, [scopedReports]);
 
   const subtitle = isAdmin
-    ? `${awaiting} awaiting review · ${drafts} drafts · ${sent} sent`
-    : `${drafts} drafts · ${awaiting} awaiting review · ${sent} sent`;
+    ? `${counts.review} in review · ${counts.drafts} drafts · ${counts.approved} approved · ${counts.sent} sent`
+    : `${counts.drafts} drafts · ${counts.review} in review · ${counts.approved} approved · ${counts.sent} sent`;
 
   /* Modal state — driven by the action rail (desktop) and the bottom action
      bar (mobile overlay). One state powers both surfaces; the rail-view owns
@@ -394,7 +410,25 @@ export function ReportsRailView({
           </header>
 
           <div className={styles.rrFilterBar}>
-            <FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+            <div className={styles.rrTabs} role="tablist" aria-label="Report status">
+              {STATUS_FILTERS.map((t) => {
+                const active = filter === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={`${styles.rrTab} tap`}
+                    data-active={active ? "true" : "false"}
+                    onClick={() => setFilter(t.id)}
+                  >
+                    <span>{t.label}</span>
+                    <span className={styles.rrTabCount}>{counts[t.id]}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className={styles.rrList}>
