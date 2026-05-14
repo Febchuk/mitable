@@ -86,15 +86,6 @@ function railHeading(filter: string, rows: ReportListRow[]): { title: string; su
   if (filter === "Sent") {
     return { title: "Sent", sub: plural(count, "sent report", "sent reports") };
   }
-  if (filter === "Daily") {
-    return { title: "Daily reports", sub: plural(count, "daily report", "daily reports") };
-  }
-  if (filter === "Major") {
-    return { title: "Major reports", sub: plural(count, "major report", "major reports") };
-  }
-  if (filter === "Incident") {
-    return { title: "Incidents", sub: plural(count, "incident report", "incident reports") };
-  }
   return { title: "All reports", sub: plural(count, "report", "reports") };
 }
 
@@ -112,7 +103,7 @@ function toneFor(id: string): Tone {
   return TONES[h % TONES.length];
 }
 
-const FILTERS = ["All", "Drafts", "Awaiting review", "Sent", "Daily", "Major", "Incident"];
+const FILTERS = ["All", "Drafts", "Awaiting review", "Sent"];
 
 const ALL_CLASSROOMS = "__ALL__";
 
@@ -137,9 +128,6 @@ function applyFilter(rows: ReportListRow[], filter: string): ReportListRow[] {
     if (filter === "Awaiting review")
       return r.status === "submitted_for_review" || r.status === "in_review";
     if (filter === "Sent") return r.status === "sent" || r.status === "approved";
-    if (filter === "Daily") return r.reportType === "daily";
-    if (filter === "Major") return r.reportType === "major";
-    if (filter === "Incident") return r.reportType === "incident";
     return true;
   });
 }
