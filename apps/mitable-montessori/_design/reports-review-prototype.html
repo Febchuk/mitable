@@ -3,30 +3,40 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mitable Montessori — Reports Review (Redesign)</title>
+    <title>Mitable Montessori — Reports Review (Three-pane redesign)</title>
 
     <!--
-      ASSUMPTIONS (locked with user in clarifying pass)
+      ASSUMPTIONS (revised May 2026 — three-pane only, chat moved to floating dock)
+
+      - Single layout: three-pane (list rail · reading pane · action rail).
+        Layout A (master-detail) deleted; chat-inside-report-pane deleted.
+      - Chat lives in the global floating ChatDock (web) and global mobile chat sheet —
+        NOT inside this surface. The right rail is an ACTION RAIL, not a chat rail.
+
       - 4 states / 4 tabs: Drafts · In Review · Approved · Sent
-      - Layout variants: A (master-detail · chat as tab inside report pane)
-                         C (three-pane · list + report + chat as columns)
-      - Dominant signals per tab:
-          Drafts        → completeness %
-          In Review     → reviewer ticks
-          Approved      → "Send now" CTA + scheduled time
-          Sent          → delivery status (read/unread) + sent-date
-      - AI score (0–100 composite + expandable flags), color band:
-          green ≥85 · amber 60–84 · red <60
-          appears on Drafts + In Review rows + top of open report
-          drops off Approved/Sent
-      - Send for review: right drawer on web, bottom sheet 70% on mobile
-      - Reviewer model: parallel review, tick + inline comments, admin always signs off
-      - Admin sees all + class filter, can override approve / reassign / bulk approve green / send back to draft
 
-      OUT OF SCOPE for prototype: draft authoring, parent receipt, notifications,
-      settings, real auth.
+      - Action rail (web, ~64px wide, vertical icon column):
+          Preview PDF  → opens modal that blurs the page
+          History      → opens modal w/ timeline
+          Submit for review → opens modal w/ reviewer picker + note
+          Reviewer avatars (MW sage, DR clay) + terracotta "2" badge — passive indicators
+          Spacer (flex-grow)
+          Delete (bottom of rail) → opens confirm modal
 
-      TOKENS reused verbatim from new-report-prototype.html / report-editor-prototype.html.
+      - Web frame now has a 232px left sidebar mirroring the live app's
+        teacher nav (Today · Roster · Curriculum · Progress · Attendance · Reports*).
+
+      - Mobile:
+          • No bottom tabs (legacy — live shell uses MobileTopBar with avatar-only).
+          • MobileTopBar: avatar (clay) → opens drawer · spacer · plus icon.
+          • Two screens: List (M-LIST) and Report Detail (M-REPORT, full-bleed
+            overlay opened by tapping a list row). Bottom action strip on detail
+            mirrors web rail icons.
+          • Global mobile chat FAB stays (it's the Ask Mitable global chat).
+
+      - Modals are centered with full-page backdrop-filter blur. 720px max-width.
+
+      TOKENS reused verbatim from new-report / report-editor prototypes.
     -->
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -80,7 +90,7 @@
         padding: 88px 32px 96px;
       }
       .stage-hed {
-        max-width: 1480px; margin: 0 auto 24px;
+        max-width: 1600px; margin: 0 auto 24px;
         display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
       }
       .stage-hed h1 { font-family: var(--font-display); font-weight: 500; font-size: 38px; letter-spacing: 0; margin: 0; color: var(--color-ink); }
@@ -117,7 +127,7 @@
 
       /* ========================= Side-by-side device frames ========================= */
       .compare {
-        max-width: 1480px; margin: 0 auto;
+        max-width: 1600px; margin: 0 auto;
         display: grid; grid-template-columns: minmax(0, 1fr) 422px; gap: 40px; align-items: start;
       }
 
@@ -154,7 +164,7 @@
         font-size: 11.5px; color: var(--color-ink-muted);
         display: flex; align-items: center; gap: 6px;
       }
-      .web-canvas { height: 760px; overflow: hidden; position: relative; background: var(--color-canvas); }
+      .web-canvas { height: 820px; overflow: hidden; position: relative; background: var(--color-canvas); }
       .web-canvas::before {
         content: ""; position: absolute; inset: 0; pointer-events: none;
         opacity: 0.04;
@@ -162,6 +172,86 @@
       }
       .web-canvas > .screen { position: absolute; inset: 0; display: none; }
       .web-canvas > .screen.active { display: block; }
+
+      /* Web shell: sidebar + content */
+      .web-shell {
+        height: 100%;
+        display: grid;
+        grid-template-columns: 232px 1fr;
+        min-height: 0;
+      }
+
+      /* ===== Left sidebar (web) — mirrors src/components/montessori/sidebar.tsx ===== */
+      .web-sidebar {
+        background: var(--color-muted);
+        border-right: 1px solid var(--color-border);
+        display: flex; flex-direction: column;
+        padding: 20px 14px;
+        min-height: 0;
+      }
+      .web-sidebar .brand {
+        padding: 0 8px 18px;
+        border-bottom: 1px solid var(--color-border);
+        margin-bottom: 14px;
+      }
+      .web-sidebar .brand .name {
+        font-family: var(--font-display);
+        font-size: 28px; line-height: 1;
+        color: var(--color-ink); letter-spacing: -0.01em;
+      }
+      .web-sidebar .brand .label-cap { margin-top: 2px; }
+      .web-sidebar .workspace {
+        padding: 8px 10px; background: var(--color-surface);
+        border-radius: 10px; border: 1px solid var(--color-border);
+        margin-bottom: 14px;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .web-sidebar .workspace .ws-avatar {
+        width: 26px; height: 26px; border-radius: 8px;
+        background: var(--color-terracotta-soft); color: var(--color-terracotta-deep);
+        display: grid; place-items: center; font-size: 13px; font-weight: 600;
+      }
+      .web-sidebar .workspace .ws-meta { flex: 1; min-width: 0; }
+      .web-sidebar .workspace .ws-name {
+        font-size: 13px; font-weight: 600; color: var(--color-ink);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .web-sidebar .workspace .ws-sub { font-size: 11px; color: var(--color-ink-muted); }
+      .web-sidebar .workspace .chev { color: var(--color-ink-muted); }
+
+      .web-sidebar nav { display: flex; flex-direction: column; }
+      .web-sidebar nav a {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 10px; border-radius: 9px; margin-bottom: 2px;
+        font-size: 13px; font-weight: 500; text-decoration: none;
+        color: var(--color-ink-secondary);
+        border: 1px solid transparent;
+      }
+      .web-sidebar nav a:hover { background: color-mix(in srgb, var(--color-surface) 60%, transparent); color: var(--color-ink); }
+      .web-sidebar nav a.active {
+        background: var(--color-surface); color: var(--color-ink);
+        border-color: var(--color-border);
+      }
+      .web-sidebar nav a .badge {
+        font-size: 10px; background: var(--color-terracotta); color: var(--color-surface);
+        border-radius: 999px; padding: 1px 6px; font-weight: 600;
+      }
+      .web-sidebar nav a svg { width: 17px; height: 17px; flex-shrink: 0; }
+
+      .web-sidebar .grow { flex: 1; }
+      .web-sidebar .footer {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 10px; border-radius: 10px;
+        background: var(--color-surface); border: 1px solid var(--color-border);
+        font-size: 12px;
+      }
+      .web-sidebar .footer .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--color-sage-deep); }
+
+      /* Web content (right of sidebar) */
+      .web-content {
+        display: flex; flex-direction: column; min-width: 0; min-height: 0;
+        position: relative;
+      }
 
       /* iPhone frame */
       .mobile-frame {
@@ -173,7 +263,7 @@
         position: relative;
       }
       .mobile-bezel {
-        width: 366px; height: 760px;
+        width: 366px; height: 820px;
         border-radius: 36px; overflow: hidden; position: relative;
         background: var(--color-canvas);
       }
@@ -227,6 +317,8 @@
       .btn-secondary:hover { border-color: var(--color-border-strong); }
       .btn-ghost { color: var(--color-ink-secondary); }
       .btn-ghost:hover { background: var(--color-muted); color: var(--color-ink); }
+      .btn-danger { background: var(--color-terracotta); color: #fff; font-weight: 600; }
+      .btn-danger:hover { background: var(--color-terracotta-deep); }
 
       /* ===== AI Score chip ===== */
       .score {
@@ -267,7 +359,7 @@
       /* avatars */
       .av { width: 28px; height: 28px; border-radius: 999px; display: inline-grid; place-items: center; font-weight: 600; font-size: 12px; color: var(--color-ink); }
       .av.sm { width: 22px; height: 22px; font-size: 10.5px; }
-      .av.xs { width: 18px; height: 18px; font-size: 9px; }
+      .av.xs { width: 20px; height: 20px; font-size: 9.5px; }
       .av.lg { width: 36px; height: 36px; font-size: 13px; }
       .av.clay { background: var(--color-clay-soft); color: var(--color-terracotta-deep); }
       .av.sage { background: var(--color-sage-soft); color: var(--color-sage-deep); }
@@ -293,7 +385,7 @@
       .ticks .t.done { background: var(--color-sage-soft); border-color: var(--color-sage-deep); color: var(--color-sage-deep); }
       .ticks .t.done svg { width: 11px; height: 11px; }
 
-      /* ========================= TOP BAR (in-app) ========================= */
+      /* ========================= TOP BAR (in-app, no longer has the tab pill chrome — tabs live in the list-rail head) ========================= */
       .app-topbar {
         height: 50px; border-bottom: 1px solid var(--color-border);
         background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
@@ -302,10 +394,6 @@
         padding: 0 18px; position: relative; z-index: 5;
       }
       .app-topbar .left { display: flex; align-items: center; gap: 10px; }
-      .app-topbar .logo {
-        width: 26px; height: 26px; border-radius: 8px; background: var(--color-terracotta); color: #fff;
-        display: grid; place-items: center; font-family: var(--font-display); font-size: 17px; font-weight: 600;
-      }
       .app-topbar .crumb { font-size: 13px; color: var(--color-ink-secondary); }
       .app-topbar .crumb b { color: var(--color-ink); font-weight: 600; }
       .app-topbar .right { display: flex; align-items: center; gap: 8px; }
@@ -330,51 +418,44 @@
       .tabs button.active { background: var(--color-surface); color: var(--color-ink); box-shadow: 0 1px 2px rgba(43,38,34,0.06); }
       .tabs button.active .count { background: var(--color-terracotta); color: #fff; border-color: transparent; }
 
-      /* ===== List page layout (web) ===== */
-      .list-page { position: relative; height: 100%; display: flex; flex-direction: column; }
-      .list-toolbar {
-        padding: 14px 18px 12px;
-        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      /* ===== Three-pane layout (the only layout) ===== */
+      .three-pane {
+        display: grid;
+        grid-template-columns: 300px 1fr 64px;
+        height: calc(100% - 50px);
+        min-height: 0;
+      }
+      .three-pane .list-rail {
+        border-right: 1px solid var(--color-border);
+        display: flex; flex-direction: column;
         background: var(--color-canvas);
+        min-height: 0;
+      }
+      .three-pane .reading-pane {
+        background: var(--color-surface);
+        display: flex; flex-direction: column;
+        min-height: 0; position: relative;
+      }
+      .three-pane .action-rail {
+        border-left: 1px solid var(--color-border);
+        background: var(--color-surface);
+        display: flex; flex-direction: column;
+        align-items: center;
+        padding: 14px 8px 16px;
+        gap: 8px;
+        min-height: 0;
+      }
+
+      /* list rail head */
+      .list-head {
+        padding: 14px 14px 12px;
         border-bottom: 1px solid var(--color-border);
+        background: var(--color-canvas);
       }
-      .list-toolbar h2 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
-      .list-toolbar .sub { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--color-ink-muted); margin-top: 2px; }
-
-      .list-toolbar .right { display: flex; align-items: center; gap: 8px; }
-      .filter-chip {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 5px 10px; font-size: 11.5px; font-weight: 600;
-        border: 1px solid var(--color-border); background: var(--color-surface);
-        color: var(--color-ink-secondary); border-radius: 999px;
-      }
-      .filter-chip.admin-only { border-color: var(--color-clay); color: var(--color-terracotta-deep); background: color-mix(in srgb, var(--color-terracotta-soft) 30%, var(--color-surface)); }
-      .filter-chip.bulk { border-color: var(--color-sage-deep); color: var(--color-sage-deep); background: color-mix(in srgb, var(--color-sage-soft) 40%, var(--color-surface)); }
-
-      /* ===== Layout A: master-detail ===== */
-      .layout-a {
-        display: grid; grid-template-columns: 340px 1fr; height: calc(100% - 50px); min-height: 0;
-      }
-      .layout-a .list-rail { border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background: var(--color-canvas); min-height: 0; }
-      .layout-a .reading-pane { background: var(--color-surface); display: flex; flex-direction: column; min-height: 0; position: relative; }
-
-      /* ===== Layout C: three-pane ===== */
-      .layout-c {
-        display: grid; grid-template-columns: 300px 1fr 320px; height: calc(100% - 50px); min-height: 0;
-      }
-      .layout-c .list-rail { border-right: 1px solid var(--color-border); display: flex; flex-direction: column; background: var(--color-canvas); min-height: 0; }
-      .layout-c .reading-pane { background: var(--color-surface); display: flex; flex-direction: column; min-height: 0; position: relative; }
-      .layout-c .chat-rail { border-left: 1px solid var(--color-border); background: var(--color-surface); display: flex; flex-direction: column; min-height: 0; }
-      .layout-c[data-chat-collapsed="true"] { grid-template-columns: 300px 1fr 52px; }
-      .layout-c[data-chat-collapsed="true"] .chat-rail .chat-body,
-      .layout-c[data-chat-collapsed="true"] .chat-rail .chat-input-row,
-      .layout-c[data-chat-collapsed="true"] .chat-rail .chat-head h4,
-      .layout-c[data-chat-collapsed="true"] .chat-rail .chat-head .chat-sub { display: none; }
-      .layout-c[data-chat-collapsed="true"] .chat-rail .chat-head { padding: 10px 8px; flex-direction: column; justify-content: center; border-bottom: 1px solid var(--color-border); }
-      .layout-c[data-chat-collapsed="true"] .chat-rail .chat-head .head-text { display: none; }
-      .layout-c[data-chat-collapsed="true"] #collapsed-rail-stack { display: flex !important; }
-      .layout-c .chat-rail .collapse-btn svg { transition: transform 180ms ease; }
-      .layout-c[data-chat-collapsed="true"] .chat-rail .collapse-btn svg { transform: rotate(180deg); }
+      .list-head .titles { display: flex; align-items: baseline; gap: 8px; justify-content: space-between; }
+      .list-head h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+      .list-head .sub { font-size: 11.5px; color: var(--color-ink-muted); margin-top: 3px; }
+      .list-head .tabs { margin-top: 10px; flex-wrap: wrap; }
 
       /* ===== List rail rows ===== */
       .rows { flex: 1; overflow: auto; padding: 6px 6px 80px; }
@@ -458,16 +539,6 @@
       .ai-callout .ai-row {
         display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       }
-      .ai-callout .reason-toggle {
-        font-size: 11.5px; font-weight: 600; color: var(--color-ink-secondary);
-        display: inline-flex; align-items: center; gap: 4px; padding: 3px 0;
-      }
-      .ai-callout .reasoning {
-        margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--color-border);
-        font-size: 12.5px; color: var(--color-ink-secondary);
-      }
-      .ai-callout .reasoning ul { margin: 6px 0 0 0; padding-left: 14px; }
-      .ai-callout .reasoning li { margin-bottom: 4px; line-height: 1.5; }
       .ai-callout .flag-chip {
         display: inline-flex; align-items: center; gap: 5px;
         padding: 3px 9px; border-radius: 999px;
@@ -489,110 +560,80 @@
       .review-strip .left .hand-mini { font-family: var(--font-display); font-size: 17px; color: var(--color-ink-secondary); }
       .review-strip .actions { display: flex; gap: 7px; align-items: center; }
 
-      /* Tab bar for chat inside report (Layout A) */
-      .pane-tabbar {
-        border-bottom: 1px solid var(--color-border);
+      /* ===== Action rail (right column) — replaces former chat-rail ===== */
+      .action-rail .rail-btn {
+        position: relative;
+        width: 40px; height: 40px;
+        border-radius: 11px;
+        display: grid; place-items: center;
         background: var(--color-surface);
-        padding: 0 24px; display: flex; gap: 4px;
-      }
-      .pane-tabbar button {
-        padding: 11px 4px; font-size: 12px; font-weight: 600;
-        color: var(--color-ink-muted); position: relative;
-        margin-right: 16px;
-      }
-      .pane-tabbar button.active { color: var(--color-ink); }
-      .pane-tabbar button.active::after {
-        content: ""; position: absolute; bottom: -1px; left: 0; right: 0;
-        height: 2px; background: var(--color-terracotta); border-radius: 2px 2px 0 0;
-      }
-      .pane-tabbar button .count {
-        background: var(--color-muted); color: var(--color-ink-secondary); font-size: 9.5px;
-        font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 6px;
-      }
-
-      /* Chat */
-      .chat-head { padding: 10px 12px 10px 14px; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-      .chat-head h4 { margin: 0; font-size: 13px; font-weight: 600; }
-      .chat-head .chat-sub { font-size: 11px; color: var(--color-ink-muted); margin-top: 2px; }
-      .chat-head .head-text { flex: 1; min-width: 0; }
-      .chat-head .collapse-btn { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: var(--color-ink-muted); flex-shrink: 0; }
-      .chat-head .collapse-btn:hover { background: var(--color-muted); color: var(--color-ink); }
-
-      /* segmented control inside the rail head */
-      .rail-tabs {
-        display: inline-flex; gap: 2px; padding: 3px;
-        background: var(--color-muted); border-radius: 9px;
         border: 1px solid var(--color-border);
-      }
-      .rail-tabs button {
-        padding: 4px 10px; border-radius: 6px;
-        font-size: 11.5px; font-weight: 600;
         color: var(--color-ink-secondary);
-        display: inline-flex; align-items: center; gap: 5px;
       }
-      .rail-tabs button.active { background: var(--color-surface); color: var(--color-ink); box-shadow: 0 1px 2px rgba(43,38,34,0.06); }
-      .rail-tabs button .count {
-        font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
-        background: var(--color-surface); color: var(--color-ink-secondary);
-        border: 1px solid var(--color-border);
+      .action-rail .rail-btn:hover {
+        background: var(--color-muted);
+        color: var(--color-ink);
+        border-color: var(--color-border-strong);
       }
-      .rail-tabs button.active .count { background: var(--color-sage-soft); color: var(--color-sage-deep); border-color: transparent; }
+      .action-rail .rail-btn.primary {
+        background: var(--color-terracotta);
+        border-color: var(--color-terracotta);
+        color: #fff;
+      }
+      .action-rail .rail-btn.primary:hover { background: var(--color-terracotta-deep); border-color: var(--color-terracotta-deep); }
+      .action-rail .rail-btn.history-tint {
+        background: color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface));
+        color: var(--color-sage-deep);
+        border-color: var(--color-sage-soft);
+      }
+      .action-rail .rail-btn.danger:hover {
+        background: var(--color-terracotta);
+        color: #fff;
+        border-color: var(--color-terracotta);
+      }
+      .action-rail .rail-btn svg { width: 17px; height: 17px; }
 
-      /* History panel inside the chat rail (Layout C) */
-      .rail-history { flex: 1; overflow: auto; padding: 14px 14px 18px; }
-      .rail-history .history-trail.compact { padding-left: 4px; }
-      .rail-history .history-trail.compact::before { left: 9px; }
-      .rail-history .history-trail.compact .history-event { grid-template-columns: 18px 1fr; gap: 9px; }
-      .rail-history .history-trail.compact .history-event .dot { width: 9px; height: 9px; margin-left: 3px; margin-top: 5px; }
-      .rail-history .history-trail.compact .he-head { font-size: 12px; }
-      .rail-history .history-trail.compact .he-body { font-size: 11.5px; margin-top: 2px; }
-      .rail-history .history-trail.compact .he-head .he-time { font-size: 11px; margin-left: 6px; }
-
-      /* collapsed-state hides both views' bodies */
-      .layout-c[data-chat-collapsed="true"] .chat-rail #rail-chat-body,
-      .layout-c[data-chat-collapsed="true"] .chat-rail #rail-chat-input,
-      .layout-c[data-chat-collapsed="true"] .chat-rail #rail-history-body { display: none !important; }
-      .chat-body { flex: 1; overflow: auto; padding: 14px 14px 8px; display: flex; flex-direction: column; gap: 12px; }
-      .msg { display: flex; gap: 8px; align-items: flex-start; }
-      .msg .bubble {
-        padding: 8px 11px; border-radius: 13px;
-        font-size: 12.5px; line-height: 1.45;
-        max-width: 240px;
+      /* tooltip */
+      .action-rail .rail-btn[data-tip] { position: relative; }
+      .action-rail .rail-btn[data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute; right: calc(100% + 8px); top: 50%;
+        transform: translateY(-50%);
+        background: var(--color-ink); color: var(--color-surface);
+        font-size: 11px; padding: 4px 8px; border-radius: 6px;
+        white-space: nowrap; font-weight: 500; letter-spacing: 0.01em;
+        z-index: 50;
+        box-shadow: 0 4px 12px -2px rgba(43,38,34,0.18);
       }
-      .msg.ai .bubble { background: var(--color-muted); border-radius: 13px 13px 13px 4px; }
-      .msg.me { justify-content: flex-end; }
-      .msg.me .bubble { background: var(--color-terracotta-soft); color: var(--color-terracotta-deep); border-radius: 13px 13px 4px 13px; }
-      .msg.review .bubble { background: var(--color-sage-soft); color: var(--color-sage-deep); border-radius: 13px 13px 13px 4px; }
-      .msg .who { font-size: 10.5px; color: var(--color-ink-muted); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.02em; }
-      .chat-input-row { padding: 10px 12px 14px; border-top: 1px solid var(--color-border); display: flex; gap: 8px; align-items: center; background: var(--color-surface); }
-      .chat-input-row input {
-        flex: 1; padding: 9px 12px; font-size: 12.5px;
-        border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-canvas);
-        outline: none;
+      .action-rail .rail-btn[data-tip]:hover::before {
+        content: ""; position: absolute; right: calc(100% + 2px); top: 50%;
+        transform: translateY(-50%);
+        border: 4px solid transparent; border-left-color: var(--color-ink);
+        z-index: 50;
       }
-      .chat-input-row input:focus { border-color: var(--color-border-strong); }
 
-      .collapsed-rail-stack { display: none; padding: 12px 8px; flex-direction: column; align-items: center; gap: 10px; }
-      .collapsed-rail-stack button { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; color: var(--color-ink-secondary); background: var(--color-muted); }
-
-      /* Pane chat / history view (Layout A) */
-      .pane-chat { flex: 1; overflow: auto; padding: 22px 28px 24px; display: flex; flex-direction: column; min-height: 0; }
-      .pane-chat-thread { flex: 1; display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; }
-      .pane-chat-thread .msg .bubble { max-width: 460px; font-size: 13px; padding: 9px 13px; }
-      .pane-chat-thread .msg .who { font-size: 11px; }
-      .pane-chat-input {
-        position: sticky; bottom: 0; left: 0; right: 0;
-        margin-top: auto; padding: 12px 0 0;
-        background: linear-gradient(to top, var(--color-surface) 70%, transparent);
-        display: flex; gap: 8px; align-items: center;
+      .action-rail .rail-sep {
+        width: 28px; height: 1px;
+        background: var(--color-border);
+        margin: 4px 0 2px;
       }
-      .pane-chat-input input {
-        flex: 1; padding: 10px 14px; font-size: 13px;
-        border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-canvas);
-        outline: none;
+      .action-rail .reviewer-dot {
+        position: relative;
       }
-      .pane-chat-input input:focus { border-color: var(--color-border-strong); }
+      .action-rail .reviewer-dot .pulse {
+        position: absolute; top: -3px; right: -3px;
+        background: var(--color-terracotta); color: #fff;
+        width: 18px; height: 18px; border-radius: 999px;
+        display: grid; place-items: center;
+        font-size: 9.5px; font-weight: 700;
+        border: 2px solid var(--color-surface);
+      }
+      .action-rail .rail-grow { flex: 1; }
+      .action-rail .rail-btn.delete-btn {
+        color: var(--color-ink-muted);
+      }
 
+      /* History trail (used in History modal) */
       .history-trail { display: flex; flex-direction: column; gap: 18px; padding-left: 8px; position: relative; }
       .history-trail::before {
         content: ""; position: absolute; left: 13px; top: 8px; bottom: 8px; width: 1px;
@@ -612,28 +653,91 @@
       .history-event .he-head .he-time { color: var(--color-ink-muted); font-size: 11.5px; margin-left: 8px; font-weight: 500; }
       .history-event .he-body { font-size: 12.5px; color: var(--color-ink-secondary); margin-top: 3px; line-height: 1.5; }
 
-      /* ============================ Drawer (Send for review) ============================ */
-      .drawer-scrim {
-        position: absolute; inset: 0; background: rgba(43, 38, 34, 0.18);
-        backdrop-filter: blur(2px);
+      /* ============================ PAGE MODAL (blurs whole page) ============================ */
+      .page-modal-scrim {
+        position: absolute; inset: 0;
+        background: rgba(26, 23, 21, 0.42);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         z-index: 80; display: none;
       }
-      .drawer-scrim.show { display: block; animation: fade-in 200ms ease both; }
-      .drawer {
-        position: absolute; top: 0; right: 0; bottom: 0; width: 440px;
-        background: var(--color-surface); border-left: 1px solid var(--color-border);
-        z-index: 90; display: none; flex-direction: column;
-        box-shadow: -18px 0 40px -20px rgba(43, 38, 34, 0.30);
-      }
-      .drawer.show { display: flex; animation: slide-in-right 240ms cubic-bezier(0.2,0.8,0.2,1) both; }
-      .drawer-head { padding: 16px 20px 14px; border-bottom: 1px solid var(--color-border); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-      .drawer-head h3 { margin: 0; font-size: 17px; font-weight: 600; }
-      .drawer-head .sub { margin-top: 3px; font-size: 12px; color: var(--color-ink-muted); }
-      .drawer-body { flex: 1; overflow: auto; padding: 16px 20px 22px; display: flex; flex-direction: column; gap: 18px; }
-      .drawer-foot { padding: 12px 20px 18px; border-top: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .page-modal-scrim.open { display: block; animation: fade-in 200ms ease both; }
 
+      .page-modal {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(720px, calc(100% - 64px));
+        max-height: calc(100% - 80px);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 16px;
+        z-index: 90; display: none;
+        flex-direction: column; overflow: hidden;
+        box-shadow: 0 32px 80px -20px rgba(43,38,34,0.45), 0 12px 24px -8px rgba(43,38,34,0.22);
+      }
+      .page-modal.open { display: flex; animation: modal-pop 220ms cubic-bezier(0.2,0.8,0.2,1) both; }
+      .page-modal.small { width: min(440px, calc(100% - 64px)); }
+      .page-modal-head {
+        padding: 18px 22px 14px;
+        border-bottom: 1px solid var(--color-border);
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      }
+      .page-modal-head h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+      .page-modal-head .sub { margin-top: 4px; font-size: 12.5px; color: var(--color-ink-muted); }
+      .page-modal-head .close-btn {
+        width: 30px; height: 30px; border-radius: 8px;
+        display: grid; place-items: center; color: var(--color-ink-muted);
+        flex-shrink: 0;
+      }
+      .page-modal-head .close-btn:hover { background: var(--color-muted); color: var(--color-ink); }
+      .page-modal-body {
+        flex: 1; overflow: auto; padding: 18px 22px 22px;
+        display: flex; flex-direction: column; gap: 18px;
+      }
+      .page-modal-foot {
+        padding: 12px 20px 18px;
+        border-top: 1px solid var(--color-border);
+        display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+      }
+
+      /* Preview PDF — paginated frame inside modal */
+      .pdf-frame {
+        background: var(--color-canvas);
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        padding: 32px 36px;
+        font-size: 13.5px; line-height: 1.7;
+        color: var(--color-ink);
+        max-height: 460px; overflow: auto;
+        position: relative;
+      }
+      .pdf-frame::before {
+        content: ""; position: absolute; inset: 8px 8px auto 8px; height: 4px;
+        background: var(--color-clay-soft); border-radius: 2px; opacity: 0.5;
+      }
+      .pdf-frame h4 {
+        font-family: var(--font-display); font-size: 24px; font-weight: 500;
+        margin: 0 0 4px; color: var(--color-ink);
+      }
+      .pdf-frame .pdf-meta { font-size: 11.5px; color: var(--color-ink-muted); margin-bottom: 18px; letter-spacing: 0.03em; }
+      .pdf-frame .pdf-section { margin-bottom: 18px; }
+      .pdf-frame .pdf-section .pdf-head {
+        font-size: 10.5px; font-weight: 700; letter-spacing: 0.10em;
+        text-transform: uppercase; color: var(--color-ink-muted); margin-bottom: 6px;
+      }
+      .pdf-frame .pdf-quote {
+        font-family: var(--font-display); font-size: 20px; line-height: 1.35;
+        color: var(--color-ink-secondary);
+        padding-left: 12px; border-left: 2px solid var(--color-terracotta-soft);
+        margin: 8px 0;
+      }
+      .pdf-pager {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-top: 8px; font-size: 11.5px; color: var(--color-ink-muted);
+      }
+
+      /* Field labels */
       .field-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-ink-muted); margin-bottom: 7px; display: block; }
-      .reviewer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
       .reviewer-card {
         padding: 10px 11px; border: 1px solid var(--color-border); border-radius: 11px;
         background: var(--color-surface);
@@ -641,8 +745,8 @@
       }
       .reviewer-card.selected { border-color: var(--color-terracotta); background: color-mix(in srgb, var(--color-terracotta-soft) 35%, var(--color-surface)); }
       .reviewer-card .info { display: flex; flex-direction: column; min-width: 0; }
-      .reviewer-card .info .nm { font-weight: 600; font-size: 12.5px; }
-      .reviewer-card .info .role { font-size: 10.5px; color: var(--color-ink-muted); }
+      .reviewer-card .info .nm { font-weight: 600; font-size: 13px; }
+      .reviewer-card .info .role { font-size: 11px; color: var(--color-ink-muted); }
       .reviewer-card .check {
         width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--color-border);
         display: grid; place-items: center; margin-left: auto; flex-shrink: 0;
@@ -663,20 +767,55 @@
       .annot {
         position: absolute; z-index: 30; pointer-events: none;
         font-family: var(--font-display); color: var(--color-ink-secondary);
-        font-size: 17px; line-height: 1.1; max-width: 200px;
+        font-size: 17px; line-height: 1.1; max-width: 220px;
       }
-      .annot svg.arrow {
-        position: absolute;
-        color: var(--color-ink-muted);
-        opacity: 0.7;
-      }
+      .annot.web { position: absolute; }
 
       /* ========================= Mobile-specific ========================= */
-      .m-topbar { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--color-border); background: var(--color-canvas); position: relative; z-index: 4; }
-      .m-topbar h1 { margin: 0; font-size: 16px; font-weight: 600; }
-      .m-topbar .icon-btn { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--color-ink-secondary); }
+      .m-topbar {
+        height: 52px; display: flex; align-items: center; gap: 10px;
+        padding: 0 12px;
+        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+        background: color-mix(in srgb, var(--color-canvas) 90%, transparent);
+        backdrop-filter: blur(10px);
+        position: relative; z-index: 4;
+      }
+      .m-topbar .m-avatar {
+        width: 36px; height: 36px; border-radius: 999px;
+        background: var(--color-clay-soft); color: var(--color-terracotta-deep);
+        border: 1px solid var(--color-border);
+        display: grid; place-items: center;
+        font-size: 13.5px; font-weight: 600;
+        flex-shrink: 0;
+      }
+      .m-topbar .m-title {
+        font-size: 15px; font-weight: 600; color: var(--color-ink);
+        margin-left: 4px;
+      }
+      .m-topbar .m-grow { flex: 1; }
+      .m-topbar .icon-btn {
+        width: 34px; height: 34px; border-radius: 9px;
+        display: grid; place-items: center;
+        color: var(--color-ink-secondary);
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+      }
+      .m-topbar .icon-btn:hover { background: var(--color-muted); color: var(--color-ink); }
+
+      /* List page header inside mobile list (matches PageHeader pattern in body) */
+      .m-page-head {
+        padding: 14px 16px 4px;
+      }
+      .m-page-head h1 {
+        margin: 0; font-family: var(--font-display);
+        font-size: 28px; line-height: 1; color: var(--color-ink); letter-spacing: -0.01em; font-weight: 500;
+      }
+      .m-page-head .sub {
+        font-size: 12px; color: var(--color-ink-secondary); margin-top: 4px;
+      }
+
       .m-tabs {
-        padding: 8px 12px 6px;
+        padding: 10px 12px 8px;
         display: flex; gap: 6px; overflow-x: auto;
         background: var(--color-canvas);
         border-bottom: 1px solid var(--color-border);
@@ -691,13 +830,18 @@
       .m-tabs button .count { background: rgba(255,255,255,0.18); padding: 1px 6px; border-radius: 999px; font-size: 10px; }
       .m-tabs button:not(.active) .count { background: var(--color-surface); color: var(--color-ink-secondary); border: 1px solid var(--color-border); }
 
-      .m-rows { padding: 8px 10px 16px; overflow-y: auto; height: calc(100% - 44px - 50px); }
+      .m-rows {
+        padding: 8px 10px 96px;
+        overflow-y: auto;
+        height: calc(100% - 52px - 56px - 46px); /* topbar + page-head + tabs */
+      }
       .m-row {
         position: relative;
         padding: 13px 14px; margin: 0 0 8px 0;
         background: var(--color-surface); border: 1px solid var(--color-border);
         border-radius: 14px;
         display: grid; grid-template-columns: 32px 1fr; gap: 11px;
+        cursor: pointer;
       }
       .m-row.selected { border-color: var(--color-terracotta); box-shadow: 0 0 0 2px var(--color-terracotta-soft); }
       .m-row .name-line { display: flex; align-items: baseline; gap: 7px; justify-content: space-between; }
@@ -705,37 +849,14 @@
       .m-row .type { font-size: 10px; color: var(--color-ink-muted); letter-spacing: 0.04em; text-transform: uppercase; }
       .m-row .summary { margin-top: 2px; font-size: 12px; color: var(--color-ink-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
       .m-row .meta-line { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
-      .m-row .expand-inline {
-        grid-column: 1 / -1;
-        padding-top: 10px;
-        margin-top: 10px;
-        border-top: 1px dashed var(--color-border);
+      .m-row .chev {
+        position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+        color: var(--color-ink-muted);
       }
-      .m-row .expand-inline .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
-      .m-row .expand-inline .photo { aspect-ratio: 1; border-radius: 8px; background: linear-gradient(135deg, var(--color-clay-soft), var(--color-butter-soft)); border: 1px solid var(--color-border); }
-      .m-row .expand-inline p { font-size: 12.5px; line-height: 1.55; margin: 4px 0; color: var(--color-ink); }
-      .m-row .expand-inline .quote { font-family: var(--font-display); font-size: 19px; color: var(--color-ink-secondary); padding-left: 11px; border-left: 2px solid var(--color-terracotta-soft); margin: 8px 0; line-height: 1.3; }
-      .m-row .expand-inline .ai-mini {
-        margin: 10px 0; padding: 10px 11px; border-radius: 10px;
-        background: color-mix(in srgb, var(--color-sage-soft) 38%, var(--color-surface));
-        border: 1px solid var(--color-sage-soft);
-        font-size: 11.5px; color: var(--color-ink-secondary);
-        display: flex; align-items: center; gap: 8px;
-      }
-      .m-row .expand-inline .ai-mini.amber { background: color-mix(in srgb, var(--color-butter-soft) 40%, var(--color-surface)); border-color: var(--color-butter-soft); }
-      .m-row .expand-inline .ai-mini.red { background: color-mix(in srgb, var(--color-terracotta-soft) 40%, var(--color-surface)); border-color: var(--color-terracotta-soft); }
 
-      .m-row .expand-inline .action-row {
-        display: flex; gap: 6px; margin-top: 12px;
-        padding-top: 10px; border-top: 1px dashed var(--color-border);
-        flex-wrap: wrap;
-      }
-      .m-row .expand-inline .action-row .btn { padding: 7px 11px; font-size: 12px; }
-
-      /* mobile chat trigger floating */
+      /* mobile chat trigger floating (global Ask Mitable) */
       .m-chat-fab {
-        position: absolute; right: 14px; bottom: 70px;
+        position: absolute; right: 14px; bottom: 22px;
         width: 48px; height: 48px; border-radius: 999px;
         background: var(--color-ink); color: var(--color-surface);
         display: grid; place-items: center; z-index: 30;
@@ -749,43 +870,149 @@
         border: 2px solid var(--color-canvas);
       }
 
-      /* mobile bottom sheet */
-      .m-sheet-scrim { position: absolute; inset: 0; background: rgba(43,38,34,0.30); z-index: 80; display: none; backdrop-filter: blur(1px); }
-      .m-sheet-scrim.show { display: block; animation: fade-in 180ms ease both; }
-      .m-sheet {
-        position: absolute; left: 0; right: 0; bottom: 0;
-        height: 70%;
+      /* ===== Mobile report-detail screen (full-bleed overlay) ===== */
+      .m-detail {
+        display: flex; flex-direction: column; height: 100%;
         background: var(--color-surface);
-        border-radius: 24px 24px 0 0;
-        z-index: 90; display: none; flex-direction: column;
-        box-shadow: 0 -16px 40px -16px rgba(43,38,34,0.30);
+        position: relative;
       }
-      .m-sheet.show { display: flex; animation: slide-up-sheet 280ms cubic-bezier(0.2,0.8,0.2,1) both; }
-      .m-sheet .handle { width: 36px; height: 4px; background: var(--color-border-strong); border-radius: 999px; margin: 9px auto 4px; opacity: 0.55; }
-      .m-sheet-head { padding: 5px 18px 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--color-border); }
-      .m-sheet-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
-      .m-sheet-head .sub { margin-top: 3px; font-size: 11.5px; color: var(--color-ink-muted); }
-      .m-sheet-body { flex: 1; overflow: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 14px; }
-      .m-sheet-foot { padding: 10px 18px 18px; border-top: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+      .m-detail-topbar {
+        height: 52px; display: flex; align-items: center; gap: 10px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--color-border);
+        background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+        backdrop-filter: blur(10px);
+        flex-shrink: 0;
+      }
+      .m-detail-topbar .back-btn {
+        width: 34px; height: 34px; border-radius: 9px;
+        display: grid; place-items: center;
+        color: var(--color-ink); border: 1px solid var(--color-border);
+        background: var(--color-surface);
+      }
+      .m-detail-topbar .title-block { flex: 1; min-width: 0; }
+      .m-detail-topbar .title-block .name {
+        font-size: 14px; font-weight: 600; color: var(--color-ink);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .m-detail-topbar .title-block .sub {
+        font-size: 10.5px; color: var(--color-ink-muted);
+        display: flex; align-items: center; gap: 6px;
+        margin-top: 1px;
+      }
+      .m-detail-topbar .kebab-btn {
+        width: 34px; height: 34px; border-radius: 9px;
+        display: grid; place-items: center;
+        color: var(--color-ink-secondary); border: 1px solid var(--color-border);
+        background: var(--color-surface);
+      }
+      .m-detail-body {
+        flex: 1; overflow: auto;
+        padding: 16px 16px 24px;
+      }
+      .m-detail-body .reading-head-mob {
+        padding: 0 0 12px;
+        border-bottom: 1px solid var(--color-border);
+        margin-bottom: 18px;
+      }
+      .m-detail-body .reading-head-mob h2 {
+        margin: 0 0 6px; font-size: 18px; font-weight: 600; letter-spacing: -0.01em;
+      }
+      .m-detail-body .reading-head-mob .meta {
+        font-size: 11.5px; color: var(--color-ink-muted);
+      }
+      .m-detail-body .ai-callout { margin: 0 0 16px; }
+      .m-detail-body .section { margin-bottom: 20px; }
+      .m-detail-body .section h3 {
+        margin: 0 0 8px; font-size: 10.5px; font-weight: 700;
+        letter-spacing: 0.10em; text-transform: uppercase; color: var(--color-ink-muted);
+      }
+      .m-detail-body p { font-size: 13.5px; line-height: 1.6; margin: 0 0 8px; }
+      .m-detail-body .quote {
+        font-family: var(--font-display); font-size: 20px; line-height: 1.3;
+        color: var(--color-ink-secondary); margin: 10px 0;
+        padding-left: 12px; border-left: 2px solid var(--color-terracotta-soft);
+      }
+      .m-detail-body .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 8px; }
+      .m-detail-body .photo {
+        aspect-ratio: 4/3; border-radius: 9px;
+        background: linear-gradient(135deg, var(--color-clay-soft), var(--color-butter-soft));
+        border: 1px solid var(--color-border);
+      }
+
+      /* Mobile bottom action strip — mirrors web action rail */
+      .m-action-bar {
+        flex-shrink: 0;
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 14px 14px;
+        border-top: 1px solid var(--color-border);
+        background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+        backdrop-filter: blur(10px);
+      }
+      .m-action-bar .m-action {
+        flex: 1;
+        height: 42px; border-radius: 11px;
+        display: grid; place-items: center;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        color: var(--color-ink-secondary);
+      }
+      .m-action-bar .m-action svg { width: 17px; height: 17px; }
+      .m-action-bar .m-action.primary {
+        background: var(--color-terracotta);
+        border-color: var(--color-terracotta);
+        color: #fff;
+      }
+      .m-action-bar .m-action.history-tint {
+        background: color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface));
+        color: var(--color-sage-deep);
+        border-color: var(--color-sage-soft);
+      }
+
+      /* ===== Mobile modal sheet (used by the 4 modals on mobile) ===== */
+      .m-modal-scrim {
+        position: absolute; inset: 0; z-index: 80;
+        background: rgba(26,23,21,0.42);
+        backdrop-filter: blur(6px);
+        display: none;
+      }
+      .m-modal-scrim.open { display: block; animation: fade-in 180ms ease both; }
+      .m-modal-sheet {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        background: var(--color-surface);
+        border-radius: 22px 22px 0 0;
+        z-index: 90;
+        display: none; flex-direction: column;
+        box-shadow: 0 -16px 40px -16px rgba(43,38,34,0.30);
+        max-height: 92%;
+      }
+      .m-modal-sheet.open { display: flex; animation: slide-up-sheet 280ms cubic-bezier(0.2,0.8,0.2,1) both; }
+      .m-modal-sheet.tall { height: 92%; }
+      .m-modal-sheet.short { /* default height clamped by content */ }
+      .m-modal-sheet .handle { width: 36px; height: 4px; background: var(--color-border-strong); border-radius: 999px; margin: 9px auto 4px; opacity: 0.55; }
+      .m-modal-sheet .m-modal-head {
+        padding: 5px 18px 12px;
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+        border-bottom: 1px solid var(--color-border);
+      }
+      .m-modal-sheet .m-modal-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+      .m-modal-sheet .m-modal-head .sub { margin-top: 3px; font-size: 11.5px; color: var(--color-ink-muted); }
+      .m-modal-sheet .m-modal-body {
+        flex: 1; overflow: auto;
+        padding: 14px 18px;
+        display: flex; flex-direction: column; gap: 14px;
+      }
+      .m-modal-sheet .m-modal-foot {
+        padding: 10px 18px 18px;
+        border-top: 1px solid var(--color-border);
+        display: flex; align-items: center; justify-content: space-between; gap: 9px;
+      }
 
       @keyframes slide-up-sheet { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-      @keyframes slide-in-right { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+      @keyframes modal-pop { from { transform: translate(-50%, -48%) scale(0.96); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
       @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
       @keyframes slide-up { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .anim-slide-up { animation: slide-up 220ms cubic-bezier(0.2,0.8,0.2,1) both; }
-
-      /* mobile bottom nav */
-      .m-bottom-nav {
-        position: absolute; left: 0; right: 0; bottom: 0; height: 50px;
-        border-top: 1px solid var(--color-border); background: var(--color-canvas);
-        display: flex; align-items: center; justify-content: space-around; z-index: 20;
-      }
-      .m-bottom-nav button { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--color-ink-muted); padding: 4px 6px; font-size: 9.5px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; }
-      .m-bottom-nav button.active { color: var(--color-ink); }
-      .m-bottom-nav button svg { width: 19px; height: 19px; }
-
-      /* annotation arrows (svg paths) */
-      .annot.web { position: absolute; }
 
       /* helper for adminonly badge in toolbar */
       .admin-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; padding: 3px 9px; background: var(--color-clay-soft); color: var(--color-terracotta-deep); border-radius: 999px; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -796,26 +1023,19 @@
       [data-role="admin"] .admin-only-inline { display: inline-flex; }
       [data-role="admin"] .teacher-only { display: none; }
 
-      /* hide / show by tab */
+      /* hide / show by tab — only display:block on the active tab */
+      .when-drafts, .when-review, .when-approved, .when-sent { display: none; }
       [data-tab="drafts"] .when-drafts,
       [data-tab="review"] .when-review,
       [data-tab="approved"] .when-approved,
       [data-tab="sent"] .when-sent { display: block; }
-      .when-drafts, .when-review, .when-approved, .when-sent { display: none; }
-
-      /* hide stuff based on layout */
-      [data-layout="A"] .only-c { display: none; }
-      [data-layout="C"] .only-a { display: none; }
-
-      /* mobile-only / web-only inside the same screens */
-      .mob-only { display: none; }
 
       /* small helpers */
       .sep-dot { color: var(--color-border-strong); }
       .tabular { font-variant-numeric: tabular-nums; }
       .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-      /* photo decorative gradients (placeholder) — Montessori material flavor */
+      /* photo decorative gradients (placeholder) */
       .photo.p1 { background: linear-gradient(135deg, #d8b4a3, #c46a4f 80%); }
       .photo.p2 { background: linear-gradient(135deg, #e8c56a, #b89880); }
       .photo.p3 { background: linear-gradient(135deg, #dde7da, #7a9b7a); }
@@ -840,11 +1060,6 @@
         <button data-set="tab" data-val="sent">Sent</button>
       </div>
       <div class="group">
-        <span>Layout</span>
-        <button data-set="layout" data-val="A" class="active">A · Master-detail</button>
-        <button data-set="layout" data-val="C">C · Three-pane</button>
-      </div>
-      <div class="group">
         <span>AI Score</span>
         <button data-set="score" data-val="high" class="active">High</button>
         <button data-set="score" data-val="med">Med</button>
@@ -857,304 +1072,314 @@
         <button data-set="ticks" data-val="3">Ready</button>
       </div>
       <div class="group">
-        <span>Panels</span>
-        <button data-set="panel" data-val="send-web">Send · Web Drawer</button>
-        <button data-set="panel" data-val="send-mob">Send · Mobile Sheet</button>
-        <button data-set="panel" data-val="none" class="active">None</button>
+        <span>Modal</span>
+        <button data-set="modal" data-val="none" class="active">None</button>
+        <button data-set="modal" data-val="preview">Preview PDF</button>
+        <button data-set="modal" data-val="history">History</button>
+        <button data-set="modal" data-val="send">Submit for review</button>
+        <button data-set="modal" data-val="delete">Delete</button>
+      </div>
+      <div class="group">
+        <span>Mobile</span>
+        <button data-set="mobile" data-val="list" class="active">List</button>
+        <button data-set="mobile" data-val="report">Report</button>
       </div>
     </div>
 
     <!-- ============================================================ STAGE ============================================================ -->
-    <main class="stage" id="stage" data-role="teacher" data-tab="drafts" data-layout="A" data-score="high" data-ticks="2">
+    <main class="stage" id="stage" data-role="teacher" data-tab="drafts" data-score="high" data-ticks="2" data-modal="none" data-mobile="list">
       <div class="stage-hed">
-        <h1>Reports — Review redesign <small style="font-family: var(--font-sans); font-size: 12px; color: var(--color-ink-muted); letter-spacing: 0.04em; text-transform: uppercase; margin-left: 12px;">Web + Mobile · One flow</small></h1>
-        <p>Persistent list, report-in-place, chat as a sidecar — never lose the queue while skimming. Toggle role/tab/layout/score above to flip scenarios.</p>
+        <h1>Reports — Three-pane redesign <small style="font-family: var(--font-sans); font-size: 12px; color: var(--color-ink-muted); letter-spacing: 0.04em; text-transform: uppercase; margin-left: 12px;">Web + Mobile · Chat lives in floating dock</small></h1>
+        <p>Persistent list, report-in-place, actions live on a quiet right-hand rail — every action launches a modal that blurs the page. Chat moved to the global floating dock; the right rail is no longer a chat surface.</p>
       </div>
 
       <div class="compare">
         <!-- ============================================================ WEB ============================================================ -->
         <div class="device">
-          <div class="device-label">Web <small>1280×760 · lg</small></div>
+          <div class="device-label">Web <small>1440×820 · lg</small></div>
           <div class="web-frame">
             <div class="web-chrome">
               <div class="lights"><span></span><span></span><span></span></div>
               <div class="urlbar">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <span>app.mitable.com/reports</span>
+                <span>app.mitable.com/app/reports</span>
               </div>
             </div>
             <div class="web-canvas">
-              <!-- ============================ SHARED TOP BAR ============================ -->
-              <!-- We render one .screen for the list view; reading pane updates per tab. The same .screen contains both Layout A and C, gated by data-layout. -->
-
               <div class="screen active" id="screen-web">
-                <div class="app-topbar">
-                  <div class="left">
-                    <div class="logo">m</div>
-                    <div class="crumb"><b>Reports</b></div>
-                    <span class="admin-badge admin-only-inline">Admin</span>
-                  </div>
-                  <div class="right">
-                    <div class="tabs" id="web-tabs">
-                      <button data-tab="drafts" class="active">Drafts <span class="count">7</span></button>
-                      <button data-tab="review">In Review <span class="count">12</span></button>
-                      <button data-tab="approved">Approved <span class="count">4</span></button>
-                      <button data-tab="sent">Sent <span class="count">38</span></button>
+                <div class="web-shell">
+                  <!-- ============================ Left sidebar ============================ -->
+                  <aside class="web-sidebar">
+                    <div class="brand">
+                      <div class="name">Mitable</div>
+                      <div class="label-cap">Montessori</div>
                     </div>
-                    <button class="btn btn-secondary" style="margin-left:8px">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      New report
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Layout A : master-detail -->
-                <div class="layout-a only-a" id="layout-a">
-                  <!-- List rail -->
-                  <aside class="list-rail">
-                    <div class="list-toolbar">
-                      <div>
-                        <h2 class="when-drafts" style="display:none;">Drafts</h2>
-                        <h2 class="when-review" style="display:none;">In Review</h2>
-                        <h2 class="when-approved" style="display:none;">Approved</h2>
-                        <h2 class="when-sent" style="display:none;">Sent</h2>
-                        <div class="sub">
-                          <span class="when-drafts" style="display:none;">7 reports — 3 ready to send</span>
-                          <span class="when-review" style="display:none;">12 out · 5 waiting on admin</span>
-                          <span class="when-approved" style="display:none;">4 cleared to send to parents</span>
-                          <span class="when-sent" style="display:none;">38 sent this week</span>
-                        </div>
+                    <div class="workspace">
+                      <div class="ws-avatar">B</div>
+                      <div class="ws-meta">
+                        <div class="ws-name">Bluebell</div>
+                        <div class="ws-sub">18 children</div>
                       </div>
+                      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
-                    <div class="rows scroll-quiet" id="rows-a"></div>
+                    <nav>
+                      <a href="#" data-nav="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Today</span></a>
+                      <a href="#" data-nav="roster"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Roster</span></a>
+                      <a href="#" data-nav="curriculum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Curriculum</span></a>
+                      <a href="#" data-nav="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Progress</span></a>
+                      <a href="#" data-nav="attendance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Attendance</span></a>
+                      <a href="#" data-nav="reports" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><polygon points="18.5 2.5 21.5 5.5 12 15 8 16 9 12 18.5 2.5"/></svg><span>Reports</span><span class="badge">5</span></a>
+                    </nav>
+                    <div class="grow"></div>
+                    <div class="footer">
+                      <span class="dot"></span>
+                      <span>Online · in classroom</span>
+                    </div>
                   </aside>
 
-                  <!-- Reading pane -->
-                  <section class="reading-pane" id="reading-a">
-                    <!-- review strip shown in review/approved tabs -->
-                    <div class="review-strip when-review" style="display:none;" id="strip-review-a">
+                  <!-- ============================ Web content (right of sidebar) ============================ -->
+                  <div class="web-content">
+                    <div class="app-topbar">
                       <div class="left">
-                        <span class="hand-mini">your turn →</span>
-                        <span style="font-size: 12px; color: var(--color-ink-secondary);">Bea Chen · Daily · sent by Sara K. 4h ago</span>
+                        <div class="crumb"><b>Reports</b></div>
+                        <span class="admin-badge admin-only-inline">Admin</span>
                       </div>
-                      <div class="actions">
-                        <button class="btn btn-secondary"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Comment</button>
-                        <button class="btn btn-secondary"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Request changes</button>
-                        <button class="btn btn-primary sage"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Approve</button>
-                      </div>
-                    </div>
-                    <div class="review-strip when-approved" style="display:none; background: color-mix(in srgb, var(--color-sage-soft) 30%, var(--color-surface));">
-                      <div class="left">
-                        <span class="hand-mini">cleared →</span>
-                        <span style="font-size: 12px; color: var(--color-sage-deep); font-weight: 600;">Approved by Mei W. · queued for parents Fri 4:00p</span>
-                      </div>
-                      <div class="actions">
-                        <button class="btn btn-secondary">Reschedule</button>
-                        <button class="btn btn-primary"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send now</button>
-                      </div>
-                    </div>
-
-                    <div class="reading-head">
-                      <div class="row1">
-                        <span class="pill major"><span class="dot"></span>Major</span>
-                        <h2 id="report-title-a">Ada Okafor · Pink Tower mastery</h2>
-                        <span class="pill clay when-drafts" style="display:none;"><span class="dot"></span>Draft</span>
-                        <span class="pill" style="background: var(--color-butter-soft); color: var(--color-butter-deep);">
-                          <span class="dot"></span><span class="when-review" style="display:none;">In Review</span><span class="when-drafts" style="display:none;">Editing</span><span class="when-approved" style="display:none;color:var(--color-sage-deep);">Approved</span><span class="when-sent" style="display:none;">Sent</span>
-                        </span>
-                      </div>
-                      <div class="row2">
-                        <div class="meta">Tuesday 14 May · 9:15a–9:42a · Sensorial</div>
-                        <div class="meta">By <span class="av sm clay" style="display:inline-grid; margin-right:4px;">SK</span><b style="color: var(--color-ink-secondary);">Sara K.</b></div>
-                        <div style="margin-left:auto;" class="action-row">
-                          <!-- Score callout chip used in head also (when drafts/review) -->
-                          <span class="score green when-drafts" style="display:none;">
-                            <span class="score-bubble">92</span>
-                            <span class="score-label">Ready to send</span>
-                          </span>
-                          <span class="score green when-review" style="display:none;">
-                            <span class="score-bubble">92</span>
-                            <span class="score-label">High confidence</span>
-                          </span>
-                          <button class="btn btn-secondary when-drafts" style="display:none;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><polygon points="18.5 2.5 21.5 5.5 12 15 8 16 9 12 18.5 2.5"/></svg> Edit</button>
-                          <button class="btn btn-primary when-drafts" style="display:none;" data-open="send-web"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send for review</button>
-                          <button class="btn btn-secondary admin-only-inline when-review" style="display:none;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Override approve</button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- pane tabbar (Layout A only) -->
-                    <div class="pane-tabbar only-a">
-                      <button data-pane="report" class="active">Report</button>
-                      <button data-pane="chat">Chat<span class="count">3</span></button>
-                      <button data-pane="history">History</button>
-                    </div>
-
-                    <div class="reading-body scroll-quiet" id="body-a">
-                      <!-- AI callout -->
-                      <div class="ai-callout" id="ai-callout-a">
-                        <div class="ai-row">
-                          <span class="score green" id="ai-callout-score">
-                            <span class="score-bubble">92</span>
-                            <span class="score-label">High confidence — ready to send</span>
-                          </span>
-                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Tone</span>
-                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Evidence</span>
-                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> No PII risk</span>
-                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Template match</span>
-                          <button class="reason-toggle" id="reason-toggle-a">why this score? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                        </div>
-                        <div class="reasoning" id="reasoning-a" style="display:none;">
-                          <ul>
-                            <li><b style="color: var(--color-sage-deep);">+ Strong evidence</b> — 3 observable behaviors cited (independent setup, error self-correction, sustained 27-min cycle).</li>
-                            <li><b style="color: var(--color-sage-deep);">+ Tone calibrated</b> — descriptive, non-evaluative language consistent with prepared-environment voice.</li>
-                            <li><b style="color: var(--color-sage-deep);">+ Quote attribution clean</b> — direct speech preserved without paraphrase.</li>
-                            <li><b style="color: var(--color-sage-deep);">+ Template adherence 98%</b> — all four prompts answered with sufficient detail (≥30 words each).</li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div class="section">
-                        <h3>What happened</h3>
-                        <p>Ada selected the Pink Tower at 9:15a without a guide present. She carried each cube individually using both hands, beginning with the largest, and arranged them in graduated order on the rug.</p>
-                        <p>Mid-way she noticed the 4th and 5th cubes were transposed. She paused, removed the smaller cubes above, corrected the order, and rebuilt without seeking adult help.</p>
-                      </div>
-
-                      <div class="section">
-                        <h3>In her own words</h3>
-                        <div class="quote">"I see — this one is smaller. It needs to be up there with the babies."</div>
-                      </div>
-
-                      <div class="section">
-                        <h3>Evidence</h3>
-                        <div class="photo-grid">
-                          <div class="photo p1">9:21a · setup</div>
-                          <div class="photo p2">9:33a · self-correction</div>
-                          <div class="photo p3">9:42a · finished tower</div>
-                        </div>
-                      </div>
-
-                      <div class="section">
-                        <h3>Connection to the plane</h3>
-                        <p>Ada's spontaneous error-correction reflects the sensitive period for order. This builds the visual-spatial foundation for the decimal system in math.</p>
-                      </div>
-                    </div>
-
-                    <!-- Chat body (Layout A · pane=chat) -->
-                    <div class="pane-chat scroll-quiet" id="chat-a" style="display:none;">
-                      <div class="pane-chat-thread">
-                        <div class="msg ai">
-                          <div class="av sm clay">AI</div>
-                          <div>
-                            <div class="who">Mitable · 11:02a</div>
-                            <div class="bubble">I drafted "What happened" and "In her own words" from your voice memo. Want me to tighten the connection-to-plane paragraph — it's a touch long for a Major report.</div>
-                          </div>
-                        </div>
-                        <div class="msg me">
-                          <div class="bubble">Yes, link it to the math sequence next term.</div>
-                        </div>
-                        <div class="msg ai">
-                          <div class="av sm clay">AI</div>
-                          <div>
-                            <div class="who">Mitable · 11:03a</div>
-                            <div class="bubble">Tightened — also moved the quote up so it sits beside the self-correction moment. Score went 87 → 92.</div>
-                          </div>
-                        </div>
-                        <div class="msg review when-review" style="display:none;">
-                          <div class="av sm sage">MW</div>
-                          <div>
-                            <div class="who">Mei W. · just now · <span style="color: var(--color-sage-deep); font-weight: 700;">✓ Approved</span></div>
-                            <div class="bubble">Beautifully observed. The self-correction framing is exactly right — that's a Major moment.</div>
-                          </div>
-                        </div>
-                        <div class="msg review when-review" style="display:none;">
-                          <div class="av sm clay">DR</div>
-                          <div>
-                            <div class="who">Diego R. · 1h · <span style="color: var(--color-sage-deep); font-weight: 700;">✓ Approved</span></div>
-                            <div class="bubble">+ one ✓. Consider adding the third repetition next time? Worth noting cycle count.</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="pane-chat-input">
-                        <input type="text" placeholder="Ask Mitable to revise, or comment for reviewers…" />
-                        <button class="btn btn-secondary" title="Suggest improvements">✦ Polish</button>
-                        <button class="btn btn-primary" style="padding: 8px 12px;">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      <div class="right">
+                        <button class="btn btn-secondary">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                          New report
                         </button>
                       </div>
                     </div>
 
-                    <!-- History body (Layout A · pane=history) -->
-                    <div class="pane-chat scroll-quiet" id="history-a" style="display:none;">
-                      <div class="history-trail">
-                        <div class="history-event">
-                          <div class="dot sage"></div>
-                          <div>
-                            <div class="he-head"><b>Approved</b> by Mei W. <span class="he-time">just now</span></div>
-                            <div class="he-body">Promoted to Approved. Queued for parents Fri 4:00p.</div>
+                    <!-- ============================ Three-pane ============================ -->
+                    <div class="three-pane">
+                      <!-- List rail -->
+                      <aside class="list-rail">
+                        <div class="list-head">
+                          <div class="titles">
+                            <div>
+                              <h2 class="when-drafts">Drafts</h2>
+                              <h2 class="when-review">In Review</h2>
+                              <h2 class="when-approved">Approved</h2>
+                              <h2 class="when-sent">Sent</h2>
+                            </div>
+                          </div>
+                          <div class="sub">
+                            <span class="when-drafts">7 reports · 3 ready to send</span>
+                            <span class="when-review">12 out · 5 waiting on admin</span>
+                            <span class="when-approved">4 cleared to send to parents</span>
+                            <span class="when-sent">38 sent this week</span>
+                          </div>
+                          <div class="tabs" id="web-tabs">
+                            <button data-tab="drafts" class="active">Drafts <span class="count">7</span></button>
+                            <button data-tab="review">In Review <span class="count">12</span></button>
+                            <button data-tab="approved">Approved <span class="count">4</span></button>
+                            <button data-tab="sent">Sent <span class="count">38</span></button>
                           </div>
                         </div>
-                        <div class="history-event">
-                          <div class="dot sage"></div>
-                          <div>
-                            <div class="he-head"><span style="color: var(--color-sage-deep);">✓ Tick</span> from Diego R. <span class="he-time">1h ago</span></div>
-                            <div class="he-body">"+ one ✓. Consider adding the third repetition next time?"</div>
+                        <div class="rows scroll-quiet" id="rows-c"></div>
+                      </aside>
+
+                      <!-- Reading pane -->
+                      <section class="reading-pane" id="reading-pane">
+                        <div class="reading-head">
+                          <div class="row1">
+                            <span class="pill major"><span class="dot"></span>Major</span>
+                            <h2 style="font-size: 19px;">Ada Okafor · Pink Tower mastery</h2>
+                          </div>
+                          <div class="row2">
+                            <div class="meta">Tuesday 14 May · 9:15a–9:42a · Sensorial · Sara K.</div>
+                            <div style="margin-left:auto; display:flex; gap: 7px; align-items: center;">
+                              <span class="score green" id="rh-score"><span class="score-bubble">92</span><span class="score-label">Ready</span></span>
+                            </div>
                           </div>
                         </div>
-                        <div class="history-event">
-                          <div class="dot butter"></div>
-                          <div>
-                            <div class="he-head"><b>Sent for review</b> to Mei W., Diego R. <span class="he-time">4h ago</span></div>
-                            <div class="he-body">By Sara K. with note: "Wanted a second pair of eyes on Major vs Daily."</div>
+                        <div class="reading-body scroll-quiet">
+                          <div class="ai-callout" id="ai-callout">
+                            <div class="ai-row">
+                              <span class="score green" id="ai-callout-score"><span class="score-bubble">92</span><span class="score-label">High confidence</span></span>
+                              <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Tone</span>
+                              <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Evidence</span>
+                              <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>No PII</span>
+                            </div>
+                          </div>
+                          <div class="section">
+                            <h3>What happened</h3>
+                            <p>Ada selected the Pink Tower at 9:15a without a guide present. She carried each cube individually using both hands, beginning with the largest.</p>
+                            <p>Mid-way she noticed the 4th and 5th cubes were transposed. She paused, removed the smaller cubes, corrected the order, and rebuilt without seeking adult help.</p>
+                          </div>
+                          <div class="section">
+                            <h3>In her own words</h3>
+                            <div class="quote">"I see — this one is smaller. It needs to be up there with the babies."</div>
+                          </div>
+                          <div class="section">
+                            <h3>Evidence</h3>
+                            <div class="photo-grid">
+                              <div class="photo p1">9:21a</div>
+                              <div class="photo p2">9:33a</div>
+                              <div class="photo p3">9:42a</div>
+                            </div>
                           </div>
                         </div>
-                        <div class="history-event">
-                          <div class="dot clay"></div>
-                          <div>
-                            <div class="he-head"><b>AI score 87 → 92</b> <span class="he-time">11:03a</span></div>
-                            <div class="he-body">After Mitable tightened "Connection to the plane".</div>
-                          </div>
+                      </section>
+
+                      <!-- Action rail (replaces former chat rail) -->
+                      <aside class="action-rail" id="action-rail">
+                        <button class="rail-btn tap" data-tip="Preview PDF" data-open-modal="preview" aria-label="Preview PDF">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                        <button class="rail-btn history-tint tap" data-tip="History" data-open-modal="history" aria-label="History">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                        </button>
+                        <button class="rail-btn primary tap" data-tip="Submit for review" data-open-modal="send" aria-label="Submit for review">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        </button>
+
+                        <div class="rail-sep"></div>
+
+                        <div class="reviewer-dot" title="Mei W. — reviewer">
+                          <div class="av xs sage">MW</div>
                         </div>
-                        <div class="history-event">
-                          <div class="dot clay"></div>
-                          <div>
-                            <div class="he-head"><b>Draft created</b> by Sara K. <span class="he-time">10:47a</span></div>
-                            <div class="he-body">From voice memo · 2 photos · 1 quote captured.</div>
-                          </div>
+                        <div class="reviewer-dot" title="Diego R. — reviewer">
+                          <div class="av xs clay">DR</div>
+                          <span class="pulse">2</span>
                         </div>
-                      </div>
+
+                        <div class="rail-grow"></div>
+
+                        <button class="rail-btn delete-btn danger tap" data-tip="Delete report" data-open-modal="delete" aria-label="Delete report">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                        </button>
+                      </aside>
                     </div>
 
-                    <!-- Drawer scrim + drawer (web) -->
-                    <div class="drawer-scrim" id="drawer-scrim"></div>
-                    <aside class="drawer" id="drawer" aria-label="Send for review drawer">
-                      <div class="drawer-head">
+                    <!-- ============================ MODALS (web-canvas-local; blur full page) ============================ -->
+                    <div class="page-modal-scrim" id="modal-scrim"></div>
+
+                    <!-- Modal: Preview PDF -->
+                    <div class="page-modal" id="modal-preview">
+                      <div class="page-modal-head">
                         <div>
-                          <h3>Send for review</h3>
-                          <div class="sub">Pink Tower mastery · Ada Okafor</div>
+                          <h3>Preview PDF</h3>
+                          <div class="sub">How parents will see this report · Ada Okafor · Pink Tower mastery</div>
                         </div>
-                        <button class="btn-ghost" style="padding:6px 8px; border-radius: 8px;" id="drawer-close">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <button class="close-btn tap" data-close-modal>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                       </div>
-                      <div class="drawer-body scroll-quiet">
-                        <!-- score readout -->
+                      <div class="page-modal-body">
+                        <div class="pdf-frame scroll-quiet">
+                          <h4>Pink Tower mastery</h4>
+                          <div class="pdf-meta">Ada Okafor · Tuesday 14 May · Sensorial · Sara K.</div>
+                          <div class="pdf-section">
+                            <div class="pdf-head">What happened</div>
+                            <p style="margin: 0 0 8px;">Ada selected the Pink Tower at 9:15a without a guide present. She carried each cube individually using both hands, beginning with the largest.</p>
+                            <p style="margin: 0;">Mid-way she noticed the 4th and 5th cubes were transposed. She paused, removed the smaller cubes, corrected the order, and rebuilt without seeking adult help.</p>
+                          </div>
+                          <div class="pdf-section">
+                            <div class="pdf-head">In her own words</div>
+                            <div class="pdf-quote">"I see — this one is smaller. It needs to be up there with the babies."</div>
+                          </div>
+                          <div class="pdf-section">
+                            <div class="pdf-head">Evidence</div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                              <div class="photo p1" style="aspect-ratio: 4/3; border-radius: 8px;"></div>
+                              <div class="photo p2" style="aspect-ratio: 4/3; border-radius: 8px;"></div>
+                              <div class="photo p3" style="aspect-ratio: 4/3; border-radius: 8px;"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="pdf-pager">
+                          <span>Page 1 of 1</span>
+                          <span>Generated 14 May · 11:03a</span>
+                        </div>
+                      </div>
+                      <div class="page-modal-foot">
+                        <button class="btn btn-ghost tap" data-close-modal>Close</button>
+                        <button class="btn btn-secondary tap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
+                      </div>
+                    </div>
+
+                    <!-- Modal: History -->
+                    <div class="page-modal" id="modal-history">
+                      <div class="page-modal-head">
+                        <div>
+                          <h3>History</h3>
+                          <div class="sub">Everything that happened to this report</div>
+                        </div>
+                        <button class="close-btn tap" data-close-modal>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                      <div class="page-modal-body">
+                        <div class="history-trail">
+                          <div class="history-event">
+                            <div class="dot sage"></div>
+                            <div>
+                              <div class="he-head"><b>Approved</b> by Mei W. <span class="he-time">just now</span></div>
+                              <div class="he-body">Queued for parents Fri 4:00p.</div>
+                            </div>
+                          </div>
+                          <div class="history-event">
+                            <div class="dot sage"></div>
+                            <div>
+                              <div class="he-head"><span style="color: var(--color-sage-deep);">✓ Tick</span> Diego R. <span class="he-time">1h</span></div>
+                              <div class="he-body">"+ one ✓. Consider adding the third repetition next time?"</div>
+                            </div>
+                          </div>
+                          <div class="history-event">
+                            <div class="dot butter"></div>
+                            <div>
+                              <div class="he-head"><b>Sent for review</b> <span class="he-time">4h</span></div>
+                              <div class="he-body">To Mei W., Diego R. By Sara K.</div>
+                            </div>
+                          </div>
+                          <div class="history-event">
+                            <div class="dot clay"></div>
+                            <div>
+                              <div class="he-head"><b>AI score 87 → 92</b> <span class="he-time">11:03a</span></div>
+                              <div class="he-body">Mitable tightened "Connection to the plane".</div>
+                            </div>
+                          </div>
+                          <div class="history-event">
+                            <div class="dot clay"></div>
+                            <div>
+                              <div class="he-head"><b>Draft created</b> by Sara K. <span class="he-time">10:47a</span></div>
+                              <div class="he-body">Voice memo · 2 photos · 1 quote.</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="page-modal-foot">
+                        <button class="btn btn-ghost tap" data-close-modal>Close</button>
+                      </div>
+                    </div>
+
+                    <!-- Modal: Submit for review -->
+                    <div class="page-modal" id="modal-send">
+                      <div class="page-modal-head">
+                        <div>
+                          <h3>Submit for review</h3>
+                          <div class="sub">Pick reviewers (1–3) and add an optional note · Pink Tower mastery</div>
+                        </div>
+                        <button class="close-btn tap" data-close-modal>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                      <div class="page-modal-body">
                         <div class="ai-callout">
                           <div class="ai-row">
-                            <span class="score green">
-                              <span class="score-bubble">92</span>
-                              <span class="score-label">Reviewers likely to fast-approve</span>
-                            </span>
+                            <span class="score green"><span class="score-bubble">92</span><span class="score-label">High confidence</span></span>
+                            <span style="font-size: 12px; color: var(--color-ink-secondary);">Reviewers see this score on their list. 85+ is usually approved without re-reading.</span>
                           </div>
-                          <div style="margin-top: 8px; font-size: 12px; color: var(--color-ink-secondary); line-height: 1.5;">Above 85 = high-confidence. Your reviewers see this score on their list. Most green-scored reports are approved without re-reading.</div>
                         </div>
-
                         <div>
-                          <label class="field-label">Assign reviewers · pick 1–3</label>
-                          <div class="reviewer-grid">
+                          <label class="field-label">Reviewers · pick 1–3</label>
+                          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             <div class="reviewer-card selected">
                               <div class="av sm sage">MW</div>
-                              <div class="info"><span class="nm">Mei Wong</span><span class="role">Lead · Bluebell room</span></div>
+                              <div class="info"><span class="nm">Mei Wong</span><span class="role">Lead · Bluebell</span></div>
                               <div class="check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
                             </div>
                             <div class="reviewer-card selected">
@@ -1164,197 +1389,82 @@
                             </div>
                             <div class="reviewer-card">
                               <div class="av sm butter">JT</div>
-                              <div class="info"><span class="nm">Jamie Tao</span><span class="role">Lead · Robin room</span></div>
+                              <div class="info"><span class="nm">Jamie Tao</span><span class="role">Lead · Robin</span></div>
                               <div class="check"></div>
                             </div>
                             <div class="reviewer-card">
                               <div class="av sm blue">RS</div>
-                              <div class="info"><span class="nm">Rita Singh</span><span class="role">Floater</span></div>
+                              <div class="info"><span class="nm">Rae Singh</span><span class="role">Admin · School</span></div>
                               <div class="check"></div>
                             </div>
                           </div>
-                          <div style="margin-top:9px; font-size: 11.5px; color: var(--color-ink-muted);">Parallel review — any of them can tick first. <a href="#" style="color: var(--color-terracotta-deep); text-decoration: none; font-weight: 600;">Pick from all teachers →</a></div>
                         </div>
-
                         <div>
-                          <label class="field-label">Note for reviewers · optional</label>
-                          <textarea class="note" placeholder="e.g. Self-correction moment — wanted a second pair of eyes on whether to call it Major.">Self-correction moment — wanted a second pair of eyes on whether to call it Major or Daily.</textarea>
+                          <label class="field-label">Note · optional</label>
+                          <textarea class="note" placeholder="Quick note for reviewers…">Wanted a second pair of eyes on Major vs Daily.</textarea>
                         </div>
+                      </div>
+                      <div class="page-modal-foot">
+                        <button class="btn btn-ghost tap" data-close-modal>Save draft</button>
+                        <button class="btn btn-primary tap">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                          Send to 2
+                        </button>
+                      </div>
+                    </div>
 
+                    <!-- Modal: Delete confirm -->
+                    <div class="page-modal small" id="modal-delete">
+                      <div class="page-modal-head">
                         <div>
-                          <label class="field-label">Promote when…</label>
-                          <div style="display:flex; gap:6px; flex-wrap: wrap;">
-                            <button class="btn btn-secondary" style="font-size: 11.5px; padding: 6px 11px; background: color-mix(in srgb, var(--color-sage-soft) 50%, var(--color-surface)); border-color: var(--color-sage-deep); color: var(--color-sage-deep);">Any 1 reviewer ✓</button>
-                            <button class="btn btn-secondary" style="font-size: 11.5px; padding: 6px 11px;">2 of 2 ✓</button>
-                            <button class="btn btn-secondary" style="font-size: 11.5px; padding: 6px 11px;">Hold for admin</button>
-                          </div>
+                          <h3>Delete this report?</h3>
+                          <div class="sub">Pink Tower mastery · Ada Okafor</div>
                         </div>
+                        <button class="close-btn tap" data-close-modal>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
                       </div>
-                      <div class="drawer-foot">
-                        <button class="btn btn-ghost" id="drawer-cancel">Save draft</button>
-                        <button class="btn btn-primary"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send to 2 reviewers</button>
+                      <div class="page-modal-body">
+                        <p style="margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--color-ink-secondary);">
+                          This will permanently delete the draft and any attached photos, quotes, and voice memos. Reviewers who were already notified will see the report disappear from their queue.
+                        </p>
+                        <p style="margin: 0; font-size: 12.5px; color: var(--color-ink-muted);">
+                          You can't undo this.
+                        </p>
                       </div>
-                    </aside>
-                  </section>
-                </div>
+                      <div class="page-modal-foot">
+                        <button class="btn btn-ghost tap" data-close-modal>Cancel</button>
+                        <button class="btn btn-danger tap" data-close-modal>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                          Delete report
+                        </button>
+                      </div>
+                    </div>
 
-                <!-- Layout C: three-pane -->
-                <div class="layout-c only-c" id="layout-c" data-chat-collapsed="false">
-                  <aside class="list-rail">
-                    <div class="list-toolbar" style="padding: 12px 14px 10px;">
-                      <div>
-                        <h2 style="font-size: 16px;" class="when-drafts" >Drafts</h2>
-                        <h2 style="font-size: 16px;" class="when-review">In Review</h2>
-                        <h2 style="font-size: 16px;" class="when-approved">Approved</h2>
-                        <h2 style="font-size: 16px;" class="when-sent">Sent</h2>
-                      </div>
-                    </div>
-                    <div class="rows scroll-quiet" id="rows-c" style="padding: 4px 4px 80px;"></div>
-                  </aside>
+                  </div><!-- /.web-content -->
+                </div><!-- /.web-shell -->
+              </div><!-- /.screen -->
+            </div><!-- /.web-canvas -->
+          </div><!-- /.web-frame -->
 
-                  <section class="reading-pane">
-                    <div class="reading-head">
-                      <div class="row1">
-                        <span class="pill major"><span class="dot"></span>Major</span>
-                        <h2 style="font-size: 18px;">Ada Okafor · Pink Tower mastery</h2>
-                      </div>
-                      <div class="row2">
-                        <div class="meta">Tuesday 14 May · 9:15a–9:42a · Sensorial · Sara K.</div>
-                        <div style="margin-left:auto; display:flex; gap: 7px;">
-                          <span class="score green" id="ai-callout-c-score"><span class="score-bubble">92</span><span class="score-label">Ready</span></span>
-                          <button class="btn btn-primary when-drafts" data-open="send-web" style="display:none;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send for review</button>
-                          <button class="btn btn-primary sage when-review" style="display:none;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Approve</button>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="reading-body scroll-quiet">
-                      <div class="ai-callout">
-                        <div class="ai-row">
-                          <span class="score green"><span class="score-bubble">92</span><span class="score-label">High confidence</span></span>
-                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Tone</span>
-                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Evidence</span>
-                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>No PII</span>
-                        </div>
-                      </div>
-                      <div class="section"><h3>What happened</h3><p>Ada selected the Pink Tower at 9:15a without a guide present. She carried each cube individually using both hands, beginning with the largest.</p><p>Mid-way she noticed the 4th and 5th cubes were transposed. She paused, removed the smaller cubes, corrected the order, and rebuilt without seeking adult help.</p></div>
-                      <div class="section"><h3>In her own words</h3><div class="quote">"I see — this one is smaller. It needs to be up there with the babies."</div></div>
-                      <div class="section"><h3>Evidence</h3>
-                        <div class="photo-grid"><div class="photo p1">9:21a</div><div class="photo p2">9:33a</div><div class="photo p3">9:42a</div></div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <aside class="chat-rail" id="chat-rail-c" data-rail-view="chat">
-                    <div class="chat-head">
-                      <div class="head-text">
-                        <div class="rail-tabs" id="rail-tabs">
-                          <button data-rail="chat" class="active">Editor</button>
-                          <button data-rail="history">History <span class="count">5</span></button>
-                        </div>
-                      </div>
-                      <button class="collapse-btn" id="chat-collapse" title="Collapse chat">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                      </button>
-                    </div>
-                    <!-- Chat view -->
-                    <div class="chat-body scroll-quiet" id="rail-chat-body">
-                      <div class="msg ai when-drafts">
-                        <div class="av sm clay">AI</div>
-                        <div>
-                          <div class="who">Mitable</div>
-                          <div class="bubble">The self-correction moment is unusually well-described. Want me to tighten the connection-to-plane paragraph?</div>
-                        </div>
-                      </div>
-                      <div class="msg me when-drafts">
-                        <div class="bubble">Yes, link it to the math sequence next term.</div>
-                      </div>
-                      <div class="msg review when-review">
-                        <div class="av sm sage">MW</div>
-                        <div>
-                          <div class="who">Mei W. · just now</div>
-                          <div class="bubble">Beautifully observed. Approving — score reasoning matches what I'd flag.</div>
-                        </div>
-                      </div>
-                      <div class="msg review when-review">
-                        <div class="av sm clay">DR</div>
-                        <div>
-                          <div class="who">Diego R. · 1h</div>
-                          <div class="bubble">+ one ✓. Consider adding the third repetition next time?</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="chat-input-row" id="rail-chat-input">
-                      <input type="text" placeholder="Ask Mitable, or comment for reviewers…" />
-                      <button class="btn btn-primary" style="padding: 7px 11px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-                    </div>
-                    <!-- History view -->
-                    <div class="rail-history scroll-quiet" id="rail-history-body" style="display:none;">
-                      <div class="history-trail compact">
-                        <div class="history-event">
-                          <div class="dot sage"></div>
-                          <div>
-                            <div class="he-head"><b>Approved</b> by Mei W. <span class="he-time">just now</span></div>
-                            <div class="he-body">Queued for parents Fri 4:00p.</div>
-                          </div>
-                        </div>
-                        <div class="history-event">
-                          <div class="dot sage"></div>
-                          <div>
-                            <div class="he-head"><span style="color: var(--color-sage-deep);">✓ Tick</span> Diego R. <span class="he-time">1h</span></div>
-                            <div class="he-body">"+ one ✓. Consider adding the third repetition next time?"</div>
-                          </div>
-                        </div>
-                        <div class="history-event">
-                          <div class="dot butter"></div>
-                          <div>
-                            <div class="he-head"><b>Sent for review</b> <span class="he-time">4h</span></div>
-                            <div class="he-body">To Mei W., Diego R. By Sara K.</div>
-                          </div>
-                        </div>
-                        <div class="history-event">
-                          <div class="dot clay"></div>
-                          <div>
-                            <div class="he-head"><b>AI score 87 → 92</b> <span class="he-time">11:03a</span></div>
-                            <div class="he-body">Mitable tightened "Connection to the plane".</div>
-                          </div>
-                        </div>
-                        <div class="history-event">
-                          <div class="dot clay"></div>
-                          <div>
-                            <div class="he-head"><b>Draft created</b> by Sara K. <span class="he-time">10:47a</span></div>
-                            <div class="he-body">Voice memo · 2 photos · 1 quote.</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- collapsed rail -->
-                    <div class="collapsed-rail-stack" id="collapsed-rail-stack">
-                      <button title="Open chat" id="chat-expand"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>
-                      <button title="Open history" id="history-expand" style="background: color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface));">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-sage-deep)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
-                      </button>
-                      <div class="av xs sage" style="margin-top: -4px;">MW</div>
-                      <div class="av xs clay" style="margin-top: -4px;">DR</div>
-                      <div style="background: var(--color-terracotta); color: #fff; width: 18px; height: 18px; border-radius: 999px; display:grid; place-items:center; font-size: 9.5px; font-weight: 700; margin-top: -2px;">2</div>
-                    </div>
-                  </aside>
-                </div>
-
-                <!-- Caveat annotations (web) -->
-                <div class="annot web" style="top: 110px; left: 28px;">
-                  <span>list never moves —<br/>flow through 20 reports in 2 min</span>
-                </div>
-                <div class="annot web" style="top: 200px; right: 28px; max-width: 220px; text-align:right;">
-                  <span>score → quick approve.<br/>flags expand when you don't trust it.</span>
-                </div>
-              </div>
-            </div>
+          <!-- web annotations -->
+          <div class="annot web" style="top: 60px; left: -200px; max-width: 180px; text-align: right;">
+            <span>left nav matches<br/>the live app sidebar</span>
           </div>
-        </div>
+          <div class="annot web" style="top: 280px; right: -210px; max-width: 200px; text-align: left;">
+            <span>actions, not chat —<br/>every icon launches a<br/>modal that blurs the page</span>
+          </div>
+          <div class="annot web" style="bottom: 60px; right: -210px; max-width: 200px; text-align: left;">
+            <span>delete is bottom-pinned<br/>and visually quieter</span>
+          </div>
+          <div class="annot web" style="top: 280px; left: -160px; max-width: 140px; text-align: right;">
+            <span>list never moves —<br/>flow through 20 reports<br/>in 2 minutes</span>
+          </div>
+        </div><!-- /.device web -->
 
         <!-- ============================================================ MOBILE ============================================================ -->
         <div class="device">
-          <div class="device-label">Mobile <small>390 × 760 · iPhone 15</small></div>
+          <div class="device-label">Mobile <small>390 × 820 · iPhone 15</small></div>
           <div class="mobile-frame">
             <div class="mobile-bezel">
               <div class="island"></div>
@@ -1368,11 +1478,24 @@
               </div>
 
               <div class="mobile-canvas">
-                <div class="m-screen active">
+                <!-- ============================ M-SCREEN 1: LIST ============================ -->
+                <div class="m-screen active" id="m-screen-list">
                   <div class="m-topbar">
-                    <button class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+                    <button class="m-avatar" aria-label="Open menu">SK</button>
+                    <div class="m-title">Reports</div>
+                    <div class="m-grow"></div>
+                    <button class="icon-btn" aria-label="New report">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                  </div>
+                  <div class="m-page-head">
                     <h1>Reports</h1>
-                    <button class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+                    <div class="sub">
+                      <span class="when-drafts">7 drafts · 3 ready to send</span>
+                      <span class="when-review">12 in review · 5 waiting on you</span>
+                      <span class="when-approved">4 cleared to send to parents</span>
+                      <span class="when-sent">38 sent this week</span>
+                    </div>
                   </div>
                   <div class="m-tabs" id="m-tabs">
                     <button data-tab="drafts" class="active">Drafts <span class="count">7</span></button>
@@ -1382,94 +1505,268 @@
                   </div>
                   <div class="m-rows scroll-quiet" id="m-rows"></div>
 
-                  <button class="m-chat-fab when-drafts when-review" style="display: grid;" id="m-chat-fab">
+                  <button class="m-chat-fab" aria-label="Ask Mitable">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                    <span class="badge when-review" style="display: grid;">2</span>
+                    <span class="badge">2</span>
                   </button>
+                </div>
 
-                  <!-- mobile bottom sheet for Send for review -->
-                  <div class="m-sheet-scrim" id="m-sheet-scrim"></div>
-                  <div class="m-sheet" id="m-sheet">
-                    <div class="handle"></div>
-                    <div class="m-sheet-head">
-                      <div>
-                        <h3>Send for review</h3>
-                        <div class="sub">Pink Tower · Ada Okafor</div>
+                <!-- ============================ M-SCREEN 2: REPORT DETAIL ============================ -->
+                <div class="m-screen" id="m-screen-report">
+                  <div class="m-detail">
+                    <div class="m-detail-topbar">
+                      <button class="back-btn tap" id="m-back-btn" aria-label="Back">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                      </button>
+                      <div class="title-block">
+                        <div class="name">Ada Okafor</div>
+                        <div class="sub">
+                          <span class="pill major" style="font-size: 9.5px; padding: 1px 6px;"><span class="dot"></span>Major</span>
+                          <span>Pink Tower mastery</span>
+                        </div>
                       </div>
-                      <button class="icon-btn" id="m-sheet-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                      <button class="kebab-btn tap" aria-label="More">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+                      </button>
                     </div>
-                    <div class="m-sheet-body scroll-quiet">
+                    <div class="m-detail-body scroll-quiet">
+                      <div class="reading-head-mob">
+                        <h2>Pink Tower mastery</h2>
+                        <div class="meta">Tuesday 14 May · 9:15a–9:42a · Sensorial · Sara K.</div>
+                      </div>
                       <div class="ai-callout">
                         <div class="ai-row">
-                          <span class="score green"><span class="score-bubble">92</span><span class="score-label">High confidence</span></span>
-                        </div>
-                        <div style="margin-top:6px; font-size: 11.5px; color: var(--color-ink-secondary); line-height: 1.45;">Reviewers see this score on their list. 85+ is usually approved without re-reading.</div>
-                      </div>
-
-                      <div>
-                        <label class="field-label">Reviewers · pick 1–3</label>
-                        <div style="display:flex; flex-direction: column; gap: 6px;">
-                          <div class="reviewer-card selected">
-                            <div class="av sm sage">MW</div>
-                            <div class="info"><span class="nm">Mei Wong</span><span class="role">Lead · Bluebell</span></div>
-                            <div class="check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-                          </div>
-                          <div class="reviewer-card selected">
-                            <div class="av sm clay">DR</div>
-                            <div class="info"><span class="nm">Diego Ruiz</span><span class="role">Assistant · Bluebell</span></div>
-                            <div class="check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-                          </div>
-                          <div class="reviewer-card">
-                            <div class="av sm butter">JT</div>
-                            <div class="info"><span class="nm">Jamie Tao</span><span class="role">Lead · Robin</span></div>
-                            <div class="check"></div>
-                          </div>
+                          <span class="score green"><span class="score-bubble">92</span><span class="score-label">Ready</span></span>
+                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Tone</span>
+                          <span class="flag-chip ok"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Evidence</span>
                         </div>
                       </div>
-
-                      <div>
-                        <label class="field-label">Note · optional</label>
-                        <textarea class="note" placeholder="Quick note for reviewers…">Wanted a second pair of eyes on Major vs Daily.</textarea>
+                      <div class="section">
+                        <h3>What happened</h3>
+                        <p>Ada selected the Pink Tower at 9:15a without a guide present. She carried each cube individually using both hands, beginning with the largest.</p>
+                        <p>Mid-way she noticed the 4th and 5th cubes were transposed. She paused, corrected the order, and rebuilt without seeking adult help.</p>
+                      </div>
+                      <div class="section">
+                        <h3>In her own words</h3>
+                        <div class="quote">"I see — this one is smaller. It needs to be up there with the babies."</div>
+                      </div>
+                      <div class="section">
+                        <h3>Evidence</h3>
+                        <div class="photo-grid">
+                          <div class="photo p1"></div>
+                          <div class="photo p2"></div>
+                          <div class="photo p3"></div>
+                        </div>
                       </div>
                     </div>
-                    <div class="m-sheet-foot">
-                      <button class="btn btn-ghost">Save draft</button>
-                      <button class="btn btn-primary"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send to 2</button>
+                    <div class="m-action-bar">
+                      <button class="m-action tap" data-open-modal-mob="preview" aria-label="Preview PDF">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                      <button class="m-action history-tint tap" data-open-modal-mob="history" aria-label="History">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                      </button>
+                      <button class="m-action primary tap" data-open-modal-mob="send" aria-label="Submit for review">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      </button>
+                      <button class="m-action tap" data-open-modal-mob="delete" aria-label="Delete report">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                      </button>
                     </div>
                   </div>
+                </div>
 
-                  <div class="m-bottom-nav">
-                    <button>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                      Today
+                <!-- ============================ Mobile modal sheets (4 instances, one per modal) ============================ -->
+                <div class="m-modal-scrim" id="m-modal-scrim"></div>
+
+                <div class="m-modal-sheet tall" id="m-modal-preview">
+                  <div class="handle"></div>
+                  <div class="m-modal-head">
+                    <div>
+                      <h3>Preview PDF</h3>
+                      <div class="sub">Pink Tower mastery · Ada Okafor</div>
+                    </div>
+                    <button class="icon-btn tap" data-close-modal-mob aria-label="Close">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
-                    <button class="active">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                      Reports
+                  </div>
+                  <div class="m-modal-body scroll-quiet">
+                    <div class="pdf-frame">
+                      <h4>Pink Tower mastery</h4>
+                      <div class="pdf-meta">Ada Okafor · 14 May · Sara K.</div>
+                      <div class="pdf-section">
+                        <div class="pdf-head">What happened</div>
+                        <p style="margin: 0;">Ada selected the Pink Tower at 9:15a without a guide present. She self-corrected at the 4th and 5th cubes and rebuilt unaided.</p>
+                      </div>
+                      <div class="pdf-section">
+                        <div class="pdf-head">In her own words</div>
+                        <div class="pdf-quote">"I see — this one is smaller. It needs to be up there with the babies."</div>
+                      </div>
+                      <div class="pdf-section">
+                        <div class="pdf-head">Evidence</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                          <div class="photo p1" style="aspect-ratio: 4/3; border-radius: 6px;"></div>
+                          <div class="photo p2" style="aspect-ratio: 4/3; border-radius: 6px;"></div>
+                          <div class="photo p3" style="aspect-ratio: 4/3; border-radius: 6px;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="m-modal-foot">
+                    <button class="btn btn-ghost tap" data-close-modal-mob>Close</button>
+                    <button class="btn btn-secondary tap">Download</button>
+                  </div>
+                </div>
+
+                <div class="m-modal-sheet tall" id="m-modal-history">
+                  <div class="handle"></div>
+                  <div class="m-modal-head">
+                    <div>
+                      <h3>History</h3>
+                      <div class="sub">Everything that happened to this report</div>
+                    </div>
+                    <button class="icon-btn tap" data-close-modal-mob aria-label="Close">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
-                    <button>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                      Children
+                  </div>
+                  <div class="m-modal-body scroll-quiet">
+                    <div class="history-trail">
+                      <div class="history-event">
+                        <div class="dot sage"></div>
+                        <div>
+                          <div class="he-head"><b>Approved</b> by Mei W. <span class="he-time">just now</span></div>
+                          <div class="he-body">Queued for parents Fri 4:00p.</div>
+                        </div>
+                      </div>
+                      <div class="history-event">
+                        <div class="dot sage"></div>
+                        <div>
+                          <div class="he-head"><span style="color: var(--color-sage-deep);">✓ Tick</span> Diego R. <span class="he-time">1h</span></div>
+                          <div class="he-body">"+ one ✓. Consider adding the third repetition next time?"</div>
+                        </div>
+                      </div>
+                      <div class="history-event">
+                        <div class="dot butter"></div>
+                        <div>
+                          <div class="he-head"><b>Sent for review</b> <span class="he-time">4h</span></div>
+                          <div class="he-body">To Mei W., Diego R.</div>
+                        </div>
+                      </div>
+                      <div class="history-event">
+                        <div class="dot clay"></div>
+                        <div>
+                          <div class="he-head"><b>AI score 87 → 92</b> <span class="he-time">11:03a</span></div>
+                          <div class="he-body">Mitable tightened "Connection to the plane".</div>
+                        </div>
+                      </div>
+                      <div class="history-event">
+                        <div class="dot clay"></div>
+                        <div>
+                          <div class="he-head"><b>Draft created</b> by Sara K. <span class="he-time">10:47a</span></div>
+                          <div class="he-body">Voice memo · 2 photos · 1 quote.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="m-modal-foot">
+                    <button class="btn btn-ghost tap" data-close-modal-mob>Close</button>
+                  </div>
+                </div>
+
+                <div class="m-modal-sheet tall" id="m-modal-send">
+                  <div class="handle"></div>
+                  <div class="m-modal-head">
+                    <div>
+                      <h3>Submit for review</h3>
+                      <div class="sub">Pink Tower mastery · Ada Okafor</div>
+                    </div>
+                    <button class="icon-btn tap" data-close-modal-mob aria-label="Close">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
-                    <button>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                      Settings
+                  </div>
+                  <div class="m-modal-body scroll-quiet">
+                    <div class="ai-callout">
+                      <div class="ai-row">
+                        <span class="score green"><span class="score-bubble">92</span><span class="score-label">High confidence</span></span>
+                      </div>
+                      <div style="margin-top:6px; font-size: 11.5px; color: var(--color-ink-secondary); line-height: 1.45;">Reviewers see this score on their list. 85+ is usually approved without re-reading.</div>
+                    </div>
+                    <div>
+                      <label class="field-label">Reviewers · pick 1–3</label>
+                      <div style="display:flex; flex-direction: column; gap: 6px;">
+                        <div class="reviewer-card selected">
+                          <div class="av sm sage">MW</div>
+                          <div class="info"><span class="nm">Mei Wong</span><span class="role">Lead · Bluebell</span></div>
+                          <div class="check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                        </div>
+                        <div class="reviewer-card selected">
+                          <div class="av sm clay">DR</div>
+                          <div class="info"><span class="nm">Diego Ruiz</span><span class="role">Assistant · Bluebell</span></div>
+                          <div class="check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                        </div>
+                        <div class="reviewer-card">
+                          <div class="av sm butter">JT</div>
+                          <div class="info"><span class="nm">Jamie Tao</span><span class="role">Lead · Robin</span></div>
+                          <div class="check"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="field-label">Note · optional</label>
+                      <textarea class="note" placeholder="Quick note for reviewers…">Wanted a second pair of eyes on Major vs Daily.</textarea>
+                    </div>
+                  </div>
+                  <div class="m-modal-foot">
+                    <button class="btn btn-ghost tap" data-close-modal-mob>Save draft</button>
+                    <button class="btn btn-primary tap">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      Send to 2
                     </button>
                   </div>
                 </div>
-              </div>
+
+                <div class="m-modal-sheet short" id="m-modal-delete">
+                  <div class="handle"></div>
+                  <div class="m-modal-head">
+                    <div>
+                      <h3>Delete this report?</h3>
+                      <div class="sub">Pink Tower mastery · Ada Okafor</div>
+                    </div>
+                    <button class="icon-btn tap" data-close-modal-mob aria-label="Close">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  <div class="m-modal-body">
+                    <p style="margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--color-ink-secondary);">
+                      This will permanently delete the draft and any attached photos, quotes, and voice memos. Reviewers who were already notified will see the report disappear from their queue. You can't undo this.
+                    </p>
+                  </div>
+                  <div class="m-modal-foot">
+                    <button class="btn btn-ghost tap" data-close-modal-mob>Cancel</button>
+                    <button class="btn btn-danger tap" data-close-modal-mob>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+              </div><!-- /.mobile-canvas -->
               <div class="home-bar"></div>
-            </div>
-          </div>
+            </div><!-- /.mobile-bezel -->
+          </div><!-- /.mobile-frame -->
+
           <!-- mobile annotations -->
-          <div class="annot" style="top: 120px; left: -180px; max-width: 170px; text-align: right;">
-            <span>tap row → opens<br/>inline, not a new page</span>
+          <div class="annot" style="top: 60px; left: -200px; max-width: 180px; text-align: right;">
+            <span>avatar opens the<br/>drawer nav (no bottom tabs)</span>
           </div>
-          <div class="annot" style="bottom: 100px; left: -180px; max-width: 170px; text-align: right;">
-            <span>send-for-review is a<br/>sheet, not a route</span>
+          <div class="annot" style="top: 240px; left: -210px; max-width: 200px; text-align: right;">
+            <span>missing entry point —<br/>tapping a row now opens<br/>the report full-bleed</span>
           </div>
-        </div>
-      </div>
+          <div class="annot" style="bottom: 140px; left: -210px; max-width: 200px; text-align: right;">
+            <span>same 4 actions as web<br/>rail, on a bottom strip</span>
+          </div>
+        </div><!-- /.device mobile -->
+      </div><!-- /.compare -->
     </main>
 
     <!-- ============================================================ DATA + RENDERING ============================================================ -->
@@ -1537,7 +1834,7 @@
           signal = `<span class="pill sage" style="font-size:10.5px;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>${row.scheduled}</span>`;
         } else if (tab === "sent") {
           const isRead = row.deliveryRead === row.deliveryTotal;
-          signal = `<span class="pill ${isRead ? "sage" : "clay"}" style="font-size:10.5px;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px;">${isRead ? '<polyline points="20 6 9 17 4 12"/><polyline points="4 12 9 17 20 6"/>' : '<circle cx="12" cy="12" r="9"/>'}</svg>${row.deliveryRead}/${row.deliveryTotal} read</span>`;
+          signal = `<span class="pill ${isRead ? "sage" : "clay"}" style="font-size:10.5px;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px;">${isRead ? '<polyline points="20 6 9 17 4 12"/>' : '<circle cx="12" cy="12" r="9"/>'}</svg>${row.deliveryRead}/${row.deliveryTotal} read</span>`;
         }
 
         const meta =
@@ -1546,7 +1843,6 @@
           tab === "approved" ? `By ${row.approver}` :
           tab === "sent" ? `${row.sentDate}${row.reply ? " · 1 reply" : ""}` : "";
 
-        // inline tick — only on green-scored rows in review tab (the fast-approve affordance)
         const inlineTick = (tab === "review" && scoreLevel === "high")
           ? `<button class="inline-tick show" title="Quick approve"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>`
           : "";
@@ -1570,7 +1866,7 @@
         `;
       }
 
-      function renderMobileRow(row, tab, scoreLevel, isOpen) {
+      function renderMobileRow(row, tab, scoreLevel) {
         const s = scoreFor(scoreLevel);
         const scoreChip = (tab === "drafts" || tab === "review") ? `<span class="score-mini ${s.klass}"><span class="bubble">${s.val}</span></span>` : "";
 
@@ -1597,40 +1893,8 @@
           tab === "approved" ? `${row.approver}` :
           tab === "sent" ? `${row.sentDate}` : "";
 
-        // expand panel for open row
-        let expand = "";
-        if (isOpen) {
-          const aiKlass = scoreLevel === "high" ? "" : scoreLevel === "med" ? "amber" : "red";
-          const ai = tab === "drafts" || tab === "review"
-            ? `<div class="ai-mini ${aiKlass}"><span class="score-mini ${s.klass}"><span class="bubble">${s.val}</span></span><span>${scoreLevel === "high" ? "Tone · evidence · attribution all clear" : scoreLevel === "med" ? "Missing one quote · evidence light" : "Tone too evaluative · 3 risks flagged"}</span></div>`
-            : "";
-
-          const photos = tab !== "sent" ? `<div class="photo-grid"><div class="photo p1"></div><div class="photo p2"></div><div class="photo p3"></div></div>` : "";
-
-          let actions = "";
-          if (tab === "drafts") {
-            actions = `<div class="action-row"><button class="btn btn-secondary">Edit</button><button class="btn btn-primary" data-m-open="send"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send for review</button></div>`;
-          } else if (tab === "review") {
-            actions = `<div class="action-row"><button class="btn btn-secondary">Comment</button><button class="btn btn-secondary">Request changes</button><button class="btn btn-primary sage"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Approve ✓</button></div>`;
-          } else if (tab === "approved") {
-            actions = `<div class="action-row"><button class="btn btn-secondary">Reschedule</button><button class="btn btn-primary"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send now</button></div>`;
-          } else if (tab === "sent") {
-            actions = `<div class="action-row"><button class="btn btn-secondary">View receipt</button>${row.reply ? `<button class="btn btn-secondary">Read reply</button>` : ""}</div>`;
-          }
-
-          expand = `
-            <div class="expand-inline">
-              ${ai}
-              <p>${row.title === "Pink Tower mastery" ? "Ada selected the Pink Tower at 9:15a without a guide present. She carried each cube with both hands and arranged them in graduated order on the rug." : row.summary}</p>
-              ${row.title === "Pink Tower mastery" ? '<div class="quote">"I see — this one is smaller. It needs to be up there with the babies."</div>' : ""}
-              ${photos}
-              ${actions}
-            </div>
-          `;
-        }
-
         return `
-          <div class="m-row ${row.focus ? "selected" : ""} tap" data-row="${row.id}">
+          <div class="m-row tap" data-row="${row.id}">
             <div class="av ${row.tone}">${avInitials(row.name)}</div>
             <div>
               <div class="name-line">
@@ -1645,25 +1909,19 @@
                 <span style="font-size:10.5px; color: var(--color-ink-muted); margin-left:auto;">${meta}</span>
               </div>
             </div>
-            ${expand}
+            <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         `;
       }
+
+      const stage = document.getElementById("stage");
 
       function renderRows() {
         const tab = stage.dataset.tab;
         const scoreLevel = stage.dataset.score;
         const rowsData = ROWS[tab] || [];
-
-        // adjust focus row's score class in dataset
-        document.getElementById("rows-a").innerHTML = rowsData.map(r => renderRow(r, tab, scoreLevel)).join("");
         document.getElementById("rows-c").innerHTML = rowsData.map(r => renderRow(r, tab, scoreLevel)).join("");
-
-        // mobile — open the focused row inline
-        const focusId = (rowsData.find(r => r.focus) || rowsData[0])?.id;
-        document.getElementById("m-rows").innerHTML = rowsData.map(r => renderMobileRow(r, tab, scoreLevel, r.id === focusId)).join("");
-
-        // update reading-pane chrome
+        document.getElementById("m-rows").innerHTML = rowsData.map(r => renderMobileRow(r, tab, scoreLevel)).join("");
         updateReading();
       }
 
@@ -1672,8 +1930,7 @@
         const scoreLevel = stage.dataset.score;
         const s = scoreFor(scoreLevel);
 
-        // adjust score bubble in body
-        document.querySelectorAll("#ai-callout-a .score, #ai-callout-c-score").forEach(el => {
+        document.querySelectorAll("#ai-callout-score, #rh-score").forEach(el => {
           el.classList.remove("green", "amber", "red");
           el.classList.add(s.klass);
           const bubble = el.querySelector(".score-bubble");
@@ -1686,59 +1943,101 @@
           }
         });
 
-        // AI callout color band
-        const callout = document.getElementById("ai-callout-a");
+        const callout = document.getElementById("ai-callout");
         if (callout) {
           callout.classList.remove("amber", "red");
           if (s.klass === "amber") callout.classList.add("amber");
           if (s.klass === "red") callout.classList.add("red");
+          callout.style.display = (tab === "approved" || tab === "sent") ? "none" : "block";
         }
 
-        // when-X visibility helpers (inline elements)
-        document.querySelectorAll(".when-drafts").forEach(el => el.style.display = tab === "drafts" ? "" : "none");
-        document.querySelectorAll(".when-review").forEach(el => el.style.display = tab === "review" ? "" : "none");
-        document.querySelectorAll(".when-approved").forEach(el => el.style.display = tab === "approved" ? "" : "none");
-        document.querySelectorAll(".when-sent").forEach(el => el.style.display = tab === "sent" ? "" : "none");
-
-        // Drafts/Approved/Sent — surface the appropriate review strip in layout A
-        const stripReviewA = document.getElementById("strip-review-a");
-        if (stripReviewA) stripReviewA.style.display = (tab === "review") ? "flex" : "none";
-
-        // tabs active state
         document.querySelectorAll("#web-tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
         document.querySelectorAll("#m-tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-
-        // approved/sent — collapse AI callout in layout A (drops off after approved)
-        const aiCalloutA = document.getElementById("ai-callout-a");
-        if (aiCalloutA) aiCalloutA.style.display = (tab === "approved" || tab === "sent") ? "none" : "block";
-
-        // approved/sent — hide chat input
-        const chatInput = document.querySelector("#chat-rail-c .chat-input-row");
-        if (chatInput) chatInput.style.display = (tab === "approved" || tab === "sent") ? "none" : "flex";
       }
 
-      // ============================ EVENT WIRING ============================
-      const stage = document.getElementById("stage");
+      // ============================ MODAL CONTROL (web) ============================
+      const MODAL_IDS = { preview: "modal-preview", history: "modal-history", send: "modal-send", delete: "modal-delete" };
 
-      // demo bar
+      function openModal(name) {
+        Object.values(MODAL_IDS).forEach(id => document.getElementById(id).classList.remove("open"));
+        const id = MODAL_IDS[name];
+        if (!id) return;
+        document.getElementById("modal-scrim").classList.add("open");
+        document.getElementById(id).classList.add("open");
+        stage.dataset.modal = name;
+        document.querySelectorAll('#demo-bar button[data-set="modal"]').forEach(b => b.classList.toggle("active", b.dataset.val === name));
+      }
+      function closeModal() {
+        Object.values(MODAL_IDS).forEach(id => document.getElementById(id).classList.remove("open"));
+        document.getElementById("modal-scrim").classList.remove("open");
+        stage.dataset.modal = "none";
+        document.querySelectorAll('#demo-bar button[data-set="modal"]').forEach(b => b.classList.toggle("active", b.dataset.val === "none"));
+      }
+
+      document.querySelectorAll("[data-open-modal]").forEach(btn => {
+        btn.addEventListener("click", () => openModal(btn.dataset.openModal));
+      });
+      document.querySelectorAll("[data-close-modal]").forEach(btn => btn.addEventListener("click", closeModal));
+      document.getElementById("modal-scrim").addEventListener("click", closeModal);
+
+      // ============================ MODAL CONTROL (mobile sheets) ============================
+      const M_MODAL_IDS = { preview: "m-modal-preview", history: "m-modal-history", send: "m-modal-send", delete: "m-modal-delete" };
+
+      function openMobModal(name) {
+        Object.values(M_MODAL_IDS).forEach(id => document.getElementById(id).classList.remove("open"));
+        const id = M_MODAL_IDS[name];
+        if (!id) return;
+        document.getElementById("m-modal-scrim").classList.add("open");
+        document.getElementById(id).classList.add("open");
+      }
+      function closeMobModal() {
+        Object.values(M_MODAL_IDS).forEach(id => document.getElementById(id).classList.remove("open"));
+        document.getElementById("m-modal-scrim").classList.remove("open");
+      }
+      document.querySelectorAll("[data-open-modal-mob]").forEach(btn => {
+        btn.addEventListener("click", () => openMobModal(btn.dataset.openModalMob));
+      });
+      document.querySelectorAll("[data-close-modal-mob]").forEach(btn => btn.addEventListener("click", closeMobModal));
+      document.getElementById("m-modal-scrim").addEventListener("click", closeMobModal);
+
+      // ============================ MOBILE SCREEN SWITCH ============================
+      function setMobile(view) {
+        document.getElementById("m-screen-list").classList.toggle("active", view === "list");
+        document.getElementById("m-screen-report").classList.toggle("active", view === "report");
+        stage.dataset.mobile = view;
+        document.querySelectorAll('#demo-bar button[data-set="mobile"]').forEach(b => b.classList.toggle("active", b.dataset.val === view));
+        if (view !== "report") closeMobModal();
+      }
+
+      // tap a row → open report
+      document.getElementById("m-rows").addEventListener("click", (e) => {
+        if (e.target.closest(".m-row")) setMobile("report");
+      });
+      document.getElementById("m-back-btn").addEventListener("click", () => setMobile("list"));
+
+      // ============================ DEMO BAR ============================
       document.querySelectorAll("#demo-bar button[data-set]").forEach(btn => {
         btn.addEventListener("click", () => {
           const key = btn.dataset.set;
           const val = btn.dataset.val;
-          if (key === "panel") {
-            if (val === "send-web") openWebDrawer();
-            else if (val === "send-mob") openMobSheet();
-            else { closeWebDrawer(); closeMobSheet(); }
-            document.querySelectorAll(`#demo-bar button[data-set="panel"]`).forEach(b => b.classList.toggle("active", b === btn));
+
+          if (key === "modal") {
+            if (val === "none") closeModal();
+            else openModal(val);
             return;
           }
+          if (key === "mobile") {
+            setMobile(val);
+            return;
+          }
+
           stage.dataset[key] = val;
           document.querySelectorAll(`#demo-bar button[data-set="${key}"]`).forEach(b => b.classList.toggle("active", b === btn));
           renderRows();
         });
       });
 
-      // tab buttons inside the app
+      // Tab buttons inside the app
       document.querySelectorAll("#web-tabs button, #m-tabs button").forEach(b => {
         b.addEventListener("click", () => {
           stage.dataset.tab = b.dataset.tab;
@@ -1747,91 +2046,9 @@
         });
       });
 
-      // chat collapse (Layout C)
-      const layoutC = document.getElementById("layout-c");
-      const chatRailC = document.getElementById("chat-rail-c");
-      document.getElementById("chat-collapse").addEventListener("click", () => {
-        const collapsed = layoutC.dataset.chatCollapsed === "true";
-        layoutC.dataset.chatCollapsed = collapsed ? "false" : "true";
-      });
-
-      // rail view switching (Editor / History inside Layout C chat rail)
-      function setRailView(name) {
-        const chat = document.getElementById("rail-chat-body");
-        const input = document.getElementById("rail-chat-input");
-        const hist = document.getElementById("rail-history-body");
-        if (chat) chat.style.display = name === "chat" ? "flex" : "none";
-        if (input) input.style.display = name === "chat" ? "flex" : "none";
-        if (hist) hist.style.display = name === "history" ? "block" : "none";
-        document.querySelectorAll("#rail-tabs button").forEach(x => x.classList.toggle("active", x.dataset.rail === name));
-        chatRailC.dataset.railView = name;
-      }
-      document.querySelectorAll("#rail-tabs button").forEach(b => {
-        b.addEventListener("click", () => setRailView(b.dataset.rail));
-      });
-
-      document.getElementById("chat-expand")?.addEventListener("click", () => {
-        layoutC.dataset.chatCollapsed = "false";
-        setRailView("chat");
-      });
-      document.getElementById("history-expand")?.addEventListener("click", () => {
-        layoutC.dataset.chatCollapsed = "false";
-        setRailView("history");
-      });
-
-      // reasoning toggle
-      const reasonToggleA = document.getElementById("reason-toggle-a");
-      reasonToggleA?.addEventListener("click", () => {
-        const r = document.getElementById("reasoning-a");
-        r.style.display = r.style.display === "block" ? "none" : "block";
-      });
-
-      // pane tabs (layout A) — swap visible body
-      function setPaneA(name) {
-        const body = document.getElementById("body-a");
-        const chat = document.getElementById("chat-a");
-        const hist = document.getElementById("history-a");
-        if (body) body.style.display = name === "report" ? "block" : "none";
-        if (chat) chat.style.display = name === "chat" ? "flex" : "none";
-        if (hist) hist.style.display = name === "history" ? "flex" : "none";
-        document.querySelectorAll(".pane-tabbar button").forEach(x => {
-          x.classList.toggle("active", x.dataset.pane === name);
-        });
-      }
-      document.querySelectorAll(".pane-tabbar button").forEach(b => {
-        b.addEventListener("click", () => setPaneA(b.dataset.pane));
-      });
-
-      // drawer open/close (web)
-      function openWebDrawer() {
-        document.getElementById("drawer-scrim").classList.add("show");
-        document.getElementById("drawer").classList.add("show");
-      }
-      function closeWebDrawer() {
-        document.getElementById("drawer-scrim").classList.remove("show");
-        document.getElementById("drawer").classList.remove("show");
-      }
-      document.querySelectorAll("[data-open=send-web]").forEach(b => b.addEventListener("click", openWebDrawer));
-      document.getElementById("drawer-scrim").addEventListener("click", closeWebDrawer);
-      document.getElementById("drawer-close").addEventListener("click", closeWebDrawer);
-      document.getElementById("drawer-cancel").addEventListener("click", closeWebDrawer);
-
-      // mobile sheet open/close
-      function openMobSheet() {
-        document.getElementById("m-sheet-scrim").classList.add("show");
-        document.getElementById("m-sheet").classList.add("show");
-      }
-      function closeMobSheet() {
-        document.getElementById("m-sheet-scrim").classList.remove("show");
-        document.getElementById("m-sheet").classList.remove("show");
-      }
-      document.getElementById("m-sheet-scrim").addEventListener("click", closeMobSheet);
-      document.getElementById("m-sheet-close").addEventListener("click", closeMobSheet);
-
-      // delegated: send-for-review buttons inside mobile expanded rows
-      document.addEventListener("click", (e) => {
-        const m = e.target.closest("[data-m-open=send]");
-        if (m) openMobSheet();
+      // Escape closes any modal
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { closeModal(); closeMobModal(); }
       });
 
       // initial render
