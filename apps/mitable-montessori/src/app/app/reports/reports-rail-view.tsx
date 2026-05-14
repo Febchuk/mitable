@@ -346,6 +346,7 @@ export function ReportsRailView({
         overline={isAdmin ? "Across the school" : "My drafts + approved"}
         title="Reports"
         subtitle={subtitle}
+        actions={!isAdmin ? <NewReportTrigger /> : undefined}
       />
 
       <div className={styles.rrLayout}>
@@ -363,7 +364,6 @@ export function ReportsRailView({
                 All reports
               </div>
             )}
-            {!isAdmin && <NewReportTrigger />}
           </header>
 
           <div className={styles.rrFilterBar}>
