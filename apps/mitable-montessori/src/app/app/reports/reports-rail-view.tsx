@@ -66,6 +66,38 @@ function kindLabel(t: ReportListRow["reportType"]): string {
   return "Incident";
 }
 
+/**
+ * Title + sub-line for the rail's own header. Mirrors the prototype's
+ * .list-head: section h2 reflects the active filter; sub line shows the
+ * count + a contextual hint. Kept here so the component stays declarative.
+ */
+function railHeading(filter: string, rows: ReportListRow[]): { title: string; sub: string } {
+  const count = rows.length;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  if (filter === "Drafts") {
+    return { title: "Drafts", sub: plural(count, "draft", "drafts") };
+  }
+  if (filter === "Awaiting review") {
+    return {
+      title: "Awaiting review",
+      sub: plural(count, "report awaiting review", "reports awaiting review"),
+    };
+  }
+  if (filter === "Sent") {
+    return { title: "Sent", sub: plural(count, "sent report", "sent reports") };
+  }
+  if (filter === "Daily") {
+    return { title: "Daily reports", sub: plural(count, "daily report", "daily reports") };
+  }
+  if (filter === "Major") {
+    return { title: "Major reports", sub: plural(count, "major report", "major reports") };
+  }
+  if (filter === "Incident") {
+    return { title: "Incidents", sub: plural(count, "incident report", "incident reports") };
+  }
+  return { title: "All reports", sub: plural(count, "report", "reports") };
+}
+
 function formatWhen(row: ReportListRow, locale: string): string {
   const date = row.reportDate || row.createdAt.slice(0, 10);
   const d = new Date(date);
@@ -353,17 +385,24 @@ export function ReportsRailView({
         {/* Left rail — flat reports list */}
         <aside className={styles.rrRail}>
           <header className={styles.rrRailHeader}>
-            {isAdmin ? (
-              <ClassroomScopeSelect
-                value={classroomScope}
-                onChange={setClassroomScope}
-                options={classroomOptions}
-              />
-            ) : (
-              <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                All reports
-              </div>
-            )}
+            {(() => {
+              const heading = railHeading(filter, filtered);
+              return (
+                <>
+                  <div className={styles.rrRailHeaderRow}>
+                    <h2 className={styles.rrRailTitle}>{heading.title}</h2>
+                    {isAdmin && (
+                      <ClassroomScopeSelect
+                        value={classroomScope}
+                        onChange={setClassroomScope}
+                        options={classroomOptions}
+                      />
+                    )}
+                  </div>
+                  <div className={styles.rrRailSub}>{heading.sub}</div>
+                </>
+              );
+            })()}
           </header>
 
           <div className={styles.rrFilterBar}>
@@ -396,7 +435,7 @@ export function ReportsRailView({
                     <Avatar
                       initials={initialsFor(r.studentName)}
                       tone={toneFor(r.studentId)}
-                      size={32}
+                      size={36}
                     />
                     <div className={styles.rrRowText}>
                       <div className={styles.rrRowTop}>
@@ -405,7 +444,10 @@ export function ReportsRailView({
                       </div>
                       <div className={styles.rrRowTitle}>{r.title || "Untitled report"}</div>
                       <div className={styles.rrRowMeta}>
-                        <span className={styles.rrRowKind}>{kindLabel(r.reportType)}</span>
+                        <span className={styles.rrRowKind} data-kind={r.reportType}>
+                          {kindLabel(r.reportType)}
+                        </span>
+                        <span className={styles.rrRowMetaSpacer} aria-hidden />
                         <span
                           className={styles.rrRowStatus}
                           style={{ background: tone.bg, color: tone.fg }}
