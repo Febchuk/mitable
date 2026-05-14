@@ -140,6 +140,7 @@ export function ReportDetail({
   backToReportsHref = "/app/reports",
   isAdmin: isAdminProp = false,
   hideBackLink = false,
+  hideTopBarActions = false,
   variant,
   onReportChanged,
 }: {
@@ -149,6 +150,8 @@ export function ReportDetail({
   isAdmin?: boolean;
   /** When true (embedded in the rail view), suppresses the back-link and post-delete nav. */
   hideBackLink?: boolean;
+  /** When true, suppresses the top-bar inline action buttons. The rail-view owns these via its action rail + modals — without this we get two Submit / Delete buttons stacked next to each other. */
+  hideTopBarActions?: boolean;
   /** String alias for isAdmin — "admin" ⇒ isAdmin. Existing callers can keep using isAdmin directly. */
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
@@ -779,6 +782,7 @@ export function ReportDetail({
           actionBusy={actionBusy}
           hasBeenSubmitted={report.hasBeenSubmitted}
           viewModeSlot={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
+          hideActions={hideTopBarActions}
           onBackClick={hideBackLink ? undefined : handleBackClick}
           onSaveDraft={
             topbarStatus === "draft"

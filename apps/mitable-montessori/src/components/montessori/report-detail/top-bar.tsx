@@ -38,6 +38,7 @@ export function ReportTopBar({
   actionBusy = false,
   hasBeenSubmitted = false,
   viewModeSlot,
+  hideActions = false,
   onSaveDraft,
   onSubmitForReview,
   onApprove,
@@ -59,6 +60,8 @@ export function ReportTopBar({
   hasBeenSubmitted?: boolean;
   /** Optional segmented toggle rendered left of the action buttons. Used for the Editor/Preview PDF switch. */
   viewModeSlot?: React.ReactNode;
+  /** When true, suppresses the inline action button row (Save/Submit/Approve/Send/Delete). The rail-view owns these via its action rail + modals; we keep the view-mode toggle so the editor/preview switch still works. */
+  hideActions?: boolean;
   onSaveDraft?: () => void;
   onSubmitForReview?: () => void;
   onApprove?: () => void;
@@ -123,17 +126,19 @@ export function ReportTopBar({
 
         <div className="rd-page-header-actions">
           {viewModeSlot}
-          <TopBarActions
-            status={status}
-            isAdmin={isAdmin}
-            actionBusy={actionBusy}
-            hasBeenSubmitted={hasBeenSubmitted}
-            onSaveDraft={onSaveDraft}
-            onSubmitForReview={onSubmitForReview}
-            onApprove={onApprove}
-            onSendToParents={onSendToParents}
-            onDeleteClick={onDeleteClick}
-          />
+          {hideActions ? null : (
+            <TopBarActions
+              status={status}
+              isAdmin={isAdmin}
+              actionBusy={actionBusy}
+              hasBeenSubmitted={hasBeenSubmitted}
+              onSaveDraft={onSaveDraft}
+              onSubmitForReview={onSubmitForReview}
+              onApprove={onApprove}
+              onSendToParents={onSendToParents}
+              onDeleteClick={onDeleteClick}
+            />
+          )}
         </div>
       </div>
     </div>

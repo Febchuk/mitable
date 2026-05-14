@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, Sparkles } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  Eye,
+  MoreVertical,
+  Send,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { initialsFor, type Tone } from "@/components/montessori/data";
 import type { ReportDetail as ReportDetailRow, ReportListRow } from "@/lib/queries/reports";
 import { FilterChips, PageHeader } from "@/components/montessori/page-header";
@@ -9,6 +18,8 @@ import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck } from "@/components/montessori/primitives";
 import { ReportDetail } from "@/components/montessori/report-detail";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
+import { ActionRail, type ActionRailModal } from "./action-rail";
+import { ReportModalsHost, type ReportModal } from "./report-modals";
 import styles from "./reports-rail.module.css";
 
 const STATUS_TONE: Record<
@@ -277,6 +288,58 @@ export function ReportsRailView({
     ? `${awaiting} awaiting review · ${drafts} drafts · ${sent} sent`
     : `${drafts} drafts · ${awaiting} awaiting review · ${sent} sent`;
 
+  /* Modal state — driven by the action rail (desktop) and the bottom action
+     bar (mobile overlay). One state powers both surfaces; the rail-view owns
+     it so the modals live above any layout boundary. */
+  const [modalOpen, setModalOpen] = React.useState<ReportModal>(null);
+  const openModal = React.useCallback((m: ActionRailModal) => setModalOpen(m), []);
+  const closeModal = React.useCallback(() => setModalOpen(null), []);
+
+  /* On mobile, tapping a row opens the report in a full-bleed overlay
+     instead of stacking it below the list. The state is independent from
+     selectedId so closing the overlay doesn't blow away the selection. */
+  const [mobileOverlayOpen, setMobileOverlayOpen] = React.useState(false);
+  const handleRowClick = React.useCallback((id: string) => {
+    setSelectedId(id);
+    setMobileOverlayOpen(true);
+  }, []);
+  const closeMobileOverlay = React.useCallback(() => {
+    setMobileOverlayOpen(false);
+    setModalOpen(null);
+  }, []);
+
+  // Lock body scroll while the mobile overlay is up.
+  React.useEffect(() => {
+    if (!mobileOverlayOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOverlayOpen]);
+
+  // Esc closes the mobile overlay (the modals handle their own Esc via Radix).
+  React.useEffect(() => {
+    if (!mobileOverlayOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && modalOpen === null) closeMobileOverlay();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileOverlayOpen, modalOpen, closeMobileOverlay]);
+
+  // After a server mutation (Submit / Delete), close any open modal, drop
+  // the cached detail for this id, and re-fetch the list via parent. Delete
+  // additionally clears the selection so the list-only mobile view doesn't
+  // get stuck on a gone report.
+  const handleReportChanged = React.useCallback(() => {
+    refreshSelectedDetail();
+    // If the report no longer exists in the list after the next render, the
+    // existing useEffect that watches `filtered` will reset selection.
+  }, [refreshSelectedDetail]);
+
+  const backHref = isAdmin ? "/admin/reports" : "/app/reports";
+
   return (
     <div className={styles.rrRoot}>
       <PageHeader
@@ -326,7 +389,7 @@ export function ReportsRailView({
                     type="button"
                     className={`${styles.rrRow} tap`}
                     data-active={active ? "true" : "false"}
-                    onClick={() => setSelectedId(r.id)}
+                    onClick={() => handleRowClick(r.id)}
                     onMouseEnter={() => prefetchDetail(r.id)}
                     onFocus={() => prefetchDetail(r.id)}
                   >
@@ -370,6 +433,7 @@ export function ReportsRailView({
               key={detail.id}
               report={detail}
               hideBackLink
+              hideTopBarActions
               variant={variant}
               onReportChanged={refreshSelectedDetail}
             />
@@ -398,8 +462,180 @@ export function ReportsRailView({
             </div>
           )}
         </section>
+
+        {/* Action rail (desktop only — CSS hides on <lg). Reads the row’s
+            status from the selected list row so it renders the right
+            icons immediately, even while the detail is still loading. */}
+        {selectedRow ? (
+          <ActionRail status={selectedRow.status} isAdmin={isAdmin} onOpenModal={openModal} />
+        ) : (
+          <div className={styles.rrActionRail} aria-hidden />
+        )}
       </div>
+
+      {/* Modals (mounted once at the rail level so they sit above either
+          the desktop columns or the mobile overlay). */}
+      {detail && (
+        <ReportModalsHost
+          open={modalOpen}
+          onClose={closeModal}
+          report={detail}
+          isAdmin={isAdmin}
+          onChanged={handleReportChanged}
+          backToReportsHref={backHref}
+        />
+      )}
+
+      {/* Mobile overlay (CSS hides on ≥lg). Shows the report full-bleed
+          when a row is tapped, with a bottom action bar that opens the same
+          modals as the desktop rail. */}
+      {mobileOverlayOpen && selectedRow && (
+        <MobileReportOverlay
+          row={selectedRow}
+          detail={detail}
+          detailLoading={detailLoading}
+          locale={locale}
+          variant={variant}
+          isAdmin={isAdmin}
+          onClose={closeMobileOverlay}
+          onOpenModal={openModal}
+          onReportChanged={refreshSelectedDetail}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Full-bleed mobile overlay hosting <ReportDetail> + a bottom action bar.
+ * Mirrors the desktop ActionRail's four icons. Modals open via the same
+ * `openModal` callback as desktop, so the mounted `<ReportModalsHost>` at
+ * the rail level handles them identically on both surfaces.
+ */
+function MobileReportOverlay({
+  row,
+  detail,
+  detailLoading,
+  locale,
+  variant,
+  isAdmin,
+  onClose,
+  onOpenModal,
+  onReportChanged,
+}: {
+  row: ReportListRow;
+  detail: ReportDetailRow | null;
+  detailLoading: boolean;
+  locale: string;
+  variant: "teacher" | "admin";
+  isAdmin: boolean;
+  onClose: () => void;
+  onOpenModal: (m: ActionRailModal) => void;
+  onReportChanged: () => void;
+}) {
+  const tone = STATUS_TONE[row.status];
+  const status = row.status;
+
+  // Visibility per row status (mirrors the table baked into ActionRail).
+  const showSend = status === "draft" || status === "changes_requested";
+  const showDelete =
+    status === "draft" ||
+    status === "changes_requested" ||
+    (isAdmin && (status === "approved" || status === "sent"));
+
+  return (
+    <>
+      <div
+        className={styles.rrMobileOverlayScrim}
+        role="presentation"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div className={styles.rrMobileOverlay} role="dialog" aria-label={row.studentName}>
+        <div className={styles.rrMobileOverlayTop}>
+          <button
+            type="button"
+            className={`${styles.rrMobileOverlayBack} tap`}
+            onClick={onClose}
+            aria-label="Back to reports list"
+          >
+            <ChevronLeft size={17} strokeWidth={2.2} />
+          </button>
+          <div className={styles.rrMobileOverlayTitle}>
+            <div className={styles.rrMobileOverlayTitleName}>{row.studentName}</div>
+            <div className={styles.rrMobileOverlayTitleSub}>
+              <span style={{ color: tone.fg }}>{tone.label}</span>
+              <span aria-hidden>·</span>
+              <span>{row.title || "Untitled report"}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`${styles.rrMobileOverlayKebab} tap`}
+            aria-label="More options"
+            onClick={() => onOpenModal("history")}
+          >
+            <MoreVertical size={17} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <div className={styles.rrMobileOverlayBody}>
+          {detail ? (
+            <ReportDetail
+              key={detail.id}
+              report={detail}
+              hideBackLink
+              hideTopBarActions
+              variant={variant}
+              onReportChanged={onReportChanged}
+            />
+          ) : detailLoading ? (
+            <ReportLoadingSkeleton row={row} locale={locale} />
+          ) : (
+            <div className={styles.rrEmptyState}>Loading…</div>
+          )}
+        </div>
+
+        <div className={styles.rrMobileActions}>
+          <button
+            type="button"
+            className={`${styles.rrMobileAction} tap`}
+            onClick={() => onOpenModal("preview")}
+            aria-label="Preview PDF"
+          >
+            <Eye size={17} strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            className={`${styles.rrMobileAction} ${styles.rrMobileActionSage} tap`}
+            onClick={() => onOpenModal("history")}
+            aria-label="History"
+          >
+            <Clock size={17} strokeWidth={1.8} />
+          </button>
+          {showSend && (
+            <button
+              type="button"
+              className={`${styles.rrMobileAction} ${styles.rrMobileActionPrimary} tap`}
+              onClick={() => onOpenModal("send")}
+              aria-label="Submit for review"
+            >
+              <Send size={17} strokeWidth={2} />
+            </button>
+          )}
+          {showDelete && (
+            <button
+              type="button"
+              className={`${styles.rrMobileAction} tap`}
+              onClick={() => onOpenModal("delete")}
+              aria-label="Delete report"
+            >
+              <Trash2 size={17} strokeWidth={1.8} />
+            </button>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 

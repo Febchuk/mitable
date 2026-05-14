@@ -18,7 +18,7 @@
 @media (min-width: 1024px) {
   .rrLayout {
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: 320px minmax(0, 1fr) 64px;
     gap: 0;
   }
 }
@@ -30,15 +30,12 @@
   min-width: 0;
   border-right: 1px solid var(--color-border);
   background: var(--color-surface);
-  /* On mobile we stack rail + main; on desktop the rail fills its grid cell. */
-  max-height: 50vh;
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 @media (min-width: 1024px) {
   .rrRail {
-    max-height: none;
     height: 100%;
-    min-height: 0;
   }
 }
 
@@ -161,6 +158,13 @@
   min-height: 0;
   flex: 1;
 }
+/* On mobile the rail-view shows only the list — the report opens in a
+   full-bleed overlay (rrMobileOverlay below) instead of stacking. */
+@media (max-width: 1023.98px) {
+  .rrMain {
+    display: none;
+  }
+}
 
 .rrEmptyState {
   margin: 32px auto;
@@ -252,4 +256,532 @@
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--color-ink-muted);
+}
+
+/* ---------- Action rail (desktop only) ---------- */
+.rrActionRail {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .rrActionRail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 8px 16px;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-surface);
+    min-height: 0;
+  }
+}
+.rrRailBtn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  flex-shrink: 0;
+}
+.rrRailBtn:hover {
+  background: var(--color-muted);
+  color: var(--color-ink);
+  border-color: var(--color-border-strong);
+}
+.rrRailBtnPrimary {
+  background: var(--color-terracotta);
+  border-color: var(--color-terracotta);
+  color: #fff;
+}
+.rrRailBtnPrimary:hover {
+  background: var(--color-terracotta-deep);
+  border-color: var(--color-terracotta-deep);
+  color: #fff;
+}
+.rrRailBtnSage {
+  background: color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface));
+  color: var(--color-sage-deep);
+  border-color: var(--color-sage-soft);
+}
+.rrRailBtnSage:hover {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+  border-color: var(--color-sage-deep);
+}
+.rrRailBtnDanger {
+  color: var(--color-ink-muted);
+}
+.rrRailBtnDanger:hover {
+  background: var(--color-terracotta);
+  color: #fff;
+  border-color: var(--color-terracotta);
+}
+
+/* Tooltip on hover (action rail only) */
+.rrRailBtn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 4px 12px -2px rgba(43, 38, 34, 0.18);
+}
+.rrRailBtn[data-tip]:hover::before {
+  content: "";
+  position: absolute;
+  right: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-left-color: var(--color-ink);
+  pointer-events: none;
+  z-index: 50;
+}
+
+.rrRailSep {
+  width: 28px;
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0 2px;
+  flex-shrink: 0;
+}
+.rrRailAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.rrTone_sage {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+}
+.rrTone_clay {
+  background: var(--color-clay-soft);
+  color: var(--color-terracotta-deep);
+}
+.rrTone_butter {
+  background: var(--color-butter-soft);
+  color: var(--color-butter-deep);
+}
+.rrTone_blue {
+  background: var(--color-dusty-blue-soft);
+  color: #355673;
+}
+.rrRailSpacer {
+  flex: 1;
+}
+.rrRailBadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-terracotta);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--color-surface);
+}
+
+/* ---------- Modal cards (overrides on shadcn DialogContent) ---------- */
+.rrModalCard {
+  max-width: 720px !important;
+  width: calc(100% - 32px) !important;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-ink) !important;
+  padding: 22px 24px 18px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 32px 80px -20px rgba(43, 38, 34, 0.45),
+    0 12px 24px -8px rgba(43, 38, 34, 0.22) !important;
+}
+.rrModalCardLg {
+  max-width: 860px !important;
+}
+.rrModalCardSm {
+  max-width: 440px !important;
+}
+.rrModalFoot {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.rrPdfFrame {
+  margin-top: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-canvas);
+  overflow: hidden;
+  min-height: 420px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+.rrPdfFrame > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* History timeline (re-built fresh, mirrors prototype trail) */
+.rrHistoryTrail {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-left: 8px;
+  position: relative;
+}
+.rrHistoryTrail::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--color-border) 20%,
+    var(--color-border) 80%,
+    transparent
+  );
+}
+.rrHistoryEvent {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 12px;
+  align-items: start;
+  position: relative;
+}
+.rrHistoryDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  margin-top: 4px;
+  margin-left: 4px;
+  box-shadow: 0 0 0 3px var(--color-surface);
+}
+.rrDot_sage {
+  background: var(--color-sage-deep);
+}
+.rrDot_butter {
+  background: #b8881a;
+}
+.rrDot_clay {
+  background: var(--color-clay);
+}
+.rrHistoryHead {
+  font-size: 13px;
+  color: var(--color-ink);
+}
+.rrHistoryHead b {
+  font-weight: 600;
+}
+.rrHistoryTime {
+  color: var(--color-ink-muted);
+  font-size: 11.5px;
+  margin-left: 8px;
+  font-weight: 500;
+}
+.rrHistoryBody {
+  font-size: 12.5px;
+  color: var(--color-ink-secondary);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+/* Form bits used inside Submit / Delete dialogs */
+.rrFieldGroup {
+  margin-top: 14px;
+}
+.rrFieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  margin-bottom: 7px;
+  display: block;
+}
+.rrFieldHint {
+  padding: 10px 0;
+  font-size: 12.5px;
+  color: var(--color-ink-muted);
+}
+.rrFieldError {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-terracotta-soft);
+  color: var(--color-terracotta-deep);
+  font-size: 12.5px;
+}
+.rrReviewerGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.rrReviewerCard {
+  padding: 10px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.rrReviewerCard:hover {
+  border-color: var(--color-border-strong);
+}
+.rrReviewerCardSelected {
+  border-color: var(--color-terracotta);
+  background: color-mix(in srgb, var(--color-terracotta-soft) 35%, var(--color-surface));
+}
+.rrReviewerMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rrReviewerName {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+.rrReviewerRole {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
+.rrReviewerCheck {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  font-size: 11px;
+  font-weight: 700;
+  color: transparent;
+}
+.rrReviewerCardSelected .rrReviewerCheck {
+  background: var(--color-terracotta);
+  border-color: var(--color-terracotta);
+  color: #fff;
+}
+.rrTextarea {
+  width: 100%;
+  resize: none;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: var(--color-canvas);
+  min-height: 78px;
+  outline: none;
+  font-family: inherit;
+  color: inherit;
+}
+.rrTextarea:focus {
+  border-color: var(--color-border-strong);
+}
+
+.rrDeleteBody {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-ink-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rrDeleteBody p {
+  margin: 0;
+}
+.rrDeleteWarn {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-butter-soft);
+  color: var(--color-butter-deep);
+  font-size: 12.5px;
+}
+.rrDeleteHint {
+  font-size: 12.5px;
+  color: var(--color-ink-muted);
+}
+
+/* ---------- Mobile overlay (full-bleed report detail) ---------- */
+.rrMobileOverlayScrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 23, 21, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 45;
+}
+.rrMobileOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  animation: rrMobileOverlayIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes rrMobileOverlayIn {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (min-width: 1024px) {
+  .rrMobileOverlay,
+  .rrMobileOverlayScrim {
+    display: none;
+  }
+}
+.rrMobileOverlayTop {
+  flex-shrink: 0;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.rrMobileOverlayBack,
+.rrMobileOverlayKebab {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--color-ink);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.rrMobileOverlayBack:hover,
+.rrMobileOverlayKebab:hover {
+  background: var(--color-muted);
+}
+.rrMobileOverlayTitle {
+  flex: 1;
+  min-width: 0;
+}
+.rrMobileOverlayTitleName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rrMobileOverlayTitleSub {
+  font-size: 10.5px;
+  color: var(--color-ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rrMobileOverlayBody {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.rrMobileOverlayBody .rd-page-header-top {
+  display: none; /* back-chevron is in the overlay top bar instead */
+}
+.rrMobileOverlayBody .rd-page-header {
+  padding-top: 18px;
+}
+.rrMobileActions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.rrMobileAction {
+  flex: 1;
+  height: 42px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.rrMobileAction:hover {
+  background: var(--color-muted);
+  color: var(--color-ink);
+}
+.rrMobileActionPrimary {
+  background: var(--color-terracotta);
+  border-color: var(--color-terracotta);
+  color: #fff;
+}
+.rrMobileActionPrimary:hover {
+  background: var(--color-terracotta-deep);
+  color: #fff;
+}
+.rrMobileActionSage {
+  background: color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface));
+  color: var(--color-sage-deep);
+  border-color: var(--color-sage-soft);
+}
+.rrMobileActionSage:hover {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
 }
