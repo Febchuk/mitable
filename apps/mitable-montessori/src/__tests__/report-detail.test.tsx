@@ -55,6 +55,7 @@ const ADA_REPORT: ReportDetailRow = {
     },
   ],
   templateId: null,
+  templateSectionMeta: {},
   templateLogoUrl: null,
   createdByUserId: "u1",
   approvedByUserId: null,

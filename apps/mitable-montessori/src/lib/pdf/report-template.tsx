@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
 
 const INK = "#2A2723";
 const INK_SECONDARY = "#4A453E";
@@ -98,10 +99,6 @@ export interface ReportPdfData {
   body: string | null;
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, "").trim();
-}
-
 function formatDate(raw: string): string {
   try {
     const d = new Date(raw);
@@ -123,7 +120,9 @@ function capitalizeType(t: string): string {
 export function ReportDocument({ data }: { data: ReportPdfData }) {
   const hasSections =
     data.sections.length > 0 &&
-    data.sections.some((sec) => sec.paragraphs.some((p) => stripHtml(p.html).length > 0));
+    data.sections.some((sec) =>
+      sec.paragraphs.some((p) => fieldPayloadToReadableText(p.html).length > 0)
+    );
 
   const dateDisplay = data.reportDate ? formatDate(data.reportDate) : null;
   const metaParts = [
@@ -156,7 +155,7 @@ export function ReportDocument({ data }: { data: ReportPdfData }) {
                     </Text>
                   )}
                   {section.paragraphs.map((p, pi) => {
-                    const text = stripHtml(p.html);
+                    const text = fieldPayloadToReadableText(p.html);
                     if (!text) return null;
                     return (
                       <Text key={pi} style={s.paragraph}>

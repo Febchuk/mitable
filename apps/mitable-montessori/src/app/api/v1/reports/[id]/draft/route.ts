@@ -8,6 +8,8 @@ import { SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
 import { DraftFromCaptureRequestSchema } from "@/lib/schemas/report";
 import { detokenizeReportText } from "@/lib/reports/detokenize";
 import { fetchTemplateLogoUrl } from "@/lib/queries/reports";
+import type { SectionMeta } from "@/lib/report-templates/sections";
+import { normalizeSectionHtmlForTemplate } from "@/lib/reports/template-field-payload";
 
 /**
  * Draft an existing reports row (created by /api/v1/reports). Pulls the row,
@@ -97,15 +99,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // the agent falls back to a single "Report" section (handled in agent-loop).
   let templateSections: { heading: string; guidance: string }[] = [];
   let writingStyle = "";
+  let templateSectionMeta: SectionMeta = {};
   if (report.template_id) {
     const { data: tpl } = await supabase
       .from("report_templates")
-      .select("sections, section_guidance, school_id, writing_style")
+      .select("sections, section_guidance, school_id, writing_style, section_meta")
       .eq("id", report.template_id as string)
       .maybeSingle();
     if (tpl && (tpl.school_id as string) === auth.user.schoolId) {
       const headings = (tpl.sections as string[] | null) ?? [];
       const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
+      templateSectionMeta = (tpl.section_meta as SectionMeta | null) ?? {};
       templateSections = headings.map((heading) => ({
         heading,
         guidance: guidance[heading] ?? "",
@@ -272,10 +276,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "")
           .slice(0, 40) || `section-${i}`;
+      const normalizedHtml = normalizeSectionHtmlForTemplate(
+        detokHeading,
+        detokContent,
+        templateSectionMeta
+      );
       return {
         id: `s-${i}-${slug}`,
         heading: detokHeading,
-        paragraphs: [{ id: `p-${i}-1`, html: detokContent }],
+        paragraphs: [{ id: `p-${i}-1`, html: normalizedHtml }],
       };
     });
     const concatenatedBody = editorSections
@@ -302,7 +311,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const { data: fresh, error: freshErr } = await supabase
       .from("reports")
       .select(
-        "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id)"
+        "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), report_templates(section_meta, school_id)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -317,6 +326,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       fresh.template_id as string | null,
       auth.user.schoolId
     );
+    const freshTpl = (
+      fresh as unknown as {
+        report_templates: { section_meta: unknown; school_id: string } | null;
+      }
+    ).report_templates;
+    const responseTemplateMeta: SectionMeta =
+      freshTpl && freshTpl.school_id === auth.user.schoolId
+        ? ((freshTpl.section_meta as SectionMeta | null) ?? {})
+        : templateSectionMeta;
     const reportPayload = {
       id: fresh.id,
       studentId: fresh.student_id,
@@ -331,6 +349,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       body: fresh.body,
       sections: fresh.sections,
       templateId: fresh.template_id,
+      templateSectionMeta: responseTemplateMeta,
       templateLogoUrl,
       createdByUserId: fresh.created_by_user_id,
       approvedByUserId: fresh.approved_by_user_id,

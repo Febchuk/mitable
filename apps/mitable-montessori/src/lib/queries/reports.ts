@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
+import type { SectionMeta } from "@/lib/report-templates/sections";
 
 type MontessoriSupabase = ReturnType<typeof createAdminClient>;
 
@@ -75,6 +76,8 @@ export type ReportDetail = ReportListRow & {
   body: string | null;
   sections: ReportSection[] | null;
   templateId: string | null;
+  /** Per-heading field types + options from `report_templates.section_meta`. */
+  templateSectionMeta: SectionMeta;
   /** Header logo from the report's template — not sent to the LLM. */
   templateLogoUrl: string | null;
   createdByUserId: string | null;
@@ -121,7 +124,7 @@ type ReportsRow = {
     school_id: string;
   } | null;
   classrooms: { id: string; name: string | null } | null;
-  report_templates: { logo_url: string | null; school_id: string } | null;
+  report_templates: { logo_url: string | null; school_id: string; section_meta: unknown } | null;
 };
 
 function fullName(s: ReportsRow["students"]): string {
@@ -390,7 +393,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id, section_meta)"
     )
     .eq("id", id)
     .eq("students.school_id", ctx.schoolId)
@@ -401,6 +404,11 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   }
   if (!data) return null;
   const row = data as unknown as ReportsRow;
+  const tplJoin = row.report_templates;
+  const templateSectionMeta: SectionMeta =
+    tplJoin && (tplJoin.school_id as string) === ctx.schoolId
+      ? ((tplJoin.section_meta as SectionMeta | null) ?? {})
+      : {};
   const [templateLogoUrl, { count: priorSubmissionCount }] = await Promise.all([
     fetchTemplateLogoUrl(supabase, row.template_id, ctx.schoolId),
     supabase
@@ -424,6 +432,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     body: row.body,
     sections: row.sections,
     templateId: row.template_id,
+    templateSectionMeta,
     templateLogoUrl,
     createdByUserId: row.created_by_user_id,
     approvedByUserId: row.approved_by_user_id,

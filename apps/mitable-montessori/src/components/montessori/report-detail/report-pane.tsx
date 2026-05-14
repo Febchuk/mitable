@@ -3,6 +3,14 @@
 import * as React from "react";
 import { Check, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import type { ReportDetail, ReportSection } from "../data";
+import type { SectionMetaEntry } from "@/lib/report-templates/sections";
+import {
+  decodeFieldPayload,
+  encodeChecklist,
+  encodeSingleSelect,
+  inferChecklistSelections,
+  inferSingleSelect,
+} from "@/lib/reports/template-field-payload";
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
 
@@ -96,6 +104,8 @@ export function ReportPane({
 
   const clearPendingFocus = React.useCallback(() => setPendingFocusParagraphId(null), []);
 
+  const sectionMeta = detail.templateSectionMeta ?? {};
+
   return (
     <main className="rd-pane rd-report-pane">
       <div className="rd-report-scroll scroll-quiet">
@@ -124,6 +134,7 @@ export function ReportPane({
             <SectionBlock
               key={section.id}
               section={section}
+              fieldMeta={sectionMeta[section.heading]}
               pendingFocusParagraphId={pendingFocusParagraphId}
               onParagraphFocused={clearPendingFocus}
               onParagraphCommit={(paragraphId, html) =>
@@ -245,8 +256,101 @@ function NewSectionPrompt({
   );
 }
 
+function TemplateChecklistField({
+  heading,
+  options,
+  html,
+  onCommit,
+}: {
+  heading: string;
+  options: string[];
+  html: string;
+  onCommit: (next: string) => void;
+}) {
+  const decoded = decodeFieldPayload(html);
+  const selected =
+    decoded.kind === "checklist"
+      ? decoded.selected
+      : decoded.kind === "legacy_prose"
+        ? inferChecklistSelections(decoded.html, options)
+        : [];
+
+  const toggle = (opt: string) => {
+    const nextSel = selected.includes(opt) ? selected.filter((x) => x !== opt) : [...selected, opt];
+    onCommit(encodeChecklist(nextSel));
+  };
+
+  return (
+    <fieldset className="rd-template-field">
+      <legend className="sr-only">{heading} — checklist</legend>
+      <ul className="rd-template-field-list">
+        {options.map((opt) => (
+          <li key={opt}>
+            <label className="rd-template-field-row">
+              <input
+                type="checkbox"
+                checked={selected.includes(opt)}
+                onChange={() => toggle(opt)}
+              />
+              <span>{opt}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <p className="rd-template-field-hint">
+        Pick any that apply. Your choices save automatically.
+      </p>
+    </fieldset>
+  );
+}
+
+function TemplateSingleSelectField({
+  heading,
+  options,
+  html,
+  radioName,
+  onCommit,
+}: {
+  heading: string;
+  options: string[];
+  html: string;
+  radioName: string;
+  onCommit: (next: string) => void;
+}) {
+  const decoded = decodeFieldPayload(html);
+  const value =
+    decoded.kind === "single_select"
+      ? decoded.value
+      : decoded.kind === "legacy_prose"
+        ? inferSingleSelect(decoded.html, options)
+        : null;
+
+  return (
+    <fieldset className="rd-template-field">
+      <legend className="sr-only">{heading} — choose one</legend>
+      <ul className="rd-template-field-list">
+        {options.map((opt) => (
+          <li key={opt}>
+            <label className="rd-template-field-row">
+              <input
+                type="radio"
+                name={radioName}
+                checked={value === opt}
+                onChange={() => onCommit(encodeSingleSelect(opt))}
+              />
+              <span>{opt}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <p className="rd-template-field-hint">Choose one option. Your choice saves automatically.</p>
+    </fieldset>
+  );
+}
+
 function SectionBlock({
   section,
+  fieldMeta,
   pendingFocusParagraphId,
   onParagraphFocused,
   onParagraphCommit,
@@ -257,6 +361,7 @@ function SectionBlock({
   onDismissGhostEdit,
 }: {
   section: ReportSection;
+  fieldMeta?: SectionMetaEntry;
   pendingFocusParagraphId: string | null;
   onParagraphFocused: () => void;
   onParagraphCommit: (paragraphId: string, html: string) => void;
@@ -271,6 +376,7 @@ function SectionBlock({
     string | null
   >(null);
   const showGhost = !!section.ghostEdit;
+  const radioGroupName = React.useId();
 
   return (
     <div className="rd-section">
@@ -316,71 +422,102 @@ function SectionBlock({
         </div>
       </div>
 
-      {section.paragraphs.map((p) => (
-        <div className="rd-para-block" key={p.id}>
-          <div className="rd-para-actions">
-            {confirmingDeleteParagraphId === p.id ? (
-              <span className="rd-para-confirm" role="group" aria-label="Confirm delete paragraph">
-                <span className="rd-para-confirm-label">Delete this paragraph?</span>
-                <button
-                  type="button"
-                  className="rd-para-action rd-para-confirm-yes"
-                  onClick={() => {
-                    onDeleteParagraph(p.id);
-                    setConfirmingDeleteParagraphId(null);
-                    ToastBus.push({ message: "Paragraph deleted" });
-                  }}
+      {section.paragraphs.map((p, paraIndex) => {
+        const structuredFirst =
+          paraIndex === 0 &&
+          fieldMeta &&
+          (fieldMeta.type === "checklist" || fieldMeta.type === "single_select");
+        const hideParagraphDelete = structuredFirst;
+
+        return (
+          <div className="rd-para-block" key={p.id}>
+            <div className="rd-para-actions">
+              {confirmingDeleteParagraphId === p.id ? (
+                <span
+                  className="rd-para-confirm"
+                  role="group"
                   aria-label="Confirm delete paragraph"
                 >
-                  <Check size={11} strokeWidth={2.5} />
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  className="rd-para-action"
-                  onClick={() => setConfirmingDeleteParagraphId(null)}
-                  aria-label="Cancel delete paragraph"
-                >
-                  <X size={11} strokeWidth={2.5} />
-                  Cancel
-                </button>
-              </span>
+                  <span className="rd-para-confirm-label">Delete this paragraph?</span>
+                  <button
+                    type="button"
+                    className="rd-para-action rd-para-confirm-yes"
+                    onClick={() => {
+                      onDeleteParagraph(p.id);
+                      setConfirmingDeleteParagraphId(null);
+                      ToastBus.push({ message: "Paragraph deleted" });
+                    }}
+                    aria-label="Confirm delete paragraph"
+                  >
+                    <Check size={11} strokeWidth={2.5} />
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="rd-para-action"
+                    onClick={() => setConfirmingDeleteParagraphId(null)}
+                    aria-label="Cancel delete paragraph"
+                  >
+                    <X size={11} strokeWidth={2.5} />
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="rd-para-action"
+                    onClick={() =>
+                      onDiscussParagraph
+                        ? onDiscussParagraph(p.id)
+                        : toast("Open the editing assistant on the left to discuss this paragraph.")
+                    }
+                    title="Discuss this paragraph in the chat"
+                  >
+                    <MessageSquare size={11} strokeWidth={2} />
+                    Discuss
+                  </button>
+                  {!hideParagraphDelete ? (
+                    <button
+                      type="button"
+                      className="rd-para-action"
+                      onClick={() => setConfirmingDeleteParagraphId(p.id)}
+                      title="Delete this paragraph"
+                      aria-label="Delete paragraph"
+                    >
+                      <Trash2 size={11} strokeWidth={2} />
+                    </button>
+                  ) : null}
+                </>
+              )}
+            </div>
+            {structuredFirst && fieldMeta.type === "checklist" ? (
+              <TemplateChecklistField
+                heading={section.heading}
+                options={fieldMeta.options}
+                html={p.html}
+                onCommit={(next) => onParagraphCommit(p.id, next)}
+              />
+            ) : structuredFirst && fieldMeta.type === "single_select" ? (
+              <TemplateSingleSelectField
+                heading={section.heading}
+                options={fieldMeta.options}
+                html={p.html}
+                radioName={radioGroupName}
+                onCommit={(next) => onParagraphCommit(p.id, next)}
+              />
             ) : (
-              <>
-                <button
-                  type="button"
-                  className="rd-para-action"
-                  onClick={() =>
-                    onDiscussParagraph
-                      ? onDiscussParagraph(p.id)
-                      : toast("Open the editing assistant on the left to discuss this paragraph.")
-                  }
-                  title="Discuss this paragraph in the chat"
-                >
-                  <MessageSquare size={11} strokeWidth={2} />
-                  Discuss
-                </button>
-                <button
-                  type="button"
-                  className="rd-para-action"
-                  onClick={() => setConfirmingDeleteParagraphId(p.id)}
-                  title="Delete this paragraph"
-                  aria-label="Delete paragraph"
-                >
-                  <Trash2 size={11} strokeWidth={2} />
-                </button>
-              </>
+              <EditableParagraph
+                html={p.html}
+                ariaLabel={`${section.heading} paragraph`}
+                autoFocus={pendingFocusParagraphId === p.id}
+                onAutoFocused={onParagraphFocused}
+                onCommit={(next) => onParagraphCommit(p.id, next)}
+              />
             )}
           </div>
-          <EditableParagraph
-            html={p.html}
-            ariaLabel={`${section.heading} paragraph`}
-            autoFocus={pendingFocusParagraphId === p.id}
-            onAutoFocused={onParagraphFocused}
-            onCommit={(next) => onParagraphCommit(p.id, next)}
-          />
-        </div>
-      ))}
+        );
+      })}
 
       {showGhost && section.ghostEdit && (
         <div className="rd-ghost-edit">
