@@ -44,6 +44,7 @@ export function NewReportMobile({
   const [notes, setNotes] = React.useState<CapturedNote[]>([]);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
   const [query, setQuery] = React.useState("");
+  const [captureOnly, setCaptureOnly] = React.useState(false);
 
   const recorder = useAudioRecorder();
 
@@ -55,6 +56,7 @@ export function NewReportMobile({
       setNotes([]);
       setTemplate(null);
       setQuery("");
+      setCaptureOnly(false);
       recorder.clear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,6 +81,7 @@ export function NewReportMobile({
       audio: recorder.memo,
       notes,
       templateId: template?.id ?? null,
+      captureOnly,
     });
   };
 
@@ -128,6 +131,8 @@ export function NewReportMobile({
           audioDuration={recorder.memo?.durationSec ?? null}
           noteCount={notes.length}
           template={template}
+          captureOnly={captureOnly}
+          onCaptureOnlyChange={setCaptureOnly}
           submitting={submitting}
           onBack={() => setStep(3)}
           onSubmit={submit}
@@ -490,6 +495,8 @@ function Step4Review({
   audioDuration,
   noteCount,
   template,
+  captureOnly,
+  onCaptureOnlyChange,
   submitting,
   onBack,
   onSubmit,
@@ -500,6 +507,8 @@ function Step4Review({
   audioDuration: number | null;
   noteCount: number;
   template: ReportTemplate | null;
+  captureOnly: boolean;
+  onCaptureOnlyChange: (v: boolean) => void;
   submitting?: boolean;
   onBack: () => void;
   onSubmit: () => void;
@@ -605,18 +614,41 @@ function Step4Review({
             ✦
           </span>
           <div>
-            The assistant will use your audio &amp; notes as primary sources
-            {template ? (
+            {captureOnly ? (
               <>
-                , and the <b>{template.name}</b> structure to organize the draft
+                First draft only uses your voice or image to write the report. Saved observations
+                and tracked progress for the child won&apos;t be included. You can still edit in the
+                editor.
               </>
-            ) : null}
-            . You can edit anything in the editor.
+            ) : (
+              <>
+                The assistant will use your audio and notes as the main sources
+                {template ? (
+                  <>
+                    , and the <b>{template.name}</b> structure to organize the draft
+                  </>
+                ) : null}
+                . It may add matching detail from saved observations when helpful. You can edit
+                anything in the editor.
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="nr-m-foot">
+      <div className="nr-m-foot nr-m-foot--stack">
+        <label className="nr-m-capture-only-foot">
+          <input
+            type="checkbox"
+            checked={captureOnly}
+            onChange={(e) => onCaptureOnlyChange(e.target.checked)}
+          />
+          <span>
+            <span className="nr-m-capture-only-foot-kicker">Standalone report</span>
+            First draft only uses your voice or image to write the report. Saved observations and
+            tracked progress for the child won&apos;t be included.
+          </span>
+        </label>
         <button type="button" className="nr-m-btn-primary" onClick={onSubmit} disabled={submitting}>
           {submitting ? "Starting…" : "Start drafting"}
           <ArrowRight size={14} strokeWidth={2.5} />

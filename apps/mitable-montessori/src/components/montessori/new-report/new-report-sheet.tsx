@@ -39,6 +39,7 @@ export function NewReportSheet({
   const [kind, setKind] = React.useState<ReportKind | null>(null);
   const [notes, setNotes] = React.useState<CapturedNote[]>([]);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
+  const [captureOnly, setCaptureOnly] = React.useState(false);
 
   const recorder = useAudioRecorder();
 
@@ -59,6 +60,7 @@ export function NewReportSheet({
       setKind(null);
       setNotes([]);
       setTemplate(null);
+      setCaptureOnly(false);
       recorder.clear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,6 +79,7 @@ export function NewReportSheet({
       audio: recorder.memo,
       notes,
       templateId: template?.id ?? null,
+      captureOnly,
     });
   };
 
@@ -88,6 +91,7 @@ export function NewReportSheet({
       isRecording={isRecording}
       noteCount={notes.length}
       templateName={template?.name ?? null}
+      captureOnly={captureOnly}
     />
   );
 
@@ -163,20 +167,36 @@ export function NewReportSheet({
         </div>
 
         <footer className="nr-foot">
-          <div className="nr-foot-meta">{summary}</div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-            <button type="button" className="nr-btn nr-btn-ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="nr-btn nr-btn-primary"
-              disabled={!canStart}
-              onClick={submit}
-            >
-              {submitting ? "Starting…" : "Start drafting"}
-              <ArrowRight size={14} strokeWidth={2.5} />
-            </button>
+          <div className="nr-foot-capture">
+            <label className="nr-capture-only-label nr-capture-only-label--footer">
+              <input
+                type="checkbox"
+                checked={captureOnly}
+                onChange={(e) => setCaptureOnly(e.target.checked)}
+              />
+              <span>
+                <span className="nr-capture-only-kicker">Standalone report</span>
+                First draft only uses your voice or image to write the report. Saved observations
+                and tracked progress for the child won&apos;t be included.
+              </span>
+            </label>
+          </div>
+          <div className="nr-foot-actions">
+            <div className="nr-foot-meta">{summary}</div>
+            <div className="nr-foot-buttons">
+              <button type="button" className="nr-btn nr-btn-ghost" onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="nr-btn nr-btn-primary"
+                disabled={!canStart}
+                onClick={submit}
+              >
+                {submitting ? "Starting…" : "Start drafting"}
+                <ArrowRight size={14} strokeWidth={2.5} />
+              </button>
+            </div>
           </div>
         </footer>
       </aside>
@@ -191,6 +211,7 @@ function NrSummary({
   isRecording,
   noteCount,
   templateName,
+  captureOnly,
 }: {
   child: PickerChild | null;
   kind: ReportKind | null;
@@ -198,6 +219,7 @@ function NrSummary({
   isRecording: boolean;
   noteCount: number;
   templateName: string | null;
+  captureOnly: boolean;
 }) {
   if (!child || !kind) return <span>Pick a child and a type to start.</span>;
 
@@ -206,6 +228,7 @@ function NrSummary({
   else if (audioDuration != null) pieces.push(formatDuration(audioDuration));
   if (noteCount > 0) pieces.push(`${noteCount} note${noteCount === 1 ? "" : "s"}`);
   if (templateName) pieces.push(templateName);
+  if (captureOnly) pieces.push("standalone");
 
   return (
     <span>

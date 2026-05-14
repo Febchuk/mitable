@@ -52,6 +52,11 @@ export const DraftFromCaptureRequestSchema = z.object({
   transcripts: z.array(z.string().min(1)).max(8).optional().default([]),
   notes: z.array(z.string().min(1)).max(20).optional().default([]),
   tokenMap: z.array(TokenMapEntrySchema).max(50).optional().default([]),
+  /**
+   * When true, the drafting agent must not read stored commands / progress
+   * history — only the supplied transcripts, notes, and template guidance.
+   */
+  captureOnly: z.boolean().optional().default(false),
 });
 export type DraftFromCaptureRequest = z.infer<typeof DraftFromCaptureRequestSchema>;
 

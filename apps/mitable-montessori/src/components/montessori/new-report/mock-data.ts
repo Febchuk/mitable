@@ -34,6 +34,8 @@ export type NewReportPayload = {
   audio: AudioMemo | null;
   notes: CapturedNote[];
   templateId: string | null;
+  /** When true, initial draft uses only voice/notes + template — not saved progress. */
+  captureOnly: boolean;
 };
 
 export function formatDuration(sec: number): string {

@@ -88,6 +88,7 @@ describe("NewReportSheet", () => {
     expect(payload.templateId).toBe(TEMPLATES[0].id);
     expect(payload.audio).toBeNull();
     expect(payload.notes).toEqual([]);
+    expect(payload.captureOnly).toBe(false);
   });
 
   it("does not render when open is false", () => {

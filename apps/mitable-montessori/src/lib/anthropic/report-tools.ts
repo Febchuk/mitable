@@ -72,6 +72,14 @@ export const REPORT_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/** In capture-only mode the read tools are omitted so the model cannot pull stored progress/commands. */
+export function reportToolsForCaptureMode(captureOnly: boolean): Anthropic.Tool[] {
+  if (captureOnly) {
+    return REPORT_TOOLS.filter((t) => t.name === "draft_report");
+  }
+  return REPORT_TOOLS;
+}
+
 export const REPORT_SYSTEM_PROMPT = `You are a Montessori teacher's writing assistant.
 You draft a single report (daily or major or incident) for one student over a specified period.
 
@@ -109,3 +117,12 @@ Source-of-truth rules — STRICT:
 - Never substitute "I don't have observations" for content the teacher already gave you in the capture text.
 
 Stop after at most 5 tool turns total. If you cannot finish, return draft_report anyway with what you have.`;
+
+/** Appended to the system prompt when capture-only mode is active. */
+export const REPORT_SYSTEM_PROMPT_CAPTURE_ONLY = `
+
+CAPTURE-ONLY RUN (the user message will say so):
+- Tools get_student_commands and get_student_progress_summary are not available. Do not call them.
+- Do not import or assume facts from the student's saved daily progress, observations tab, or stored command history.
+- Your only factual material is the teacher's voice transcript and handwritten-note OCR in the user message (when present), plus the section headings and guidance.
+- If a section needs detail the teacher did not supply, write one short honest sentence that you are not expanding beyond what was shared — do not invent classroom events.`;
