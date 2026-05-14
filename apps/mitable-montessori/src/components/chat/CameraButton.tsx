@@ -7,6 +7,7 @@ import { startCamera, type CameraSession } from "@/lib/capture/camera-capture";
 import { getOcrEngine } from "@/lib/capture/engines";
 import { redactPiiFromImage } from "@/lib/capture/redact-image";
 import { getDb } from "@/lib/db/schema";
+import { decryptRoster } from "@/lib/db/encrypted-fields";
 import type { RosterEntry } from "@/lib/capture/tokenize";
 import { recordEvent } from "@/lib/telemetry/events";
 
@@ -29,9 +30,12 @@ type State = "idle" | "loading-model" | "open" | "ocr" | "redacting" | "error";
 async function loadRosterForClassroom(classroomId: string): Promise<RosterEntry[]> {
   const db = getDb();
   const enrollments = await db.enrollments.where("classroomId").equals(classroomId).toArray();
-  const studentIds = new Set(enrollments.map((e) => e.studentId));
-  const students = await db.roster.where("id").anyOf([...studentIds]).toArray();
-  return students.map((s) => ({
+  const activeEnrollments = enrollments.filter((e) => e.endDate === null);
+  const studentIds = new Set(activeEnrollments.map((e) => e.studentId));
+  if (studentIds.size === 0) return [];
+  const encryptedStudents = await db.roster.where("id").anyOf([...studentIds]).toArray();
+  const decrypted = await Promise.all(encryptedStudents.map((r) => decryptRoster(r)));
+  return decrypted.map((s) => ({
     id: s.id,
     name: [s.firstName, s.lastName].filter(Boolean).join(" "),
   }));

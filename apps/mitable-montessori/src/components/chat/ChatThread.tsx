@@ -107,7 +107,7 @@ export function ChatThread(props: ChatThreadProps) {
                         className="w-full rounded-lg"
                       />
                     ) : null}
-                    {e.text}
+                    {e.redactedImageUrl ? null : e.text}
                   </div>
                 );
               }
