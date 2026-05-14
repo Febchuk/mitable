@@ -37,6 +37,7 @@ import {
   buildImportDrafts,
   buildStudentImportPlan,
   detectImportMapping,
+  listSchoolStudentsMatchingName,
   parseImportText,
   type ClassroomOption,
   type DraftAnalysis,
@@ -115,6 +116,23 @@ type OverviewResponse = {
   teachers: ApiTeacher[];
   roster: ApiRosterStudent[];
   montessoriCurricula: Array<{ id: string; name: string }>;
+};
+
+type SchoolRosterApiStudent = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  preferredName: string | null;
+  birthDate: string | null;
+  guardianCount: number;
+  enrolledEarliest: string | null;
+  classrooms: Array<{ id: string; name: string }>;
+};
+
+type SchoolRosterPickOption = {
+  id: string;
+  label: string;
+  hint: string;
 };
 
 const LEVEL_OPTIONS = ["Toddler", "Primary", "Lower Elementary", "Upper Elementary"];
@@ -229,13 +247,38 @@ export default function AdminClassroomsPage() {
   const [montessoriCurricula, setMontessoriCurricula] = React.useState<
     Array<{ id: string; name: string }>
   >([]);
+  const [schoolStudentsForImport, setSchoolStudentsForImport] = React.useState<
+    Array<{ id: string; firstName: string; lastName: string }>
+  >([]);
+  const [schoolRosterPickOptions, setSchoolRosterPickOptions] = React.useState<
+    SchoolRosterPickOption[]
+  >([]);
 
   const reload = React.useCallback(async () => {
     setLoadState("loading");
     setLoadError(null);
     try {
-      const data = await apiJson<OverviewResponse>("/api/admin/classrooms");
+      const [data, schoolR] = await Promise.all([
+        apiJson<OverviewResponse>("/api/admin/classrooms"),
+        apiJson<{ students: SchoolRosterApiStudent[] }>("/api/admin/school-roster"),
+      ]);
       setMontessoriCurricula(data.montessoriCurricula ?? []);
+      const schoolStudents = (schoolR.students ?? []).map((s) => ({
+        id: s.id,
+        firstName: s.firstName,
+        lastName: s.lastName,
+      }));
+      setSchoolStudentsForImport(schoolStudents);
+      setSchoolRosterPickOptions(
+        (schoolR.students ?? []).map((s) => ({
+          id: s.id,
+          label: `${s.firstName} ${s.lastName}`.trim(),
+          hint:
+            s.classrooms.length > 0
+              ? s.classrooms.map((c) => c.name).join(", ")
+              : "No classroom yet",
+        }))
+      );
       const mappedClassrooms: AdminClassroom[] = data.classrooms.map((c) => ({
         id: c.id,
         name: c.name,
@@ -298,20 +341,59 @@ export default function AdminClassroomsPage() {
     [children]
   );
 
-  const applyImportPlan = async (plan: StudentImportPlan) => {
+  const applyImportPlan = async (
+    plan: StudentImportPlan,
+    nameMatchPicks: Record<string, "new" | string> = {}
+  ) => {
     setMutationError(null);
     try {
       for (const s of plan.newStudents) {
-        const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
-          method: "POST",
-          body: JSON.stringify({
-            first_name: s.firstName,
-            last_name: s.lastName,
-            ...(s.birthDate ? { birth_date: s.birthDate } : {}),
-            classroom_id: s.classroomId,
-          }),
-        });
-        const studentId = created.id;
+        const matches = listSchoolStudentsMatchingName(
+          s.firstName,
+          s.lastName,
+          schoolStudentsForImport
+        );
+
+        let studentId: string;
+        if (matches.length > 0) {
+          const pick = nameMatchPicks[s.draftId];
+          if (!pick) {
+            throw new Error("Resolve same-name warnings on highlighted rows before importing.");
+          }
+          if (pick !== "new") {
+            if (!matches.some((m) => m.id === pick)) {
+              throw new Error("Stale student selection — reopen import and pick again.");
+            }
+            await apiJson<{ ok: boolean }>("/api/admin/student-enrollments", {
+              method: "POST",
+              body: JSON.stringify({ student_id: pick, classroom_id: s.classroomId }),
+            });
+            studentId = pick;
+          } else {
+            const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
+              method: "POST",
+              body: JSON.stringify({
+                first_name: s.firstName,
+                last_name: s.lastName,
+                ...(s.birthDate ? { birth_date: s.birthDate } : {}),
+                classroom_id: s.classroomId,
+              }),
+            });
+            studentId = created.id;
+          }
+        } else {
+          const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
+            method: "POST",
+            body: JSON.stringify({
+              first_name: s.firstName,
+              last_name: s.lastName,
+              ...(s.birthDate ? { birth_date: s.birthDate } : {}),
+              classroom_id: s.classroomId,
+            }),
+          });
+          studentId = created.id;
+        }
+
         for (const g of s.guardians) {
           const email = (g.email ?? "").trim();
           const name = (g.name ?? "").trim();
@@ -368,6 +450,73 @@ export default function AdminClassroomsPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Import failed";
       setMutationError(msg);
+      throw e;
+    }
+  };
+
+  const enrollExistingChild = async (studentId: string) => {
+    if (!selectedClassroomId) return;
+    setMutationError(null);
+    try {
+      await apiJson<{ ok: boolean }>("/api/admin/student-enrollments", {
+        method: "POST",
+        body: JSON.stringify({ student_id: studentId, classroom_id: selectedClassroomId }),
+      });
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not add child to this classroom");
+      throw e;
+    }
+  };
+
+  /** Enroll an existing student in the selected class, then attach guardians from the same form
+   *  shape as manual add (optional). */
+  const enrollExistingChildWithGuardians = async (
+    studentId: string,
+    input: {
+      guardianFirstName?: string;
+      guardianLastName?: string;
+      guardianEmail?: string;
+      guardianPhone?: string;
+    }
+  ) => {
+    if (!selectedClassroomId) return;
+    setMutationError(null);
+    try {
+      await apiJson<{ ok: boolean }>("/api/admin/student-enrollments", {
+        method: "POST",
+        body: JSON.stringify({ student_id: studentId, classroom_id: selectedClassroomId }),
+      });
+      const gfn = input.guardianFirstName?.trim();
+      const gln = input.guardianLastName?.trim();
+      const gem = input.guardianEmail?.trim();
+      const gphone = input.guardianPhone?.trim();
+      const emailOk = gem ? z.string().email().safeParse(gem).success : false;
+      if (emailOk || (gfn && gln)) {
+        const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
+          method: "POST",
+          body: JSON.stringify({
+            first_name: gfn || undefined,
+            last_name: gln || undefined,
+            email: gem || undefined,
+            phone: gphone || undefined,
+            preferred_contact_method: "either",
+          }),
+        });
+        await apiJson("/api/admin/student-guardians", {
+          method: "POST",
+          body: JSON.stringify({
+            student_id: studentId,
+            guardian_id: guardianRow.id,
+            relationship: "guardian",
+            is_primary_contact: false,
+            receives_reports: true,
+          }),
+        });
+      }
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not add child to this classroom");
       throw e;
     }
   };
@@ -839,7 +988,8 @@ export default function AdminClassroomsPage() {
         onOpenChange={setImportOpen}
         classrooms={classrooms}
         existingStudents={existingStudents}
-        onImport={applyImportPlan}
+        schoolStudentsForImport={schoolStudentsForImport}
+        onImport={(plan, nameMatchPicks) => applyImportPlan(plan, nameMatchPicks)}
       />
 
       <CreateClassroomDialog
@@ -853,7 +1003,19 @@ export default function AdminClassroomsPage() {
         open={addChildOpen}
         onOpenChange={setAddChildOpen}
         classroomName={selectedClassroom?.name ?? "Classroom"}
+        classroomId={selectedClassroomId}
+        rosterPickOptions={schoolRosterPickOptions.filter(
+          (o) =>
+            !children.some(
+              (c) => c.id === o.id && selectedClassroomId && c.classroomId === selectedClassroomId
+            )
+        )}
+        schoolStudentsForImport={schoolStudentsForImport}
         onAdd={addChildManually}
+        onEnrollExisting={(studentId) => enrollExistingChild(studentId)}
+        onEnrollExistingWithGuardians={(studentId, guardianInput) =>
+          enrollExistingChildWithGuardians(studentId, guardianInput)
+        }
       />
 
       <Dialog
@@ -1240,11 +1402,19 @@ function AddChildDialog({
   open,
   onOpenChange,
   classroomName,
+  classroomId,
+  rosterPickOptions,
+  schoolStudentsForImport,
   onAdd,
+  onEnrollExisting,
+  onEnrollExistingWithGuardians,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   classroomName: string;
+  classroomId: string | null;
+  rosterPickOptions: SchoolRosterPickOption[];
+  schoolStudentsForImport: Array<{ id: string; firstName: string; lastName: string }>;
   onAdd: (input: {
     firstName: string;
     lastName: string;
@@ -1254,7 +1424,18 @@ function AddChildDialog({
     guardianEmail?: string;
     guardianPhone?: string;
   }) => void | Promise<void>;
+  onEnrollExisting: (studentId: string) => void | Promise<void>;
+  onEnrollExistingWithGuardians: (
+    studentId: string,
+    input: {
+      guardianFirstName?: string;
+      guardianLastName?: string;
+      guardianEmail?: string;
+      guardianPhone?: string;
+    }
+  ) => void | Promise<void>;
 }) {
+  const [mode, setMode] = React.useState<"new" | "roster">("new");
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [birthDate, setBirthDate] = React.useState("");
@@ -1262,9 +1443,15 @@ function AddChildDialog({
   const [guardianLastName, setGuardianLastName] = React.useState("");
   const [guardianEmail, setGuardianEmail] = React.useState("");
   const [guardianPhone, setGuardianPhone] = React.useState("");
+  const [rosterSearch, setRosterSearch] = React.useState("");
+  const [pickedStudentId, setPickedStudentId] = React.useState<string | null>(null);
+  const [enrollBusy, setEnrollBusy] = React.useState(false);
+  const [duplicatePickId, setDuplicatePickId] = React.useState<string | null>(null);
+  const [duplicateBusy, setDuplicateBusy] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) {
+      setMode("new");
       setFirstName("");
       setLastName("");
       setBirthDate("");
@@ -1272,6 +1459,11 @@ function AddChildDialog({
       setGuardianLastName("");
       setGuardianEmail("");
       setGuardianPhone("");
+      setRosterSearch("");
+      setPickedStudentId(null);
+      setEnrollBusy(false);
+      setDuplicatePickId(null);
+      setDuplicateBusy(false);
     }
   }, [open]);
 
@@ -1284,126 +1476,319 @@ function AddChildDialog({
   const guardianPartial =
     oneNameOnly || (ge.length > 0 && !emailOk) || (Boolean(gp) && !emailOk && !(gf && gl));
 
-  const canSubmit = firstName.trim().length > 0 && lastName.trim().length > 0 && !guardianPartial;
+  const canSubmitNew =
+    firstName.trim().length > 0 && lastName.trim().length > 0 && !guardianPartial;
 
-  // Calendar picker icon — push to far right and keep the date text left aligned
-  // so the field doesn't look like the icon is floating in the middle.
+  const nameMatches = React.useMemo(
+    () => listSchoolStudentsMatchingName(firstName, lastName, schoolStudentsForImport),
+    [firstName, lastName, schoolStudentsForImport]
+  );
+
+  React.useEffect(() => {
+    const matches = listSchoolStudentsMatchingName(firstName, lastName, schoolStudentsForImport);
+    if (matches.length === 0) setDuplicatePickId(null);
+    else if (matches.length === 1) setDuplicatePickId(matches[0].id);
+    else
+      setDuplicatePickId((prev) =>
+        prev && matches.some((m) => m.id === prev) ? prev : matches[0].id
+      );
+  }, [firstName, lastName, schoolStudentsForImport]);
+
+  const hasDuplicateName = canSubmitNew && nameMatches.length > 0;
+  const guardianPayload = {
+    guardianFirstName: gf || undefined,
+    guardianLastName: gl || undefined,
+    guardianEmail: ge || undefined,
+    guardianPhone: gp || undefined,
+  };
+
+  const filteredRoster = React.useMemo(() => {
+    const q = rosterSearch.trim().toLowerCase();
+    if (!q) return rosterPickOptions;
+    return rosterPickOptions.filter(
+      (o) => o.label.toLowerCase().includes(q) || o.hint.toLowerCase().includes(q)
+    );
+  }, [rosterPickOptions, rosterSearch]);
+
   const dateInputClassName =
     "h-10 bg-canvas text-left [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[480px] rounded-[22px] border border-border bg-surface p-0 shadow-2xl">
+      <DialogContent className="max-w-[520px] rounded-[22px] border border-border bg-surface p-0 shadow-2xl">
         <DialogHeader className="border-b border-border px-6 py-5">
           <DialogTitle className="text-xl">Add child</DialogTitle>
           <p className="text-sm text-ink-secondary">Adding to {classroomName}.</p>
+          <div className="mt-4 flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === "new" ? "default" : "secondary"}
+              onClick={() => setMode("new")}
+            >
+              New child
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === "roster" ? "default" : "secondary"}
+              onClick={() => setMode("roster")}
+              disabled={!classroomId}
+            >
+              From school roster
+            </Button>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4 px-6 py-5">
-          <div className="grid gap-3 md:grid-cols-2">
-            <FieldLabel label="First name">
-              <Input
-                value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
-                className="h-10 bg-canvas"
-                autoFocus
-              />
-            </FieldLabel>
-            <FieldLabel label="Last name">
-              <Input
-                value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
-                className="h-10 bg-canvas"
-              />
-            </FieldLabel>
-          </div>
+        {mode === "new" ? (
+          <>
+            <div className="space-y-4 px-6 py-5">
+              <div className="grid gap-3 md:grid-cols-2">
+                <FieldLabel label="First name">
+                  <Input
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    className="h-10 bg-canvas"
+                    autoFocus
+                  />
+                </FieldLabel>
+                <FieldLabel label="Last name">
+                  <Input
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    className="h-10 bg-canvas"
+                  />
+                </FieldLabel>
+              </div>
 
-          <FieldLabel label="Birthday (optional)">
-            <Input
-              type="date"
-              value={birthDate}
-              onChange={(event) => setBirthDate(event.target.value)}
-              className={dateInputClassName}
-            />
-          </FieldLabel>
+              <FieldLabel label="Birthday (optional)">
+                <Input
+                  type="date"
+                  value={birthDate}
+                  onChange={(event) => setBirthDate(event.target.value)}
+                  className={dateInputClassName}
+                />
+              </FieldLabel>
 
-          <div
-            style={{
-              borderTop: "1px solid var(--color-border)",
-              paddingTop: 16,
-            }}
-          >
-            <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-              Guardian (optional)
+              <div
+                style={{
+                  borderTop: "1px solid var(--color-border)",
+                  paddingTop: 16,
+                }}
+              >
+                <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                  Guardian (optional)
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <FieldLabel label="Guardian first name">
+                    <Input
+                      value={guardianFirstName}
+                      onChange={(event) => setGuardianFirstName(event.target.value)}
+                      className="h-10 bg-canvas"
+                    />
+                  </FieldLabel>
+                  <FieldLabel label="Guardian last name">
+                    <Input
+                      value={guardianLastName}
+                      onChange={(event) => setGuardianLastName(event.target.value)}
+                      className="h-10 bg-canvas"
+                    />
+                  </FieldLabel>
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <FieldLabel label="Guardian email">
+                    <Input
+                      type="email"
+                      value={guardianEmail}
+                      onChange={(event) => setGuardianEmail(event.target.value)}
+                      className="h-10 bg-canvas"
+                    />
+                  </FieldLabel>
+                  <FieldLabel label="Guardian phone (optional)">
+                    <Input
+                      type="tel"
+                      value={guardianPhone}
+                      onChange={(event) => setGuardianPhone(event.target.value)}
+                      className="h-10 bg-canvas"
+                    />
+                  </FieldLabel>
+                </div>
+                {guardianPartial && (
+                  <p className="mt-2 text-xs text-terracotta">
+                    Use a valid email (names optional with email), or both first and last name, or
+                    leave guardian fields blank. Add a phone only together with a valid email or
+                    with both names.
+                  </p>
+                )}
+              </div>
+
+              {hasDuplicateName && classroomId ? (
+                <div className="rounded-xl border border-terracotta/35 bg-terracotta/10 px-4 py-3 text-sm text-ink">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-terracotta" />
+                    <div>
+                      <p className="font-medium">
+                        A child with this first and last name is already on the school roster.
+                      </p>
+                      <p className="mt-1 text-xs text-ink-secondary">
+                        Add that student to this classroom (same person), or create a second record
+                        only if this is a different child.
+                      </p>
+                    </div>
+                  </div>
+                  {nameMatches.length > 1 ? (
+                    <div className="mt-3 space-y-1">
+                      <div className="label-cap text-ink-muted">Which existing child?</div>
+                      <select
+                        className="h-9 w-full max-w-md rounded-md border border-ink/15 bg-surface px-2 text-sm text-ink"
+                        value={duplicatePickId ?? ""}
+                        onChange={(e) => setDuplicatePickId(e.target.value || null)}
+                      >
+                        {nameMatches.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.firstName} {c.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={duplicateBusy || !duplicatePickId}
+                      onClick={() => {
+                        const sid = nameMatches.length === 1 ? nameMatches[0].id : duplicatePickId;
+                        if (!sid) return;
+                        setDuplicateBusy(true);
+                        void Promise.resolve(onEnrollExistingWithGuardians(sid, guardianPayload))
+                          .then(() => onOpenChange(false))
+                          .finally(() => setDuplicateBusy(false));
+                      }}
+                    >
+                      {duplicateBusy ? "Adding…" : "Add existing child to this class"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={duplicateBusy}
+                      onClick={() => {
+                        setDuplicateBusy(true);
+                        void Promise.resolve(
+                          onAdd({
+                            firstName,
+                            lastName,
+                            birthDate: birthDate.trim() || undefined,
+                            guardianFirstName: gf || undefined,
+                            guardianLastName: gl || undefined,
+                            guardianEmail: ge || undefined,
+                            guardianPhone: gp || undefined,
+                          })
+                        )
+                          .then(() => onOpenChange(false))
+                          .finally(() => setDuplicateBusy(false));
+                      }}
+                    >
+                      Create new student record anyway
+                    </Button>
+                  </div>
+                </div>
+              ) : hasDuplicateName && !classroomId ? (
+                <p className="text-xs text-terracotta">Pick a classroom first.</p>
+              ) : null}
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <FieldLabel label="Guardian first name">
-                <Input
-                  value={guardianFirstName}
-                  onChange={(event) => setGuardianFirstName(event.target.value)}
-                  className="h-10 bg-canvas"
-                />
-              </FieldLabel>
-              <FieldLabel label="Guardian last name">
-                <Input
-                  value={guardianLastName}
-                  onChange={(event) => setGuardianLastName(event.target.value)}
-                  className="h-10 bg-canvas"
-                />
-              </FieldLabel>
+
+            <div className="flex items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!canSubmitNew || hasDuplicateName}
+                onClick={() => {
+                  if (!canSubmitNew || hasDuplicateName) return;
+                  void onAdd({
+                    firstName,
+                    lastName,
+                    birthDate: birthDate.trim() || undefined,
+                    guardianFirstName: gf || undefined,
+                    guardianLastName: gl || undefined,
+                    guardianEmail: ge || undefined,
+                    guardianPhone: gp || undefined,
+                  });
+                  onOpenChange(false);
+                }}
+              >
+                Add child
+              </Button>
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <FieldLabel label="Guardian email">
-                <Input
-                  type="email"
-                  value={guardianEmail}
-                  onChange={(event) => setGuardianEmail(event.target.value)}
-                  className="h-10 bg-canvas"
-                />
-              </FieldLabel>
-              <FieldLabel label="Guardian phone (optional)">
-                <Input
-                  type="tel"
-                  value={guardianPhone}
-                  onChange={(event) => setGuardianPhone(event.target.value)}
-                  className="h-10 bg-canvas"
-                />
-              </FieldLabel>
-            </div>
-            {guardianPartial && (
-              <p className="mt-2 text-xs text-terracotta">
-                Use a valid email (names optional with email), or both first and last name, or leave
-                guardian fields blank. Add a phone only together with a valid email or with both
-                names.
+          </>
+        ) : (
+          <>
+            <div className="space-y-3 px-6 py-5">
+              <p className="text-xs text-ink-secondary">
+                Pick someone already on the school roster. They stay one person across classrooms;
+                this only adds them to {classroomName}.
               </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={!canSubmit}
-            onClick={() => {
-              if (!canSubmit) return;
-              void onAdd({
-                firstName,
-                lastName,
-                birthDate: birthDate.trim() || undefined,
-                guardianFirstName: gf || undefined,
-                guardianLastName: gl || undefined,
-                guardianEmail: ge || undefined,
-                guardianPhone: gp || undefined,
-              });
-              onOpenChange(false);
-            }}
-          >
-            Add child
-          </Button>
-        </div>
+              <Input
+                value={rosterSearch}
+                onChange={(e) => setRosterSearch(e.target.value)}
+                placeholder="Search by name or current classroom…"
+                className="h-10 bg-canvas"
+              />
+              <div
+                className="scroll-quiet max-h-[280px] overflow-y-auto rounded-xl border border-border bg-canvas"
+                role="listbox"
+              >
+                {filteredRoster.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-ink-muted">
+                    {rosterPickOptions.length === 0
+                      ? "No students on the school roster yet."
+                      : "No matches — try another search."}
+                  </div>
+                ) : (
+                  filteredRoster.map((o) => {
+                    const active = pickedStudentId === o.id;
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className="tap flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left last:border-b-0"
+                        style={{
+                          background: active ? "var(--color-terracotta-soft)" : "transparent",
+                        }}
+                        onClick={() => setPickedStudentId(o.id)}
+                      >
+                        <span className="text-sm font-semibold text-ink">{o.label}</span>
+                        <span className="text-xs text-ink-muted">{o.hint}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!pickedStudentId || enrollBusy || !classroomId}
+                onClick={() => {
+                  if (!pickedStudentId || !classroomId) return;
+                  setEnrollBusy(true);
+                  void Promise.resolve(onEnrollExisting(pickedStudentId))
+                    .then(() => onOpenChange(false))
+                    .finally(() => setEnrollBusy(false));
+                }}
+              >
+                {enrollBusy ? "Adding…" : "Add to this classroom"}
+              </Button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -1791,13 +2176,18 @@ function StudentImportDialog({
   onOpenChange,
   classrooms,
   existingStudents,
+  schoolStudentsForImport,
   onImport,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   classrooms: ClassroomOption[];
   existingStudents: Array<{ id: string; name: string; birthDate?: string; classroomId?: string }>;
-  onImport: (plan: StudentImportPlan) => void | Promise<void>;
+  schoolStudentsForImport: Array<{ id: string; firstName: string; lastName: string }>;
+  onImport: (
+    plan: StudentImportPlan,
+    nameMatchPicks: Record<string, "new" | string>
+  ) => void | Promise<void>;
 }) {
   const [rawData, setRawData] = React.useState<RawImportData | null>(null);
   const [mapping, setMapping] = React.useState<ImportMapping>({});
@@ -1805,6 +2195,7 @@ function StudentImportDialog({
   const [pasteText, setPasteText] = React.useState("");
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [importBusy, setImportBusy] = React.useState(false);
+  const [nameMatchPicks, setNameMatchPicks] = React.useState<Record<string, "new" | string>>({});
 
   React.useEffect(() => {
     if (!open) {
@@ -1814,8 +2205,14 @@ function StudentImportDialog({
       setPasteText("");
       setFileName(null);
       setImportBusy(false);
+      setNameMatchPicks({});
     }
   }, [open]);
+
+  const draftIdsKey = drafts.map((d) => d.id).join("|");
+  React.useEffect(() => {
+    setNameMatchPicks({});
+  }, [draftIdsKey]);
 
   const loadText = (text: string) => {
     const parsed = parseImportText(text);
@@ -1844,6 +2241,23 @@ function StudentImportDialog({
     return map;
   }, [analyses, planResult]);
 
+  const nameMatchBlockers = React.useMemo(() => {
+    const plan = planResult.plan;
+    if (!plan) return 0;
+    let n = 0;
+    for (const s of plan.newStudents) {
+      const matches = listSchoolStudentsMatchingName(
+        s.firstName,
+        s.lastName,
+        schoolStudentsForImport
+      );
+      if (matches.length === 0) continue;
+      const pick = nameMatchPicks[s.draftId];
+      if (!pick) n++;
+    }
+    return n;
+  }, [planResult.plan, schoolStudentsForImport, nameMatchPicks]);
+
   const issueCount = Array.from(issuesById.values()).reduce(
     (sum, issues) => sum + issues.length,
     0
@@ -1851,7 +2265,11 @@ function StudentImportDialog({
   const readyRows =
     drafts.length - Array.from(issuesById.values()).filter((issues) => issues.length > 0).length;
   const canImport =
-    drafts.length > 0 && issueCount === 0 && !!planResult.plan && classrooms.length > 0;
+    drafts.length > 0 &&
+    issueCount === 0 &&
+    !!planResult.plan &&
+    classrooms.length > 0 &&
+    nameMatchBlockers === 0;
 
   const updateDraft = (id: string, update: Partial<StudentImportDraft>) => {
     setDrafts((prev) => prev.map((draft) => (draft.id === id ? { ...draft, ...update } : draft)));
@@ -1991,24 +2409,46 @@ function StudentImportDialog({
               <div className="flex flex-wrap items-center gap-2">
                 {readyRows > 0 && <Badge variant="sage">{readyRows} ready</Badge>}
                 {issueCount > 0 && <Badge variant="terracotta">{issueCount} to fix</Badge>}
+                {nameMatchBlockers > 0 && (
+                  <Badge variant="terracotta">
+                    {nameMatchBlockers} same-name choice{nameMatchBlockers === 1 ? "" : "s"}
+                  </Badge>
+                )}
               </div>
 
               <div className="space-y-3">
-                {drafts.map((draft, index) => (
-                  <ImportDraftCard
-                    key={draft.id}
-                    draft={draft}
-                    analysis={analyses[index]}
-                    issues={issuesById.get(draft.id) ?? []}
-                    classrooms={classrooms}
-                    typoCounts={typoCounts}
-                    onUpdate={updateDraft}
-                    onRemove={() =>
-                      setDrafts((prev) => prev.filter((item) => item.id !== draft.id))
-                    }
-                    onApplyClassroomToAll={applyClassroomToAll}
-                  />
-                ))}
+                {drafts.map((draft, index) => {
+                  const ns = planResult.plan?.newStudents.find((row) => row.draftId === draft.id);
+                  const nameMatches = ns
+                    ? listSchoolStudentsMatchingName(
+                        ns.firstName,
+                        ns.lastName,
+                        schoolStudentsForImport
+                      )
+                    : [];
+                  return (
+                    <ImportDraftCard
+                      key={draft.id}
+                      draft={draft}
+                      analysis={analyses[index]}
+                      issues={issuesById.get(draft.id) ?? []}
+                      classrooms={classrooms}
+                      typoCounts={typoCounts}
+                      onUpdate={updateDraft}
+                      onRemove={() =>
+                        setDrafts((prev) => prev.filter((item) => item.id !== draft.id))
+                      }
+                      onApplyClassroomToAll={applyClassroomToAll}
+                      nameMatchCandidates={nameMatches}
+                      nameMatchPick={
+                        ns && nameMatches.length > 0 ? nameMatchPicks[draft.id] : undefined
+                      }
+                      onNameMatchPick={(pick) =>
+                        setNameMatchPicks((prev) => ({ ...prev, [draft.id]: pick }))
+                      }
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2024,7 +2464,7 @@ function StudentImportDialog({
             onClick={() => {
               if (!planResult.plan || importBusy) return;
               setImportBusy(true);
-              void Promise.resolve(onImport(planResult.plan))
+              void Promise.resolve(onImport(planResult.plan, nameMatchPicks))
                 .then(() => onOpenChange(false))
                 .finally(() => setImportBusy(false));
             }}
@@ -2033,7 +2473,9 @@ function StudentImportDialog({
               ? "Importing…"
               : canImport
                 ? `Import ${planResult.plan?.newStudents.length ?? 0} children`
-                : `Fix ${issueCount} issue${issueCount === 1 ? "" : "s"} first`}
+                : nameMatchBlockers > 0
+                  ? `Choose same-name option (${nameMatchBlockers})`
+                  : `Fix ${issueCount} issue${issueCount === 1 ? "" : "s"} first`}
           </Button>
         </div>
       </DialogContent>
@@ -2050,6 +2492,9 @@ function ImportDraftCard({
   onUpdate,
   onRemove,
   onApplyClassroomToAll,
+  nameMatchCandidates = [],
+  nameMatchPick,
+  onNameMatchPick,
 }: {
   draft: StudentImportDraft;
   analysis: DraftAnalysis;
@@ -2059,18 +2504,23 @@ function ImportDraftCard({
   onUpdate: (id: string, update: Partial<StudentImportDraft>) => void;
   onRemove: () => void;
   onApplyClassroomToAll: (oldValue: string, newValue: string) => void;
+  nameMatchCandidates?: Array<{ id: string; firstName: string; lastName: string }>;
+  nameMatchPick?: "new" | string;
+  onNameMatchPick?: (pick: "new" | string) => void;
 }) {
-  const hasIssues = issues.length > 0;
+  const nameMatchPending =
+    Boolean(onNameMatchPick) && nameMatchCandidates.length > 0 && nameMatchPick === undefined;
+  const cardAttention = issues.length > 0 || nameMatchPending;
   return (
     <section
       className={
-        hasIssues
+        cardAttention
           ? "rounded-2xl border border-terracotta/40 bg-terracotta/10 p-4"
           : "rounded-2xl border border-border bg-canvas p-4"
       }
     >
       <div className="mb-3 flex items-center gap-2">
-        {hasIssues ? (
+        {cardAttention ? (
           <AlertTriangle size={16} className="text-terracotta" />
         ) : (
           <Check size={16} className="text-sage" />
@@ -2132,11 +2582,68 @@ function ImportDraftCard({
         />
       </div>
 
-      {analysis.dateHint && !hasIssues && (
+      {nameMatchCandidates.length > 0 && onNameMatchPick ? (
+        <div
+          className={`mt-3 space-y-2 rounded-xl border px-3 py-3 text-sm ${
+            nameMatchPick
+              ? "border-ink/10 bg-surface text-ink"
+              : "border-terracotta/35 bg-terracotta/10 text-ink"
+          }`}
+        >
+          <p className="font-medium">Same first and last name as a child already at this school.</p>
+          <p className="mt-1 text-xs text-ink-secondary">
+            Link this row to an existing student (they are added to the classroom from this import),
+            or create a second student record if this is a different child.
+          </p>
+          {nameMatchCandidates.length === 1 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                type="button"
+                onClick={() => onNameMatchPick(nameMatchCandidates[0].id)}
+              >
+                Use {nameMatchCandidates[0].firstName} {nameMatchCandidates[0].lastName} (existing)
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                type="button"
+                onClick={() => onNameMatchPick("new")}
+              >
+                Create new student record
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-1">
+              <div className="label-cap text-ink-muted">Which child is this row?</div>
+              <select
+                className="h-9 w-full max-w-md rounded-md border border-ink/15 bg-surface px-2 text-sm text-ink"
+                value={nameMatchPick ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  onNameMatchPick(v === "new" ? "new" : v);
+                }}
+              >
+                <option value="">Choose…</option>
+                {nameMatchCandidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Existing · {c.firstName} {c.lastName}
+                  </option>
+                ))}
+                <option value="new">New student (same name, different person)</option>
+              </select>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {analysis.dateHint && issues.length === 0 && !nameMatchPending && (
         <p className="mt-2 text-xs text-ink-muted">{analysis.dateHint}</p>
       )}
 
-      {hasIssues && (
+      {issues.length > 0 && (
         <div className="mt-3 space-y-2">
           {issues.map((issue, index) => (
             <IssueMessage

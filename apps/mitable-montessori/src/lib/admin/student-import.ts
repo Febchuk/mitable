@@ -78,6 +78,8 @@ export interface DraftAnalysis {
 
 export interface StudentImportPlan {
   newStudents: Array<{
+    /** Stable id of the import draft row; used for name-collision UI. */
+    draftId: string;
     studentKey: string;
     firstName: string;
     lastName: string;
@@ -388,6 +390,7 @@ export function buildStudentImportPlan(
     }
 
     newStudentsByKey.set(ready.studentKey, {
+      draftId: analysis.draft.id,
       studentKey: ready.studentKey,
       firstName: analysis.draft.firstName.trim(),
       lastName: analysis.draft.lastName.trim(),
@@ -406,6 +409,20 @@ export function buildStudentImportPlan(
     },
     duplicateIssues,
   };
+}
+
+/** Case-insensitive first + last match against the school roster (for import warnings). */
+export function listSchoolStudentsMatchingName(
+  firstName: string,
+  lastName: string,
+  schoolStudents: Array<{ id: string; firstName: string; lastName: string }>
+): Array<{ id: string; firstName: string; lastName: string }> {
+  const a = firstName.trim().toLowerCase();
+  const b = lastName.trim().toLowerCase();
+  if (!a || !b) return [];
+  return schoolStudents.filter(
+    (s) => s.firstName.trim().toLowerCase() === a && s.lastName.trim().toLowerCase() === b
+  );
 }
 
 export function ageLabelFromBirthDate(iso: string): string {

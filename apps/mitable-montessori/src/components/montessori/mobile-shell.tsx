@@ -59,6 +59,7 @@ const TEACHER_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin/today", label: "Today", icon: <HouseSimple {...ph} /> },
   { href: "/admin/classrooms", label: "Classrooms", icon: <Building2 {...lu} /> },
+  { href: "/admin/roster", label: "Roster", icon: <Users {...lu} /> },
   { href: "/admin/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
   { href: "/admin/report-templates", label: "Templates", icon: <LayoutTemplate {...lu} /> },
   { href: "/admin/teachers", label: "Teachers", icon: <Users {...lu} /> },

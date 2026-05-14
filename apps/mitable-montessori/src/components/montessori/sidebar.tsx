@@ -41,6 +41,7 @@ const NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
   { href: "/admin/classrooms", label: "Classrooms", renderIcon: () => <Building2 {...lucide} /> },
+  { href: "/admin/roster", label: "Roster", renderIcon: () => <Users {...lucide} /> },
   { href: "/admin/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
   {
     href: "/admin/report-templates",

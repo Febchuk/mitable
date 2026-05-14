@@ -40,7 +40,9 @@ export default async function ChildDetailPage({
   const rosterBackLink =
     sp.from === "admin-classrooms"
       ? { href: "/admin/classrooms", label: "Classrooms" }
-      : { href: "/app/roster", label: "All children" };
+      : sp.from === "admin-roster"
+        ? { href: "/admin/roster", label: "School roster" }
+        : { href: "/app/roster", label: "All children" };
 
   return (
     <ChildDetail
