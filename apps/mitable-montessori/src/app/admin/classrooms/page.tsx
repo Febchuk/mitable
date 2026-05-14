@@ -67,6 +67,7 @@ type AdminChild = {
 
 type AdminClassroom = ClassroomOption & {
   level?: string;
+  curriculumId?: string | null;
   curriculumName?: string | null;
   mainTeacherId?: string;
   programTypes: ProgressProgram[];
@@ -86,6 +87,7 @@ type ApiClassroom = {
   id: string;
   name: string;
   code: string | null;
+  curriculumId: string | null;
   curriculumName: string | null;
   leadTeacherId: string | null;
   programTypes: ProgressProgram[];
@@ -112,6 +114,7 @@ type OverviewResponse = {
   classrooms: ApiClassroom[];
   teachers: ApiTeacher[];
   roster: ApiRosterStudent[];
+  montessoriCurricula: Array<{ id: string; name: string }>;
 };
 
 const LEVEL_OPTIONS = ["Toddler", "Primary", "Lower Elementary", "Upper Elementary"];
@@ -223,16 +226,21 @@ export default function AdminClassroomsPage() {
   const [createClassroomOpen, setCreateClassroomOpen] = React.useState(false);
   const [addChildOpen, setAddChildOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [montessoriCurricula, setMontessoriCurricula] = React.useState<
+    Array<{ id: string; name: string }>
+  >([]);
 
   const reload = React.useCallback(async () => {
     setLoadState("loading");
     setLoadError(null);
     try {
       const data = await apiJson<OverviewResponse>("/api/admin/classrooms");
+      setMontessoriCurricula(data.montessoriCurricula ?? []);
       const mappedClassrooms: AdminClassroom[] = data.classrooms.map((c) => ({
         id: c.id,
         name: c.name,
         level: c.code ?? "",
+        curriculumId: c.curriculumId,
         curriculumName: c.curriculumName,
         mainTeacherId: c.leadTeacherId ?? undefined,
         teachers: Array.isArray(c.teachers) ? c.teachers : [],
@@ -415,6 +423,19 @@ export default function AdminClassroomsPage() {
     } catch (e) {
       setMutationError(e instanceof Error ? e.message : "Could not update programs");
       return false;
+    }
+  };
+
+  const setClassroomCurriculum = async (classroomId: string, curriculumId: string | null) => {
+    setMutationError(null);
+    try {
+      await apiJson("/api/admin/classrooms", {
+        method: "PATCH",
+        body: JSON.stringify({ classroom_id: classroomId, curriculum_id: curriculumId }),
+      });
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not update curriculum");
     }
   };
 
@@ -698,6 +719,13 @@ export default function AdminClassroomsPage() {
                 <ProgramTypesEditor
                   value={selectedClassroom.programTypes}
                   onSave={(next) => setClassroomPrograms(selectedClassroom.id, next)}
+                />
+                <MontessoriCurriculumPicker
+                  programTypes={selectedClassroom.programTypes}
+                  curriculumId={selectedClassroom.curriculumId ?? null}
+                  curriculumName={selectedClassroom.curriculumName ?? null}
+                  options={montessoriCurricula}
+                  onPick={(next) => setClassroomCurriculum(selectedClassroom.id, next)}
                 />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1425,6 +1453,91 @@ function ProgramPicker({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function MontessoriCurriculumPicker({
+  programTypes,
+  curriculumId,
+  curriculumName,
+  options,
+  onPick,
+}: {
+  programTypes: ProgressProgram[];
+  curriculumId: string | null;
+  curriculumName: string | null;
+  options: Array<{ id: string; name: string }>;
+  onPick: (curriculumId: string | null) => Promise<void>;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const montessoriOn = programTypes.includes("montessori");
+
+  const selectOptions = React.useMemo(() => {
+    if (curriculumId && !options.some((o) => o.id === curriculumId)) {
+      return [
+        { id: curriculumId, name: curriculumName?.trim() ? curriculumName : "Assigned curriculum" },
+        ...options,
+      ];
+    }
+    return options;
+  }, [curriculumId, curriculumName, options]);
+
+  if (!montessoriOn) return null;
+
+  return (
+    <div style={{ marginTop: 10, maxWidth: 360 }}>
+      <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+        Montessori curriculum
+      </div>
+      {selectOptions.length === 0 ? (
+        <p
+          style={{ margin: 0, fontSize: 12, color: "var(--color-ink-secondary)", lineHeight: 1.45 }}
+        >
+          No active Montessori curriculum exists for your school yet. Teachers need one to use the
+          Progress grid.{" "}
+          <Link href="/admin/curriculum" className="underline">
+            Open Curriculum
+          </Link>
+          .
+        </p>
+      ) : (
+        <select
+          className="tap"
+          disabled={busy}
+          value={curriculumId ?? ""}
+          onChange={(event) => {
+            const v = event.target.value;
+            const next = v === "" ? null : v;
+            setBusy(true);
+            void (async () => {
+              try {
+                await onPick(next);
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+          style={{
+            width: "100%",
+            maxWidth: 340,
+            fontSize: 13,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-canvas)",
+            color: "var(--color-ink)",
+            fontFamily: "inherit",
+          }}
+        >
+          <option value="">None — Progress grid hidden for this class</option>
+          {selectOptions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

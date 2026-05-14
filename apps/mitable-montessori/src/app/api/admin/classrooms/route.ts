@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminWriteRoute } from "@/lib/admin/route-helper";
-import { CreateClassroomSchema, UpdateClassroomProgramsSchema } from "@/lib/schemas/admin";
-import { createClassroom, updateClassroomPrograms } from "@/lib/admin/crud";
+import { CreateClassroomSchema, PatchClassroomSchema } from "@/lib/schemas/admin";
+import {
+  createClassroom,
+  setClassroomMontessoriCurriculum,
+  updateClassroomPrograms,
+} from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { createClient } from "@/utils/supabase/server";
 
@@ -93,6 +97,25 @@ export async function GET() {
     }
   }
 
+  const { data: curriculumListRows } = await supabase
+    .from("curricula")
+    .select("id, name, framework")
+    .eq("school_id", schoolId)
+    .eq("is_active", true)
+    .order("name");
+
+  const montessoriCurricula = (curriculumListRows ?? [])
+    .filter(
+      (row) =>
+        String((row as { framework?: string }).framework ?? "")
+          .trim()
+          .toLowerCase() === "montessori"
+    )
+    .map((row) => {
+      const c = row as { id: string; name: string };
+      return { id: c.id, name: c.name };
+    });
+
   const classroomsOut = roomRows.map((r) => {
     const id = r.id as string;
     const assigns = assignsByRoom.get(id) ?? [];
@@ -116,6 +139,7 @@ export async function GET() {
       id,
       name: r.name as string,
       code: (r.code as string | null) ?? null,
+      curriculumId: (r.curriculum_id as string | null) ?? null,
       curriculumName: r.curriculum_id
         ? (curriculumNameById.get(r.curriculum_id as string) ?? null)
         : null,
@@ -265,6 +289,7 @@ export async function GET() {
     classrooms: classroomsOut,
     teachers,
     roster,
+    montessoriCurricula,
   });
 }
 
@@ -281,13 +306,22 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  return adminWriteRoute(
-    req,
-    UpdateClassroomProgramsSchema,
-    "admin_update_classroom_programs",
-    async (input, ctx) => {
-      await updateClassroomPrograms(ctx, input);
-      return { id: input.classroom_id };
+  return adminWriteRoute(req, PatchClassroomSchema, "admin_patch_classroom", async (input, ctx) => {
+    if (input.program_types) {
+      await updateClassroomPrograms(ctx, {
+        classroom_id: input.classroom_id,
+        program_types: input.program_types,
+      });
     }
-  );
+    if (input.curriculum_id !== undefined) {
+      await setClassroomMontessoriCurriculum(ctx, input.classroom_id, input.curriculum_id);
+    }
+    return {
+      id: input.classroom_id,
+      meta: {
+        updated_programs: Boolean(input.program_types),
+        updated_curriculum: input.curriculum_id !== undefined,
+      },
+    };
+  });
 }

@@ -313,17 +313,68 @@ export async function transferStudent(
   });
 }
 
-export async function assignCurriculumToClassroom(
+/** Sets `classrooms.curriculum_id` (or clears it). Only active Montessori
+ *  curricula in the same school; classroom must include the Montessori program
+ *  when assigning a non-null curriculum. */
+export async function setClassroomMontessoriCurriculum(
   ctx: AdminContext,
   classroomId: string,
-  curriculumId: string
+  curriculumId: string | null
 ): Promise<void> {
+  const { data: room } = await ctx.supabase
+    .from("classrooms")
+    .select("id, program_types")
+    .eq("id", classroomId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (!room) throw new AdminError("Classroom not found", "not_found");
+
+  const rawPrograms = (room as { program_types?: string[] | null }).program_types;
+  const programs =
+    Array.isArray(rawPrograms) && rawPrograms.length > 0 ? rawPrograms : (["montessori"] as const);
+
+  if (curriculumId !== null && !programs.includes("montessori")) {
+    throw new AdminError(
+      "Add the Montessori program to this classroom before assigning a curriculum",
+      "invalid"
+    );
+  }
+
+  if (curriculumId !== null) {
+    const { data: cur } = await ctx.supabase
+      .from("curricula")
+      .select("id, framework, is_active")
+      .eq("id", curriculumId)
+      .eq("school_id", ctx.schoolId)
+      .maybeSingle();
+    if (!cur || !(cur as { is_active?: boolean }).is_active) {
+      throw new AdminError("Curriculum not found", "not_found");
+    }
+    const fw = String((cur as { framework?: string }).framework ?? "")
+      .trim()
+      .toLowerCase();
+    if (fw !== "montessori") {
+      throw new AdminError(
+        "Only Montessori curricula can be assigned to a classroom here",
+        "invalid"
+      );
+    }
+  }
+
   const { error } = await ctx.supabase
     .from("classrooms")
     .update({ curriculum_id: curriculumId, updated_at: new Date().toISOString() })
     .eq("id", classroomId)
     .eq("school_id", ctx.schoolId);
   if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function assignCurriculumToClassroom(
+  ctx: AdminContext,
+  classroomId: string,
+  curriculumId: string
+): Promise<void> {
+  await setClassroomMontessoriCurriculum(ctx, classroomId, curriculumId);
 }
 
 // === Curriculum ===
@@ -338,6 +389,27 @@ export async function createCurriculum(
     is_active: true,
     created_by_user_id: ctx.actorUserId,
   });
+}
+
+export async function setCurriculumActive(
+  ctx: AdminContext,
+  curriculumId: string,
+  isActive: boolean
+): Promise<void> {
+  const { data: row } = await ctx.supabase
+    .from("curricula")
+    .select("id")
+    .eq("id", curriculumId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (!row) throw new AdminError("Curriculum not found", "not_found");
+
+  const { error } = await ctx.supabase
+    .from("curricula")
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq("id", curriculumId)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
 }
 
 export async function createCurriculumSubject(

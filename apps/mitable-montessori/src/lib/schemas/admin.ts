@@ -79,17 +79,33 @@ export const CreateClassroomSchema = z.object({
   program_types: z.array(ProgressProgramSchema).min(1).max(3).optional(),
 });
 
-/** Patch a classroom's program_types. Used by the admin "Edit programs"
- *  control to flip a Montessori room into Montessori + IEP, etc. */
-export const UpdateClassroomProgramsSchema = z.object({
-  classroom_id: z.string().uuid(),
-  program_types: z.array(ProgressProgramSchema).min(1).max(3),
-});
+/** Patch program_types, curriculum_id, or both. At least one field required. */
+export const PatchClassroomSchema = z
+  .object({
+    classroom_id: z.string().uuid(),
+    program_types: z.array(ProgressProgramSchema).min(1).max(3).optional(),
+    curriculum_id: z.union([z.string().uuid(), z.null()]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.program_types === undefined && data.curriculum_id === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide program_types and/or curriculum_id",
+      });
+    }
+  });
+export type PatchClassroomInput = z.infer<typeof PatchClassroomSchema>;
 
 export const CreateCurriculumSchema = z.object({
   name: z.string().min(1).max(200),
   framework: z.string().max(100).default("montessori"),
   description: z.string().max(2000).optional(),
+});
+
+/** Toggle whether a curriculum is available (classroom pickers, teacher sync). */
+export const SetCurriculumActiveSchema = z.object({
+  curriculum_id: z.string().uuid(),
+  is_active: z.boolean(),
 });
 
 export const CreateCurriculumSubjectSchema = z.object({

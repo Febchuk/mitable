@@ -68,11 +68,89 @@ function subtopicCount(curriculum: AdminCurriculum): number {
 
 type AdminCurriculumTab = "curricula" | "iep";
 
+type DbSchoolCurriculum = {
+  id: string;
+  name: string;
+  framework: string;
+  is_active: boolean;
+};
+
 export default function AdminCurriculumPage() {
   const [activeTab, setActiveTab] = React.useState<AdminCurriculumTab>("curricula");
   const [curricula, setCurricula] = React.useState<AdminCurriculum[]>(() => initialCurricula());
   const [selectedId, setSelectedId] = React.useState(curricula[0]?.id ?? "");
   const [createOpen, setCreateOpen] = React.useState(false);
+
+  const [dbCurricula, setDbCurricula] = React.useState<DbSchoolCurriculum[] | null>(null);
+  const [dbLoadError, setDbLoadError] = React.useState<string | null>(null);
+  const [dbActionError, setDbActionError] = React.useState<string | null>(null);
+  const [patchBusyId, setPatchBusyId] = React.useState<string | null>(null);
+  const [seedBusy, setSeedBusy] = React.useState(false);
+
+  const reloadDbCurricula = React.useCallback(async () => {
+    setDbLoadError(null);
+    setDbActionError(null);
+    try {
+      const res = await fetch("/api/admin/curricula", { cache: "no-store" });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        curricula?: DbSchoolCurriculum[];
+      };
+      if (!res.ok) {
+        setDbLoadError(data.error ?? "Could not load");
+        setDbCurricula(null);
+        return;
+      }
+      setDbCurricula(data.curricula ?? []);
+    } catch {
+      setDbLoadError("Could not load");
+      setDbCurricula(null);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (activeTab === "curricula") void reloadDbCurricula();
+  }, [activeTab, reloadDbCurricula]);
+
+  const runStandardSeed = async () => {
+    setSeedBusy(true);
+    setDbActionError(null);
+    try {
+      const res = await fetch("/api/admin/curricula/seed-defaults", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not add programs");
+      await reloadDbCurricula();
+    } catch (e) {
+      setDbActionError(e instanceof Error ? e.message : "Could not add programs");
+    } finally {
+      setSeedBusy(false);
+    }
+  };
+
+  const setDbCurriculumActive = async (row: DbSchoolCurriculum, nextActive: boolean) => {
+    setPatchBusyId(row.id);
+    setDbActionError(null);
+    try {
+      const res = await fetch("/api/admin/curricula", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ curriculum_id: row.id, is_active: nextActive }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not update");
+      await reloadDbCurricula();
+    } catch (e) {
+      setDbActionError(e instanceof Error ? e.message : "Could not update");
+    } finally {
+      setPatchBusyId(null);
+    }
+  };
+
+  const dbByName = React.useMemo(() => {
+    const m = new Map<string, DbSchoolCurriculum>();
+    for (const r of dbCurricula ?? []) m.set(r.name, r);
+    return m;
+  }, [dbCurricula]);
 
   const selected = curricula.find((curriculum) => curriculum.id === selectedId) ?? curricula[0];
 
@@ -283,40 +361,116 @@ export default function AdminCurriculumPage() {
               const active = curriculum.id === selected?.id;
               const sCount = curriculum.subjects.length;
               const tCount = topicCount(curriculum);
+              const dbRow = dbCurricula !== null ? dbByName.get(curriculum.name) : undefined;
+              const dbLoading = dbCurricula === null && !dbLoadError;
               return (
-                <button
+                <div
                   key={curriculum.id}
-                  type="button"
-                  className="tap"
-                  onClick={() => setSelectedId(curriculum.id)}
                   style={{
-                    width: "100%",
                     display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "14px 16px",
-                    border: 0,
+                    alignItems: "stretch",
                     borderTop: index ? "1px solid var(--color-border)" : 0,
                     background: active ? "var(--color-terracotta-soft)" : "transparent",
-                    textAlign: "left",
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
-                      {curriculum.name}
+                  <button
+                    type="button"
+                    className="tap"
+                    onClick={() => setSelectedId(curriculum.id)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "14px 10px 14px 16px",
+                      border: 0,
+                      background: "transparent",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
+                        {curriculum.name}
+                      </div>
+                      <div
+                        style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}
+                      >
+                        {curriculum.ageRange
+                          ? `${curriculum.ageRange} · ${sCount} subjects · ${tCount} topics`
+                          : `${sCount} subjects · ${tCount} topics`}
+                      </div>
                     </div>
-                    <div
-                      style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}
-                    >
-                      {curriculum.ageRange
-                        ? `${curriculum.ageRange} · ${sCount} subjects · ${tCount} topics`
-                        : `${sCount} subjects · ${tCount} topics`}
-                    </div>
+                    <ChevronRight size={15} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                  </button>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      paddingRight: 12,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {dbLoading ? (
+                      <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>…</span>
+                    ) : dbCurricula === null ? (
+                      <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>—</span>
+                    ) : dbRow ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={dbRow.is_active ? "secondary" : "outline"}
+                        disabled={patchBusyId === dbRow.id || seedBusy}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void setDbCurriculumActive(dbRow, !dbRow.is_active);
+                        }}
+                        className="shrink-0"
+                      >
+                        {patchBusyId === dbRow.id ? "…" : dbRow.is_active ? "Active" : "Inactive"}
+                      </Button>
+                    ) : null}
                   </div>
-                  <ChevronRight size={15} strokeWidth={1.5} />
-                </button>
+                </div>
               );
             })}
+            {dbCurricula !== null && dbCurricula.length === 0 && !dbLoadError ? (
+              <div
+                style={{
+                  padding: "14px 16px",
+                  borderTop: curricula.length ? "1px solid var(--color-border)" : 0,
+                }}
+              >
+                <p style={{ margin: 0, fontSize: 12, color: "var(--color-ink-secondary)" }}>
+                  Your account does not have the five standard programs yet. Add them here, then you
+                  can turn each one on or off with the buttons next to the list.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="mt-2"
+                  disabled={seedBusy}
+                  onClick={() => void runStandardSeed()}
+                >
+                  {seedBusy ? "Adding…" : "Add standard programs"}
+                </Button>
+              </div>
+            ) : null}
+            {(dbLoadError || dbActionError) && (
+              <div
+                style={{
+                  padding: "10px 16px 14px",
+                  borderTop: "1px solid var(--color-border)",
+                  fontSize: 12,
+                  color: "var(--status-error, #e87474)",
+                }}
+              >
+                {dbLoadError ?? dbActionError}
+              </div>
+            )}
           </aside>
 
           <section style={cardStyle}>
