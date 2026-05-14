@@ -32,6 +32,8 @@ export type ClassroomProgressStudent = {
   preferredName: string | null;
   /** True for now (TODO: join attendance_days). Mirrors mock CHILDREN.present. */
   present: boolean;
+  /** Active (non-archived) IEP goal rows for this child. 0 when classroom has no IEP program. */
+  iepItemCount: number;
 };
 
 export type ClassroomProgress = {
@@ -85,6 +87,25 @@ type ProgressDbRow = {
   curriculum_subtopic_id: string;
   status: CurriculumStatus;
 };
+
+async function iepItemCountByStudent(
+  supabase: ReturnType<typeof createClient>,
+  studentIds: string[]
+): Promise<Record<string, number>> {
+  if (studentIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("iep_items")
+    .select("student_id")
+    .in("student_id", studentIds)
+    .is("archived_at", null);
+  if (error || !data) return {};
+  const out: Record<string, number> = {};
+  for (const row of data) {
+    const sid = row.student_id as string;
+    out[sid] = (out[sid] ?? 0) + 1;
+  }
+  return out;
+}
 
 /**
  * Returns everything the Progress tab needs in one server-side pass:
@@ -140,7 +161,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     .is("archived_at", null)
     .returns<StudentDbRow[]>();
 
-  const students: ClassroomProgressStudent[] = (studentsResp.data ?? [])
+  const studentsBase = (studentsResp.data ?? [])
     .filter((s) =>
       s.student_classroom_enrollments.some(
         (e) => e.end_date === null && e.classroom_id === classroom.id
@@ -153,6 +174,19 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
       present: true,
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  const iepCounts =
+    programs.includes("iep") && studentsBase.length > 0
+      ? await iepItemCountByStudent(
+          supabase,
+          studentsBase.map((s) => s.id)
+        )
+      : null;
+
+  const students: ClassroomProgressStudent[] = studentsBase.map((s) => ({
+    ...s,
+    iepItemCount: iepCounts ? (iepCounts[s.id] ?? 0) : 0,
+  }));
 
   if (!curriculumId) {
     return {

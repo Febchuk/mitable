@@ -39,18 +39,34 @@ export function IepAdminTab() {
   const [studentId, setStudentId] = React.useState<string | null>(null);
   const [domains, setDomains] = React.useState<PlanDomain[]>([]);
   const [loadingPlan, setLoadingPlan] = React.useState(false);
+  const [onlyWithIepGoals, setOnlyWithIepGoals] = React.useState(true);
+
+  const displayRoster = React.useMemo(() => {
+    if (!onlyWithIepGoals) return roster;
+    return roster.filter((s) => s.itemCount > 0);
+  }, [roster, onlyWithIepGoals]);
 
   const refreshRoster = React.useCallback(async () => {
     const res = await fetch("/api/admin/iep/students", { cache: "no-store" });
     if (!res.ok) return;
     const data = (await res.json().catch(() => ({}))) as { students?: RosterRow[] };
     setRoster(data.students ?? []);
-    setStudentId((current) => current ?? data.students?.[0]?.id ?? null);
   }, []);
 
   React.useEffect(() => {
     void refreshRoster();
   }, [refreshRoster]);
+
+  React.useEffect(() => {
+    if (displayRoster.length === 0) {
+      setStudentId(null);
+      return;
+    }
+    setStudentId((cur) => {
+      if (cur && displayRoster.some((s) => s.id === cur)) return cur;
+      return displayRoster[0]!.id;
+    });
+  }, [displayRoster]);
 
   const refreshPlan = React.useCallback(async (sid: string) => {
     setLoadingPlan(true);
@@ -75,7 +91,7 @@ export function IepAdminTab() {
     void refreshPlan(studentId);
   }, [studentId, refreshPlan]);
 
-  const student = roster.find((s) => s.id === studentId) ?? null;
+  const student = displayRoster.find((s) => s.id === studentId) ?? null;
 
   const addDomain = async (name: string) => {
     if (!studentId || !name.trim()) return;
@@ -223,76 +239,93 @@ export function IepAdminTab() {
 
   return (
     <div style={{ padding: "20px 24px 64px", display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Student chip row — same shape as the teacher view. */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          overflowX: "auto",
-          scrollbarWidth: "thin",
-          paddingBottom: 4,
-        }}
-      >
-        {roster.map((s) => {
-          const active = s.id === studentId;
-          const label = s.preferredName ?? s.firstName;
-          const tone = toneFor(s.id);
-          return (
-            <button
-              key={s.id}
-              type="button"
-              className="tap"
-              onClick={() => setStudentId(s.id)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "6px 12px 6px 6px",
-                borderRadius: 999,
-                border: `1px solid ${active ? "var(--color-ink)" : "var(--color-border)"}`,
-                background: active ? "var(--color-ink)" : "var(--color-surface)",
-                color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-            >
-              <Avatar
-                initials={initialsFor(`${s.firstName} ${s.lastName}`)}
-                tone={tone}
-                size={24}
-              />
-              <span>
-                {label}
-                {s.itemCount > 0 ? (
-                  <span
-                    style={{
-                      marginLeft: 6,
-                      opacity: 0.6,
-                      fontSize: 11,
-                      fontWeight: 400,
-                    }}
-                  >
-                    {s.itemCount}
-                  </span>
-                ) : null}
-              </span>
-            </button>
-          );
-        })}
-        {roster.length === 0 && (
-          <span style={{ fontSize: 13, color: "var(--color-ink-muted)", padding: "6px 0" }}>
-            No active students yet — add some on the Classrooms page.
-          </span>
-        )}
+      {/* Student chip row — same filter + scroll pattern as the teacher IEP view. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {roster.length > 0 ? (
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12.5,
+              color: "var(--color-ink-secondary)",
+              cursor: "pointer",
+              userSelect: "none",
+              width: "fit-content",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={onlyWithIepGoals}
+              onChange={(e) => setOnlyWithIepGoals(e.target.checked)}
+            />
+            Only show children with IEP goals
+          </label>
+        ) : null}
+        {displayRoster.length === 0 && roster.length > 0 && onlyWithIepGoals ? (
+          <div style={{ fontSize: 12.5, color: "var(--color-ink-muted)" }}>
+            No students have IEP goals yet. Turn off the filter above to pick any child and add a
+            plan.
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            scrollbarWidth: "thin",
+            paddingBottom: 4,
+          }}
+        >
+          {displayRoster.map((s) => {
+            const active = s.id === studentId;
+            const label = s.preferredName ?? s.firstName;
+            const tone = toneFor(s.id);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                className="tap"
+                onClick={() => setStudentId(s.id)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 12px 6px 6px",
+                  borderRadius: 999,
+                  border: `1px solid ${active ? "var(--color-ink)" : "var(--color-border)"}`,
+                  background: active ? "var(--color-ink)" : "var(--color-surface)",
+                  color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                <Avatar
+                  initials={initialsFor(`${s.firstName} ${s.lastName}`)}
+                  tone={tone}
+                  size={24}
+                />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+          {roster.length === 0 && (
+            <span style={{ fontSize: 13, color: "var(--color-ink-muted)", padding: "6px 0" }}>
+              No active students yet — add some on the Classrooms page.
+            </span>
+          )}
+        </div>
       </div>
 
       <section style={cardStyle}>
         {!student ? (
           <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
-            Pick a child above to start their IEP plan.
+            {roster.length > 0 && onlyWithIepGoals && displayRoster.length === 0
+              ? "Turn off “Only show children with IEP goals” above, pick a child, then add domains and goals."
+              : "Pick a child above to start their IEP plan."}
           </div>
         ) : (
           <PlanEditor
