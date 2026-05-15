@@ -18,7 +18,7 @@ import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 import {
   fieldPayloadToReadableText,
-  paragraphHasTeacherContent,
+  paragraphCountsTowardDraftReadiness,
 } from "@/lib/reports/template-field-payload";
 import {
   Dialog,
@@ -176,7 +176,12 @@ export function ReportDetail({
   const empty =
     !report.body?.trim() &&
     (!report.sections?.length ||
-      !report.sections.some((s) => s.paragraphs.some((p) => paragraphHasTeacherContent(p.html))));
+      !report.sections.some((s) => {
+        const fieldMeta = report.templateSectionMeta?.[s.heading];
+        return s.paragraphs.some((p, idx) =>
+          paragraphCountsTowardDraftReadiness(p.html, idx === 0 ? fieldMeta : undefined)
+        );
+      }));
 
   // Auto-trigger draft for fresh empty drafts. The new-report flow creates a
   // row with status='draft' and empty body; the editor opens here and

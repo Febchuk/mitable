@@ -122,6 +122,10 @@ export function ReportTemplateEditor({
       ToastBus.push({ message: "Option lists need at least one option." });
       return false;
     }
+    if (filled.some((r) => r.fieldType === "hardcoded" && !r.description.trim())) {
+      ToastBus.push({ message: "Fixed-text sections need the exact wording filled in." });
+      return false;
+    }
     return true;
   };
 
@@ -573,6 +577,7 @@ export function ReportTemplateEditor({
                     <option value="text">Text</option>
                     <option value="checklist">Checklist (multi-select)</option>
                     <option value="single_select">Single-select</option>
+                    <option value="hardcoded">Fixed text (school boilerplate)</option>
                   </select>
                 </div>
                 {row.fieldType === "checklist" || row.fieldType === "single_select" ? (
@@ -581,6 +586,18 @@ export function ReportTemplateEditor({
                     onChange={(next) =>
                       setRows((prev) => prev.map((p, j) => (j === i ? { ...p, options: next } : p)))
                     }
+                  />
+                ) : row.fieldType === "hardcoded" ? (
+                  <Textarea
+                    value={row.description}
+                    onChange={(e) =>
+                      setRows((prev) =>
+                        prev.map((p, j) => (j === i ? { ...p, description: e.target.value } : p))
+                      )
+                    }
+                    placeholder="Exact wording for every report — teachers do not edit this in the report editor."
+                    rows={5}
+                    className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
                   />
                 ) : (
                   <Textarea

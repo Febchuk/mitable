@@ -10,7 +10,7 @@ import { z } from "zod";
  * so existing templates render without a backfill.
  */
 
-export const TEMPLATE_FIELD_TYPES = ["text", "checklist", "single_select"] as const;
+export const TEMPLATE_FIELD_TYPES = ["text", "checklist", "single_select", "hardcoded"] as const;
 export type TemplateFieldType = (typeof TEMPLATE_FIELD_TYPES)[number];
 
 export const TemplateSectionRowSchema = z
@@ -31,6 +31,13 @@ export const TemplateSectionRowSchema = z
         message: "This field type needs at least one option",
       });
     }
+    if (row.fieldType === "hardcoded" && !(row.description ?? "").trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["description"],
+        message: "Fixed text cannot be empty",
+      });
+    }
   });
 
 export const TemplateSectionsSchema = z
@@ -45,6 +52,7 @@ export type TemplateSectionRow = z.infer<typeof TemplateSectionRowSchema>;
 
 export type SectionMetaEntry =
   | { type: "text" }
+  | { type: "hardcoded" }
   | { type: "checklist"; options: string[] }
   | { type: "single_select"; options: string[] };
 
@@ -61,6 +69,8 @@ export function rowsToDb(rows: TemplateSectionRow[]): {
       section_meta[r.section] = { type: "checklist", options: r.options };
     } else if (r.fieldType === "single_select") {
       section_meta[r.section] = { type: "single_select", options: r.options };
+    } else if (r.fieldType === "hardcoded") {
+      section_meta[r.section] = { type: "hardcoded" };
     }
     // Plain text sections are left out of section_meta — the reader
     // resolves missing entries to { type: 'text' }, keeping the column
@@ -96,6 +106,14 @@ export function dbToRows(
         description: g[section] ?? "",
         fieldType: "single_select" as const,
         options: entry.options ?? [],
+      };
+    }
+    if (entry?.type === "hardcoded") {
+      return {
+        section,
+        description: g[section] ?? "",
+        fieldType: "hardcoded" as const,
+        options: [],
       };
     }
     return {

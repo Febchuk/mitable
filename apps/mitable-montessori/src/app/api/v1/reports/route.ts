@@ -5,6 +5,8 @@ import { auditLog } from "@/lib/audit/log";
 import { listReports } from "@/lib/queries/reports";
 import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import { CreateReportRequestSchema, type ReportKind } from "@/lib/schemas/report";
+import type { SectionMeta } from "@/lib/report-templates/sections";
+import { initialParagraphHtmlForTemplateSection } from "@/lib/reports/template-field-payload";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
   Daily: "daily",
@@ -69,14 +71,21 @@ export async function POST(req: Request) {
   if (input.templateId) {
     const { data: tpl } = await supabase
       .from("report_templates")
-      .select("id, sections, kind, school_id")
+      .select("id, sections, kind, school_id, section_guidance, section_meta")
       .eq("id", input.templateId)
       .maybeSingle();
     if (tpl && (tpl.school_id as string) === auth.user.schoolId && tpl.sections) {
+      const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
+      const meta = (tpl.section_meta as SectionMeta | null) ?? {};
       sections = (tpl.sections as string[]).map((heading, i) => ({
         id: `s-${i}-${heading.toLowerCase().replace(/\s+/g, "-")}`,
         heading,
-        paragraphs: [{ id: `p-${i}-1`, html: "" }],
+        paragraphs: [
+          {
+            id: `p-${i}-1`,
+            html: initialParagraphHtmlForTemplateSection(heading, guidance[heading] ?? "", meta),
+          },
+        ],
       }));
     }
   }

@@ -4,9 +4,34 @@
  * need a DB migration. Plain prose remains the default for `text` sections.
  */
 
-import type { SectionMeta } from "@/lib/report-templates/sections";
+import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
 
 const PREFIX = "__MITABLE_FIELD_V1__";
+
+/** Escape plain text for one report paragraph (`innerHTML`); newlines → `<br>`. */
+export function plainTextToReportParagraphHtml(plain: string): string {
+  const t = plain.replace(/\r\n/g, "\n");
+  if (!t.trim()) return "";
+  return t
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/\n/g, "<br>");
+}
+
+/** Seed HTML when a report row is created from a template (hardcoded = verbatim from guidance). */
+export function initialParagraphHtmlForTemplateSection(
+  heading: string,
+  guidance: string,
+  meta: SectionMeta
+): string {
+  const entry = meta[heading];
+  if (entry?.type === "hardcoded") {
+    return plainTextToReportParagraphHtml(guidance);
+  }
+  return "";
+}
 
 export type DecodedFieldPayload =
   | { kind: "checklist"; selected: string[] }
@@ -99,6 +124,18 @@ export function paragraphHasTeacherContent(html: string): boolean {
   return stripTags(d.html).length > 0;
 }
 
+/**
+ * Whether this paragraph counts as "filled" for draft readiness / empty-report checks.
+ * Template hardcoded boilerplate does not count — teachers did not write it.
+ */
+export function paragraphCountsTowardDraftReadiness(
+  html: string,
+  fieldMeta?: SectionMetaEntry | null
+): boolean {
+  if (fieldMeta?.type === "hardcoded") return false;
+  return paragraphHasTeacherContent(html);
+}
+
 /** After agent draft: coerce first paragraph of structured sections to encoded payloads. */
 export function normalizeSectionHtmlForTemplate(
   heading: string,
@@ -106,7 +143,7 @@ export function normalizeSectionHtmlForTemplate(
   meta: SectionMeta
 ): string {
   const entry = meta[heading];
-  if (!entry || entry.type === "text") return html;
+  if (!entry || entry.type === "text" || entry.type === "hardcoded") return html;
 
   const decoded = decodeFieldPayload(html);
   if (entry.type === "checklist") {

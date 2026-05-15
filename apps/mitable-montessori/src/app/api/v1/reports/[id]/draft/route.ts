@@ -3,13 +3,26 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { getAnthropic, SONNET_MODEL } from "@/lib/anthropic/client";
-import { runReportAgent, AgentAbortError } from "@/lib/reports/agent-loop";
+import { runReportAgent, AgentAbortError, type AgentRunOutput } from "@/lib/reports/agent-loop";
 import { SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
 import { DraftFromCaptureRequestSchema } from "@/lib/schemas/report";
 import { detokenizeReportText } from "@/lib/reports/detokenize";
 import { fetchTemplateLogoUrl } from "@/lib/queries/reports";
 import type { SectionMeta } from "@/lib/report-templates/sections";
-import { normalizeSectionHtmlForTemplate } from "@/lib/reports/template-field-payload";
+import {
+  normalizeSectionHtmlForTemplate,
+  plainTextToReportParagraphHtml,
+} from "@/lib/reports/template-field-payload";
+
+function sectionSlug(heading: string, i: number): string {
+  return (
+    heading
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 40) || `section-${i}`
+  );
+}
 
 /**
  * Draft an existing reports row (created by /api/v1/reports). Pulls the row,
@@ -97,6 +110,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   // Resolve template sections + guidance. If the report has no template_id,
   // the agent falls back to a single "Report" section (handled in agent-loop).
+  /** Full template order (includes hardcoded — those are merged server-side, not sent to the agent). */
+  let templateHeadings: string[] = [];
+  let sectionGuidance: Record<string, string> = {};
   let templateSections: { heading: string; guidance: string }[] = [];
   let writingStyle = "";
   let templateSectionMeta: SectionMeta = {};
@@ -110,10 +126,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       const headings = (tpl.sections as string[] | null) ?? [];
       const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
       templateSectionMeta = (tpl.section_meta as SectionMeta | null) ?? {};
-      templateSections = headings.map((heading) => ({
-        heading,
-        guidance: guidance[heading] ?? "",
-      }));
+      templateHeadings = headings;
+      sectionGuidance = guidance;
+      templateSections = headings
+        .filter((heading) => templateSectionMeta[heading]?.type !== "hardcoded")
+        .map((heading) => ({
+          heading,
+          guidance: guidance[heading] ?? "",
+        }));
       writingStyle = ((tpl.writing_style as string | null) ?? "").trim();
     }
   }
@@ -223,6 +243,92 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         .lte("changed_at", periodEndDay),
     ]);
     if ((cmdCount ?? 0) === 0 && (progCount ?? 0) === 0) {
+      let skipReportPayload: Record<string, unknown> | null = null;
+      if (
+        templateHeadings.length > 0 &&
+        templateHeadings.some((h) => templateSectionMeta[h]?.type === "hardcoded")
+      ) {
+        const editorSections = templateHeadings.map((heading, i) => {
+          const slug = sectionSlug(heading, i);
+          if (templateSectionMeta[heading]?.type === "hardcoded") {
+            return {
+              id: `s-${i}-${slug}`,
+              heading,
+              paragraphs: [
+                {
+                  id: `p-${i}-1`,
+                  html: plainTextToReportParagraphHtml(sectionGuidance[heading] ?? ""),
+                },
+              ],
+            };
+          }
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [{ id: `p-${i}-1`, html: "" }],
+          };
+        });
+        const concatenatedBody = editorSections
+          .map((s) => `# ${s.heading}\n\n${s.paragraphs.map((p) => p.html).join("\n\n")}`)
+          .join("\n\n");
+        const { error: skipUpdErr } = await supabase
+          .from("reports")
+          .update({
+            sections: editorSections,
+            body: concatenatedBody,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+        if (!skipUpdErr) {
+          const { data: freshSkip, error: freshSkipErr } = await supabase
+            .from("reports")
+            .select(
+              "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), report_templates(section_meta, school_id)"
+            )
+            .eq("id", id)
+            .maybeSingle();
+          if (!freshSkipErr && freshSkip) {
+            const templateLogoUrl = await fetchTemplateLogoUrl(
+              supabase,
+              freshSkip.template_id as string | null,
+              auth.user.schoolId
+            );
+            const freshTplSkip = (
+              freshSkip as unknown as {
+                report_templates: { section_meta: unknown; school_id: string } | null;
+              }
+            ).report_templates;
+            const responseTemplateMeta: SectionMeta =
+              freshTplSkip && freshTplSkip.school_id === auth.user.schoolId
+                ? ((freshTplSkip.section_meta as SectionMeta | null) ?? {})
+                : templateSectionMeta;
+            skipReportPayload = {
+              id: freshSkip.id,
+              studentId: freshSkip.student_id,
+              studentName: studentFullName,
+              classroomId: freshSkip.classroom_id,
+              reportType: freshSkip.report_type,
+              reportDate: freshSkip.report_date,
+              periodStart: freshSkip.period_start,
+              periodEnd: freshSkip.period_end,
+              status: freshSkip.status,
+              title: freshSkip.title,
+              body: freshSkip.body,
+              sections: freshSkip.sections,
+              templateId: freshSkip.template_id,
+              templateSectionMeta: responseTemplateMeta,
+              templateLogoUrl,
+              createdByUserId: freshSkip.created_by_user_id,
+              approvedByUserId: freshSkip.approved_by_user_id,
+              approvedAt: freshSkip.approved_at,
+              sentAt: freshSkip.sent_at,
+              createdAt: freshSkip.created_at,
+              updatedAt: freshSkip.updated_at,
+            };
+          }
+        }
+      }
+
       await auditLog({
         actor_id: auth.user.userId,
         actor_role: auth.user.role,
@@ -235,6 +341,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         reportId: id,
         skipped: true,
         reason: "no_context",
+        ...(skipReportPayload ? { report: skipReportPayload } : {}),
       });
     }
   }
@@ -243,63 +350,143 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const seedReferences = { refs: seedRefs };
 
   try {
-    const result = await runReportAgent({
-      studentToken,
-      studentRef: report.student_id as string,
-      classroomToken,
-      classroomRef: report.classroom_id as string,
-      reportType: report.report_type as "daily" | "major" | "incident",
-      periodStart,
-      periodEnd,
-      adapter,
-      anthropic: getAnthropic(),
-      model: SONNET_MODEL,
-      captureTranscripts: input.transcripts,
-      captureNotes: input.notes,
-      seedReferences,
-      templateSections,
-      writingStyle,
-      captureOnly: input.captureOnly,
-    });
+    let agentResult: AgentRunOutput | null = null;
+    let detokTitle: string | null = null;
+    let editorSections: Array<{
+      id: string;
+      heading: string;
+      paragraphs: { id: string; html: string }[];
+    }>;
 
-    // De-tokenize the draft and shape it for the editor. We persist the
-    // de-tokenized form because the editor reads `sections` JSON directly;
-    // the reference set isn't stored alongside the row, so re-tokenizing on
-    // every render isn't possible without redesign.
-    const detokTitle = detokenizeReportText(result.draft.title, result.references);
-    const editorSections = result.draft.sections.map((s, i) => {
-      const detokHeading = detokenizeReportText(s.heading, result.references);
-      const detokContent = detokenizeReportText(s.content, result.references);
-      const slug =
-        detokHeading
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "")
-          .slice(0, 40) || `section-${i}`;
-      const normalizedHtml = normalizeSectionHtmlForTemplate(
-        detokHeading,
-        detokContent,
-        templateSectionMeta
-      );
-      return {
-        id: `s-${i}-${slug}`,
-        heading: detokHeading,
-        paragraphs: [{ id: `p-${i}-1`, html: normalizedHtml }],
-      };
-    });
+    const headingsForAgent = templateHeadings.filter(
+      (h) => templateSectionMeta[h]?.type !== "hardcoded"
+    );
+
+    if (templateHeadings.length === 0) {
+      agentResult = await runReportAgent({
+        studentToken,
+        studentRef: report.student_id as string,
+        classroomToken,
+        classroomRef: report.classroom_id as string,
+        reportType: report.report_type as "daily" | "major" | "incident",
+        periodStart,
+        periodEnd,
+        adapter,
+        anthropic: getAnthropic(),
+        model: SONNET_MODEL,
+        captureTranscripts: input.transcripts,
+        captureNotes: input.notes,
+        seedReferences,
+        templateSections,
+        writingStyle,
+        captureOnly: input.captureOnly,
+      });
+      detokTitle = detokenizeReportText(agentResult.draft.title, agentResult.references);
+      editorSections = agentResult.draft.sections.map((s, i) => {
+        const detokHeading = detokenizeReportText(s.heading, agentResult!.references);
+        const detokContent = detokenizeReportText(s.content, agentResult!.references);
+        const slug = sectionSlug(detokHeading, i);
+        const normalizedHtml = normalizeSectionHtmlForTemplate(
+          detokHeading,
+          detokContent,
+          templateSectionMeta
+        );
+        return {
+          id: `s-${i}-${slug}`,
+          heading: detokHeading,
+          paragraphs: [{ id: `p-${i}-1`, html: normalizedHtml }],
+        };
+      });
+    } else if (headingsForAgent.length === 0) {
+      editorSections = templateHeadings.map((heading, i) => {
+        const slug = sectionSlug(heading, i);
+        return {
+          id: `s-${i}-${slug}`,
+          heading,
+          paragraphs: [
+            {
+              id: `p-${i}-1`,
+              html: plainTextToReportParagraphHtml(sectionGuidance[heading] ?? ""),
+            },
+          ],
+        };
+      });
+      detokTitle = null;
+    } else {
+      agentResult = await runReportAgent({
+        studentToken,
+        studentRef: report.student_id as string,
+        classroomToken,
+        classroomRef: report.classroom_id as string,
+        reportType: report.report_type as "daily" | "major" | "incident",
+        periodStart,
+        periodEnd,
+        adapter,
+        anthropic: getAnthropic(),
+        model: SONNET_MODEL,
+        captureTranscripts: input.transcripts,
+        captureNotes: input.notes,
+        seedReferences,
+        templateSections,
+        writingStyle,
+        captureOnly: input.captureOnly,
+      });
+      detokTitle = detokenizeReportText(agentResult.draft.title, agentResult.references);
+      let agentIdx = 0;
+      editorSections = templateHeadings.map((heading, i) => {
+        const slug = sectionSlug(heading, i);
+        if (templateSectionMeta[heading]?.type === "hardcoded") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [
+              {
+                id: `p-${i}-1`,
+                html: plainTextToReportParagraphHtml(sectionGuidance[heading] ?? ""),
+              },
+            ],
+          };
+        }
+        const s = agentResult!.draft.sections[agentIdx++];
+        if (!s) {
+          throw new Error("Draft sections misaligned with template (missing agent block)");
+        }
+        const detokContent = detokenizeReportText(s.content, agentResult!.references);
+        const normalizedHtml = normalizeSectionHtmlForTemplate(
+          heading,
+          detokContent,
+          templateSectionMeta
+        );
+        return {
+          id: `s-${i}-${slug}`,
+          heading,
+          paragraphs: [{ id: `p-${i}-1`, html: normalizedHtml }],
+        };
+      });
+      if (agentIdx !== agentResult.draft.sections.length) {
+        throw new Error("Draft sections misaligned with template (extra agent block)");
+      }
+    }
+
     const concatenatedBody = editorSections
       .map((s) => `# ${s.heading}\n\n${s.paragraphs.map((p) => p.html).join("\n\n")}`)
       .join("\n\n");
 
-    const { error: updateErr } = await supabase
-      .from("reports")
-      .update({
-        title: detokTitle,
-        sections: editorSections,
-        body: concatenatedBody,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+    const updateRow: {
+      title?: string;
+      sections: typeof editorSections;
+      body: string;
+      updated_at: string;
+    } = {
+      sections: editorSections,
+      body: concatenatedBody,
+      updated_at: new Date().toISOString(),
+    };
+    if (detokTitle !== null) {
+      updateRow.title = detokTitle;
+    }
+
+    const { error: updateErr } = await supabase.from("reports").update(updateRow).eq("id", id);
     if (updateErr) {
       return NextResponse.json(
         { error: "Failed to persist draft", details: updateErr.message },
@@ -367,8 +554,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       target_id: id,
       metadata: {
         report_type: report.report_type,
-        turns: result.turns,
-        regenerations: result.regenerations,
+        turns: agentResult?.turns ?? 0,
+        regenerations: agentResult?.regenerations ?? 0,
         capture_transcripts: input.transcripts.length,
         capture_notes: input.notes.length,
         capture_tokens: input.tokenMap.length,
@@ -379,9 +566,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({
       reportId: id,
       report: reportPayload,
-      draft: result.draft,
-      references: result.references,
-      meta: { turns: result.turns, regenerations: result.regenerations },
+      ...(agentResult
+        ? {
+            draft: agentResult.draft,
+            references: agentResult.references,
+            meta: { turns: agentResult.turns, regenerations: agentResult.regenerations },
+          }
+        : { meta: { turns: 0, regenerations: 0 } }),
     });
   } catch (err) {
     if (err instanceof AgentAbortError) {
