@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, GripVertical, Plus, Trash2, X } from "lucide-react";
 import type {
   AdminReportTemplateDto,
   ReportingPeriod,
@@ -24,6 +24,19 @@ function emptySection(): TemplateSectionRow {
   return { section: "", description: "", fieldType: "text", options: [] };
 }
 
+type RowBundle = { id: string; row: TemplateSectionRow };
+
+function newRowId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `row-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function bundlesFromRows(rows: TemplateSectionRow[]): RowBundle[] {
+  return rows.map((row) => ({ id: newRowId(), row }));
+}
+
 export function ReportTemplateEditor({
   mode,
   templateId,
@@ -41,7 +54,10 @@ export function ReportTemplateEditor({
   const [writingStyle, setWritingStyle] = React.useState("");
   const [reportingPeriod, setReportingPeriod] = React.useState<ReportingPeriod | null>(null);
   const [contextMode, setContextMode] = React.useState<ContextModeDefault>("history");
-  const [rows, setRows] = React.useState<TemplateSectionRow[]>([emptySection()]);
+  const [bundles, setBundles] = React.useState<RowBundle[]>(() =>
+    bundlesFromRows([emptySection()])
+  );
+  const [dragState, setDragState] = React.useState<{ from: number; over: number } | null>(null);
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -69,7 +85,9 @@ export function ReportTemplateEditor({
         setWritingStyle(t.writingStyle ?? "");
         setReportingPeriod(t.reportingPeriod ?? null);
         setContextMode(t.contextModeDefault ?? "history");
-        setRows(t.templateSections.length ? t.templateSections : [emptySection()]);
+        setBundles(
+          bundlesFromRows(t.templateSections.length ? t.templateSections : [emptySection()])
+        );
         setLogoUrl(t.logoUrl);
       } finally {
         if (!cancelled) setLoading(false);
@@ -80,17 +98,18 @@ export function ReportTemplateEditor({
     };
   }, [mode, templateId, router]);
 
-  const moveRow = (index: number, dir: -1 | 1) => {
-    const next = index + dir;
-    if (next < 0 || next >= rows.length) return;
-    setRows((prev) => {
-      const copy = [...prev];
-      const tmp = copy[index]!;
-      copy[index] = copy[next]!;
-      copy[next] = tmp;
-      return copy;
+  const reorderBundles = React.useCallback((from: number, to: number) => {
+    if (from === to || from < 0 || to < 0) return;
+    setBundles((prev) => {
+      if (from >= prev.length || to >= prev.length) return prev;
+      const next = [...prev];
+      const [removed] = next.splice(from, 1);
+      next.splice(to, 0, removed!);
+      return next;
     });
-  };
+  }, []);
+
+  const clearDragState = React.useCallback(() => setDragState(null), []);
 
   const validate = (): boolean => {
     const trimmedName = name.trim();
@@ -98,11 +117,11 @@ export function ReportTemplateEditor({
       ToastBus.push({ message: "Add a template name." });
       return false;
     }
-    const filled = rows.map((r) => ({
-      section: r.section.trim(),
-      description: (r.description ?? "").trim(),
-      fieldType: r.fieldType ?? "text",
-      options: (r.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0),
+    const filled = bundles.map((b) => ({
+      section: b.row.section.trim(),
+      description: (b.row.description ?? "").trim(),
+      fieldType: b.row.fieldType ?? "text",
+      options: (b.row.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0),
     }));
     if (filled.some((r) => !r.section)) {
       ToastBus.push({ message: "Every section needs a title." });
@@ -137,13 +156,13 @@ export function ReportTemplateEditor({
     writingStyle: writingStyle.trim(),
     reportingPeriod: reportingPeriod ?? null,
     contextModeDefault: contextMode,
-    templateSections: rows.map((r) => ({
-      section: r.section.trim(),
-      description: (r.description ?? "").trim(),
-      fieldType: r.fieldType ?? "text",
+    templateSections: bundles.map((b) => ({
+      section: b.row.section.trim(),
+      description: (b.row.description ?? "").trim(),
+      fieldType: b.row.fieldType ?? "text",
       options:
-        r.fieldType === "checklist" || r.fieldType === "single_select"
-          ? (r.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0)
+        b.row.fieldType === "checklist" || b.row.fieldType === "single_select"
+          ? (b.row.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0)
           : [],
     })),
   });
@@ -464,156 +483,234 @@ export function ReportTemplateEditor({
               borderBottom: "1px solid var(--color-border)",
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 10,
+              flexWrap: "wrap",
             }}
           >
             <span style={{ fontWeight: 600, fontSize: 14 }}>Sections</span>
+            {bundles.length > 1 ? (
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "var(--color-ink-muted)",
+                  fontWeight: 400,
+                  lineHeight: 1.35,
+                }}
+              >
+                Drag the grip to reorder.
+              </span>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="ml-auto h-8 gap-1 text-[var(--color-terracotta)]"
-              onClick={() => setRows((r) => [...r, emptySection()])}
+              onClick={() => setBundles((b) => [...b, { id: newRowId(), row: emptySection() }])}
             >
               <Plus size={14} strokeWidth={2} />
               Add section
             </Button>
           </div>
           <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
-            {rows.map((row, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: 14,
-                  borderRadius: 10,
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-muted)",
-                }}
-              >
+            {bundles.map((bundle, i) => {
+              const row = bundle.row;
+              const isDragging = dragState?.from === i;
+              const isDropOver = dragState !== null && dragState.over === i && dragState.from !== i;
+              return (
                 <div
+                  key={bundle.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragState === null) return;
+                    if (dragState.over !== i) {
+                      setDragState({ from: dragState.from, over: i });
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const raw = e.dataTransfer.getData("text/plain");
+                    const from = parseInt(raw, 10);
+                    if (Number.isNaN(from) || from < 0 || from >= bundles.length) {
+                      clearDragState();
+                      return;
+                    }
+                    reorderBundles(from, i);
+                    clearDragState();
+                  }}
                   style={{
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 10,
+                    gap: 10,
+                    alignItems: "stretch",
+                    padding: 14,
+                    paddingLeft: 10,
+                    borderRadius: 10,
+                    border: `1px solid ${
+                      isDropOver
+                        ? "color-mix(in srgb, var(--color-terracotta-deep) 42%, var(--color-border))"
+                        : "var(--color-border)"
+                    }`,
+                    background: isDropOver
+                      ? "color-mix(in srgb, var(--color-terracotta-soft) 55%, var(--color-muted))"
+                      : "var(--color-muted)",
+                    opacity: isDragging ? 0.58 : 1,
+                    boxShadow: isDropOver
+                      ? "0 0 0 1px color-mix(in srgb, var(--color-terracotta-deep) 22%, transparent)"
+                      : undefined,
+                    transition:
+                      "opacity 0.14s ease, border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease",
                   }}
                 >
-                  <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                    Section {i + 1}
-                  </span>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button
-                      type="button"
-                      className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
-                      aria-label="Move section up"
-                      onClick={() => moveRow(i, -1)}
-                      disabled={i === 0}
-                    >
-                      <ArrowUp size={16} strokeWidth={1.6} />
-                    </button>
-                    <button
-                      type="button"
-                      className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
-                      aria-label="Move section down"
-                      onClick={() => moveRow(i, 1)}
-                      disabled={i === rows.length - 1}
-                    >
-                      <ArrowDown size={16} strokeWidth={1.6} />
-                    </button>
-                    <button
-                      type="button"
-                      className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-terracotta-deep)]"
-                      aria-label="Remove section"
-                      onClick={() => rows.length > 1 && setRows((r) => r.filter((_, j) => j !== i))}
-                      disabled={rows.length <= 1}
-                    >
-                      <Trash2 size={16} strokeWidth={1.6} />
-                    </button>
-                  </div>
-                </div>
-                <Input
-                  value={row.section}
-                  onChange={(e) =>
-                    setRows((prev) =>
-                      prev.map((p, j) => (j === i ? { ...p, section: e.target.value } : p))
-                    )
-                  }
-                  placeholder="Section heading"
-                  className="mb-2"
-                />
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                    Field type
-                  </span>
-                  <select
-                    className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-ink)]"
-                    value={row.fieldType ?? "text"}
-                    onChange={(e) => {
-                      const next = e.target.value as TemplateSectionRow["fieldType"];
-                      setRows((prev) =>
-                        prev.map((p, j) =>
-                          j === i
-                            ? {
-                                ...p,
-                                fieldType: next,
-                                options:
-                                  next === "checklist" || next === "single_select"
-                                    ? (p.options ?? [])
-                                    : [],
-                              }
-                            : p
-                        )
-                      );
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Reorder section ${i + 1}`}
+                    aria-grabbed={isDragging}
+                    draggable={bundles.length > 1}
+                    onDragStart={(e) => {
+                      if (bundles.length <= 1) return;
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", String(i));
+                      setDragState({ from: i, over: i });
+                    }}
+                    onDragEnd={() => clearDragState()}
+                    className="tap flex shrink-0 cursor-grab select-none flex-col items-center justify-center rounded-lg border border-transparent text-[var(--color-ink-muted)] outline-none hover:border-[var(--color-border)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)] active:cursor-grabbing aria-grabbed:border-[var(--color-border)] aria-grabbed:bg-[var(--color-surface)]"
+                    style={{ width: 32, alignSelf: "stretch", minHeight: 44 }}
+                    onKeyDown={(e) => {
+                      if (bundles.length <= 1) return;
+                      if (e.key === "ArrowUp" && i > 0) {
+                        e.preventDefault();
+                        reorderBundles(i, i - 1);
+                      } else if (e.key === "ArrowDown" && i < bundles.length - 1) {
+                        e.preventDefault();
+                        reorderBundles(i, i + 1);
+                      }
                     }}
                   >
-                    <option value="text">Text</option>
-                    <option value="checklist">Checklist (multi-select)</option>
-                    <option value="single_select">Single-select</option>
-                    <option value="hardcoded">Fixed text (school boilerplate)</option>
-                  </select>
+                    <GripVertical size={18} strokeWidth={1.75} aria-hidden />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                        Section {i + 1}
+                      </span>
+                      <button
+                        type="button"
+                        className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-terracotta-deep)]"
+                        aria-label="Remove section"
+                        onClick={() =>
+                          bundles.length > 1 && setBundles((b) => b.filter((_, j) => j !== i))
+                        }
+                        disabled={bundles.length <= 1}
+                      >
+                        <Trash2 size={16} strokeWidth={1.6} />
+                      </button>
+                    </div>
+                    <Input
+                      value={row.section}
+                      onChange={(e) =>
+                        setBundles((prev) =>
+                          prev.map((p, j) =>
+                            j === i ? { ...p, row: { ...p.row, section: e.target.value } } : p
+                          )
+                        )
+                      }
+                      placeholder="Section heading"
+                      className="mb-2"
+                    />
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                        Field type
+                      </span>
+                      <select
+                        className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-ink)]"
+                        value={row.fieldType ?? "text"}
+                        onChange={(e) => {
+                          const next = e.target.value as TemplateSectionRow["fieldType"];
+                          setBundles((prev) =>
+                            prev.map((p, j) =>
+                              j === i
+                                ? {
+                                    ...p,
+                                    row: {
+                                      ...p.row,
+                                      fieldType: next,
+                                      options:
+                                        next === "checklist" || next === "single_select"
+                                          ? (p.row.options ?? [])
+                                          : [],
+                                    },
+                                  }
+                                : p
+                            )
+                          );
+                        }}
+                      >
+                        <option value="text">Text</option>
+                        <option value="checklist">Checklist (multi-select)</option>
+                        <option value="single_select">Single-select</option>
+                        <option value="hardcoded">Fixed text (school boilerplate)</option>
+                      </select>
+                    </div>
+                    {row.fieldType === "checklist" || row.fieldType === "single_select" ? (
+                      <ChecklistOptionsEditor
+                        options={row.options ?? []}
+                        onChange={(next) =>
+                          setBundles((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, row: { ...p.row, options: next } } : p
+                            )
+                          )
+                        }
+                      />
+                    ) : row.fieldType === "hardcoded" ? (
+                      <Textarea
+                        value={row.description}
+                        onChange={(e) =>
+                          setBundles((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, row: { ...p.row, description: e.target.value } } : p
+                            )
+                          )
+                        }
+                        placeholder="Exact wording for every report — teachers do not edit this in the report editor."
+                        rows={5}
+                        className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
+                      />
+                    ) : (
+                      <Textarea
+                        value={row.description}
+                        onChange={(e) =>
+                          setBundles((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, row: { ...p.row, description: e.target.value } } : p
+                            )
+                          )
+                        }
+                        placeholder="What should the assistant write here? Facts to include, length, tone for this block."
+                        rows={4}
+                        className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
+                      />
+                    )}
+                  </div>
                 </div>
-                {row.fieldType === "checklist" || row.fieldType === "single_select" ? (
-                  <ChecklistOptionsEditor
-                    options={row.options ?? []}
-                    onChange={(next) =>
-                      setRows((prev) => prev.map((p, j) => (j === i ? { ...p, options: next } : p)))
-                    }
-                  />
-                ) : row.fieldType === "hardcoded" ? (
-                  <Textarea
-                    value={row.description}
-                    onChange={(e) =>
-                      setRows((prev) =>
-                        prev.map((p, j) => (j === i ? { ...p, description: e.target.value } : p))
-                      )
-                    }
-                    placeholder="Exact wording for every report — teachers do not edit this in the report editor."
-                    rows={5}
-                    className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
-                  />
-                ) : (
-                  <Textarea
-                    value={row.description}
-                    onChange={(e) =>
-                      setRows((prev) =>
-                        prev.map((p, j) => (j === i ? { ...p, description: e.target.value } : p))
-                      )
-                    }
-                    placeholder="What should the assistant write here? Facts to include, length, tone for this block."
-                    rows={4}
-                    className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
-                  />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
