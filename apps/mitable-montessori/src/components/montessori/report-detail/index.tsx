@@ -138,6 +138,7 @@ export function ReportDetail({
   isAdmin: isAdminProp = false,
   hideBackLink = false,
   hideTopBarActions = false,
+  hideTopBar = false,
   variant,
   onReportChanged,
 }: {
@@ -149,6 +150,8 @@ export function ReportDetail({
   hideBackLink?: boolean;
   /** When true, suppresses the top-bar inline action buttons. The rail-view owns these via its action rail + modals — without this we get two Submit / Delete buttons stacked next to each other. */
   hideTopBarActions?: boolean;
+  /** When true, removes the entire ReportTopBar (back link, avatar, title, status pill, meta row, view-mode toggle). The rail-view passes this so the list rail's selected row already communicates which report is open. PDF preview moves to the action-rail modal in this mode. */
+  hideTopBar?: boolean;
   /** String alias for isAdmin — "admin" ⇒ isAdmin. Existing callers can keep using isAdmin directly. */
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
@@ -506,42 +509,46 @@ export function ReportDetail({
 
   return (
     <>
-      <div className="rd-root">
-        <ReportTopBar
-          child={{ name: report.studentName, tone: "clay" }}
-          status={topbarStatus}
-          kind={topbarKind}
-          dayLabel={detail.dayLabel}
-          classroom={detail.classroom}
-          savedMeta={savedMeta}
-          savedMetaDirty={isDirty || isDrafting || isSaving}
-          reportsListHref={hideBackLink ? undefined : backToReportsHref}
-          isAdmin={isAdmin}
-          actionBusy={actionBusy}
-          hasBeenSubmitted={report.hasBeenSubmitted}
-          viewModeSlot={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
-          hideActions={hideTopBarActions}
-          onBackClick={hideBackLink ? undefined : handleBackClick}
-          onSaveDraft={
-            topbarStatus === "draft"
-              ? () => {
-                  const pending = pendingSaveRef.current;
-                  if (pending) void performSave(pending);
-                  else ToastBus.push({ message: "No changes to save." });
-                }
-              : undefined
-          }
-          onSubmitForReview={
-            topbarStatus === "draft" && !isAdmin ? () => void handleSubmitForReview() : undefined
-          }
-          onApprove={
-            (topbarStatus === "draft" || topbarStatus === "review") && isAdmin
-              ? () => void handleApprove()
-              : undefined
-          }
-          onSendToParents={topbarStatus === "approved" && isAdmin ? handleSendToParents : undefined}
-          onDeleteClick={() => setDeleteDialogOpen(true)}
-        />
+      <div className="rd-root" data-no-topbar={hideTopBar ? "true" : "false"}>
+        {hideTopBar ? null : (
+          <ReportTopBar
+            child={{ name: report.studentName, tone: "clay" }}
+            status={topbarStatus}
+            kind={topbarKind}
+            dayLabel={detail.dayLabel}
+            classroom={detail.classroom}
+            savedMeta={savedMeta}
+            savedMetaDirty={isDirty || isDrafting || isSaving}
+            reportsListHref={hideBackLink ? undefined : backToReportsHref}
+            isAdmin={isAdmin}
+            actionBusy={actionBusy}
+            hasBeenSubmitted={report.hasBeenSubmitted}
+            viewModeSlot={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
+            hideActions={hideTopBarActions}
+            onBackClick={hideBackLink ? undefined : handleBackClick}
+            onSaveDraft={
+              topbarStatus === "draft"
+                ? () => {
+                    const pending = pendingSaveRef.current;
+                    if (pending) void performSave(pending);
+                    else ToastBus.push({ message: "No changes to save." });
+                  }
+                : undefined
+            }
+            onSubmitForReview={
+              topbarStatus === "draft" && !isAdmin ? () => void handleSubmitForReview() : undefined
+            }
+            onApprove={
+              (topbarStatus === "draft" || topbarStatus === "review") && isAdmin
+                ? () => void handleApprove()
+                : undefined
+            }
+            onSendToParents={
+              topbarStatus === "approved" && isAdmin ? handleSendToParents : undefined
+            }
+            onDeleteClick={() => setDeleteDialogOpen(true)}
+          />
+        )}
         <div className="rd-workspace">
           <div className="rd-split">
             <div className={viewMode === "editor" ? "rd-pane-wrap" : "rd-pane-wrap rd-pane-hidden"}>

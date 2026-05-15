@@ -463,6 +463,7 @@ export function ReportsRailView({
               report={detail}
               hideBackLink
               hideTopBarActions
+              hideTopBar
               variant={variant}
               onReportChanged={refreshSelectedDetail}
             />
@@ -615,6 +616,7 @@ function MobileReportOverlay({
               report={detail}
               hideBackLink
               hideTopBarActions
+              hideTopBar
               variant={variant}
               onReportChanged={onReportChanged}
             />
