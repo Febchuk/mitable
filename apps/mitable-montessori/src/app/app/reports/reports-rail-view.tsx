@@ -459,10 +459,6 @@ export function ReportsRailView({
                       </div>
                       <div className={styles.rrRowTitle}>{r.title || "Untitled report"}</div>
                       <div className={styles.rrRowMeta}>
-                        <span className={styles.rrRowKind} data-kind={r.reportType}>
-                          {kindLabel(r.reportType)}
-                        </span>
-                        <span className={styles.rrRowMetaSpacer} aria-hidden />
                         <RowSignal row={r} bucket={filter} locale={locale} />
                       </div>
                     </div>
@@ -592,8 +588,16 @@ function RowSignal({
   if (bucket === "review") {
     const { approved, total } = row.reviewerTicks;
     const ticks = total > 0 ? total : 1;
+    const tone = scoreTone(row.displayScore);
     return (
       <span className={`${styles.rrSignal} ${styles.rrSignalTicks}`}>
+        <span
+          className={styles.rrScoreBubble}
+          data-tone={tone}
+          aria-label={`AI confidence ${row.displayScore}`}
+        >
+          {row.displayScore}
+        </span>
         <span className={styles.rrTicks} aria-label={`${approved} of ${ticks} reviewers approved`}>
           {Array.from({ length: ticks }).map((_, i) => {
             const done = i < approved;
