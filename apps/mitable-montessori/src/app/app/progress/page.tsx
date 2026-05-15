@@ -3,22 +3,42 @@
 import * as React from "react";
 import { IepProgressFeature } from "@/components/montessori/iep";
 import { ProgressFeature } from "@/components/montessori/progress";
+import { SpeechProgressFeature } from "@/components/montessori/speech";
 import { useMontessori } from "@/components/montessori/store";
 
-type ProgressMode = "class" | "iep";
+type ProgressMode = "class" | "iep" | "speech";
 
 export default function ProgressPage() {
-  const { showIepProgressTab } = useMontessori();
+  const { showIepProgressTab, showSpeechProgressTab } = useMontessori();
   const [mode, setMode] = React.useState<ProgressMode>("class");
 
   React.useEffect(() => {
     if (!showIepProgressTab && mode === "iep") setMode("class");
   }, [showIepProgressTab, mode]);
 
+  React.useEffect(() => {
+    if (!showSpeechProgressTab && mode === "speech") setMode("class");
+  }, [showSpeechProgressTab, mode]);
+
+  const showModeToggle = showIepProgressTab || showSpeechProgressTab;
+
   return (
     <>
-      {showIepProgressTab ? <ProgressModeToggle mode={mode} onChange={setMode} /> : null}
-      {mode === "class" || !showIepProgressTab ? <ProgressFeature /> : <IepProgressFeature />}
+      {showModeToggle ? (
+        <ProgressModeToggle
+          mode={mode}
+          onChange={setMode}
+          showIep={showIepProgressTab}
+          showSpeech={showSpeechProgressTab}
+        />
+      ) : null}
+      {mode === "class" || !showModeToggle ? (
+        <ProgressFeature />
+      ) : mode === "iep" ? (
+        <IepProgressFeature />
+      ) : (
+        <SpeechProgressFeature />
+      )}
     </>
   );
 }
@@ -26,9 +46,13 @@ export default function ProgressPage() {
 function ProgressModeToggle({
   mode,
   onChange,
+  showIep,
+  showSpeech,
 }: {
   mode: ProgressMode;
   onChange: (m: ProgressMode) => void;
+  showIep: boolean;
+  showSpeech: boolean;
 }) {
   return (
     <div
@@ -43,9 +67,16 @@ function ProgressModeToggle({
       <ModeTab active={mode === "class"} onClick={() => onChange("class")}>
         Class progress
       </ModeTab>
-      <ModeTab active={mode === "iep"} onClick={() => onChange("iep")}>
-        IEP progress
-      </ModeTab>
+      {showIep ? (
+        <ModeTab active={mode === "iep"} onClick={() => onChange("iep")}>
+          IEP progress
+        </ModeTab>
+      ) : null}
+      {showSpeech ? (
+        <ModeTab active={mode === "speech"} onClick={() => onChange("speech")}>
+          Speech
+        </ModeTab>
+      ) : null}
     </div>
   );
 }
