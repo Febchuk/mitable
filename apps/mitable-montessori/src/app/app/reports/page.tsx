@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
-import { listReports } from "@/lib/queries/reports";
+import { listReportsV2 } from "@/lib/queries/reports";
 import { ReportsRailView } from "./reports-rail-view";
 
 export default async function ReportsPage({
@@ -26,7 +26,7 @@ export default async function ReportsPage({
     if (ids.length > 0) classroomIds = ids;
   }
 
-  const reports = await listReports({ classroomIds });
+  const reports = await listReportsV2({ classroomIds });
   const initialOpenReportId =
     openParam && reports.some((r) => r.id === openParam) ? openParam : null;
   return <ReportsRailView reports={reports} initialOpenReportId={initialOpenReportId} />;

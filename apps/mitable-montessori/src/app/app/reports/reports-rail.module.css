@@ -245,6 +245,138 @@
   flex: 1;
 }
 
+/* ---------- Per-bucket row signal ----------
+   Right-aligned chip + small trailing meta time. Variants share the same
+   2-row stack visually: the chip itself + a faint `rrSignalMeta` below it
+   (only used when there's a relevant time to show). */
+.rrSignal {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+}
+.rrSignalMeta {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.01em;
+}
+
+/* Drafts: completeness bar — 64×5 capsule + N% read-out. Tone shifts from
+   terracotta (under 60) → butter (60–84) → sage (≥85). */
+.rrCompleteness {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-variant-numeric: tabular-nums;
+}
+.rrCompletenessBar {
+  width: 64px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-muted);
+  overflow: hidden;
+  display: inline-block;
+}
+.rrCompletenessBar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-terracotta);
+}
+.rrCompleteness[data-tone="med"] .rrCompletenessBar > i {
+  background: var(--color-butter-deep);
+}
+.rrCompleteness[data-tone="high"] .rrCompletenessBar > i {
+  background: var(--color-sage-deep);
+}
+.rrCompletenessValue {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+.rrCompleteness[data-tone="med"] .rrCompletenessValue {
+  color: var(--color-butter-deep);
+}
+.rrCompleteness[data-tone="high"] .rrCompletenessValue {
+  color: var(--color-sage-deep);
+}
+
+/* In Review: tick boxes — small squares, sage-filled when approved. */
+.rrTicks {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rrTickBox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  flex-shrink: 0;
+}
+.rrTickBox[data-done="true"] {
+  background: var(--color-sage-soft);
+  border-color: var(--color-sage-deep);
+  color: var(--color-sage-deep);
+}
+.rrTickCount {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+  margin-left: 2px;
+}
+
+/* Approved: sage pill with a small paper-plane glyph. */
+.rrApprovedPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px 2px 7px;
+  border-radius: 999px;
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+  letter-spacing: 0.01em;
+}
+.rrApprovedPill svg {
+  flex-shrink: 0;
+}
+
+/* Sent: HandCheck + delivered/total. Tone shifts sage (all delivered) →
+   clay (some still pending). */
+.rrSentPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+.rrSentPill[data-tone="sage"] {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+}
+.rrSentPill[data-tone="clay"] {
+  background: var(--color-clay-soft);
+  color: var(--color-terracotta-deep);
+}
+.rrSentPill svg {
+  flex-shrink: 0;
+}
+
 /* ---------- right pane ---------- */
 .rrMain {
   min-width: 0;
@@ -387,26 +519,6 @@
   background: var(--color-muted);
   color: var(--color-ink);
   border-color: var(--color-border-strong);
-}
-.rrRailBtnPrimary {
-  background: var(--color-terracotta);
-  border-color: var(--color-terracotta);
-  color: #fff;
-}
-.rrRailBtnPrimary:hover {
-  background: var(--color-terracotta-deep);
-  border-color: var(--color-terracotta-deep);
-  color: #fff;
-}
-.rrRailBtnSage {
-  background: color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface));
-  color: var(--color-sage-deep);
-  border-color: var(--color-sage-soft);
-}
-.rrRailBtnSage:hover {
-  background: var(--color-sage-soft);
-  color: var(--color-sage-deep);
-  border-color: var(--color-sage-deep);
 }
 .rrRailBtnDanger {
   color: var(--color-ink-muted);
@@ -862,21 +974,12 @@
   background: var(--color-muted);
   color: var(--color-ink);
 }
-.rrMobileActionPrimary {
+/* Red treatment reserved for the destructive Delete action. */
+.rrMobileActionDanger {
+  color: var(--color-ink-muted);
+}
+.rrMobileActionDanger:hover {
   background: var(--color-terracotta);
+  color: #fff;
   border-color: var(--color-terracotta);
-  color: #fff;
-}
-.rrMobileActionPrimary:hover {
-  background: var(--color-terracotta-deep);
-  color: #fff;
-}
-.rrMobileActionSage {
-  background: color-mix(in srgb, var(--color-sage-soft) 60%, var(--color-surface));
-  color: var(--color-sage-deep);
-  border-color: var(--color-sage-soft);
-}
-.rrMobileActionSage:hover {
-  background: var(--color-sage-soft);
-  color: var(--color-sage-deep);
 }

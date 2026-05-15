@@ -2,17 +2,21 @@
 
 import * as React from "react";
 import {
+  Check,
   ChevronDown,
   ChevronLeft,
   Clock,
   Eye,
   MoreVertical,
+  RotateCcw,
   Send,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { initialsFor, type Tone } from "@/components/montessori/data";
-import type { ReportDetail as ReportDetailRow, ReportListRow } from "@/lib/queries/reports";
+import type {
+  ReportDetail as ReportDetailRow,
+  ReportListRowV2 as ReportListRow,
+} from "@/lib/queries/reports";
 import { PageHeader } from "@/components/montessori/page-header";
 import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck } from "@/components/montessori/primitives";
@@ -71,6 +75,31 @@ function formatWhen(row: ReportListRow, locale: string): string {
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return date;
   return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+}
+
+/** Short relative time ("12m", "3h", "yesterday", "May 7"). Mirrors the
+ *  prototype's row meta voice — compact, no padding, no commas. */
+function formatRelative(iso: string | null | undefined, locale: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(diffMs / 3_600_000);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(diffMs / 86_400_000);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d`;
+  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+}
+
+/** Map AI score to a green / amber / red tone for the completeness bar. */
+function scoreTone(score: number): "high" | "med" | "low" {
+  if (score >= 85) return "high";
+  if (score >= 60) return "med";
+  return "low";
 }
 
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
@@ -407,7 +436,6 @@ export function ReportsRailView({
               </div>
             ) : (
               filtered.map((r) => {
-                const tone = STATUS_TONE[r.status];
                 const active = r.id === selectedId;
                 return (
                   <button
@@ -435,14 +463,7 @@ export function ReportsRailView({
                           {kindLabel(r.reportType)}
                         </span>
                         <span className={styles.rrRowMetaSpacer} aria-hidden />
-                        <span
-                          className={styles.rrRowStatus}
-                          style={{ background: tone.bg, color: tone.fg }}
-                        >
-                          {tone.sparkle && <Sparkles size={10} strokeWidth={1.5} />}
-                          {tone.sent && <HandCheck color={tone.fg} size={10} />}
-                          {tone.label}
-                        </span>
+                        <RowSignal row={r} bucket={filter} locale={locale} />
                       </div>
                     </div>
                   </button>
@@ -537,6 +558,93 @@ export function ReportsRailView({
 }
 
 /**
+ * Per-row meta signal — what reads to the right of the kind pill in the
+ * rail's row list. Mirrors the prototype's four bucket modes:
+ *   Drafts    → AI score completeness bar + "edited Xm ago"
+ *   In Review → reviewer tick boxes (✓ ✓ □ + N/total) + "sent Xh"
+ *   Approved  → paper-plane + relative approved time
+ *   Sent      → delivered count + sent-date
+ */
+function RowSignal({
+  row,
+  bucket,
+  locale,
+}: {
+  row: ReportListRow;
+  bucket: StatusFilter;
+  locale: string;
+}) {
+  if (bucket === "drafts") {
+    const tone = scoreTone(row.completenessPercent);
+    return (
+      <span className={`${styles.rrSignal} ${styles.rrSignalCompleteness}`}>
+        <span className={styles.rrCompleteness} data-tone={tone}>
+          <span className={styles.rrCompletenessBar} aria-hidden>
+            <i style={{ width: `${Math.max(0, Math.min(100, row.completenessPercent))}%` }} />
+          </span>
+          <span className={styles.rrCompletenessValue}>{row.completenessPercent}%</span>
+        </span>
+        <span className={styles.rrSignalMeta}>{formatRelative(row.updatedAt, locale)}</span>
+      </span>
+    );
+  }
+
+  if (bucket === "review") {
+    const { approved, total } = row.reviewerTicks;
+    const ticks = total > 0 ? total : 1;
+    return (
+      <span className={`${styles.rrSignal} ${styles.rrSignalTicks}`}>
+        <span className={styles.rrTicks} aria-label={`${approved} of ${ticks} reviewers approved`}>
+          {Array.from({ length: ticks }).map((_, i) => {
+            const done = i < approved;
+            return (
+              <span key={i} className={styles.rrTickBox} data-done={done ? "true" : "false"}>
+                {done ? <Check size={9} strokeWidth={3} /> : null}
+              </span>
+            );
+          })}
+          <span className={styles.rrTickCount}>
+            {approved}/{ticks}
+          </span>
+        </span>
+        <span className={styles.rrSignalMeta}>
+          {row.lastSubmittedAt ? formatRelative(row.lastSubmittedAt, locale) : ""}
+        </span>
+      </span>
+    );
+  }
+
+  if (bucket === "approved") {
+    const when = row.lastSubmittedAt ?? row.updatedAt;
+    return (
+      <span className={`${styles.rrSignal} ${styles.rrSignalApproved}`}>
+        <span className={styles.rrApprovedPill}>
+          <Send size={10} strokeWidth={2.2} />
+          <span>Approved</span>
+        </span>
+        <span className={styles.rrSignalMeta}>{formatRelative(when, locale)}</span>
+      </span>
+    );
+  }
+
+  // sent
+  const { delivered, pending, failed } = row.delivery;
+  const total = delivered + pending + failed;
+  const allDelivered = total > 0 && delivered === total;
+  return (
+    <span className={`${styles.rrSignal} ${styles.rrSignalSent}`}>
+      <span className={styles.rrSentPill} data-tone={allDelivered ? "sage" : "clay"}>
+        <HandCheck color="currentColor" size={10} />
+        <span>
+          {delivered}/{total || 1} {allDelivered ? "delivered" : "sending"}
+        </span>
+      </span>
+      <span className={styles.rrSignalMeta}>{formatWhen(row, locale)}</span>
+    </span>
+  );
+}
+
+/**
  * Full-bleed mobile overlay hosting <ReportDetail> + a bottom action bar.
  * Mirrors the desktop ActionRail's four icons. Modals open via the same
  * `openModal` callback as desktop, so the mounted `<ReportModalsHost>` at
@@ -568,6 +676,7 @@ function MobileReportOverlay({
 
   // Visibility per row status (mirrors the table baked into ActionRail).
   const showSend = status === "draft" || status === "changes_requested";
+  const showAdminReview = isAdmin && (status === "submitted_for_review" || status === "in_review");
   const showDelete =
     status === "draft" ||
     status === "changes_requested" ||
@@ -638,7 +747,7 @@ function MobileReportOverlay({
           </button>
           <button
             type="button"
-            className={`${styles.rrMobileAction} ${styles.rrMobileActionSage} tap`}
+            className={`${styles.rrMobileAction} tap`}
             onClick={() => onOpenModal("history")}
             aria-label="History"
           >
@@ -647,17 +756,37 @@ function MobileReportOverlay({
           {showSend && (
             <button
               type="button"
-              className={`${styles.rrMobileAction} ${styles.rrMobileActionPrimary} tap`}
+              className={`${styles.rrMobileAction} tap`}
               onClick={() => onOpenModal("send")}
               aria-label="Submit for review"
             >
               <Send size={17} strokeWidth={2} />
             </button>
           )}
+          {showAdminReview && (
+            <>
+              <button
+                type="button"
+                className={`${styles.rrMobileAction} tap`}
+                onClick={() => onOpenModal("approve")}
+                aria-label="Approve report"
+              >
+                <Check size={17} strokeWidth={2.2} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.rrMobileAction} tap`}
+                onClick={() => onOpenModal("request_changes")}
+                aria-label="Request changes"
+              >
+                <RotateCcw size={17} strokeWidth={1.8} />
+              </button>
+            </>
+          )}
           {showDelete && (
             <button
               type="button"
-              className={`${styles.rrMobileAction} tap`}
+              className={`${styles.rrMobileAction} ${styles.rrMobileActionDanger} tap`}
               onClick={() => onOpenModal("delete")}
               aria-label="Delete report"
             >
