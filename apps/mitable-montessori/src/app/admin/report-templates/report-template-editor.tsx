@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, GripVertical, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Copy, GripVertical, Plus, Trash2, X } from "lucide-react";
 import type {
   AdminReportTemplateDto,
   ReportingPeriod,
@@ -13,6 +13,13 @@ import { REPORTING_PERIOD_LABEL, REPORTING_PERIOD_VALUES } from "@/lib/report-te
 import type { TemplateSectionRow } from "@/lib/report-templates/sections";
 import { PageHeader, cardHeaderStyle, cardStyle } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { HandDivider, ToastBus } from "@/components/montessori/primitives";
@@ -59,10 +66,14 @@ export function ReportTemplateEditor({
   );
   const [dragState, setDragState] = React.useState<{ from: number; over: number } | null>(null);
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
+  const [duplicating, setDuplicating] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (mode !== "edit" || !templateId) return;
+    setLoading(true);
     let cancelled = false;
     void (async () => {
       try {
@@ -244,20 +255,45 @@ export function ReportTemplateEditor({
     router.refresh();
   };
 
-  const onDeleteTemplate = async () => {
+  const confirmDeleteTemplate = async () => {
     if (!templateId || mode !== "edit") return;
-    if (!window.confirm("Delete this template? Reports already created keep their content."))
-      return;
-    const res = await fetch(`/api/admin/templates/${templateId}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!res.ok) {
-      ToastBus.push({ message: "Couldn't delete" });
-      return;
+    setDeleteBusy(true);
+    try {
+      const res = await fetch(`/api/admin/templates/${templateId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        ToastBus.push({ message: "Couldn't delete" });
+        return;
+      }
+      setDeleteDialogOpen(false);
+      router.replace("/admin/report-templates");
+      router.refresh();
+    } finally {
+      setDeleteBusy(false);
     }
-    router.replace("/admin/report-templates");
-    router.refresh();
+  };
+
+  const onDuplicateTemplate = async () => {
+    if (!templateId || mode !== "edit") return;
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/admin/templates/${templateId}/duplicate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (!res.ok || !data.id) {
+        ToastBus.push({ message: data.error || "Couldn't duplicate template" });
+        return;
+      }
+      ToastBus.push({ message: "Duplicated. You're now editing the copy." });
+      router.replace(`/admin/report-templates/${data.id}`);
+      router.refresh();
+    } finally {
+      setDuplicating(false);
+    }
   };
 
   if (loading) {
@@ -282,14 +318,26 @@ export function ReportTemplateEditor({
         subtitle="Logo and layout stay here for teachers; tone and section notes go to the assistant."
         actions={
           mode === "edit" ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="border-[var(--color-border)] text-[var(--color-ink-secondary)]"
-              onClick={() => void onDeleteTemplate()}
-            >
-              Delete
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-[var(--color-border)] text-[var(--color-ink-secondary)]"
+                disabled={duplicating}
+                onClick={() => void onDuplicateTemplate()}
+              >
+                <Copy size={14} strokeWidth={1.6} className="mr-1.5 inline" aria-hidden />
+                {duplicating ? "Duplicating…" : "Duplicate"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-[var(--color-border)] text-[var(--color-ink-secondary)]"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                Delete
+              </Button>
+            </div>
           ) : null
         }
       />
@@ -723,6 +771,41 @@ export function ReportTemplateEditor({
           </Button>
         </div>
       </div>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="border-ink/10 bg-canvas">
+          <DialogHeader>
+            <DialogTitle>Delete this template?</DialogTitle>
+            <DialogDescription>
+              This removes{" "}
+              <span className="font-medium text-ink">{name.trim() || "this template"}</span> for
+              your school. Reports already created from it are unchanged. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-ink/15 bg-canvas px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas-muted"
+              disabled={deleteBusy}
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+              style={{
+                borderColor: "rgba(232, 116, 116, 0.45)",
+                color: "var(--status-error, #e87474)",
+              }}
+              disabled={deleteBusy}
+              onClick={() => void confirmDeleteTemplate()}
+            >
+              {deleteBusy ? "Deleting…" : "Delete template"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
