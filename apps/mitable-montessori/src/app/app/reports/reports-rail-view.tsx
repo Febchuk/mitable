@@ -66,29 +66,6 @@ function kindLabel(t: ReportListRow["reportType"]): string {
   return "Incident";
 }
 
-/**
- * Title + sub-line for the rail's own header. Mirrors the prototype's
- * .list-head: section h2 reflects the active filter; sub line shows the
- * count + a contextual hint. Kept here so the component stays declarative.
- */
-function railHeading(filter: StatusFilter, rows: ReportListRow[]): { title: string; sub: string } {
-  const count = rows.length;
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  if (filter === "drafts") {
-    return { title: "Drafts", sub: plural(count, "draft", "drafts") };
-  }
-  if (filter === "review") {
-    return { title: "In Review", sub: plural(count, "report in review", "reports in review") };
-  }
-  if (filter === "approved") {
-    return {
-      title: "Approved",
-      sub: plural(count, "approved report", "approved reports"),
-    };
-  }
-  return { title: "Sent", sub: plural(count, "sent report", "sent reports") };
-}
-
 function formatWhen(row: ReportListRow, locale: string): string {
   const date = row.reportDate || row.createdAt.slice(0, 10);
   const d = new Date(date);
@@ -388,26 +365,15 @@ export function ReportsRailView({
       <div className={styles.rrLayout}>
         {/* Left rail — flat reports list */}
         <aside className={styles.rrRail}>
-          <header className={styles.rrRailHeader}>
-            {(() => {
-              const heading = railHeading(filter, filtered);
-              return (
-                <>
-                  <div className={styles.rrRailHeaderRow}>
-                    <h2 className={styles.rrRailTitle}>{heading.title}</h2>
-                    {isAdmin && (
-                      <ClassroomScopeSelect
-                        value={classroomScope}
-                        onChange={setClassroomScope}
-                        options={classroomOptions}
-                      />
-                    )}
-                  </div>
-                  <div className={styles.rrRailSub}>{heading.sub}</div>
-                </>
-              );
-            })()}
-          </header>
+          {isAdmin && (
+            <div className={styles.rrAdminScopeRow}>
+              <ClassroomScopeSelect
+                value={classroomScope}
+                onChange={setClassroomScope}
+                options={classroomOptions}
+              />
+            </div>
+          )}
 
           <div className={styles.rrFilterBar}>
             <div className={styles.rrTabs} role="tablist" aria-label="Report status">
