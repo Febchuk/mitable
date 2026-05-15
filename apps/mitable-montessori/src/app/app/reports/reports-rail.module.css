@@ -484,6 +484,17 @@
   color: #fff;
   border-color: var(--color-terracotta);
 }
+/* Pressed/active state for toggle buttons (preview/edit swap). */
+.rrRailBtnActive {
+  background: var(--color-ink);
+  color: var(--color-surface);
+  border-color: var(--color-ink);
+}
+.rrRailBtnActive:hover {
+  background: var(--color-ink);
+  color: var(--color-surface);
+  border-color: var(--color-ink);
+}
 
 /* Score button — replaces the in-row AI-score bubble. Same 40px footprint
    as the other rail buttons so the column reads as a single column, but

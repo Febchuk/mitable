@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Check, Clock, Eye, RotateCcw, Send, Trash2 } from "lucide-react";
+import { Check, Clock, FileText, Pencil, RotateCcw, Send, Trash2 } from "lucide-react";
 import type { ReportListRow } from "@/lib/queries/reports";
+import type { ViewMode } from "@/components/montessori/report-detail/view-mode-toggle";
 import styles from "./reports-rail.module.css";
 
 type ReportStatus = ReportListRow["status"];
 
+/** Modal targets only — Preview PDF is no longer a modal; the rail's toggle
+ *  swaps the editor pane in-place between editor and PDF preview. */
 export type ActionRailModal =
   | "score"
-  | "preview"
   | "history"
   | "send"
   | "delete"
@@ -24,23 +26,24 @@ export function scoreToneBand(score: number): "high" | "med" | "low" {
 }
 
 /**
- * Resolves which action-rail icons should render for a given report. Mirrors
- * the rail-visibility table approved with the design — kept in one place so
- * desktop and mobile share the exact same affordances.
+ * Resolves which modal-launching icons should render for a given report.
+ * Mirrors the rail-visibility table approved with the design — kept in one
+ * place so desktop and mobile share the exact same affordances.
  *
- * - Preview PDF + History are always visible.
+ * - History is always visible.
  * - Submit for review only on `draft` (teachers re-submit from draft after
  *   `changes_requested`, so we include that too).
  * - Delete on draft for anyone; on approved / sent for admins only.
+ *
+ * The preview/edit toggle is rendered separately (not modal-routed) and the
+ * score button uses its own visibility check (`aiScore != null`).
  */
 export function railIcons(status: ReportStatus, isAdmin: boolean): ActionRailModal[] {
-  const out: ActionRailModal[] = ["preview", "history"];
+  const out: ActionRailModal[] = ["history"];
   if (status === "draft" || status === "changes_requested") {
     out.push("send");
   }
-  // Approve / Request changes for admins on review-state reports. These
-  // replace the dead "Reject draft / Save & close" footer that the
-  // floating chat was covering — same intent, moved into the rail.
+  // Approve / Request changes for admins on review-state reports.
   if (isAdmin && (status === "submitted_for_review" || status === "in_review")) {
     out.push("approve");
     out.push("request_changes");
@@ -58,6 +61,8 @@ export function ActionRail({
   isAdmin,
   onOpenModal,
   aiScore = null,
+  viewMode = "editor",
+  onViewModeChange,
   pendingReviewerBadge = 0,
   reviewerSummary = [],
 }: {
@@ -68,18 +73,28 @@ export function ActionRail({
    *  score button at the top of the rail. When null we hide the button —
    *  the report hasn't been scored yet. */
   aiScore?: number | null;
+  /** Controlled view mode for the editor pane. The rail's preview toggle
+   *  flips between "editor" and "preview" — there's no Preview PDF modal
+   *  anymore; the editor pane swaps in-place. */
+  viewMode?: ViewMode;
+  onViewModeChange?: (next: ViewMode) => void;
   /** Unread reviewer-comment count, surfaced as a terracotta dot on the History icon. */
   pendingReviewerBadge?: number;
   /** Compact reviewer indicators (≤3 shown). */
   reviewerSummary?: { initials: string; tone: "sage" | "clay" | "butter" | "blue" }[];
 }) {
   const icons = railIcons(status, isAdmin);
-  const showPreview = icons.includes("preview");
   const showHistory = icons.includes("history");
   const showSend = icons.includes("send");
   const showApprove = icons.includes("approve");
   const showRequestChanges = icons.includes("request_changes");
   const showDelete = icons.includes("delete");
+
+  // The toggle is a single button whose icon = the destination: FileText
+  // when you're in editor mode (tap → preview PDF), Pencil when you're in
+  // preview (tap → back to editor). Single tap flips modes.
+  const inPreview = viewMode === "preview";
+  const togglePreview = () => onViewModeChange?.(inPreview ? "editor" : "preview");
 
   return (
     <aside className={styles.rrActionRail} aria-label="Report actions">
@@ -96,13 +111,19 @@ export function ActionRail({
         </button>
       )}
 
-      {showPreview && (
+      {onViewModeChange && (
         <RailButton
-          tip="Preview PDF"
-          aria-label="Preview PDF"
-          onClick={() => onOpenModal("preview")}
+          tip={inPreview ? "Back to editor" : "Preview PDF"}
+          aria-label={inPreview ? "Switch to editor" : "Preview PDF"}
+          aria-pressed={inPreview}
+          onClick={togglePreview}
+          active={inPreview}
         >
-          <Eye size={17} strokeWidth={1.8} />
+          {inPreview ? (
+            <Pencil size={17} strokeWidth={1.8} />
+          ) : (
+            <FileText size={17} strokeWidth={1.8} />
+          )}
         </RailButton>
       )}
 
@@ -181,6 +202,7 @@ function RailButton({
   tip,
   children,
   danger,
+  active,
   badge,
   onClick,
   ...aria
@@ -189,10 +211,18 @@ function RailButton({
   children: React.ReactNode;
   /** Red treatment reserved for the destructive Delete action. */
   danger?: boolean;
+  /** Pressed/active styling for toggle buttons (e.g. preview/edit). */
+  active?: boolean;
   badge?: number;
   onClick: () => void;
-} & Pick<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label">) {
-  const cls = [styles.rrRailBtn, danger ? styles.rrRailBtnDanger : ""].filter(Boolean).join(" ");
+} & Pick<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "aria-pressed">) {
+  const cls = [
+    styles.rrRailBtn,
+    danger ? styles.rrRailBtnDanger : "",
+    active ? styles.rrRailBtnActive : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <button type="button" className={`${cls} tap`} onClick={onClick} data-tip={tip} {...aria}>
       {children}

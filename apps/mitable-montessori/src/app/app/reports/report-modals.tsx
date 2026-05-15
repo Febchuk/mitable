@@ -11,8 +11,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ToastBus } from "@/components/montessori/primitives";
-import { PdfPreviewPane } from "@/components/montessori/report-detail/pdf-preview-pane";
-import { localDetailToPdfData } from "@/lib/pdf/local-detail-to-pdf-data";
 import { fetchReviewerCandidates, type ReviewerCandidate } from "@/lib/reports-v2/api";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import styles from "./reports-rail.module.css";
@@ -20,29 +18,12 @@ import { scoreToneBand, type ActionRailModal } from "./action-rail";
 
 export type ReportModal = ActionRailModal | null;
 
-type LocalSection = NonNullable<ReportDetailRow["sections"]>[number];
-
-function pdfDataFor(report: ReportDetailRow) {
-  const sections = (report.sections as LocalSection[] | null | undefined)?.length
-    ? (report.sections as LocalSection[])
-    : [];
-  return localDetailToPdfData(
-    {
-      title: report.title || `${report.studentName} report`,
-      sections: sections.map((s) => ({
-        id: s.id,
-        heading: s.heading,
-        paragraphs: s.paragraphs,
-      })),
-    },
-    report
-  );
-}
-
 /**
- * Mounts the four action-rail modals (Preview PDF · History · Submit · Delete)
- * and routes server actions through a single `onChanged` callback so the rail
- * view can revalidate. Pure controlled — caller owns the open state.
+ * Mounts the action-rail modals (Score · History · Submit · Approve · Request
+ * changes · Delete) and routes server actions through a single `onChanged`
+ * callback so the rail view can revalidate. Preview PDF is NOT a modal —
+ * the rail's preview toggle swaps the editor pane in-place. Pure controlled —
+ * caller owns the open state.
  */
 export function ReportModalsHost({
   open,
@@ -64,7 +45,6 @@ export function ReportModalsHost({
   return (
     <>
       <AiScoreDialog open={open === "score"} onClose={onClose} report={report} />
-      <PreviewPdfDialog open={open === "preview"} onClose={onClose} report={report} />
       <HistoryDialog open={open === "history"} onClose={onClose} report={report} />
       <SubmitForReviewDialog
         open={open === "send"}
@@ -371,40 +351,6 @@ function RequestChangesDialog({
           >
             <RotateCcw size={13} strokeWidth={2.2} />
             {busy ? "Sending…" : "Send back for changes"}
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/* ───────────────────────── Preview PDF ───────────────────────── */
-
-function PreviewPdfDialog({
-  open,
-  onClose,
-  report,
-}: {
-  open: boolean;
-  onClose: () => void;
-  report: ReportDetailRow;
-}) {
-  const data = React.useMemo(() => pdfDataFor(report), [report]);
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={`${styles.rrModalCard} ${styles.rrModalCardLg}`}>
-        <DialogHeader>
-          <DialogTitle>Preview PDF</DialogTitle>
-          <DialogDescription>
-            How parents will see this report · {report.studentName}
-          </DialogDescription>
-        </DialogHeader>
-        <div className={styles.rrPdfFrame}>
-          <PdfPreviewPane data={data} />
-        </div>
-        <div className={styles.rrModalFoot}>
-          <button type="button" className="rd-btn rd-btn-secondary" onClick={onClose}>
-            Close
           </button>
         </div>
       </DialogContent>

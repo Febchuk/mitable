@@ -139,6 +139,8 @@ export function ReportDetail({
   hideBackLink = false,
   hideTopBarActions = false,
   hideTopBar = false,
+  viewMode: viewModeProp,
+  onViewModeChange,
   variant,
   onReportChanged,
 }: {
@@ -150,8 +152,15 @@ export function ReportDetail({
   hideBackLink?: boolean;
   /** When true, suppresses the top-bar inline action buttons. The rail-view owns these via its action rail + modals — without this we get two Submit / Delete buttons stacked next to each other. */
   hideTopBarActions?: boolean;
-  /** When true, removes the entire ReportTopBar (back link, avatar, title, status pill, meta row, view-mode toggle). The rail-view passes this so the list rail's selected row already communicates which report is open. PDF preview moves to the action-rail modal in this mode. */
+  /** When true, removes the entire ReportTopBar (back link, avatar, title, status pill, meta row, view-mode toggle). The rail-view passes this so the list rail's selected row already communicates which report is open. PDF preview swaps in-place via the action-rail toggle in this mode. */
   hideTopBar?: boolean;
+  /** Controlled view mode. When provided, the parent owns the editor/preview
+   *  state (the rail-view does this so its action-rail toggle button drives
+   *  what's rendered here). When omitted, ReportDetail manages it itself
+   *  via the in-bar segmented toggle. */
+  viewMode?: ViewMode;
+  /** Paired with `viewMode` for controlled mode. */
+  onViewModeChange?: (next: ViewMode) => void;
   /** String alias for isAdmin — "admin" ⇒ isAdmin. Existing callers can keep using isAdmin directly. */
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
@@ -411,7 +420,15 @@ export function ReportDetail({
 
   const [actionBusy, setActionBusy] = React.useState(false);
   const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState<ViewMode>("editor");
+  const [internalViewMode, setInternalViewMode] = React.useState<ViewMode>("editor");
+  const viewMode = viewModeProp ?? internalViewMode;
+  const setViewMode = React.useCallback(
+    (next: ViewMode) => {
+      if (onViewModeChange) onViewModeChange(next);
+      if (viewModeProp === undefined) setInternalViewMode(next);
+    },
+    [onViewModeChange, viewModeProp]
+  );
 
   const pdfData = React.useMemo(
     () => localDetailToPdfData({ title: detail.title, sections: detail.sections }, report),

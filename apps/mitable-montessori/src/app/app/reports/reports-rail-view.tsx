@@ -6,8 +6,9 @@ import {
   ChevronDown,
   ChevronLeft,
   Clock,
-  Eye,
+  FileText,
   MoreVertical,
+  Pencil,
   RotateCcw,
   Send,
   Trash2,
@@ -23,6 +24,7 @@ import { Avatar, HandCheck } from "@/components/montessori/primitives";
 import { ReportDetail } from "@/components/montessori/report-detail";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import { ActionRail, railIcons, scoreToneBand, type ActionRailModal } from "./action-rail";
+import type { ViewMode } from "@/components/montessori/report-detail/view-mode-toggle";
 import { ReportModalsHost, type ReportModal } from "./report-modals";
 import styles from "./reports-rail.module.css";
 
@@ -337,6 +339,15 @@ export function ReportsRailView({
   const openModal = React.useCallback((m: ActionRailModal) => setModalOpen(m), []);
   const closeModal = React.useCallback(() => setModalOpen(null), []);
 
+  /* View mode for the embedded ReportDetail — flipped by the rail's preview
+     toggle (or the mobile kebab's preview row). Reset to "editor" whenever
+     the selected report changes so opening a new row doesn't strand the
+     user on the previous report's preview. */
+  const [viewMode, setViewMode] = React.useState<ViewMode>("editor");
+  React.useEffect(() => {
+    setViewMode("editor");
+  }, [selectedId]);
+
   /* On mobile, tapping a row opens the report in a full-bleed overlay
      instead of stacking it below the list. The state is independent from
      selectedId so closing the overlay doesn't blow away the selection. */
@@ -481,6 +492,8 @@ export function ReportsRailView({
               hideBackLink
               hideTopBarActions
               hideTopBar
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
               variant={variant}
               onReportChanged={refreshSelectedDetail}
             />
@@ -519,6 +532,8 @@ export function ReportsRailView({
             isAdmin={isAdmin}
             onOpenModal={openModal}
             aiScore={selectedRow.displayScore}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
           />
         ) : (
           <div className={styles.rrActionRail} aria-hidden />
@@ -551,6 +566,8 @@ export function ReportsRailView({
           isAdmin={isAdmin}
           onClose={closeMobileOverlay}
           onOpenModal={openModal}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
           onReportChanged={refreshSelectedDetail}
         />
       )}
@@ -660,6 +677,8 @@ function MobileReportOverlay({
   isAdmin,
   onClose,
   onOpenModal,
+  viewMode,
+  onViewModeChange,
   onReportChanged,
 }: {
   row: ReportListRow;
@@ -670,6 +689,8 @@ function MobileReportOverlay({
   isAdmin: boolean;
   onClose: () => void;
   onOpenModal: (m: ActionRailModal) => void;
+  viewMode: ViewMode;
+  onViewModeChange: (next: ViewMode) => void;
   onReportChanged: () => void;
 }) {
   const tone = STATUS_TONE[row.status];
@@ -734,6 +755,8 @@ function MobileReportOverlay({
               hideBackLink
               hideTopBarActions
               hideTopBar
+              viewMode={viewMode}
+              onViewModeChange={onViewModeChange}
               variant={variant}
               onReportChanged={onReportChanged}
             />
@@ -750,6 +773,11 @@ function MobileReportOverlay({
             isAdmin={isAdmin}
             onClose={() => setMenuOpen(false)}
             onPick={handlePick}
+            viewMode={viewMode}
+            onViewModeChange={(next) => {
+              setMenuOpen(false);
+              onViewModeChange(next);
+            }}
           />
         )}
       </div>
@@ -760,28 +788,32 @@ function MobileReportOverlay({
 /**
  * Compact popover anchored under the overlay's kebab button. Source of every
  * action on mobile: the same set as the desktop right rail, in the same order
- * (Score · Preview · History · Submit · Approve · Request changes · Delete),
- * each visible per `railIcons(row.status, isAdmin)`. Closes on outside click,
- * row click, or Escape; locks body scroll while open.
+ * (Score · Preview/Edit toggle · History · Submit · Approve · Request changes
+ * · Delete), each visible per `railIcons(row.status, isAdmin)`. Closes on
+ * outside click, row click, or Escape; locks body scroll while open.
  */
 function KebabMenu({
   row,
   isAdmin,
   onClose,
   onPick,
+  viewMode,
+  onViewModeChange,
 }: {
   row: ReportListRow;
   isAdmin: boolean;
   onClose: () => void;
   onPick: (m: ActionRailModal) => void;
+  viewMode: ViewMode;
+  onViewModeChange: (next: ViewMode) => void;
 }) {
   const actions = railIcons(row.status, isAdmin);
-  const showPreview = actions.includes("preview");
   const showHistory = actions.includes("history");
   const showSend = actions.includes("send");
   const showApprove = actions.includes("approve");
   const showRequestChanges = actions.includes("request_changes");
   const showDelete = actions.includes("delete");
+  const inPreview = viewMode === "preview";
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -821,19 +853,24 @@ function KebabMenu({
           </button>
         )}
 
-        {showPreview && (
-          <button
-            type="button"
-            className={`${styles.rrKebabItem} tap`}
-            role="menuitem"
-            onClick={() => onPick("preview")}
-          >
-            <span className={styles.rrKebabIcon} aria-hidden>
-              <Eye size={16} strokeWidth={1.8} />
-            </span>
-            <span className={styles.rrKebabLabel}>Preview PDF</span>
-          </button>
-        )}
+        <button
+          type="button"
+          className={`${styles.rrKebabItem} tap`}
+          role="menuitem"
+          aria-pressed={inPreview}
+          onClick={() => onViewModeChange(inPreview ? "editor" : "preview")}
+        >
+          <span className={styles.rrKebabIcon} aria-hidden>
+            {inPreview ? (
+              <Pencil size={16} strokeWidth={1.8} />
+            ) : (
+              <FileText size={16} strokeWidth={1.8} />
+            )}
+          </span>
+          <span className={styles.rrKebabLabel}>
+            {inPreview ? "Back to editor" : "Preview PDF"}
+          </span>
+        </button>
 
         {showHistory && (
           <button
