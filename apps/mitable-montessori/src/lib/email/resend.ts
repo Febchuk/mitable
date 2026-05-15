@@ -128,6 +128,7 @@ function renderInviteHtml({ inviteUrl, schoolName, inviterName }: SendInviteInpu
 
 import type { EmailJob, EmailSender } from "@/lib/admin/email-worker";
 import { generateReportPdf } from "@/lib/pdf/generate-report-pdf";
+import { sectionsToPdfSections } from "@/lib/pdf/sections-to-pdf-sections";
 
 export class ResendEmailSender implements EmailSender {
   async send(job: EmailJob): Promise<{ ok: boolean; messageId?: string; error?: string }> {
@@ -154,7 +155,8 @@ export class ResendEmailSender implements EmailSender {
         reportDate: job.reportDate,
         classroom: job.classroomName ?? "",
         reportType: job.reportType ?? "daily",
-        sections: job.reportSections ?? [],
+        logoUrl: job.templateLogoUrl,
+        sections: sectionsToPdfSections(job.reportSections, job.templateSectionMeta),
         body: job.reportBody,
       });
       pdfAttachment = {

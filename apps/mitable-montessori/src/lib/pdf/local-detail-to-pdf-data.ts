@@ -1,6 +1,7 @@
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
 import type { ReportPdfData } from "./report-template";
 import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
+import { sectionsToPdfSections } from "./sections-to-pdf-sections";
 
 type LocalParagraph = { id: string; html: string };
 type LocalSection = {
@@ -39,10 +40,8 @@ export function localDetailToPdfData(
     reportDate: report.reportDate,
     classroom: report.classroomName ?? "",
     reportType: report.reportType,
-    sections: detail.sections.map((s) => ({
-      heading: s.heading,
-      paragraphs: s.paragraphs.map((p) => ({ html: p.html })),
-    })),
+    logoUrl: report.templateLogoUrl ?? null,
+    sections: sectionsToPdfSections(detail.sections, report.templateSectionMeta ?? {}),
     body: sectionsToBody(detail.sections),
   };
 }

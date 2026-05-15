@@ -121,13 +121,23 @@ export function ReportPane({
             aria-label="Report title"
           />
 
-          <div className="rd-report-byline">
-            <span>Observed by {detail.observer}</span>
-            <span className="rd-dot-sep" />
-            <span>
-              {detail.sources.voiceNotes} voice notes · {detail.sources.photos} photos ·{" "}
-              {detail.sources.worksheets} worksheet{detail.sources.worksheets === 1 ? "" : "s"}
-            </span>
+          <div className="rd-report-identity">
+            {detail.dayLabel ? (
+              <p className="rd-report-identity-line">
+                <span className="rd-report-identity-label">Date: </span>
+                {detail.dayLabel}
+              </p>
+            ) : null}
+            {detail.classroom ? (
+              <p className="rd-report-identity-line">
+                <span className="rd-report-identity-label">Classroom: </span>
+                {detail.classroom}
+              </p>
+            ) : null}
+            <p className="rd-report-identity-line">
+              <span className="rd-report-identity-label">Observed by: </span>
+              {detail.observer}
+            </p>
           </div>
 
           {detail.sections.map((section) => (
@@ -164,22 +174,9 @@ export function ReportPane({
               Add section
             </button>
           )}
-        </article>
-      </div>
 
-      <div className="rd-report-footer">
-        <div className="rd-footer-left">
-          <span className="rd-label-cap">Visible to</span>
-          <span>{detail.visibleTo.join(" · ")}</span>
-        </div>
-        <div className="rd-footer-right">
-          <button type="button" className="rd-btn rd-btn-ghost" onClick={() => toast()}>
-            Reject draft
-          </button>
-          <button type="button" className="rd-btn rd-btn-secondary" onClick={() => toast()}>
-            Save &amp; close
-          </button>
-        </div>
+          <p className="rd-report-paper-footer">Prepared with Mitable</p>
+        </article>
       </div>
 
       {isDrafting ? (
