@@ -34,6 +34,8 @@ export type ClassroomProgressStudent = {
   present: boolean;
   /** Active (non-archived) IEP goal rows for this child. 0 when classroom has no IEP program. */
   iepItemCount: number;
+  /** Active (non-archived) speech target rows for this child. 0 when classroom has no Speech program. */
+  speechTargetCount: number;
 };
 
 export type ClassroomProgress = {
@@ -107,6 +109,25 @@ async function iepItemCountByStudent(
   return out;
 }
 
+async function speechTargetCountByStudent(
+  supabase: ReturnType<typeof createClient>,
+  studentIds: string[]
+): Promise<Record<string, number>> {
+  if (studentIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("speech_targets")
+    .select("student_id")
+    .in("student_id", studentIds)
+    .is("archived_at", null);
+  if (error || !data) return {};
+  const out: Record<string, number> = {};
+  for (const row of data) {
+    const sid = row.student_id as string;
+    out[sid] = (out[sid] ?? 0) + 1;
+  }
+  return out;
+}
+
 /**
  * Returns everything the Progress tab needs in one server-side pass:
  * the active classroom's roster, its curriculum tree (subjects → topics →
@@ -136,7 +157,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
   const programs: ProgressProgram[] =
     Array.isArray(rawPrograms) && rawPrograms.length > 0
       ? rawPrograms.filter((p): p is ProgressProgram =>
-          (["montessori", "iep"] as const).includes(p as ProgressProgram)
+          (["montessori", "iep", "speech"] as const).includes(p as ProgressProgram)
         )
       : ["montessori"];
 
@@ -183,9 +204,18 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
         )
       : null;
 
+  const speechCounts =
+    programs.includes("speech") && studentsBase.length > 0
+      ? await speechTargetCountByStudent(
+          supabase,
+          studentsBase.map((s) => s.id)
+        )
+      : null;
+
   const students: ClassroomProgressStudent[] = studentsBase.map((s) => ({
     ...s,
     iepItemCount: iepCounts ? (iepCounts[s.id] ?? 0) : 0,
+    speechTargetCount: speechCounts ? (speechCounts[s.id] ?? 0) : 0,
   }));
 
   if (!curriculumId) {

@@ -165,3 +165,36 @@ export async function teacherShouldSeeIepProgressTab(): Promise<boolean> {
 
   return anyMontessori && anyIep;
 }
+
+/** True when the teacher has any active assignment to a classroom that includes Speech. */
+export async function teacherShouldSeeSpeechProgressTab(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data: rows, error } = await supabase
+    .from("classroom_teacher_assignments")
+    .select("classrooms ( program_types )")
+    .eq("teacher_user_id", user.id)
+    .is("end_date", null);
+
+  if (error || !rows?.length) return false;
+
+  for (const row of rows) {
+    const c = (row as { classrooms: { program_types?: string[] | null } | null }).classrooms;
+    const raw = c?.program_types;
+    const programs =
+      Array.isArray(raw) && raw.length > 0
+        ? raw.filter(
+            (p): p is "montessori" | "iep" | "speech" =>
+              p === "montessori" || p === "iep" || p === "speech"
+          )
+        : ["montessori"];
+    if (programs.includes("speech")) return true;
+  }
+
+  return false;
+}

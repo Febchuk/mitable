@@ -69,21 +69,21 @@ export const CreateGuardianSchema = CreateGuardianBaseSchema.transform((v) => ({
 });
 export type CreateGuardianInput = z.infer<typeof CreateGuardianSchema>;
 
-export const ProgressProgramSchema = z.enum(["montessori", "iep"]);
+export const ProgressProgramSchema = z.enum(["montessori", "iep", "speech"]);
 
 export const CreateClassroomSchema = z.object({
   name: z.string().min(1).max(200),
   code: z.string().max(20).optional(),
   curriculum_id: z.string().uuid().optional(),
   /** Programs the classroom unlocks. Defaults to ['montessori'] when omitted. */
-  program_types: z.array(ProgressProgramSchema).min(1).max(3).optional(),
+  program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
 });
 
 /** Patch program_types, curriculum_id, or both. At least one field required. */
 export const PatchClassroomSchema = z
   .object({
     classroom_id: z.string().uuid(),
-    program_types: z.array(ProgressProgramSchema).min(1).max(3).optional(),
+    program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
     curriculum_id: z.union([z.string().uuid(), z.null()]).optional(),
   })
   .superRefine((data, ctx) => {

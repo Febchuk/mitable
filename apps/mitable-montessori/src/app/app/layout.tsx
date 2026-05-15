@@ -11,6 +11,7 @@ import {
   getActiveClassroomForCurrentUser,
   getCurrentUserContext,
   teacherShouldSeeIepProgressTab,
+  teacherShouldSeeSpeechProgressTab,
 } from "@/lib/app/active-classroom";
 import { getClassroomProgress } from "@/lib/queries/classroom-progress";
 
@@ -26,11 +27,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // pages, not the teacher Progress tab).
   const initialClassroomProgress = isAdmin ? null : await getClassroomProgress();
   const showIepProgressTab = !isAdmin && (await teacherShouldSeeIepProgressTab());
+  const showSpeechProgressTab = !isAdmin && (await teacherShouldSeeSpeechProgressTab());
 
   return (
     <MontessoriProvider
       initialClassroomProgress={initialClassroomProgress}
       showIepProgressTab={showIepProgressTab}
+      showSpeechProgressTab={showSpeechProgressTab}
     >
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
