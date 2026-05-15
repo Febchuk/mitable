@@ -2,6 +2,46 @@
    and _design/new-report-mobile-prototype.html (mobile step flow). Scoped
    to .nr-* to avoid leakage. globals.css supplies tokens + fonts. */
 
+/* ---------- Page-header trigger button ----------
+   Quiet secondary button — mirrors the prototype's `.btn-secondary`
+   "New report" affordance in the reports app-topbar. Surface bg + ink
+   border + small + icon; hovers darken the border instead of switching
+   fill, so the page header stays calm. */
+.nr-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease,
+    box-shadow 180ms ease;
+}
+.nr-trigger:hover {
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-canvas) 70%, var(--color-surface));
+}
+.nr-trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+}
+.nr-trigger svg {
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+.nr-trigger:hover svg {
+  color: var(--color-ink);
+}
+
 /* ---------- Animations ---------- */
 @keyframes nr-slide-in-right {
   from { transform: translateX(24px); opacity: 0; }

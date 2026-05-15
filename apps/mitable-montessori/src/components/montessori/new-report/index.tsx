@@ -157,24 +157,12 @@ export function NewReportTrigger() {
     <>
       <button
         type="button"
-        className="tap"
+        className="tap nr-trigger"
         onClick={() => setOpen(true)}
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          border: 0,
-          background: "var(--color-terracotta)",
-          color: "var(--color-surface)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 4px 10px rgba(196,106,79,0.25)",
-          cursor: "pointer",
-        }}
         aria-label="New report"
       >
-        <Plus size={18} strokeWidth={1.5} />
+        <Plus size={14} strokeWidth={2} />
+        <span>New report</span>
       </button>
 
       {!mobile && (
