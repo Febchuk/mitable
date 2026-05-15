@@ -1016,6 +1016,10 @@
 .rrMobileOverlayKebab:hover {
   background: var(--color-muted);
 }
+.rrMobileOverlayKebab[data-active="true"] {
+  background: var(--color-muted);
+  border-color: var(--color-border-strong);
+}
 .rrMobileOverlayTitle {
   flex: 1;
   min-width: 0;
@@ -1050,39 +1054,150 @@
 .rrMobileOverlayBody .rd-page-header {
   padding-top: 18px;
 }
-.rrMobileActions {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px 14px;
-  border-top: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+/* ---------- Kebab popover menu (mobile overlay only) ----------
+   Replaces the old bottom action bar. Anchored under the kebab in the
+   overlay top bar; right edge aligns with the kebab so it stays
+   on-screen on 360px+ widths. */
+.rrKebabScrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 23, 21, 0.3);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 47;
+  animation: rrKebabScrimIn 140ms ease-out both;
 }
-.rrMobileAction {
-  flex: 1;
-  height: 42px;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
+@keyframes rrKebabScrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.rrKebabMenu {
+  position: absolute;
+  top: calc(52px + 4px); /* overlay top bar height + 4px gap */
+  right: 12px;
+  z-index: 48;
+  width: 240px;
+  max-width: calc(100% - 24px);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: var(--color-ink-secondary);
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow:
+    0 24px 48px -16px rgba(43, 38, 34, 0.35),
+    0 6px 14px -6px rgba(43, 38, 34, 0.18);
+  transform-origin: top right;
+  animation: rrKebabMenuIn 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes rrKebabMenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.rrKebabItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-}
-.rrMobileAction:hover {
-  background: var(--color-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-ink);
+  text-align: left;
+  letter-spacing: -0.005em;
+  transition: background 120ms ease, color 120ms ease;
+  width: 100%;
 }
-/* Red treatment reserved for the destructive Delete action. */
-.rrMobileActionDanger {
-  color: var(--color-ink-muted);
+.rrKebabItem:hover,
+.rrKebabItem:focus-visible {
+  background: var(--color-muted);
+  outline: none;
 }
-.rrMobileActionDanger:hover {
-  background: var(--color-terracotta);
+.rrKebabIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--color-ink-secondary);
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.rrKebabLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Primary affordance — Submit for review. Bolder weight + terracotta icon
+   so draft reports nudge teachers toward the next step. */
+.rrKebabItemSend .rrKebabLabel {
+  font-weight: 600;
+}
+.rrKebabItemSend .rrKebabIcon {
+  background: var(--color-terracotta-soft);
+  color: var(--color-terracotta-deep);
+  border-color: transparent;
+}
+
+/* Admin Approve — sage tint to read as the affirmative path. */
+.rrKebabItemApprove .rrKebabIcon {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+  border-color: transparent;
+}
+
+/* Destructive — terracotta text, soft-terracotta hover bg. */
+.rrKebabItemDanger {
+  color: var(--color-terracotta-deep);
+}
+.rrKebabItemDanger .rrKebabIcon {
+  color: var(--color-terracotta-deep);
+}
+.rrKebabItemDanger:hover,
+.rrKebabItemDanger:focus-visible {
+  background: var(--color-terracotta-soft);
+}
+
+/* AI score row — the "icon" slot becomes a tinted score chip (mirrors
+   the desktop rail's score button). */
+.rrKebabScore {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
   color: #fff;
-  border-color: var(--color-terracotta);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  background: var(--color-terracotta-deep);
+}
+.rrKebabScore[data-tone="med"] {
+  background: #b8881a;
+}
+.rrKebabScore[data-tone="high"] {
+  background: var(--color-sage-deep);
 }

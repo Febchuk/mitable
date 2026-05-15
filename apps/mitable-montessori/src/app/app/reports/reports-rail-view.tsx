@@ -22,7 +22,7 @@ import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck } from "@/components/montessori/primitives";
 import { ReportDetail } from "@/components/montessori/report-detail";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
-import { ActionRail, type ActionRailModal } from "./action-rail";
+import { ActionRail, railIcons, scoreToneBand, type ActionRailModal } from "./action-rail";
 import { ReportModalsHost, type ReportModal } from "./report-modals";
 import styles from "./reports-rail.module.css";
 
@@ -673,15 +673,19 @@ function MobileReportOverlay({
   onReportChanged: () => void;
 }) {
   const tone = STATUS_TONE[row.status];
-  const status = row.status;
 
-  // Visibility per row status (mirrors the table baked into ActionRail).
-  const showSend = status === "draft" || status === "changes_requested";
-  const showAdminReview = isAdmin && (status === "submitted_for_review" || status === "in_review");
-  const showDelete =
-    status === "draft" ||
-    status === "changes_requested" ||
-    (isAdmin && (status === "approved" || status === "sent"));
+  // Kebab popover is the single source for every action on mobile — replaces
+  // the old bottom action bar, which crowded 4–6 icons in a flat strip and
+  // gave the kebab nothing meaningful to do.
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
+  const handlePick = React.useCallback(
+    (m: ActionRailModal) => {
+      setMenuOpen(false);
+      onOpenModal(m);
+    },
+    [onOpenModal]
+  );
 
   return (
     <>
@@ -712,8 +716,11 @@ function MobileReportOverlay({
           <button
             type="button"
             className={`${styles.rrMobileOverlayKebab} tap`}
-            aria-label="More options"
-            onClick={() => onOpenModal("history")}
+            aria-label="Report actions"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            data-active={menuOpen ? "true" : "false"}
+            onClick={() => setMenuOpen((v) => !v)}
           >
             <MoreVertical size={17} strokeWidth={1.8} />
           </button>
@@ -737,64 +744,166 @@ function MobileReportOverlay({
           )}
         </div>
 
-        <div className={styles.rrMobileActions}>
+        {menuOpen && (
+          <KebabMenu
+            row={row}
+            isAdmin={isAdmin}
+            onClose={() => setMenuOpen(false)}
+            onPick={handlePick}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Compact popover anchored under the overlay's kebab button. Source of every
+ * action on mobile: the same set as the desktop right rail, in the same order
+ * (Score · Preview · History · Submit · Approve · Request changes · Delete),
+ * each visible per `railIcons(row.status, isAdmin)`. Closes on outside click,
+ * row click, or Escape; locks body scroll while open.
+ */
+function KebabMenu({
+  row,
+  isAdmin,
+  onClose,
+  onPick,
+}: {
+  row: ReportListRow;
+  isAdmin: boolean;
+  onClose: () => void;
+  onPick: (m: ActionRailModal) => void;
+}) {
+  const actions = railIcons(row.status, isAdmin);
+  const showPreview = actions.includes("preview");
+  const showHistory = actions.includes("history");
+  const showSend = actions.includes("send");
+  const showApprove = actions.includes("approve");
+  const showRequestChanges = actions.includes("request_changes");
+  const showDelete = actions.includes("delete");
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return (
+    <>
+      <div className={styles.rrKebabScrim} role="presentation" onClick={onClose} aria-hidden />
+      <div className={styles.rrKebabMenu} role="menu" aria-label="Report actions">
+        {row.displayScore != null && (
           <button
             type="button"
-            className={`${styles.rrMobileAction} tap`}
-            onClick={() => onOpenModal("preview")}
-            aria-label="Preview PDF"
+            className={`${styles.rrKebabItem} tap`}
+            role="menuitem"
+            onClick={() => onPick("score")}
           >
-            <Eye size={17} strokeWidth={1.8} />
+            <span
+              className={styles.rrKebabScore}
+              data-tone={scoreToneBand(row.displayScore)}
+              aria-hidden
+            >
+              {row.displayScore}
+            </span>
+            <span className={styles.rrKebabLabel}>AI confidence</span>
           </button>
+        )}
+
+        {showPreview && (
           <button
             type="button"
-            className={`${styles.rrMobileAction} tap`}
-            onClick={() => onOpenModal("history")}
-            aria-label="History"
+            className={`${styles.rrKebabItem} tap`}
+            role="menuitem"
+            onClick={() => onPick("preview")}
           >
-            <Clock size={17} strokeWidth={1.8} />
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Eye size={16} strokeWidth={1.8} />
+            </span>
+            <span className={styles.rrKebabLabel}>Preview PDF</span>
           </button>
-          {showSend && (
-            <button
-              type="button"
-              className={`${styles.rrMobileAction} tap`}
-              onClick={() => onOpenModal("send")}
-              aria-label="Submit for review"
-            >
-              <Send size={17} strokeWidth={2} />
-            </button>
-          )}
-          {showAdminReview && (
-            <>
-              <button
-                type="button"
-                className={`${styles.rrMobileAction} tap`}
-                onClick={() => onOpenModal("approve")}
-                aria-label="Approve report"
-              >
-                <Check size={17} strokeWidth={2.2} />
-              </button>
-              <button
-                type="button"
-                className={`${styles.rrMobileAction} tap`}
-                onClick={() => onOpenModal("request_changes")}
-                aria-label="Request changes"
-              >
-                <RotateCcw size={17} strokeWidth={1.8} />
-              </button>
-            </>
-          )}
-          {showDelete && (
-            <button
-              type="button"
-              className={`${styles.rrMobileAction} ${styles.rrMobileActionDanger} tap`}
-              onClick={() => onOpenModal("delete")}
-              aria-label="Delete report"
-            >
-              <Trash2 size={17} strokeWidth={1.8} />
-            </button>
-          )}
-        </div>
+        )}
+
+        {showHistory && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} tap`}
+            role="menuitem"
+            onClick={() => onPick("history")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Clock size={16} strokeWidth={1.8} />
+            </span>
+            <span className={styles.rrKebabLabel}>History</span>
+          </button>
+        )}
+
+        {showSend && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} ${styles.rrKebabItemSend} tap`}
+            role="menuitem"
+            onClick={() => onPick("send")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Send size={16} strokeWidth={2} />
+            </span>
+            <span className={styles.rrKebabLabel}>Submit for review</span>
+          </button>
+        )}
+
+        {showApprove && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} ${styles.rrKebabItemApprove} tap`}
+            role="menuitem"
+            onClick={() => onPick("approve")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Check size={16} strokeWidth={2.2} />
+            </span>
+            <span className={styles.rrKebabLabel}>Approve</span>
+          </button>
+        )}
+
+        {showRequestChanges && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} tap`}
+            role="menuitem"
+            onClick={() => onPick("request_changes")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <RotateCcw size={16} strokeWidth={1.8} />
+            </span>
+            <span className={styles.rrKebabLabel}>Request changes</span>
+          </button>
+        )}
+
+        {showDelete && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} ${styles.rrKebabItemDanger} tap`}
+            role="menuitem"
+            onClick={() => onPick("delete")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Trash2 size={16} strokeWidth={1.8} />
+            </span>
+            <span className={styles.rrKebabLabel}>Delete report</span>
+          </button>
+        )}
       </div>
     </>
   );
