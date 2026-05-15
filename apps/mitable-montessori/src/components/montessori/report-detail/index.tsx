@@ -4,12 +4,12 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
 import { ToastBus } from "../primitives";
-import { ChatPane, type ChatPaneHandle } from "./chat-pane";
 import { ReportPane } from "./report-pane";
 import { ReportTopBar } from "./top-bar";
-import { useMediaQuery } from "./use-media-query";
+import { ViewModeToggle, type ViewMode } from "./view-mode-toggle";
+import { PdfPreviewPane } from "./pdf-preview-pane";
+import { localDetailToPdfData } from "@/lib/pdf/local-detail-to-pdf-data";
 import "./report-detail.css";
-import { MessageSquare, Sparkles, X } from "lucide-react";
 import {
   clearStoredDraftCapture,
   readStoredDraftCapture,
@@ -137,6 +137,10 @@ export function ReportDetail({
   backToReportsHref = "/app/reports",
   isAdmin: isAdminProp = false,
   hideBackLink = false,
+  hideTopBarActions = false,
+  hideTopBar = false,
+  viewMode: viewModeProp,
+  onViewModeChange,
   variant,
   onReportChanged,
 }: {
@@ -146,6 +150,17 @@ export function ReportDetail({
   isAdmin?: boolean;
   /** When true (embedded in the rail view), suppresses the back-link and post-delete nav. */
   hideBackLink?: boolean;
+  /** When true, suppresses the top-bar inline action buttons. The rail-view owns these via its action rail + modals — without this we get two Submit / Delete buttons stacked next to each other. */
+  hideTopBarActions?: boolean;
+  /** When true, removes the entire ReportTopBar (back link, avatar, title, status pill, meta row, view-mode toggle). The rail-view passes this so the list rail's selected row already communicates which report is open. PDF preview swaps in-place via the action-rail toggle in this mode. */
+  hideTopBar?: boolean;
+  /** Controlled view mode. When provided, the parent owns the editor/preview
+   *  state (the rail-view does this so its action-rail toggle button drives
+   *  what's rendered here). When omitted, ReportDetail manages it itself
+   *  via the in-bar segmented toggle. */
+  viewMode?: ViewMode;
+  /** Paired with `viewMode` for controlled mode. */
+  onViewModeChange?: (next: ViewMode) => void;
   /** String alias for isAdmin — "admin" ⇒ isAdmin. Existing callers can keep using isAdmin directly. */
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
@@ -375,239 +390,6 @@ export function ReportDetail({
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty, isSaving]);
 
-  // ----- Phase 3: chat-driven proposal apply + discuss-from-paragraph -----
-  const chatPaneRef = React.useRef<ChatPaneHandle>(null);
-
-  /** Mutate the report's local state when chat applies a proposal or undo. */
-  const onApplyProposalFromChat = React.useCallback(
-    (args: { sectionId: string; paragraphId: string; newText: string }) => {
-      setDetail((prev) => {
-        const sections = prev.sections.map((section) => {
-          if (section.id !== args.sectionId) return section;
-          const paragraphs = section.paragraphs.map((p) =>
-            p.id === args.paragraphId ? { ...p, html: args.newText } : p
-          );
-          return { ...section, paragraphs };
-        });
-        const next = { ...prev, sections };
-        setIsDirty(true);
-        queueSave(next);
-        return next;
-      });
-    },
-    [queueSave]
-  );
-
-  /** Called when the user clicks "Discuss" on a paragraph. Seeds the chat scope. */
-  const onDiscussParagraph = React.useCallback(
-    (sectionId: string, paragraphId: string) => {
-      const section = detail.sections.find((s) => s.id === sectionId);
-      const heading = section?.heading;
-      chatPaneRef.current?.seedTurn({
-        targetRef: { sectionId, paragraphId },
-        targetLabel: heading ? `${heading} paragraph` : "this paragraph",
-      });
-    },
-    [detail.sections]
-  );
-
-  // ----- Phase 4: ghost edits + obs-ref pull-in -----
-
-  /** Tracks which originating chat-message id seeded each section's ghost so
-   *  Accept/Reject can post the editorial action to the right row. */
-  const ghostMessageIdsRef = React.useRef(new Map<string, string>());
-
-  /**
-   * Chat agent emitted a new-section — splice into detail.sections at the
-   * requested position (after `afterSectionId` if provided, otherwise
-   * append). Auto-applies on receipt; dirties the report so the debounced
-   * PATCH picks it up. Posts to /applied so the chat row records that the
-   * change landed.
-   */
-  const onApplyNewSection = React.useCallback(
-    ({
-      sectionId,
-      heading,
-      paragraphs,
-      afterSectionId,
-      messageId,
-    }: {
-      sectionId: string;
-      heading: string;
-      paragraphs: { id: string; html: string }[];
-      afterSectionId?: string;
-      messageId: string;
-    }) => {
-      setDetail((prev) => {
-        // Idempotent: skip if a section with this id already exists (the
-        // auto-apply effect can fire twice in strict mode).
-        if (prev.sections.some((s) => s.id === sectionId)) return prev;
-        const newSection = { id: sectionId, heading, paragraphs };
-        let sections: typeof prev.sections;
-        if (afterSectionId) {
-          const idx = prev.sections.findIndex((s) => s.id === afterSectionId);
-          if (idx >= 0) {
-            sections = [
-              ...prev.sections.slice(0, idx + 1),
-              newSection,
-              ...prev.sections.slice(idx + 1),
-            ];
-          } else {
-            sections = [...prev.sections, newSection];
-          }
-        } else {
-          sections = [...prev.sections, newSection];
-        }
-        const next = { ...prev, sections };
-        setIsDirty(true);
-        queueSave(next);
-        return next;
-      });
-      void fetch(`/api/v1/reports/${report.id}/chat/messages/${messageId}/applied`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "applied" }),
-      }).catch(() => {
-        // Non-fatal — the local mutation already happened.
-      });
-    },
-    [queueSave, report.id]
-  );
-
-  /** Chat agent emitted a ghost-edit — merge into the section's slot. */
-  const onApplyGhostEdit = React.useCallback(
-    ({
-      sectionId,
-      ghostEdit,
-      messageId,
-    }: {
-      sectionId: string;
-      ghostEdit: { id: string; html: string; sourceLabel: string };
-      messageId?: string;
-    }) => {
-      setDetail((prev) => {
-        const sections = prev.sections.map((s) => (s.id === sectionId ? { ...s, ghostEdit } : s));
-        return { ...prev, sections };
-      });
-      if (messageId) ghostMessageIdsRef.current.set(sectionId, messageId);
-    },
-    []
-  );
-
-  const recordGhostAction = React.useCallback(
-    async (
-      messageId: string,
-      action: "applied" | "dismissed",
-      appliedTo?: { sectionId: string; paragraphId: string; before: string; after: string }
-    ) => {
-      try {
-        await fetch(`/api/v1/reports/${report.id}/chat/messages/${messageId}/applied`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action, appliedTo }),
-        });
-      } catch {
-        // Non-fatal — the local mutation already happened.
-      }
-    },
-    [report.id]
-  );
-
-  /** Accept the ghost: append it as a new paragraph and clear the slot. */
-  const onAcceptGhostEdit = React.useCallback(
-    (sectionId: string) => {
-      setDetail((prev) => {
-        const section = prev.sections.find((s) => s.id === sectionId);
-        const ghost = section?.ghostEdit;
-        if (!section || !ghost) return prev;
-        const paragraphId = `p-ghost-${Math.random().toString(36).slice(2, 9)}`;
-        const sections = prev.sections.map((s) => {
-          if (s.id !== sectionId) return s;
-          const { ghostEdit: _drop, ...rest } = s;
-          void _drop;
-          return {
-            ...rest,
-            paragraphs: [...s.paragraphs, { id: paragraphId, html: ghost.html }],
-          };
-        });
-        const next = { ...prev, sections };
-        setIsDirty(true);
-        queueSave(next);
-        const messageId = ghostMessageIdsRef.current.get(sectionId);
-        ghostMessageIdsRef.current.delete(sectionId);
-        if (messageId) {
-          void recordGhostAction(messageId, "applied", {
-            sectionId,
-            paragraphId,
-            before: "",
-            after: ghost.html,
-          });
-        }
-        return next;
-      });
-    },
-    [queueSave, recordGhostAction]
-  );
-
-  /** Dismiss the ghost: clear the slot. */
-  const onDismissGhostEdit = React.useCallback(
-    (sectionId: string) => {
-      setDetail((prev) => {
-        const sections = prev.sections.map((s) => {
-          if (s.id !== sectionId) return s;
-          const { ghostEdit: _drop, ...rest } = s;
-          void _drop;
-          return rest;
-        });
-        const next = { ...prev, sections };
-        // No PATCH needed — ghostEdit lives only in client state, never persisted.
-        return next;
-      });
-      const messageId = ghostMessageIdsRef.current.get(sectionId);
-      ghostMessageIdsRef.current.delete(sectionId);
-      if (messageId) void recordGhostAction(messageId, "dismissed");
-    },
-    [recordGhostAction]
-  );
-
-  /** Chat agent's obs-ref Pull in — append a paragraph with the captured text. */
-  const onPullObservation = React.useCallback(
-    ({
-      text,
-      suggestedTarget,
-    }: {
-      text: string;
-      suggestedTarget?: { sectionId: string; position: "append" | "after" | "new-paragraph" };
-    }) => {
-      setDetail((prev) => {
-        // If suggestedTarget points at an existing section, append there.
-        // Otherwise put it in the last section so the teacher can move it.
-        const targetSectionId =
-          suggestedTarget?.sectionId &&
-          prev.sections.some((s) => s.id === suggestedTarget.sectionId)
-            ? suggestedTarget.sectionId
-            : prev.sections[prev.sections.length - 1]?.id;
-        if (!targetSectionId) {
-          ToastBus.push({ message: "Add a section first, then pull observations into it." });
-          return prev;
-        }
-        const paragraphId = `p-obs-${Math.random().toString(36).slice(2, 9)}`;
-        const sections = prev.sections.map((s) =>
-          s.id === targetSectionId
-            ? { ...s, paragraphs: [...s.paragraphs, { id: paragraphId, html: text }] }
-            : s
-        );
-        const next = { ...prev, sections };
-        setIsDirty(true);
-        queueSave(next);
-        return next;
-      });
-    },
-    [queueSave]
-  );
-
   // After draft (router.refresh) or navigation, merge server report into local editor
   // state when the user isn't mid-edit.
   //
@@ -638,32 +420,20 @@ export function ReportDetail({
 
   const [actionBusy, setActionBusy] = React.useState(false);
   const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
+  const [internalViewMode, setInternalViewMode] = React.useState<ViewMode>("editor");
+  const viewMode = viewModeProp ?? internalViewMode;
+  const setViewMode = React.useCallback(
+    (next: ViewMode) => {
+      if (onViewModeChange) onViewModeChange(next);
+      if (viewModeProp === undefined) setInternalViewMode(next);
+    },
+    [onViewModeChange, viewModeProp]
+  );
 
-  // Mobile-only: ChatPane lives inside this bottom sheet on <lg. The desktop
-  // split-view ChatPane and the mobile sheet ChatPane are mutually exclusive
-  // (gated by useMediaQuery below) so the chat thread only ever has one mount.
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
-  const [mobileChatOpen, setMobileChatOpen] = React.useState(false);
-
-  // Esc closes the mobile chat sheet.
-  React.useEffect(() => {
-    if (!mobileChatOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobileChatOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [mobileChatOpen]);
-
-  // Lock body scroll while the mobile chat sheet is up.
-  React.useEffect(() => {
-    if (!mobileChatOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mobileChatOpen]);
+  const pdfData = React.useMemo(
+    () => localDetailToPdfData({ title: detail.title, sections: detail.sections }, report),
+    [detail.title, detail.sections, report]
+  );
 
   const savedMeta = isSaving
     ? SAVING_LABEL
@@ -756,137 +526,60 @@ export function ReportDetail({
 
   return (
     <>
-      <div className="rd-root">
-        <ReportTopBar
-          child={{ name: report.studentName, tone: "clay" }}
-          status={topbarStatus}
-          kind={topbarKind}
-          dayLabel={detail.dayLabel}
-          classroom={detail.classroom}
-          savedMeta={savedMeta}
-          savedMetaDirty={isDirty || isDrafting || isSaving}
-          reportsListHref={hideBackLink ? undefined : backToReportsHref}
-          isAdmin={isAdmin}
-          actionBusy={actionBusy}
-          hasBeenSubmitted={report.hasBeenSubmitted}
-          onBackClick={hideBackLink ? undefined : handleBackClick}
-          onSaveDraft={
-            topbarStatus === "draft"
-              ? () => {
-                  const pending = pendingSaveRef.current;
-                  if (pending) void performSave(pending);
-                  else ToastBus.push({ message: "No changes to save." });
-                }
-              : undefined
-          }
-          onSubmitForReview={
-            topbarStatus === "draft" && !isAdmin ? () => void handleSubmitForReview() : undefined
-          }
-          onApprove={
-            (topbarStatus === "draft" || topbarStatus === "review") && isAdmin
-              ? () => void handleApprove()
-              : undefined
-          }
-          onSendToParents={topbarStatus === "approved" && isAdmin ? handleSendToParents : undefined}
-          onDeleteClick={() => setDeleteDialogOpen(true)}
-        />
+      <div className="rd-root" data-no-topbar={hideTopBar ? "true" : "false"}>
+        {hideTopBar ? null : (
+          <ReportTopBar
+            child={{ name: report.studentName, tone: "clay" }}
+            status={topbarStatus}
+            kind={topbarKind}
+            dayLabel={detail.dayLabel}
+            classroom={detail.classroom}
+            savedMeta={savedMeta}
+            savedMetaDirty={isDirty || isDrafting || isSaving}
+            reportsListHref={hideBackLink ? undefined : backToReportsHref}
+            isAdmin={isAdmin}
+            actionBusy={actionBusy}
+            hasBeenSubmitted={report.hasBeenSubmitted}
+            viewModeSlot={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
+            hideActions={hideTopBarActions}
+            onBackClick={hideBackLink ? undefined : handleBackClick}
+            onSaveDraft={
+              topbarStatus === "draft"
+                ? () => {
+                    const pending = pendingSaveRef.current;
+                    if (pending) void performSave(pending);
+                    else ToastBus.push({ message: "No changes to save." });
+                  }
+                : undefined
+            }
+            onSubmitForReview={
+              topbarStatus === "draft" && !isAdmin ? () => void handleSubmitForReview() : undefined
+            }
+            onApprove={
+              (topbarStatus === "draft" || topbarStatus === "review") && isAdmin
+                ? () => void handleApprove()
+                : undefined
+            }
+            onSendToParents={
+              topbarStatus === "approved" && isAdmin ? handleSendToParents : undefined
+            }
+            onDeleteClick={() => setDeleteDialogOpen(true)}
+          />
+        )}
         <div className="rd-workspace">
           <div className="rd-split">
-            {isDesktop ? (
-              <ChatPane
-                ref={chatPaneRef}
-                reportId={report.id}
-                sections={detail.sections}
-                flushPendingSave={flushPendingSave}
-                onApplyProposal={onApplyProposalFromChat}
-                onPullObservation={onPullObservation}
-                onApplyGhostEdit={onApplyGhostEdit}
-                onApplyNewSection={onApplyNewSection}
+            <div className={viewMode === "editor" ? "rd-pane-wrap" : "rd-pane-wrap rd-pane-hidden"}>
+              <ReportPane
+                detail={detail}
+                onChange={onChange}
+                isDrafting={isDrafting}
+                onCancelDrafting={cancelDraftGeneration}
               />
-            ) : null}
-            <ReportPane
-              detail={detail}
-              onChange={onChange}
-              isDrafting={isDrafting}
-              onCancelDrafting={cancelDraftGeneration}
-              onDiscussParagraph={onDiscussParagraph}
-              onAcceptGhostEdit={onAcceptGhostEdit}
-              onDismissGhostEdit={onDismissGhostEdit}
-            />
+            </div>
+            {viewMode === "preview" && <PdfPreviewPane data={pdfData} />}
           </div>
         </div>
       </div>
-
-      {/*
-        Mobile (<lg): the report editor's report-scoped chat lives in a bottom
-        sheet, opened by a terracotta FAB. The MontessoriMobileShell hides its
-        own generic FAB on report-detail routes so there's only one FAB on screen.
-        ChatPane is lazy-mounted only when the sheet is open the first time, so
-        we don't load /api/v1/reports/{id}/chat on every report visit.
-      */}
-      {!isDesktop && (
-        <>
-          <button
-            type="button"
-            className="lg:hidden tap rd-mobile-fab"
-            onClick={() => setMobileChatOpen(true)}
-            aria-label="Open report chat"
-            aria-hidden={mobileChatOpen}
-            data-hidden={mobileChatOpen ? "true" : "false"}
-          >
-            <MessageSquare size={22} strokeWidth={1.8} />
-          </button>
-
-          <div
-            className="lg:hidden rd-mobile-scrim"
-            role="presentation"
-            onClick={() => setMobileChatOpen(false)}
-            aria-hidden={!mobileChatOpen}
-            data-open={mobileChatOpen ? "true" : "false"}
-          />
-
-          <div
-            className="lg:hidden rd-mobile-sheet"
-            role="dialog"
-            aria-label="Report chat"
-            aria-hidden={!mobileChatOpen}
-            data-open={mobileChatOpen ? "true" : "false"}
-          >
-            <div className="rd-mobile-sheet-grabber" aria-hidden />
-            <div className="rd-mobile-sheet-head">
-              <div className="rd-mobile-sheet-head-icon">
-                <Sparkles size={16} strokeWidth={1.6} />
-              </div>
-              <div className="rd-mobile-sheet-head-text">
-                <div className="rd-mobile-sheet-head-title">Report chat</div>
-                <div className="rd-mobile-sheet-head-sub">{report.studentName}</div>
-              </div>
-              <button
-                type="button"
-                className="tap rd-mobile-sheet-close"
-                onClick={() => setMobileChatOpen(false)}
-                aria-label="Close report chat"
-              >
-                <X size={18} strokeWidth={1.6} />
-              </button>
-            </div>
-            <div className="rd-mobile-sheet-body">
-              {mobileChatOpen ? (
-                <ChatPane
-                  ref={chatPaneRef}
-                  reportId={report.id}
-                  sections={detail.sections}
-                  flushPendingSave={flushPendingSave}
-                  onApplyProposal={onApplyProposalFromChat}
-                  onPullObservation={onPullObservation}
-                  onApplyGhostEdit={onApplyGhostEdit}
-                  onApplyNewSection={onApplyNewSection}
-                />
-              ) : null}
-            </div>
-          </div>
-        </>
-      )}
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="border-ink/10 bg-canvas">

@@ -1,4 +1,4 @@
-import { listReports } from "@/lib/queries/reports";
+import { listReportsV2 } from "@/lib/queries/reports";
 import { ReportsRailView } from "@/app/app/reports/reports-rail-view";
 
 // Future split-view workspace UI archived at ./PHASE_8_FUTURE_WORKSPACE.md
@@ -14,7 +14,7 @@ export default async function AdminReportsPage({
   const openParam =
     typeof rawOpen === "string" ? rawOpen : Array.isArray(rawOpen) ? rawOpen[0] : undefined;
 
-  const reports = await listReports();
+  const reports = await listReportsV2();
   const initialOpenReportId =
     openParam && reports.some((r) => r.id === openParam) ? openParam : null;
   return (

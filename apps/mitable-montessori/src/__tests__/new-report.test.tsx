@@ -33,6 +33,8 @@ const TEMPLATES: ReportTemplate[] = [
     description: "Morning · Language · Math · Afternoon · Social",
     kind: "Daily",
     sections: ["Morning", "Language", "Math", "Afternoon", "Social"],
+    sectionMeta: {},
+    logoUrl: null,
     iconTone: "clay",
   },
 ];
@@ -49,7 +51,7 @@ const baseProps = {
 };
 
 describe("NewReportSheet", () => {
-  it("renders with a disabled CTA until child + type are picked", () => {
+  it("renders with a disabled CTA until child + template are picked", () => {
     render(<NewReportSheet open={true} onClose={() => {}} onSubmit={() => {}} {...baseProps} />);
     expect(screen.getByRole("dialog", { name: /start a report/i })).toBeTruthy();
     const cta = screen.getByRole("button", { name: /start drafting/i }) as HTMLButtonElement;
@@ -65,30 +67,27 @@ describe("NewReportSheet", () => {
     expect(screen.queryByText("Bea Chen")).toBeNull();
   });
 
-  it("submits payload with child, kind, optional template", () => {
+  it("submits payload with child + template (kind derives from template)", () => {
     const onSubmit = vi.fn<(payload: NewReportPayload) => void>();
     render(<NewReportSheet open={true} onClose={() => {}} onSubmit={onSubmit} {...baseProps} />);
 
+    // Pick child
     const search = screen.getByLabelText("Search children") as HTMLInputElement;
     fireEvent.focus(search);
     fireEvent.change(search, { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: /Ada Okafor/ }));
 
-    fireEvent.click(screen.getByRole("button", { name: /^Daily/ }));
+    // Pick template — list is rendered immediately (no two-step accordion)
+    fireEvent.click(screen.getByRole("radio", { name: /Sunflower daily/i }));
 
-    fireEvent.click(screen.getByRole("button", { name: /Pick a template/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Sunflower daily/i }));
-
+    // Submit
     fireEvent.click(screen.getByRole("button", { name: /start drafting/i }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     const payload = onSubmit.mock.calls[0][0];
     expect(payload.childId).toBe("ada");
-    expect(payload.kind).toBe("Daily");
     expect(payload.templateId).toBe(TEMPLATES[0].id);
-    expect(payload.audio).toBeNull();
-    expect(payload.notes).toEqual([]);
-    expect(payload.captureOnly).toBe(false);
+    expect(payload.kind).toBe("Daily");
   });
 
   it("does not render when open is false", () => {

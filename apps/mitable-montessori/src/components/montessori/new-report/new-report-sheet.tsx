@@ -1,20 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, LayoutTemplate, X } from "lucide-react";
 import { ChildPicker, type PickerChild } from "./child-picker";
-import { TypePicker } from "./type-picker";
-import { AudioOptCard } from "./audio-block";
-import { NotesOptCard } from "./notes-block";
-import { TemplateOptCard } from "./template-block";
-import { useAudioRecorder } from "./use-audio-recorder";
-import {
-  formatDuration,
-  type CapturedNote,
-  type NewReportPayload,
-  type ReportKind,
-  type ReportTemplate,
-} from "./mock-data";
+import { TemplatePicker, TemplatePreview } from "./template-block";
+import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
 type CapturedToday = Record<string, { voice: number; photos: number }>;
 
@@ -36,12 +26,10 @@ export function NewReportSheet({
   submitting?: boolean;
 }) {
   const [child, setChild] = React.useState<PickerChild | null>(null);
-  const [kind, setKind] = React.useState<ReportKind | null>(null);
-  const [notes, setNotes] = React.useState<CapturedNote[]>([]);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
-  const [captureOnly, setCaptureOnly] = React.useState(false);
-
-  const recorder = useAudioRecorder();
+  // Highlighted template drives the right-side preview. When something is
+  // selected, that's the highlight; otherwise hover/focus on a row sets it.
+  const [highlight, setHighlight] = React.useState<ReportTemplate | null>(null);
 
   // Close on Escape
   React.useEffect(() => {
@@ -57,146 +45,104 @@ export function NewReportSheet({
   React.useEffect(() => {
     if (open) {
       setChild(null);
-      setKind(null);
-      setNotes([]);
       setTemplate(null);
-      setCaptureOnly(false);
-      recorder.clear();
+      setHighlight(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!open) return null;
 
-  const canStart = !!child && !!kind && recorder.state !== "recording" && !submitting;
-  const isRecording = recorder.state === "recording";
+  const canStart = !!child && !!template && !submitting;
+  const previewed = template ?? highlight;
 
   const submit = () => {
-    if (!child || !kind) return;
+    if (!child || !template) return;
     onSubmit({
       childId: child.id,
-      kind,
-      audio: recorder.memo,
-      notes,
-      templateId: template?.id ?? null,
-      captureOnly,
+      kind: template.kind,
+      templateId: template.id,
     });
   };
 
-  const summary = (
-    <NrSummary
-      child={child}
-      kind={kind}
-      audioDuration={recorder.memo?.durationSec ?? null}
-      isRecording={isRecording}
-      noteCount={notes.length}
-      templateName={template?.name ?? null}
-      captureOnly={captureOnly}
-    />
-  );
-
   return (
     <>
-      <div className="nr-scrim" onClick={() => !isRecording && onClose()} />
+      <div className="nr-scrim" onClick={onClose} />
       <aside className="nr-sheet" role="dialog" aria-modal="true" aria-labelledby="nr-sheet-title">
         <header className="nr-head">
           <span className="nr-crest">A new report ✿</span>
           <div style={{ marginTop: 4, minWidth: 0 }}>
             <h2 id="nr-sheet-title">Start a report</h2>
-            <p>
-              Pick a child and a type. Add audio, handwritten notes, or a template — or hand it all
-              to the assistant.
-            </p>
+            <p>Pick a child and a template — the assistant drafts the empty form for you.</p>
           </div>
           <button type="button" className="nr-close" onClick={onClose} aria-label="Close">
             <X size={16} strokeWidth={2} />
           </button>
         </header>
 
-        <div className="nr-body scroll-quiet">
-          <div className="nr-field">
-            <div className="nr-field-label">
-              <span className="nr-label-cap">Child</span>
-              <span className="nr-req">required</span>
-            </div>
-            <ChildPicker
-              value={child}
-              onChange={setChild}
-              roster={roster}
-              capturedToday={capturedToday}
-            />
-          </div>
-
-          <div className="nr-field">
-            <div className="nr-field-label">
-              <span className="nr-label-cap">Report type</span>
-              <span className="nr-req">required</span>
-            </div>
-            <TypePicker value={kind} onChange={setKind} variant="grid" />
-          </div>
-
-          <div className="nr-field">
-            <div className="nr-with-hand-label">
-              <span className="nr-label-cap">Optional · capture</span>
-              <span className="nr-hand">skip if you&rsquo;d rather just talk</span>
-            </div>
-
-            <div className="nr-opt-grid">
-              <AudioOptCard
-                state={recorder.state}
-                elapsed={recorder.elapsed}
-                memo={recorder.memo}
-                onStart={recorder.start}
-                onStop={recorder.stop}
-                onClear={recorder.clear}
+        <div className="nr-body nr-body-2col scroll-quiet">
+          <div className="nr-body-form">
+            <div className="nr-field">
+              <div className="nr-field-label">
+                <span className="nr-label-cap">Child</span>
+                <span className="nr-req">required</span>
+              </div>
+              <ChildPicker
+                value={child}
+                onChange={setChild}
+                roster={roster}
+                capturedToday={capturedToday}
               />
-              <NotesOptCard
-                notes={notes}
-                onAdd={(n) => setNotes((prev) => [...prev, ...n])}
-                onRemove={(id) => {
-                  setNotes((prev) => {
-                    const target = prev.find((x) => x.id === id);
-                    if (target) URL.revokeObjectURL(target.url);
-                    return prev.filter((x) => x.id !== id);
-                  });
-                }}
+            </div>
+
+            <div className="nr-field">
+              <div className="nr-field-label">
+                <span className="nr-label-cap">Template</span>
+                <span className="nr-req">required</span>
+              </div>
+              <TemplatePicker
+                selected={template}
+                onPick={setTemplate}
+                onHighlight={setHighlight}
+                templates={templates}
               />
-              <TemplateOptCard selected={template} onPick={setTemplate} templates={templates} />
             </div>
           </div>
+
+          <aside className="nr-body-preview" aria-label="Template preview">
+            {previewed ? (
+              <TemplatePreview template={previewed} child={child} locked={!!template} />
+            ) : (
+              <div className="nr-preview-placeholder">
+                <span className="nr-preview-placeholder-icon" aria-hidden>
+                  <LayoutTemplate size={18} strokeWidth={1.6} />
+                </span>
+                <div className="nr-preview-placeholder-title">Preview the empty form</div>
+                <div className="nr-preview-placeholder-sub">
+                  Hover or pick a template on the left to see the sections the assistant will fill
+                  in.
+                </div>
+              </div>
+            )}
+          </aside>
         </div>
 
-        <footer className="nr-foot">
-          <div className="nr-foot-capture">
-            <label className="nr-capture-only-label nr-capture-only-label--footer">
-              <input
-                type="checkbox"
-                checked={captureOnly}
-                onChange={(e) => setCaptureOnly(e.target.checked)}
-              />
-              <span>
-                <span className="nr-capture-only-kicker">Standalone report</span>
-                First draft only uses your voice or image to write the report. Saved observations
-                and tracked progress for the child won&apos;t be included.
-              </span>
-            </label>
+        <footer className="nr-foot nr-foot-simple">
+          <div className="nr-foot-meta">
+            <NrSummary child={child} template={template} />
           </div>
-          <div className="nr-foot-actions">
-            <div className="nr-foot-meta">{summary}</div>
-            <div className="nr-foot-buttons">
-              <button type="button" className="nr-btn nr-btn-ghost" onClick={onClose}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="nr-btn nr-btn-primary"
-                disabled={!canStart}
-                onClick={submit}
-              >
-                {submitting ? "Starting…" : "Start drafting"}
-                <ArrowRight size={14} strokeWidth={2.5} />
-              </button>
-            </div>
+          <div className="nr-foot-buttons">
+            <button type="button" className="nr-btn nr-btn-ghost" onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="nr-btn nr-btn-primary"
+              disabled={!canStart}
+              onClick={submit}
+            >
+              {submitting ? "Starting…" : "Start drafting"}
+              <ArrowRight size={14} strokeWidth={2.5} />
+            </button>
           </div>
         </footer>
       </aside>
@@ -206,34 +152,18 @@ export function NewReportSheet({
 
 function NrSummary({
   child,
-  kind,
-  audioDuration,
-  isRecording,
-  noteCount,
-  templateName,
-  captureOnly,
+  template,
 }: {
   child: PickerChild | null;
-  kind: ReportKind | null;
-  audioDuration: number | null;
-  isRecording: boolean;
-  noteCount: number;
-  templateName: string | null;
-  captureOnly: boolean;
+  template: ReportTemplate | null;
 }) {
-  if (!child || !kind) return <span>Pick a child and a type to start.</span>;
-
-  const pieces: string[] = [`${child.name.split(" ")[0]} · ${kind}`];
-  if (isRecording) pieces.push("recording…");
-  else if (audioDuration != null) pieces.push(formatDuration(audioDuration));
-  if (noteCount > 0) pieces.push(`${noteCount} note${noteCount === 1 ? "" : "s"}`);
-  if (templateName) pieces.push(templateName);
-  if (captureOnly) pieces.push("standalone");
-
+  if (!child || !template) return <span>Pick a child and a template to start.</span>;
   return (
     <span>
-      <b>{pieces[0]}</b>
-      {pieces.length > 1 && ` · ${pieces.slice(1).join(" · ")}`}
+      <b>
+        {child.name.split(" ")[0]} · {template.kind}
+      </b>
+      {` · ${template.name}`}
     </span>
   );
 }

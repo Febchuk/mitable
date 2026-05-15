@@ -12,6 +12,9 @@ export type ReportTemplate = {
   sections: string[];
   sectionMeta: SectionMeta;
   iconTone: "clay" | "butter" | "blue" | "sage";
+  /** School-uploaded logo printed on the parent-facing PDF. Null when the
+   *  admin hasn't uploaded one. */
+  logoUrl: string | null;
   isActive: boolean;
 };
 
@@ -24,7 +27,7 @@ export async function listTemplates(): Promise<ReportTemplate[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("report_templates")
-    .select("id, name, description, kind, sections, section_meta, icon_tone, is_active")
+    .select("id, name, description, kind, sections, section_meta, icon_tone, logo_url, is_active")
     .eq("school_id", ctx.schoolId)
     .eq("is_active", true)
     .order("created_at", { ascending: true });
@@ -40,6 +43,7 @@ export async function listTemplates(): Promise<ReportTemplate[]> {
     sections: (row.sections as string[] | null) ?? [],
     sectionMeta: (row.section_meta as SectionMeta | null) ?? {},
     iconTone: row.icon_tone as ReportTemplate["iconTone"],
+    logoUrl: (row.logo_url as string | null) ?? null,
     isActive: row.is_active as boolean,
   }));
 }

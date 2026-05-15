@@ -1,14 +1,31 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, Sparkles } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  FileText,
+  MoreVertical,
+  Pencil,
+  RotateCcw,
+  Send,
+  Trash2,
+} from "lucide-react";
 import { initialsFor, type Tone } from "@/components/montessori/data";
-import type { ReportDetail as ReportDetailRow, ReportListRow } from "@/lib/queries/reports";
-import { FilterChips, PageHeader } from "@/components/montessori/page-header";
+import type {
+  ReportDetail as ReportDetailRow,
+  ReportListRowV2 as ReportListRow,
+} from "@/lib/queries/reports";
+import { PageHeader } from "@/components/montessori/page-header";
 import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck } from "@/components/montessori/primitives";
 import { ReportDetail } from "@/components/montessori/report-detail";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
+import { ActionRail, railIcons, scoreToneBand, type ActionRailModal } from "./action-rail";
+import type { ViewMode } from "@/components/montessori/report-detail/view-mode-toggle";
+import { ReportModalsHost, type ReportModal } from "./report-modals";
 import styles from "./reports-rail.module.css";
 
 const STATUS_TONE: Record<
@@ -62,6 +79,31 @@ function formatWhen(row: ReportListRow, locale: string): string {
   return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
+/** Short relative time ("12m", "3h", "yesterday", "May 7"). Mirrors the
+ *  prototype's row meta voice — compact, no padding, no commas. */
+function formatRelative(iso: string | null | undefined, locale: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(diffMs / 3_600_000);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(diffMs / 86_400_000);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d`;
+  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+}
+
+/** Map AI score to a green / amber / red tone for the completeness bar. */
+function scoreTone(score: number): "high" | "med" | "low" {
+  if (score >= 85) return "high";
+  if (score >= 60) return "med";
+  return "low";
+}
+
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
 function toneFor(id: string): Tone {
   let h = 0;
@@ -69,7 +111,21 @@ function toneFor(id: string): Tone {
   return TONES[h % TONES.length];
 }
 
-const FILTERS = ["All", "Drafts", "Awaiting review", "Sent", "Daily", "Major", "Incident"];
+/** Status filter is fixed to the four lifecycle buckets in the prototype. */
+type StatusFilter = "drafts" | "review" | "approved" | "sent";
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: "drafts", label: "Drafts" },
+  { id: "review", label: "In Review" },
+  { id: "approved", label: "Approved" },
+  { id: "sent", label: "Sent" },
+];
+
+function statusBucket(status: ReportListRow["status"]): StatusFilter {
+  if (status === "draft" || status === "changes_requested") return "drafts";
+  if (status === "submitted_for_review" || status === "in_review") return "review";
+  if (status === "approved") return "approved";
+  return "sent";
+}
 
 const ALL_CLASSROOMS = "__ALL__";
 
@@ -77,7 +133,7 @@ function firstSelectableReportId(
   rows: ReportListRow[],
   variant: "teacher" | "admin",
   classroomScope: string,
-  filter: string
+  filter: StatusFilter
 ): string | null {
   const isAdmin = variant === "admin";
   const scoped =
@@ -87,18 +143,8 @@ function firstSelectableReportId(
   return applyFilter(scoped, filter)[0]?.id ?? null;
 }
 
-function applyFilter(rows: ReportListRow[], filter: string): ReportListRow[] {
-  return rows.filter((r) => {
-    if (filter === "All") return true;
-    if (filter === "Drafts") return r.status === "draft";
-    if (filter === "Awaiting review")
-      return r.status === "submitted_for_review" || r.status === "in_review";
-    if (filter === "Sent") return r.status === "sent" || r.status === "approved";
-    if (filter === "Daily") return r.reportType === "daily";
-    if (filter === "Major") return r.reportType === "major";
-    if (filter === "Incident") return r.reportType === "incident";
-    return true;
-  });
+function applyFilter(rows: ReportListRow[], filter: StatusFilter): ReportListRow[] {
+  return rows.filter((r) => statusBucket(r.status) === filter);
 }
 
 export function ReportsRailView({
@@ -130,7 +176,7 @@ export function ReportsRailView({
   }, [reports]);
 
   const [classroomScope, setClassroomScope] = React.useState<string>(ALL_CLASSROOMS);
-  const [filter, setFilter] = React.useState("All");
+  const [filter, setFilter] = React.useState<StatusFilter>("drafts");
 
   const scopedReports = React.useMemo(() => {
     if (!isAdmin || classroomScope === ALL_CLASSROOMS) return reports;
@@ -144,12 +190,14 @@ export function ReportsRailView({
     if (initialOpenReportId && reports.some((r) => r.id === initialOpenReportId)) {
       return initialOpenReportId;
     }
-    return firstSelectableReportId(reports, variant, ALL_CLASSROOMS, "All");
+    return firstSelectableReportId(reports, variant, ALL_CLASSROOMS, "drafts");
   });
 
   React.useEffect(() => {
-    if (!initialOpenReportId || !reports.some((r) => r.id === initialOpenReportId)) return;
-    setFilter("All");
+    if (!initialOpenReportId) return;
+    const target = reports.find((r) => r.id === initialOpenReportId);
+    if (!target) return;
+    setFilter(statusBucket(target.status));
     if (isAdmin) setClassroomScope(ALL_CLASSROOMS);
     setSelectedId(initialOpenReportId);
   }, [initialOpenReportId, reports, isAdmin]);
@@ -267,15 +315,83 @@ export function ReportsRailView({
       });
   }, []);
 
-  const drafts = scopedReports.filter((r) => r.status === "draft").length;
-  const awaiting = scopedReports.filter(
-    (r) => r.status === "submitted_for_review" || r.status === "in_review"
-  ).length;
-  const sent = scopedReports.filter((r) => r.status === "sent" || r.status === "approved").length;
+  // Per-bucket counts drive both the page-header subtitle and the segmented
+  // status tabs in the rail head, so they stay in sync without re-deriving.
+  const counts = React.useMemo<Record<StatusFilter, number>>(() => {
+    const acc: Record<StatusFilter, number> = {
+      drafts: 0,
+      review: 0,
+      approved: 0,
+      sent: 0,
+    };
+    for (const r of scopedReports) acc[statusBucket(r.status)] += 1;
+    return acc;
+  }, [scopedReports]);
 
   const subtitle = isAdmin
-    ? `${awaiting} awaiting review · ${drafts} drafts · ${sent} sent`
-    : `${drafts} drafts · ${awaiting} awaiting review · ${sent} sent`;
+    ? `${counts.review} in review · ${counts.drafts} drafts · ${counts.approved} approved · ${counts.sent} sent`
+    : `${counts.drafts} drafts · ${counts.review} in review · ${counts.approved} approved · ${counts.sent} sent`;
+
+  /* Modal state — driven by the action rail (desktop) and the bottom action
+     bar (mobile overlay). One state powers both surfaces; the rail-view owns
+     it so the modals live above any layout boundary. */
+  const [modalOpen, setModalOpen] = React.useState<ReportModal>(null);
+  const openModal = React.useCallback((m: ActionRailModal) => setModalOpen(m), []);
+  const closeModal = React.useCallback(() => setModalOpen(null), []);
+
+  /* View mode for the embedded ReportDetail — flipped by the rail's preview
+     toggle (or the mobile kebab's preview row). Reset to "editor" whenever
+     the selected report changes so opening a new row doesn't strand the
+     user on the previous report's preview. */
+  const [viewMode, setViewMode] = React.useState<ViewMode>("editor");
+  React.useEffect(() => {
+    setViewMode("editor");
+  }, [selectedId]);
+
+  /* On mobile, tapping a row opens the report in a full-bleed overlay
+     instead of stacking it below the list. The state is independent from
+     selectedId so closing the overlay doesn't blow away the selection. */
+  const [mobileOverlayOpen, setMobileOverlayOpen] = React.useState(false);
+  const handleRowClick = React.useCallback((id: string) => {
+    setSelectedId(id);
+    setMobileOverlayOpen(true);
+  }, []);
+  const closeMobileOverlay = React.useCallback(() => {
+    setMobileOverlayOpen(false);
+    setModalOpen(null);
+  }, []);
+
+  // Lock body scroll while the mobile overlay is up.
+  React.useEffect(() => {
+    if (!mobileOverlayOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOverlayOpen]);
+
+  // Esc closes the mobile overlay (the modals handle their own Esc via Radix).
+  React.useEffect(() => {
+    if (!mobileOverlayOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && modalOpen === null) closeMobileOverlay();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileOverlayOpen, modalOpen, closeMobileOverlay]);
+
+  // After a server mutation (Submit / Delete), close any open modal, drop
+  // the cached detail for this id, and re-fetch the list via parent. Delete
+  // additionally clears the selection so the list-only mobile view doesn't
+  // get stuck on a gone report.
+  const handleReportChanged = React.useCallback(() => {
+    refreshSelectedDetail();
+    // If the report no longer exists in the list after the next render, the
+    // existing useEffect that watches `filtered` will reset selection.
+  }, [refreshSelectedDetail]);
+
+  const backHref = isAdmin ? "/admin/reports" : "/app/reports";
 
   return (
     <div className={styles.rrRoot}>
@@ -283,28 +399,41 @@ export function ReportsRailView({
         overline={isAdmin ? "Across the school" : "My drafts + approved"}
         title="Reports"
         subtitle={subtitle}
+        actions={!isAdmin ? <NewReportTrigger /> : undefined}
       />
 
       <div className={styles.rrLayout}>
         {/* Left rail — flat reports list */}
         <aside className={styles.rrRail}>
-          <header className={styles.rrRailHeader}>
-            {isAdmin ? (
+          {isAdmin && (
+            <div className={styles.rrAdminScopeRow}>
               <ClassroomScopeSelect
                 value={classroomScope}
                 onChange={setClassroomScope}
                 options={classroomOptions}
               />
-            ) : (
-              <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                All reports
-              </div>
-            )}
-            {!isAdmin && <NewReportTrigger />}
-          </header>
+            </div>
+          )}
 
           <div className={styles.rrFilterBar}>
-            <FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+            <div className={styles.rrTabs} role="tablist" aria-label="Report status">
+              {STATUS_FILTERS.map((t) => {
+                const active = filter === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={`${styles.rrTab} tap`}
+                    data-active={active ? "true" : "false"}
+                    onClick={() => setFilter(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className={styles.rrList}>
@@ -318,7 +447,6 @@ export function ReportsRailView({
               </div>
             ) : (
               filtered.map((r) => {
-                const tone = STATUS_TONE[r.status];
                 const active = r.id === selectedId;
                 return (
                   <button
@@ -326,14 +454,14 @@ export function ReportsRailView({
                     type="button"
                     className={`${styles.rrRow} tap`}
                     data-active={active ? "true" : "false"}
-                    onClick={() => setSelectedId(r.id)}
+                    onClick={() => handleRowClick(r.id)}
                     onMouseEnter={() => prefetchDetail(r.id)}
                     onFocus={() => prefetchDetail(r.id)}
                   >
                     <Avatar
                       initials={initialsFor(r.studentName)}
                       tone={toneFor(r.studentId)}
-                      size={32}
+                      size={36}
                     />
                     <div className={styles.rrRowText}>
                       <div className={styles.rrRowTop}>
@@ -342,15 +470,7 @@ export function ReportsRailView({
                       </div>
                       <div className={styles.rrRowTitle}>{r.title || "Untitled report"}</div>
                       <div className={styles.rrRowMeta}>
-                        <span className={styles.rrRowKind}>{kindLabel(r.reportType)}</span>
-                        <span
-                          className={styles.rrRowStatus}
-                          style={{ background: tone.bg, color: tone.fg }}
-                        >
-                          {tone.sparkle && <Sparkles size={10} strokeWidth={1.5} />}
-                          {tone.sent && <HandCheck color={tone.fg} size={10} />}
-                          {tone.label}
-                        </span>
+                        <RowSignal row={r} bucket={filter} locale={locale} />
                       </div>
                     </div>
                   </button>
@@ -370,6 +490,10 @@ export function ReportsRailView({
               key={detail.id}
               report={detail}
               hideBackLink
+              hideTopBarActions
+              hideTopBar
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
               variant={variant}
               onReportChanged={refreshSelectedDetail}
             />
@@ -398,8 +522,427 @@ export function ReportsRailView({
             </div>
           )}
         </section>
+
+        {/* Action rail (desktop only — CSS hides on <lg). Reads the row’s
+            status from the selected list row so it renders the right
+            icons immediately, even while the detail is still loading. */}
+        {selectedRow ? (
+          <ActionRail
+            status={selectedRow.status}
+            isAdmin={isAdmin}
+            onOpenModal={openModal}
+            aiScore={selectedRow.displayScore}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
+        ) : (
+          <div className={styles.rrActionRail} aria-hidden />
+        )}
       </div>
+
+      {/* Modals (mounted once at the rail level so they sit above either
+          the desktop columns or the mobile overlay). */}
+      {detail && (
+        <ReportModalsHost
+          open={modalOpen}
+          onClose={closeModal}
+          report={detail}
+          isAdmin={isAdmin}
+          onChanged={handleReportChanged}
+          backToReportsHref={backHref}
+        />
+      )}
+
+      {/* Mobile overlay (CSS hides on ≥lg). Shows the report full-bleed
+          when a row is tapped, with a bottom action bar that opens the same
+          modals as the desktop rail. */}
+      {mobileOverlayOpen && selectedRow && (
+        <MobileReportOverlay
+          row={selectedRow}
+          detail={detail}
+          detailLoading={detailLoading}
+          locale={locale}
+          variant={variant}
+          isAdmin={isAdmin}
+          onClose={closeMobileOverlay}
+          onOpenModal={openModal}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onReportChanged={refreshSelectedDetail}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Per-row meta signal — what reads to the right of the kind pill in the
+ * rail's row list. Mirrors the prototype's four bucket modes:
+ *   Drafts    → AI score completeness bar + "edited Xm ago"
+ *   In Review → reviewer tick boxes (✓ ✓ □ + N/total) + "sent Xh"
+ *   Approved  → paper-plane + relative approved time
+ *   Sent      → delivered count + sent-date
+ */
+function RowSignal({
+  row,
+  bucket,
+  locale,
+}: {
+  row: ReportListRow;
+  bucket: StatusFilter;
+  locale: string;
+}) {
+  if (bucket === "drafts") {
+    const tone = scoreTone(row.completenessPercent);
+    return (
+      <span className={`${styles.rrSignal} ${styles.rrSignalCompleteness}`}>
+        <span className={styles.rrCompleteness} data-tone={tone}>
+          <span className={styles.rrCompletenessBar} aria-hidden>
+            <i style={{ width: `${Math.max(0, Math.min(100, row.completenessPercent))}%` }} />
+          </span>
+          <span className={styles.rrCompletenessValue}>{row.completenessPercent}%</span>
+        </span>
+        <span className={styles.rrSignalMeta}>{formatRelative(row.updatedAt, locale)}</span>
+      </span>
+    );
+  }
+
+  if (bucket === "review") {
+    const { approved, total } = row.reviewerTicks;
+    const ticks = total > 0 ? total : 1;
+    return (
+      <span className={`${styles.rrSignal} ${styles.rrSignalTicks}`}>
+        <span className={styles.rrTicks} aria-label={`${approved} of ${ticks} reviewers approved`}>
+          {Array.from({ length: ticks }).map((_, i) => {
+            const done = i < approved;
+            return (
+              <span key={i} className={styles.rrTickBox} data-done={done ? "true" : "false"}>
+                {done ? <Check size={9} strokeWidth={3} /> : null}
+              </span>
+            );
+          })}
+          <span className={styles.rrTickCount}>
+            {approved}/{ticks}
+          </span>
+        </span>
+        <span className={styles.rrSignalMeta}>
+          {row.lastSubmittedAt ? formatRelative(row.lastSubmittedAt, locale) : ""}
+        </span>
+      </span>
+    );
+  }
+
+  if (bucket === "approved") {
+    const when = row.lastSubmittedAt ?? row.updatedAt;
+    return (
+      <span className={`${styles.rrSignal} ${styles.rrSignalApproved}`}>
+        <span className={styles.rrApprovedPill}>
+          <Send size={10} strokeWidth={2.2} />
+          <span>Approved</span>
+        </span>
+        <span className={styles.rrSignalMeta}>{formatRelative(when, locale)}</span>
+      </span>
+    );
+  }
+
+  // sent
+  const { delivered, pending, failed } = row.delivery;
+  const total = delivered + pending + failed;
+  const allDelivered = total > 0 && delivered === total;
+  return (
+    <span className={`${styles.rrSignal} ${styles.rrSignalSent}`}>
+      <span className={styles.rrSentPill} data-tone={allDelivered ? "sage" : "clay"}>
+        <HandCheck color="currentColor" size={10} />
+        <span>
+          {delivered}/{total || 1} {allDelivered ? "delivered" : "sending"}
+        </span>
+      </span>
+      <span className={styles.rrSignalMeta}>{formatWhen(row, locale)}</span>
+    </span>
+  );
+}
+
+/**
+ * Full-bleed mobile overlay hosting <ReportDetail> + a bottom action bar.
+ * Mirrors the desktop ActionRail's four icons. Modals open via the same
+ * `openModal` callback as desktop, so the mounted `<ReportModalsHost>` at
+ * the rail level handles them identically on both surfaces.
+ */
+function MobileReportOverlay({
+  row,
+  detail,
+  detailLoading,
+  locale,
+  variant,
+  isAdmin,
+  onClose,
+  onOpenModal,
+  viewMode,
+  onViewModeChange,
+  onReportChanged,
+}: {
+  row: ReportListRow;
+  detail: ReportDetailRow | null;
+  detailLoading: boolean;
+  locale: string;
+  variant: "teacher" | "admin";
+  isAdmin: boolean;
+  onClose: () => void;
+  onOpenModal: (m: ActionRailModal) => void;
+  viewMode: ViewMode;
+  onViewModeChange: (next: ViewMode) => void;
+  onReportChanged: () => void;
+}) {
+  const tone = STATUS_TONE[row.status];
+
+  // Kebab popover is the single source for every action on mobile — replaces
+  // the old bottom action bar, which crowded 4–6 icons in a flat strip and
+  // gave the kebab nothing meaningful to do.
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
+  const handlePick = React.useCallback(
+    (m: ActionRailModal) => {
+      setMenuOpen(false);
+      onOpenModal(m);
+    },
+    [onOpenModal]
+  );
+
+  return (
+    <>
+      <div
+        className={styles.rrMobileOverlayScrim}
+        role="presentation"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div className={styles.rrMobileOverlay} role="dialog" aria-label={row.studentName}>
+        <div className={styles.rrMobileOverlayTop}>
+          <button
+            type="button"
+            className={`${styles.rrMobileOverlayBack} tap`}
+            onClick={onClose}
+            aria-label="Back to reports list"
+          >
+            <ChevronLeft size={17} strokeWidth={2.2} />
+          </button>
+          <div className={styles.rrMobileOverlayTitle}>
+            <div className={styles.rrMobileOverlayTitleName}>{row.studentName}</div>
+            <div className={styles.rrMobileOverlayTitleSub}>
+              <span style={{ color: tone.fg }}>{tone.label}</span>
+              <span aria-hidden>·</span>
+              <span>{row.title || "Untitled report"}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`${styles.rrMobileOverlayKebab} tap`}
+            aria-label="Report actions"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            data-active={menuOpen ? "true" : "false"}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <MoreVertical size={17} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <div className={styles.rrMobileOverlayBody}>
+          {detail ? (
+            <ReportDetail
+              key={detail.id}
+              report={detail}
+              hideBackLink
+              hideTopBarActions
+              hideTopBar
+              viewMode={viewMode}
+              onViewModeChange={onViewModeChange}
+              variant={variant}
+              onReportChanged={onReportChanged}
+            />
+          ) : detailLoading ? (
+            <ReportLoadingSkeleton row={row} locale={locale} />
+          ) : (
+            <div className={styles.rrEmptyState}>Loading…</div>
+          )}
+        </div>
+
+        {menuOpen && (
+          <KebabMenu
+            row={row}
+            isAdmin={isAdmin}
+            onClose={() => setMenuOpen(false)}
+            onPick={handlePick}
+            viewMode={viewMode}
+            onViewModeChange={(next) => {
+              setMenuOpen(false);
+              onViewModeChange(next);
+            }}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Compact popover anchored under the overlay's kebab button. Source of every
+ * action on mobile: the same set as the desktop right rail, in the same order
+ * (Score · Preview/Edit toggle · History · Submit · Approve · Request changes
+ * · Delete), each visible per `railIcons(row.status, isAdmin)`. Closes on
+ * outside click, row click, or Escape; locks body scroll while open.
+ */
+function KebabMenu({
+  row,
+  isAdmin,
+  onClose,
+  onPick,
+  viewMode,
+  onViewModeChange,
+}: {
+  row: ReportListRow;
+  isAdmin: boolean;
+  onClose: () => void;
+  onPick: (m: ActionRailModal) => void;
+  viewMode: ViewMode;
+  onViewModeChange: (next: ViewMode) => void;
+}) {
+  const actions = railIcons(row.status, isAdmin);
+  const showHistory = actions.includes("history");
+  const showSend = actions.includes("send");
+  const showApprove = actions.includes("approve");
+  const showRequestChanges = actions.includes("request_changes");
+  const showDelete = actions.includes("delete");
+  const inPreview = viewMode === "preview";
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return (
+    <>
+      <div className={styles.rrKebabScrim} role="presentation" onClick={onClose} aria-hidden />
+      <div className={styles.rrKebabMenu} role="menu" aria-label="Report actions">
+        {row.displayScore != null && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} tap`}
+            role="menuitem"
+            onClick={() => onPick("score")}
+          >
+            <span
+              className={styles.rrKebabScore}
+              data-tone={scoreToneBand(row.displayScore)}
+              aria-hidden
+            >
+              {row.displayScore}
+            </span>
+            <span className={styles.rrKebabLabel}>AI confidence</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          className={`${styles.rrKebabItem} tap`}
+          role="menuitemcheckbox"
+          aria-checked={inPreview}
+          onClick={() => onViewModeChange(inPreview ? "editor" : "preview")}
+        >
+          <span className={styles.rrKebabIcon} aria-hidden>
+            {inPreview ? (
+              <Pencil size={16} strokeWidth={1.8} />
+            ) : (
+              <FileText size={16} strokeWidth={1.8} />
+            )}
+          </span>
+          <span className={styles.rrKebabLabel}>
+            {inPreview ? "Back to editor" : "Preview PDF"}
+          </span>
+        </button>
+
+        {showHistory && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} tap`}
+            role="menuitem"
+            onClick={() => onPick("history")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Clock size={16} strokeWidth={1.8} />
+            </span>
+            <span className={styles.rrKebabLabel}>History</span>
+          </button>
+        )}
+
+        {showSend && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} ${styles.rrKebabItemSend} tap`}
+            role="menuitem"
+            onClick={() => onPick("send")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Send size={16} strokeWidth={2} />
+            </span>
+            <span className={styles.rrKebabLabel}>Submit for review</span>
+          </button>
+        )}
+
+        {showApprove && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} ${styles.rrKebabItemApprove} tap`}
+            role="menuitem"
+            onClick={() => onPick("approve")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Check size={16} strokeWidth={2.2} />
+            </span>
+            <span className={styles.rrKebabLabel}>Approve</span>
+          </button>
+        )}
+
+        {showRequestChanges && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} tap`}
+            role="menuitem"
+            onClick={() => onPick("request_changes")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <RotateCcw size={16} strokeWidth={1.8} />
+            </span>
+            <span className={styles.rrKebabLabel}>Request changes</span>
+          </button>
+        )}
+
+        {showDelete && (
+          <button
+            type="button"
+            className={`${styles.rrKebabItem} ${styles.rrKebabItemDanger} tap`}
+            role="menuitem"
+            onClick={() => onPick("delete")}
+          >
+            <span className={styles.rrKebabIcon} aria-hidden>
+              <Trash2 size={16} strokeWidth={1.8} />
+            </span>
+            <span className={styles.rrKebabLabel}>Delete report</span>
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 

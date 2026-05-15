@@ -18,42 +18,87 @@
 @media (min-width: 1024px) {
   .rrLayout {
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: 320px minmax(0, 1fr) 64px;
     gap: 0;
   }
 }
 
-/* ---------- left rail ---------- */
+/* ---------- left rail ----------
+   Sits on canvas (not surface) so rows can lift onto surface when hovered.
+   Borderless rows + small vertical rhythm gap; selection signaled by a
+   terracotta inset bar instead of a fill tint. */
 .rrRail {
   display: flex;
   flex-direction: column;
   min-width: 0;
   border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
-  /* On mobile we stack rail + main; on desktop the rail fills its grid cell. */
-  max-height: 50vh;
-  overflow: hidden;
+  background: var(--color-canvas);
+  flex: 1;
+  min-height: 0;
 }
 @media (min-width: 1024px) {
   .rrRail {
-    max-height: none;
     height: 100%;
-    min-height: 0;
   }
 }
 
-.rrRailHeader {
+/* Admin-only narrow row above the tabs that hosts the classroom scope select. */
+.rrAdminScopeRow {
+  padding: 10px 12px 0;
+  background: var(--color-canvas);
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 14px 8px;
-  border-bottom: 1px solid var(--color-border);
 }
+
 .rrFilterBar {
-  padding: 8px 12px;
+  padding: 10px 12px 12px;
   border-bottom: 1px solid var(--color-border);
+  background: var(--color-canvas);
   overflow-x: auto;
   scrollbar-width: thin;
+}
+
+/* Segmented status tabs — mirrors prototype .tabs.
+   Single muted-bg pill container hosts 4 segments; active one gets a
+   surface card with a quiet shadow, and its count badge inverts to
+   terracotta so the read-out reads "you're on Drafts, there are 7". */
+.rrTabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rrTab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+  min-width: 0;
+}
+.rrTab:hover[data-active="false"] {
+  color: var(--color-ink);
+}
+.rrTab[data-active="true"] {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 1px 2px rgba(43, 38, 34, 0.06);
 }
 
 .rrList {
@@ -61,6 +106,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  padding: 6px;
+  gap: 2px;
 }
 .rrEmpty {
   padding: 18px 14px;
@@ -71,28 +118,35 @@
 
 .rrRow {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 11px;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px 12px 14px;
+  padding: 11px 12px 11px 14px;
   border: 0;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-radius: 11px;
+  background: transparent;
   cursor: pointer;
   text-align: left;
   font: inherit;
   color: inherit;
-  transition: background 100ms ease;
+  transition: background 140ms ease, box-shadow 140ms ease;
 }
 .rrRow:hover {
-  background: var(--color-canvas);
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
 }
 .rrRow[data-active="true"] {
-  background: color-mix(in srgb, var(--color-butter) 22%, var(--color-surface));
-  box-shadow: inset 3px 0 0 var(--color-ink);
+  background: var(--color-surface);
+  box-shadow: inset 3px 0 0 0 var(--color-terracotta);
 }
-.rrRow:last-child {
-  border-bottom: 0;
+.rrRow[data-active="true"]:hover {
+  background: var(--color-surface);
+}
+.rrRow:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 3px 0 0 0 var(--color-terracotta),
+    0 0 0 2px var(--color-terracotta-soft);
 }
 
 .rrRowText {
@@ -100,7 +154,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .rrRowTop {
   display: flex;
@@ -115,42 +169,162 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.005em;
 }
 .rrRowDate {
   font-size: 11px;
   color: var(--color-ink-muted);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .rrRowTitle {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--color-ink-secondary);
-  white-space: nowrap;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .rrRowMeta {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 2px;
+  margin-top: 5px;
   flex-wrap: wrap;
 }
-.rrRowKind {
+
+
+/* ---------- Per-bucket row signal ----------
+   Right-aligned chip + small trailing meta time. Variants share the same
+   2-row stack visually: the chip itself + a faint `rrSignalMeta` below it
+   (only used when there's a relevant time to show). */
+.rrSignal {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+}
+.rrSignalMeta {
   font-size: 10.5px;
   font-weight: 500;
   color: var(--color-ink-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
-.rrRowStatus {
+
+/* Drafts: completeness bar — 64×5 capsule + N% read-out. Tone shifts from
+   terracotta (under 60) → butter (60–84) → sage (≥85). */
+.rrCompleteness {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-variant-numeric: tabular-nums;
+}
+.rrCompletenessBar {
+  width: 64px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-muted);
+  overflow: hidden;
+  display: inline-block;
+}
+.rrCompletenessBar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-terracotta);
+}
+.rrCompleteness[data-tone="med"] .rrCompletenessBar > i {
+  background: var(--color-butter-deep);
+}
+.rrCompleteness[data-tone="high"] .rrCompletenessBar > i {
+  background: var(--color-sage-deep);
+}
+.rrCompletenessValue {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+.rrCompleteness[data-tone="med"] .rrCompletenessValue {
+  color: var(--color-butter-deep);
+}
+.rrCompleteness[data-tone="high"] .rrCompletenessValue {
+  color: var(--color-sage-deep);
+}
+
+/* In Review: tick boxes — small squares, sage-filled when approved. */
+.rrTicks {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+.rrTickBox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  flex-shrink: 0;
+}
+.rrTickBox[data-done="true"] {
+  background: var(--color-sage-soft);
+  border-color: var(--color-sage-deep);
+  color: var(--color-sage-deep);
+}
+.rrTickCount {
   font-size: 10.5px;
-  font-weight: 500;
-  padding: 2px 7px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+  margin-left: 2px;
+}
+
+/* Approved: sage pill with a small paper-plane glyph. */
+.rrApprovedPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px 2px 7px;
   border-radius: 999px;
-  white-space: nowrap;
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+  letter-spacing: 0.01em;
+}
+.rrApprovedPill svg {
+  flex-shrink: 0;
+}
+
+/* Sent: HandCheck + delivered/total. Tone shifts sage (all delivered) →
+   clay (some still pending). */
+.rrSentPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+.rrSentPill[data-tone="sage"] {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+}
+.rrSentPill[data-tone="clay"] {
+  background: var(--color-clay-soft);
+  color: var(--color-terracotta-deep);
+}
+.rrSentPill svg {
+  flex-shrink: 0;
 }
 
 /* ---------- right pane ---------- */
@@ -160,6 +334,13 @@
   flex-direction: column;
   min-height: 0;
   flex: 1;
+}
+/* On mobile the rail-view shows only the list — the report opens in a
+   full-bleed overlay (rrMobileOverlay below) instead of stacking. */
+@media (max-width: 1023.98px) {
+  .rrMain {
+    display: none;
+  }
 }
 
 .rrEmptyState {
@@ -252,4 +433,787 @@
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--color-ink-muted);
+}
+
+/* ---------- Action rail (desktop only) ---------- */
+.rrActionRail {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .rrActionRail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 8px 16px;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-surface);
+    min-height: 0;
+    /* Tooltips on rail buttons render outside the rail (to the left) —
+       overflow must stay visible and the rail itself must out-stack the
+       reading pane next to it. */
+    overflow: visible;
+    position: relative;
+    z-index: 6;
+  }
+}
+.rrRailBtn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  flex-shrink: 0;
+}
+.rrRailBtn:hover {
+  background: var(--color-muted);
+  color: var(--color-ink);
+  border-color: var(--color-border-strong);
+}
+.rrRailBtnDanger {
+  color: var(--color-ink-muted);
+}
+.rrRailBtnDanger:hover {
+  background: var(--color-terracotta);
+  color: #fff;
+  border-color: var(--color-terracotta);
+}
+/* Pressed/active state for toggle buttons (preview/edit swap). */
+.rrRailBtnActive {
+  background: var(--color-ink);
+  color: var(--color-surface);
+  border-color: var(--color-ink);
+}
+.rrRailBtnActive:hover {
+  background: var(--color-ink);
+  color: var(--color-surface);
+  border-color: var(--color-ink);
+}
+
+/* Score button — replaces the in-row AI-score bubble. Same 40px footprint
+   as the other rail buttons so the column reads as a single column, but
+   filled with the score's tone so the read-out is "Mitable's confidence
+   in this report" without needing a hover. */
+.rrRailScoreBtn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border: 1px solid transparent;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  transition: filter 140ms ease, box-shadow 140ms ease;
+  background: var(--color-terracotta-deep);
+}
+.rrRailScoreBtn[data-tone="med"] {
+  background: #b8881a;
+}
+.rrRailScoreBtn[data-tone="high"] {
+  background: var(--color-sage-deep);
+}
+.rrRailScoreBtn:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 12px -4px rgba(43, 38, 34, 0.25);
+}
+.rrRailScoreBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent);
+}
+.rrRailScoreNumber {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Tooltip on hover (action rail only) */
+.rrRailBtn[data-tip]:hover::after,
+.rrRailScoreBtn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  z-index: 60;
+  box-shadow: 0 4px 12px -2px rgba(43, 38, 34, 0.18);
+}
+.rrRailBtn[data-tip]:hover::before,
+.rrRailScoreBtn[data-tip]:hover::before {
+  content: "";
+  position: absolute;
+  right: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-left-color: var(--color-ink);
+  pointer-events: none;
+  z-index: 60;
+}
+
+.rrRailSep {
+  width: 28px;
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0 2px;
+  flex-shrink: 0;
+}
+.rrRailAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.rrTone_sage {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+}
+.rrTone_clay {
+  background: var(--color-clay-soft);
+  color: var(--color-terracotta-deep);
+}
+.rrTone_butter {
+  background: var(--color-butter-soft);
+  color: var(--color-butter-deep);
+}
+.rrTone_blue {
+  background: var(--color-dusty-blue-soft);
+  color: #355673;
+}
+.rrRailBadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-terracotta);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--color-surface);
+}
+
+/* ---------- Modal cards (overrides on shadcn DialogContent) ---------- */
+.rrModalCard {
+  max-width: 720px !important;
+  width: calc(100% - 32px) !important;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-ink) !important;
+  padding: 22px 24px 18px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 32px 80px -20px rgba(43, 38, 34, 0.45),
+    0 12px 24px -8px rgba(43, 38, 34, 0.22) !important;
+}
+.rrModalCardLg {
+  max-width: 860px !important;
+}
+.rrModalCardSm {
+  max-width: 440px !important;
+}
+.rrModalFoot {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.rrPdfFrame {
+  margin-top: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-canvas);
+  overflow: hidden;
+  min-height: 420px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+.rrPdfFrame > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* AI score modal — hero block (big tinted bubble + label + sub copy),
+   flag chips for each AI signal, and a numbered reasoning list. */
+.rrScoreHero {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--color-terracotta-soft) 50%, var(--color-surface));
+}
+.rrScoreHero[data-tone="med"] {
+  background: color-mix(in srgb, var(--color-butter-soft) 50%, var(--color-surface));
+  border-color: var(--color-butter-soft);
+}
+.rrScoreHero[data-tone="high"] {
+  background: color-mix(in srgb, var(--color-sage-soft) 55%, var(--color-surface));
+  border-color: var(--color-sage-soft);
+}
+.rrScoreHeroBubble {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  background: var(--color-terracotta-deep);
+}
+.rrScoreHero[data-tone="med"] .rrScoreHeroBubble {
+  background: #b8881a;
+}
+.rrScoreHero[data-tone="high"] .rrScoreHeroBubble {
+  background: var(--color-sage-deep);
+}
+.rrScoreHeroMeta {
+  min-width: 0;
+}
+.rrScoreHeroLabel {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+}
+.rrScoreHeroSub {
+  font-size: 12.5px;
+  color: var(--color-ink-secondary);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+.rrFlagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rrFlagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-secondary);
+}
+.rrFlagChip[data-status="ok"] {
+  background: var(--color-sage-soft);
+  border-color: transparent;
+  color: var(--color-sage-deep);
+}
+.rrFlagChip[data-status="warn"] {
+  background: var(--color-butter-soft);
+  border-color: transparent;
+  color: var(--color-butter-deep);
+}
+.rrFlagChip[data-status="fail"] {
+  background: var(--color-terracotta-soft);
+  border-color: transparent;
+  color: var(--color-terracotta-deep);
+}
+.rrFlagChip svg {
+  flex-shrink: 0;
+}
+
+.rrReasoningList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-ink-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rrReasoningList li::marker {
+  color: var(--color-ink-muted);
+}
+
+/* History timeline (re-built fresh, mirrors prototype trail) */
+.rrHistoryTrail {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-left: 8px;
+  position: relative;
+}
+.rrHistoryTrail::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--color-border) 20%,
+    var(--color-border) 80%,
+    transparent
+  );
+}
+.rrHistoryEvent {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 12px;
+  align-items: start;
+  position: relative;
+}
+.rrHistoryDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  margin-top: 4px;
+  margin-left: 4px;
+  box-shadow: 0 0 0 3px var(--color-surface);
+}
+.rrDot_sage {
+  background: var(--color-sage-deep);
+}
+.rrDot_butter {
+  background: #b8881a;
+}
+.rrDot_clay {
+  background: var(--color-clay);
+}
+.rrHistoryHead {
+  font-size: 13px;
+  color: var(--color-ink);
+}
+.rrHistoryHead b {
+  font-weight: 600;
+}
+.rrHistoryTime {
+  color: var(--color-ink-muted);
+  font-size: 11.5px;
+  margin-left: 8px;
+  font-weight: 500;
+}
+.rrHistoryBody {
+  font-size: 12.5px;
+  color: var(--color-ink-secondary);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+/* Form bits used inside Submit / Delete dialogs */
+.rrFieldGroup {
+  margin-top: 14px;
+}
+.rrFieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  margin-bottom: 7px;
+  display: block;
+}
+.rrFieldHint {
+  padding: 10px 0;
+  font-size: 12.5px;
+  color: var(--color-ink-muted);
+}
+.rrFieldError {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-terracotta-soft);
+  color: var(--color-terracotta-deep);
+  font-size: 12.5px;
+}
+.rrReviewerGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.rrReviewerCard {
+  padding: 10px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.rrReviewerCard:hover {
+  border-color: var(--color-border-strong);
+}
+.rrReviewerCardSelected {
+  border-color: var(--color-terracotta);
+  background: color-mix(in srgb, var(--color-terracotta-soft) 35%, var(--color-surface));
+}
+.rrReviewerMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rrReviewerName {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+.rrReviewerRole {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
+.rrReviewerCheck {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  font-size: 11px;
+  font-weight: 700;
+  color: transparent;
+}
+.rrReviewerCardSelected .rrReviewerCheck {
+  background: var(--color-terracotta);
+  border-color: var(--color-terracotta);
+  color: #fff;
+}
+.rrTextarea {
+  width: 100%;
+  resize: none;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: var(--color-canvas);
+  min-height: 78px;
+  outline: none;
+  font-family: inherit;
+  color: inherit;
+}
+.rrTextarea:focus {
+  border-color: var(--color-border-strong);
+}
+
+.rrDeleteBody {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-ink-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rrDeleteBody p {
+  margin: 0;
+}
+.rrDeleteWarn {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-butter-soft);
+  color: var(--color-butter-deep);
+  font-size: 12.5px;
+}
+.rrDeleteHint {
+  font-size: 12.5px;
+  color: var(--color-ink-muted);
+}
+
+/* ---------- Mobile overlay (full-bleed report detail) ---------- */
+.rrMobileOverlayScrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 23, 21, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 45;
+}
+.rrMobileOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  animation: rrMobileOverlayIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes rrMobileOverlayIn {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (min-width: 1024px) {
+  .rrMobileOverlay,
+  .rrMobileOverlayScrim {
+    display: none;
+  }
+}
+.rrMobileOverlayTop {
+  flex-shrink: 0;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.rrMobileOverlayBack,
+.rrMobileOverlayKebab {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--color-ink);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.rrMobileOverlayBack:hover,
+.rrMobileOverlayKebab:hover {
+  background: var(--color-muted);
+}
+.rrMobileOverlayKebab[data-active="true"] {
+  background: var(--color-muted);
+  border-color: var(--color-border-strong);
+}
+.rrMobileOverlayTitle {
+  flex: 1;
+  min-width: 0;
+}
+.rrMobileOverlayTitleName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rrMobileOverlayTitleSub {
+  font-size: 10.5px;
+  color: var(--color-ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rrMobileOverlayBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Inner panes (.rd-report-scroll for editor, .rd-pdf-preview-iframe for
+     preview) own their own scroll — the body just provides the flex column
+     context so .rd-root's `flex: 1` resolves to the full available height. */
+  overflow: hidden;
+}
+.rrMobileOverlayBody .rd-page-header-top {
+  display: none; /* back-chevron is in the overlay top bar instead */
+}
+.rrMobileOverlayBody .rd-page-header {
+  padding-top: 18px;
+}
+/* ---------- Kebab popover menu (mobile overlay only) ----------
+   Replaces the old bottom action bar. Anchored under the kebab in the
+   overlay top bar; right edge aligns with the kebab so it stays
+   on-screen on 360px+ widths. */
+.rrKebabScrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 23, 21, 0.3);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 47;
+  animation: rrKebabScrimIn 140ms ease-out both;
+}
+@keyframes rrKebabScrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.rrKebabMenu {
+  position: absolute;
+  top: calc(52px + 4px); /* overlay top bar height + 4px gap */
+  right: 12px;
+  z-index: 48;
+  width: 240px;
+  max-width: calc(100% - 24px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow:
+    0 24px 48px -16px rgba(43, 38, 34, 0.35),
+    0 6px 14px -6px rgba(43, 38, 34, 0.18);
+  transform-origin: top right;
+  animation: rrKebabMenuIn 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes rrKebabMenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.rrKebabItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-ink);
+  text-align: left;
+  letter-spacing: -0.005em;
+  transition: background 120ms ease, color 120ms ease;
+  width: 100%;
+}
+.rrKebabItem:hover,
+.rrKebabItem:focus-visible {
+  background: var(--color-muted);
+  outline: none;
+}
+.rrKebabIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--color-ink-secondary);
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.rrKebabLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Primary affordance — Submit for review. Bolder weight + terracotta icon
+   so draft reports nudge teachers toward the next step. */
+.rrKebabItemSend .rrKebabLabel {
+  font-weight: 600;
+}
+.rrKebabItemSend .rrKebabIcon {
+  background: var(--color-terracotta-soft);
+  color: var(--color-terracotta-deep);
+  border-color: transparent;
+}
+
+/* Admin Approve — sage tint to read as the affirmative path. */
+.rrKebabItemApprove .rrKebabIcon {
+  background: var(--color-sage-soft);
+  color: var(--color-sage-deep);
+  border-color: transparent;
+}
+
+/* Destructive — terracotta text, soft-terracotta hover bg. */
+.rrKebabItemDanger {
+  color: var(--color-terracotta-deep);
+}
+.rrKebabItemDanger .rrKebabIcon {
+  color: var(--color-terracotta-deep);
+}
+.rrKebabItemDanger:hover,
+.rrKebabItemDanger:focus-visible {
+  background: var(--color-terracotta-soft);
+}
+
+/* AI score row — the "icon" slot becomes a tinted score chip (mirrors
+   the desktop rail's score button). */
+.rrKebabScore {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  background: var(--color-terracotta-deep);
+}
+.rrKebabScore[data-tone="med"] {
+  background: #b8881a;
+}
+.rrKebabScore[data-tone="high"] {
+  background: var(--color-sage-deep);
 }

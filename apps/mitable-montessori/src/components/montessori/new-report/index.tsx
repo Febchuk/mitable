@@ -6,8 +6,7 @@ import { Plus } from "lucide-react";
 import { ToastBus } from "../primitives";
 import { useIsMobile } from "../child-detail/use-is-mobile";
 import type { Tone } from "../data";
-import { parseCaptureInputs } from "@/lib/capture/parse-on-submit";
-import { writeStoredDraftCapture } from "@/lib/capture/draft-capture-storage";
+import type { SectionMeta } from "@/lib/report-templates/sections";
 import { NewReportSheet } from "./new-report-sheet";
 import { NewReportMobile } from "./new-report-mobile";
 import type { PickerChild } from "./child-picker";
@@ -29,12 +28,15 @@ type ApiTemplateRow = {
   description: string | null;
   kind: ReportTemplate["kind"];
   sections: string[];
+  sectionMeta: SectionMeta | null;
+  logoUrl: string | null;
   iconTone: ReportTemplate["iconTone"];
 };
 
 /** The Plus button on /app/reports — clicking opens the sheet (desktop)
    or the full-screen step flow (mobile). Lazy-loads templates + roster
-   + captured-today on first open. */
+   + captured-today on first open. The flow is now child + template only;
+   the assistant drafts the empty template into the editor. */
 export function NewReportTrigger() {
   const [open, setOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
@@ -63,6 +65,8 @@ export function NewReportTrigger() {
           description: t.description ?? "",
           kind: t.kind,
           sections: t.sections,
+          sectionMeta: t.sectionMeta ?? {},
+          logoUrl: t.logoUrl ?? null,
           iconTone: t.iconTone,
         }));
         setTemplates(tplRows);
@@ -92,27 +96,10 @@ export function NewReportTrigger() {
       if (submitting) return;
       setSubmitting(true);
       try {
-        // Pull recorded audio + note images into Blobs, run Whisper (worker)
-        // + OCR, fuzzy-match roster → tokenized strings for the draft API.
-        const audioBlob = payload.audio
-          ? await fetch(payload.audio.url)
-              .then((r) => r.blob())
-              .catch(() => null)
-          : null;
-        const noteBlobs = await Promise.all(
-          payload.notes.map((n) =>
-            fetch(n.url)
-              .then((r) => r.blob())
-              .catch(() => null)
-          )
-        ).then((arr) => arr.filter((b): b is Blob => b != null));
-
-        const parsed = await parseCaptureInputs({
-          audio: audioBlob,
-          noteImages: noteBlobs,
-          roster: roster.map((r) => ({ id: r.id, name: r.name })),
-        });
-
+        // No audio / handwritten notes any more — the assistant drafts the
+        // empty template. The backend still accepts the legacy capture
+        // fields; we send them as empty so the "from scratch" code path
+        // runs server-side.
         const res = await fetch("/api/v1/reports", {
           method: "POST",
           credentials: "include",
@@ -120,10 +107,10 @@ export function NewReportTrigger() {
           body: JSON.stringify({
             childId: payload.childId,
             kind: payload.kind,
-            templateId: payload.templateId ?? null,
-            transcripts: parsed.transcripts,
-            notes: parsed.notes,
-            tokenMap: parsed.tokenMap,
+            templateId: payload.templateId,
+            transcripts: [],
+            notes: [],
+            tokenMap: {},
           }),
         });
         if (!res.ok) {
@@ -132,12 +119,6 @@ export function NewReportTrigger() {
           return;
         }
         const json = (await res.json()) as { reportId: string };
-        writeStoredDraftCapture(json.reportId, {
-          transcripts: parsed.transcripts,
-          notes: parsed.notes,
-          tokenMap: parsed.tokenMap,
-          captureOnly: payload.captureOnly,
-        });
         const child = roster.find((c) => c.id === payload.childId);
         ToastBus.push({
           message: child
@@ -157,24 +138,12 @@ export function NewReportTrigger() {
     <>
       <button
         type="button"
-        className="tap"
+        className="tap nr-trigger"
         onClick={() => setOpen(true)}
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          border: 0,
-          background: "var(--color-terracotta)",
-          color: "var(--color-surface)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 4px 10px rgba(196,106,79,0.25)",
-          cursor: "pointer",
-        }}
         aria-label="New report"
       >
-        <Plus size={18} strokeWidth={1.5} />
+        <Plus size={14} strokeWidth={2} />
+        <span>New report</span>
       </button>
 
       {!mobile && (

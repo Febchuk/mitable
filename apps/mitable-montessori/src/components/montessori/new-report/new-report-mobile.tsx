@@ -4,21 +4,10 @@ import * as React from "react";
 import { ArrowLeft, ArrowRight, Clock, Search, X } from "lucide-react";
 import { initialsFor } from "../data";
 import { type PickerChild } from "./child-picker";
-import { TypePicker } from "./type-picker";
-import { LiveWave, AudioPreview } from "./audio-block";
-import { NotesMobileRow } from "./notes-block";
-import { TemplateMobileCard } from "./template-block";
-import { useAudioRecorder } from "./use-audio-recorder";
-import { ToastBus } from "../primitives";
-import {
-  formatDuration,
-  type CapturedNote,
-  type NewReportPayload,
-  type ReportKind,
-  type ReportTemplate,
-} from "./mock-data";
+import { MobileTemplateList } from "./template-block";
+import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2;
 type CapturedToday = Record<string, { voice: number; photos: number }>;
 
 export function NewReportMobile({
@@ -40,26 +29,16 @@ export function NewReportMobile({
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
-  const [kind, setKind] = React.useState<ReportKind | null>(null);
-  const [notes, setNotes] = React.useState<CapturedNote[]>([]);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
   const [query, setQuery] = React.useState("");
-  const [captureOnly, setCaptureOnly] = React.useState(false);
-
-  const recorder = useAudioRecorder();
 
   React.useEffect(() => {
     if (open) {
       setStep(1);
       setChild(null);
-      setKind(null);
-      setNotes([]);
       setTemplate(null);
       setQuery("");
-      setCaptureOnly(false);
-      recorder.clear();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   React.useEffect(() => {
@@ -74,14 +53,11 @@ export function NewReportMobile({
   if (!open) return null;
 
   const submit = () => {
-    if (!child || !kind) return;
+    if (!child || !template) return;
     onSubmit({
       childId: child.id,
-      kind,
-      audio: recorder.memo,
-      notes,
-      templateId: template?.id ?? null,
-      captureOnly,
+      kind: template.kind,
+      templateId: template.id,
     });
   };
 
@@ -102,41 +78,14 @@ export function NewReportMobile({
         />
       )}
       {step === 2 && (
-        <Step2Type
+        <Step2Template
           child={child!}
-          kind={kind}
-          setKind={setKind}
-          onBack={() => setStep(1)}
-          onNext={() => setStep(3)}
-        />
-      )}
-      {step === 3 && (
-        <Step3Capture
-          child={child!}
-          kind={kind!}
-          recorder={recorder}
-          notes={notes}
-          setNotes={setNotes}
           template={template}
-          setTemplate={setTemplate}
+          onPick={setTemplate}
           templates={templates}
-          onBack={() => setStep(2)}
-          onNext={() => setStep(4)}
-        />
-      )}
-      {step === 4 && (
-        <Step4Review
-          child={child!}
-          kind={kind!}
-          audioDuration={recorder.memo?.durationSec ?? null}
-          noteCount={notes.length}
-          template={template}
-          captureOnly={captureOnly}
-          onCaptureOnlyChange={setCaptureOnly}
           submitting={submitting}
-          onBack={() => setStep(3)}
+          onBack={() => setStep(1)}
           onSubmit={submit}
-          onJump={(s) => setStep(s)}
         />
       )}
     </div>
@@ -280,20 +229,24 @@ function MobileChildRow({
 }
 
 /* ============================================================
- *  Step 2 — Type
+ *  Step 2 — Template (with inline preview)
  * ============================================================ */
-function Step2Type({
+function Step2Template({
   child,
-  kind,
-  setKind,
+  template,
+  onPick,
+  templates,
+  submitting,
   onBack,
-  onNext,
+  onSubmit,
 }: {
   child: PickerChild;
-  kind: ReportKind | null;
-  setKind: (k: ReportKind) => void;
+  template: ReportTemplate | null;
+  onPick: (t: ReportTemplate) => void;
+  templates: ReportTemplate[];
+  submitting?: boolean;
   onBack: () => void;
-  onNext: () => void;
+  onSubmit: () => void;
 }) {
   return (
     <>
@@ -311,345 +264,29 @@ function Step2Type({
       </div>
 
       <div className="nr-m-page-head">
-        <div className="nr-m-crest">what kind?</div>
-        <h1>Pick a type</h1>
-        <p>The assistant tunes its drafting to fit.</p>
+        <div className="nr-m-crest">pick a template</div>
+        <h1>Template</h1>
+        <p>
+          We&rsquo;ll draft the empty form. Tap the chevron to preview a template&rsquo;s sections.
+        </p>
       </div>
 
       <div className="nr-m-body">
-        <TypePicker value={kind} onChange={setKind} variant="stack" />
-      </div>
-
-      <div className="nr-m-foot">
-        <button type="button" className="nr-m-btn-primary" disabled={!kind} onClick={onNext}>
-          Continue
-          <ArrowRight size={14} strokeWidth={2.5} />
-        </button>
-      </div>
-    </>
-  );
-}
-
-/* ============================================================
- *  Step 3 — Capture
- * ============================================================ */
-function Step3Capture({
-  child,
-  kind,
-  recorder,
-  notes,
-  setNotes,
-  template,
-  setTemplate,
-  templates,
-  onBack,
-  onNext,
-}: {
-  child: PickerChild;
-  kind: ReportKind;
-  recorder: ReturnType<typeof useAudioRecorder>;
-  notes: CapturedNote[];
-  setNotes: React.Dispatch<React.SetStateAction<CapturedNote[]>>;
-  template: ReportTemplate | null;
-  setTemplate: (t: ReportTemplate | null) => void;
-  templates: ReportTemplate[];
-  onBack: () => void;
-  onNext: () => void;
-}) {
-  const isRecording = recorder.state === "recording";
-  const isRecorded = recorder.state === "recorded" && recorder.memo;
-
-  React.useEffect(() => {
-    if (recorder.state === "denied") {
-      ToastBus.push({
-        message: "Microphone access denied. Enable it in browser settings to record.",
-      });
-    } else if (recorder.state === "error") {
-      ToastBus.push({ message: "Couldn't start recording. Try again." });
-    }
-  }, [recorder.state]);
-
-  return (
-    <>
-      <div className="nr-m-head">
-        <div className="nr-m-left">
-          <button type="button" className="nr-m-iconbtn" onClick={onBack} aria-label="Back">
-            <ArrowLeft size={18} strokeWidth={2} />
-          </button>
-          <span className="nr-m-title">
-            {child.name.split(" ")[0]} · {kind}
-          </span>
-        </div>
-        <DotRail step={3} />
-      </div>
-
-      <div className="nr-m-page-head">
-        <div className="nr-m-crest">capture, or skip</div>
-        <h1>Anything to add?</h1>
-        <p>All optional. The assistant can also draft from scratch.</p>
-      </div>
-
-      <div className="nr-m-body nr-m-capture">
-        {/* Voice memo */}
-        <div className="nr-m-opt-block">
-          <div className="nr-m-opt-title">
-            <span className="nr-label-cap">Voice memo</span>
-            {isRecording && <span className="nr-hand">listening…</span>}
-            {isRecorded && <span className="nr-m-opt-skip">recorded</span>}
-            {!isRecording && !isRecorded && <span className="nr-m-opt-skip">optional</span>}
-          </div>
-
-          {!isRecording && !isRecorded && (
-            <div className="nr-m-recorder-card">
-              <button
-                type="button"
-                className="nr-m-record-btn"
-                onClick={recorder.start}
-                aria-label="Start recording"
-              >
-                <span className="nr-core" />
-              </button>
-              <div className="nr-copy">
-                <b>Tap to record</b>Talk for a minute about the day.
-              </div>
-            </div>
-          )}
-
-          {isRecording && (
-            <div className="nr-m-recorder-card nr-recording">
-              <button
-                type="button"
-                className="nr-m-record-btn nr-recording"
-                onClick={recorder.stop}
-                aria-label="Stop recording"
-              >
-                <span className="nr-core" />
-              </button>
-              <div className="nr-copy">
-                <b>{formatDuration(recorder.elapsed)}</b>Tap to stop. We&rsquo;ll transcribe it.
-              </div>
-              <LiveWave size="lg" />
-            </div>
-          )}
-
-          {isRecorded && recorder.memo && (
-            <AudioPreview memo={recorder.memo} onRemove={recorder.clear} />
-          )}
-        </div>
-
-        {/* Handwritten notes */}
-        <div className="nr-m-opt-block">
-          <div className="nr-m-opt-title">
-            <span className="nr-label-cap">Handwritten notes</span>
-            <span className="nr-m-opt-skip">
-              {notes.length > 0 ? `${notes.length} added` : "optional · AI will read"}
-            </span>
-          </div>
-          <NotesMobileRow
-            notes={notes}
-            onAdd={(n) => setNotes((prev) => [...prev, ...n])}
-            onRemove={(id) =>
-              setNotes((prev) => {
-                const target = prev.find((x) => x.id === id);
-                if (target) URL.revokeObjectURL(target.url);
-                return prev.filter((x) => x.id !== id);
-              })
-            }
-          />
-        </div>
-
-        {/* Template */}
-        <div className="nr-m-opt-block">
-          <div className="nr-m-opt-title">
-            <span className="nr-label-cap">Template</span>
-            <span className="nr-m-opt-skip">admin-managed · optional</span>
-          </div>
-          <TemplateMobileCard selected={template} onPick={setTemplate} templates={templates} />
-        </div>
+        <MobileTemplateList
+          selected={template}
+          onPick={onPick}
+          templates={templates}
+          child={child}
+        />
       </div>
 
       <div className="nr-m-foot">
         <button
           type="button"
-          className="nr-m-btn-secondary"
-          onClick={onNext}
-          disabled={isRecording}
+          className="nr-m-btn-primary"
+          disabled={!template || submitting}
+          onClick={onSubmit}
         >
-          Skip
-        </button>
-        <button type="button" className="nr-m-btn-primary" onClick={onNext} disabled={isRecording}>
-          Continue
-          <ArrowRight size={14} strokeWidth={2.5} />
-        </button>
-      </div>
-    </>
-  );
-}
-
-/* ============================================================
- *  Step 4 — Review
- * ============================================================ */
-function Step4Review({
-  child,
-  kind,
-  audioDuration,
-  noteCount,
-  template,
-  captureOnly,
-  onCaptureOnlyChange,
-  submitting,
-  onBack,
-  onSubmit,
-  onJump,
-}: {
-  child: PickerChild;
-  kind: ReportKind;
-  audioDuration: number | null;
-  noteCount: number;
-  template: ReportTemplate | null;
-  captureOnly: boolean;
-  onCaptureOnlyChange: (v: boolean) => void;
-  submitting?: boolean;
-  onBack: () => void;
-  onSubmit: () => void;
-  onJump: (step: Step) => void;
-}) {
-  return (
-    <>
-      <div className="nr-m-head">
-        <div className="nr-m-left">
-          <button type="button" className="nr-m-iconbtn" onClick={onBack} aria-label="Back">
-            <ArrowLeft size={18} strokeWidth={2} />
-          </button>
-          <span className="nr-m-title">One last look</span>
-        </div>
-        <DotRail step={4} />
-      </div>
-
-      <div className="nr-m-page-head">
-        <div className="nr-m-crest">ready ✿</div>
-        <h1>Looks good?</h1>
-        <p>The assistant will draft from this and bring you to the editor.</p>
-      </div>
-
-      <div className="nr-m-body">
-        <div className="nr-m-review-card">
-          <div className="nr-m-review-row" style={{ alignItems: "center" }}>
-            <span
-              className={`nr-av nr-${child.tone}`}
-              style={{ width: 36, height: 36, fontSize: 13 }}
-            >
-              {initialsFor(child.name)}
-            </span>
-            <div style={{ flex: 1 }}>
-              <div className="nr-value">
-                <b>{child.name}</b>
-              </div>
-              <div style={{ fontSize: 11.5, color: "var(--color-ink-muted)", marginTop: 1 }}>
-                {child.age}
-              </div>
-            </div>
-            <button type="button" className="nr-edit" onClick={() => onJump(1)}>
-              Change
-            </button>
-          </div>
-
-          <div className="nr-m-review-row">
-            <span className="nr-label-cap">Type</span>
-            <span className="nr-value">
-              <b>{kind}</b>
-            </span>
-            <button type="button" className="nr-edit" onClick={() => onJump(2)}>
-              Edit
-            </button>
-          </div>
-
-          <div className="nr-m-review-row">
-            <span className="nr-label-cap">Audio</span>
-            <span className="nr-value">
-              {audioDuration != null ? (
-                <>
-                  <b>{formatDuration(audioDuration)}</b> voice memo
-                </>
-              ) : (
-                <span style={{ color: "var(--color-ink-muted)" }}>None</span>
-              )}
-            </span>
-            <button type="button" className="nr-edit" onClick={() => onJump(3)}>
-              Edit
-            </button>
-          </div>
-
-          <div className="nr-m-review-row">
-            <span className="nr-label-cap">Notes</span>
-            <span className="nr-value">
-              {noteCount > 0 ? (
-                <>{noteCount} attached</>
-              ) : (
-                <span style={{ color: "var(--color-ink-muted)" }}>None</span>
-              )}
-            </span>
-            <button type="button" className="nr-edit" onClick={() => onJump(3)}>
-              Edit
-            </button>
-          </div>
-
-          <div className="nr-m-review-row">
-            <span className="nr-label-cap">Template</span>
-            <span className="nr-value">
-              {template ? (
-                <b>{template.name}</b>
-              ) : (
-                <span style={{ color: "var(--color-ink-muted)" }}>From scratch</span>
-              )}
-            </span>
-            <button type="button" className="nr-edit" onClick={() => onJump(3)}>
-              Change
-            </button>
-          </div>
-        </div>
-
-        <div className="nr-m-review-callout">
-          <span className="nr-ai-glyph" aria-hidden>
-            ✦
-          </span>
-          <div>
-            {captureOnly ? (
-              <>
-                First draft only uses your voice or image to write the report. Saved observations
-                and tracked progress for the child won&apos;t be included. You can still edit in the
-                editor.
-              </>
-            ) : (
-              <>
-                The assistant will use your audio and notes as the main sources
-                {template ? (
-                  <>
-                    , and the <b>{template.name}</b> structure to organize the draft
-                  </>
-                ) : null}
-                . It may add matching detail from saved observations when helpful. You can edit
-                anything in the editor.
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="nr-m-foot nr-m-foot--stack">
-        <label className="nr-m-capture-only-foot">
-          <input
-            type="checkbox"
-            checked={captureOnly}
-            onChange={(e) => onCaptureOnlyChange(e.target.checked)}
-          />
-          <span>
-            <span className="nr-m-capture-only-foot-kicker">Standalone report</span>
-            First draft only uses your voice or image to write the report. Saved observations and
-            tracked progress for the child won&apos;t be included.
-          </span>
-        </label>
-        <button type="button" className="nr-m-btn-primary" onClick={onSubmit} disabled={submitting}>
           {submitting ? "Starting…" : "Start drafting"}
           <ArrowRight size={14} strokeWidth={2.5} />
         </button>
@@ -660,8 +297,8 @@ function Step4Review({
 
 function DotRail({ step }: { step: Step }) {
   return (
-    <div className="nr-dot-rail" aria-label={`Step ${step} of 4`}>
-      {[1, 2, 3, 4].map((s) => (
+    <div className="nr-dot-rail" aria-label={`Step ${step} of 2`}>
+      {[1, 2].map((s) => (
         <span
           key={s}
           className={`nr-dot${s < step ? " nr-done" : ""}${s === step ? " nr-active" : ""}`}
