@@ -123,37 +123,43 @@ export default function AdminSchoolRosterPage() {
       : "No children match this search. Try a different name or classroom.";
 
   return (
-    <RosterListView
-      overline={overline}
-      title="Roster"
-      rows={visibleRows}
-      emptyMessage={emptyMessage}
-      toolbar={
-        <div style={{ padding: "28px 24px 12px" }}>
-          <div style={{ position: "relative", maxWidth: 400 }}>
-            <Search
-              size={15}
-              strokeWidth={1.5}
-              style={{
-                position: "absolute",
-                left: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--color-ink-muted)",
-                pointerEvents: "none",
-              }}
-            />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or classroom…"
-              className="h-10 bg-canvas"
-              style={{ paddingLeft: 32 }}
-              aria-label="Search roster"
-            />
+    <div
+      className="flex min-h-0 flex-col"
+      style={{ height: "calc(100dvh - 96px)", minHeight: 280 }}
+    >
+      <RosterListView
+        overline={overline}
+        title="Roster"
+        rows={visibleRows}
+        emptyMessage={emptyMessage}
+        scrollMode="stickyHeader"
+        toolbar={
+          <div style={{ padding: "20px 24px 16px" }}>
+            <div style={{ position: "relative", maxWidth: 400 }}>
+              <Search
+                size={15}
+                strokeWidth={1.5}
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--color-ink-muted)",
+                  pointerEvents: "none",
+                }}
+              />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or classroom…"
+                className="h-10 bg-canvas"
+                style={{ paddingLeft: 32 }}
+                aria-label="Search roster"
+              />
+            </div>
           </div>
-        </div>
-      }
-    />
+        }
+      />
+    </div>
   );
 }

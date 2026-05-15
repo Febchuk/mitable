@@ -58,6 +58,7 @@ export function RosterListView({
   rows,
   emptyMessage,
   toolbar,
+  scrollMode = "default",
 }: {
   overline: string;
   title: string;
@@ -65,66 +66,87 @@ export function RosterListView({
   emptyMessage: string;
   /** Renders between the page title and the roster table (e.g. search). */
   toolbar?: React.ReactNode;
+  /** When `stickyHeader`, title + toolbar stay fixed and only the roster body scrolls. */
+  scrollMode?: "default" | "stickyHeader";
 }) {
   const showClassrooms = rows.some((r) => r.classroomsLine != null && r.classroomsLine !== "");
+
+  const listContent =
+    rows.length === 0 ? (
+      <div
+        style={{
+          ...cardStyle,
+          padding: 24,
+          textAlign: "center",
+          color: "var(--color-ink-muted)",
+          fontSize: 13.5,
+        }}
+      >
+        {emptyMessage}
+      </div>
+    ) : (
+      <>
+        <div className="hidden lg:block" style={cardStyle}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: showClassrooms
+                ? "1.35fr 0.55fr 0.75fr 1.05fr 0.75fr 24px"
+                : "1.4fr 0.6fr 0.8fr 0.8fr 24px",
+              padding: "12px 20px",
+              borderBottom: "1px solid var(--color-border)",
+            }}
+          >
+            {(showClassrooms
+              ? ["Child", "Age", "Enrolled", "Classrooms", "Family", ""]
+              : ["Child", "Age", "Enrolled", "Family", ""]
+            ).map((h) => (
+              <div key={h} className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+                {h}
+              </div>
+            ))}
+          </div>
+          {rows.map((c) => (
+            <RosterDesktopRow key={c.id} c={c} showClassrooms={showClassrooms} />
+          ))}
+        </div>
+
+        <div className="lg:hidden" style={cardStyle}>
+          {rows.map((c, i) => (
+            <RosterMobileRow key={c.id} c={c} firstRow={i === 0} showClassrooms={showClassrooms} />
+          ))}
+        </div>
+      </>
+    );
+
+  if (scrollMode === "stickyHeader") {
+    return (
+      <div className="flex h-full min-h-0 flex-1 flex-col">
+        <div
+          className="shrink-0"
+          style={{
+            background: "var(--color-muted)",
+            borderBottom: "1px solid var(--color-border)",
+          }}
+        >
+          <PageHeader overline={overline} title={title} />
+          {toolbar}
+        </div>
+        <div
+          className="scroll-quiet min-h-0 flex-1 overflow-y-auto"
+          style={{ padding: "12px 24px 80px" }}
+        >
+          {listContent}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <PageHeader overline={overline} title={title} />
       {toolbar}
-      <div style={{ padding: "16px 24px 60px" }}>
-        {rows.length === 0 ? (
-          <div
-            style={{
-              ...cardStyle,
-              padding: 24,
-              textAlign: "center",
-              color: "var(--color-ink-muted)",
-              fontSize: 13.5,
-            }}
-          >
-            {emptyMessage}
-          </div>
-        ) : (
-          <>
-            <div className="hidden lg:block" style={cardStyle}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: showClassrooms
-                    ? "1.35fr 0.55fr 0.75fr 1.05fr 0.75fr 24px"
-                    : "1.4fr 0.6fr 0.8fr 0.8fr 24px",
-                  padding: "12px 20px",
-                  borderBottom: "1px solid var(--color-border)",
-                }}
-              >
-                {(showClassrooms
-                  ? ["Child", "Age", "Enrolled", "Classrooms", "Family", ""]
-                  : ["Child", "Age", "Enrolled", "Family", ""]
-                ).map((h) => (
-                  <div key={h} className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                    {h}
-                  </div>
-                ))}
-              </div>
-              {rows.map((c) => (
-                <RosterDesktopRow key={c.id} c={c} showClassrooms={showClassrooms} />
-              ))}
-            </div>
-
-            <div className="lg:hidden" style={cardStyle}>
-              {rows.map((c, i) => (
-                <RosterMobileRow
-                  key={c.id}
-                  c={c}
-                  firstRow={i === 0}
-                  showClassrooms={showClassrooms}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      <div style={{ padding: "16px 24px 60px" }}>{listContent}</div>
     </div>
   );
 }

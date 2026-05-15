@@ -454,17 +454,19 @@ export default function AdminClassroomsPage() {
     }
   };
 
-  const enrollExistingChild = async (studentId: string) => {
-    if (!selectedClassroomId) return;
+  const enrollExistingChildren = async (studentIds: string[]) => {
+    if (!selectedClassroomId || studentIds.length === 0) return;
     setMutationError(null);
     try {
-      await apiJson<{ ok: boolean }>("/api/admin/student-enrollments", {
-        method: "POST",
-        body: JSON.stringify({ student_id: studentId, classroom_id: selectedClassroomId }),
-      });
+      for (const studentId of studentIds) {
+        await apiJson<{ ok: boolean }>("/api/admin/student-enrollments", {
+          method: "POST",
+          body: JSON.stringify({ student_id: studentId, classroom_id: selectedClassroomId }),
+        });
+      }
       await reload();
     } catch (e) {
-      setMutationError(e instanceof Error ? e.message : "Could not add child to this classroom");
+      setMutationError(e instanceof Error ? e.message : "Could not add children to this classroom");
       throw e;
     }
   };
@@ -1012,7 +1014,7 @@ export default function AdminClassroomsPage() {
         )}
         schoolStudentsForImport={schoolStudentsForImport}
         onAdd={addChildManually}
-        onEnrollExisting={(studentId) => enrollExistingChild(studentId)}
+        onEnrollExistingMany={(studentIds) => enrollExistingChildren(studentIds)}
         onEnrollExistingWithGuardians={(studentId, guardianInput) =>
           enrollExistingChildWithGuardians(studentId, guardianInput)
         }
@@ -1406,7 +1408,7 @@ function AddChildDialog({
   rosterPickOptions,
   schoolStudentsForImport,
   onAdd,
-  onEnrollExisting,
+  onEnrollExistingMany,
   onEnrollExistingWithGuardians,
 }: {
   open: boolean;
@@ -1424,7 +1426,7 @@ function AddChildDialog({
     guardianEmail?: string;
     guardianPhone?: string;
   }) => void | Promise<void>;
-  onEnrollExisting: (studentId: string) => void | Promise<void>;
+  onEnrollExistingMany: (studentIds: string[]) => void | Promise<void>;
   onEnrollExistingWithGuardians: (
     studentId: string,
     input: {
@@ -1444,7 +1446,7 @@ function AddChildDialog({
   const [guardianEmail, setGuardianEmail] = React.useState("");
   const [guardianPhone, setGuardianPhone] = React.useState("");
   const [rosterSearch, setRosterSearch] = React.useState("");
-  const [pickedStudentId, setPickedStudentId] = React.useState<string | null>(null);
+  const [selectedRosterIds, setSelectedRosterIds] = React.useState<string[]>([]);
   const [enrollBusy, setEnrollBusy] = React.useState(false);
   const [duplicatePickId, setDuplicatePickId] = React.useState<string | null>(null);
   const [duplicateBusy, setDuplicateBusy] = React.useState(false);
@@ -1460,7 +1462,7 @@ function AddChildDialog({
       setGuardianEmail("");
       setGuardianPhone("");
       setRosterSearch("");
-      setPickedStudentId(null);
+      setSelectedRosterIds([]);
       setEnrollBusy(false);
       setDuplicatePickId(null);
       setDuplicateBusy(false);
@@ -1509,6 +1511,14 @@ function AddChildDialog({
       (o) => o.label.toLowerCase().includes(q) || o.hint.toLowerCase().includes(q)
     );
   }, [rosterPickOptions, rosterSearch]);
+
+  const toggleRosterSelection = (id: string) => {
+    setSelectedRosterIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const selectedRosterCount = selectedRosterIds.length;
 
   const dateInputClassName =
     "h-10 bg-canvas text-left [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer";
@@ -1729,8 +1739,8 @@ function AddChildDialog({
           <>
             <div className="space-y-3 px-6 py-5">
               <p className="text-xs text-ink-secondary">
-                Pick someone already on the school roster. They stay one person across classrooms;
-                this only adds them to {classroomName}.
+                Tap to select one or more students already on the school roster. They stay one
+                person across classrooms; this only adds them to {classroomName}.
               </p>
               <Input
                 value={rosterSearch}
@@ -1738,9 +1748,22 @@ function AddChildDialog({
                 placeholder="Search by name or current classroom…"
                 className="h-10 bg-canvas"
               />
+              {selectedRosterCount > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-secondary">
+                  <span>{selectedRosterCount} selected</span>
+                  <button
+                    type="button"
+                    className="font-medium text-ink underline decoration-ink/30 underline-offset-2 hover:text-ink"
+                    onClick={() => setSelectedRosterIds([])}
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              ) : null}
               <div
-                className="scroll-quiet max-h-[280px] overflow-y-auto rounded-xl border border-border bg-canvas"
+                className="scroll-quiet max-h-[min(360px,50vh)] overflow-y-auto rounded-xl border border-border bg-canvas"
                 role="listbox"
+                aria-multiselectable="true"
               >
                 {filteredRoster.length === 0 ? (
                   <div className="px-4 py-6 text-center text-sm text-ink-muted">
@@ -1750,41 +1773,63 @@ function AddChildDialog({
                   </div>
                 ) : (
                   filteredRoster.map((o) => {
-                    const active = pickedStudentId === o.id;
+                    const selected = selectedRosterIds.includes(o.id);
                     return (
                       <button
                         key={o.id}
                         type="button"
-                        className="tap flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left last:border-b-0"
+                        role="option"
+                        aria-selected={selected}
+                        className="tap flex w-full items-start gap-3 border-b border-border px-3 py-3 text-left last:border-b-0"
                         style={{
-                          background: active ? "var(--color-terracotta-soft)" : "transparent",
+                          background: selected ? "var(--color-terracotta-soft)" : "transparent",
                         }}
-                        onClick={() => setPickedStudentId(o.id)}
+                        onClick={() => toggleRosterSelection(o.id)}
                       >
-                        <span className="text-sm font-semibold text-ink">{o.label}</span>
-                        <span className="text-xs text-ink-muted">{o.hint}</span>
+                        <span
+                          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-ink/20"
+                          style={{
+                            background: selected ? "var(--color-terracotta)" : "transparent",
+                            borderColor: selected ? "var(--color-terracotta)" : undefined,
+                          }}
+                          aria-hidden
+                        >
+                          {selected ? (
+                            <Check className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
+                          ) : null}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="text-sm font-semibold text-ink">{o.label}</span>
+                          <span className="text-xs text-ink-muted">{o.hint}</span>
+                        </span>
                       </button>
                     );
                   })
                 )}
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button
                 type="button"
-                disabled={!pickedStudentId || enrollBusy || !classroomId}
+                disabled={selectedRosterCount === 0 || enrollBusy || !classroomId}
                 onClick={() => {
-                  if (!pickedStudentId || !classroomId) return;
+                  if (selectedRosterCount === 0 || !classroomId) return;
                   setEnrollBusy(true);
-                  void Promise.resolve(onEnrollExisting(pickedStudentId))
+                  void Promise.resolve(onEnrollExistingMany([...selectedRosterIds]))
                     .then(() => onOpenChange(false))
                     .finally(() => setEnrollBusy(false));
                 }}
               >
-                {enrollBusy ? "Adding…" : "Add to this classroom"}
+                {enrollBusy
+                  ? "Adding…"
+                  : selectedRosterCount === 0
+                    ? "Select students"
+                    : selectedRosterCount === 1
+                      ? "Add 1 to this classroom"
+                      : `Add ${selectedRosterCount} to this classroom`}
               </Button>
             </div>
           </>
