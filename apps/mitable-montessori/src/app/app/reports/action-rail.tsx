@@ -147,6 +147,17 @@ export function ActionRail({
         </RailButton>
       )}
 
+      {showDelete && (
+        <RailButton
+          tip="Delete report"
+          danger
+          aria-label="Delete report"
+          onClick={() => onOpenModal("delete")}
+        >
+          <Trash2 size={17} strokeWidth={1.8} />
+        </RailButton>
+      )}
+
       {reviewerSummary.length > 0 && (
         <>
           <div className={styles.rrRailSep} />
@@ -161,19 +172,6 @@ export function ActionRail({
             </div>
           ))}
         </>
-      )}
-
-      <div className={styles.rrRailSpacer} />
-
-      {showDelete && (
-        <RailButton
-          tip="Delete report"
-          danger
-          aria-label="Delete report"
-          onClick={() => onOpenModal("delete")}
-        >
-          <Trash2 size={17} strokeWidth={1.8} />
-        </RailButton>
       )}
     </aside>
   );
