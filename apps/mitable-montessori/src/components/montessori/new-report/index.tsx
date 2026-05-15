@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { ToastBus } from "../primitives";
 import { useIsMobile } from "../child-detail/use-is-mobile";
 import type { Tone } from "../data";
+import type { SectionMeta } from "@/lib/report-templates/sections";
 import { NewReportSheet } from "./new-report-sheet";
 import { NewReportMobile } from "./new-report-mobile";
 import type { PickerChild } from "./child-picker";
@@ -27,6 +28,7 @@ type ApiTemplateRow = {
   description: string | null;
   kind: ReportTemplate["kind"];
   sections: string[];
+  sectionMeta: SectionMeta | null;
   iconTone: ReportTemplate["iconTone"];
 };
 
@@ -62,6 +64,7 @@ export function NewReportTrigger() {
           description: t.description ?? "",
           kind: t.kind,
           sections: t.sections,
+          sectionMeta: t.sectionMeta ?? {},
           iconTone: t.iconTone,
         }));
         setTemplates(tplRows);

@@ -33,6 +33,7 @@ const TEMPLATES: ReportTemplate[] = [
     description: "Morning · Language · Math · Afternoon · Social",
     kind: "Daily",
     sections: ["Morning", "Language", "Math", "Afternoon", "Social"],
+    sectionMeta: {},
     iconTone: "clay",
   },
 ];

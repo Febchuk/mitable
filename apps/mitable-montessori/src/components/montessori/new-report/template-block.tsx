@@ -105,9 +105,18 @@ function TemplateRow({
 }
 
 /** Build a `ReportPdfData` from a template's empty form so we can render
- *  the real PDF preview before the report exists. Each template section
- *  becomes a heading with one empty paragraph so the layout reads as the
- *  shape parents will see. */
+ *  the real PDF preview before the report exists.
+ *
+ *  Each section is rendered per its template field type:
+ *  - `checklist`     → one paragraph with `field.selected = []` so every
+ *                      option prints with an empty checkbox glyph.
+ *  - `single_select` → one paragraph with `field.value = null` so every
+ *                      option prints as an unselected radio.
+ *  - `text` / missing meta → one empty prose paragraph.
+ *
+ *  This is what the editor produces server-side too, so the empty preview
+ *  reads the same shape as the parent-facing PDF after the teacher fills
+ *  it in. */
 function templateToPdfData(template: ReportTemplate, child: PickerChild | null): ReportPdfData {
   return {
     title: template.name,
@@ -116,10 +125,26 @@ function templateToPdfData(template: ReportTemplate, child: PickerChild | null):
     classroom: "",
     reportType: template.kind.toLowerCase(),
     logoUrl: null,
-    sections: template.sections.map((heading) => ({
-      heading,
-      paragraphs: [{ text: "" }],
-    })),
+    sections: template.sections.map((heading) => {
+      const meta = template.sectionMeta?.[heading];
+      if (meta?.type === "checklist") {
+        return {
+          heading,
+          paragraphs: [
+            { text: "", field: { kind: "checklist", options: meta.options, selected: [] } },
+          ],
+        };
+      }
+      if (meta?.type === "single_select") {
+        return {
+          heading,
+          paragraphs: [
+            { text: "", field: { kind: "single_select", options: meta.options, value: null } },
+          ],
+        };
+      }
+      return { heading, paragraphs: [{ text: "" }] };
+    }),
     body: null,
   };
 }

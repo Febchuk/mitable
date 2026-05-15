@@ -1,6 +1,8 @@
 /* Type-only module (the consts moved to the server: see
    src/lib/queries/templates.ts and src/lib/queries/captured-today.ts). */
 
+import type { SectionMeta } from "@/lib/report-templates/sections";
+
 export type ReportTemplate = {
   id: string;
   name: string;
@@ -8,6 +10,11 @@ export type ReportTemplate = {
   /** What kind of report this template is meant for. */
   kind: "Daily" | "Major" | "Incident";
   sections: string[];
+  /** Per-section field type + options (checklist / single_select / text).
+   *  Sections missing from this map default to plain text. Drives the
+   *  empty-template PDF preview so reviewers see real unchecked boxes /
+   *  unselected radios, not just headings. */
+  sectionMeta: SectionMeta;
   iconTone: "clay" | "butter" | "blue" | "sage";
 };
 
