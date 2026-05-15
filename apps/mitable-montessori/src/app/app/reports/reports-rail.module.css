@@ -119,23 +119,6 @@
   color: var(--color-ink);
   box-shadow: 0 1px 2px rgba(43, 38, 34, 0.06);
 }
-.rrTabCount {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--color-surface);
-  color: var(--color-ink-secondary);
-  border: 1px solid var(--color-border);
-  flex-shrink: 0;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
-}
-.rrTab[data-active="true"] .rrTabCount {
-  background: var(--color-terracotta);
-  color: #fff;
-  border-color: transparent;
-}
 
 .rrList {
   flex: 1;

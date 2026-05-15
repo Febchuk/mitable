@@ -423,8 +423,7 @@ export function ReportsRailView({
                     data-active={active ? "true" : "false"}
                     onClick={() => setFilter(t.id)}
                   >
-                    <span>{t.label}</span>
-                    <span className={styles.rrTabCount}>{counts[t.id]}</span>
+                    {t.label}
                   </button>
                 );
               })}
