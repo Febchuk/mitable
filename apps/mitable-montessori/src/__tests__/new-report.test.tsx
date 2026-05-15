@@ -34,6 +34,7 @@ const TEMPLATES: ReportTemplate[] = [
     kind: "Daily",
     sections: ["Morning", "Language", "Math", "Afternoon", "Social"],
     sectionMeta: {},
+    logoUrl: null,
     iconTone: "clay",
   },
 ];

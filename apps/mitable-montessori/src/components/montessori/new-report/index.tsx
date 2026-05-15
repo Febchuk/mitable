@@ -29,6 +29,7 @@ type ApiTemplateRow = {
   kind: ReportTemplate["kind"];
   sections: string[];
   sectionMeta: SectionMeta | null;
+  logoUrl: string | null;
   iconTone: ReportTemplate["iconTone"];
 };
 
@@ -65,6 +66,7 @@ export function NewReportTrigger() {
           kind: t.kind,
           sections: t.sections,
           sectionMeta: t.sectionMeta ?? {},
+          logoUrl: t.logoUrl ?? null,
           iconTone: t.iconTone,
         }));
         setTemplates(tplRows);

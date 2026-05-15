@@ -124,7 +124,7 @@ function templateToPdfData(template: ReportTemplate, child: PickerChild | null):
     reportDate: null,
     classroom: "",
     reportType: template.kind.toLowerCase(),
-    logoUrl: null,
+    logoUrl: template.logoUrl,
     sections: template.sections.map((heading) => {
       const meta = template.sectionMeta?.[heading];
       if (meta?.type === "checklist") {

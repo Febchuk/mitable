@@ -15,6 +15,9 @@ export type ReportTemplate = {
    *  empty-template PDF preview so reviewers see real unchecked boxes /
    *  unselected radios, not just headings. */
   sectionMeta: SectionMeta;
+  /** School-uploaded logo URL; printed at the top of the parent-facing
+   *  PDF. Null when the admin hasn't uploaded one. */
+  logoUrl: string | null;
   iconTone: "clay" | "butter" | "blue" | "sage";
 };
 
