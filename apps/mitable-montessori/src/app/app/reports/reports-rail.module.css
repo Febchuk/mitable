@@ -1056,8 +1056,13 @@
 }
 .rrMobileOverlayBody {
   flex: 1;
-  overflow: auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Inner panes (.rd-report-scroll for editor, .rd-pdf-preview-iframe for
+     preview) own their own scroll — the body just provides the flex column
+     context so .rd-root's `flex: 1` resolves to the full available height. */
+  overflow: hidden;
 }
 .rrMobileOverlayBody .rd-page-header-top {
   display: none; /* back-chevron is in the overlay top bar instead */
