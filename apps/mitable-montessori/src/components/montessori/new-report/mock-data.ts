@@ -13,14 +13,20 @@ export type ReportTemplate = {
 
 export type ReportKind = "Daily" | "Major" | "Incident";
 
-export type CapturedNote = {
-  id: string;
-  /** Object URL of the selected image — local-only until backend lands. */
-  url: string;
-  /** Original file name; falls back to "Note 1" etc. for camera captures. */
-  name: string;
+/** Submitted to /api/v1/reports. Audio + handwritten notes are no longer part
+ *  of the new-report flow — the assistant drafts from the empty template. The
+ *  backend still accepts `transcripts/notes/tokenMap`, so the trigger sends
+ *  empty arrays for those fields. */
+export type NewReportPayload = {
+  childId: string;
+  /** Mirrors the chosen template's kind. */
+  kind: ReportKind;
+  templateId: string;
 };
 
+/** Legacy — kept alive because `use-audio-recorder.ts` (consumed by the
+ *  not-rendered-but-typechecked report chat-pane) still references it. The
+ *  new-report flow itself no longer captures audio. */
 export type AudioMemo = {
   /** Object URL of the recorded blob. */
   url: string;
@@ -28,16 +34,14 @@ export type AudioMemo = {
   durationSec: number;
 };
 
-export type NewReportPayload = {
-  childId: string;
-  kind: ReportKind;
-  audio: AudioMemo | null;
-  notes: CapturedNote[];
-  templateId: string | null;
-  /** When true, initial draft uses only voice/notes + template — not saved progress. */
-  captureOnly: boolean;
+/** Legacy — same story as AudioMemo. */
+export type CapturedNote = {
+  id: string;
+  url: string;
+  name: string;
 };
 
+/** Legacy formatter — used by the not-rendered chat-pane only. */
 export function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);

@@ -82,7 +82,9 @@
   right: 0;
   top: 0;
   bottom: 0;
-  width: min(560px, calc(100vw - 80px));
+  /* Wider than before to fit the 2-col body (form + preview). Falls back
+     to single-col below 760px (see .nr-body-2col @media). */
+  width: min(820px, calc(100vw - 64px));
   background: var(--color-surface);
   border-left: 1px solid var(--color-border-strong);
   box-shadow: -24px 0 60px rgba(43, 38, 34, 0.16);
@@ -1471,4 +1473,235 @@
   .nr-mobile-fullscreen {
     display: none;
   }
+}
+
+/* ===========================================================================
+   New-report simplified flow — child + template + preview
+   =========================================================================== */
+
+/* Desktop body becomes a 2-col grid: form on the left, preview on the right.
+   Below 760px sheet width the right column drops underneath the form so the
+   preview stays usable on narrower laptops. */
+.nr-body-2col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+.nr-body-form {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.nr-body-preview {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .nr-body-2col {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .nr-body-preview {
+    position: static;
+  }
+}
+
+/* Sheet footer in the simplified flow drops the capture-only callout —
+   we collapse to a single row with summary + buttons. */
+.nr-foot-simple {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.nr-foot-simple .nr-foot-meta {
+  flex: 1;
+  min-width: 0;
+}
+.nr-foot-simple .nr-foot-buttons {
+  flex-shrink: 0;
+}
+
+/* ---------- Preview pane (renders the empty template's actual PDF) ---------- */
+.nr-preview {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 16px 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Height is the sheet body minus header/footer; the inner iframe
+     consumes the remaining space. */
+  height: calc(100vh - 260px);
+  overflow: hidden;
+}
+.nr-preview[data-locked="true"] {
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+}
+.nr-preview-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.nr-preview-kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+.nr-preview-title {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--color-ink);
+}
+.nr-preview-sub {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink-secondary);
+}
+
+/* The PDF iframe lives inside the preview card; let it consume all the
+   remaining height and clip cleanly to the card's rounded corners. */
+.nr-preview-pdf {
+  flex: 1;
+  min-height: 0;
+  margin: 4px -18px 0;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+.nr-preview-pdf > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Placeholder when nothing is highlighted yet on desktop. */
+.nr-preview-placeholder {
+  background: var(--color-canvas);
+  border: 1px dashed color-mix(in srgb, var(--color-border) 80%, transparent);
+  border-radius: 14px;
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 200px;
+}
+.nr-preview-placeholder-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: grid;
+  place-items: center;
+  color: var(--color-ink-secondary);
+}
+.nr-preview-placeholder-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: -0.005em;
+  margin-top: 2px;
+}
+.nr-preview-placeholder-sub {
+  font-size: 12.5px;
+  color: var(--color-ink-secondary);
+  line-height: 1.5;
+}
+
+/* ---------- Mobile template list (chevron-accordion preview) ---------- */
+.nr-m-template-item {
+  display: flex;
+  flex-direction: column;
+}
+.nr-m-template-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.nr-m-template-row.nr-selected {
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+}
+.nr-m-template-rowMain {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+}
+.nr-m-template-previewBtn {
+  flex-shrink: 0;
+  width: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-ink-muted);
+}
+.nr-m-template-previewBtn:hover {
+  background: var(--color-muted);
+  color: var(--color-ink);
+}
+.nr-m-template-previewBtn[aria-expanded="true"] {
+  background: var(--color-muted);
+  color: var(--color-ink);
+}
+.nr-m-template-preview {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  margin-top: -3px;
+  padding: 12px;
+  animation: nr-fade-in 160ms ease both;
+}
+.nr-m-template-preview .nr-preview {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  /* Fixed height for the inline mobile preview so the PDF iframe has a
+     concrete container to render into. */
+  height: 60vh;
+  overflow: hidden;
+}
+.nr-m-template-preview .nr-preview-pdf {
+  margin: 4px 0 0;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Mobile body keeps the list breathing. */
+.nr-m-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
 }
