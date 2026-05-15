@@ -48,6 +48,7 @@ import {
   type StudentImportDraft,
   type StudentImportPlan,
 } from "@/lib/admin/student-import";
+import { executeStudentImportPlan } from "@/lib/admin/execute-student-import-plan";
 import {
   PROGRAM_LABEL,
   PROGRAM_ORDER,
@@ -129,7 +130,7 @@ type SchoolRosterApiStudent = {
   classrooms: Array<{ id: string; name: string }>;
 };
 
-type SchoolRosterPickOption = {
+export type SchoolRosterPickOption = {
   id: string;
   label: string;
   hint: string;
@@ -159,21 +160,6 @@ function guardianRelationshipLabel(r: string | null): string {
     default:
       return "Guardian";
   }
-}
-
-function mapGuardianRelationship(raw: string): "mother" | "father" | "guardian" | "other" {
-  const x = raw.trim().toLowerCase();
-  if (x.includes("mother") || x === "mom") return "mother";
-  if (x.includes("father") || x === "dad") return "father";
-  if (x.includes("other")) return "other";
-  return "guardian";
-}
-
-function splitPersonName(full: string): { first_name: string; last_name: string } {
-  const t = full.trim();
-  const space = t.indexOf(" ");
-  if (space === -1) return { first_name: t || "Unknown", last_name: "" };
-  return { first_name: t.slice(0, space).trim(), last_name: t.slice(space + 1).trim() };
 }
 
 function rosterToAdminChildren(roster: ApiRosterStudent[]): AdminChild[] {
@@ -347,105 +333,7 @@ export default function AdminClassroomsPage() {
   ) => {
     setMutationError(null);
     try {
-      for (const s of plan.newStudents) {
-        const matches = listSchoolStudentsMatchingName(
-          s.firstName,
-          s.lastName,
-          schoolStudentsForImport
-        );
-
-        let studentId: string;
-        if (matches.length > 0) {
-          const pick = nameMatchPicks[s.draftId];
-          if (!pick) {
-            throw new Error("Resolve same-name warnings on highlighted rows before importing.");
-          }
-          if (pick !== "new") {
-            if (!matches.some((m) => m.id === pick)) {
-              throw new Error("Stale student selection — reopen import and pick again.");
-            }
-            await apiJson<{ ok: boolean }>("/api/admin/student-enrollments", {
-              method: "POST",
-              body: JSON.stringify({ student_id: pick, classroom_id: s.classroomId }),
-            });
-            studentId = pick;
-          } else {
-            const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
-              method: "POST",
-              body: JSON.stringify({
-                first_name: s.firstName,
-                last_name: s.lastName,
-                ...(s.birthDate ? { birth_date: s.birthDate } : {}),
-                classroom_id: s.classroomId,
-              }),
-            });
-            studentId = created.id;
-          }
-        } else {
-          const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
-            method: "POST",
-            body: JSON.stringify({
-              first_name: s.firstName,
-              last_name: s.lastName,
-              ...(s.birthDate ? { birth_date: s.birthDate } : {}),
-              classroom_id: s.classroomId,
-            }),
-          });
-          studentId = created.id;
-        }
-
-        for (const g of s.guardians) {
-          const email = (g.email ?? "").trim();
-          const name = (g.name ?? "").trim();
-          if (!email && !name) continue;
-          const gn = name ? splitPersonName(name) : { first_name: "", last_name: "" };
-          const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
-            method: "POST",
-            body: JSON.stringify({
-              first_name: gn.first_name.trim() || undefined,
-              last_name: gn.last_name.trim() || undefined,
-              email: email || undefined,
-              phone: (g.phone ?? "").trim() || undefined,
-              preferred_contact_method: "either",
-            }),
-          });
-          await apiJson("/api/admin/student-guardians", {
-            method: "POST",
-            body: JSON.stringify({
-              student_id: studentId,
-              guardian_id: guardianRow.id,
-              relationship: mapGuardianRelationship(g.relationship || "guardian"),
-              is_primary_contact: false,
-              receives_reports: true,
-            }),
-          });
-        }
-      }
-      for (const item of plan.guardiansForExisting) {
-        const email = (item.guardian.email ?? "").trim();
-        const name = (item.guardian.name ?? "").trim();
-        const gn = name ? splitPersonName(name) : { first_name: "", last_name: "" };
-        const guardianRow = await apiJson<{ ok: boolean; id: string }>("/api/admin/guardians", {
-          method: "POST",
-          body: JSON.stringify({
-            first_name: gn.first_name.trim() || undefined,
-            last_name: gn.last_name.trim() || undefined,
-            email: email || undefined,
-            phone: (item.guardian.phone ?? "").trim() || undefined,
-            preferred_contact_method: "either",
-          }),
-        });
-        await apiJson("/api/admin/student-guardians", {
-          method: "POST",
-          body: JSON.stringify({
-            student_id: item.studentId,
-            guardian_id: guardianRow.id,
-            relationship: mapGuardianRelationship(item.guardian.relationship || "guardian"),
-            is_primary_contact: false,
-            receives_reports: true,
-          }),
-        });
-      }
+      await executeStudentImportPlan(apiJson, plan, nameMatchPicks, schoolStudentsForImport);
       await reload();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Import failed";
@@ -991,6 +879,8 @@ export default function AdminClassroomsPage() {
         classrooms={classrooms}
         existingStudents={existingStudents}
         schoolStudentsForImport={schoolStudentsForImport}
+        allowUnassignedClassroom={false}
+        importTarget="classroom"
         onImport={(plan, nameMatchPicks) => applyImportPlan(plan, nameMatchPicks)}
       />
 
@@ -1004,6 +894,7 @@ export default function AdminClassroomsPage() {
       <AddChildDialog
         open={addChildOpen}
         onOpenChange={setAddChildOpen}
+        scope="classroom"
         classroomName={selectedClassroom?.name ?? "Classroom"}
         classroomId={selectedClassroomId}
         rosterPickOptions={schoolRosterPickOptions.filter(
@@ -1400,19 +1291,22 @@ function CreateClassroomDialog({
   );
 }
 
-function AddChildDialog({
+export function AddChildDialog({
   open,
   onOpenChange,
+  scope = "classroom",
   classroomName,
   classroomId,
   rosterPickOptions,
   schoolStudentsForImport,
   onAdd,
-  onEnrollExistingMany,
-  onEnrollExistingWithGuardians,
+  onEnrollExistingMany = async () => {},
+  onEnrollExistingWithGuardians = async () => {},
+  onAttachGuardiansOnly,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  scope?: "classroom" | "school";
   classroomName: string;
   classroomId: string | null;
   rosterPickOptions: SchoolRosterPickOption[];
@@ -1426,8 +1320,17 @@ function AddChildDialog({
     guardianEmail?: string;
     guardianPhone?: string;
   }) => void | Promise<void>;
-  onEnrollExistingMany: (studentIds: string[]) => void | Promise<void>;
-  onEnrollExistingWithGuardians: (
+  onEnrollExistingMany?: (studentIds: string[]) => void | Promise<void>;
+  onEnrollExistingWithGuardians?: (
+    studentId: string,
+    input: {
+      guardianFirstName?: string;
+      guardianLastName?: string;
+      guardianEmail?: string;
+      guardianPhone?: string;
+    }
+  ) => void | Promise<void>;
+  onAttachGuardiansOnly?: (
     studentId: string,
     input: {
       guardianFirstName?: string;
@@ -1497,6 +1400,7 @@ function AddChildDialog({
   }, [firstName, lastName, schoolStudentsForImport]);
 
   const hasDuplicateName = canSubmitNew && nameMatches.length > 0;
+  const canAttachGuardiansOnly = emailOk || (Boolean(gf) && Boolean(gl));
   const guardianPayload = {
     guardianFirstName: gf || undefined,
     guardianLastName: gl || undefined,
@@ -1528,26 +1432,32 @@ function AddChildDialog({
       <DialogContent className="max-w-[520px] rounded-[22px] border border-border bg-surface p-0 shadow-2xl">
         <DialogHeader className="border-b border-border px-6 py-5">
           <DialogTitle className="text-xl">Add child</DialogTitle>
-          <p className="text-sm text-ink-secondary">Adding to {classroomName}.</p>
-          <div className="mt-4 flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === "new" ? "default" : "secondary"}
-              onClick={() => setMode("new")}
-            >
-              New child
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === "roster" ? "default" : "secondary"}
-              onClick={() => setMode("roster")}
-              disabled={!classroomId}
-            >
-              From school roster
-            </Button>
-          </div>
+          <p className="text-sm text-ink-secondary">
+            {scope === "school"
+              ? "Adds a student to the whole-school roster. You can assign a classroom later under Classrooms."
+              : `Adding to ${classroomName}.`}
+          </p>
+          {scope === "classroom" ? (
+            <div className="mt-4 flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "new" ? "default" : "secondary"}
+                onClick={() => setMode("new")}
+              >
+                New child
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "roster" ? "default" : "secondary"}
+                onClick={() => setMode("roster")}
+                disabled={!classroomId}
+              >
+                From school roster
+              </Button>
+            </div>
+          ) : null}
         </DialogHeader>
 
         {mode === "new" ? (
@@ -1632,7 +1542,7 @@ function AddChildDialog({
                 )}
               </div>
 
-              {hasDuplicateName && classroomId ? (
+              {hasDuplicateName && scope === "classroom" && classroomId ? (
                 <div className="rounded-xl border border-terracotta/35 bg-terracotta/10 px-4 py-3 text-sm text-ink">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-terracotta" />
@@ -1705,7 +1615,86 @@ function AddChildDialog({
                     </Button>
                   </div>
                 </div>
-              ) : hasDuplicateName && !classroomId ? (
+              ) : hasDuplicateName && scope === "school" && onAttachGuardiansOnly ? (
+                <div className="rounded-xl border border-terracotta/35 bg-terracotta/10 px-4 py-3 text-sm text-ink">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-terracotta" />
+                    <div>
+                      <p className="font-medium">
+                        A child with this first and last name is already on the school roster.
+                      </p>
+                      <p className="mt-1 text-xs text-ink-secondary">
+                        Add guardians to that student, or create a second record only if this is a
+                        different child.
+                      </p>
+                    </div>
+                  </div>
+                  {nameMatches.length > 1 ? (
+                    <div className="mt-3 space-y-1">
+                      <div className="label-cap text-ink-muted">Which existing child?</div>
+                      <select
+                        className="h-9 w-full max-w-md rounded-md border border-ink/15 bg-surface px-2 text-sm text-ink"
+                        value={duplicatePickId ?? ""}
+                        onChange={(e) => setDuplicatePickId(e.target.value || null)}
+                      >
+                        {nameMatches.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.firstName} {c.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={duplicateBusy || !duplicatePickId || !canAttachGuardiansOnly}
+                      onClick={() => {
+                        const sid = nameMatches.length === 1 ? nameMatches[0].id : duplicatePickId;
+                        if (!sid) return;
+                        setDuplicateBusy(true);
+                        void Promise.resolve(onAttachGuardiansOnly(sid, guardianPayload))
+                          .then(() => onOpenChange(false))
+                          .finally(() => setDuplicateBusy(false));
+                      }}
+                    >
+                      {duplicateBusy ? "Saving…" : "Add guardians to this child"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={duplicateBusy}
+                      onClick={() => {
+                        setDuplicateBusy(true);
+                        void Promise.resolve(
+                          onAdd({
+                            firstName,
+                            lastName,
+                            birthDate: birthDate.trim() || undefined,
+                            guardianFirstName: gf || undefined,
+                            guardianLastName: gl || undefined,
+                            guardianEmail: ge || undefined,
+                            guardianPhone: gp || undefined,
+                          })
+                        )
+                          .then(() => onOpenChange(false))
+                          .finally(() => setDuplicateBusy(false));
+                      }}
+                    >
+                      Create new student record anyway
+                    </Button>
+                  </div>
+                  {!canAttachGuardiansOnly ? (
+                    <p className="mt-2 text-xs text-ink-muted">
+                      Enter a valid guardian email, or both guardian first and last name with a
+                      valid email, to attach guardians to the existing child.
+                    </p>
+                  ) : null}
+                </div>
+              ) : hasDuplicateName && scope === "classroom" && !classroomId ? (
                 <p className="text-xs text-terracotta">Pick a classroom first.</p>
               ) : null}
             </div>
@@ -2216,12 +2205,14 @@ function RosterMobileRow({
   );
 }
 
-function StudentImportDialog({
+export function StudentImportDialog({
   open,
   onOpenChange,
   classrooms,
   existingStudents,
   schoolStudentsForImport,
+  allowUnassignedClassroom = false,
+  importTarget = "classroom",
   onImport,
 }: {
   open: boolean;
@@ -2229,6 +2220,8 @@ function StudentImportDialog({
   classrooms: ClassroomOption[];
   existingStudents: Array<{ id: string; name: string; birthDate?: string; classroomId?: string }>;
   schoolStudentsForImport: Array<{ id: string; firstName: string; lastName: string }>;
+  allowUnassignedClassroom?: boolean;
+  importTarget?: "classroom" | "school";
   onImport: (
     plan: StudentImportPlan,
     nameMatchPicks: Record<string, "new" | string>
@@ -2269,8 +2262,9 @@ function StudentImportDialog({
   };
 
   const analyses = React.useMemo(
-    () => drafts.map((draft) => analyzeImportDraft(draft, classrooms)),
-    [drafts, classrooms]
+    () =>
+      drafts.map((draft) => analyzeImportDraft(draft, classrooms, { allowUnassignedClassroom })),
+    [drafts, classrooms, allowUnassignedClassroom]
   );
   const planResult = React.useMemo(
     () => buildStudentImportPlan(analyses, existingStudents),
@@ -2313,7 +2307,7 @@ function StudentImportDialog({
     drafts.length > 0 &&
     issueCount === 0 &&
     !!planResult.plan &&
-    classrooms.length > 0 &&
+    (allowUnassignedClassroom || classrooms.length > 0) &&
     nameMatchBlockers === 0;
 
   const updateDraft = (id: string, update: Partial<StudentImportDraft>) => {
@@ -2355,8 +2349,9 @@ function StudentImportDialog({
         <DialogHeader className="border-b border-border px-6 py-5">
           <DialogTitle className="text-xl">Import children</DialogTitle>
           <p className="text-sm text-ink-secondary">
-            Paste rows from a spreadsheet or upload a CSV. We will show every issue before anything
-            is added.
+            {importTarget === "school"
+              ? "Paste rows from a spreadsheet or upload a CSV. Classroom is optional — leave it blank to add children to the school roster only; assign classes later under Classrooms."
+              : "Paste rows from a spreadsheet or upload a CSV. We will show every issue before anything is added."}
           </p>
         </DialogHeader>
 
@@ -2478,6 +2473,8 @@ function StudentImportDialog({
                       analysis={analyses[index]}
                       issues={issuesById.get(draft.id) ?? []}
                       classrooms={classrooms}
+                      allowUnassignedClassroom={allowUnassignedClassroom}
+                      importTarget={importTarget}
                       typoCounts={typoCounts}
                       onUpdate={updateDraft}
                       onRemove={() =>
@@ -2533,6 +2530,8 @@ function ImportDraftCard({
   analysis,
   issues,
   classrooms,
+  allowUnassignedClassroom = false,
+  importTarget = "classroom",
   typoCounts,
   onUpdate,
   onRemove,
@@ -2545,6 +2544,8 @@ function ImportDraftCard({
   analysis: DraftAnalysis;
   issues: ImportIssue[];
   classrooms: ClassroomOption[];
+  allowUnassignedClassroom?: boolean;
+  importTarget?: "classroom" | "school";
   typoCounts: Map<string, number>;
   onUpdate: (id: string, update: Partial<StudentImportDraft>) => void;
   onRemove: () => void;
@@ -2598,7 +2599,7 @@ function ImportDraftCard({
           onChange={(value) => onUpdate(draft.id, { birthDate: value })}
         />
         <MiniInput
-          label="Classroom"
+          label={allowUnassignedClassroom ? "Classroom (optional)" : "Classroom"}
           value={draft.classroomName}
           onChange={(value) => onUpdate(draft.id, { classroomName: value })}
         />
@@ -2637,8 +2638,9 @@ function ImportDraftCard({
         >
           <p className="font-medium">Same first and last name as a child already at this school.</p>
           <p className="mt-1 text-xs text-ink-secondary">
-            Link this row to an existing student (they are added to the classroom from this import),
-            or create a second student record if this is a different child.
+            {importTarget === "school"
+              ? "Link this row to an existing student to attach guardians only, or create a second student record if this is a different child."
+              : "Link this row to an existing student (they are added to the classroom from this import), or create a second student record if this is a different child."}
           </p>
           {nameMatchCandidates.length === 1 ? (
             <div className="mt-3 flex flex-wrap gap-2">
