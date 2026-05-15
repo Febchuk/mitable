@@ -8,6 +8,23 @@ import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/secti
 
 const PREFIX = "__MITABLE_FIELD_V1__";
 
+function escapeHtmlText(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** HTML for a curriculum-backed section (speech = bullet list). */
+export function speechLabelsToReportHtml(labels: string[]): string {
+  if (labels.length === 0) {
+    return plainTextToReportParagraphHtml("No speech targets on file yet.");
+  }
+  const items = labels.map((l) => `<li>${escapeHtmlText(l)}</li>`).join("");
+  return `<ul>${items}</ul>`;
+}
+
 /** Escape plain text for one report paragraph (`innerHTML`); newlines → `<br>`. */
 export function plainTextToReportParagraphHtml(plain: string): string {
   const t = plain.replace(/\r\n/g, "\n");
@@ -20,15 +37,19 @@ export function plainTextToReportParagraphHtml(plain: string): string {
     .replace(/\n/g, "<br>");
 }
 
-/** Seed HTML when a report row is created from a template (hardcoded = verbatim from guidance). */
+/** Seed HTML when a report row is created from a template. */
 export function initialParagraphHtmlForTemplateSection(
   heading: string,
   guidance: string,
-  meta: SectionMeta
+  meta: SectionMeta,
+  opts?: { speechLabels?: string[] }
 ): string {
   const entry = meta[heading];
   if (entry?.type === "hardcoded") {
     return plainTextToReportParagraphHtml(guidance);
+  }
+  if (entry?.type === "curriculum" && entry.program === "speech") {
+    return speechLabelsToReportHtml(opts?.speechLabels ?? []);
   }
   return "";
 }
@@ -132,7 +153,7 @@ export function paragraphCountsTowardDraftReadiness(
   html: string,
   fieldMeta?: SectionMetaEntry | null
 ): boolean {
-  if (fieldMeta?.type === "hardcoded") return false;
+  if (fieldMeta?.type === "hardcoded" || fieldMeta?.type === "curriculum") return false;
   return paragraphHasTeacherContent(html);
 }
 
@@ -143,7 +164,8 @@ export function normalizeSectionHtmlForTemplate(
   meta: SectionMeta
 ): string {
   const entry = meta[heading];
-  if (!entry || entry.type === "text" || entry.type === "hardcoded") return html;
+  if (!entry || entry.type === "text" || entry.type === "hardcoded" || entry.type === "curriculum")
+    return html;
 
   const decoded = decodeFieldPayload(html);
   if (entry.type === "checklist") {

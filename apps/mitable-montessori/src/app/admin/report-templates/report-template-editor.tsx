@@ -133,6 +133,7 @@ export function ReportTemplateEditor({
       description: (b.row.description ?? "").trim(),
       fieldType: b.row.fieldType ?? "text",
       options: (b.row.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0),
+      curriculumProgram: b.row.curriculumProgram,
     }));
     if (filled.some((r) => !r.section)) {
       ToastBus.push({ message: "Every section needs a title." });
@@ -156,6 +157,10 @@ export function ReportTemplateEditor({
       ToastBus.push({ message: "Fixed-text sections need the exact wording filled in." });
       return false;
     }
+    if (filled.some((r) => r.fieldType === "curriculum" && !r.curriculumProgram)) {
+      ToastBus.push({ message: "Curriculum sections need a program selected." });
+      return false;
+    }
     return true;
   };
 
@@ -167,15 +172,21 @@ export function ReportTemplateEditor({
     writingStyle: writingStyle.trim(),
     reportingPeriod: reportingPeriod ?? null,
     contextModeDefault: contextMode,
-    templateSections: bundles.map((b) => ({
-      section: b.row.section.trim(),
-      description: (b.row.description ?? "").trim(),
-      fieldType: b.row.fieldType ?? "text",
-      options:
-        b.row.fieldType === "checklist" || b.row.fieldType === "single_select"
-          ? (b.row.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0)
-          : [],
-    })),
+    templateSections: bundles.map((b) => {
+      const ft = b.row.fieldType ?? "text";
+      return {
+        section: b.row.section.trim(),
+        description: (b.row.description ?? "").trim(),
+        fieldType: ft,
+        options:
+          ft === "checklist" || ft === "single_select"
+            ? (b.row.options ?? []).map((o) => o.trim()).filter((o) => o.length > 0)
+            : [],
+        ...(ft === "curriculum" && b.row.curriculumProgram
+          ? { curriculumProgram: b.row.curriculumProgram }
+          : {}),
+      };
+    }),
   });
 
   const onSave = async () => {
@@ -702,6 +713,8 @@ export function ReportTemplateEditor({
                                         next === "checklist" || next === "single_select"
                                           ? (p.row.options ?? [])
                                           : [],
+                                      curriculumProgram:
+                                        next === "curriculum" ? "speech" : undefined,
                                     },
                                   }
                                 : p
@@ -713,6 +726,7 @@ export function ReportTemplateEditor({
                         <option value="checklist">Checklist (multi-select)</option>
                         <option value="single_select">Single-select</option>
                         <option value="hardcoded">Fixed text (school boilerplate)</option>
+                        <option value="curriculum">Curriculum (speech targets)</option>
                       </select>
                     </div>
                     {row.fieldType === "checklist" || row.fieldType === "single_select" ? (
@@ -738,6 +752,20 @@ export function ReportTemplateEditor({
                         }
                         placeholder="Exact wording for every report — teachers do not edit this in the report editor."
                         rows={5}
+                        className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
+                      />
+                    ) : row.fieldType === "curriculum" ? (
+                      <Textarea
+                        value={row.description}
+                        onChange={(e) =>
+                          setBundles((prev) =>
+                            prev.map((p, j) =>
+                              j === i ? { ...p, row: { ...p.row, description: e.target.value } } : p
+                            )
+                          )
+                        }
+                        placeholder="Optional: extra instructions for the assistant. Section body is auto-filled from the child’s speech targets (Curriculum → Speech)."
+                        rows={3}
                         className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
                       />
                     ) : (

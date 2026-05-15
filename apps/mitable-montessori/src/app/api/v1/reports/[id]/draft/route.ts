@@ -8,10 +8,12 @@ import { SupabaseReportDataAdapter } from "@/lib/reports/supabase-adapter";
 import { DraftFromCaptureRequestSchema } from "@/lib/schemas/report";
 import { detokenizeReportText } from "@/lib/reports/detokenize";
 import { fetchTemplateLogoUrl } from "@/lib/queries/reports";
-import type { SectionMeta } from "@/lib/report-templates/sections";
+import { fetchSpeechTargetLabels } from "@/lib/queries/speech-targets";
+import { sectionExcludedFromAgent, type SectionMeta } from "@/lib/report-templates/sections";
 import {
   normalizeSectionHtmlForTemplate,
   plainTextToReportParagraphHtml,
+  speechLabelsToReportHtml,
 } from "@/lib/reports/template-field-payload";
 
 function sectionSlug(heading: string, i: number): string {
@@ -129,7 +131,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       templateHeadings = headings;
       sectionGuidance = guidance;
       templateSections = headings
-        .filter((heading) => templateSectionMeta[heading]?.type !== "hardcoded")
+        .filter((heading) => !sectionExcludedFromAgent(templateSectionMeta[heading]))
         .map((heading) => ({
           heading,
           guidance: guidance[heading] ?? "",
@@ -246,11 +248,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       let skipReportPayload: Record<string, unknown> | null = null;
       if (
         templateHeadings.length > 0 &&
-        templateHeadings.some((h) => templateSectionMeta[h]?.type === "hardcoded")
+        templateHeadings.some((h) => sectionExcludedFromAgent(templateSectionMeta[h]))
       ) {
+        const skipNeedsSpeech = templateHeadings.some((h) => {
+          const e = templateSectionMeta[h];
+          return e?.type === "curriculum" && e.program === "speech";
+        });
+        const skipSpeechLabels = skipNeedsSpeech
+          ? await fetchSpeechTargetLabels(supabase, report.student_id as string)
+          : [];
         const editorSections = templateHeadings.map((heading, i) => {
           const slug = sectionSlug(heading, i);
-          if (templateSectionMeta[heading]?.type === "hardcoded") {
+          const meta = templateSectionMeta[heading];
+          if (meta?.type === "hardcoded") {
             return {
               id: `s-${i}-${slug}`,
               heading,
@@ -258,6 +268,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
                 {
                   id: `p-${i}-1`,
                   html: plainTextToReportParagraphHtml(sectionGuidance[heading] ?? ""),
+                },
+              ],
+            };
+          }
+          if (meta?.type === "curriculum" && meta.program === "speech") {
+            return {
+              id: `s-${i}-${slug}`,
+              heading,
+              paragraphs: [
+                {
+                  id: `p-${i}-1`,
+                  html: speechLabelsToReportHtml(skipSpeechLabels),
                 },
               ],
             };
@@ -358,8 +380,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       paragraphs: { id: string; html: string }[];
     }>;
 
+    const needsSpeechForTemplate = templateHeadings.some((h) => {
+      const e = templateSectionMeta[h];
+      return e?.type === "curriculum" && e.program === "speech";
+    });
+    const speechLabelsForReport = needsSpeechForTemplate
+      ? await fetchSpeechTargetLabels(supabase, report.student_id as string)
+      : [];
+
     const headingsForAgent = templateHeadings.filter(
-      (h) => templateSectionMeta[h]?.type !== "hardcoded"
+      (h) => !sectionExcludedFromAgent(templateSectionMeta[h])
     );
 
     if (templateHeadings.length === 0) {
@@ -400,15 +430,35 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     } else if (headingsForAgent.length === 0) {
       editorSections = templateHeadings.map((heading, i) => {
         const slug = sectionSlug(heading, i);
+        const meta = templateSectionMeta[heading];
+        if (meta?.type === "hardcoded") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [
+              {
+                id: `p-${i}-1`,
+                html: plainTextToReportParagraphHtml(sectionGuidance[heading] ?? ""),
+              },
+            ],
+          };
+        }
+        if (meta?.type === "curriculum" && meta.program === "speech") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [
+              {
+                id: `p-${i}-1`,
+                html: speechLabelsToReportHtml(speechLabelsForReport),
+              },
+            ],
+          };
+        }
         return {
           id: `s-${i}-${slug}`,
           heading,
-          paragraphs: [
-            {
-              id: `p-${i}-1`,
-              html: plainTextToReportParagraphHtml(sectionGuidance[heading] ?? ""),
-            },
-          ],
+          paragraphs: [{ id: `p-${i}-1`, html: "" }],
         };
       });
       detokTitle = null;
@@ -443,6 +493,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
               {
                 id: `p-${i}-1`,
                 html: plainTextToReportParagraphHtml(sectionGuidance[heading] ?? ""),
+              },
+            ],
+          };
+        }
+        const cur = templateSectionMeta[heading];
+        if (cur?.type === "curriculum" && cur.program === "speech") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [
+              {
+                id: `p-${i}-1`,
+                html: speechLabelsToReportHtml(speechLabelsForReport),
               },
             ],
           };

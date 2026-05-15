@@ -6,6 +6,7 @@ import { listReports } from "@/lib/queries/reports";
 import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import { CreateReportRequestSchema, type ReportKind } from "@/lib/schemas/report";
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import { fetchSpeechTargetLabels } from "@/lib/queries/speech-targets";
 import { initialParagraphHtmlForTemplateSection } from "@/lib/reports/template-field-payload";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
@@ -77,13 +78,22 @@ export async function POST(req: Request) {
     if (tpl && (tpl.school_id as string) === auth.user.schoolId && tpl.sections) {
       const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
       const meta = (tpl.section_meta as SectionMeta | null) ?? {};
-      sections = (tpl.sections as string[]).map((heading, i) => ({
+      const headings = tpl.sections as string[];
+      const needsSpeech = headings.some(
+        (h) => meta[h]?.type === "curriculum" && meta[h]?.program === "speech"
+      );
+      const speechLabels = needsSpeech
+        ? await fetchSpeechTargetLabels(supabase, input.childId)
+        : [];
+      sections = headings.map((heading, i) => ({
         id: `s-${i}-${heading.toLowerCase().replace(/\s+/g, "-")}`,
         heading,
         paragraphs: [
           {
             id: `p-${i}-1`,
-            html: initialParagraphHtmlForTemplateSection(heading, guidance[heading] ?? "", meta),
+            html: initialParagraphHtmlForTemplateSection(heading, guidance[heading] ?? "", meta, {
+              speechLabels,
+            }),
           },
         ],
       }));

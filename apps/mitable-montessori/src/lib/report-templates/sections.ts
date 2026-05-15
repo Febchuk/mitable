@@ -10,7 +10,16 @@ import { z } from "zod";
  * so existing templates render without a backfill.
  */
 
-export const TEMPLATE_FIELD_TYPES = ["text", "checklist", "single_select", "hardcoded"] as const;
+export const CURRICULUM_PROGRAMS = ["speech"] as const;
+export type CurriculumProgram = (typeof CURRICULUM_PROGRAMS)[number];
+
+export const TEMPLATE_FIELD_TYPES = [
+  "text",
+  "checklist",
+  "single_select",
+  "hardcoded",
+  "curriculum",
+] as const;
 export type TemplateFieldType = (typeof TEMPLATE_FIELD_TYPES)[number];
 
 export const TemplateSectionRowSchema = z
@@ -19,6 +28,7 @@ export const TemplateSectionRowSchema = z
     description: z.string().max(8000).optional().default(""),
     fieldType: z.enum(TEMPLATE_FIELD_TYPES).optional().default("text"),
     options: z.array(z.string().min(1).max(120)).max(40).optional().default([]),
+    curriculumProgram: z.enum(CURRICULUM_PROGRAMS).optional(),
   })
   .superRefine((row, ctx) => {
     if (
@@ -38,6 +48,13 @@ export const TemplateSectionRowSchema = z
         message: "Fixed text cannot be empty",
       });
     }
+    if (row.fieldType === "curriculum" && !row.curriculumProgram) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["curriculumProgram"],
+        message: "Pick which curriculum to embed",
+      });
+    }
   });
 
 export const TemplateSectionsSchema = z
@@ -54,9 +71,15 @@ export type SectionMetaEntry =
   | { type: "text" }
   | { type: "hardcoded" }
   | { type: "checklist"; options: string[] }
-  | { type: "single_select"; options: string[] };
+  | { type: "single_select"; options: string[] }
+  | { type: "curriculum"; program: CurriculumProgram };
 
 export type SectionMeta = Record<string, SectionMetaEntry>;
+
+/** Sections filled server-side (not sent to the drafting agent as empty prose). */
+export function sectionExcludedFromAgent(meta: SectionMetaEntry | undefined): boolean {
+  return meta?.type === "hardcoded" || meta?.type === "curriculum";
+}
 
 export function rowsToDb(rows: TemplateSectionRow[]): {
   sections: string[];
@@ -71,6 +94,8 @@ export function rowsToDb(rows: TemplateSectionRow[]): {
       section_meta[r.section] = { type: "single_select", options: r.options };
     } else if (r.fieldType === "hardcoded") {
       section_meta[r.section] = { type: "hardcoded" };
+    } else if (r.fieldType === "curriculum" && r.curriculumProgram) {
+      section_meta[r.section] = { type: "curriculum", program: r.curriculumProgram };
     }
     // Plain text sections are left out of section_meta — the reader
     // resolves missing entries to { type: 'text' }, keeping the column
@@ -114,6 +139,15 @@ export function dbToRows(
         description: g[section] ?? "",
         fieldType: "hardcoded" as const,
         options: [],
+      };
+    }
+    if (entry?.type === "curriculum") {
+      return {
+        section,
+        description: g[section] ?? "",
+        fieldType: "curriculum" as const,
+        options: [],
+        curriculumProgram: entry.program,
       };
     }
     return {

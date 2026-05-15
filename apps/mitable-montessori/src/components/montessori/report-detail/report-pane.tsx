@@ -348,7 +348,16 @@ function TemplateSingleSelectField({
   );
 }
 
-function TemplateHardcodedField({ heading, html }: { heading: string; html: string }) {
+function TemplateHardcodedField({
+  heading,
+  html,
+  hint,
+}: {
+  heading: string;
+  html: string;
+  /** When set, replaces the default “fixed school text” hint (e.g. curriculum blocks). */
+  hint?: string;
+}) {
   const trimmed = html.replace(/<[^>]+>/g, "").trim();
   return (
     <div className="rd-template-field rd-template-hardcoded" aria-readonly>
@@ -367,7 +376,7 @@ function TemplateHardcodedField({ heading, html }: { heading: string; html: stri
         </p>
       )}
       <p className="rd-template-field-hint">
-        Fixed text from your school&rsquo;s report template — not edited here.
+        {hint ?? "Fixed text from your school&rsquo;s report template — not edited here."}
       </p>
     </div>
   );
@@ -452,8 +461,9 @@ function SectionBlock({
           paraIndex === 0 &&
           fieldMeta &&
           (fieldMeta.type === "checklist" || fieldMeta.type === "single_select");
-        const hardcodedFirst = paraIndex === 0 && fieldMeta?.type === "hardcoded";
-        const hideParagraphDelete = structuredFirst || hardcodedFirst;
+        const serverFilledFirst =
+          paraIndex === 0 && (fieldMeta?.type === "hardcoded" || fieldMeta?.type === "curriculum");
+        const hideParagraphDelete = structuredFirst || serverFilledFirst;
 
         return (
           <div className="rd-para-block" key={p.id}>
@@ -490,7 +500,7 @@ function SectionBlock({
                 </span>
               ) : (
                 <>
-                  {!hardcodedFirst ? (
+                  {!serverFilledFirst ? (
                     <button
                       type="button"
                       className="rd-para-action"
@@ -536,8 +546,16 @@ function SectionBlock({
                 radioName={radioGroupName}
                 onCommit={(next) => onParagraphCommit(p.id, next)}
               />
-            ) : hardcodedFirst ? (
-              <TemplateHardcodedField heading={section.heading} html={p.html} />
+            ) : serverFilledFirst ? (
+              <TemplateHardcodedField
+                heading={section.heading}
+                html={p.html}
+                hint={
+                  fieldMeta?.type === "curriculum"
+                    ? "Filled from this child’s speech targets. Admins edit them under Curriculum → Speech."
+                    : undefined
+                }
+              />
             ) : (
               <EditableParagraph
                 html={p.html}
