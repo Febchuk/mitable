@@ -856,8 +856,8 @@ function KebabMenu({
         <button
           type="button"
           className={`${styles.rrKebabItem} tap`}
-          role="menuitem"
-          aria-pressed={inPreview}
+          role="menuitemcheckbox"
+          aria-checked={inPreview}
           onClick={() => onViewModeChange(inPreview ? "editor" : "preview")}
         >
           <span className={styles.rrKebabIcon} aria-hidden>
