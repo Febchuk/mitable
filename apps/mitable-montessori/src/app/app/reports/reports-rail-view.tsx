@@ -514,7 +514,12 @@ export function ReportsRailView({
             status from the selected list row so it renders the right
             icons immediately, even while the detail is still loading. */}
         {selectedRow ? (
-          <ActionRail status={selectedRow.status} isAdmin={isAdmin} onOpenModal={openModal} />
+          <ActionRail
+            status={selectedRow.status}
+            isAdmin={isAdmin}
+            onOpenModal={openModal}
+            aiScore={selectedRow.displayScore}
+          />
         ) : (
           <div className={styles.rrActionRail} aria-hidden />
         )}
@@ -588,16 +593,8 @@ function RowSignal({
   if (bucket === "review") {
     const { approved, total } = row.reviewerTicks;
     const ticks = total > 0 ? total : 1;
-    const tone = scoreTone(row.displayScore);
     return (
       <span className={`${styles.rrSignal} ${styles.rrSignalTicks}`}>
-        <span
-          className={styles.rrScoreBubble}
-          data-tone={tone}
-          aria-label={`AI confidence ${row.displayScore}`}
-        >
-          {row.displayScore}
-        </span>
         <span className={styles.rrTicks} aria-label={`${approved} of ${ticks} reviewers approved`}>
           {Array.from({ length: ticks }).map((_, i) => {
             const done = i < approved;

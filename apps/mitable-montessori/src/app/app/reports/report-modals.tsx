@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Send, Trash2 } from "lucide-react";
-import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
+import { AlertTriangle, Check, RotateCcw, Send, Trash2, X } from "lucide-react";
+import type { AiFlag, ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import { localDetailToPdfData } from "@/lib/pdf/local-detail-to-pdf-data";
 import { fetchReviewerCandidates, type ReviewerCandidate } from "@/lib/reports-v2/api";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import styles from "./reports-rail.module.css";
-import type { ActionRailModal } from "./action-rail";
+import { scoreToneBand, type ActionRailModal } from "./action-rail";
 
 export type ReportModal = ActionRailModal | null;
 
@@ -63,10 +63,23 @@ export function ReportModalsHost({
 }) {
   return (
     <>
+      <AiScoreDialog open={open === "score"} onClose={onClose} report={report} />
       <PreviewPdfDialog open={open === "preview"} onClose={onClose} report={report} />
       <HistoryDialog open={open === "history"} onClose={onClose} report={report} />
       <SubmitForReviewDialog
         open={open === "send"}
+        onClose={onClose}
+        report={report}
+        onChanged={onChanged}
+      />
+      <ApproveDialog
+        open={open === "approve"}
+        onClose={onClose}
+        report={report}
+        onChanged={onChanged}
+      />
+      <RequestChangesDialog
+        open={open === "request_changes"}
         onClose={onClose}
         report={report}
         onChanged={onChanged}
@@ -80,6 +93,288 @@ export function ReportModalsHost({
         backToReportsHref={backToReportsHref ?? "/app/reports"}
       />
     </>
+  );
+}
+
+/* ───────────────────────── AI score ───────────────────────── */
+
+const SCORE_LABEL: Record<"high" | "med" | "low", string> = {
+  high: "Ready",
+  med: "Review needed",
+  low: "Needs work",
+};
+
+const FLAG_KIND_LABEL: Record<AiFlag["kind"], string> = {
+  tone: "Tone",
+  evidence: "Evidence",
+  pii: "No PII",
+  template: "Template",
+};
+
+function AiScoreDialog({
+  open,
+  onClose,
+  report,
+}: {
+  open: boolean;
+  onClose: () => void;
+  report: ReportDetailRow;
+}) {
+  const score = report.aiScore;
+  const tone = scoreToneBand(score ?? 0);
+  const flags: AiFlag[] = report.aiFlags ?? [];
+  const reasoning: string[] = report.aiReasoning ?? [];
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className={styles.rrModalCard}>
+        <DialogHeader>
+          <DialogTitle>AI confidence</DialogTitle>
+          <DialogDescription>How Mitable read this draft.</DialogDescription>
+        </DialogHeader>
+
+        {score == null ? (
+          <div className={styles.rrFieldHint}>
+            Mitable hasn&rsquo;t scored this report yet. The score appears after the draft is saved
+            and analyzed.
+          </div>
+        ) : (
+          <>
+            <div className={styles.rrScoreHero} data-tone={tone}>
+              <div className={styles.rrScoreHeroBubble}>{score}</div>
+              <div className={styles.rrScoreHeroMeta}>
+                <div className={styles.rrScoreHeroLabel}>{SCORE_LABEL[tone]}</div>
+                <div className={styles.rrScoreHeroSub}>
+                  {tone === "high"
+                    ? "Reviewers usually approve scores 85+ without re-reading."
+                    : tone === "med"
+                      ? "Worth a closer look before sending to reviewers."
+                      : "Tighten this draft before submitting."}
+                </div>
+              </div>
+            </div>
+
+            {flags.length > 0 && (
+              <div className={styles.rrFieldGroup}>
+                <label className={styles.rrFieldLabel}>Signals</label>
+                <div className={styles.rrFlagRow}>
+                  {flags.map((f, i) => (
+                    <span
+                      key={`${f.kind}-${i}`}
+                      className={styles.rrFlagChip}
+                      data-status={f.status}
+                      title={f.note}
+                    >
+                      {f.status === "ok" ? (
+                        <Check size={10} strokeWidth={3} />
+                      ) : f.status === "warn" ? (
+                        <AlertTriangle size={10} strokeWidth={2.4} />
+                      ) : (
+                        <X size={10} strokeWidth={3} />
+                      )}
+                      {FLAG_KIND_LABEL[f.kind]}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {reasoning.length > 0 && (
+              <div className={styles.rrFieldGroup}>
+                <label className={styles.rrFieldLabel}>Why this score</label>
+                <ul className={styles.rrReasoningList}>
+                  {reasoning.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className={styles.rrModalFoot}>
+          <button type="button" className="rd-btn rd-btn-secondary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ───────────────────────── Approve ───────────────────────── */
+
+function ApproveDialog({
+  open,
+  onClose,
+  report,
+  onChanged,
+}: {
+  open: boolean;
+  onClose: () => void;
+  report: ReportDetailRow;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = React.useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/v1/reports/approve", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reportId: report.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        ToastBus.push({ message: data.error || "Couldn't approve this report." });
+        return;
+      }
+      ToastBus.push({ message: "Report approved." });
+      onChanged();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && !busy && onClose()}>
+      <DialogContent className={`${styles.rrModalCard} ${styles.rrModalCardSm}`}>
+        <DialogHeader>
+          <DialogTitle>Approve this report?</DialogTitle>
+          <DialogDescription>
+            {report.title || `${report.studentName} report`} · {report.studentName}
+          </DialogDescription>
+        </DialogHeader>
+        <p className={styles.rrFieldHint}>
+          Approving clears the report to be sent to parents. The teacher will see it in their
+          approved queue.
+        </p>
+        <div className={styles.rrModalFoot}>
+          <button
+            type="button"
+            className="rd-btn rd-btn-secondary"
+            onClick={onClose}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rd-btn rd-btn-primary"
+            onClick={() => void submit()}
+            disabled={busy}
+            style={{
+              background: "var(--color-sage-deep)",
+              color: "#fff",
+              border: "1px solid var(--color-sage-deep)",
+            }}
+          >
+            <Check size={13} strokeWidth={2.4} />
+            {busy ? "Approving…" : "Approve"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ───────────────────────── Request changes ───────────────────────── */
+
+function RequestChangesDialog({
+  open,
+  onClose,
+  report,
+  onChanged,
+}: {
+  open: boolean;
+  onClose: () => void;
+  report: ReportDetailRow;
+  onChanged: () => void;
+}) {
+  const [notes, setNotes] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) setNotes("");
+  }, [open]);
+
+  const submit = async () => {
+    const trimmed = notes.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/v1/reports/changes", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reportId: report.id, notes: trimmed }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        ToastBus.push({ message: data.error || "Couldn't send back for changes." });
+        return;
+      }
+      ToastBus.push({ message: "Sent back for changes." });
+      onChanged();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disabled = busy || notes.trim().length === 0;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && !busy && onClose()}>
+      <DialogContent className={styles.rrModalCard}>
+        <DialogHeader>
+          <DialogTitle>Request changes</DialogTitle>
+          <DialogDescription>
+            Send {report.studentName}&rsquo;s report back to the teacher with a note explaining what
+            to fix.
+          </DialogDescription>
+        </DialogHeader>
+        <div className={styles.rrFieldGroup}>
+          <label className={styles.rrFieldLabel} htmlFor="rr-request-changes-notes">
+            What needs to change?
+          </label>
+          <textarea
+            id="rr-request-changes-notes"
+            className={styles.rrTextarea}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            disabled={busy}
+            maxLength={2000}
+            placeholder="e.g. Add a quote from outdoor play; tighten the math observation."
+          />
+          <span className={styles.rrFieldHint}>
+            The teacher will see this in their drafts queue.
+          </span>
+        </div>
+        <div className={styles.rrModalFoot}>
+          <button
+            type="button"
+            className="rd-btn rd-btn-secondary"
+            onClick={onClose}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rd-btn rd-btn-primary"
+            onClick={() => void submit()}
+            disabled={disabled}
+          >
+            <RotateCcw size={13} strokeWidth={2.2} />
+            {busy ? "Sending…" : "Send back for changes"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
