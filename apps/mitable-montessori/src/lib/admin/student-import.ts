@@ -69,7 +69,8 @@ export interface DraftAnalysis {
   ready: {
     fullName: string;
     birthDate: string | null;
-    classroomId: string;
+    /** When null, child is added to the school roster only (no classroom enrollment from this row). */
+    classroomId: string | null;
     classroomName: string;
     studentKey: string;
     guardian: GuardianImport | null;
@@ -78,12 +79,14 @@ export interface DraftAnalysis {
 
 export interface StudentImportPlan {
   newStudents: Array<{
+    /** Stable id of the import draft row; used for name-collision UI. */
+    draftId: string;
     studentKey: string;
     firstName: string;
     lastName: string;
     fullName: string;
     birthDate: string | null;
-    classroomId: string;
+    classroomId: string | null;
     guardians: GuardianImport[];
   }>;
   guardiansForExisting: Array<{
@@ -264,8 +267,10 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
 
 export function analyzeImportDraft(
   draft: StudentImportDraft,
-  classrooms: ClassroomOption[]
+  classrooms: ClassroomOption[],
+  options?: { allowUnassignedClassroom?: boolean }
 ): DraftAnalysis {
+  const allowUnassigned = options?.allowUnassignedClassroom === true;
   const issues: ImportIssue[] = [];
   const firstName = draft.firstName.trim();
   const lastName = draft.lastName.trim();
@@ -278,15 +283,18 @@ export function analyzeImportDraft(
     issues.push({ kind: "invalid_birth_date", value: draft.birthDate });
   }
 
+  const trimmedClassroom = draft.classroomName.trim();
   const classroomMatch = matchClassroom(draft.classroomName, classrooms);
-  if (!draft.classroomName.trim()) {
+  if (trimmedClassroom) {
+    if (!classroomMatch.exact) {
+      issues.push({
+        kind: "unknown_classroom",
+        value: draft.classroomName,
+        suggestion: classroomMatch.suggestion,
+      });
+    }
+  } else if (!allowUnassigned) {
     issues.push({ kind: "missing_classroom" });
-  } else if (!classroomMatch.exact) {
-    issues.push({
-      kind: "unknown_classroom",
-      value: draft.classroomName,
-      suggestion: classroomMatch.suggestion,
-    });
   }
 
   const guardianName = draft.guardianName.trim();
@@ -315,16 +323,19 @@ export function analyzeImportDraft(
       }
     : null;
 
+  const classroomResolved = trimmedClassroom ? Boolean(classroomMatch.exact) : allowUnassigned;
+
+  const exact = classroomMatch.exact;
   const ready =
-    issues.length === 0 && classroomMatch.exact
+    issues.length === 0 && classroomResolved
       ? {
           fullName,
           birthDate: parsedDate ? parsedDate.iso : null,
-          classroomId: classroomMatch.exact.id,
-          classroomName: classroomMatch.exact.name,
+          classroomId: exact ? exact.id : null,
+          classroomName: exact ? exact.name : "",
           studentKey: parsedDate
             ? `${fullName.toLowerCase()}|${parsedDate.iso}`
-            : `${fullName.toLowerCase()}|__nodob__|${classroomMatch.exact.id}`,
+            : `${fullName.toLowerCase()}|__nodob__|${exact ? exact.id : "__school__"}`,
           guardian,
         }
       : null;
@@ -353,6 +364,8 @@ export function buildStudentImportPlan(
       existingByKey.set(`${nameKey}|${student.birthDate}`, student);
     } else if (student.classroomId) {
       existingByKey.set(`${nameKey}|__nodob__|${student.classroomId}`, student);
+    } else {
+      existingByKey.set(`${nameKey}|__nodob__|__school__`, student);
     }
   });
 
@@ -388,6 +401,7 @@ export function buildStudentImportPlan(
     }
 
     newStudentsByKey.set(ready.studentKey, {
+      draftId: analysis.draft.id,
       studentKey: ready.studentKey,
       firstName: analysis.draft.firstName.trim(),
       lastName: analysis.draft.lastName.trim(),
@@ -406,6 +420,20 @@ export function buildStudentImportPlan(
     },
     duplicateIssues,
   };
+}
+
+/** Case-insensitive first + last match against the school roster (for import warnings). */
+export function listSchoolStudentsMatchingName(
+  firstName: string,
+  lastName: string,
+  schoolStudents: Array<{ id: string; firstName: string; lastName: string }>
+): Array<{ id: string; firstName: string; lastName: string }> {
+  const a = firstName.trim().toLowerCase();
+  const b = lastName.trim().toLowerCase();
+  if (!a || !b) return [];
+  return schoolStudents.filter(
+    (s) => s.firstName.trim().toLowerCase() === a && s.lastName.trim().toLowerCase() === b
+  );
 }
 
 export function ageLabelFromBirthDate(iso: string): string {

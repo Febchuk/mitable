@@ -183,6 +183,15 @@ export const AssignCurriculumSchema = z.object({
   curriculum_id: z.string().uuid(),
 });
 
+export const EnrollStudentSchema = z.object({
+  student_id: z.string().uuid(),
+  classroom_id: z.string().uuid(),
+  start_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
 export const ImportRosterSchema = z.object({
   csv_data: z.string().min(1).max(1_000_000),
   classroom_id: z.string().uuid(),
