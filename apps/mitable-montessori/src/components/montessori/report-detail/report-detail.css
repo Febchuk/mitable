@@ -1552,3 +1552,9 @@ main:has(.rd-root) {
   font-size: 12px;
   color: var(--color-ink-muted);
 }
+
+.rd-template-hardcoded-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-ink);
+}

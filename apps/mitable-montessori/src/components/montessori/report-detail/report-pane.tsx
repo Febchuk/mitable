@@ -348,6 +348,40 @@ function TemplateSingleSelectField({
   );
 }
 
+function TemplateHardcodedField({
+  heading,
+  html,
+  hint,
+}: {
+  heading: string;
+  html: string;
+  /** When set, replaces the default “fixed school text” hint (e.g. curriculum blocks). */
+  hint?: string;
+}) {
+  const trimmed = html.replace(/<[^>]+>/g, "").trim();
+  return (
+    <div className="rd-template-field rd-template-hardcoded" aria-readonly>
+      <p className="sr-only">{heading} — fixed school text</p>
+      {trimmed ? (
+        <div
+          className="rd-template-hardcoded-body"
+          dangerouslySetInnerHTML={{ __html: html || "" }}
+        />
+      ) : (
+        <p
+          className="rd-template-hardcoded-body"
+          style={{ fontStyle: "italic", color: "var(--color-ink-muted)" }}
+        >
+          No fixed text is stored for this section yet (check the template in admin).
+        </p>
+      )}
+      <p className="rd-template-field-hint">
+        {hint ?? "Fixed text from your school&rsquo;s report template — not edited here."}
+      </p>
+    </div>
+  );
+}
+
 function SectionBlock({
   section,
   fieldMeta,
@@ -427,7 +461,9 @@ function SectionBlock({
           paraIndex === 0 &&
           fieldMeta &&
           (fieldMeta.type === "checklist" || fieldMeta.type === "single_select");
-        const hideParagraphDelete = structuredFirst;
+        const serverFilledFirst =
+          paraIndex === 0 && (fieldMeta?.type === "hardcoded" || fieldMeta?.type === "curriculum");
+        const hideParagraphDelete = structuredFirst || serverFilledFirst;
 
         return (
           <div className="rd-para-block" key={p.id}>
@@ -464,19 +500,23 @@ function SectionBlock({
                 </span>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    className="rd-para-action"
-                    onClick={() =>
-                      onDiscussParagraph
-                        ? onDiscussParagraph(p.id)
-                        : toast("Open the editing assistant on the left to discuss this paragraph.")
-                    }
-                    title="Discuss this paragraph in the chat"
-                  >
-                    <MessageSquare size={11} strokeWidth={2} />
-                    Discuss
-                  </button>
+                  {!serverFilledFirst ? (
+                    <button
+                      type="button"
+                      className="rd-para-action"
+                      onClick={() =>
+                        onDiscussParagraph
+                          ? onDiscussParagraph(p.id)
+                          : toast(
+                              "Open the editing assistant on the left to discuss this paragraph."
+                            )
+                      }
+                      title="Discuss this paragraph in the chat"
+                    >
+                      <MessageSquare size={11} strokeWidth={2} />
+                      Discuss
+                    </button>
+                  ) : null}
                   {!hideParagraphDelete ? (
                     <button
                       type="button"
@@ -505,6 +545,16 @@ function SectionBlock({
                 html={p.html}
                 radioName={radioGroupName}
                 onCommit={(next) => onParagraphCommit(p.id, next)}
+              />
+            ) : serverFilledFirst ? (
+              <TemplateHardcodedField
+                heading={section.heading}
+                html={p.html}
+                hint={
+                  fieldMeta?.type === "curriculum"
+                    ? "Filled from this child’s speech targets. Admins edit them under Curriculum → Speech."
+                    : undefined
+                }
               />
             ) : (
               <EditableParagraph

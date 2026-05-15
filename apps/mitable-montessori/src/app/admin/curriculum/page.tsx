@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { DEFAULT_CURRICULA, type DefaultCurriculum } from "@/lib/admin/curriculum-data";
 import { IepAdminTab } from "./iep-tab";
+import { SpeechAdminTab } from "./speech-tab";
 
 type AdminSubtopic = { id: string; name: string };
 
@@ -66,7 +67,7 @@ function subtopicCount(curriculum: AdminCurriculum): number {
   );
 }
 
-type AdminCurriculumTab = "curricula" | "iep";
+type AdminCurriculumTab = "curricula" | "iep" | "speech";
 
 type DbSchoolCurriculum = {
   id: string;
@@ -313,6 +314,7 @@ export default function AdminCurriculumPage() {
           [
             { id: "curricula", label: "Curricula" },
             { id: "iep", label: "IEP" },
+            { id: "speech", label: "Speech" },
           ] as const
         ).map((tab) => {
           const active = activeTab === tab.id;
@@ -340,6 +342,7 @@ export default function AdminCurriculumPage() {
       </div>
 
       {activeTab === "iep" ? <IepAdminTab /> : null}
+      {activeTab === "speech" ? <SpeechAdminTab /> : null}
 
       {activeTab === "curricula" ? (
         <div

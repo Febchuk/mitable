@@ -182,7 +182,7 @@ export async function createClassroom(
     name: string;
     code?: string;
     curriculum_id?: string;
-    program_types?: Array<"montessori" | "iep">;
+    program_types?: Array<"montessori" | "iep" | "speech">;
   }
 ) {
   return insertReturningId(ctx, "classrooms", {
@@ -203,7 +203,7 @@ export async function updateClassroomPrograms(
   ctx: AdminContext,
   input: {
     classroom_id: string;
-    program_types: Array<"montessori" | "iep">;
+    program_types: Array<"montessori" | "iep" | "speech">;
   }
 ): Promise<void> {
   const { error } = await ctx.supabase

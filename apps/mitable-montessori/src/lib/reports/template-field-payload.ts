@@ -4,9 +4,55 @@
  * need a DB migration. Plain prose remains the default for `text` sections.
  */
 
-import type { SectionMeta } from "@/lib/report-templates/sections";
+import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
 
 const PREFIX = "__MITABLE_FIELD_V1__";
+
+function escapeHtmlText(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** HTML for a curriculum-backed section (speech = bullet list). */
+export function speechLabelsToReportHtml(labels: string[]): string {
+  if (labels.length === 0) {
+    return plainTextToReportParagraphHtml("No speech targets on file yet.");
+  }
+  const items = labels.map((l) => `<li>${escapeHtmlText(l)}</li>`).join("");
+  return `<ul>${items}</ul>`;
+}
+
+/** Escape plain text for one report paragraph (`innerHTML`); newlines → `<br>`. */
+export function plainTextToReportParagraphHtml(plain: string): string {
+  const t = plain.replace(/\r\n/g, "\n");
+  if (!t.trim()) return "";
+  return t
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/\n/g, "<br>");
+}
+
+/** Seed HTML when a report row is created from a template. */
+export function initialParagraphHtmlForTemplateSection(
+  heading: string,
+  guidance: string,
+  meta: SectionMeta,
+  opts?: { speechLabels?: string[] }
+): string {
+  const entry = meta[heading];
+  if (entry?.type === "hardcoded") {
+    return plainTextToReportParagraphHtml(guidance);
+  }
+  if (entry?.type === "curriculum" && entry.program === "speech") {
+    return speechLabelsToReportHtml(opts?.speechLabels ?? []);
+  }
+  return "";
+}
 
 export type DecodedFieldPayload =
   | { kind: "checklist"; selected: string[] }
@@ -99,6 +145,18 @@ export function paragraphHasTeacherContent(html: string): boolean {
   return stripTags(d.html).length > 0;
 }
 
+/**
+ * Whether this paragraph counts as "filled" for draft readiness / empty-report checks.
+ * Template hardcoded boilerplate does not count — teachers did not write it.
+ */
+export function paragraphCountsTowardDraftReadiness(
+  html: string,
+  fieldMeta?: SectionMetaEntry | null
+): boolean {
+  if (fieldMeta?.type === "hardcoded" || fieldMeta?.type === "curriculum") return false;
+  return paragraphHasTeacherContent(html);
+}
+
 /** After agent draft: coerce first paragraph of structured sections to encoded payloads. */
 export function normalizeSectionHtmlForTemplate(
   heading: string,
@@ -106,7 +164,8 @@ export function normalizeSectionHtmlForTemplate(
   meta: SectionMeta
 ): string {
   const entry = meta[heading];
-  if (!entry || entry.type === "text") return html;
+  if (!entry || entry.type === "text" || entry.type === "hardcoded" || entry.type === "curriculum")
+    return html;
 
   const decoded = decodeFieldPayload(html);
   if (entry.type === "checklist") {
