@@ -6,6 +6,12 @@ const appDir = import.meta.dirname;
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(appDir, "../../"),
+  // @react-pdf/renderer ships ESM-only. Without transpiling, Next's webpack
+  // build fails with "ESM packages need to be imported. Use 'import' to
+  // reference the package instead." when it's reached through the client
+  // graph via a static import (the <PDFViewer> itself is dynamic({ ssr: false })
+  // but ReportDocument is imported statically).
+  transpilePackages: ["@react-pdf/renderer"],
   typescript: {
     ignoreBuildErrors: false,
   },
