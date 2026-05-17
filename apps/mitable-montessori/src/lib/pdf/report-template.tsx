@@ -200,10 +200,22 @@ export function ReportDocument({ data }: { data: ReportPdfData }) {
                   );
                 }
                 if (!p.text) return null;
+                const lines = p.text.split("\n").filter((l) => l.length > 0);
+                if (lines.length <= 1) {
+                  return (
+                    <Text key={pi} style={s.paragraph}>
+                      {p.text}
+                    </Text>
+                  );
+                }
                 return (
-                  <Text key={pi} style={s.paragraph}>
-                    {p.text}
-                  </Text>
+                  <View key={pi}>
+                    {lines.map((line, li) => (
+                      <Text key={li} style={s.paragraph}>
+                        {line}
+                      </Text>
+                    ))}
+                  </View>
                 );
               })}
             </View>
