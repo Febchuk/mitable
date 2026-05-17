@@ -26,7 +26,19 @@ let asrPipeline:
   | ((audio: Float32Array, opts?: Record<string, unknown>) => Promise<{ text: string }>)
   | null = null;
 let ocrWorker: {
-  recognize: (img: Blob | ImageBitmap) => Promise<{ data: { text: string; confidence: number } }>;
+  recognize: (
+    img: Blob | ImageBitmap
+  ) => Promise<{
+    data: {
+      text: string;
+      confidence: number;
+      words: Array<{
+        text: string;
+        confidence: number;
+        bbox: { x0: number; y0: number; x1: number; y1: number };
+      }>;
+    };
+  }>;
   terminate: () => Promise<void>;
 } | null = null;
 
@@ -95,12 +107,7 @@ async function loadOcr() {
           status: { state: "loading", progress: m.progress, message: m.status },
         });
       },
-    })) as {
-      recognize: (
-        img: Blob | ImageBitmap
-      ) => Promise<{ data: { text: string; confidence: number } }>;
-      terminate: () => Promise<void>;
-    };
+    })) as typeof ocrWorker;
     ocrWorker = worker;
   } catch (err) {
     throw new Error(
@@ -129,13 +136,61 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
   const t0 = performance.now();
   try {
     await loadOcr();
-    const blob = new Blob([payload], { type: mime || "image/png" });
-    const result = await ocrWorker!.recognize(blob);
+    const sourceBlob = new Blob([payload], { type: mime || "image/png" });
+
+    // Multi-pass preprocessing (greyscale+sharpen, aggressive contrast, 2× upscale)
+    // mirrors the backend's Sharp pipeline from pii-redaction.service.ts.
+    const { preprocessForOCR } = await import("./preprocess-image");
+    const variants = await preprocessForOCR(sourceBlob);
+
+    send({
+      type: "status",
+      status: { state: "running" },
+    });
+
+    let bestText = "";
+    let bestConfidence = 0;
+    const allWords: Array<{
+      text: string;
+      confidence: number;
+      bbox: { x0: number; y0: number; x1: number; y1: number };
+    }> = [];
+
+    for (const variant of variants) {
+      const result = await ocrWorker!.recognize(variant.blob);
+      const conf = result.data.confidence ?? 0;
+
+      // Track best pass for the text sent to the LLM.
+      if (
+        conf > bestConfidence ||
+        (conf === bestConfidence &&
+          (result.data.text ?? "").trim().length > bestText.length)
+      ) {
+        bestConfidence = conf;
+        bestText = (result.data.text ?? "").trim();
+      }
+
+      // Accumulate words from ALL passes for PII redaction.
+      for (const w of result.data.words ?? []) {
+        allWords.push({
+          text: w.text,
+          confidence: w.confidence,
+          bbox: {
+            x0: Math.round(w.bbox.x0 / variant.scale),
+            y0: Math.round(w.bbox.y0 / variant.scale),
+            x1: Math.round(w.bbox.x1 / variant.scale),
+            y1: Math.round(w.bbox.y1 / variant.scale),
+          },
+        });
+      }
+    }
+
     send({
       type: "recognize-result",
       jobId,
-      text: (result.data.text ?? "").trim(),
-      confidence: result.data.confidence,
+      text: bestText,
+      confidence: bestConfidence,
+      words: allWords,
       durationMs: performance.now() - t0,
     });
   } catch (err) {

@@ -9,7 +9,7 @@ import { captureSupported } from "@/lib/capture/engines";
 import { recordEvent } from "@/lib/telemetry/events";
 import type { CaptureMode } from "@/lib/capture/types";
 import type { DetokenizedToolCall } from "@/lib/tokenize/detokenize";
-import { CameraButton } from "@/components/chat/CameraButton";
+import { CameraButton, type CameraCapture } from "@/components/chat/CameraButton";
 import { DictationButton } from "@/components/chat/DictationButton";
 
 export interface ComposerProps {
@@ -20,6 +20,8 @@ export interface ComposerProps {
 export interface ComposerEmit {
   message: string;
   mode: CaptureMode;
+  /** Ephemeral object URL of the redacted image (photo mode only). */
+  redactedImageUrl?: string;
   proposals: Array<{
     proposalId: string;
     call: DetokenizedToolCall;
@@ -34,7 +36,11 @@ export function Composer(props: ComposerProps & { onProposals: (e: ComposerEmit)
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<string | null>(null);
 
-  async function runPipeline(rawText: string, mode: CaptureMode) {
+  async function runPipeline(
+    rawText: string,
+    mode: CaptureMode,
+    redactedImageUrl?: string
+  ) {
     setBusy(true);
     setError(null);
     setDebug(null);
@@ -48,7 +54,12 @@ export function Composer(props: ComposerProps & { onProposals: (e: ComposerEmit)
         mode,
       });
       setDebug(`tokenized: ${result.tokenizedText}`);
-      props.onProposals({ message: rawText, mode, proposals: result.proposals });
+      props.onProposals({
+        message: rawText,
+        mode,
+        redactedImageUrl,
+        proposals: result.proposals,
+      });
       recordEvent({
         name: "capture_completed",
         mode,
@@ -63,6 +74,10 @@ export function Composer(props: ComposerProps & { onProposals: (e: ComposerEmit)
     } finally {
       setBusy(false);
     }
+  }
+
+  function handlePhotoCapture(capture: CameraCapture) {
+    void runPipeline(capture.text, "photo", capture.redactedImageUrl);
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -103,7 +118,8 @@ export function Composer(props: ComposerProps & { onProposals: (e: ComposerEmit)
           {support.photo ? (
             <CameraButton
               disabled={busy}
-              onText={(t) => void runPipeline(t, "photo")}
+              classroomId={props.classroomId}
+              onCapture={handlePhotoCapture}
               onError={(m) => setError(m)}
             />
           ) : null}

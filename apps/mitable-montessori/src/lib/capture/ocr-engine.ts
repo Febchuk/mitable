@@ -30,7 +30,7 @@ export class TesseractOcrEngine implements OcrEngine {
     const mime = image instanceof Blob ? image.type || "image/png" : "image/png";
     const r = await this.host.recognize(buf, mime);
     this.ready = true;
-    return r;
+    return { text: r.text, durationMs: r.durationMs, confidence: r.confidence, words: r.words };
   }
 
   isReady() {
