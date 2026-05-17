@@ -16,13 +16,19 @@ function escapeHtmlText(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** HTML for a curriculum-backed section (speech = bullet list). */
+/**
+ * HTML for a curriculum-backed section (speech = bullet list).
+ *
+ * Emits `• label<br>• label<br>…` rather than `<ul><li>…</li></ul>` so the
+ * list survives both renderers: Tailwind's preflight zeroes `<ul>` styling
+ * in the editor, and the PDF text-extraction path strips tags. A `•` glyph
+ * plus `<br>` is portable through both.
+ */
 export function speechLabelsToReportHtml(labels: string[]): string {
   if (labels.length === 0) {
     return plainTextToReportParagraphHtml("No speech targets on file yet.");
   }
-  const items = labels.map((l) => `<li>${escapeHtmlText(l)}</li>`).join("");
-  return `<ul>${items}</ul>`;
+  return labels.map((l) => `• ${escapeHtmlText(l)}`).join("<br>");
 }
 
 /** Escape plain text for one report paragraph (`innerHTML`); newlines → `<br>`. */
@@ -92,10 +98,14 @@ export function decodeFieldPayload(html: string): DecodedFieldPayload {
 }
 
 function stripTags(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Preserve <br> as a newline so bullet-list content (one `• label` per
+  // line, joined by <br>) stays on multiple lines once tags are stripped.
+  const withBreaks = html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ");
+  return withBreaks
+    .split("\n")
+    .map((line) => line.replace(/[^\S\n]+/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .join("\n");
 }
 
 /** Guess which template options the drafted prose refers to (for migration + post-draft normalize). */

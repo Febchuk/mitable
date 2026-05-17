@@ -110,7 +110,7 @@ export function NewReportTrigger() {
             templateId: payload.templateId,
             transcripts: [],
             notes: [],
-            tokenMap: {},
+            tokenMap: [],
           }),
         });
         if (!res.ok) {
