@@ -100,8 +100,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   revalidatePath(`/admin/reports/${id}`);
   revalidatePath("/app/reports");
   revalidatePath("/admin/reports");
-  revalidatePath("/app/reports-v2");
-  revalidatePath("/admin/reports-v2");
 
   // Fire-and-forget re-score on content edits. Only triggers when body or
   // sections changed (title-only edits don't move the score). We don't

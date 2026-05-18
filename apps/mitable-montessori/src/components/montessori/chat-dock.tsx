@@ -3,6 +3,8 @@
 import * as React from "react";
 import { MessageSquare, Sparkles, X } from "lucide-react";
 import { ChatThread } from "@/components/chat/ChatThread";
+import { ChatPane } from "./report-detail/chat-pane";
+import { useActiveReport } from "./active-report-context";
 import { useMontessori } from "./store";
 
 export interface ChatDockProps {
@@ -16,6 +18,15 @@ export function ChatDock(props: ChatDockProps) {
   const store = useMontessori();
   const isOpen = store.webChatMode === "open";
   const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
+  const activeReport = useActiveReport();
+  const editorMode = Boolean(activeReport?.reportId);
+
+  // Editor mode gets more vertical room — ChatPane shows proposal cards,
+  // attachments, and the inline composer with attachment thumbnails, which
+  // crowd the 540px capture-mode height.
+  const dockHeight = editorMode ? 640 : 540;
+  const dockWidth = editorMode ? 420 : 380;
+  const collapseToPill = React.useCallback(() => store.setWebChatMode("pill"), [store]);
 
   return (
     <div className="hidden lg:block">
@@ -26,8 +37,8 @@ export function ChatDock(props: ChatDockProps) {
             position: "fixed",
             bottom: 22,
             right: 22,
-            width: 380,
-            height: 540,
+            width: dockWidth,
+            height: dockHeight,
             background: "var(--color-canvas)",
             borderRadius: 18,
             overflow: "hidden",
@@ -67,14 +78,24 @@ export function ChatDock(props: ChatDockProps) {
               <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-ink)" }}>
                 Mitable
               </div>
-              <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>
-                Capture &amp; review · {props.classroomName}
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--color-ink-muted)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {editorMode
+                  ? `Editing · ${activeReport?.title ?? "report"}`
+                  : `Capture & review · ${props.classroomName}`}
               </div>
             </div>
             <button
               type="button"
               className="tap"
-              onClick={() => store.setWebChatMode("pill")}
+              onClick={collapseToPill}
               style={{
                 width: 28,
                 height: 28,
@@ -91,7 +112,18 @@ export function ChatDock(props: ChatDockProps) {
             </button>
           </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            {props.classroomId ? (
+            {editorMode && activeReport ? (
+              <ChatPane
+                reportId={activeReport.reportId}
+                sections={activeReport.sections}
+                onApplyProposal={activeReport.handlers.onApplyProposal}
+                onApplyGhostEdit={activeReport.handlers.onApplyGhostEdit}
+                onApplyNewSection={activeReport.handlers.onApplyNewSection}
+                onPullObservation={activeReport.handlers.onPullObservation}
+                flushPendingSave={activeReport.handlers.flushPendingSave}
+                onCollapse={collapseToPill}
+              />
+            ) : props.classroomId ? (
               <ChatThread
                 threadId={threadId}
                 classroomId={props.classroomId}
@@ -155,8 +187,8 @@ export function ChatDock(props: ChatDockProps) {
           >
             <MessageSquare size={18} strokeWidth={1.5} />
           </div>
-          <span>Ask Mitable</span>
-          {store.pendingObs > 0 && (
+          <span>{editorMode ? "Edit with Mitable" : "Ask Mitable"}</span>
+          {!editorMode && store.pendingObs > 0 && (
             <span
               style={{
                 background: "var(--color-surface)",

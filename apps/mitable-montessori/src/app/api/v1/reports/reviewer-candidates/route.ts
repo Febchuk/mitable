@@ -6,7 +6,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
  * Lookup: who can be assigned as a reviewer for reports in my school?
  *
  * Returns active teachers + admins in the requester's school. Used by the
- * /app/reports-v2 send-for-review drawer's reviewer multi-select. Excludes
+ * /app/reports send-for-review drawer's reviewer multi-select. Excludes
  * the requester themselves (you don't review your own work).
  *
  * Auth: any authenticated school user. Read-only.
