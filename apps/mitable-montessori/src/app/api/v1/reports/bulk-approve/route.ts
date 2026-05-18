@@ -97,8 +97,6 @@ export async function POST(req: Request) {
 
   revalidatePath("/app/reports");
   revalidatePath("/admin/reports");
-  revalidatePath("/app/reports-v2");
-  revalidatePath("/admin/reports-v2");
 
   return NextResponse.json({
     ok: true,

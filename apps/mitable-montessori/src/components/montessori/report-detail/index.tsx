@@ -27,6 +27,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { usePublishActiveReport } from "../active-report-context";
+import type { ChatPaneSection } from "./chat-pane";
 
 const DIRTY_LABEL = "Unsaved changes";
 const SAVING_LABEL = "Saving…";
@@ -35,8 +37,10 @@ type LocalSection = {
   id: string;
   heading: string;
   paragraphs: { id: string; html: string }[];
-  /** Phase 4: chat-driven ghost suggestion attached to this section. */
-  ghostEdit?: { id: string; html: string; sourceLabel: string };
+  /** Phase 4: chat-driven ghost suggestion attached to this section.
+   *  `messageId` ties this slot back to the originating chat row so
+   *  Accept/Reject can record `applied`/`dismissed` server-side. */
+  ghostEdit?: { id: string; html: string; sourceLabel: string; messageId?: string };
 };
 
 type LocalDetail = {
@@ -370,6 +374,202 @@ export function ReportDetail({
     [queueSave]
   );
 
+  // Latest detail snapshot for chat-driven mutations. Using a ref so the
+  // handlers below don't recreate on every keystroke (would re-publish to
+  // ActiveReportContext and remount ChatPane, losing local input state).
+  const detailRef = React.useRef(detail);
+  detailRef.current = detail;
+
+  const applyProposalToDetail = React.useCallback(
+    (args: { sectionId: string; paragraphId: string; newText: string }) => {
+      const current = detailRef.current;
+      const nextSections = current.sections.map((s) => {
+        if (s.id !== args.sectionId) return s;
+        return {
+          ...s,
+          paragraphs: s.paragraphs.map((p) =>
+            p.id === args.paragraphId ? { ...p, html: args.newText } : p
+          ),
+        };
+      });
+      onChange({ ...current, sections: nextSections });
+    },
+    [onChange]
+  );
+
+  const applyGhostEditToDetail = React.useCallback(
+    (args: {
+      sectionId: string;
+      ghostEdit: { id: string; html: string; sourceLabel: string };
+      messageId?: string;
+    }) => {
+      const current = detailRef.current;
+      const nextSections = current.sections.map((s) =>
+        s.id === args.sectionId
+          ? { ...s, ghostEdit: { ...args.ghostEdit, messageId: args.messageId } }
+          : s
+      );
+      onChange({ ...current, sections: nextSections });
+    },
+    [onChange]
+  );
+
+  /** Append the ghost's html as a new paragraph in the section, clear the
+   *  ghost slot, and record `applied` on the originating chat message. */
+  const acceptGhostEditOnSection = React.useCallback(
+    (sectionId: string) => {
+      const current = detailRef.current;
+      const section = current.sections.find((s) => s.id === sectionId);
+      const ghost = section?.ghostEdit;
+      if (!section || !ghost) return;
+      const newParagraphId = `p-ghost-${Math.random().toString(36).slice(2, 9)}`;
+      const nextSections = current.sections.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              paragraphs: [...s.paragraphs, { id: newParagraphId, html: ghost.html }],
+              ghostEdit: undefined,
+            }
+          : s
+      );
+      onChange({ ...current, sections: nextSections });
+      if (ghost.messageId) {
+        void fetch(`/api/v1/reports/${report.id}/chat/messages/${ghost.messageId}/applied`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "applied",
+            appliedTo: {
+              sectionId,
+              paragraphId: newParagraphId,
+              before: "",
+              after: ghost.html,
+            },
+          }),
+        }).catch(() => {
+          // Editorial audit is best-effort; the local mutation is what the user sees.
+        });
+      }
+    },
+    [onChange, report.id]
+  );
+
+  /** Clear the ghost slot without appending; record `dismissed`. */
+  const dismissGhostEditOnSection = React.useCallback(
+    (sectionId: string) => {
+      const current = detailRef.current;
+      const section = current.sections.find((s) => s.id === sectionId);
+      const ghost = section?.ghostEdit;
+      if (!section || !ghost) return;
+      const nextSections = current.sections.map((s) =>
+        s.id === sectionId ? { ...s, ghostEdit: undefined } : s
+      );
+      onChange({ ...current, sections: nextSections });
+      if (ghost.messageId) {
+        void fetch(`/api/v1/reports/${report.id}/chat/messages/${ghost.messageId}/applied`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "dismissed" }),
+        }).catch(() => {
+          // Best-effort.
+        });
+      }
+    },
+    [onChange, report.id]
+  );
+
+  const applyNewSectionToDetail = React.useCallback(
+    (args: {
+      sectionId: string;
+      heading: string;
+      paragraphs: { id: string; html: string }[];
+      afterSectionId?: string;
+    }) => {
+      const current = detailRef.current;
+      const newSection: LocalSection = {
+        id: args.sectionId,
+        heading: args.heading,
+        paragraphs: args.paragraphs,
+      };
+      let nextSections: LocalSection[];
+      if (args.afterSectionId) {
+        const idx = current.sections.findIndex((s) => s.id === args.afterSectionId);
+        if (idx === -1) {
+          nextSections = [...current.sections, newSection];
+        } else {
+          nextSections = [
+            ...current.sections.slice(0, idx + 1),
+            newSection,
+            ...current.sections.slice(idx + 1),
+          ];
+        }
+      } else {
+        nextSections = [...current.sections, newSection];
+      }
+      onChange({ ...current, sections: nextSections });
+    },
+    [onChange]
+  );
+
+  // Snapshot for the floating ChatDock. Sections must rebuild on each edit
+  // so the chat agent's read_report_sections sees fresh content, but the
+  // handler identities stay stable across keystrokes.
+  const chatPaneSections: ChatPaneSection[] = React.useMemo(
+    () =>
+      detail.sections.map((s) => ({
+        id: s.id,
+        heading: s.heading,
+        paragraphs: s.paragraphs.map((p) => ({ id: p.id, html: p.html })),
+      })),
+    [detail.sections]
+  );
+
+  const activeReportSnapshot = React.useMemo(
+    () => ({
+      reportId: report.id,
+      title: detail.title,
+      sections: chatPaneSections,
+      handlers: {
+        onApplyProposal: applyProposalToDetail,
+        onApplyGhostEdit: ({
+          sectionId,
+          ghostEdit,
+          messageId,
+        }: {
+          sectionId: string;
+          ghostEdit: { id: string; html: string; sourceLabel: string };
+          messageId: string;
+        }) => applyGhostEditToDetail({ sectionId, ghostEdit, messageId }),
+        onApplyNewSection: ({
+          sectionId,
+          heading,
+          paragraphs,
+          afterSectionId,
+        }: {
+          sectionId: string;
+          heading: string;
+          paragraphs: { id: string; html: string }[];
+          afterSectionId?: string;
+          messageId: string;
+        }) => applyNewSectionToDetail({ sectionId, heading, paragraphs, afterSectionId }),
+        flushPendingSave,
+      },
+    }),
+    [
+      report.id,
+      detail.title,
+      chatPaneSections,
+      applyProposalToDetail,
+      applyGhostEditToDetail,
+      applyNewSectionToDetail,
+      flushPendingSave,
+    ]
+  );
+
+  usePublishActiveReport(activeReportSnapshot);
+
   React.useEffect(() => {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -574,6 +774,8 @@ export function ReportDetail({
                 onChange={onChange}
                 isDrafting={isDrafting}
                 onCancelDrafting={cancelDraftGeneration}
+                onAcceptGhostEdit={acceptGhostEditOnSection}
+                onDismissGhostEdit={dismissGhostEditOnSection}
               />
             </div>
             {viewMode === "preview" && <PdfPreviewPane data={pdfData} />}

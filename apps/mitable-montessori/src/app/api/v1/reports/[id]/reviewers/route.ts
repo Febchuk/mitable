@@ -79,8 +79,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     metadata: { reviewer_count: parsed.data.reviewerIds.length },
   });
 
-  revalidatePath("/app/reports-v2");
-  revalidatePath("/admin/reports-v2");
+  revalidatePath("/app/reports");
+  revalidatePath("/admin/reports");
 
   return NextResponse.json({ ok: true, reviewerCount: parsed.data.reviewerIds.length });
 }

@@ -69,8 +69,6 @@ export async function POST(req: Request) {
     revalidatePath(`/admin/reports/${reportId}`);
     revalidatePath("/app/reports");
     revalidatePath("/admin/reports");
-    revalidatePath("/app/reports-v2");
-    revalidatePath("/admin/reports-v2");
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof WorkflowError) {

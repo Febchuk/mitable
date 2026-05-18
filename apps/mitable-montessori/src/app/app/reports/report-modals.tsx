@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ToastBus } from "@/components/montessori/primitives";
-import { fetchReviewerCandidates, type ReviewerCandidate } from "@/lib/reports-v2/api";
+import { fetchReviewerCandidates, type ReviewerCandidate } from "@/lib/reports/api";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import styles from "./reports-rail.module.css";
 import { scoreToneBand, type ActionRailModal } from "./action-rail";

@@ -97,8 +97,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   revalidatePath(`/app/reports/${reportId}`);
   revalidatePath(`/admin/reports/${reportId}`);
-  revalidatePath("/app/reports-v2");
-  revalidatePath("/admin/reports-v2");
+  revalidatePath("/app/reports");
+  revalidatePath("/admin/reports");
 
   return NextResponse.json({ ok: true });
 }

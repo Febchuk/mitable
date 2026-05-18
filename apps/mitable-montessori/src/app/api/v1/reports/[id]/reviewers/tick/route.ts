@@ -74,8 +74,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     target_id: reportId,
   });
 
-  revalidatePath("/app/reports-v2");
-  revalidatePath("/admin/reports-v2");
+  revalidatePath("/app/reports");
+  revalidatePath("/admin/reports");
 
   return NextResponse.json({ ok: true, status: parsed.data.status });
 }

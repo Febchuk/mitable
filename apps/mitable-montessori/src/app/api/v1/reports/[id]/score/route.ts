@@ -50,8 +50,8 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       metadata: { score: result.score },
     });
 
-    revalidatePath("/app/reports-v2");
-    revalidatePath("/admin/reports-v2");
+    revalidatePath("/app/reports");
+    revalidatePath("/admin/reports");
 
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
