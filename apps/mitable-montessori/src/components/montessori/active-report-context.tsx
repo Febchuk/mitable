@@ -22,11 +22,13 @@ import type { ChatGhostEdit, ChatObsRefSuggestedTarget } from "@/lib/schemas/rep
 
 export interface ActiveReportHandlers {
   onApplyProposal: (args: { sectionId: string; paragraphId: string; newText: string }) => void;
-  onApplyGhostEdit: (args: {
-    sectionId: string;
-    ghostEdit: ChatGhostEdit;
-    messageId: string;
-  }) => void;
+  onApplyGhostEdits: (
+    edits: Array<{
+      sectionId: string;
+      ghostEdit: ChatGhostEdit;
+      messageId: string;
+    }>
+  ) => void;
   onApplyNewSection: (args: {
     sectionId: string;
     heading: string;

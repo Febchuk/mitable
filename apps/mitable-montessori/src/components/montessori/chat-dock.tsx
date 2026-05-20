@@ -117,7 +117,7 @@ export function ChatDock(props: ChatDockProps) {
                 reportId={activeReport.reportId}
                 sections={activeReport.sections}
                 onApplyProposal={activeReport.handlers.onApplyProposal}
-                onApplyGhostEdit={activeReport.handlers.onApplyGhostEdit}
+                onApplyGhostEdits={activeReport.handlers.onApplyGhostEdits}
                 onApplyNewSection={activeReport.handlers.onApplyNewSection}
                 onPullObservation={activeReport.handlers.onPullObservation}
                 flushPendingSave={activeReport.handlers.flushPendingSave}

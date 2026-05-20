@@ -1294,6 +1294,16 @@ main:has(.rd-root) {
   color: var(--color-ink-muted);
   font-style: italic;
 }
+.rd-ghost-confirm-preview {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--color-terracotta);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-ink);
+}
 
 /* Phase 4 — photo attach inline viewfinder + thumbnail strip above composer */
 .rd-attachments {
