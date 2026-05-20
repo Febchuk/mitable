@@ -19,6 +19,11 @@
  */
 
 import type { HostInbound, HostOutbound } from "./worker-host";
+import {
+  pcmDurationSec,
+  transcribeLongAudio,
+  WHISPER_CHUNK_LENGTH_S,
+} from "./transcribe-long-audio";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -26,9 +31,7 @@ let asrPipeline:
   | ((audio: Float32Array, opts?: Record<string, unknown>) => Promise<{ text: string }>)
   | null = null;
 let ocrWorker: {
-  recognize: (
-    img: Blob | ImageBitmap
-  ) => Promise<{
+  recognize: (img: Blob | ImageBitmap) => Promise<{
     data: {
       text: string;
       confidence: number;
@@ -120,11 +123,15 @@ async function handleTranscribe(jobId: string, audio: Float32Array, sampleRate: 
   const t0 = performance.now();
   try {
     await loadAsr();
-    const result = await asrPipeline!(audio, { sampling_rate: sampleRate });
+    const inputSec = pcmDurationSec(audio, sampleRate);
+    const text = await transcribeLongAudio(asrPipeline!, audio, sampleRate);
+    if (typeof console !== "undefined" && inputSec > WHISPER_CHUNK_LENGTH_S) {
+      console.log(`[capture][whisper] long audio ${inputSec.toFixed(1)}s → ${text.length} chars`);
+    }
     send({
       type: "transcribe-result",
       jobId,
-      text: (result.text ?? "").trim(),
+      text,
       durationMs: performance.now() - t0,
     });
   } catch (err) {
@@ -163,8 +170,7 @@ async function handleRecognize(jobId: string, payload: ArrayBuffer, mime: string
       // Track best pass for the text sent to the LLM.
       if (
         conf > bestConfidence ||
-        (conf === bestConfidence &&
-          (result.data.text ?? "").trim().length > bestText.length)
+        (conf === bestConfidence && (result.data.text ?? "").trim().length > bestText.length)
       ) {
         bestConfidence = conf;
         bestText = (result.data.text ?? "").trim();

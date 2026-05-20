@@ -38,8 +38,11 @@ export type NewReportPayload = {
  *  not-rendered-but-typechecked report chat-pane) still references it. The
  *  new-report flow itself no longer captures audio. */
 export type AudioMemo = {
-  /** Object URL of the recorded blob. */
+  /** Object URL of the recorded blob (playback / dedupe key). */
   url: string;
+  /** Raw recording — used for decode/transcribe without re-fetching the URL. */
+  blob: Blob;
+  mimeType: string;
   /** Duration in seconds. */
   durationSec: number;
 };
