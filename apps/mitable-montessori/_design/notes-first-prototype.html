@@ -1,0 +1,5282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mitable Montessori · Notes-first prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Caveat:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      :root {
+        --canvas: #f7f4ee;
+        --surface: #fffbf3;
+        --surface-2: #f2ede0;
+        --muted: #ebe6db;
+        --ink: #1f1c18;
+        --ink-2: #5c544a;
+        --ink-3: #9c9285;
+        --border: #e0d8c8;
+        --border-2: #d4cab6;
+        --clay: #b89880;
+        --terracotta: #c46a4f;
+        --terracotta-soft: #f4ddd2;
+        --terracotta-deep: #a24a3d;
+        --sage: #7a9b7a;
+        --sage-soft: #dde7da;
+        --sage-deep: #3f5c40;
+        --butter: #e8c56a;
+        --butter-soft: #f6e8b8;
+        --dusty: #6b8aa6;
+        --dusty-soft: #d2dce5;
+        --shadow-1: 0 1px 2px rgba(31, 28, 24, 0.04), 0 1px 1px rgba(31, 28, 24, 0.03);
+        --shadow-2: 0 6px 18px rgba(31, 28, 24, 0.08), 0 2px 4px rgba(31, 28, 24, 0.04);
+        --shadow-3: 0 18px 44px rgba(31, 28, 24, 0.12), 0 6px 12px rgba(31, 28, 24, 0.06);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #2a2723;
+        color: var(--ink);
+        font-family:
+          'DM Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          sans-serif;
+        font-size: 14px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        padding: 0;
+      }
+      input,
+      textarea {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+      }
+      input:focus,
+      textarea:focus,
+      button:focus {
+        outline: none;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 999px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .serif {
+        font-family: 'Fraunces', ui-serif, Georgia, serif;
+        font-feature-settings: 'ss01';
+        letter-spacing: -0.005em;
+      }
+      .hand {
+        font-family: 'Caveat', cursive;
+      }
+      .tnums {
+        font-variant-numeric: tabular-nums;
+      }
+      .caps {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 10.5px;
+        font-weight: 500;
+        color: var(--ink-3);
+      }
+
+      /* ---------- prototype shell ---------- */
+      .shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 28px 28px 56px;
+        background:
+          radial-gradient(
+            1200px 600px at 50% -10%,
+            rgba(255, 255, 255, 0.04),
+            transparent 70%
+          ),
+          #2a2723;
+      }
+      .shell-bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 22px;
+        color: #d6cdb9;
+      }
+      .shell-bar .title {
+        font-family: 'Fraunces', serif;
+        font-size: 16px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+      }
+      .shell-bar .sep {
+        opacity: 0.4;
+      }
+      .shell-bar .meta {
+        opacity: 0.7;
+        font-size: 12.5px;
+      }
+      .shell-toggle {
+        display: inline-flex;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 999px;
+        padding: 3px;
+      }
+      .shell-toggle button {
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        color: #d6cdb9;
+        opacity: 0.7;
+        transition: all 160ms ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .shell-toggle button.on {
+        background: #f7f4ee;
+        color: #1f1c18;
+        opacity: 1;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      }
+
+      /* ---------- desktop / macOS window ---------- */
+      .desktop {
+        width: min(1280px, calc(100vw - 56px));
+        height: 820px;
+        border-radius: 14px;
+        background: var(--canvas);
+        box-shadow:
+          0 40px 80px rgba(0, 0, 0, 0.35),
+          0 8px 20px rgba(0, 0, 0, 0.18);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .titlebar {
+        height: 38px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        flex: 0 0 auto;
+      }
+      .traffic {
+        display: inline-flex;
+        gap: 8px;
+      }
+      .traffic span {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .traffic .r {
+        background: #ff5f57;
+      }
+      .traffic .y {
+        background: #febc2e;
+      }
+      .traffic .g {
+        background: #28c840;
+      }
+      .titlebar .tabbtn {
+        margin-left: 10px;
+        width: 26px;
+        height: 22px;
+        border-radius: 5px;
+        border: 1px solid var(--border-2);
+        background: var(--canvas);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-3);
+      }
+      .titlebar .titletext {
+        position: absolute;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--ink-3);
+        pointer-events: none;
+      }
+      .titlebar {
+        position: relative;
+      }
+      .desktop-body {
+        flex: 1 1 auto;
+        display: grid;
+        grid-template-columns: 248px 1fr;
+        min-height: 0;
+        transition: grid-template-columns 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .desktop-body.sidebar-hidden {
+        grid-template-columns: 0 1fr;
+      }
+      .desktop-body.sidebar-hidden .sidebar {
+        overflow: hidden;
+        padding: 0;
+        border-right: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .sidebar {
+        transition:
+          opacity 200ms ease,
+          padding 200ms ease;
+      }
+
+      /* ---------- sidebar ---------- */
+      .sidebar {
+        background: var(--canvas);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 14px 12px 12px;
+        gap: 4px;
+        min-height: 0;
+      }
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--muted);
+        color: var(--ink-3);
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .search .kbd {
+        margin-left: auto;
+        font-size: 11px;
+        color: var(--ink-3);
+        opacity: 0.7;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .nav .item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        color: var(--ink);
+        font-size: 13.5px;
+        font-weight: 500;
+        transition: background 140ms ease;
+      }
+      .nav .item:hover {
+        background: var(--muted);
+      }
+      .nav .item.active {
+        background: var(--muted);
+      }
+      .nav .item .ico {
+        color: var(--ink-2);
+        opacity: 0.85;
+        flex: 0 0 auto;
+      }
+      .nav .item .count {
+        margin-left: auto;
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+      .nav .item .dot {
+        margin-left: auto;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--terracotta);
+      }
+      .nav-section-label {
+        padding: 14px 10px 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        font-weight: 600;
+      }
+      .nav .sub {
+        padding-left: 26px;
+        font-weight: 400;
+        color: var(--ink-2);
+        font-size: 13px;
+      }
+      .nav .sub.active {
+        background: var(--muted);
+        color: var(--ink);
+      }
+      .nav .sub.add {
+        color: var(--ink-3);
+      }
+      .nav .sub .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        flex: 0 0 auto;
+      }
+      .sidebar-footer {
+        margin-top: auto;
+        padding-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .sidebar-foot-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+      }
+      .sidebar-foot-row .avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: var(--sage);
+        color: #fff;
+        font-weight: 600;
+        font-size: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+      }
+
+      /* ---------- main canvas ---------- */
+      .main {
+        position: relative;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .main-scroll {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        position: relative;
+      }
+      .main-inner {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 44px 56px 220px;
+      }
+      .top-actions {
+        position: absolute;
+        top: 12px;
+        right: 18px;
+        display: flex;
+        gap: 8px;
+        z-index: 5;
+      }
+      .sidebar-toggle {
+        margin-left: 6px;
+        width: 28px;
+        height: 26px;
+        border-radius: 7px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-2);
+        background: transparent;
+      }
+      .sidebar-toggle:hover {
+        background: var(--muted);
+        color: var(--ink);
+      }
+      .sidebar-toggle.on {
+        color: var(--ink);
+      }
+
+      /* page hero (no inline CTA anymore — CTA is its own row) */
+      .page-header-row {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+      .page-header-row .left {
+        min-width: 0;
+      }
+
+      /* Large list-row CTA (sits at the top of the list, sized like 2 list items) */
+      .cta-big {
+        display: grid;
+        grid-template-columns: 64px 1fr auto;
+        gap: 20px;
+        align-items: center;
+        width: 100%;
+        text-align: left;
+        padding: 22px 24px 22px 20px;
+        background: var(--ink);
+        color: var(--canvas);
+        border-radius: 18px;
+        box-shadow: var(--shadow-2);
+        transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 160ms ease;
+        margin: 4px 0 14px;
+      }
+      .cta-big:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-3);
+      }
+      .cta-big .icon-circle {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--canvas);
+        position: relative;
+      }
+      .cta-big .icon-circle::after {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .cta-big .label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .cta-big .label .t {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 22px;
+        letter-spacing: -0.005em;
+        line-height: 1.1;
+      }
+      .cta-big .label .s {
+        font-size: 12.5px;
+        color: rgba(245, 240, 224, 0.7);
+        font-weight: 400;
+      }
+      .cta-big .arrow-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--canvas);
+        color: var(--ink);
+        transition: transform 140ms ease;
+      }
+      .cta-big:hover .arrow-pill {
+        transform: translateX(2px);
+      }
+
+      /* voice capture screen */
+      .capture {
+        max-width: 540px;
+        margin: 28px auto 0;
+        padding: 24px 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .capture .kicker {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .capture h1 {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 34px;
+        line-height: 1.1;
+        margin: 0 0 6px;
+        letter-spacing: -0.012em;
+      }
+      .capture p.cue {
+        color: var(--ink-2);
+        font-size: 14px;
+        margin: 0 0 32px;
+      }
+      .mic-btn {
+        width: 116px;
+        height: 116px;
+        border-radius: 50%;
+        background: var(--terracotta);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow:
+          0 14px 36px rgba(196, 106, 79, 0.32),
+          0 0 0 0 rgba(196, 106, 79, 0.4);
+        transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .mic-btn:hover {
+        transform: scale(1.04);
+      }
+      .mic-btn.recording {
+        background: var(--terracotta-deep);
+        animation: micPulse 1.6s infinite ease-in-out;
+      }
+      @keyframes micPulse {
+        0%, 100% {
+          box-shadow:
+            0 14px 36px rgba(196, 106, 79, 0.32),
+            0 0 0 0 rgba(196, 106, 79, 0.45);
+        }
+        50% {
+          box-shadow:
+            0 14px 36px rgba(196, 106, 79, 0.32),
+            0 0 0 22px rgba(196, 106, 79, 0);
+        }
+      }
+      .mic-btn .stop-square {
+        width: 28px;
+        height: 28px;
+        border-radius: 5px;
+        background: #fff;
+      }
+      .capture .timer {
+        margin-top: 18px;
+        font-family: 'Fraunces', serif;
+        font-feature-settings: 'tnum';
+        font-variant-numeric: tabular-nums;
+        font-size: 28px;
+        color: var(--ink);
+      }
+      .capture .waveform {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+        height: 36px;
+        margin-top: 14px;
+      }
+      .capture .waveform span {
+        width: 3px;
+        background: var(--terracotta);
+        border-radius: 999px;
+        opacity: 0.85;
+      }
+      .capture .waveform.live span {
+        animation: waveBar 0.9s infinite ease-in-out;
+      }
+      .capture .waveform span:nth-child(1) { animation-delay: 0.00s; height: 14px; }
+      .capture .waveform span:nth-child(2) { animation-delay: 0.06s; height: 22px; }
+      .capture .waveform span:nth-child(3) { animation-delay: 0.12s; height: 32px; }
+      .capture .waveform span:nth-child(4) { animation-delay: 0.18s; height: 20px; }
+      .capture .waveform span:nth-child(5) { animation-delay: 0.24s; height: 28px; }
+      .capture .waveform span:nth-child(6) { animation-delay: 0.30s; height: 12px; }
+      .capture .waveform span:nth-child(7) { animation-delay: 0.36s; height: 24px; }
+      .capture .waveform span:nth-child(8) { animation-delay: 0.42s; height: 30px; }
+      .capture .waveform span:nth-child(9) { animation-delay: 0.48s; height: 18px; }
+      .capture .waveform span:nth-child(10) { animation-delay: 0.54s; height: 26px; }
+      .capture .waveform span:nth-child(11) { animation-delay: 0.60s; height: 14px; }
+      .capture .waveform span:nth-child(12) { animation-delay: 0.66s; height: 22px; }
+      @keyframes waveBar {
+        0%, 100% {
+          transform: scaleY(0.45);
+        }
+        50% {
+          transform: scaleY(1);
+        }
+      }
+      .capture .live-transcript {
+        margin-top: 26px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px 26px;
+        text-align: left;
+        font-size: 15.5px;
+        line-height: 1.7;
+        color: var(--ink);
+        width: 100%;
+        max-width: 620px;
+        min-height: 130px;
+      }
+      .capture .live-transcript .ph {
+        color: var(--ink-3);
+        font-style: italic;
+      }
+      .capture .live-transcript .cursor {
+        display: inline-block;
+        width: 2px;
+        height: 18px;
+        background: var(--terracotta);
+        vertical-align: -3px;
+        margin-left: 2px;
+        animation: blink 0.9s infinite;
+      }
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+      }
+      .capture .actions {
+        margin-top: 22px;
+        display: flex;
+        gap: 10px;
+      }
+      .capture .actions .save {
+        background: var(--ink);
+        color: var(--canvas);
+        padding: 10px 18px;
+        border-radius: 999px;
+        font-size: 13.5px;
+        font-weight: 500;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .capture .actions .discard {
+        color: var(--ink-3);
+        padding: 10px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+      }
+
+      /* inline editable note (document mode) */
+      .note-body [contenteditable]:focus {
+        outline: none;
+      }
+      .note-body .editable {
+        border-radius: 4px;
+        padding: 2px 4px;
+        margin: -2px -4px;
+        transition: background 140ms ease;
+        cursor: text;
+      }
+      .note-body .editable:hover {
+        background: rgba(184, 152, 128, 0.08);
+      }
+      .note-body .editable:focus {
+        background: var(--surface);
+        box-shadow: 0 0 0 2px var(--butter-soft);
+      }
+      .note-h1.editable {
+        border-radius: 6px;
+        padding: 2px 6px;
+        margin: 0 -6px 4px;
+      }
+      .note-stamp.editable {
+        cursor: text;
+      }
+      /* placeholder for blank editable elements when empty */
+      [contenteditable][data-placeholder]:empty::before {
+        content: attr(data-placeholder);
+        color: var(--ink-3);
+        opacity: 0.55;
+        pointer-events: none;
+        font-style: italic;
+      }
+      .note-h1[data-placeholder]:empty::before {
+        font-style: normal;
+        opacity: 0.4;
+      }
+
+      /* voice-mode dock — replaces the chat input on the Note view */
+      .dock.voice-mode {
+        background: var(--surface);
+      }
+      .dock-voice-row {
+        display: grid;
+        grid-template-columns: 60px 1fr auto;
+        gap: 14px;
+        align-items: center;
+        padding: 12px 16px 12px 12px;
+        min-height: 72px;
+      }
+      .dock-mic {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--terracotta);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow:
+          0 6px 16px rgba(196, 106, 79, 0.28),
+          0 0 0 0 rgba(196, 106, 79, 0.4);
+        transition: transform 140ms ease;
+        flex: 0 0 auto;
+      }
+      .dock-mic:hover {
+        transform: scale(1.04);
+      }
+      .dock-mic.recording {
+        animation: micPulse 1.6s infinite ease-in-out;
+      }
+      .dock-mic .stop-square {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        background: #fff;
+      }
+      .dock-voice-row .label {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .dock-voice-row .label .t {
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--ink);
+      }
+      .dock-voice-row .label .s {
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+      .dock-voice-row .timer {
+        font-family: 'Fraunces', serif;
+        font-variant-numeric: tabular-nums;
+        font-size: 18px;
+        color: var(--ink);
+      }
+      .dock-voice-row .wave-mini {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        height: 22px;
+      }
+      .dock-voice-row .wave-mini span {
+        width: 2.5px;
+        background: var(--terracotta);
+        border-radius: 999px;
+      }
+      .dock-voice-row .wave-mini.live span {
+        animation: waveBar 0.9s infinite ease-in-out;
+      }
+      .dock-voice-row .wave-mini span:nth-child(1) { animation-delay: 0.00s; height: 10px; }
+      .dock-voice-row .wave-mini span:nth-child(2) { animation-delay: 0.06s; height: 16px; }
+      .dock-voice-row .wave-mini span:nth-child(3) { animation-delay: 0.12s; height: 20px; }
+      .dock-voice-row .wave-mini span:nth-child(4) { animation-delay: 0.18s; height: 14px; }
+      .dock-voice-row .wave-mini span:nth-child(5) { animation-delay: 0.24s; height: 18px; }
+      .dock-voice-row .wave-mini span:nth-child(6) { animation-delay: 0.30s; height: 10px; }
+      .dock-voice-row .wave-mini span:nth-child(7) { animation-delay: 0.36s; height: 16px; }
+      .dock-voice-row .wave-mini span:nth-child(8) { animation-delay: 0.42s; height: 12px; }
+      .dock-voice-row .switch-mode {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--canvas);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--ink-2);
+        font-weight: 500;
+      }
+      .dock-voice-row .switch-mode:hover {
+        background: var(--muted);
+      }
+      /* live transcription cursor inside note body */
+      .live-write {
+        background: linear-gradient(90deg, var(--butter-soft) 0%, transparent 100%);
+        padding: 2px 4px;
+        margin: -2px -4px;
+        border-radius: 4px;
+      }
+      .live-write::after {
+        content: '';
+        display: inline-block;
+        width: 2px;
+        height: 17px;
+        background: var(--terracotta);
+        vertical-align: -3px;
+        margin-left: 2px;
+        animation: blink 0.9s infinite;
+      }
+      .edit-hint {
+        margin-top: 22px;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--ink-3);
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--muted);
+      }
+
+      /* report row actions */
+      .report-row .row-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        opacity: 0;
+        transition: opacity 140ms ease;
+      }
+      .report-row:hover .row-actions {
+        opacity: 1;
+      }
+      .report-row .row-actions .iconbtn {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--canvas);
+        border: 1px solid var(--border);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-2);
+      }
+      .report-row .row-actions .iconbtn:hover {
+        background: var(--surface);
+        color: var(--ink);
+      }
+
+      /* report top actions */
+      .report-top-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+        align-items: center;
+      }
+      .report-top-actions .btn-pri {
+        background: var(--terracotta);
+        color: #fff;
+        padding: 8px 16px 8px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+        box-shadow: var(--shadow-1);
+      }
+      .report-top-actions .btn-pri:hover {
+        background: var(--terracotta-deep);
+      }
+      .report-top-actions .btn-sec {
+        background: var(--surface);
+        color: var(--ink);
+        border: 1px solid var(--border);
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .report-top-actions .btn-sec:hover {
+        background: var(--muted);
+      }
+      .report-top-actions .sent-stamp {
+        margin-left: auto;
+        font-size: 11.5px;
+        color: var(--sage-deep);
+        background: var(--sage-soft);
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-weight: 500;
+      }
+
+      /* PDF preview modal */
+      .modal-bg {
+        position: absolute;
+        inset: 0;
+        background: rgba(20, 16, 12, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 80;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+        animation: fadeIn 200ms ease;
+      }
+      .modal-card {
+        background: var(--canvas);
+        border-radius: 14px;
+        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.4);
+        width: min(820px, 100%);
+        max-height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: popIn 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .modal-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      .modal-head .file-ico {
+        width: 32px;
+        height: 32px;
+        border-radius: 7px;
+        background: var(--terracotta-soft);
+        color: var(--terracotta-deep);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.05em;
+      }
+      .modal-head .file-meta {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.25;
+      }
+      .modal-head .file-meta .t {
+        font-size: 13.5px;
+        font-weight: 500;
+      }
+      .modal-head .file-meta .s {
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+      .modal-head .actions {
+        margin-left: auto;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .modal-head .actions button {
+        padding: 7px 13px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 500;
+        border: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .modal-head .actions button.primary {
+        background: var(--ink);
+        color: var(--canvas);
+        border-color: var(--ink);
+      }
+      .modal-head .closebtn {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-2);
+        background: var(--muted);
+      }
+      .modal-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        background: linear-gradient(180deg, #c8c0b0 0%, #b8b0a0 100%);
+        padding: 28px;
+      }
+      .pdf-sheet {
+        background: #fff;
+        margin: 0 auto;
+        max-width: 600px;
+        padding: 56px 60px 64px;
+        box-shadow:
+          0 1px 0 rgba(0, 0, 0, 0.04),
+          0 18px 40px rgba(0, 0, 0, 0.22),
+          0 6px 12px rgba(0, 0, 0, 0.1);
+        border-radius: 2px;
+        color: #1f1c18;
+        font-size: 11px;
+        line-height: 1.55;
+      }
+      .pdf-sheet + .pdf-sheet {
+        margin-top: 22px;
+      }
+      .pdf-sheet .pdf-head {
+        text-align: center;
+        margin-bottom: 28px;
+        padding-bottom: 22px;
+        border-bottom: 1px solid #d9d3c4;
+      }
+      .pdf-sheet .pdf-head .crest {
+        font-family: 'Caveat', cursive;
+        font-size: 16px;
+        color: var(--clay);
+        margin-bottom: 6px;
+      }
+      .pdf-sheet .pdf-head h1 {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 26px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .pdf-sheet .pdf-head .kicker {
+        font-size: 9.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #5c544a;
+      }
+      .pdf-sheet h2 {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 14.5px;
+        margin: 18px 0 4px;
+        letter-spacing: -0.005em;
+      }
+      .pdf-sheet h2 .lead {
+        font-size: 9px;
+        font-weight: 600;
+        color: #9c9285;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-right: 8px;
+      }
+      .pdf-sheet .pdf-rule {
+        height: 1px;
+        background: #ece4d2;
+        margin: 4px 0 8px;
+      }
+      .pdf-sheet p {
+        margin: 0 0 8px;
+        font-size: 10.5px;
+        line-height: 1.65;
+      }
+      .pdf-sheet .pdf-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin: 14px 0 0;
+        font-size: 10px;
+      }
+      .pdf-sheet .pdf-meta-grid .cell .lab {
+        font-size: 8.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9c9285;
+        margin-bottom: 2px;
+      }
+      .pdf-sheet .pdf-foot {
+        margin-top: 24px;
+        padding-top: 14px;
+        border-top: 1px solid #ece4d2;
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+      }
+      .pdf-sheet .pdf-sig {
+        font-family: 'Caveat', cursive;
+        font-size: 22px;
+      }
+      .pdf-sheet .pdf-page-no {
+        font-size: 9px;
+        color: #9c9285;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* send composer */
+      .send-card {
+        max-width: 560px;
+        margin: 8px auto 0;
+        background: var(--canvas);
+        border-radius: 14px;
+        padding: 22px 24px;
+      }
+      .send-card .row {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 14px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 13.5px;
+      }
+      .send-card .row .lab {
+        color: var(--ink-3);
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+        padding-top: 3px;
+      }
+      .send-card .row .val .chip {
+        margin-right: 6px;
+      }
+      .send-card .preview-body {
+        padding: 14px 0 0;
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: var(--ink);
+      }
+      .send-card .send-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 18px;
+        justify-content: flex-end;
+      }
+
+      /* sent toast */
+      .toast {
+        position: absolute;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--ink);
+        color: var(--canvas);
+        padding: 11px 18px 11px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        box-shadow: var(--shadow-3);
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        z-index: 90;
+        animation: toastIn 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .toast .check {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--sage);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      @keyframes toastIn {
+        from {
+          transform: translate(-50%, -10px);
+          opacity: 0;
+        }
+        to {
+          transform: translate(-50%, 0);
+          opacity: 1;
+        }
+      }
+
+      /* reports list (replaces picker grid as the new default landing for Reports) */
+      .reports-list {
+        margin-top: 6px;
+      }
+      .report-row {
+        display: grid;
+        grid-template-columns: 56px 1fr 90px 70px;
+        gap: 18px;
+        align-items: center;
+        padding: 14px 0;
+        border-top: 1px dashed var(--border);
+        text-align: left;
+        width: 100%;
+        cursor: pointer;
+        transition: background 140ms ease;
+      }
+      .report-row:hover {
+        background: rgba(184, 152, 128, 0.06);
+      }
+      .report-row .av {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        color: #fff;
+        font-weight: 600;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .report-row .meta {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .report-row .meta .t {
+        font-size: 14.5px;
+        font-weight: 500;
+      }
+      .report-row .meta .s {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .report-row .status {
+        display: inline-flex;
+        align-items: center;
+        justify-self: end;
+        width: auto;
+        font-size: 11.5px;
+        font-weight: 500;
+        padding: 2px 9px;
+        border-radius: 999px;
+        background: var(--muted);
+        color: var(--ink-2);
+      }
+      .report-row .status.draft {
+        background: var(--butter-soft);
+        color: var(--butter-deep);
+      }
+      .report-row .status.sent {
+        background: var(--sage-soft);
+        color: var(--sage-deep);
+      }
+      .report-row .when {
+        font-size: 12.5px;
+        color: var(--ink-3);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* shell-bar additions */
+      .shell-toggle.compact button {
+        padding: 6px 11px;
+        font-size: 12px;
+      }
+      .shell-bar .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(214, 205, 185, 0.5);
+        margin-right: 6px;
+      }
+      .top-actions .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--ink);
+        font-size: 12.5px;
+        font-weight: 500;
+        box-shadow: var(--shadow-1);
+      }
+      .top-actions .pill:hover {
+        background: var(--muted);
+      }
+
+      /* page hero */
+      .page-h1 {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 44px;
+        line-height: 1.05;
+        letter-spacing: -0.015em;
+        color: var(--ink);
+        margin: 0 0 4px;
+      }
+      .page-sub {
+        color: var(--ink-2);
+        font-size: 14.5px;
+        margin: 0 0 28px;
+      }
+
+      /* date group header (notes list) */
+      .day-row {
+        display: grid;
+        grid-template-columns: 86px 1fr auto;
+        gap: 18px;
+        align-items: baseline;
+        padding: 18px 0 8px;
+      }
+      .day-num {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 32px;
+        line-height: 1;
+        color: var(--ink);
+      }
+      .day-meta {
+        display: flex;
+        flex-direction: column;
+        margin-top: 4px;
+      }
+      .day-meta .mo {
+        font-size: 11.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-2);
+      }
+      .day-meta .dw {
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+      .day-tally {
+        color: var(--ink-3);
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* note row */
+      .note-row {
+        display: grid;
+        grid-template-columns: 86px 40px 1fr auto;
+        gap: 18px;
+        align-items: center;
+        padding: 12px 0;
+        border-top: 1px dashed var(--border);
+        text-align: left;
+        width: 100%;
+        cursor: pointer;
+        transition: background 140ms ease;
+      }
+      .note-row:hover {
+        background: rgba(184, 152, 128, 0.06);
+      }
+      .note-row .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        color: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+      }
+      .note-row .title {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .note-row .title .t {
+        font-weight: 500;
+        font-size: 14.5px;
+        color: var(--ink);
+        line-height: 1.35;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .note-row .title .meta {
+        font-size: 12px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .note-row .time {
+        font-size: 12.5px;
+        color: var(--ink-3);
+        font-variant-numeric: tabular-nums;
+      }
+      .note-row.today .avatar::after {
+        content: '';
+        display: none;
+      }
+      .note-row .today-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--terracotta);
+        margin-left: 4px;
+        display: inline-block;
+        transform: translateY(-1px);
+      }
+
+      /* upgrade ribbon */
+      .upgrade {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        margin: 22px 0;
+        font-size: 13.5px;
+        color: var(--ink-2);
+        box-shadow: var(--shadow-1);
+      }
+      .upgrade .view {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--canvas);
+        border: 1px solid var(--border);
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-weight: 500;
+        font-size: 12.5px;
+        color: var(--ink);
+      }
+      .upgrade .view .arrow {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--sage-deep);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* tag chip */
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--ink-2);
+        font-weight: 500;
+      }
+      .chip .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .chip.terracotta .dot {
+        background: var(--terracotta);
+      }
+      .chip.sage .dot {
+        background: var(--sage);
+      }
+      .chip.dusty .dot {
+        background: var(--dusty);
+      }
+      .chip.butter .dot {
+        background: var(--butter);
+      }
+      .chip.clay .dot {
+        background: var(--clay);
+      }
+
+      /* single note */
+      .note-page {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 36px 0 320px;
+      }
+      .back-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--ink-2);
+        margin-bottom: 22px;
+        cursor: pointer;
+      }
+      .back-row:hover {
+        color: var(--ink);
+      }
+      .note-meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0 14px;
+      }
+      .note-h1 {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 34px;
+        line-height: 1.1;
+        letter-spacing: -0.012em;
+        margin: 0 0 4px;
+      }
+      .note-stamp {
+        font-family: 'Caveat', cursive;
+        font-weight: 500;
+        font-size: 20px;
+        color: var(--clay);
+        margin: 18px 0 2px;
+      }
+      .note-body p {
+        margin: 0 0 14px;
+        font-size: 15px;
+        line-height: 1.7;
+        color: var(--ink);
+      }
+      .note-body p .mention {
+        background: var(--sage-soft);
+        color: var(--sage-deep);
+        padding: 1px 6px;
+        border-radius: 6px;
+        font-weight: 500;
+      }
+      .note-body p .work {
+        background: var(--butter-soft);
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+      .note-body p.added {
+        background: var(--sage-soft);
+        padding: 10px 12px;
+        border-radius: 8px;
+        animation: fadeIn 600ms ease;
+        transition: background 1200ms ease;
+      }
+      .note-body p.added.settled {
+        background: transparent;
+      }
+      .ghost {
+        color: var(--terracotta-deep);
+        border-bottom: 1.5px dashed var(--terracotta);
+        padding-bottom: 1px;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translate(-50%, 12px);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, 0);
+        }
+      }
+      @keyframes popIn {
+        0% {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* reports */
+      .reports-grid {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 32px;
+        margin-top: 8px;
+      }
+      .roster {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .roster .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 140ms ease;
+        text-align: left;
+        width: 100%;
+      }
+      .roster .row:hover {
+        background: var(--muted);
+      }
+      .roster .row.active {
+        background: var(--muted);
+      }
+      .roster .av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        color: #fff;
+        font-weight: 600;
+        font-size: 12.5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+      }
+      .roster .name {
+        font-size: 13.5px;
+        font-weight: 500;
+      }
+      .roster .age {
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+
+      .templates {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      .template {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 180ms ease;
+        text-align: left;
+      }
+      .template:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-2);
+        border-color: var(--border-2);
+      }
+      .template .preview {
+        height: 144px;
+        background: var(--canvas);
+        border-bottom: 1px solid var(--border);
+        position: relative;
+        padding: 14px;
+        font-family: 'Fraunces', serif;
+        overflow: hidden;
+      }
+      .template .preview .ph-h {
+        font-size: 11px;
+        line-height: 1.2;
+        color: var(--ink);
+        font-weight: 500;
+        margin-bottom: 6px;
+      }
+      .template .preview .ph-body span {
+        display: block;
+        height: 4px;
+        background: var(--border);
+        border-radius: 2px;
+        margin-bottom: 5px;
+      }
+      .template .preview .ph-body span.short {
+        width: 60%;
+      }
+      .template .preview .ph-body span.mid {
+        width: 78%;
+      }
+      .template .preview .ph-stamp {
+        position: absolute;
+        bottom: 10px;
+        right: 12px;
+        font-family: 'Caveat', cursive;
+        font-size: 13px;
+        color: var(--clay);
+      }
+      .template-preview-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--ink);
+        box-shadow: var(--shadow-1);
+        opacity: 0;
+        transition: opacity 140ms ease;
+      }
+      .template:hover .template-preview-btn {
+        opacity: 1;
+      }
+      .template-preview-btn:hover {
+        background: var(--muted);
+      }
+      .template .body {
+        padding: 12px 14px 14px;
+      }
+      .template .body .t {
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .template .body .d {
+        font-size: 12.5px;
+        color: var(--ink-3);
+        margin-top: 2px;
+      }
+      .template .body .footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+      .template .body .footer .sep {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: var(--border-2);
+        display: inline-block;
+      }
+
+      /* generated report */
+      .report-page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 16px 0 320px;
+      }
+      .report-cover {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 28px 32px 26px;
+        margin-bottom: 28px;
+        position: relative;
+      }
+      .report-cover .crest {
+        position: absolute;
+        top: 22px;
+        right: 28px;
+        font-family: 'Caveat', cursive;
+        font-size: 22px;
+        color: var(--clay);
+      }
+      .report-cover .kicker {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 8px;
+      }
+      .report-cover h1 {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 38px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      .report-cover .who {
+        color: var(--ink-2);
+        font-size: 14px;
+      }
+      .report-cover .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+      .report-cover .meta-grid .cell .lab {
+        font-size: 10.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        margin-bottom: 3px;
+      }
+      .report-cover .meta-grid .cell .val {
+        font-size: 13px;
+        color: var(--ink);
+      }
+
+      .section {
+        margin: 28px 0;
+        scroll-margin-top: 60px;
+      }
+      .section h2 {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 22px;
+        margin: 0 0 4px;
+        letter-spacing: -0.005em;
+      }
+      .section h2 .lead {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-3);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-right: 10px;
+        vertical-align: middle;
+      }
+      .section .rule {
+        height: 1px;
+        background: var(--border);
+        margin: 10px 0 14px;
+      }
+      .section p {
+        margin: 0 0 12px;
+        font-size: 14.5px;
+        line-height: 1.72;
+      }
+
+      .section.toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 18px;
+      }
+      .section.toc button {
+        font-size: 12px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--ink-2);
+        font-weight: 500;
+      }
+      .section.toc button:hover {
+        background: var(--muted);
+        color: var(--ink);
+      }
+
+      /* signature */
+      .signature {
+        margin-top: 26px;
+        padding-top: 18px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 18px;
+      }
+      .signature .sig {
+        font-family: 'Caveat', cursive;
+        font-size: 28px;
+        color: var(--ink);
+        line-height: 1;
+      }
+      .signature .sig-meta {
+        text-align: right;
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+
+      /* ---------- chat dock ---------- */
+      .dock-wrap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 22px;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 30;
+      }
+      .dock {
+        pointer-events: auto;
+        width: min(720px, calc(100% - 56px));
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: var(--shadow-3);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: max-height 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .dock.collapsed {
+        max-height: 60px;
+      }
+      .dock.expanded {
+        max-height: 520px;
+      }
+      .dock-input-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px 12px 18px;
+        min-height: 60px;
+      }
+      .dock-input-row input {
+        flex: 1 1 auto;
+        font-size: 14px;
+        color: var(--ink);
+      }
+      .dock-input-row input::placeholder {
+        color: var(--ink-3);
+      }
+      .dock-quick {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        background: var(--canvas);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--ink-2);
+        font-weight: 500;
+      }
+      .dock-send {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--ink);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 140ms ease;
+      }
+      .dock-send:disabled {
+        background: var(--border-2);
+        cursor: default;
+      }
+      .dock-send:not(:disabled):hover {
+        transform: scale(1.05);
+      }
+      .dock-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 0 18px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .dock-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 12px 0 6px;
+      }
+      .dock-suggestions button {
+        font-size: 12.5px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--canvas);
+        border: 1px solid var(--border);
+        color: var(--ink-2);
+      }
+      .dock-suggestions button:hover {
+        background: var(--muted);
+        color: var(--ink);
+      }
+      .dock-msg {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 0;
+        animation: fadeIn 300ms ease;
+      }
+      .dock-msg .who {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 4px;
+      }
+      .dock-msg.user .who {
+        color: var(--ink-2);
+      }
+      .dock-msg .body {
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--ink);
+      }
+      .dock-msg.assist .body {
+        background: var(--muted);
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+      .dock-msg.assist .ghost-pull {
+        border-left: 2px dashed var(--terracotta);
+        padding: 6px 10px;
+        margin-top: 8px;
+        color: var(--terracotta-deep);
+        font-style: italic;
+        background: rgba(196, 106, 79, 0.05);
+        border-radius: 0 6px 6px 0;
+      }
+      .ghost-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .ghost-actions .apply {
+        background: var(--sage);
+        color: #fff;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .ghost-actions .apply:hover {
+        background: var(--sage-deep);
+      }
+      .ghost-actions .dismiss {
+        background: transparent;
+        color: var(--ink-3);
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      .dock-typing {
+        display: inline-flex;
+        gap: 4px;
+        padding: 8px 10px;
+        background: var(--muted);
+        border-radius: 12px;
+        margin: 4px 0;
+      }
+      .dock-typing span {
+        width: 6px;
+        height: 6px;
+        background: var(--ink-3);
+        border-radius: 50%;
+        animation: bouncedot 1.2s infinite ease-in-out;
+      }
+      .dock-typing span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .dock-typing span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes bouncedot {
+        0%,
+        80%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.4;
+        }
+        40% {
+          transform: translateY(-3px);
+          opacity: 1;
+        }
+      }
+
+      /* empty state */
+      .empty {
+        max-width: 540px;
+        margin: 12vh auto 0;
+        text-align: center;
+      }
+      .empty h1 {
+        font-family: 'Fraunces', serif;
+        font-weight: 400;
+        font-size: 42px;
+        line-height: 1.15;
+        letter-spacing: -0.015em;
+        color: var(--ink);
+        margin: 0 0 14px;
+      }
+      .empty .sub {
+        color: var(--ink-2);
+        font-size: 15px;
+        margin: 0 0 30px;
+      }
+      .empty .start {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 18px;
+        border-radius: 999px;
+        background: var(--ink);
+        color: var(--canvas);
+        font-size: 13.5px;
+        font-weight: 500;
+        box-shadow: var(--shadow-2);
+      }
+      .empty .start:hover {
+        background: #000;
+      }
+      .empty .hint {
+        margin-top: 22px;
+        color: var(--ink-3);
+        font-size: 13px;
+      }
+      .empty .hint .k {
+        background: var(--muted);
+        border-radius: 6px;
+        padding: 1px 7px;
+        color: var(--ink-2);
+        font-weight: 500;
+        font-size: 12px;
+      }
+      .empty .ill {
+        margin: 0 auto 28px;
+        width: 92px;
+        height: 92px;
+        border-radius: 28px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--clay);
+        position: relative;
+        font-family: 'Caveat', cursive;
+        font-size: 18px;
+        line-height: 1.1;
+        text-align: center;
+        padding: 6px;
+      }
+
+      /* mention popover */
+      .mention-pop {
+        position: absolute;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow-2);
+        padding: 6px;
+        z-index: 50;
+        min-width: 220px;
+        animation: popIn 160ms ease;
+      }
+      .mention-pop .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .mention-pop .row:hover,
+      .mention-pop .row.focus {
+        background: var(--muted);
+      }
+      .mention-pop .av {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .mention-pop .age {
+        margin-left: auto;
+        color: var(--ink-3);
+        font-size: 11.5px;
+      }
+
+      /* ---------- iPhone frame (mobile) ---------- */
+      .iphone {
+        width: 390px;
+        height: 844px;
+        background: #000;
+        border-radius: 56px;
+        padding: 14px;
+        box-shadow:
+          0 50px 90px rgba(0, 0, 0, 0.45),
+          0 12px 28px rgba(0, 0, 0, 0.25);
+        position: relative;
+      }
+      .iphone-screen {
+        width: 100%;
+        height: 100%;
+        border-radius: 44px;
+        background: var(--canvas);
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+      .island {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 124px;
+        height: 36px;
+        background: #000;
+        border-radius: 20px;
+        z-index: 30;
+      }
+      .iphone .status {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 28px;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--ink);
+        z-index: 25;
+      }
+      .iphone .status .l {
+        margin-top: 4px;
+      }
+      .iphone .status .r {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        margin-top: 4px;
+      }
+      .iphone .status .r .battery {
+        width: 22px;
+        height: 11px;
+        border: 1px solid var(--ink);
+        border-radius: 3px;
+        position: relative;
+      }
+      .iphone .status .r .battery::after {
+        content: '';
+        position: absolute;
+        right: -3px;
+        top: 3px;
+        width: 2px;
+        height: 5px;
+        background: var(--ink);
+      }
+      .iphone .status .r .battery::before {
+        content: '';
+        position: absolute;
+        inset: 1.5px;
+        width: 70%;
+        background: var(--ink);
+        border-radius: 1.5px;
+      }
+      .home-indicator {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 134px;
+        height: 5px;
+        border-radius: 999px;
+        background: #000;
+        z-index: 30;
+        opacity: 0.85;
+      }
+      .ios-app {
+        padding: 60px 0 0;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        position: relative;
+      }
+      .ios-topbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px 4px;
+      }
+      .ios-topbar .ham {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-2);
+      }
+      .ios-topbar .title {
+        font-family: 'Fraunces', serif;
+        font-size: 17px;
+        font-weight: 500;
+      }
+      .ios-topbar .right {
+        margin-left: auto;
+        display: inline-flex;
+        gap: 6px;
+      }
+      .ios-topbar .iconbtn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--ink-2);
+      }
+      .ios-content {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 4px 16px 140px;
+      }
+      .ios-h {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 30px;
+        line-height: 1.1;
+        margin: 8px 0 4px;
+      }
+      .ios-sub {
+        color: var(--ink-2);
+        font-size: 13.5px;
+        margin: 0 0 18px;
+      }
+      .ios-dock-wrap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 22px;
+        display: flex;
+        justify-content: center;
+        z-index: 30;
+        padding: 0 14px;
+      }
+      .ios-dock {
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        box-shadow: var(--shadow-3);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: max-height 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .ios-dock.collapsed {
+        max-height: 56px;
+      }
+      .ios-dock.expanded {
+        max-height: 460px;
+      }
+      .ios-dock .dock-input-row {
+        padding: 10px 12px 10px 16px;
+        min-height: 56px;
+      }
+      .ios-dock .dock-body {
+        padding: 0 14px 12px;
+      }
+      .ios-drawer-bg {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.32);
+        backdrop-filter: blur(2px);
+        z-index: 40;
+        animation: fadeIn 200ms ease;
+      }
+      .ios-drawer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 78%;
+        max-width: 300px;
+        background: var(--canvas);
+        z-index: 45;
+        padding: 60px 12px 18px;
+        animation: slideRight 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        border-right: 1px solid var(--border);
+      }
+      @keyframes slideRight {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(0);
+        }
+      }
+
+      /* shared icon */
+      .ico-svg {
+        flex: 0 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="env,react">
+      const { useState, useEffect, useRef, useMemo } = React;
+
+      // ---------- icon helpers ----------
+      const Ico = ({ d, size = 16, stroke = 1.5, fill = 'none', style }) => (
+        <svg
+          className="ico-svg"
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill={fill}
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={style}
+        >
+          {d}
+        </svg>
+      );
+      const IconSearch = (p) => <Ico {...p} d={<><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>} />;
+      const IconNotes = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="5" y="3" width="14" height="18" rx="2" />
+              <path d="M9 8h6M9 12h6M9 16h4" />
+            </>
+          }
+        />
+      );
+      const IconReport = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+              <path d="M14 3v5h5" />
+              <path d="M9 14h7M9 17h5" />
+            </>
+          }
+        />
+      );
+      const IconFolder = (p) => (
+        <Ico
+          {...p}
+          d={<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l2 2h9A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z" />}
+        />
+      );
+      const IconAdd = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="3" y="6" width="13" height="13" rx="2" />
+              <path d="M19 4v4M21 6h-4M9 12h4M11 10v4" />
+            </>
+          }
+        />
+      );
+      const IconChild = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+            </>
+          }
+        />
+      );
+      const IconHam = (p) => <Ico {...p} d={<><path d="M4 7h16M4 12h16M4 17h16" /></>} />;
+      const IconHome = (p) => (
+        <Ico
+          {...p}
+          d={<><path d="m3 11 9-7 9 7" /><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" /></>}
+        />
+      );
+      const IconBack = (p) => <Ico {...p} d={<path d="m15 6-6 6 6 6" />} />;
+      const IconArrowUp = (p) => <Ico {...p} d={<><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></>} />;
+      const IconPlus = (p) => <Ico {...p} d={<><path d="M12 5v14" /><path d="M5 12h14" /></>} />;
+      const IconLock = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </>
+          }
+        />
+      );
+      const IconClose = (p) => <Ico {...p} d={<><path d="M6 6l12 12M6 18 18 6" /></>} />;
+      const IconAt = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <circle cx="12" cy="12" r="4" />
+              <path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.2 6.9" />
+            </>
+          }
+        />
+      );
+      const IconShare = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <circle cx="18" cy="5" r="2.5" />
+              <circle cx="6" cy="12" r="2.5" />
+              <circle cx="18" cy="19" r="2.5" />
+              <path d="m8.4 11 7.2-4.2M8.4 13l7.2 4.2" />
+            </>
+          }
+        />
+      );
+      const IconCalendar = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="4" y="5" width="16" height="16" rx="2" />
+              <path d="M4 9h16M9 3v4M15 3v4" />
+            </>
+          }
+        />
+      );
+      const IconWand = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <path d="m15 4 5 5M4 20l11-11" />
+              <path d="M14 7l3 3M19 3l1 1M3 19l1 1M9 3l1 1M3 9l1 1" />
+            </>
+          }
+        />
+      );
+      const IconLap = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="3" y="5" width="18" height="11" rx="1.5" />
+              <path d="M2 19h20" />
+            </>
+          }
+        />
+      );
+      const IconPhone = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="7" y="2.5" width="10" height="19" rx="2" />
+              <path d="M11 19h2" />
+            </>
+          }
+        />
+      );
+      const IconKebab = (p) => (
+        <Ico {...p} d={<><circle cx="12" cy="6" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="18" r="1" /></>} />
+      );
+      const IconMic = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8" />
+            </>
+          }
+        />
+      );
+      const IconEye = (p) => (
+        <Ico {...p} d={<><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>} />
+      );
+      const IconMail = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <path d="m3 7 9 7 9-7" />
+            </>
+          }
+        />
+      );
+      const IconCheck = (p) => <Ico {...p} d={<path d="m5 12 5 5 9-11" />} />;
+      const IconDownload = (p) => (
+        <Ico
+          {...p}
+          d={
+            <>
+              <path d="M12 4v12" />
+              <path d="m7 11 5 5 5-5" />
+              <path d="M5 20h14" />
+            </>
+          }
+        />
+      );
+      const IconArrowRight = (p) => <Ico {...p} d={<><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></>} />;
+
+      // ---------- data ----------
+      const CHILDREN = [
+        { id: 'maya', first: 'Maya', last: 'Chen', age: '4y 5m', initials: 'M', tone: 'sage', hex: '#7a9b7a' },
+        { id: 'theo', first: 'Theo', last: 'Park', age: '3y 11m', initials: 'T', tone: 'dusty', hex: '#6b8aa6' },
+        { id: 'amara', first: 'Amara', last: 'Okafor', age: '5y 2m', initials: 'A', tone: 'terracotta', hex: '#c46a4f' },
+        { id: 'eli', first: 'Eli', last: 'Bergmann', age: '4y 8m', initials: 'E', tone: 'butter', hex: '#b89a2e' },
+        { id: 'sage', first: 'Sage', last: 'Whitaker', age: '3y 6m', initials: 'S', tone: 'clay', hex: '#a88876' },
+      ];
+      const childById = (id) => CHILDREN.find((c) => c.id === id);
+
+      const NOTES = [
+        {
+          id: 'n1',
+          title: 'Maya carried the water pitcher all the way across the room',
+          dateLabel: 'Today',
+          dayNum: 19,
+          mo: 'May',
+          dw: 'Tue',
+          tags: ['maya'],
+          area: 'Practical Life',
+          stamp: 'Tuesday morning · work cycle',
+          time: '9:14 AM',
+          today: true,
+          body: [
+            { mention: 'Maya', text: ' arrived a few minutes after circle and went straight to the pouring shelf. This morning she carried the ' , work: 'water pitcher', textEnd: ' across the classroom without spilling for the first time. She did the pouring work three times in a row — concentration was unbroken for about fourteen minutes.' },
+            { text: 'Afterwards she asked me where the sponges live, and put hers back without being prompted. I noticed her hands were steadier holding the pitcher in her left hand, supporting the spout with her right.' },
+            { text: 'Tomorrow I want to invite her to try the dry-pouring with two pitchers side-by-side.' },
+          ],
+        },
+        {
+          id: 'n2',
+          title: 'Pink tower with Theo — three towers in a row',
+          dateLabel: 'Today',
+          dayNum: 19,
+          mo: 'May',
+          dw: 'Tue',
+          tags: ['theo'],
+          area: 'Sensorial',
+          stamp: 'Tuesday late morning',
+          time: '11:24 AM',
+          today: true,
+          body: [
+            { mention: 'Theo', text: ' built the pink tower three times this morning. First two attempts he placed the second-largest cube on top — caught himself the third time and self-corrected without prompting.' },
+            { text: 'He asked Amara to watch his last build. Social bridge.' },
+          ],
+        },
+        {
+          id: 'n3',
+          title: 'Moveable alphabet — Maya wrote "the cat ran"',
+          dateLabel: 'Yesterday',
+          dayNum: 18,
+          mo: 'May',
+          dw: 'Mon',
+          tags: ['maya'],
+          area: 'Language',
+          stamp: 'Monday afternoon',
+          time: '2:08 PM',
+          body: [
+            { mention: 'Maya', text: ' composed her first three-word phrase with the moveable alphabet today — ' , work: '"the cat ran"', textEnd: '. She sounded out each phoneme aloud as she placed the letters. Worked on the small carpet near the window for about twenty-five minutes.' },
+            { text: "After she finished, she pointed at it and said, 'I made a sentence.' Big moment. She wanted to leave it out for circle." },
+          ],
+        },
+        {
+          id: 'n4',
+          title: 'Amara helping Sage with the dressing frame',
+          dateLabel: 'Yesterday',
+          dayNum: 18,
+          mo: 'May',
+          dw: 'Mon',
+          tags: ['amara', 'sage'],
+          area: 'Practical Life',
+          stamp: 'Monday morning',
+          time: '10:42 AM',
+          body: [
+            { mention: 'Amara', text: ' showed ' },
+            { mention: 'Sage', text: ' the button frame this morning. Demonstrated three times slowly without speaking. Sage tried twice, got frustrated on the third button, walked away. Came back ten minutes later and finished it alone.' },
+            { text: 'Grace and courtesy — Amara waited, didn\'t interrupt, didn\'t take over.' },
+          ],
+        },
+        {
+          id: 'n5',
+          title: 'Eli at the binomial cube — first independent build',
+          dateLabel: 'Fri, May 16',
+          dayNum: 16,
+          mo: 'May',
+          dw: 'Fri',
+          tags: ['eli'],
+          area: 'Sensorial',
+          stamp: 'Friday late morning',
+          time: '11:51 AM',
+          body: [
+            { mention: 'Eli', text: ' completed the binomial cube independently for the first time. Took two attempts. He hummed the whole way through.' },
+          ],
+        },
+        {
+          id: 'n6',
+          title: 'Maya — number rods, 1 to 7',
+          dateLabel: 'Thu, May 15',
+          dayNum: 15,
+          mo: 'May',
+          dw: 'Thu',
+          tags: ['maya'],
+          area: 'Math',
+          stamp: 'Thursday',
+          time: '9:48 AM',
+          body: [
+            { mention: 'Maya', text: ' worked with the number rods, counting from 1 to 7. Self-corrected when she skipped 5. Wanted to extend to 10 but I let her settle at 7 today — she\'ll come back to it.' },
+          ],
+        },
+        {
+          id: 'n7',
+          title: 'Continent puzzle map — group of four',
+          dateLabel: 'Wed, May 14',
+          dayNum: 14,
+          mo: 'May',
+          dw: 'Wed',
+          tags: ['amara', 'theo', 'eli'],
+          area: 'Cultural',
+          stamp: 'Wednesday afternoon',
+          time: '1:32 PM',
+          body: [
+            { text: 'A spontaneous group of four formed around the continent puzzle map today. ' , mention: 'Amara', textEnd: ' led, naming each continent as she handed pieces to ' },
+            { mention: 'Theo', text: ' and ' },
+            { mention: 'Eli', text: '. About 35 minutes of sustained shared work.' },
+          ],
+        },
+      ];
+
+      // ---------- canned chat responses ----------
+      const CANNED_NOTES = {
+        default: {
+          text: "Here's a short summary of this note: Maya carried the water pitcher across the classroom for the first time today, completing the pouring work three times in sustained concentration of about 14 minutes. She returned her sponge without prompting.",
+          pull: null,
+          ghost: null,
+        },
+        summarize: {
+          text: "Today's note in one sentence:",
+          pull: 'Maya carried the water pitcher across the classroom for the first time and repeated the pouring work three times in roughly fourteen minutes of unbroken concentration.',
+          ghost: null,
+        },
+        pinkTower: {
+          text: "Here's what I found across your notes from this week with the pink tower:",
+          pull: 'Theo — Tue, May 19 · Built the pink tower three times. Self-corrected on the third build without prompting. Invited Amara to watch.',
+          ghost: null,
+        },
+        parent: {
+          text: "Draft for a quick parent note to Maya's family — I'll add it to the end of this entry as a separate paragraph:",
+          pull: null,
+          ghost: 'A small but meaningful milestone today: Maya carried a full water pitcher all the way across the classroom for the first time, then repeated the pouring work three times in a row. Her concentration is lengthening beautifully.',
+        },
+      };
+
+      const CANNED_REPORTS = {
+        default: {
+          text: "I can help refine any section. Try asking me to make a section more specific, add an example, or soften the tone for the parent audience.",
+          pull: null,
+          ghost: null,
+        },
+        languageMoreSpecific: {
+          text: "I drafted a more specific Language passage drawing on her moveable-alphabet entry from May 7 and the number-rod note from May 15:",
+          pull: null,
+          ghostFor: 'language',
+          ghost:
+            'She independently composed her first three-word phrase — "the cat ran" — on May 7, sounding out each phoneme aloud as she placed each letter. She now reads three-letter phonetic words confidently and has begun choosing books about animals during the work cycle.',
+        },
+        concentration: {
+          text: "Here's a sentence about her concentration during work cycle that I can drop into Whole-child observations:",
+          pull: null,
+          ghostFor: 'whole',
+          ghost:
+            'Maya now sustains work cycles of twenty to thirty minutes regularly, returning to the same material for several days in succession before moving on.',
+        },
+        softer: {
+          text: "I gentled the Math section — same observations, warmer phrasing for the family:",
+          pull: null,
+          ghostFor: 'math',
+          ghost:
+            'Maya is building a confident sense of number through the rods, counting one to seven steadily and catching her own mistakes. She is curious about going further, and we will follow her lead into the spindle boxes after the break.',
+        },
+      };
+
+      const pickResponse = (route, q) => {
+        const t = q.toLowerCase();
+        if (route === 'note') {
+          if (t.includes('parent')) return CANNED_NOTES.parent;
+          if (t.includes('pink tower') || t.includes('pulled out')) return CANNED_NOTES.pinkTower;
+          if (t.includes('summar')) return CANNED_NOTES.summarize;
+          return CANNED_NOTES.default;
+        }
+        if (route === 'report') {
+          if (t.includes('language')) return CANNED_REPORTS.languageMoreSpecific;
+          if (t.includes('concentration')) return CANNED_REPORTS.concentration;
+          if (t.includes('soft') || t.includes('warm') || t.includes('parent')) return CANNED_REPORTS.softer;
+          return CANNED_REPORTS.default;
+        }
+        return CANNED_NOTES.default;
+      };
+
+      // ---------- shell ----------
+      function App() {
+        const [device, setDevice] = useState('desktop');
+        // routes: notes-list | notes-one | reports-list | reports-picker | reports-doc
+        const [route, setRoute] = useState('notes-list');
+        const [activeNoteId, setActiveNoteId] = useState('n1');
+        const [emptyPreview, setEmptyPreview] = useState(false);
+        const [sidebarOpen, setSidebarOpen] = useState(false);
+        // PDF preview modal (can be a populated report or an empty template)
+        const [previewReport, setPreviewReport] = useState(null);
+        // when true, NoteOne mounts with an empty title/body for a fresh note
+        const [isNewNote, setIsNewNote] = useState(false);
+
+        return (
+          <div className="shell">
+            <div className="shell-bar">
+              <span className="title">Mitable Montessori</span>
+              <span className="sep">·</span>
+              <span className="meta">Notes-first prototype</span>
+              <span className="sep">·</span>
+              <span className="meta">v2 · two routes</span>
+              <div style={{ flex: 1 }} />
+              <span className="label">View</span>
+              <div className="shell-toggle compact" role="tablist" style={{ marginRight: 10 }}>
+                <button className={!emptyPreview ? 'on' : ''} onClick={() => setEmptyPreview(false)}>
+                  With content
+                </button>
+                <button className={emptyPreview ? 'on' : ''} onClick={() => setEmptyPreview(true)}>
+                  Empty
+                </button>
+              </div>
+              <div className="shell-toggle" role="tablist">
+                <button className={device === 'desktop' ? 'on' : ''} onClick={() => setDevice('desktop')}>
+                  <IconLap size={14} stroke={1.7} /> Web
+                </button>
+                <button className={device === 'mobile' ? 'on' : ''} onClick={() => setDevice('mobile')}>
+                  <IconPhone size={14} stroke={1.7} /> Mobile
+                </button>
+              </div>
+            </div>
+
+            {device === 'desktop' ? (
+              <Desktop
+                route={route}
+                setRoute={setRoute}
+                activeNoteId={activeNoteId}
+                setActiveNoteId={setActiveNoteId}
+                emptyPreview={emptyPreview}
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+                previewReport={previewReport}
+                setPreviewReport={setPreviewReport}
+                isNewNote={isNewNote}
+                setIsNewNote={setIsNewNote}
+              />
+            ) : (
+              <Mobile
+                route={route}
+                setRoute={setRoute}
+                activeNoteId={activeNoteId}
+                setActiveNoteId={setActiveNoteId}
+                emptyPreview={emptyPreview}
+                previewReport={previewReport}
+                setPreviewReport={setPreviewReport}
+                isNewNote={isNewNote}
+                setIsNewNote={setIsNewNote}
+              />
+            )}
+          </div>
+        );
+      }
+
+      // ---------- desktop frame ----------
+      function Desktop(props) {
+        const {
+          route, setRoute, activeNoteId, setActiveNoteId, emptyPreview, sidebarOpen, setSidebarOpen,
+          previewReport, setPreviewReport, isNewNote, setIsNewNote,
+        } = props;
+        return (
+          <div className="desktop">
+            <div className="titlebar">
+              <span className="traffic">
+                <span className="r" />
+                <span className="y" />
+                <span className="g" />
+              </span>
+              <button
+                className={'sidebar-toggle' + (sidebarOpen ? ' on' : '')}
+                title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+                onClick={() => setSidebarOpen((s) => !s)}
+              >
+                <Ico
+                  d={
+                    <>
+                      <rect x="3" y="4" width="18" height="16" rx="2" />
+                      <path d="M9 4v16" />
+                    </>
+                  }
+                  size={15}
+                  stroke={1.7}
+                />
+              </button>
+              <div className="titletext">
+                {route.startsWith('notes')
+                  ? "Sarah's Classroom — Notes"
+                  : "Sarah's Classroom — Reports"}
+              </div>
+            </div>
+            <div className={'desktop-body' + (sidebarOpen ? '' : ' sidebar-hidden')}>
+              <Sidebar route={route} setRoute={setRoute} />
+              <Main
+                route={route}
+                setRoute={setRoute}
+                activeNoteId={activeNoteId}
+                setActiveNoteId={setActiveNoteId}
+                emptyPreview={emptyPreview}
+                setPreviewReport={setPreviewReport}
+                isNewNote={isNewNote}
+                setIsNewNote={setIsNewNote}
+              />
+            </div>
+
+            {previewReport && (
+              <PdfPreviewModal report={previewReport} onClose={() => setPreviewReport(null)} />
+            )}
+          </div>
+        );
+      }
+
+      function Sidebar({ route, setRoute }) {
+        const onNotes = route.startsWith('notes');
+        const onReports = route.startsWith('reports');
+        return (
+          <aside className="sidebar">
+            <div className="search">
+              <IconSearch size={14} stroke={1.7} /> Search<span className="kbd">⌘K</span>
+            </div>
+
+            <div className="nav">
+              <button className={'item' + (onNotes ? ' active' : '')} onClick={() => setRoute('notes-list')}>
+                <span className="ico">
+                  <IconNotes size={16} />
+                </span>
+                Notes
+                <span className="dot" />
+              </button>
+              <button className={'item' + (onReports ? ' active' : '')} onClick={() => setRoute('reports-list')}>
+                <span className="ico">
+                  <IconReport size={16} />
+                </span>
+                Reports
+                <span className="count">12</span>
+              </button>
+            </div>
+
+            <div className="sidebar-footer">
+              <div className="sidebar-foot-row">
+                <span className="avatar">SK</span>
+                <div>
+                  <div style={{ fontWeight: 600 }}>Sarah Kovač</div>
+                  <div style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>Primrose Room · Lead Guide</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        );
+      }
+
+      // ---------- main canvas ----------
+      function Main({
+        route, setRoute, activeNoteId, setActiveNoteId, emptyPreview,
+        setPreviewReport, isNewNote, setIsNewNote,
+      }) {
+        const [chatExpanded, setChatExpanded] = useState(false);
+        const [messages, setMessages] = useState([]);
+        const [typing, setTyping] = useState(false);
+        // ghost insertions per-screen
+        const [noteAppended, setNoteAppended] = useState(null);
+        const [reportGhost, setReportGhost] = useState({});
+        const [ghostSettled, setGhostSettled] = useState({});
+
+        useEffect(() => {
+          setMessages([]);
+          setChatExpanded(false);
+          setTyping(false);
+        }, [route, activeNoteId, emptyPreview]);
+
+        const onSendChat = (q) => {
+          const ctx = route === 'notes-one' ? 'note' : route === 'reports-doc' ? 'report' : 'note';
+          setMessages((m) => [...m, { who: 'user', text: q }]);
+          setTyping(true);
+          setChatExpanded(true);
+          setTimeout(() => {
+            const r = pickResponse(ctx, q);
+            setMessages((m) => [...m, { who: 'assist', ...r }]);
+            setTyping(false);
+          }, 750);
+        };
+
+        const onApplyGhost = (msg) => {
+          if (route === 'notes-one' && msg.ghost) {
+            setNoteAppended(msg.ghost);
+            setTimeout(() => setNoteAppended((g) => (g ? g + ' ' : g)), 50);
+            setTimeout(() => {
+              const el = document.querySelector('.note-body p.added');
+              if (el) el.classList.add('settled');
+            }, 1400);
+          }
+          if (route === 'reports-doc' && msg.ghostFor) {
+            setReportGhost((g) => ({ ...g, [msg.ghostFor]: msg.ghost }));
+            setTimeout(() => setGhostSettled((s) => ({ ...s, [msg.ghostFor]: true })), 1400);
+            setTimeout(() => {
+              const el = document.getElementById('sec-' + msg.ghostFor);
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          }
+          setMessages((m) => m.map((x) => (x === msg ? { ...x, applied: true } : x)));
+        };
+
+        const suggestions = useMemo(() => {
+          if (route === 'notes-one') {
+            return ['Summarize this note', 'What did Maya do with the pink tower?', 'Draft a parent message about today'];
+          }
+          if (route === 'reports-doc') {
+            return [
+              'Make the Language section more specific',
+              'Add a sentence about her concentration during work cycle',
+              'Soften the Math section for parents',
+            ];
+          }
+          if (route === 'notes-list') {
+            return [
+              'Summarize what Maya worked on this week',
+              "What's still unobserved this week?",
+              'Suggest 3 reports I could draft',
+            ];
+          }
+          if (route === 'reports-list' || route === 'reports-picker') {
+            return [
+              'Which children are due for a check-in?',
+              'Draft a Spring Progress Report for Maya',
+              'Who has the most recent notes?',
+            ];
+          }
+          return [];
+        }, [route]);
+
+        // The Notes "with content" landing also shows the empty state when emptyPreview is on
+        const showNotesEmpty = route === 'notes-list' && emptyPreview;
+        const showReportsEmpty = route === 'reports-list' && emptyPreview;
+
+        return (
+          <div className="main">
+            <div className="top-actions">
+              <button className="pill">
+                <IconShare size={14} stroke={1.7} /> Share
+              </button>
+            </div>
+
+            <div className="main-scroll">
+              <div className="main-inner">
+                {route === 'notes-list' && !showNotesEmpty && (
+                  <NotesList
+                    onNew={() => {
+                      setIsNewNote(true);
+                      setRoute('notes-one');
+                    }}
+                    onOpen={(id) => {
+                      setIsNewNote(false);
+                      setActiveNoteId(id);
+                      setRoute('notes-one');
+                    }}
+                  />
+                )}
+                {showNotesEmpty && (
+                  <EmptyState
+                    kind="notes"
+                    onStart={() => {
+                      setIsNewNote(true);
+                      setRoute('notes-one');
+                    }}
+                  />
+                )}
+                {route === 'notes-one' && (
+                  <NoteOne
+                    noteId={activeNoteId}
+                    appended={noteAppended}
+                    isNew={isNewNote}
+                    onBack={() => {
+                      setIsNewNote(false);
+                      setRoute('notes-list');
+                    }}
+                  />
+                )}
+                {route === 'reports-list' && !showReportsEmpty && (
+                  <ReportsList
+                    onNew={() => setRoute('reports-picker')}
+                    onOpen={() => setRoute('reports-doc')}
+                    onPreview={(r) => setPreviewReport(r)}
+                  />
+                )}
+                {showReportsEmpty && (
+                  <EmptyState
+                    kind="reports"
+                    onStart={() => setRoute('reports-picker')}
+                  />
+                )}
+                {route === 'reports-picker' && (
+                  <ReportsPick
+                    onBack={() => setRoute('reports-list')}
+                    onOpen={() => setRoute('reports-doc')}
+                    onPreviewTemplate={(t) => setPreviewReport({ kind: 'template', template: t })}
+                  />
+                )}
+                {route === 'reports-doc' && (
+                  <ReportDoc
+                    ghost={reportGhost}
+                    settled={ghostSettled}
+                    onBack={() => setRoute('reports-list')}
+                    onPreview={() =>
+                      setPreviewReport({
+                        kind: 'report',
+                        child: 'maya',
+                        template: 'Spring Progress Report',
+                        term: 'Term 2 · Spring 2026',
+                      })
+                    }
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Voice dock on the Note view replaces the chat dock entirely */}
+            {route === 'notes-one' ? (
+              <VoiceDock noteContext={{ isNew: isNewNote, noteId: activeNoteId }} />
+            ) : (
+              <ChatDock
+                expanded={chatExpanded}
+                setExpanded={setChatExpanded}
+                suggestions={suggestions}
+                messages={messages}
+                typing={typing}
+                onSend={onSendChat}
+                onApplyGhost={onApplyGhost}
+              />
+            )}
+          </div>
+        );
+      }
+
+      // ---------- screens ----------
+      function EmptyState({ kind = 'notes', onStart }) {
+        const copy =
+          kind === 'reports'
+            ? {
+                stamp: 'first\nreport',
+                h1: 'No reports yet.',
+                sub: "When you're ready, pick a child and a template — I'll pre-fill from your notes this term.",
+                cta: 'Start your first report',
+                hint: (
+                  <>
+                    Tip — you'll move faster if you've written a few <span className="k">@child</span> notes first.
+                  </>
+                ),
+              }
+            : {
+                stamp: 'first\nday',
+                h1: 'A quiet place for your day with the children.',
+                sub: "Start with a single observation. The rest folds itself into reports when you're ready.",
+                cta: 'Start your first note',
+                hint: (
+                  <>
+                    Tip — type <span className="k">@</span> to tag a child, so you can find this later.
+                  </>
+                ),
+              };
+        return (
+          <div className="empty">
+            <div className="ill" aria-hidden>
+              {copy.stamp.split('\n').map((s, i) => (
+                <span key={i}>
+                  {s}
+                  {i < copy.stamp.split('\n').length - 1 && <br />}
+                </span>
+              ))}
+            </div>
+            <h1>{copy.h1}</h1>
+            <p className="sub">{copy.sub}</p>
+            <button className="start" onClick={onStart}>
+              <IconPlus size={14} stroke={2} /> {copy.cta}
+            </button>
+            <div className="hint">{copy.hint}</div>
+          </div>
+        );
+      }
+
+      // ---------- voice transcript ----------
+      const CAPTURE_SCRIPT =
+        'This morning Maya carried the water pitcher across the classroom without spilling for the first time. ' +
+        'She did the pouring work three times in a row — concentration was unbroken for about fourteen minutes. ' +
+        'Afterwards she asked me where the sponges live and put hers back without being prompted. ' +
+        'Tomorrow I want to invite her to try dry-pouring with two pitchers side-by-side.';
+
+      // VoiceDock: the chat-dock-shaped recording surface that appears in place of the chat dock
+      // when the user is viewing a note. Tapping the mic streams the simulated transcript into
+      // the note body via DOM manipulation (because the body is contentEditable, React doesn't own it).
+      function VoiceDock({ noteContext }) {
+        const [phase, setPhase] = useState('idle'); // idle | recording
+        const [elapsed, setElapsed] = useState(0);
+        const timersRef = useRef([]);
+
+        useEffect(() => {
+          // reset when note context changes
+          setPhase('idle');
+          setElapsed(0);
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
+          return () => timersRef.current.forEach(clearTimeout);
+        }, [noteContext.noteId, noteContext.isNew]);
+
+        useEffect(() => {
+          if (phase !== 'recording') return;
+          const start = Date.now();
+          const i = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 250);
+          return () => clearInterval(i);
+        }, [phase]);
+
+        const fmt = (s) =>
+          `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+        const startRecording = () => {
+          // find the live-write target inside the note body. We append a new paragraph
+          // marked with the .live-write class so the user can see what's streaming in.
+          const body = document.querySelector('.note-body');
+          if (!body) return;
+          // remove any existing live-write paragraph
+          body.querySelectorAll('p.live-write').forEach((el) => el.remove());
+          const p = document.createElement('p');
+          p.className = 'live-write editable';
+          p.setAttribute('contenteditable', 'true');
+          p.setAttribute('spellcheck', 'false');
+          body.appendChild(p);
+
+          setPhase('recording');
+
+          const words = CAPTURE_SCRIPT.split(/(\s+)/).filter(Boolean);
+          let accumulated = '';
+          words.forEach((w, i) => {
+            const t = setTimeout(() => {
+              accumulated += w;
+              p.textContent = accumulated;
+            }, 380 + i * 95);
+            timersRef.current.push(t);
+          });
+          // when finished, drop the live-write class
+          const done = setTimeout(() => {
+            p.classList.remove('live-write');
+            setPhase('idle');
+          }, 380 + words.length * 95 + 800);
+          timersRef.current.push(done);
+        };
+
+        const stopRecording = () => {
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
+          // remove the cursor underline from the live paragraph
+          const live = document.querySelector('.note-body p.live-write');
+          if (live) live.classList.remove('live-write');
+          setPhase('idle');
+        };
+
+        return (
+          <div className="dock-wrap">
+            <div className="dock voice-mode collapsed">
+              <div className="dock-voice-row">
+                <button
+                  className={'dock-mic' + (phase === 'recording' ? ' recording' : '')}
+                  onClick={phase === 'recording' ? stopRecording : startRecording}
+                  aria-label={phase === 'recording' ? 'Stop recording' : 'Record'}
+                >
+                  {phase === 'recording' ? <span className="stop-square" /> : <IconMic size={20} stroke={1.6} />}
+                </button>
+                <div className="label">
+                  {phase === 'recording' ? (
+                    <>
+                      <span className="t">Listening…</span>
+                      <span className="s">Speak naturally — I'm writing it down for you.</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="t">{noteContext.isNew ? 'Tap to record this note' : 'Add to this note by voice'}</span>
+                      <span className="s">Or click into the document above to type.</span>
+                    </>
+                  )}
+                </div>
+                {phase === 'recording' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+                    <span className="wave-mini live">
+                      <span /><span /><span /><span /><span /><span /><span /><span />
+                    </span>
+                    <span className="timer">{fmt(elapsed)}</span>
+                  </span>
+                ) : (
+                  <button className="switch-mode" onClick={() => {
+                    const firstP = document.querySelector('.note-body p.editable');
+                    if (firstP) firstP.focus();
+                  }}>
+                    <IconWand size={11} stroke={1.8} /> Type instead
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function PdfPreviewModal({ report, onClose }) {
+        const isTemplate = report.kind === 'template';
+        const c = isTemplate ? null : childById(report.child || 'maya');
+        const templateName = isTemplate ? report.template.name : report.template;
+        const term = isTemplate ? 'Spring · 2026' : (report.term || 'Term 2 · Spring 2026');
+        return (
+          <div className="modal-bg" onClick={onClose}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-head">
+                <div className="file-ico">PDF</div>
+                <div className="file-meta">
+                  <div className="t">
+                    {isTemplate
+                      ? `${templateName} — empty template`
+                      : `${c.first} ${c.last} — ${templateName}`}
+                  </div>
+                  <div className="s">
+                    {term} · 4 pages · {isTemplate ? 'preview the structure' : "what the family will see"}
+                  </div>
+                </div>
+                <div className="actions">
+                  <button>
+                    <IconDownload size={13} stroke={1.8} style={{ marginRight: 6, verticalAlign: -2 }} />
+                    Download
+                  </button>
+                  <button className="closebtn" onClick={onClose}>
+                    <IconClose size={14} />
+                  </button>
+                </div>
+              </div>
+              <div className="modal-body">
+                {isTemplate ? (
+                  <TemplatePdfPages template={report.template} />
+                ) : (
+                  <ReportPdfPages child={c} templateName={templateName} term={term} />
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // populated-report PDF pages
+      function ReportPdfPages({ child: c, templateName, term }) {
+        return (
+          <>
+            <div className="pdf-sheet">
+              <div className="pdf-head">
+                <div className="crest">Primrose Montessori · Primrose Room</div>
+                <h1>{c.first} {c.last}</h1>
+                <div className="kicker">{templateName} · {term}</div>
+              </div>
+              <h2><span className="lead">01</span>Practical Life</h2>
+              <div className="pdf-rule" />
+              <p>
+                {c.first} has grown steadier and more deliberate this term. She now carries the water pitcher
+                confidently from the shelf to her workspace — a milestone she reached on May 19, completing the
+                pouring work three times in a row with unbroken concentration of about fourteen minutes. She returns
+                her materials to the shelf without prompting and has begun helping younger children find the sponges.
+              </p>
+              <p>
+                Her grace and courtesy is gentle and observant: she waits at the edge of others' work, asks before
+                joining, and has started to invite Sage into the dressing-frame work as a quiet companion.
+              </p>
+              <h2><span className="lead">02</span>Sensorial</h2>
+              <div className="pdf-rule" />
+              <p>
+                {c.first} builds the pink tower consistently and has begun pairing it with the brown stair — a sign
+                she is ready to extend into dimensional comparison work. She has handled the geometric cabinet
+                drawers for the triangles and circles and identifies the rectangles by name.
+              </p>
+              <div className="pdf-foot">
+                <div>
+                  <div style={{ fontSize: 9, color: '#9c9285', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>Primrose Montessori</div>
+                </div>
+                <div className="pdf-page-no">Page 1 of 4</div>
+              </div>
+            </div>
+
+            <div className="pdf-sheet">
+              <h2><span className="lead">03</span>Language</h2>
+              <div className="pdf-rule" />
+              <p>
+                {c.first} moved from the sandpaper letters into the moveable alphabet this term. She independently
+                composed her first three-word phrase — "the cat ran" — on May 7, sounding out each phoneme aloud as
+                she placed each letter. Her concentration during reading work has lengthened to roughly twenty-five
+                minutes. She is beginning to read three-letter phonetic words confidently and shows particular
+                interest in books about animals.
+              </p>
+              <h2><span className="lead">04</span>Math</h2>
+              <div className="pdf-rule" />
+              <p>
+                {c.first} is building a confident sense of number through the rods, counting one to seven steadily
+                and catching her own mistakes. She is curious about the spindle boxes and has watched older children
+                use them with interest.
+              </p>
+              <h2><span className="lead">05</span>Cultural</h2>
+              <div className="pdf-rule" />
+              <p>
+                {c.first} joined a spontaneous group of four around the continent puzzle map on May 14 — Amara led,
+                and the group worked together for thirty-five minutes. {c.first} named four continents on her own
+                and pointed out the ocean each time. Her interest in maps has steadily grown.
+              </p>
+              <div className="pdf-foot">
+                <div>
+                  <div style={{ fontSize: 9, color: '#9c9285', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>Primrose Montessori</div>
+                </div>
+                <div className="pdf-page-no">Page 2 of 4</div>
+              </div>
+            </div>
+
+            <div className="pdf-sheet">
+              <h2><span className="lead">06</span>Whole-child observations</h2>
+              <div className="pdf-rule" />
+              <p>
+                {c.first} brings a quiet, sustained focus to her work. She is observant of the children around her
+                and quick to offer help, though she does not crowd others. She has begun asking thoughtful questions
+                about the natural world and prefers to choose her own work each morning.
+              </p>
+              <h2><span className="lead">07</span>Closing</h2>
+              <div className="pdf-rule" />
+              <p>
+                This term, {c.first} has settled deeply into the work of Primrose Room. She is moving from concrete
+                to symbolic work across all five areas, and her concentration is the steady thread running through
+                every part of her day. We look forward to following her interests into the third term.
+              </p>
+              <div className="pdf-foot">
+                <div>
+                  <div className="pdf-sig">Sarah Kovač</div>
+                  <div style={{ fontSize: 8.5, color: '#9c9285' }}>Lead Guide · Primrose Room · May 20, 2026</div>
+                </div>
+                <div className="pdf-page-no">Page 3 of 4</div>
+              </div>
+            </div>
+          </>
+        );
+      }
+
+      // empty-template PDF pages — section headings + dashed placeholder lines
+      function TemplatePdfPages({ template }) {
+        // pick sections per template
+        const sectionSets = {
+          spring: [
+            'Practical Life',
+            'Sensorial',
+            'Language',
+            'Math',
+            'Cultural',
+            'Whole-child observations',
+            'Closing',
+          ],
+          'parent-conf': [
+            'Strengths to celebrate',
+            'Current focus areas',
+            'Two questions for the conversation',
+            'Next steps to discuss',
+          ],
+          midterm: ['Concentration', 'Social development', 'Work cycle behavior'],
+          portfolio: [
+            'Cover letter',
+            'Practical Life',
+            'Sensorial',
+            'Language',
+            'Math',
+            'Cultural',
+            'Work samples',
+            'Closing reflection',
+          ],
+        };
+        const sections = sectionSets[template.id] || sectionSets.spring;
+        // split sections roughly across 3 pages
+        const perPage = Math.ceil(sections.length / 3);
+        const pages = [
+          sections.slice(0, perPage),
+          sections.slice(perPage, perPage * 2),
+          sections.slice(perPage * 2),
+        ].filter((p) => p.length);
+
+        const Lines = ({ count = 3 }) => (
+          <>
+            {Array.from({ length: count }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  height: 1,
+                  borderTop: '1px dashed #d9d3c4',
+                  margin: '10px 0 0',
+                  width: i === count - 1 ? '62%' : '100%',
+                }}
+              />
+            ))}
+            <div style={{ height: 14 }} />
+          </>
+        );
+
+        return (
+          <>
+            {pages.map((pageSections, pageIdx) => (
+              <div className="pdf-sheet" key={pageIdx}>
+                {pageIdx === 0 && (
+                  <div className="pdf-head">
+                    <div className="crest">Primrose Montessori · Primrose Room</div>
+                    <h1 style={{ color: '#9c9285' }}>[ Child name ]</h1>
+                    <div className="kicker">{template.name} · {'{Term placeholder}'}</div>
+                  </div>
+                )}
+                {pageSections.map((title, sIdx) => {
+                  const globalIdx = pages.slice(0, pageIdx).reduce((a, b) => a + b.length, 0) + sIdx + 1;
+                  return (
+                    <div key={title}>
+                      <h2>
+                        <span className="lead">{String(globalIdx).padStart(2, '0')}</span>
+                        {title}
+                      </h2>
+                      <div className="pdf-rule" />
+                      <Lines count={3} />
+                    </div>
+                  );
+                })}
+                <div className="pdf-foot">
+                  <div>
+                    <div style={{ fontSize: 9, color: '#9c9285', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {pageIdx === pages.length - 1 ? 'Lead Guide — signature' : 'Primrose Montessori'}
+                    </div>
+                  </div>
+                  <div className="pdf-page-no">Page {pageIdx + 1} of {pages.length + 1}</div>
+                </div>
+              </div>
+            ))}
+          </>
+        );
+      }
+
+      function NotesList({ onNew, onOpen }) {
+        const groups = [];
+        const byDay = {};
+        NOTES.forEach((n) => {
+          if (!byDay[n.dateLabel]) {
+            byDay[n.dateLabel] = { label: n.dateLabel, dayNum: n.dayNum, mo: n.mo, dw: n.dw, notes: [] };
+            groups.push(byDay[n.dateLabel]);
+          }
+          byDay[n.dateLabel].notes.push(n);
+        });
+        return (
+          <div>
+            <h1 className="page-h1">Today, Wednesday</h1>
+            <p className="page-sub">
+              A calm morning in Primrose Room — fourteen of fifteen children present.
+            </p>
+
+            <button className="cta-big" onClick={onNew}>
+              <span className="icon-circle">
+                <IconMic size={26} stroke={1.6} />
+              </span>
+              <span className="label">
+                <span className="t">Record a new note</span>
+                <span className="s">Speak it — I'll transcribe and tag it for you.</span>
+              </span>
+              <span className="arrow-pill">
+                <IconArrowRight size={16} stroke={2} />
+              </span>
+            </button>
+
+            {groups.map((g) => (
+              <div key={g.label}>
+                <div className="day-row">
+                  <div className="day-num">{g.dayNum}</div>
+                  <div className="day-meta">
+                    <div className="mo">{g.mo}</div>
+                    <div className="dw">{g.dw} · {g.label}</div>
+                  </div>
+                  <div className="day-tally">
+                    {g.notes.length} {g.notes.length === 1 ? 'note' : 'notes'}
+                  </div>
+                </div>
+                {g.notes.map((n) => (
+                  <button key={n.id} className={'note-row ' + (n.today ? 'today' : '')} onClick={() => onOpen(n.id)}>
+                    <div />
+                    <span
+                      className="avatar"
+                      style={{ background: childById(n.tags[0]).hex }}
+                    >
+                      {childById(n.tags[0]).initials}
+                    </span>
+                    <span className="title">
+                      <span className="t">
+                        {n.title}
+                        {n.today && <span className="today-dot" />}
+                      </span>
+                      <span className="meta">
+                        {n.tags.map((t) => '@' + childById(t).first).join(' ')} · {n.area} · {n.time}
+                      </span>
+                    </span>
+                    <span className="time">{n.time}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+
+            <div className="upgrade">
+              <IconLock size={15} />
+              Notes older than 30 days are tucked away. Open them anytime by upgrading.
+              <span className="view">
+                View plans
+                <span className="arrow">
+                  <IconArrowUp size={12} stroke={2.2} />
+                </span>
+              </span>
+            </div>
+          </div>
+        );
+      }
+
+      function NoteOne({ noteId, appended, isNew, onBack }) {
+        const existing = NOTES.find((x) => x.id === noteId) || NOTES[0];
+        const [mentionOpen, setMentionOpen] = useState(false);
+
+        return (
+          <div className="note-page">
+            <div
+              className="back-row"
+              onClick={onBack}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+            >
+              <IconBack size={14} /> Back to Notes
+            </div>
+            <h1
+              className={'note-h1 editable' + (isNew ? ' empty-ph' : '')}
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={false}
+              data-placeholder="Untitled note"
+            >
+              {!isNew && existing.title}
+            </h1>
+            <div className="note-meta-row">
+              {isNew ? (
+                <>
+                  <button className="chip" style={{ cursor: 'pointer' }}>
+                    <IconAt size={11} stroke={1.8} /> Tag a child
+                  </button>
+                  <span className="chip">
+                    <IconCalendar size={11} stroke={1.7} /> Wed · May 20
+                  </span>
+                  <button className="chip" style={{ cursor: 'pointer' }}>
+                    <IconPlus size={11} stroke={2} /> Add area
+                  </button>
+                </>
+              ) : (
+                <>
+                  {existing.tags.map((t) => {
+                    const c = childById(t);
+                    return (
+                      <span key={t} className={'chip ' + c.tone}>
+                        <span className="dot" /> @{c.first} {c.last} · {c.age}
+                      </span>
+                    );
+                  })}
+                  <span className="chip">
+                    <IconCalendar size={11} stroke={1.7} /> Wed · May 20
+                  </span>
+                  <span className="chip">{existing.area}</span>
+                  <button className="chip" style={{ cursor: 'pointer' }}>
+                    <IconPlus size={11} stroke={2} /> Add tag
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div
+              className={'note-stamp editable' + (isNew ? ' empty-ph' : '')}
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={false}
+              data-placeholder="Wednesday morning · work cycle"
+            >
+              {!isNew && existing.stamp}
+            </div>
+
+            <div className="note-body">
+              {isNew ? (
+                <p
+                  className="editable empty-ph"
+                  contentEditable
+                  suppressContentEditableWarning
+                  spellCheck={false}
+                  data-placeholder="Click here to type, or tap the mic below to record this note by voice…"
+                />
+              ) : (
+                existing.body.map((seg, i) => (
+                  <p
+                    key={i}
+                    className="editable"
+                    contentEditable
+                    suppressContentEditableWarning
+                    spellCheck={false}
+                  >
+                    {seg.mention && <span className="mention">@{seg.mention}</span>}
+                    {seg.text}
+                    {seg.work && <span className="work">{seg.work}</span>}
+                    {seg.textEnd}
+                  </p>
+                ))
+              )}
+              {appended && (
+                <p className="added">
+                  <em>{appended.trim()}</em>
+                </p>
+              )}
+              {mentionOpen && (
+                <div style={{ position: 'relative' }}>
+                  <div className="mention-pop" style={{ top: 0, left: 0 }}>
+                    {CHILDREN.slice(0, 4).map((c, i) => (
+                      <div
+                        className={'row' + (i === 0 ? ' focus' : '')}
+                        key={c.id}
+                        onClick={() => setMentionOpen(false)}
+                      >
+                        <span className="av" style={{ background: c.hex }}>
+                          {c.initials}
+                        </span>
+                        <span>
+                          {c.first} {c.last}
+                        </span>
+                        <span className="age">{c.age}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="edit-hint">
+              <IconWand size={11} stroke={1.8} />
+              {isNew ? 'Click anywhere to type, or use the mic below to record' : 'Click any section to edit · @ to tag a child'}
+            </div>
+          </div>
+        );
+      }
+
+      const REPORTS = [
+        {
+          id: 'r1',
+          child: 'maya',
+          template: 'Spring Progress Report',
+          status: 'Draft',
+          tone: 'draft',
+          term: 'Term 2 · Spring 2026',
+          updated: 'Edited 2h ago',
+          updatedKey: 'today',
+        },
+        {
+          id: 'r2',
+          child: 'theo',
+          template: 'Parent-Teacher Conference Notes',
+          status: 'Draft',
+          tone: 'draft',
+          term: 'Term 2 · Spring 2026',
+          updated: 'Edited yesterday',
+          updatedKey: 'yesterday',
+        },
+        {
+          id: 'r3',
+          child: 'amara',
+          template: 'Mid-term Check-In',
+          status: 'Sent',
+          tone: 'sent',
+          term: 'Term 2 · Spring 2026',
+          updated: 'Sent Mon, May 11',
+          updatedKey: 'thisweek',
+        },
+        {
+          id: 'r4',
+          child: 'eli',
+          template: 'Parent-Teacher Conference Notes',
+          status: 'Draft',
+          tone: 'draft',
+          term: 'Term 2 · Spring 2026',
+          updated: 'Edited Fri, May 8',
+          updatedKey: 'thisweek',
+        },
+        {
+          id: 'r5',
+          child: 'sage',
+          template: 'Mid-term Check-In',
+          status: 'Sent',
+          tone: 'sent',
+          term: 'Term 2 · Spring 2026',
+          updated: 'Sent Apr 28',
+          updatedKey: 'earlier',
+        },
+        {
+          id: 'r6',
+          child: 'maya',
+          template: 'Mid-term Check-In',
+          status: 'Sent',
+          tone: 'sent',
+          term: 'Term 2 · Spring 2026',
+          updated: 'Sent Apr 14',
+          updatedKey: 'earlier',
+        },
+      ];
+
+      function ReportsList({ onNew, onOpen, onPreview }) {
+        const groups = [
+          { key: 'today', label: 'Today' },
+          { key: 'yesterday', label: 'Yesterday' },
+          { key: 'thisweek', label: 'Earlier this week' },
+          { key: 'earlier', label: 'Earlier' },
+        ];
+        return (
+          <div>
+            <h1 className="page-h1">Reports</h1>
+            <p className="page-sub">
+              Six reports in progress across Primrose Room. Pick one to keep editing, or start a fresh draft.
+            </p>
+
+            <button className="cta-big" onClick={onNew}>
+              <span className="icon-circle">
+                <IconReport size={26} stroke={1.6} />
+              </span>
+              <span className="label">
+                <span className="t">Draft a new report</span>
+                <span className="s">Pick a child and a template — I'll pre-fill from this term's notes.</span>
+              </span>
+              <span className="arrow-pill">
+                <IconArrowRight size={16} stroke={2} />
+              </span>
+            </button>
+
+            <div className="reports-list">
+              {groups.map((g) => {
+                const rows = REPORTS.filter((r) => r.updatedKey === g.key);
+                if (!rows.length) return null;
+                return (
+                  <div key={g.key}>
+                    <div
+                      className="caps"
+                      style={{ marginTop: 22, marginBottom: 4, paddingBottom: 6 }}
+                    >
+                      {g.label}
+                    </div>
+                    {rows.map((r) => {
+                      const c = childById(r.child);
+                      return (
+                        <div key={r.id} className="report-row" onClick={onOpen} role="button" tabIndex={0}>
+                          <span className="av" style={{ background: c.hex }}>
+                            {c.initials}
+                          </span>
+                          <span className="meta">
+                            <span className="t">
+                              {c.first} {c.last} — {r.template}
+                            </span>
+                            <span className="s">
+                              {r.term} · drawn from 28 observations · {r.updated}
+                            </span>
+                          </span>
+                          <span className="row-actions">
+                            <button
+                              className="iconbtn"
+                              title="Preview PDF"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onPreview(r);
+                              }}
+                            >
+                              <IconEye size={15} stroke={1.7} />
+                            </button>
+                            <button
+                              className="iconbtn"
+                              title="Open editor"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpen();
+                              }}
+                            >
+                              <IconArrowRight size={15} stroke={1.8} />
+                            </button>
+                          </span>
+                          <span className={'status ' + r.tone}>{r.status}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      const TEMPLATES = [
+        {
+          id: 'spring',
+          name: 'Spring Progress Report',
+          desc: 'Full Montessori narrative across all five great areas.',
+          sections: '6 sections',
+          time: '~ 8 min',
+        },
+        {
+          id: 'parent-conf',
+          name: 'Parent-Teacher Conference Notes',
+          desc: 'Bulleted observations + 2 next steps to discuss.',
+          sections: '4 sections',
+          time: '~ 4 min',
+        },
+        {
+          id: 'midterm',
+          name: 'Mid-term Check-In',
+          desc: 'Lighter touch — concentration, social, work cycle.',
+          sections: '3 sections',
+          time: '~ 3 min',
+        },
+        {
+          id: 'portfolio',
+          name: 'End-of-Year Portfolio',
+          desc: 'Long-form narrative with work samples and milestones.',
+          sections: '8 sections',
+          time: '~ 14 min',
+        },
+      ];
+
+      function ReportsPick({ onBack, onOpen, onPreviewTemplate }) {
+        const [pickedChild, setPickedChild] = useState('maya');
+        const picked = childById(pickedChild);
+        return (
+          <div>
+            <div className="back-row" onClick={onBack}>
+              <IconBack size={14} /> Back to Reports
+            </div>
+            <h1 className="page-h1">Start a new report</h1>
+            <p className="page-sub">Pick a child, then a template. I'll pre-fill from this term's notes.</p>
+
+            <div className="reports-grid">
+              <div>
+                <div className="caps" style={{ marginBottom: 8 }}>Children · Primrose Room</div>
+                <div className="roster">
+                  {CHILDREN.map((c) => (
+                    <button
+                      key={c.id}
+                      className={'row' + (pickedChild === c.id ? ' active' : '')}
+                      onClick={() => setPickedChild(c.id)}
+                    >
+                      <span className="av" style={{ background: c.hex }}>{c.initials}</span>
+                      <span style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span className="name">{c.first} {c.last}</span>
+                        <span className="age">{c.age} · 28 notes this term</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="caps" style={{ marginBottom: 8 }}>
+                  Templates for {picked.first}
+                </div>
+                <div className="templates">
+                  {TEMPLATES.map((t) => (
+                    <div key={t.id} className="template" role="button" tabIndex={0} onClick={onOpen}>
+                      <div className="preview">
+                        <div className="ph-h">{picked.first} {picked.last} — {t.name}</div>
+                        <div className="ph-body">
+                          <span /><span className="mid" /><span className="short" /><span /><span className="mid" />
+                        </div>
+                        <div className="ph-stamp">— Sarah</div>
+                        <button
+                          className="template-preview-btn"
+                          title="Preview empty template"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPreviewTemplate(t);
+                          }}
+                        >
+                          <IconEye size={13} stroke={1.7} />
+                          Preview
+                        </button>
+                      </div>
+                      <div className="body">
+                        <div className="t">{t.name}</div>
+                        <div className="d">{t.desc}</div>
+                        <div className="footer">
+                          <span>{t.sections}</span>
+                          <span className="sep" />
+                          <span>{t.time}</span>
+                          <span style={{ marginLeft: 'auto', color: 'var(--terracotta-deep)' }}>Open →</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function ReportDoc({ ghost, settled, onBack, onPreview }) {
+        return (
+          <div className="report-page">
+            <div className="back-row" onClick={onBack}>
+              <IconBack size={14} /> Back to Reports
+            </div>
+
+            <div className="report-cover">
+              <div className="crest">Primrose Room</div>
+              <div className="kicker">Spring Progress Report · Term 2</div>
+              <h1>Maya Chen</h1>
+              <div className="who">Age 4 years, 5 months · with Sarah Kovač</div>
+              <div className="meta-grid">
+                <div className="cell"><div className="lab">Reporting period</div><div className="val">Feb 4 – May 20, 2026</div></div>
+                <div className="cell"><div className="lab">Notes drawn from</div><div className="val">28 observations</div></div>
+                <div className="cell"><div className="lab">Status</div><div className="val">Draft · auto-saved</div></div>
+                <div className="cell">
+                  <div className="lab">Last edited</div>
+                  <div className="val">2 hours ago</div>
+                </div>
+              </div>
+              <div className="report-top-actions">
+                <button className="btn-pri" onClick={onPreview}>
+                  <IconEye size={14} stroke={1.8} />
+                  Preview PDF
+                </button>
+                <button className="btn-sec">
+                  <IconDownload size={14} stroke={1.8} />
+                  Download
+                </button>
+              </div>
+            </div>
+
+            <div className="section toc">
+              {['Practical Life', 'Sensorial', 'Language', 'Math', 'Cultural', 'Whole-child', 'Closing'].map((s) => (
+                <button key={s}>{s}</button>
+              ))}
+            </div>
+
+            <section className="section" id="sec-practical">
+              <h2><span className="lead">01</span>Practical Life</h2>
+              <div className="rule" />
+              <p>
+                Maya has grown steadier and more deliberate this term. She now carries the water pitcher confidently from the
+                shelf to her workspace — a milestone she reached on May 19, completing the pouring work three times in a row
+                with unbroken concentration of about fourteen minutes. She returns her materials to the shelf without
+                prompting and has begun helping younger children find the sponges.
+              </p>
+              <p>
+                Her grace and courtesy is gentle and observant: she waits at the edge of others' work, asks before joining,
+                and has started to invite Sage into the dressing-frame work as a quiet companion.
+              </p>
+            </section>
+
+            <section className="section" id="sec-sensorial">
+              <h2><span className="lead">02</span>Sensorial</h2>
+              <div className="rule" />
+              <p>
+                Maya builds the pink tower consistently and has begun pairing it with the brown stair — a sign she is ready
+                to extend into dimensional comparison work. She has handled the geometric cabinet drawers for the triangles
+                and circles and identifies the rectangles by name.
+              </p>
+            </section>
+
+            <section className="section" id="sec-language">
+              <h2><span className="lead">03</span>Language</h2>
+              <div className="rule" />
+              <p>
+                Maya moved from the sandpaper letters into the moveable alphabet this term. Her concentration during reading
+                work has lengthened to roughly twenty-five minutes. She enjoys reading aloud to herself in the corner near
+                the window.
+              </p>
+              {ghost.language && (
+                <p className={'added' + (settled.language ? ' settled' : '')}>
+                  {ghost.language}
+                </p>
+              )}
+            </section>
+
+            <section className="section" id="sec-math">
+              <h2><span className="lead">04</span>Math</h2>
+              <div className="rule" />
+              <p>
+                Maya is working steadily with the number rods, counting one to seven and self-correcting when she skips a
+                quantity. She is curious about the spindle boxes and has watched older children use them with interest.
+              </p>
+              {ghost.math && (
+                <p className={'added' + (settled.math ? ' settled' : '')}>
+                  {ghost.math}
+                </p>
+              )}
+            </section>
+
+            <section className="section" id="sec-cultural">
+              <h2><span className="lead">05</span>Cultural</h2>
+              <div className="rule" />
+              <p>
+                Maya joined a spontaneous group of four around the continent puzzle map on May 14 — Amara led, and the group
+                worked together for thirty-five minutes. Maya named four continents on her own and pointed out the ocean
+                each time. Her interest in maps has steadily grown.
+              </p>
+            </section>
+
+            <section className="section" id="sec-whole">
+              <h2><span className="lead">06</span>Whole-child observations</h2>
+              <div className="rule" />
+              <p>
+                Maya brings a quiet, sustained focus to her work. She is observant of the children around her and quick to
+                offer help, though she does not crowd others. She has begun asking thoughtful questions about the natural
+                world and prefers to choose her own work each morning.
+              </p>
+              {ghost.whole && (
+                <p className={'added' + (settled.whole ? ' settled' : '')}>
+                  {ghost.whole}
+                </p>
+              )}
+            </section>
+
+            <section className="section" id="sec-closing">
+              <h2><span className="lead">07</span>Closing</h2>
+              <div className="rule" />
+              <p>
+                This term, Maya has settled deeply into the work of Primrose Room. She is moving from concrete to symbolic
+                work across all five areas, and her concentration is the steady thread running through every part of her
+                day. We look forward to following her interests into the third term.
+              </p>
+              <div className="signature">
+                <div>
+                  <div className="sig">Sarah Kovač</div>
+                  <div className="sig-meta" style={{ textAlign: 'left' }}>Lead Guide · Primrose Room</div>
+                </div>
+                <div className="sig-meta">
+                  May 19, 2026<br />Primrose Montessori
+                </div>
+              </div>
+            </section>
+          </div>
+        );
+      }
+
+      // ---------- chat dock ----------
+      function ChatDock({ expanded, setExpanded, suggestions, messages, typing, onSend, onApplyGhost, mobile }) {
+        const [text, setText] = useState('');
+        const bodyRef = useRef(null);
+
+        useEffect(() => {
+          if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+        }, [messages, typing]);
+
+        const submit = () => {
+          if (!text.trim()) return;
+          onSend(text.trim());
+          setText('');
+        };
+
+        const onKey = (e) => {
+          if (e.key === 'Enter') submit();
+        };
+
+        const Wrap = mobile ? 'div' : 'div';
+        const wrapClass = mobile ? 'ios-dock-wrap' : 'dock-wrap';
+        const dockClass = mobile ? 'ios-dock' : 'dock';
+
+        return (
+          <Wrap className={wrapClass}>
+            <div className={dockClass + ' ' + (expanded ? 'expanded' : 'collapsed')}>
+              {expanded && (
+                <div className="dock-body" ref={bodyRef}>
+                  {messages.length === 0 && (
+                    <div className="dock-suggestions">
+                      {suggestions.map((s) => (
+                        <button key={s} onClick={() => onSend(s)}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {messages.map((m, i) => (
+                    <div className={'dock-msg ' + (m.who === 'user' ? 'user' : 'assist')} key={i}>
+                      <div className="who">{m.who === 'user' ? 'You' : 'Mitable'}</div>
+                      <div className="body">
+                        {m.text}
+                        {m.pull && <div className="ghost-pull">{m.pull}</div>}
+                        {m.ghost && (
+                          <>
+                            <div className="ghost-pull">{m.ghost}</div>
+                            {!m.applied && (
+                              <div className="ghost-actions">
+                                <button className="apply" onClick={() => onApplyGhost(m)}>
+                                  {m.ghostFor ? 'Apply to ' + sectionLabel(m.ghostFor) : 'Add to note'}
+                                </button>
+                                <button className="dismiss">Dismiss</button>
+                              </div>
+                            )}
+                            {m.applied && (
+                              <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--sage-deep)' }}>
+                                ✓ Applied
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {typing && (
+                    <div className="dock-msg assist">
+                      <div className="who">Mitable</div>
+                      <div className="dock-typing">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="dock-input-row" onClick={() => !expanded && setExpanded(true)}>
+                <input
+                  placeholder="Ask anything"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onFocus={() => setExpanded(true)}
+                  onKeyDown={onKey}
+                />
+                {!expanded && suggestions[0] && (
+                  <button className="dock-quick" onClick={(e) => { e.stopPropagation(); onSend(suggestions[0]); }}>
+                    <IconWand size={12} stroke={1.7} /> {suggestions[0]}
+                  </button>
+                )}
+                {expanded && (
+                  <button
+                    className="dock-quick"
+                    onClick={() => setExpanded(false)}
+                    title="Collapse"
+                    style={{ background: 'transparent', border: 0, padding: 4 }}
+                  >
+                    <IconClose size={14} stroke={1.7} />
+                  </button>
+                )}
+                <button className="dock-send" disabled={!text.trim()} onClick={submit}>
+                  <IconArrowUp size={14} stroke={2.2} />
+                </button>
+              </div>
+            </div>
+          </Wrap>
+        );
+      }
+
+      const sectionLabel = (k) =>
+        ({ language: 'Language', math: 'Math', whole: 'Whole-child', practical: 'Practical Life', sensorial: 'Sensorial' }[k] || 'section');
+
+      // ---------- mobile ----------
+      function Mobile({
+        route, setRoute, activeNoteId, setActiveNoteId, emptyPreview,
+        previewReport, setPreviewReport, isNewNote, setIsNewNote,
+      }) {
+        const [drawer, setDrawer] = useState(false);
+        const [chatExpanded, setChatExpanded] = useState(false);
+        const [messages, setMessages] = useState([]);
+        const [typing, setTyping] = useState(false);
+        const [noteAppended, setNoteAppended] = useState(null);
+        const [reportGhost, setReportGhost] = useState({});
+        const [ghostSettled, setGhostSettled] = useState({});
+
+        useEffect(() => {
+          setMessages([]);
+          setChatExpanded(false);
+        }, [route, activeNoteId, emptyPreview]);
+
+        const suggestions = useMemo(() => {
+          if (route === 'notes-one') return ['Summarize this', 'What did Maya do with the pink tower?'];
+          if (route === 'reports-doc') return ['Make Language more specific', 'Add a sentence about concentration'];
+          if (route === 'notes-list') return ['Summarize Maya this week', 'Who is unobserved?'];
+          if (route === 'reports-list' || route === 'reports-picker') return ["Who's due for a check-in?"];
+          return [];
+        }, [route]);
+
+        const onSend = (q) => {
+          const ctx = route === 'notes-one' ? 'note' : route === 'reports-doc' ? 'report' : 'note';
+          setMessages((m) => [...m, { who: 'user', text: q }]);
+          setTyping(true);
+          setChatExpanded(true);
+          setTimeout(() => {
+            const r = pickResponse(ctx, q);
+            setMessages((m) => [...m, { who: 'assist', ...r }]);
+            setTyping(false);
+          }, 750);
+        };
+
+        const onApplyGhost = (msg) => {
+          if (route === 'notes-one' && msg.ghost) {
+            setNoteAppended(msg.ghost);
+            setTimeout(() => {
+              const el = document.querySelector('.note-body p.added');
+              if (el) el.classList.add('settled');
+            }, 1400);
+          }
+          if (route === 'reports-doc' && msg.ghostFor) {
+            setReportGhost((g) => ({ ...g, [msg.ghostFor]: msg.ghost }));
+            setTimeout(() => setGhostSettled((s) => ({ ...s, [msg.ghostFor]: true })), 1400);
+          }
+          setMessages((m) => m.map((x) => (x === msg ? { ...x, applied: true } : x)));
+        };
+
+        const title =
+          route === 'notes-list'
+            ? 'Notes'
+            : route === 'notes-one'
+            ? isNewNote
+              ? 'New note'
+              : 'Note'
+            : route === 'reports-list'
+            ? 'Reports'
+            : route === 'reports-picker'
+            ? 'New report'
+            : 'Report';
+
+        const showNotesEmpty = route === 'notes-list' && emptyPreview;
+        const showReportsEmpty = route === 'reports-list' && emptyPreview;
+        const isDetail =
+          route === 'notes-one' || route === 'reports-doc' || route === 'reports-picker';
+        const onBack = () => {
+          if (route === 'notes-one') {
+            setIsNewNote(false);
+            setRoute('notes-list');
+          } else if (route === 'reports-doc') setRoute('reports-list');
+          else if (route === 'reports-picker') setRoute('reports-list');
+          else setRoute('notes-list');
+        };
+
+        return (
+          <div className="iphone">
+            <div className="iphone-screen">
+              <div className="island" />
+              <div className="status">
+                <span className="l">9:41</span>
+                <span className="r">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor">
+                      <rect x="0" y="7" width="2.5" height="4" rx="0.5" />
+                      <rect x="4" y="5" width="2.5" height="6" rx="0.5" />
+                      <rect x="8" y="3" width="2.5" height="8" rx="0.5" />
+                      <rect x="12" y="0" width="2.5" height="11" rx="0.5" />
+                    </svg>
+                  </span>
+                  <span className="battery" />
+                </span>
+              </div>
+
+              <div className="ios-app">
+                <div className="ios-topbar">
+                  {isDetail ? (
+                    <button className="ham" onClick={onBack}>
+                      <IconBack size={18} stroke={1.8} />
+                    </button>
+                  ) : (
+                    <button
+                      className="ham"
+                      title="Show sidebar"
+                      onClick={() => setDrawer(true)}
+                    >
+                      <Ico
+                        d={
+                          <>
+                            <rect x="3" y="4" width="18" height="16" rx="2" />
+                            <path d="M9 4v16" />
+                          </>
+                        }
+                        size={18}
+                        stroke={1.7}
+                      />
+                    </button>
+                  )}
+                  <div className="title">{title}</div>
+                  <div className="right">
+                    {!isDetail && (route === 'notes-list' && !showNotesEmpty ? (
+                      <button
+                        className="iconbtn"
+                        title="New note"
+                        onClick={() => {
+                          setActiveNoteId('n1');
+                          setRoute('notes-one');
+                        }}
+                      >
+                        <IconPlus size={18} stroke={2} />
+                      </button>
+                    ) : route === 'reports-list' && !showReportsEmpty ? (
+                      <button
+                        className="iconbtn"
+                        title="New report"
+                        onClick={() => setRoute('reports-picker')}
+                      >
+                        <IconPlus size={18} stroke={2} />
+                      </button>
+                    ) : null)}
+                    <button className="iconbtn">
+                      <IconKebab size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="ios-content">
+                  {route === 'notes-list' && !showNotesEmpty && (
+                    <MobileNotesList
+                      onNew={() => {
+                        setIsNewNote(true);
+                        setRoute('notes-one');
+                      }}
+                      onOpen={(id) => {
+                        setIsNewNote(false);
+                        setActiveNoteId(id);
+                        setRoute('notes-one');
+                      }}
+                    />
+                  )}
+                  {showNotesEmpty && (
+                    <MobileEmpty
+                      kind="notes"
+                      onStart={() => {
+                        setIsNewNote(true);
+                        setRoute('notes-one');
+                      }}
+                    />
+                  )}
+                  {route === 'notes-one' && (
+                    <MobileNoteOne noteId={activeNoteId} appended={noteAppended} isNew={isNewNote} />
+                  )}
+                  {route === 'reports-list' && !showReportsEmpty && (
+                    <MobileReportsList
+                      onNew={() => setRoute('reports-picker')}
+                      onOpen={() => setRoute('reports-doc')}
+                      onPreview={(r) => setPreviewReport(r)}
+                    />
+                  )}
+                  {showReportsEmpty && (
+                    <MobileEmpty kind="reports" onStart={() => setRoute('reports-picker')} />
+                  )}
+                  {route === 'reports-picker' && (
+                    <MobileReportsPick
+                      onOpen={() => setRoute('reports-doc')}
+                      onPreviewTemplate={(t) => setPreviewReport({ kind: 'template', template: t })}
+                    />
+                  )}
+                  {route === 'reports-doc' && (
+                    <MobileReportDoc
+                      ghost={reportGhost}
+                      settled={ghostSettled}
+                      onPreview={() =>
+                        setPreviewReport({
+                          kind: 'report',
+                          child: 'maya',
+                          template: 'Spring Progress Report',
+                          term: 'Term 2 · Spring 2026',
+                        })
+                      }
+                    />
+                  )}
+                </div>
+
+                {route === 'notes-one' ? (
+                  <MobileVoiceDock noteContext={{ isNew: isNewNote, noteId: activeNoteId }} />
+                ) : (
+                  <ChatDock
+                    mobile
+                    expanded={chatExpanded}
+                    setExpanded={setChatExpanded}
+                    suggestions={suggestions}
+                    messages={messages}
+                    typing={typing}
+                    onSend={onSend}
+                    onApplyGhost={onApplyGhost}
+                  />
+                )}
+              </div>
+
+              {drawer && (
+                <>
+                  <div className="ios-drawer-bg" onClick={() => setDrawer(false)} />
+                  <div className="ios-drawer">
+                    <div className="search">
+                      <IconSearch size={14} stroke={1.7} /> Search
+                    </div>
+                    <div className="nav">
+                      <button
+                        className={'item' + (route.startsWith('notes') ? ' active' : '')}
+                        onClick={() => {
+                          setRoute('notes-list');
+                          setDrawer(false);
+                        }}
+                      >
+                        <span className="ico"><IconNotes size={16} /></span>
+                        Notes
+                        <span className="dot" />
+                      </button>
+                      <button
+                        className={'item' + (route.startsWith('reports') ? ' active' : '')}
+                        onClick={() => {
+                          setRoute('reports-list');
+                          setDrawer(false);
+                        }}
+                      >
+                        <span className="ico"><IconReport size={16} /></span>
+                        Reports
+                      </button>
+                    </div>
+                    <div className="sidebar-footer">
+                      <div className="sidebar-foot-row">
+                        <span className="avatar">SK</span>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>Sarah Kovač</div>
+                          <div style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>
+                            Primrose Room · Lead Guide
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="home-indicator" />
+              {previewReport && (
+                <PdfPreviewModal report={previewReport} onClose={() => setPreviewReport(null)} />
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // mobile voice dock — same logic as desktop VoiceDock but rendered in the ios-dock-wrap
+      function MobileVoiceDock({ noteContext }) {
+        const [phase, setPhase] = useState('idle');
+        const [elapsed, setElapsed] = useState(0);
+        const timersRef = useRef([]);
+
+        useEffect(() => {
+          setPhase('idle');
+          setElapsed(0);
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
+          return () => timersRef.current.forEach(clearTimeout);
+        }, [noteContext.noteId, noteContext.isNew]);
+
+        useEffect(() => {
+          if (phase !== 'recording') return;
+          const start = Date.now();
+          const i = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 250);
+          return () => clearInterval(i);
+        }, [phase]);
+
+        const fmt = (s) =>
+          `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+        const start = () => {
+          const body = document.querySelector('.note-body');
+          if (!body) return;
+          body.querySelectorAll('p.live-write').forEach((el) => el.remove());
+          const p = document.createElement('p');
+          p.className = 'live-write editable';
+          p.setAttribute('contenteditable', 'true');
+          p.setAttribute('spellcheck', 'false');
+          p.style.fontSize = '14.5px';
+          p.style.lineHeight = '1.65';
+          body.appendChild(p);
+          setPhase('recording');
+
+          const words = CAPTURE_SCRIPT.split(/(\s+)/).filter(Boolean);
+          let accumulated = '';
+          words.forEach((w, i) => {
+            const t = setTimeout(() => {
+              accumulated += w;
+              p.textContent = accumulated;
+            }, 380 + i * 95);
+            timersRef.current.push(t);
+          });
+          const done = setTimeout(() => {
+            p.classList.remove('live-write');
+            setPhase('idle');
+          }, 380 + words.length * 95 + 800);
+          timersRef.current.push(done);
+        };
+
+        const stop = () => {
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
+          const live = document.querySelector('.note-body p.live-write');
+          if (live) live.classList.remove('live-write');
+          setPhase('idle');
+        };
+
+        return (
+          <div className="ios-dock-wrap">
+            <div className="ios-dock voice-mode collapsed" style={{ background: 'var(--surface)' }}>
+              <div className="dock-voice-row" style={{ padding: '10px 12px 10px 10px', gridTemplateColumns: '46px 1fr auto' }}>
+                <button
+                  className={'dock-mic' + (phase === 'recording' ? ' recording' : '')}
+                  onClick={phase === 'recording' ? stop : start}
+                  style={{ width: 42, height: 42 }}
+                >
+                  {phase === 'recording' ? <span className="stop-square" style={{ width: 12, height: 12 }} /> : <IconMic size={18} stroke={1.6} />}
+                </button>
+                <div className="label">
+                  {phase === 'recording' ? (
+                    <>
+                      <span className="t" style={{ fontSize: 12.5 }}>Listening…</span>
+                      <span className="s" style={{ fontSize: 11 }}>Speak naturally.</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="t" style={{ fontSize: 12.5 }}>
+                        {noteContext.isNew ? 'Tap to record' : 'Add by voice'}
+                      </span>
+                      <span className="s" style={{ fontSize: 11 }}>Or tap above to type.</span>
+                    </>
+                  )}
+                </div>
+                {phase === 'recording' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span className="wave-mini live">
+                      <span /><span /><span /><span /><span /><span />
+                    </span>
+                    <span className="timer" style={{ fontSize: 14 }}>{fmt(elapsed)}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function MobileEmpty({ kind = 'notes', onStart }) {
+        const copy =
+          kind === 'reports'
+            ? {
+                stamp: ['first', 'report'],
+                h1: 'No reports yet.',
+                sub: "When you're ready, pick a child and a template — I'll pre-fill from your notes.",
+                cta: 'Start your first report',
+              }
+            : {
+                stamp: ['first', 'day'],
+                h1: 'A quiet place for your day with the children.',
+                sub: "Start with a single observation. The rest folds itself into reports when you're ready.",
+                cta: 'Start your first note',
+              };
+        return (
+          <div style={{ paddingTop: '12vh', textAlign: 'center' }}>
+            <div
+              className="ill"
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 22,
+                margin: '0 auto 20px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--clay)',
+                fontFamily: 'Caveat, cursive',
+                fontSize: 15,
+                flexDirection: 'column',
+                lineHeight: 1.05,
+              }}
+            >
+              <span>{copy.stamp[0]}</span>
+              <span>{copy.stamp[1]}</span>
+            </div>
+            <h1 className="serif" style={{ fontWeight: 400, fontSize: 24, margin: '0 16px 10px', lineHeight: 1.18, letterSpacing: '-0.01em' }}>
+              {copy.h1}
+            </h1>
+            <p style={{ color: 'var(--ink-2)', fontSize: 13.5, margin: '0 16px 22px' }}>{copy.sub}</p>
+            <button
+              className="start"
+              onClick={onStart}
+              style={{
+                background: 'var(--ink)',
+                color: 'var(--canvas)',
+                padding: '8px 16px',
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 500,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <IconPlus size={13} stroke={2} /> {copy.cta}
+            </button>
+          </div>
+        );
+      }
+
+      function MobileNotesList({ onNew, onOpen }) {
+        const groups = [];
+        const byDay = {};
+        NOTES.forEach((n) => {
+          if (!byDay[n.dateLabel]) {
+            byDay[n.dateLabel] = { label: n.dateLabel, dayNum: n.dayNum, mo: n.mo, dw: n.dw, notes: [] };
+            groups.push(byDay[n.dateLabel]);
+          }
+          byDay[n.dateLabel].notes.push(n);
+        });
+        return (
+          <div>
+            <h1 className="ios-h">Today, Wednesday</h1>
+            <p className="ios-sub">Fourteen of fifteen children present.</p>
+            <button
+              onClick={onNew}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '48px 1fr auto',
+                gap: 14,
+                width: '100%',
+                padding: '16px 16px 16px 14px',
+                background: 'var(--ink)',
+                color: 'var(--canvas)',
+                borderRadius: 16,
+                marginBottom: 10,
+                marginTop: 6,
+                textAlign: 'left',
+                alignItems: 'center',
+                boxShadow: 'var(--shadow-2)',
+              }}
+            >
+              <span
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.10)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flex: '0 0 auto',
+                }}
+              >
+                <IconMic size={22} stroke={1.6} />
+              </span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span className="serif" style={{ fontWeight: 500, fontSize: 17, lineHeight: 1.15 }}>
+                  Record a new note
+                </span>
+                <span style={{ fontSize: 11.5, color: 'rgba(245, 240, 224, 0.7)' }}>
+                  Speak — I'll transcribe it for you.
+                </span>
+              </span>
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  background: 'var(--canvas)',
+                  color: 'var(--ink)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <IconArrowRight size={14} stroke={2} />
+              </span>
+            </button>
+            {groups.map((g) => (
+              <div key={g.label} style={{ marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '14px 0 6px' }}>
+                  <span className="serif" style={{ fontWeight: 500, fontSize: 22 }}>{g.dayNum}</span>
+                  <span className="caps" style={{ fontSize: 10.5 }}>{g.mo}</span>
+                  <span style={{ color: 'var(--ink-3)', fontSize: 12, marginLeft: 2 }}>{g.dw} · {g.label}</span>
+                  <span style={{ marginLeft: 'auto', color: 'var(--ink-3)', fontSize: 11.5 }}>{g.notes.length}</span>
+                </div>
+                {g.notes.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => onOpen(n.id)}
+                    style={{
+                      display: 'flex',
+                      gap: 12,
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 0',
+                      borderTop: '1px dashed var(--border)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 999,
+                        background: childById(n.tags[0]).hex,
+                        color: '#fff',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flex: '0 0 auto',
+                      }}
+                    >
+                      {childById(n.tags[0]).initials}
+                    </span>
+                    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {n.title}
+                      </span>
+                      <span style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>
+                        {n.tags.map((t) => '@' + childById(t).first).join(' ')} · {n.area}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--ink-3)', flex: '0 0 auto', marginTop: 2 }}>{n.time}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      function MobileNoteOne({ noteId, appended, isNew }) {
+        const n = NOTES.find((x) => x.id === noteId) || NOTES[0];
+        return (
+          <div>
+            <h1
+              className="serif editable"
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={false}
+              data-placeholder="Untitled note"
+              style={{ fontWeight: 500, fontSize: 22, lineHeight: 1.2, margin: '6px 0 8px' }}
+            >
+              {!isNew && n.title}
+            </h1>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {isNew ? (
+                <>
+                  <button className="chip">
+                    <IconAt size={11} stroke={1.8} /> Tag a child
+                  </button>
+                  <span className="chip">Wed · May 20</span>
+                </>
+              ) : (
+                <>
+                  {n.tags.map((t) => {
+                    const c = childById(t);
+                    return (
+                      <span key={t} className={'chip ' + c.tone}>
+                        <span className="dot" /> @{c.first}
+                      </span>
+                    );
+                  })}
+                  <span className="chip">Wed · May 20</span>
+                  <span className="chip">{n.area}</span>
+                </>
+              )}
+            </div>
+            <div
+              className="hand editable"
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={false}
+              data-placeholder="Wednesday morning · work cycle"
+              style={{ color: 'var(--clay)', fontSize: 17, margin: '12px 0 4px', fontWeight: 500 }}
+            >
+              {!isNew && n.stamp}
+            </div>
+            <div className="note-body">
+              {isNew ? (
+                <p
+                  className="editable"
+                  contentEditable
+                  suppressContentEditableWarning
+                  spellCheck={false}
+                  data-placeholder="Tap to type, or use the mic below to record…"
+                  style={{ fontSize: 14.5, lineHeight: 1.65 }}
+                />
+              ) : (
+                n.body.map((seg, i) => (
+                  <p
+                    key={i}
+                    className="editable"
+                    contentEditable
+                    suppressContentEditableWarning
+                    spellCheck={false}
+                    style={{ fontSize: 14.5, lineHeight: 1.65 }}
+                  >
+                    {seg.mention && <span className="mention">@{seg.mention}</span>}
+                    {seg.text}
+                    {seg.work && <span className="work">{seg.work}</span>}
+                    {seg.textEnd}
+                  </p>
+                ))
+              )}
+              {appended && (
+                <p className="added">
+                  <em>{appended.trim()}</em>
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      function MobileReportsList({ onNew, onOpen, onPreview }) {
+        const groups = [
+          { key: 'today', label: 'Today' },
+          { key: 'yesterday', label: 'Yesterday' },
+          { key: 'thisweek', label: 'Earlier this week' },
+          { key: 'earlier', label: 'Earlier' },
+        ];
+        return (
+          <div>
+            <h1 className="ios-h">Reports</h1>
+            <p className="ios-sub">Six reports in progress across Primrose Room.</p>
+            <button
+              onClick={onNew}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '48px 1fr auto',
+                gap: 14,
+                width: '100%',
+                padding: '16px 16px 16px 14px',
+                background: 'var(--ink)',
+                color: 'var(--canvas)',
+                borderRadius: 16,
+                marginBottom: 10,
+                marginTop: 6,
+                textAlign: 'left',
+                alignItems: 'center',
+                boxShadow: 'var(--shadow-2)',
+              }}
+            >
+              <span
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.10)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flex: '0 0 auto',
+                }}
+              >
+                <IconReport size={22} stroke={1.6} />
+              </span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span className="serif" style={{ fontWeight: 500, fontSize: 17, lineHeight: 1.15 }}>
+                  Draft a new report
+                </span>
+                <span style={{ fontSize: 11.5, color: 'rgba(245, 240, 224, 0.7)' }}>
+                  Pick child &amp; template
+                </span>
+              </span>
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  background: 'var(--canvas)',
+                  color: 'var(--ink)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <IconArrowRight size={14} stroke={2} />
+              </span>
+            </button>
+
+            {groups.map((g) => {
+              const rows = REPORTS.filter((r) => r.updatedKey === g.key);
+              if (!rows.length) return null;
+              return (
+                <div key={g.key} style={{ marginTop: 14 }}>
+                  <div className="caps" style={{ fontSize: 10.5, marginBottom: 4 }}>{g.label}</div>
+                  {rows.map((r) => {
+                    const c = childById(r.child);
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={onOpen}
+                        role="button"
+                        tabIndex={0}
+                        style={{
+                          display: 'flex',
+                          gap: 10,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '10px 0',
+                          borderTop: '1px dashed var(--border)',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 999,
+                            background: c.hex,
+                            color: '#fff',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flex: '0 0 auto',
+                          }}
+                        >
+                          {c.initials}
+                        </span>
+                        <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.35 }}>
+                            {c.first} {c.last}
+                          </span>
+                          <span style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.template}
+                          </span>
+                        </span>
+                        <button
+                          title="Preview"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPreview(r);
+                          }}
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 999,
+                            border: '1px solid var(--border)',
+                            background: 'var(--surface)',
+                            color: 'var(--ink-2)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flex: '0 0 auto',
+                          }}
+                        >
+                          <IconEye size={14} stroke={1.7} />
+                        </button>
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 500,
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            background: r.tone === 'sent' ? 'var(--sage-soft)' : 'var(--butter-soft)',
+                            color: r.tone === 'sent' ? 'var(--sage-deep)' : 'var(--butter-deep)',
+                            flex: '0 0 auto',
+                          }}
+                        >
+                          {r.status}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      function MobileReportsPick({ onOpen, onPreviewTemplate }) {
+        const [pickedChild, setPickedChild] = useState('maya');
+        return (
+          <div>
+            <h1 className="ios-h">Start a report</h1>
+            <p className="ios-sub">Pick a child, then a template.</p>
+
+            <div className="caps" style={{ marginBottom: 10 }}>Children</div>
+            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 12, marginLeft: -16, paddingLeft: 16, marginRight: -16 }}>
+              {CHILDREN.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setPickedChild(c.id)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 6,
+                    flex: '0 0 auto',
+                    padding: '8px 6px',
+                    borderRadius: 12,
+                    background: pickedChild === c.id ? 'var(--muted)' : 'transparent',
+                  }}
+                >
+                  <span style={{ width: 48, height: 48, borderRadius: 999, background: c.hex, color: '#fff', fontWeight: 600, fontSize: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {c.initials}
+                  </span>
+                  <span style={{ fontSize: 11.5, fontWeight: 500 }}>{c.first}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="caps" style={{ marginBottom: 8, marginTop: 6 }}>
+              Templates for {childById(pickedChild).first}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {TEMPLATES.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={onOpen}
+                  role="button"
+                  tabIndex={0}
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{t.desc}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{t.time}</div>
+                    </div>
+                    <button
+                      title="Preview template"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPreviewTemplate(t);
+                      }}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 999,
+                        border: '1px solid var(--border)',
+                        background: 'var(--canvas)',
+                        color: 'var(--ink-2)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flex: '0 0 auto',
+                      }}
+                    >
+                      <IconEye size={14} stroke={1.7} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      function MobileReportDoc({ ghost, settled, onPreview }) {
+        return (
+          <div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 16px', marginBottom: 14 }}>
+              <div className="caps" style={{ fontSize: 9.5, marginBottom: 6 }}>Spring Progress Report · Term 2</div>
+              <h2 className="serif" style={{ fontWeight: 500, fontSize: 22, margin: '0 0 2px' }}>Maya Chen</h2>
+              <div style={{ color: 'var(--ink-2)', fontSize: 12.5, marginBottom: 14 }}>Age 4y 5m · with Sarah Kovač</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  onClick={onPreview}
+                  style={{
+                    background: 'var(--terracotta)',
+                    color: '#fff',
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    display: 'inline-flex',
+                    gap: 6,
+                    alignItems: 'center',
+                    flex: '1 1 auto',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <IconEye size={13} stroke={1.8} /> Preview PDF
+                </button>
+                <button
+                  style={{
+                    background: 'var(--canvas)',
+                    color: 'var(--ink)',
+                    border: '1px solid var(--border)',
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    display: 'inline-flex',
+                    gap: 6,
+                    alignItems: 'center',
+                  }}
+                >
+                  <IconDownload size={13} stroke={1.8} /> Download
+                </button>
+              </div>
+            </div>
+
+            {[
+              {
+                key: 'practical',
+                lead: '01',
+                title: 'Practical Life',
+                body: 'Maya has grown steadier and more deliberate this term. She carries the water pitcher confidently and returns her materials without prompting.',
+              },
+              {
+                key: 'sensorial',
+                lead: '02',
+                title: 'Sensorial',
+                body: 'Maya builds the pink tower consistently and has begun pairing it with the brown stair.',
+              },
+              {
+                key: 'language',
+                lead: '03',
+                title: 'Language',
+                body: 'Maya moved into the moveable alphabet this term. Her concentration during reading work has lengthened to roughly twenty-five minutes.',
+              },
+              {
+                key: 'math',
+                lead: '04',
+                title: 'Math',
+                body: 'Maya is working steadily with the number rods, counting one to seven and self-correcting.',
+              },
+              {
+                key: 'whole',
+                lead: '05',
+                title: 'Whole-child observations',
+                body: 'Maya brings a quiet, sustained focus to her work, observant of others and quick to offer help.',
+              },
+            ].map((s) => (
+              <section key={s.key} style={{ marginBottom: 18 }}>
+                <h3 className="serif" style={{ fontWeight: 500, fontSize: 17, margin: '0 0 6px' }}>
+                  <span className="caps" style={{ marginRight: 8, fontSize: 9.5 }}>{s.lead}</span>
+                  {s.title}
+                </h3>
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 8px' }} />
+                <p style={{ fontSize: 13.5, lineHeight: 1.65, margin: 0 }}>{s.body}</p>
+                {ghost[s.key] && (
+                  <p className={'added' + (settled[s.key] ? ' settled' : '')} style={{ fontSize: 13.5, lineHeight: 1.65, marginTop: 8 }}>
+                    {ghost[s.key]}
+                  </p>
+                )}
+              </section>
+            ))}
+
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <div className="hand" style={{ fontSize: 22, color: 'var(--ink)' }}>Sarah Kovač</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Lead Guide · Primrose Room · May 19, 2026</div>
+            </div>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
