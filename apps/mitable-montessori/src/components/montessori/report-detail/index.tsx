@@ -96,6 +96,31 @@ function bodyToSections(body: string): LocalSection[] {
   ];
 }
 
+/** Strip ephemeral ghost slots before PATCH — ghosts live in chat + local UI until Accept. */
+function sectionsForPersist(sections: LocalSection[]): Omit<LocalSection, "ghostEdit">[] {
+  return sections.map(({ ghostEdit: _ghost, ...s }) => s);
+}
+
+/** Map agent target ids to report section ids (handles rare heading-only mismatches). */
+function resolveSectionId(sections: LocalSection[], rawId: string): string | null {
+  if (!rawId.trim()) return null;
+  if (sections.some((s) => s.id === rawId)) return rawId;
+  const norm = rawId.trim().toLowerCase();
+  const byHeading = sections.find(
+    (s) =>
+      s.heading.toLowerCase() === norm ||
+      s.heading
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") === norm
+  );
+  if (byHeading) return byHeading.id;
+  const bySlug = sections.find(
+    (s) => s.id.toLowerCase().endsWith(`-${norm}`) || s.id.toLowerCase() === norm
+  );
+  return bySlug?.id ?? null;
+}
+
 function sectionsToBody(sections: LocalSection[]): string {
   return sections
     .map((s) => {
@@ -312,7 +337,7 @@ export function ReportDetail({
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               title: next.title,
-              sections: next.sections,
+              sections: sectionsForPersist(next.sections),
               body: sectionsToBody(next.sections),
             }),
           });
@@ -374,6 +399,11 @@ export function ReportDetail({
     [queueSave]
   );
 
+  /** Local-only detail update (no autosave). Used for pending ghost slots. */
+  const setDetailLocal = React.useCallback((next: LocalDetail) => {
+    setDetail(next);
+  }, []);
+
   // Latest detail snapshot for chat-driven mutations. Using a ref so the
   // handlers below don't recreate on every keystroke (would re-publish to
   // ActiveReportContext and remount ChatPane, losing local input state).
@@ -397,21 +427,34 @@ export function ReportDetail({
     [onChange]
   );
 
-  const applyGhostEditToDetail = React.useCallback(
-    (args: {
-      sectionId: string;
-      ghostEdit: { id: string; html: string; sourceLabel: string };
-      messageId?: string;
-    }) => {
+  const applyGhostEditsToDetail = React.useCallback(
+    (
+      edits: Array<{
+        sectionId: string;
+        ghostEdit: { id: string; html: string; sourceLabel: string };
+        messageId?: string;
+      }>
+    ) => {
+      if (edits.length === 0) return;
       const current = detailRef.current;
-      const nextSections = current.sections.map((s) =>
-        s.id === args.sectionId
-          ? { ...s, ghostEdit: { ...args.ghostEdit, messageId: args.messageId } }
-          : s
-      );
-      onChange({ ...current, sections: nextSections });
+      const bySectionId = new Map<
+        string,
+        { id: string; html: string; sourceLabel: string; messageId?: string }
+      >();
+      for (const e of edits) {
+        const resolved = resolveSectionId(current.sections, e.sectionId);
+        if (!resolved) continue;
+        bySectionId.set(resolved, { ...e.ghostEdit, messageId: e.messageId });
+      }
+      if (bySectionId.size === 0) return;
+      const nextSections = current.sections.map((s) => {
+        const ghostEdit = bySectionId.get(s.id);
+        return ghostEdit ? { ...s, ghostEdit } : s;
+      });
+      // Do not autosave — PATCH schema drops ghostEdit and a resync would wipe the pane.
+      setDetailLocal({ ...current, sections: nextSections });
     },
-    [onChange]
+    [setDetailLocal]
   );
 
   /** Append the ghost's html as a new paragraph in the section, clear the
@@ -522,6 +565,7 @@ export function ReportDetail({
         id: s.id,
         heading: s.heading,
         paragraphs: s.paragraphs.map((p) => ({ id: p.id, html: p.html })),
+        ...(s.ghostEdit ? { ghostEdit: s.ghostEdit } : {}),
       })),
     [detail.sections]
   );
@@ -533,15 +577,13 @@ export function ReportDetail({
       sections: chatPaneSections,
       handlers: {
         onApplyProposal: applyProposalToDetail,
-        onApplyGhostEdit: ({
-          sectionId,
-          ghostEdit,
-          messageId,
-        }: {
-          sectionId: string;
-          ghostEdit: { id: string; html: string; sourceLabel: string };
-          messageId: string;
-        }) => applyGhostEditToDetail({ sectionId, ghostEdit, messageId }),
+        onApplyGhostEdits: (
+          edits: Array<{
+            sectionId: string;
+            ghostEdit: { id: string; html: string; sourceLabel: string };
+            messageId: string;
+          }>
+        ) => applyGhostEditsToDetail(edits),
         onApplyNewSection: ({
           sectionId,
           heading,
@@ -562,7 +604,7 @@ export function ReportDetail({
       detail.title,
       chatPaneSections,
       applyProposalToDetail,
-      applyGhostEditToDetail,
+      applyGhostEditsToDetail,
       applyNewSectionToDetail,
       flushPendingSave,
     ]
@@ -603,6 +645,8 @@ export function ReportDetail({
   isDirtyRef.current = isDirty;
   React.useEffect(() => {
     if (isDirtyRef.current) return;
+    // Keep pending ghost suggestions when the parent refetches after unrelated saves.
+    if (detailRef.current.sections.some((s) => s.ghostEdit)) return;
     setDetail(buildLocalDetail(report, locale));
   }, [
     report.id,

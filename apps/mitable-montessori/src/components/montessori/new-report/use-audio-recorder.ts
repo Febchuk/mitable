@@ -3,9 +3,12 @@
 import * as React from "react";
 import type { AudioMemo } from "./mock-data";
 
+/** Flush MediaRecorder every second so long recordings are not held in one buffer. */
+const RECORDER_TIMESLICE_MS = 1000;
+
 /**
- * Wraps MediaRecorder for a single voice memo. Local-only — produces a blob
- * URL that lives in component state until the user submits or cancels.
+ * Wraps MediaRecorder for a single voice memo. Local-only — keeps the blob
+ * and an object URL in state until the user submits or cancels.
  *
  * Returns: state ("idle" | "recording" | "recorded" | "denied" | "error"),
  * elapsed seconds while recording, the recorded memo when done, and three
@@ -55,23 +58,26 @@ export function useAudioRecorder() {
       const supported = candidates.find((t) =>
         typeof MediaRecorder.isTypeSupported === "function"
           ? MediaRecorder.isTypeSupported(t)
-          : false,
+          : false
       );
-      const rec = supported ? new MediaRecorder(stream, { mimeType: supported }) : new MediaRecorder(stream);
+      const rec = supported
+        ? new MediaRecorder(stream, { mimeType: supported })
+        : new MediaRecorder(stream);
       recRef.current = rec;
       chunksRef.current = [];
       rec.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
       rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || supported || "audio/webm" });
+        const mimeType = rec.mimeType || supported || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const durationSec = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
-        setMemo({ url, durationSec });
+        setMemo({ url, blob, mimeType, durationSec });
         setState("recorded");
         teardownStream();
       };
-      rec.start();
+      rec.start(RECORDER_TIMESLICE_MS);
       startedAtRef.current = Date.now();
       setElapsed(0);
       stopTick();

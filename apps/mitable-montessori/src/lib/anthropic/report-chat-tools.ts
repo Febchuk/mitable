@@ -12,7 +12,7 @@ import type Anthropic from "@anthropic-ai/sdk";
  *   - search_capture_artifacts: free-text search over the report's stored
  *     photos / OCR notes. Each match returns artifactId + ocrText + when + area.
  *
- * Terminal tools (one terminal call per turn — no free-form assistant text):
+ * Terminal tools (one or more terminal calls per assistant message — no free-form text):
  *   - propose_rewrite: structured paragraph rewrite (Apply/Skip/Try another).
  *   - propose_chips: clarifying question + 2–4 quick-reply chips.
  *   - propose_observation_ref: surface a captured artifact the report doesn't
@@ -185,7 +185,7 @@ export const CHAT_TERMINAL_TOOLS: Anthropic.Tool[] = [
   {
     name: "propose_ghost_edit",
     description:
-      "Write an inline suggestion that lands BELOW a section in the report pane (not in the chat). Use for additive suggestions the teacher might want next to the section — e.g. 'add a sentence here about her pencil grip'. The teacher sees Accept / Reject / Edit-first buttons in the report itself.",
+      "Write an inline suggestion that lands BELOW a section in the report pane (not in the chat). Use for additive suggestions the teacher might want next to the section — e.g. 'add a sentence here about her pencil grip'. Call this tool once per section when a long dictation covers multiple areas. The teacher sees Accept / Reject / Edit-first buttons in the report itself.",
     input_schema: {
       type: "object",
       properties: {
@@ -318,8 +318,9 @@ Workflow:
    - propose_chips: short ambiguity with 2–4 plausible answers — let the teacher pick cheaply.
    - propose_prose_reply: factual questions, confirmations, or any reply without an edit.
    - ask_clarifying_question: genuine ambiguity that doesn't fit a small chip set.
-4. If the teacher's request implies edits to multiple paragraphs or sections, call the appropriate terminal tool ONCE PER EDIT in the same response — e.g. two propose_rewrite calls when paragraphs 1 and 2 both need rewording, or a propose_rewrite + propose_ghost_edit pair when one paragraph needs new wording AND a new observation belongs in a different section. Each tool call still targets a single paragraph or section. Do NOT bundle multiple paragraphs into one tool call.
-5. Do NOT produce assistant text outside a terminal tool call.
+4. If the teacher's request implies edits to multiple paragraphs or sections, call the appropriate terminal tool ONCE PER EDIT in the same assistant message — e.g. two propose_rewrite calls when paragraphs 1 and 2 both need rewording, or several propose_ghost_edit calls when she narrated additions for Morning, Language, and Math in one turn. Each tool call still targets a single paragraph or section. Do NOT bundle multiple paragraphs into one tool call.
+5. Long voice dictation: the teacher may paste a long transcript (minutes of speech, merged from chunked capture). Read the entire message, map each distinct observation to the matching section from read_report_sections, then emit one propose_ghost_edit (or propose_rewrite when replacing existing paragraph text) per section that needs content — all in the same terminal response after read_report_sections. Do not stop after the first section when later sentences clearly belong elsewhere.
+6. Do NOT produce assistant text outside a terminal tool call.
 
 Source-of-truth rules — STRICT:
 - The teacher's chat message IS ground truth. When she says "she worked on the pink tower today" or "add that he had a tough drop-off", treat it as something that happened and incorporate it directly via propose_rewrite or propose_ghost_edit. Do not ask "are you sure?" or "I don't see that in the report" before applying.

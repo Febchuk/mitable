@@ -137,7 +137,10 @@ export class WorkerHost {
         },
         reject,
       });
-      w.postMessage({ type: "transcribe", jobId, audio, sampleRate });
+      const transferable = audio.slice();
+      w.postMessage({ type: "transcribe", jobId, audio: transferable, sampleRate }, [
+        transferable.buffer,
+      ]);
     });
   }
 

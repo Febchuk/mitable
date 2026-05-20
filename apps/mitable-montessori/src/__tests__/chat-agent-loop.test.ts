@@ -623,6 +623,48 @@ describe("runReportChatAgent — Phase 4 archetypes", () => {
     expect(emission.ghostEdit.ghostEdit.id.length).toBeGreaterThan(0);
   });
 
+  it("returns multiple ghost-edit emissions from one assistant message", async () => {
+    const stub = buildStubAnthropic([
+      {
+        toolUses: [
+          {
+            id: "tu-1",
+            name: "propose_ghost_edit",
+            input: {
+              body: "Morning addition.",
+              target: { sectionId: "morning" },
+              ghostEdit: {
+                html: "[STUDENT_1] had a calm drop-off.",
+                sourceLabel: "Voice note",
+              },
+            },
+          },
+          {
+            id: "tu-2",
+            name: "propose_ghost_edit",
+            input: {
+              body: "Afternoon addition.",
+              target: { sectionId: "afternoon" },
+              ghostEdit: {
+                html: "[STUDENT_1] worked with the metal insets.",
+                sourceLabel: "Voice note",
+              },
+            },
+          },
+        ],
+      },
+    ]);
+    const out = await runReportChatAgent({ ...BASE_INPUT, anthropic: stub.sdk });
+    expect(out.emissions).toHaveLength(2);
+    expect(out.emissions[0]?.terminalKind).toBe("ghost-edit");
+    expect(out.emissions[1]?.terminalKind).toBe("ghost-edit");
+    if (out.emissions[0]?.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
+    if (out.emissions[1]?.terminalKind !== "ghost-edit") throw new Error("expected ghost-edit");
+    expect(out.emissions[0].ghostEdit.target.sectionId).toBe("morning");
+    expect(out.emissions[1].ghostEdit.target.sectionId).toBe("afternoon");
+    expect(stub.calls[0]?.max_tokens).toBe(4096);
+  });
+
   it("propose_ghost_edit rejects a missing section", async () => {
     const stub = buildStubAnthropic([
       {

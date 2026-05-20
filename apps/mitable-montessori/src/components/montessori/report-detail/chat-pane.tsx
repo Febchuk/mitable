@@ -38,6 +38,7 @@ export interface ChatPaneSection {
   id: string;
   heading: string;
   paragraphs: { id: string; html: string }[];
+  ghostEdit?: { id: string; html: string; sourceLabel: string; messageId?: string };
 }
 
 /** Imperative API exposed via ref so the report pane can seed a chat turn. */
@@ -64,16 +65,18 @@ export interface ChatPaneProps {
    */
   onPullObservation?: (args: { text: string; suggestedTarget?: ChatObsRefSuggestedTarget }) => void;
   /**
-   * Merge a ghost-edit suggestion into the report pane's section slot. The
-   * report pane already renders ghosts inline (Accept/Reject/Edit-first).
-   * `messageId` is the originating chat message — the parent uses it to
-   * record applied/dismissed via /chat/messages/[id]/applied.
+   * Merge ghost-edit suggestions into the report pane (one batch per turn so
+   * multiple sections update atomically). The report pane renders ghosts inline
+   * (Accept/Reject/Edit-first). Each `messageId` ties back to a chat row for
+   * applied/dismissed via /chat/messages/[id]/applied.
    */
-  onApplyGhostEdit?: (args: {
-    sectionId: string;
-    ghostEdit: ChatGhostEdit;
-    messageId: string;
-  }) => void;
+  onApplyGhostEdits?: (
+    edits: Array<{
+      sectionId: string;
+      ghostEdit: ChatGhostEdit;
+      messageId: string;
+    }>
+  ) => void;
   /**
    * Insert a brand-new section into the report. Auto-applies on receipt: the
    * chat shows a confirmation card while the report pane gets the new
@@ -108,7 +111,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     sections,
     onApplyProposal,
     onPullObservation,
-    onApplyGhostEdit,
+    onApplyGhostEdits,
     onApplyNewSection,
     flushPendingSave,
     onCollapse,
@@ -176,19 +179,29 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
   // track which ones we've already merged so re-renders don't double-fire.
   const mergedGhostIdsRef = React.useRef(new Set<string>());
   React.useEffect(() => {
-    if (!onApplyGhostEdit) return;
+    if (!onApplyGhostEdits) return;
+    const pending: Array<{
+      sectionId: string;
+      ghostEdit: ChatGhostEdit;
+      messageId: string;
+    }> = [];
     for (const m of messages) {
       if (m.kind !== "ghost-edit") continue;
       if (m.appliedAt || m.dismissedAt) continue;
-      if (mergedGhostIdsRef.current.has(m.id)) continue;
+      const alreadyMerged = mergedGhostIdsRef.current.has(m.id);
+      const onPane = sections.some(
+        (s) => s.id === m.target.sectionId && s.ghostEdit?.messageId === m.id
+      );
+      if (alreadyMerged && onPane) continue;
       mergedGhostIdsRef.current.add(m.id);
-      onApplyGhostEdit({
+      pending.push({
         sectionId: m.target.sectionId,
         ghostEdit: m.ghostEdit,
         messageId: m.id,
       });
     }
-  }, [messages, onApplyGhostEdit]);
+    if (pending.length > 0) onApplyGhostEdits(pending);
+  }, [messages, onApplyGhostEdits, sections]);
 
   // Same auto-apply pattern for new-section: when the agent emits one and
   // the parent supplied a handler, splice it into the report pane on
@@ -320,20 +333,27 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
   }, []);
 
   // Mic dictation: when the recorder transitions to "recorded" with a fresh
-  // memo, fetch the blob → decode → Whisper transcribe → append to composer.
+  // memo, decode the blob → Whisper transcribe → append to composer.
   React.useEffect(() => {
     if (recorder.state !== "recorded" || !recorder.memo) return;
-    if (transcribedMemoRef.current === recorder.memo.url) return;
-    transcribedMemoRef.current = recorder.memo.url;
+    const memoKey = recorder.memo.url;
+    if (transcribedMemoRef.current === memoKey) return;
 
     let cancelled = false;
     void (async () => {
       setMicStatus("transcribing");
       setMicError(null);
       try {
-        const res = await fetch(recorder.memo!.url);
-        const blob = await res.blob();
+        const blob = recorder.memo!.blob;
         const { audio, sampleRate } = await decodeBlobToMonoFloat32(blob);
+        const decodedSec = audio.length / sampleRate;
+        if (process.env.NODE_ENV === "development") {
+          console.log("[capture][report-mic]", {
+            wallClockSec: recorder.memo!.durationSec,
+            blobBytes: blob.size,
+            decodedSec: Number(decodedSec.toFixed(2)),
+          });
+        }
         if (!asrRef.current) {
           asrRef.current = new WhisperAsrEngine();
           await asrRef.current.init();
@@ -341,10 +361,14 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         const result = await asrRef.current.transcribe(audio, sampleRate);
         if (cancelled) return;
         const text = (result.text ?? "").trim();
+        if (process.env.NODE_ENV === "development") {
+          console.log("[capture][report-mic] transcript chars:", text.length);
+        }
         if (text) {
           setInput((prev) => (prev ? `${prev} ${text}` : text));
           requestAnimationFrame(() => textareaRef.current?.focus());
         }
+        if (!cancelled) transcribedMemoRef.current = memoKey;
         setMicStatus("idle");
       } catch (err) {
         if (cancelled) return;
@@ -1112,6 +1136,7 @@ function GhostEditConfirmationView({
 }: {
   message: Extract<ChatTurnMessage, { kind: "ghost-edit" }>;
 }) {
+  const previewHtml = message.ghostEdit.html?.trim() ?? "";
   return (
     <div className="rd-msg rd-msg-ai">
       <div className="rd-avatar">
@@ -1123,6 +1148,12 @@ function GhostEditConfirmationView({
           <span className="rd-label-cap">Suggested addition</span>
           <span className="rd-ghost-confirm-source">{message.ghostEdit.sourceLabel}</span>
         </div>
+        {previewHtml.length > 0 ? (
+          <div
+            className="rd-ghost-confirm-preview"
+            dangerouslySetInnerHTML={{ __html: previewHtml }}
+          />
+        ) : null}
       </div>
     </div>
   );

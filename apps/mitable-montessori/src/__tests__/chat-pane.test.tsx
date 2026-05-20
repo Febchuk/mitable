@@ -18,6 +18,11 @@ const SECTIONS = [
     heading: "Morning",
     paragraphs: [{ id: "morning-p1", html: "Ada arrived at 8:42." }],
   },
+  {
+    id: "afternoon",
+    heading: "Afternoon",
+    paragraphs: [{ id: "afternoon-p1", html: "Worked with metal insets." }],
+  },
 ];
 
 function defaultProps(overrides: Partial<ChatPaneProps> = {}): ChatPaneProps {
@@ -26,7 +31,7 @@ function defaultProps(overrides: Partial<ChatPaneProps> = {}): ChatPaneProps {
     sections: SECTIONS,
     onApplyProposal: vi.fn(),
     onPullObservation: vi.fn(),
-    onApplyGhostEdit: vi.fn(),
+    onApplyGhostEdits: vi.fn(),
     flushPendingSave: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -404,7 +409,7 @@ describe("ChatPane (Phase 3)", () => {
     await waitFor(() => expect(screen.getByText("Pulled in")).toBeTruthy());
   });
 
-  it("ghost-edit message merges into the report's section slot via onApplyGhostEdit", async () => {
+  it("ghost-edit message merges into the report's section slot via onApplyGhostEdits", async () => {
     const props = defaultProps();
     setupFetch({
       history: {
@@ -428,16 +433,62 @@ describe("ChatPane (Phase 3)", () => {
     await waitFor(() =>
       expect(screen.getByText(/I added a suggestion below the Morning section/i)).toBeTruthy()
     );
-    expect(props.onApplyGhostEdit).toHaveBeenCalledWith({
-      sectionId: "morning",
-      ghostEdit: expect.objectContaining({
-        id: "g-deadbeef",
-        html: "Ada held the pencil with a tripod grip today.",
-        sourceLabel: "10:14 AM photo",
-      }),
-      messageId: "g1",
-    });
+    expect(props.onApplyGhostEdits).toHaveBeenCalledWith([
+      {
+        sectionId: "morning",
+        ghostEdit: expect.objectContaining({
+          id: "g-deadbeef",
+          html: "Ada held the pencil with a tripod grip today.",
+          sourceLabel: "10:14 AM photo",
+        }),
+        messageId: "g1",
+      },
+    ]);
     // Confirmation card renders the source label.
     expect(screen.getByText(/10:14 AM photo/i)).toBeTruthy();
+  });
+
+  it("applies multiple ghost-edit messages in one batch", async () => {
+    const props = defaultProps();
+    setupFetch({
+      history: {
+        messages: [
+          {
+            kind: "ghost-edit",
+            id: "g-morning",
+            body: "Morning suggestion.",
+            target: { sectionId: "morning" },
+            ghostEdit: {
+              id: "g-m",
+              html: "Calm drop-off.",
+              sourceLabel: "Voice note",
+            },
+            actorRole: "assistant",
+          },
+          {
+            kind: "ghost-edit",
+            id: "g-afternoon",
+            body: "Afternoon suggestion.",
+            target: { sectionId: "afternoon" },
+            ghostEdit: {
+              id: "g-a",
+              html: "Metal insets.",
+              sourceLabel: "Voice note",
+            },
+            actorRole: "assistant",
+          },
+        ],
+      },
+    });
+    render(<ChatPane {...props} />);
+    await waitFor(() => expect(props.onApplyGhostEdits).toHaveBeenCalled());
+    expect(props.onApplyGhostEdits).toHaveBeenCalledTimes(1);
+    expect(props.onApplyGhostEdits).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ sectionId: "morning", messageId: "g-morning" }),
+        expect.objectContaining({ sectionId: "afternoon", messageId: "g-afternoon" }),
+      ])
+    );
+    expect(props.onApplyGhostEdits.mock.calls[0]![0]).toHaveLength(2);
   });
 });

@@ -24,6 +24,8 @@ import type { AnthropicLike } from "@/lib/reports/agent-loop";
 
 export const MAX_CHAT_TURNS_PER_REQUEST = 4;
 export const MAX_CHAT_REGENERATIONS = 1;
+/** Room for several parallel terminal tool calls (e.g. one ghost-edit per section). */
+export const CHAT_AGENT_MAX_OUTPUT_TOKENS = 4096;
 
 export type ChatAgentTerminalKind = "prose" | "clarify" | "proposal";
 
@@ -260,7 +262,7 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
       turn++;
       const resp = await input.anthropic.messages.create({
         model: input.model,
-        max_tokens: 1024,
+        max_tokens: CHAT_AGENT_MAX_OUTPUT_TOKENS,
         // Phase 5: prompt caching. The system prompt is the highest-leverage
         // cache target — it's identical across every turn in a thread. Mark
         // the last tool with cache_control too so the tools block is reused.
