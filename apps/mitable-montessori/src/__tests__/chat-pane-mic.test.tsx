@@ -65,7 +65,7 @@ describe("ChatPane report mic", () => {
         sections={SECTIONS}
         onApplyProposal={vi.fn()}
         onPullObservation={vi.fn()}
-        onApplyGhostEdit={vi.fn()}
+        onApplyGhostEdits={vi.fn()}
         flushPendingSave={vi.fn().mockResolvedValue(undefined)}
       />
     );
