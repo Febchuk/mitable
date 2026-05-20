@@ -320,20 +320,27 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
   }, []);
 
   // Mic dictation: when the recorder transitions to "recorded" with a fresh
-  // memo, fetch the blob → decode → Whisper transcribe → append to composer.
+  // memo, decode the blob → Whisper transcribe → append to composer.
   React.useEffect(() => {
     if (recorder.state !== "recorded" || !recorder.memo) return;
-    if (transcribedMemoRef.current === recorder.memo.url) return;
-    transcribedMemoRef.current = recorder.memo.url;
+    const memoKey = recorder.memo.url;
+    if (transcribedMemoRef.current === memoKey) return;
 
     let cancelled = false;
     void (async () => {
       setMicStatus("transcribing");
       setMicError(null);
       try {
-        const res = await fetch(recorder.memo!.url);
-        const blob = await res.blob();
+        const blob = recorder.memo!.blob;
         const { audio, sampleRate } = await decodeBlobToMonoFloat32(blob);
+        const decodedSec = audio.length / sampleRate;
+        if (process.env.NODE_ENV === "development") {
+          console.log("[capture][report-mic]", {
+            wallClockSec: recorder.memo!.durationSec,
+            blobBytes: blob.size,
+            decodedSec: Number(decodedSec.toFixed(2)),
+          });
+        }
         if (!asrRef.current) {
           asrRef.current = new WhisperAsrEngine();
           await asrRef.current.init();
@@ -341,10 +348,14 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         const result = await asrRef.current.transcribe(audio, sampleRate);
         if (cancelled) return;
         const text = (result.text ?? "").trim();
+        if (process.env.NODE_ENV === "development") {
+          console.log("[capture][report-mic] transcript chars:", text.length);
+        }
         if (text) {
           setInput((prev) => (prev ? `${prev} ${text}` : text));
           requestAnimationFrame(() => textareaRef.current?.focus());
         }
+        if (!cancelled) transcribedMemoRef.current = memoKey;
         setMicStatus("idle");
       } catch (err) {
         if (cancelled) return;
