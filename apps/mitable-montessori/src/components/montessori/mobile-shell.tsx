@@ -71,8 +71,12 @@ const ADMIN_NAV: NavItem[] = [
   },
 ];
 
+const LEGACY_TEACHER_HREFS = new Set(["/app/today", "/app/progress"]);
+
 export interface MontessoriMobileShellProps {
   variant: Variant;
+  showLegacyNav?: boolean;
+  showLegacyChat?: boolean;
   /** First name for the drawer profile block. Falls back to email local part. */
   firstName?: string | null;
   email: string;
@@ -86,13 +90,13 @@ export interface MontessoriMobileShellProps {
   userId: string;
 }
 
-// Matches /admin/reports/<id> and /app/reports/<id> (and anything nested below
-// them), but NOT the bare list pages /admin/reports or /app/reports.
-const REPORT_DETAIL_PATTERN = /^\/(?:admin|app)\/reports\/[^/]+/;
+// Report editor routes (incl. mobile full-screen chat) — hide generic Ask Mitable FAB.
+const REPORT_DETAIL_PATTERN = /^\/(?:admin|app)\/reports\/[^/]+(?:\/chat)?$/;
 
 export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
   const pathname = usePathname() ?? "";
   const isReportDetail = REPORT_DETAIL_PATTERN.test(pathname);
+  const showLegacyChat = props.showLegacyChat ?? false;
 
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const store = useMontessori();
@@ -154,6 +158,7 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
       <MobileDrawer
         open={drawerOpen}
         variant={props.variant}
+        showLegacyNav={props.showLegacyNav ?? false}
         firstName={props.firstName}
         email={props.email}
         schoolName={props.schoolName}
@@ -163,7 +168,7 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
 
       {/* On report-detail routes the report editor mounts its own report-scoped
           chat FAB + sheet, so the shell hides this generic one to avoid two FABs. */}
-      {!isReportDetail && (
+      {!isReportDetail && showLegacyChat && (
         <>
           <MobileChatSheet
             open={sheetOpen}
@@ -278,6 +283,7 @@ function MobileScrim({ open, onClick }: { open: boolean; onClick: () => void }) 
 function MobileDrawer({
   open,
   variant,
+  showLegacyNav,
   firstName,
   email,
   schoolName,
@@ -286,6 +292,7 @@ function MobileDrawer({
 }: {
   open: boolean;
   variant: Variant;
+  showLegacyNav: boolean;
   firstName?: string | null;
   email: string;
   schoolName: string;
@@ -300,7 +307,12 @@ function MobileDrawer({
     store.reports.filter((r) => r.status === "review").length;
   const [signingOut, setSigningOut] = React.useState(false);
 
-  const items = variant === "admin" ? ADMIN_NAV : TEACHER_NAV;
+  const items =
+    variant === "admin"
+      ? ADMIN_NAV
+      : showLegacyNav
+        ? TEACHER_NAV
+        : TEACHER_NAV.filter((n) => !LEGACY_TEACHER_HREFS.has(n.href));
 
   const localPart = email.split("@")[0] ?? email;
   const displayName =

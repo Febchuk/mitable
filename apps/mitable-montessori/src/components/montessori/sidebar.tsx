@@ -57,13 +57,18 @@ const ADMIN_NAV: NavItem[] = [
   },
 ];
 
+const LEGACY_TEACHER_HREFS = new Set(["/app/today", "/app/progress"]);
+
 export function MontessoriSidebar({
   variant = "teacher",
+  showLegacyNav = false,
   classroomName,
   contextSubtitle,
   userMenuSlot,
 }: {
   variant?: "teacher" | "admin";
+  /** When false (default report-first), hides Today and Progress links. */
+  showLegacyNav?: boolean;
   classroomName: string;
   /** Replaces the default “{n} children” line under the workspace title */
   contextSubtitle?: string;
@@ -79,7 +84,12 @@ export function MontessoriSidebar({
   const draftCount =
     store.reports.filter((r) => r.status === "draft").length +
     store.reports.filter((r) => r.status === "review").length;
-  const navItems = variant === "admin" ? ADMIN_NAV : NAV;
+  const navItems =
+    variant === "admin"
+      ? ADMIN_NAV
+      : showLegacyNav
+        ? NAV
+        : NAV.filter((n) => !LEGACY_TEACHER_HREFS.has(n.href));
   const subtitleLine =
     contextSubtitle ??
     (variant === "admin" ? "People, curriculum, and reports" : `${CHILDREN.length} children`);
