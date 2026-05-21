@@ -47,14 +47,30 @@ interface NavItem {
 const ph = { size: 18, weight: "regular" as const };
 const lu = { size: 18, strokeWidth: 1.6 };
 
-const TEACHER_NAV: NavItem[] = [
+const TEACHER_REPORTS: NavItem = {
+  href: "/app/reports",
+  label: "Reports",
+  icon: <PencilSimple {...ph} />,
+  withDraftBadge: true,
+};
+
+const TEACHER_NAV_LEGACY: NavItem[] = [
   { href: "/app/today", label: "Today", icon: <HouseSimple {...ph} /> },
+  { href: "/app/progress", label: "Progress", icon: <SquaresFour {...ph} /> },
+];
+
+const TEACHER_NAV_CORE: NavItem[] = [
   { href: "/app/roster", label: "Roster", icon: <Users {...lu} /> },
   { href: "/app/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
-  { href: "/app/progress", label: "Progress", icon: <SquaresFour {...ph} /> },
   { href: "/app/attendance", label: "Attendance", icon: <CalendarBlank {...ph} /> },
-  { href: "/app/reports", label: "Reports", icon: <PencilSimple {...ph} />, withDraftBadge: true },
 ];
+
+const TEACHER_NAV: NavItem[] = [...TEACHER_NAV_LEGACY, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
+
+function teacherNavItems(showLegacyNav: boolean): NavItem[] {
+  if (showLegacyNav) return TEACHER_NAV;
+  return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+}
 
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin/today", label: "Today", icon: <HouseSimple {...ph} /> },
@@ -73,6 +89,8 @@ const ADMIN_NAV: NavItem[] = [
 
 export interface MontessoriMobileShellProps {
   variant: Variant;
+  showLegacyNav?: boolean;
+  showLegacyChat?: boolean;
   /** First name for the drawer profile block. Falls back to email local part. */
   firstName?: string | null;
   email: string;
@@ -86,13 +104,13 @@ export interface MontessoriMobileShellProps {
   userId: string;
 }
 
-// Matches /admin/reports/<id> and /app/reports/<id> (and anything nested below
-// them), but NOT the bare list pages /admin/reports or /app/reports.
-const REPORT_DETAIL_PATTERN = /^\/(?:admin|app)\/reports\/[^/]+/;
+// Report editor routes (incl. mobile full-screen chat) — hide generic Ask Mitable FAB.
+const REPORT_DETAIL_PATTERN = /^\/(?:admin|app)\/reports\/[^/]+(?:\/chat)?$/;
 
 export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
   const pathname = usePathname() ?? "";
   const isReportDetail = REPORT_DETAIL_PATTERN.test(pathname);
+  const showLegacyChat = props.showLegacyChat ?? false;
 
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const store = useMontessori();
@@ -154,6 +172,7 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
       <MobileDrawer
         open={drawerOpen}
         variant={props.variant}
+        showLegacyNav={props.showLegacyNav ?? false}
         firstName={props.firstName}
         email={props.email}
         schoolName={props.schoolName}
@@ -163,7 +182,7 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
 
       {/* On report-detail routes the report editor mounts its own report-scoped
           chat FAB + sheet, so the shell hides this generic one to avoid two FABs. */}
-      {!isReportDetail && (
+      {!isReportDetail && showLegacyChat && (
         <>
           <MobileChatSheet
             open={sheetOpen}
@@ -278,6 +297,7 @@ function MobileScrim({ open, onClick }: { open: boolean; onClick: () => void }) 
 function MobileDrawer({
   open,
   variant,
+  showLegacyNav,
   firstName,
   email,
   schoolName,
@@ -286,6 +306,7 @@ function MobileDrawer({
 }: {
   open: boolean;
   variant: Variant;
+  showLegacyNav: boolean;
   firstName?: string | null;
   email: string;
   schoolName: string;
@@ -300,7 +321,7 @@ function MobileDrawer({
     store.reports.filter((r) => r.status === "review").length;
   const [signingOut, setSigningOut] = React.useState(false);
 
-  const items = variant === "admin" ? ADMIN_NAV : TEACHER_NAV;
+  const items = variant === "admin" ? ADMIN_NAV : teacherNavItems(showLegacyNav);
 
   const localPart = email.split("@")[0] ?? email;
   const displayName =

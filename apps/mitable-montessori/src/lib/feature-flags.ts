@@ -1,12 +1,25 @@
 /**
- * Feature flag helpers. All flags must be read through these accessors so the
- * source of truth stays in one place and we can swap the backing store later
- * (env var → remote config / per-org toggle) without touching call sites.
+ * Feature flag helpers. Read flags here so we can swap env → remote config later
+ * without touching call sites.
  */
 
-// function readPublicFlag(name: string): boolean {
-//   const raw = process.env[name];
-//   return raw === "1" || raw === "true";
-// }
+function readPublicFlag(name: string): boolean {
+  const raw = process.env[name];
+  return raw === "1" || raw === "true";
+}
 
-export const featureFlags = {};
+/**
+ * When true, restores Today + Progress nav/routes and the global Ask Mitable
+ * chatbot on top of the report-first teacher experience.
+ */
+export function addTodayProgressAndAgent(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_ADD_TODAY_PROGRESS_AND_AGENT");
+}
+
+export function enableCaptureWorker(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_ENABLE_CAPTURE_WORKER");
+}
+
+export function enableLocalIntent(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_ENABLE_LOCAL_INTENT");
+}

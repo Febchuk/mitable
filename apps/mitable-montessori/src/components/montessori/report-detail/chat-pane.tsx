@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   Camera,
   Check,
+  ChevronDown,
   Clock,
   Mic,
   PanelLeftClose,
@@ -44,6 +45,8 @@ export interface ChatPaneSection {
 /** Imperative API exposed via ref so the report pane can seed a chat turn. */
 export interface ChatPaneHandle {
   seedTurn(opts: { targetRef: TargetRef; targetLabel?: string }): void;
+  /** Sync chat UI when the teacher accepts/rejects a ghost on the report pane. */
+  resolveGhostMessage: (messageId: string, action: "applied" | "dismissed") => void;
 }
 
 export interface ChatPaneProps {
@@ -103,6 +106,16 @@ export interface ChatPaneProps {
    * without owning chat internals.
    */
   onCollapse?: () => void;
+  /**
+   * `panel` (default) renders the full chat panel with header + messages + composer.
+   * `drawer` renders a pill composer with the mic as a separate round button on the
+   * left; the host controls whether messages are visible via `messagesVisible`.
+   */
+  layout?: "panel" | "drawer";
+  /** In `drawer` layout, when false the message history is hidden (collapsed pill). */
+  messagesVisible?: boolean;
+  /** In `drawer` layout, fired when the composer input gains focus so the host can open the drawer. */
+  onComposerFocus?: () => void;
 }
 
 export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatPane(
@@ -115,9 +128,13 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     onApplyNewSection,
     flushPendingSave,
     onCollapse,
+    layout = "panel",
+    messagesVisible = true,
+    onComposerFocus,
   },
   ref
 ) {
+  const isDrawer = layout === "drawer";
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -153,6 +170,22 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const resolveGhostMessage = React.useCallback(
+    (messageId: string, action: "applied" | "dismissed") => {
+      const stamp = new Date().toISOString();
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? action === "applied"
+              ? { ...m, appliedAt: stamp, dismissedAt: undefined }
+              : { ...m, dismissedAt: stamp, appliedAt: undefined }
+            : m
+        )
+      );
+    },
+    []
+  );
+
   React.useImperativeHandle(
     ref,
     () => ({
@@ -163,8 +196,9 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         });
         requestAnimationFrame(() => textareaRef.current?.focus());
       },
+      resolveGhostMessage,
     }),
-    []
+    [resolveGhostMessage]
   );
 
   // Auto-scroll to bottom on new messages.
@@ -188,11 +222,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     for (const m of messages) {
       if (m.kind !== "ghost-edit") continue;
       if (m.appliedAt || m.dismissedAt) continue;
-      const alreadyMerged = mergedGhostIdsRef.current.has(m.id);
-      const onPane = sections.some(
-        (s) => s.id === m.target.sectionId && s.ghostEdit?.messageId === m.id
-      );
-      if (alreadyMerged && onPane) continue;
+      if (mergedGhostIdsRef.current.has(m.id)) continue;
       mergedGhostIdsRef.current.add(m.id);
       pending.push({
         sectionId: m.target.sectionId,
@@ -346,14 +376,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
       try {
         const blob = recorder.memo!.blob;
         const { audio, sampleRate } = await decodeBlobToMonoFloat32(blob);
-        const decodedSec = audio.length / sampleRate;
-        if (process.env.NODE_ENV === "development") {
-          console.log("[capture][report-mic]", {
-            wallClockSec: recorder.memo!.durationSec,
-            blobBytes: blob.size,
-            decodedSec: Number(decodedSec.toFixed(2)),
-          });
-        }
         if (!asrRef.current) {
           asrRef.current = new WhisperAsrEngine();
           await asrRef.current.init();
@@ -361,9 +383,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         const result = await asrRef.current.transcribe(audio, sampleRate);
         if (cancelled) return;
         const text = (result.text ?? "").trim();
-        if (process.env.NODE_ENV === "development") {
-          console.log("[capture][report-mic] transcript chars:", text.length);
-        }
         if (text) {
           setInput((prev) => (prev ? `${prev} ${text}` : text));
           requestAnimationFrame(() => textareaRef.current?.focus());
@@ -375,14 +394,12 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         setMicStatus("error");
         setMicError((err as Error).message || "Couldn't transcribe that — try typing.");
       } finally {
-        // Always reset the recorder so the next press starts a fresh memo.
         recorder.clear();
       }
     })();
     return () => {
       cancelled = true;
     };
-    // recorder.clear is stable from the hook; we only react to state/memo changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.state, recorder.memo]);
 
@@ -464,74 +481,81 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     };
   }, [reportId]);
 
-  const onSend = React.useCallback(async () => {
-    const trimmed = input.trim();
-    if (!trimmed || sending) return;
+  const sendUserMessage = React.useCallback(
+    async (raw: string) => {
+      const trimmed = raw.trim();
+      if (!trimmed || sending) return;
 
-    // Flush any pending debounced save so the agent reads fresh state.
-    try {
-      await flushPendingSave?.();
-    } catch {
-      // A save failure shouldn't block the chat — the toast will surface it.
-    }
+      try {
+        await flushPendingSave?.();
+      } catch {
+        // A save failure shouldn't block the chat — the toast will surface it.
+      }
 
-    const tempId = `temp-${crypto.randomUUID()}`;
-    const optimistic: ChatTurnMessage = {
-      kind: "user-text",
-      id: tempId,
-      body: trimmed,
-      ...(pinnedTarget ? { targetRef: pinnedTarget.ref } : {}),
-    };
-    setMessages((prev) => [...prev, optimistic]);
-    const sentTargetRef = pinnedTarget?.ref;
-    const sentAttachments = pendingAttachments;
-    setInput("");
-    setPinnedTarget(null);
-    setPendingAttachments([]);
-    setSending(true);
+      const tempId = `temp-${crypto.randomUUID()}`;
+      const optimistic: ChatTurnMessage = {
+        kind: "user-text",
+        id: tempId,
+        body: trimmed,
+        ...(pinnedTarget ? { targetRef: pinnedTarget.ref } : {}),
+      };
+      setMessages((prev) => [...prev, optimistic]);
+      const sentTargetRef = pinnedTarget?.ref;
+      const sentAttachments = pendingAttachments;
+      setInput("");
+      setPinnedTarget(null);
+      setPendingAttachments([]);
+      setSending(true);
 
-    try {
-      const res = await fetch(`/api/v1/reports/${reportId}/chat/turn`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          userMessage: trimmed,
-          ...(sentTargetRef ? { targetRef: sentTargetRef } : {}),
-          ...(sentAttachments.length > 0 ? { attachments: sentAttachments } : {}),
-        }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
+      try {
+        const res = await fetch(`/api/v1/reports/${reportId}/chat/turn`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            userMessage: trimmed,
+            ...(sentTargetRef ? { targetRef: sentTargetRef } : {}),
+            ...(sentAttachments.length > 0 ? { attachments: sentAttachments } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          setMessages((prev) => [
+            ...prev.filter((m) => m.id !== tempId),
+            optimistic,
+            {
+              kind: "error",
+              id: `e-${crypto.randomUUID()}`,
+              body: j.error || "Something went wrong. Try again.",
+            },
+          ]);
+          if (sentAttachments.length > 0) setPendingAttachments(sentAttachments);
+          return;
+        }
+        const json = (await res.json()) as { messages: ChatTurnMessage[] };
+        setMessages((prev) => [...prev.filter((m) => m.id !== tempId), ...json.messages]);
+      } catch (err) {
         setMessages((prev) => [
-          ...prev.filter((m) => m.id !== tempId),
-          optimistic,
+          ...prev,
           {
             kind: "error",
             id: `e-${crypto.randomUUID()}`,
-            body: j.error || "Something went wrong. Try again.",
+            body: (err as Error).message || "Network error. Try again.",
           },
         ]);
-        // Restore attachments so the teacher can retry without re-uploading.
-        if (sentAttachments.length > 0) setPendingAttachments(sentAttachments);
-        return;
+      } finally {
+        setSending(false);
+        if (!isDrawer) {
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }
       }
-      const json = (await res.json()) as { messages: ChatTurnMessage[] };
-      setMessages((prev) => [...prev.filter((m) => m.id !== tempId), ...json.messages]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          kind: "error",
-          id: `e-${crypto.randomUUID()}`,
-          body: (err as Error).message || "Network error. Try again.",
-        },
-      ]);
-    } finally {
-      setSending(false);
-      requestAnimationFrame(() => textareaRef.current?.focus());
-    }
-  }, [input, reportId, sending, pinnedTarget, pendingAttachments, flushPendingSave]);
+    },
+    [reportId, sending, pinnedTarget, pendingAttachments, flushPendingSave, isDrawer]
+  );
+
+  const onSend = React.useCallback(async () => {
+    await sendUserMessage(input);
+  }, [input, sendUserMessage]);
 
   // Slash-section targeting: show a dropdown of sections when the user types
   // "/" at the start. Filter as they type after the slash.
@@ -716,6 +740,257 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     [onPullObservation, recordAction]
   );
 
+  const composerNode = (
+    <div className={`rd-composer-wrap${isDrawer ? " rd-composer-wrap--drawer" : ""}`}>
+      {pinnedTarget ? (
+        <div className="rd-target-chip">
+          <span className="rd-label-cap">About</span>
+          <span className="rd-target-chip-label">{pinnedTarget.label}</span>
+          <button
+            type="button"
+            className="rd-target-chip-close"
+            onClick={() => setPinnedTarget(null)}
+            aria-label="Clear target scope"
+          >
+            <X size={11} strokeWidth={2.5} />
+          </button>
+        </div>
+      ) : null}
+      {pendingAttachments.length > 0 ? (
+        <div className="rd-attachments" aria-label="Attached photos">
+          {pendingAttachments.map((a) => (
+            <span key={a.artifactId} className="rd-attachment">
+              <span className="rd-attachment-thumb" aria-hidden="true">
+                📷
+              </span>
+              <span>Photo</span>
+              <button
+                type="button"
+                className="rd-attachment-remove"
+                onClick={() => removeAttachment(a.artifactId)}
+                aria-label="Remove attachment"
+              >
+                <X size={11} strokeWidth={2.5} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {cameraSession ? (
+        <div className="rd-camera" aria-label="Camera viewfinder">
+          <video ref={videoRef} autoPlay playsInline muted />
+          <div className="rd-camera-actions">
+            <button
+              type="button"
+              className="rd-btn rd-btn-primary"
+              onClick={() => void captureAndAttach()}
+              disabled={
+                cameraStatus === "capturing" ||
+                cameraStatus === "ocr" ||
+                cameraStatus === "uploading"
+              }
+            >
+              {cameraStatus === "capturing"
+                ? "Capturing…"
+                : cameraStatus === "ocr"
+                  ? "Reading text…"
+                  : cameraStatus === "uploading"
+                    ? "Uploading…"
+                    : "Capture"}
+            </button>
+            <button
+              type="button"
+              className="rd-btn rd-btn-ghost"
+              onClick={closeCamera}
+              disabled={cameraStatus === "uploading"}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {cameraError ? (
+        <div className="rd-camera-progress" role="alert">
+          {cameraError}
+        </div>
+      ) : null}
+      {micStatus === "recording" ? (
+        <div className="rd-camera-progress" role="status" aria-live="polite">
+          🎤 Recording… {recorder.elapsed}s
+        </div>
+      ) : micStatus === "transcribing" ? (
+        <div className="rd-camera-progress" role="status" aria-live="polite">
+          Transcribing…
+        </div>
+      ) : micError ? (
+        <div className="rd-camera-progress" role="alert">
+          {micError}
+        </div>
+      ) : null}
+      {slashOpen ? (
+        <ul className="rd-slash-menu" role="listbox" aria-label="Pick a section">
+          {slashMatches.map((s, i) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                className="rd-slash-item"
+                role="option"
+                aria-selected={i === 0}
+                onClick={() => pickSlashSection(s)}
+              >
+                <span className="rd-slash-heading">{s.heading}</span>
+                <span className="rd-slash-hint">section</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className={`rd-composer${isDrawer ? " rd-composer--pill" : ""}`}>
+        {isDrawer ? (
+          <button
+            type="button"
+            className={`rd-mic-circle${recorder.state === "recording" ? " rd-recording" : ""}`}
+            title={
+              recorder.state === "recording"
+                ? `Stop recording (${recorder.elapsed}s)`
+                : micStatus === "transcribing"
+                  ? "Transcribing…"
+                  : "Record voice note"
+            }
+            aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
+            aria-pressed={recorder.state === "recording"}
+            onClick={() => void onToggleMic()}
+            disabled={micStatus === "transcribing"}
+          >
+            <Mic size={18} strokeWidth={2} />
+          </button>
+        ) : null}
+        <div className={isDrawer ? "rd-composer-pill" : "contents"}>
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            placeholder={
+              pinnedTarget
+                ? `Ask the assistant to refine ${pinnedTarget.label}…`
+                : isDrawer
+                  ? "Ask anything"
+                  : "Ask the assistant to refine this report…"
+            }
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            onFocus={onComposerFocus}
+            disabled={sending}
+            aria-label="Message the editing assistant"
+          />
+          <div className="rd-composer-actions">
+            {!isDrawer ? (
+              <button
+                type="button"
+                className={`rd-icon-btn${recorder.state === "recording" ? " rd-recording" : ""}`}
+                title={
+                  recorder.state === "recording"
+                    ? `Stop recording (${recorder.elapsed}s)`
+                    : micStatus === "transcribing"
+                      ? "Transcribing…"
+                      : "Hold to talk — releases when you tap again"
+                }
+                aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
+                aria-pressed={recorder.state === "recording"}
+                onClick={() => void onToggleMic()}
+                disabled={micStatus === "transcribing"}
+              >
+                <Mic size={16} strokeWidth={2} />
+              </button>
+            ) : null}
+            {!isDrawer ? (
+              <button
+                type="button"
+                className="rd-icon-btn"
+                title={cameraSession ? "Close camera" : "Attach a photo"}
+                aria-label="Attach a photo"
+                onClick={() => (cameraSession ? closeCamera() : void openCamera())}
+                disabled={cameraStatus === "opening" || cameraStatus === "uploading"}
+              >
+                <Camera size={16} strokeWidth={2} />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rd-icon-btn rd-primary"
+              title="Send"
+              onClick={() => void onSend()}
+              disabled={sending || !input.trim()}
+            >
+              <Send size={15} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+      </div>
+      {!isDrawer ? (
+        <div className="rd-composer-hints">
+          <span className="rd-kbd">Enter</span>
+          <span>send</span>
+          <span className="rd-kbd" style={{ marginLeft: 8 }}>
+            Shift + Enter
+          </span>
+          <span>new line</span>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (isDrawer) {
+    return (
+      <>
+        {messagesVisible ? (
+          <div className="rd-chat-drawer-card" aria-label="Editing assistant">
+            {onCollapse ? (
+              <div className="rd-chat-drawer-head">
+                <button
+                  type="button"
+                  className="rd-chat-drawer-close"
+                  onClick={onCollapse}
+                  aria-label="Collapse assistant"
+                >
+                  <ChevronDown size={18} strokeWidth={2} />
+                </button>
+              </div>
+            ) : null}
+            <div className="rd-chat-scroll scroll-quiet" ref={scrollRef}>
+              {historyLoaded && messages.length === 0 ? (
+                <EmptyState />
+              ) : (
+                messages.map((m) => (
+                  <MessageView
+                    key={m.id}
+                    message={m}
+                    onApply={onApply}
+                    onSkip={onSkip}
+                    onTryAnother={onTryAnother}
+                    onChipClick={onChipClick}
+                    onPullIn={onPullIn}
+                  />
+                ))
+              )}
+              {sending ? <ThinkingIndicator /> : null}
+              {undo ? (
+                <div className="rd-chat-undo" role="status">
+                  <Undo2 size={12} strokeWidth={2.5} />
+                  <span>Applied edit to {undo.label}.</span>
+                  <button type="button" onClick={onUndo} className="rd-chat-undo-btn">
+                    Undo
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {composerNode}
+      </>
+    );
+  }
+
   return (
     <aside className="rd-pane rd-chat-pane" aria-label="Editing assistant">
       <div className="rd-chat-header">
@@ -782,173 +1057,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         {sending ? <ThinkingIndicator /> : null}
       </div>
 
-      <div className="rd-composer-wrap">
-        {pinnedTarget ? (
-          <div className="rd-target-chip">
-            <span className="rd-label-cap">About</span>
-            <span className="rd-target-chip-label">{pinnedTarget.label}</span>
-            <button
-              type="button"
-              className="rd-target-chip-close"
-              onClick={() => setPinnedTarget(null)}
-              aria-label="Clear target scope"
-            >
-              <X size={11} strokeWidth={2.5} />
-            </button>
-          </div>
-        ) : null}
-        {pendingAttachments.length > 0 ? (
-          <div className="rd-attachments" aria-label="Attached photos">
-            {pendingAttachments.map((a) => (
-              <span key={a.artifactId} className="rd-attachment">
-                <span className="rd-attachment-thumb" aria-hidden="true">
-                  📷
-                </span>
-                <span>Photo</span>
-                <button
-                  type="button"
-                  className="rd-attachment-remove"
-                  onClick={() => removeAttachment(a.artifactId)}
-                  aria-label="Remove attachment"
-                >
-                  <X size={11} strokeWidth={2.5} />
-                </button>
-              </span>
-            ))}
-          </div>
-        ) : null}
-        {cameraSession ? (
-          <div className="rd-camera" aria-label="Camera viewfinder">
-            <video ref={videoRef} autoPlay playsInline muted />
-            <div className="rd-camera-actions">
-              <button
-                type="button"
-                className="rd-btn rd-btn-primary"
-                onClick={() => void captureAndAttach()}
-                disabled={
-                  cameraStatus === "capturing" ||
-                  cameraStatus === "ocr" ||
-                  cameraStatus === "uploading"
-                }
-              >
-                {cameraStatus === "capturing"
-                  ? "Capturing…"
-                  : cameraStatus === "ocr"
-                    ? "Reading text…"
-                    : cameraStatus === "uploading"
-                      ? "Uploading…"
-                      : "Capture"}
-              </button>
-              <button
-                type="button"
-                className="rd-btn rd-btn-ghost"
-                onClick={closeCamera}
-                disabled={cameraStatus === "uploading"}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {cameraError ? (
-          <div className="rd-camera-progress" role="alert">
-            {cameraError}
-          </div>
-        ) : null}
-        {micStatus === "recording" ? (
-          <div className="rd-camera-progress" role="status" aria-live="polite">
-            🎤 Recording… {recorder.elapsed}s
-          </div>
-        ) : micStatus === "transcribing" ? (
-          <div className="rd-camera-progress" role="status" aria-live="polite">
-            Transcribing…
-          </div>
-        ) : micError ? (
-          <div className="rd-camera-progress" role="alert">
-            {micError}
-          </div>
-        ) : null}
-        {slashOpen ? (
-          <ul className="rd-slash-menu" role="listbox" aria-label="Pick a section">
-            {slashMatches.map((s, i) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  className="rd-slash-item"
-                  role="option"
-                  aria-selected={i === 0}
-                  onClick={() => pickSlashSection(s)}
-                >
-                  <span className="rd-slash-heading">{s.heading}</span>
-                  <span className="rd-slash-hint">section</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="rd-composer">
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            placeholder={
-              pinnedTarget
-                ? `Ask the assistant to refine ${pinnedTarget.label}…`
-                : "Ask the assistant to refine this report…"
-            }
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            disabled={sending}
-            aria-label="Message the editing assistant"
-          />
-          <div className="rd-composer-actions">
-            <button
-              type="button"
-              className={`rd-icon-btn${recorder.state === "recording" ? " rd-recording" : ""}`}
-              title={
-                recorder.state === "recording"
-                  ? `Stop recording (${recorder.elapsed}s)`
-                  : micStatus === "transcribing"
-                    ? "Transcribing…"
-                    : "Hold to talk — releases when you tap again"
-              }
-              aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
-              aria-pressed={recorder.state === "recording"}
-              onClick={() => void onToggleMic()}
-              disabled={micStatus === "transcribing"}
-            >
-              <Mic size={16} strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              className="rd-icon-btn"
-              title={cameraSession ? "Close camera" : "Attach a photo"}
-              aria-label="Attach a photo"
-              onClick={() => (cameraSession ? closeCamera() : void openCamera())}
-              disabled={cameraStatus === "opening" || cameraStatus === "uploading"}
-            >
-              <Camera size={16} strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              className="rd-icon-btn rd-primary"
-              title="Send"
-              onClick={() => void onSend()}
-              disabled={sending || !input.trim()}
-            >
-              <Send size={15} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-        <div className="rd-composer-hints">
-          <span className="rd-kbd">Enter</span>
-          <span>send</span>
-          <span className="rd-kbd" style={{ marginLeft: 8 }}>
-            Shift + Enter
-          </span>
-          <span>new line</span>
-        </div>
-      </div>
+      {composerNode}
     </aside>
   );
 });
@@ -1136,6 +1245,7 @@ function GhostEditConfirmationView({
 }: {
   message: Extract<ChatTurnMessage, { kind: "ghost-edit" }>;
 }) {
+  if (message.appliedAt || message.dismissedAt) return null;
   const previewHtml = message.ghostEdit.html?.trim() ?? "";
   return (
     <div className="rd-msg rd-msg-ai">
@@ -1164,6 +1274,7 @@ function NewSectionConfirmationView({
 }: {
   message: Extract<ChatTurnMessage, { kind: "new-section" }>;
 }) {
+  if (message.appliedAt || message.dismissedAt) return null;
   return (
     <div className="rd-msg rd-msg-ai">
       <div className="rd-avatar">

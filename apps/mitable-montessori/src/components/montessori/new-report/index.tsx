@@ -4,10 +4,11 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { ToastBus } from "../primitives";
+import { useMontessori } from "../store";
 import { useIsMobile } from "../child-detail/use-is-mobile";
 import type { Tone } from "../data";
 import type { SectionMeta } from "@/lib/report-templates/sections";
-import { NewReportSheet } from "./new-report-sheet";
+import { NewReportModal } from "./new-report-modal";
 import { NewReportMobile } from "./new-report-mobile";
 import type { PickerChild } from "./child-picker";
 import { type NewReportPayload, type ReportTemplate } from "./mock-data";
@@ -33,12 +34,26 @@ type ApiTemplateRow = {
   iconTone: ReportTemplate["iconTone"];
 };
 
-/** The Plus button on /app/reports — clicking opens the sheet (desktop)
-   or the full-screen step flow (mobile). Lazy-loads templates + roster
-   + captured-today on first open. The flow is now child + template only;
-   the assistant drafts the empty template into the editor. */
-export function NewReportTrigger() {
-  const [open, setOpen] = React.useState(false);
+type NewReportTriggerProps = {
+  /** Controlled open state (e.g. hero CTA on reports landing). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** When true, only the sheet/mobile flow renders — no "+ New report" chip. */
+  hideButton?: boolean;
+  /** After create, navigate here (`{id}` replaced). Default report-first path. */
+  createdReportHref?: (reportId: string) => string;
+};
+
+/** Opens new-report flow — desktop modal or mobile full-screen steps. */
+export function NewReportTrigger({
+  open: openProp,
+  onOpenChange,
+  hideButton = false,
+  createdReportHref = (id) => `/app/reports/${id}`,
+}: NewReportTriggerProps = {}) {
+  const [openInternal, setOpenInternal] = React.useState(false);
+  const open = openProp ?? openInternal;
+  const setOpen = onOpenChange ?? setOpenInternal;
   const [submitting, setSubmitting] = React.useState(false);
   const [roster, setRoster] = React.useState<PickerChild[]>([]);
   const [templates, setTemplates] = React.useState<ReportTemplate[]>([]);
@@ -47,6 +62,7 @@ export function NewReportTrigger() {
 
   const mobile = useIsMobile();
   const router = useRouter();
+  const classroomName = useMontessori().classroomProgress?.classroomName?.trim() || "Classroom";
 
   // Lazy-load on first open.
   React.useEffect(() => {
@@ -126,28 +142,30 @@ export function NewReportTrigger() {
             : "Drafting new report…",
         });
         setOpen(false);
-        router.push(`/app/reports?open=${encodeURIComponent(json.reportId)}`);
+        router.push(createdReportHref(json.reportId));
       } finally {
         setSubmitting(false);
       }
     },
-    [router, roster, submitting]
+    [router, roster, submitting, createdReportHref, setOpen]
   );
 
   return (
     <>
-      <button
-        type="button"
-        className="tap nr-trigger"
-        onClick={() => setOpen(true)}
-        aria-label="New report"
-      >
-        <Plus size={14} strokeWidth={2} />
-        <span>New report</span>
-      </button>
+      {!hideButton ? (
+        <button
+          type="button"
+          className="tap nr-trigger"
+          onClick={() => setOpen(true)}
+          aria-label="New report"
+        >
+          <Plus size={14} strokeWidth={2} />
+          <span>New report</span>
+        </button>
+      ) : null}
 
       {!mobile && (
-        <NewReportSheet
+        <NewReportModal
           open={open}
           onClose={() => setOpen(false)}
           onSubmit={onSubmit}
@@ -155,6 +173,7 @@ export function NewReportTrigger() {
           capturedToday={capturedToday}
           templates={templates}
           submitting={submitting}
+          classroomName={classroomName}
         />
       )}
       {mobile && (
@@ -166,6 +185,7 @@ export function NewReportTrigger() {
           capturedToday={capturedToday}
           templates={templates}
           submitting={submitting}
+          classroomName={classroomName}
         />
       )}
     </>

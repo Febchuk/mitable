@@ -1,12 +1,14 @@
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import { listReportsV2 } from "@/lib/queries/reports";
-import { ReportsRailView } from "./reports-rail-view";
+import { ReportsLandingView } from "./reports-landing-view";
 
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ open?: string | string[] }>;
+  searchParams: Promise<{ open?: string | string[]; notice?: string }>;
 }) {
   const ctx = await getCurrentUserContext();
   const sp = await searchParams;
@@ -27,7 +29,14 @@ export default async function ReportsPage({
   }
 
   const reports = await listReportsV2({ classroomIds });
-  const initialOpenReportId =
-    openParam && reports.some((r) => r.id === openParam) ? openParam : null;
-  return <ReportsRailView reports={reports} initialOpenReportId={initialOpenReportId} />;
+
+  if (openParam && reports.some((r) => r.id === openParam)) {
+    redirect(`/app/reports/${openParam}`);
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <ReportsLandingView reports={reports} />
+    </Suspense>
+  );
 }

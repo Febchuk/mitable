@@ -18,13 +18,136 @@ type ChildPickerProps = {
   onChange: (child: PickerChild) => void;
   roster: PickerChild[];
   capturedToday: CapturedToday;
+  /** Shown above the roster (e.g. classroom name). */
+  rosterGroupLabel?: string;
+  /** List shows the full roster with optional search; dropdown is legacy typeahead. */
+  layout?: "list" | "dropdown";
 };
 
-export function ChildPicker({ value, onChange, roster, capturedToday }: ChildPickerProps) {
+function useFilteredRoster(roster: PickerChild[], capturedToday: CapturedToday, query: string) {
+  const filter = query.trim().toLowerCase();
+  const matches = filter ? roster.filter((c) => c.name.toLowerCase().includes(filter)) : roster;
+  const todayChildren = matches.filter((c) => capturedToday[c.id]);
+  const otherChildren = matches.filter((c) => !capturedToday[c.id]);
+  return { matches, todayChildren, otherChildren };
+}
+
+export function ChildPicker({
+  value,
+  onChange,
+  roster,
+  capturedToday,
+  rosterGroupLabel = "Children",
+  layout = "list",
+}: ChildPickerProps) {
+  if (layout === "dropdown") {
+    return (
+      <ChildPickerDropdown
+        value={value}
+        onChange={onChange}
+        roster={roster}
+        capturedToday={capturedToday}
+      />
+    );
+  }
+  return (
+    <ChildPickerList
+      value={value}
+      onChange={onChange}
+      roster={roster}
+      capturedToday={capturedToday}
+      rosterGroupLabel={rosterGroupLabel}
+    />
+  );
+}
+
+function ChildPickerList({
+  value,
+  onChange,
+  roster,
+  capturedToday,
+  rosterGroupLabel = "Children",
+}: ChildPickerProps) {
+  const [query, setQuery] = React.useState("");
+  const { matches, todayChildren, otherChildren } = useFilteredRoster(roster, capturedToday, query);
+
+  return (
+    <div className="nr-child-list">
+      <div className="nr-child-list-search">
+        <Search size={16} strokeWidth={2} aria-hidden />
+        <input
+          type="search"
+          placeholder="Search children…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search children"
+        />
+      </div>
+      <div className="nr-child-list-scroll scroll-quiet" aria-label="Children in your classrooms">
+        {roster.length === 0 ? (
+          <div className="nr-empty-row">Loading children…</div>
+        ) : matches.length === 0 ? (
+          <div className="nr-empty-row">No children match your search.</div>
+        ) : (
+          <>
+            {todayChildren.length > 0 ? (
+              <ChildListGroup label="Captured today" icon={<Clock size={11} strokeWidth={2.5} />}>
+                {todayChildren.map((c) => (
+                  <PickerRow
+                    key={c.id}
+                    child={c}
+                    selected={value?.id === c.id}
+                    badge={capturedToday[c.id]}
+                    onPick={() => onChange(c)}
+                  />
+                ))}
+              </ChildListGroup>
+            ) : null}
+            {otherChildren.length > 0 ? (
+              <ChildListGroup label={todayChildren.length > 0 ? "All children" : rosterGroupLabel}>
+                {otherChildren.map((c) => (
+                  <PickerRow
+                    key={c.id}
+                    child={c}
+                    selected={value?.id === c.id}
+                    onPick={() => onChange(c)}
+                  />
+                ))}
+              </ChildListGroup>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChildListGroup({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="nr-child-list-group">
+      <div className="nr-group-head">
+        {icon}
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ChildPickerDropdown({ value, onChange, roster, capturedToday }: ChildPickerProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const { matches, todayChildren, otherChildren } = useFilteredRoster(roster, capturedToday, query);
 
   React.useEffect(() => {
     if (!open) return;
@@ -41,11 +164,6 @@ export function ChildPicker({ value, onChange, roster, capturedToday }: ChildPic
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
-
-  const filter = query.trim().toLowerCase();
-  const matches = filter ? roster.filter((c) => c.name.toLowerCase().includes(filter)) : roster;
-  const todayChildren = matches.filter((c) => capturedToday[c.id]);
-  const otherChildren = matches.filter((c) => !capturedToday[c.id]);
 
   if (value && !open) {
     const today = capturedToday[value.id];
@@ -81,7 +199,7 @@ export function ChildPicker({ value, onChange, roster, capturedToday }: ChildPic
       <input
         ref={inputRef}
         className="nr-picker-input"
-        placeholder="Start typing a name…"
+        placeholder="Search children…"
         value={query}
         autoFocus={open}
         onFocus={() => setOpen(true)}
@@ -146,15 +264,22 @@ export function ChildPicker({ value, onChange, roster, capturedToday }: ChildPic
 function PickerRow({
   child,
   badge,
+  selected = false,
   onPick,
 }: {
   child: PickerChild;
   badge?: { voice: number; photos: number };
+  selected?: boolean;
   onPick: () => void;
 }) {
   return (
-    <button type="button" className="nr-picker-row" onClick={onPick}>
-      <span className={`nr-av nr-${child.tone}`} style={{ width: 32, height: 32, fontSize: 12 }}>
+    <button
+      type="button"
+      aria-pressed={selected}
+      className={`nr-picker-row${selected ? " nr-selected" : ""}`}
+      onClick={onPick}
+    >
+      <span className={`nr-av nr-${child.tone}`} style={{ width: 36, height: 36, fontSize: 12 }}>
         {initialsFor(child.name)}
       </span>
       <span style={{ minWidth: 0 }}>
@@ -167,7 +292,7 @@ function PickerRow({
       </span>
       {badge ? (
         <span className="nr-today-badge">
-          📷 {badge.voice}·{badge.photos}
+          {badge.voice} voice · {badge.photos} photo{badge.photos === 1 ? "" : "s"}
         </span>
       ) : (
         <span />

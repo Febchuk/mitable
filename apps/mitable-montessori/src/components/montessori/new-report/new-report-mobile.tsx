@@ -18,6 +18,7 @@ export function NewReportMobile({
   capturedToday,
   templates,
   submitting,
+  classroomName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function NewReportMobile({
   capturedToday: CapturedToday;
   templates: ReportTemplate[];
   submitting?: boolean;
+  classroomName: string;
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
@@ -75,6 +77,7 @@ export function NewReportMobile({
           onClose={onClose}
           roster={roster}
           capturedToday={capturedToday}
+          classroomName={classroomName}
         />
       )}
       {step === 2 && (
@@ -103,6 +106,7 @@ function Step1Child({
   onClose,
   roster,
   capturedToday,
+  classroomName,
 }: {
   child: PickerChild | null;
   query: string;
@@ -111,6 +115,7 @@ function Step1Child({
   onClose: () => void;
   roster: PickerChild[];
   capturedToday: CapturedToday;
+  classroomName: string;
 }) {
   const filter = query.trim().toLowerCase();
   const matches = filter ? roster.filter((c) => c.name.toLowerCase().includes(filter)) : roster;
@@ -165,7 +170,7 @@ function Step1Child({
         )}
         {others.length > 0 && (
           <>
-            <div className="nr-m-group-head">All children</div>
+            <div className="nr-m-group-head">{classroomName}</div>
             {others.map((c) => (
               <MobileChildRow
                 key={c.id}

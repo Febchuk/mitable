@@ -16,6 +16,7 @@ export function NewReportSheet({
   capturedToday,
   templates,
   submitting,
+  classroomName = "Classroom",
 }: {
   open: boolean;
   onClose: () => void;
@@ -24,6 +25,7 @@ export function NewReportSheet({
   capturedToday: CapturedToday;
   templates: ReportTemplate[];
   submitting?: boolean;
+  classroomName?: string;
 }) {
   const [child, setChild] = React.useState<PickerChild | null>(null);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
@@ -87,10 +89,12 @@ export function NewReportSheet({
                 <span className="nr-req">required</span>
               </div>
               <ChildPicker
+                layout="list"
                 value={child}
                 onChange={setChild}
                 roster={roster}
                 capturedToday={capturedToday}
+                rosterGroupLabel={classroomName}
               />
             </div>
 

@@ -20,23 +20,35 @@ const NAV_ICON_SIZE = 18;
 const phosphor = { size: NAV_ICON_SIZE, weight: "regular" as const };
 const lucide = { size: 17, strokeWidth: 1.5 };
 
-const NAV: NavItem[] = [
+const TEACHER_REPORTS: NavItem = {
+  href: "/app/reports",
+  label: "Reports",
+  renderIcon: () => <PencilSimple {...phosphor} />,
+  withDraftBadge: true,
+};
+
+const TEACHER_NAV_LEGACY: NavItem[] = [
   { href: "/app/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
+  { href: "/app/progress", label: "Progress", renderIcon: () => <SquaresFour {...phosphor} /> },
+];
+
+const TEACHER_NAV_CORE: NavItem[] = [
   { href: "/app/roster", label: "Roster", renderIcon: () => <Users {...lucide} /> },
   { href: "/app/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
-  { href: "/app/progress", label: "Progress", renderIcon: () => <SquaresFour {...phosphor} /> },
   {
     href: "/app/attendance",
     label: "Attendance",
     renderIcon: () => <CalendarBlank {...phosphor} />,
   },
-  {
-    href: "/app/reports",
-    label: "Reports",
-    renderIcon: () => <PencilSimple {...phosphor} />,
-    withDraftBadge: true,
-  },
 ];
+
+/** Legacy order (Today first). Report-first puts Reports at the top. */
+const NAV: NavItem[] = [...TEACHER_NAV_LEGACY, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
+
+function teacherNavItems(showLegacyNav: boolean): NavItem[] {
+  if (showLegacyNav) return NAV;
+  return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+}
 
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
@@ -59,11 +71,14 @@ const ADMIN_NAV: NavItem[] = [
 
 export function MontessoriSidebar({
   variant = "teacher",
+  showLegacyNav = false,
   classroomName,
   contextSubtitle,
   userMenuSlot,
 }: {
   variant?: "teacher" | "admin";
+  /** When false (default report-first), hides Today and Progress links. */
+  showLegacyNav?: boolean;
   classroomName: string;
   /** Replaces the default “{n} children” line under the workspace title */
   contextSubtitle?: string;
@@ -79,7 +94,7 @@ export function MontessoriSidebar({
   const draftCount =
     store.reports.filter((r) => r.status === "draft").length +
     store.reports.filter((r) => r.status === "review").length;
-  const navItems = variant === "admin" ? ADMIN_NAV : NAV;
+  const navItems = variant === "admin" ? ADMIN_NAV : teacherNavItems(showLegacyNav);
   const subtitleLine =
     contextSubtitle ??
     (variant === "admin" ? "People, curriculum, and reports" : `${CHILDREN.length} children`);
