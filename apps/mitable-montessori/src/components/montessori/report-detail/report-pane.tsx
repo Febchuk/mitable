@@ -11,6 +11,7 @@ import {
   inferChecklistSelections,
   inferSingleSelect,
 } from "@/lib/reports/template-field-payload";
+import { firstOpenParagraphIndex } from "@/lib/reports/section-paragraph-slots";
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
 
@@ -407,6 +408,9 @@ function SectionBlock({
     string | null
   >(null);
   const showGhost = !!section.ghostEdit;
+  const ghostOpenParagraphIndex = showGhost
+    ? firstOpenParagraphIndex(section.paragraphs, fieldMeta)
+    : null;
   const radioGroupName = React.useId();
 
   return (
@@ -454,6 +458,17 @@ function SectionBlock({
       </div>
 
       {section.paragraphs.map((p, paraIndex) => {
+        if (showGhost && ghostOpenParagraphIndex === paraIndex && section.ghostEdit) {
+          return (
+            <GhostSuggestionBlock
+              key={`ghost-${p.id}`}
+              ghost={section.ghostEdit}
+              onAcceptGhostEdit={onAcceptGhostEdit}
+              onDismissGhostEdit={onDismissGhostEdit}
+            />
+          );
+        }
+
         const structuredFirst =
           paraIndex === 0 &&
           fieldMeta &&
@@ -566,51 +581,64 @@ function SectionBlock({
         );
       })}
 
-      {showGhost && section.ghostEdit && (
-        <div className="rd-ghost-edit">
-          <div className="rd-ghost-edit-label">
-            <Bolt size={11} />
-            Suggested addition · {section.ghostEdit.sourceLabel}
-          </div>
-          <div
-            className="rd-ghost-edit-text"
-            dangerouslySetInnerHTML={{ __html: section.ghostEdit.html }}
-          />
-          <div className="rd-ghost-edit-actions">
-            <button
-              type="button"
-              className="rd-ghost-btn rd-accept"
-              onClick={() => {
-                if (onAcceptGhostEdit) onAcceptGhostEdit();
-                else toast("Ghost suggestions need a chat thread to accept.");
-              }}
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              className="rd-ghost-btn"
-              onClick={() => {
-                if (onDismissGhostEdit) onDismissGhostEdit();
-                else toast("Ghost suggestions need a chat thread to dismiss.");
-                ToastBus.push({ message: "Suggestion dismissed" });
-              }}
-            >
-              Reject
-            </button>
-            <button
-              type="button"
-              className="rd-ghost-btn"
-              style={{ marginLeft: "auto" }}
-              onClick={() =>
-                toast("Edit-first lands with the inline ghost editor in a later phase.")
-              }
-            >
-              Edit first
-            </button>
-          </div>
-        </div>
-      )}
+      {showGhost && ghostOpenParagraphIndex === null && section.ghostEdit ? (
+        <GhostSuggestionBlock
+          ghost={section.ghostEdit}
+          onAcceptGhostEdit={onAcceptGhostEdit}
+          onDismissGhostEdit={onDismissGhostEdit}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function GhostSuggestionBlock({
+  ghost,
+  onAcceptGhostEdit,
+  onDismissGhostEdit,
+}: {
+  ghost: { id: string; html: string; sourceLabel: string };
+  onAcceptGhostEdit?: () => void;
+  onDismissGhostEdit?: () => void;
+}) {
+  return (
+    <div className="rd-ghost-edit">
+      <div className="rd-ghost-edit-label">
+        <Bolt size={11} />
+        Suggested addition · {ghost.sourceLabel}
+      </div>
+      <div className="rd-ghost-edit-text" dangerouslySetInnerHTML={{ __html: ghost.html }} />
+      <div className="rd-ghost-edit-actions">
+        <button
+          type="button"
+          className="rd-ghost-btn rd-accept"
+          onClick={() => {
+            if (onAcceptGhostEdit) onAcceptGhostEdit();
+            else toast("Ghost suggestions need a chat thread to accept.");
+          }}
+        >
+          Accept
+        </button>
+        <button
+          type="button"
+          className="rd-ghost-btn"
+          onClick={() => {
+            if (onDismissGhostEdit) onDismissGhostEdit();
+            else toast("Ghost suggestions need a chat thread to dismiss.");
+            ToastBus.push({ message: "Suggestion dismissed" });
+          }}
+        >
+          Reject
+        </button>
+        <button
+          type="button"
+          className="rd-ghost-btn"
+          style={{ marginLeft: "auto" }}
+          onClick={() => toast("Edit-first lands with the inline ghost editor in a later phase.")}
+        >
+          Edit first
+        </button>
+      </div>
     </div>
   );
 }
