@@ -54,10 +54,6 @@ export function ReportsLandingView({ reports }: { reports: ReportListRow[] }) {
     [reports, locale]
   );
 
-  const draftCount = reports.filter(
-    (r) => r.status === "draft" || r.status === "changes_requested"
-  ).length;
-
   const openReport = (id: string) => {
     router.push(`/app/reports/${id}`);
   };
@@ -67,13 +63,6 @@ export function ReportsLandingView({ reports }: { reports: ReportListRow[] }) {
       {notice ? <p className={styles.notice}>{notice}</p> : null}
 
       <h1 className={styles.pageH1}>Reports</h1>
-      <p className={styles.pageSub}>
-        {reports.length === 0
-          ? "Start a new report when you're ready — pick a child and template."
-          : draftCount > 0
-            ? `${draftCount} draft${draftCount === 1 ? "" : "s"} in progress. Pick one to keep editing, or start fresh.`
-            : `${reports.length} report${reports.length === 1 ? "" : "s"} here. Open one to continue or start a new draft.`}
-      </p>
 
       <button
         type="button"
@@ -83,12 +72,7 @@ export function ReportsLandingView({ reports }: { reports: ReportListRow[] }) {
         <span className={styles.ctaIcon} aria-hidden>
           <FileText size={24} strokeWidth={1.6} />
         </span>
-        <span>
-          <span className={styles.ctaTitle}>Start a new session</span>
-          <span className={styles.ctaSub}>
-            Pick a child and a template — then record or type observations.
-          </span>
-        </span>
+        <span className={styles.ctaTitle}>Write a new report</span>
         <span className={styles.ctaArrow} aria-hidden>
           <ArrowRight size={16} strokeWidth={2} />
         </span>

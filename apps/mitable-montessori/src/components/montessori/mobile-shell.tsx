@@ -47,14 +47,30 @@ interface NavItem {
 const ph = { size: 18, weight: "regular" as const };
 const lu = { size: 18, strokeWidth: 1.6 };
 
-const TEACHER_NAV: NavItem[] = [
+const TEACHER_REPORTS: NavItem = {
+  href: "/app/reports",
+  label: "Reports",
+  icon: <PencilSimple {...ph} />,
+  withDraftBadge: true,
+};
+
+const TEACHER_NAV_LEGACY: NavItem[] = [
   { href: "/app/today", label: "Today", icon: <HouseSimple {...ph} /> },
+  { href: "/app/progress", label: "Progress", icon: <SquaresFour {...ph} /> },
+];
+
+const TEACHER_NAV_CORE: NavItem[] = [
   { href: "/app/roster", label: "Roster", icon: <Users {...lu} /> },
   { href: "/app/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
-  { href: "/app/progress", label: "Progress", icon: <SquaresFour {...ph} /> },
   { href: "/app/attendance", label: "Attendance", icon: <CalendarBlank {...ph} /> },
-  { href: "/app/reports", label: "Reports", icon: <PencilSimple {...ph} />, withDraftBadge: true },
 ];
+
+const TEACHER_NAV: NavItem[] = [...TEACHER_NAV_LEGACY, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
+
+function teacherNavItems(showLegacyNav: boolean): NavItem[] {
+  if (showLegacyNav) return TEACHER_NAV;
+  return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+}
 
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin/today", label: "Today", icon: <HouseSimple {...ph} /> },
@@ -70,8 +86,6 @@ const ADMIN_NAV: NavItem[] = [
     withDraftBadge: true,
   },
 ];
-
-const LEGACY_TEACHER_HREFS = new Set(["/app/today", "/app/progress"]);
 
 export interface MontessoriMobileShellProps {
   variant: Variant;
@@ -307,12 +321,7 @@ function MobileDrawer({
     store.reports.filter((r) => r.status === "review").length;
   const [signingOut, setSigningOut] = React.useState(false);
 
-  const items =
-    variant === "admin"
-      ? ADMIN_NAV
-      : showLegacyNav
-        ? TEACHER_NAV
-        : TEACHER_NAV.filter((n) => !LEGACY_TEACHER_HREFS.has(n.href));
+  const items = variant === "admin" ? ADMIN_NAV : teacherNavItems(showLegacyNav);
 
   const localPart = email.split("@")[0] ?? email;
   const displayName =
