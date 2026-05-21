@@ -20,6 +20,7 @@ import {
   fieldPayloadToReadableText,
   paragraphCountsTowardDraftReadiness,
 } from "@/lib/reports/template-field-payload";
+import { firstOpenParagraphIndex } from "@/lib/reports/section-paragraph-slots";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +29,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePublishActiveReport } from "../active-report-context";
-import type { ChatPaneSection } from "./chat-pane";
+import { ChatPane, type ChatPaneHandle, type ChatPaneSection } from "./chat-pane";
+import { ReportChatDrawer } from "./report-chat-drawer";
 
 const DIRTY_LABEL = "Unsaved changes";
 const SAVING_LABEL = "Saving…";
@@ -172,6 +174,12 @@ export function ReportDetail({
   onViewModeChange,
   variant,
   onReportChanged,
+  /**
+   * `dock`       — legacy floating ChatDock (flag on).
+   * `drawer`     — bottom pill on the report. Desktop opens drawer in place; mobile navigates to `fullscreen`.
+   * `fullscreen` — chat owns the screen with a back link (the mobile `/chat` route).
+   */
+  chatMode = "dock",
 }: {
   report: ReportDetailRow;
   /** Where "All reports" and post-delete navigation go (`/admin/reports` for admin). */
@@ -194,10 +202,12 @@ export function ReportDetail({
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
   onReportChanged?: () => void;
+  chatMode?: "dock" | "drawer" | "fullscreen";
 }) {
   const isAdmin = isAdminProp || variant === "admin";
   const router = useRouter();
   const locale = useUiLocale();
+  const chatPaneRef = React.useRef<ChatPaneHandle | null>(null);
   const [detail, setDetail] = React.useState<LocalDetail>(() => buildLocalDetail(report, locale));
   const [isDirty, setIsDirty] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -465,18 +475,32 @@ export function ReportDetail({
       const section = current.sections.find((s) => s.id === sectionId);
       const ghost = section?.ghostEdit;
       if (!section || !ghost) return;
-      const newParagraphId = `p-ghost-${Math.random().toString(36).slice(2, 9)}`;
-      const nextSections = current.sections.map((s) =>
-        s.id === sectionId
-          ? {
-              ...s,
-              paragraphs: [...s.paragraphs, { id: newParagraphId, html: ghost.html }],
-              ghostEdit: undefined,
-            }
-          : s
-      );
+      const fieldMeta = current.templateSectionMeta?.[section.heading];
+      const openIdx = firstOpenParagraphIndex(section.paragraphs, fieldMeta);
+      let appliedParagraphId = "";
+      const nextSections = current.sections.map((s) => {
+        if (s.id !== sectionId) return s;
+        if (openIdx !== null) {
+          const target = s.paragraphs[openIdx];
+          appliedParagraphId = target.id;
+          return {
+            ...s,
+            paragraphs: s.paragraphs.map((p, i) =>
+              i === openIdx ? { ...p, html: ghost.html } : p
+            ),
+            ghostEdit: undefined,
+          };
+        }
+        appliedParagraphId = `p-ghost-${Math.random().toString(36).slice(2, 9)}`;
+        return {
+          ...s,
+          paragraphs: [...s.paragraphs, { id: appliedParagraphId, html: ghost.html }],
+          ghostEdit: undefined,
+        };
+      });
       onChange({ ...current, sections: nextSections });
       if (ghost.messageId) {
+        chatPaneRef.current?.resolveGhostMessage(ghost.messageId, "applied");
         void fetch(`/api/v1/reports/${report.id}/chat/messages/${ghost.messageId}/applied`, {
           method: "POST",
           credentials: "include",
@@ -485,7 +509,7 @@ export function ReportDetail({
             action: "applied",
             appliedTo: {
               sectionId,
-              paragraphId: newParagraphId,
+              paragraphId: appliedParagraphId,
               before: "",
               after: ghost.html,
             },
@@ -510,6 +534,7 @@ export function ReportDetail({
       );
       onChange({ ...current, sections: nextSections });
       if (ghost.messageId) {
+        chatPaneRef.current?.resolveGhostMessage(ghost.messageId, "dismissed");
         void fetch(`/api/v1/reports/${report.id}/chat/messages/${ghost.messageId}/applied`, {
           method: "POST",
           credentials: "include",
@@ -610,7 +635,7 @@ export function ReportDetail({
     ]
   );
 
-  usePublishActiveReport(activeReportSnapshot);
+  usePublishActiveReport(chatMode === "dock" ? activeReportSnapshot : null);
 
   React.useEffect(() => {
     return () => {
@@ -768,6 +793,41 @@ export function ReportDetail({
     [guardedNavigate, backToReportsHref]
   );
 
+  if (chatMode === "fullscreen") {
+    return (
+      <div className="rd-root rd-root--chat-fullscreen">
+        <header className="rd-chat-fullscreen-head">
+          <button
+            type="button"
+            className="rd-chat-fullscreen-back tap"
+            onClick={() => guardedNavigate(`/app/reports/${report.id}`)}
+            aria-label="Back to report"
+          >
+            <span aria-hidden>←</span>
+            <span>Report</span>
+          </button>
+          <div className="rd-chat-fullscreen-title">
+            <span className="rd-chat-fullscreen-title-name">{report.studentName}</span>
+            <span className="rd-chat-fullscreen-title-sub">Edit with Mitable</span>
+          </div>
+        </header>
+        <div className="rd-chat-fullscreen-body">
+          <ChatPane
+            ref={chatPaneRef}
+            layout="drawer"
+            messagesVisible
+            reportId={report.id}
+            sections={chatPaneSections}
+            onApplyProposal={applyProposalToDetail}
+            onApplyGhostEdits={applyGhostEditsToDetail}
+            onApplyNewSection={applyNewSectionToDetail}
+            flushPendingSave={flushPendingSave}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="rd-root" data-no-topbar={hideTopBar ? "true" : "false"}>
@@ -825,6 +885,18 @@ export function ReportDetail({
             {viewMode === "preview" && <PdfPreviewPane data={pdfData} />}
           </div>
         </div>
+
+        {chatMode === "drawer" ? (
+          <ReportChatDrawer
+            chatPaneRef={chatPaneRef}
+            reportId={report.id}
+            sections={chatPaneSections}
+            onApplyProposal={applyProposalToDetail}
+            onApplyGhostEdits={applyGhostEditsToDetail}
+            onApplyNewSection={applyNewSectionToDetail}
+            flushPendingSave={flushPendingSave}
+          />
+        ) : null}
       </div>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

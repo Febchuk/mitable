@@ -40,6 +40,321 @@ main:has(.rd-root) {
   overflow: hidden;
 }
 
+/* ---------- Report chat drawer (bottom pill + upward drawer / mobile launcher) ---------- */
+
+/* Let the report scroll to the viewport bottom; keep last lines readable under
+   the floating pill via scroll-padding (not a dead band below the pane). */
+.rd-root:has(.rd-chat-drawer) .rd-report-scroll {
+  scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+}
+
+.rd-chat-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 39;
+  background: rgba(31, 28, 24, 0.32);
+  backdrop-filter: blur(2px);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  animation: rd-fade-in 180ms ease;
+}
+@keyframes rd-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.rd-chat-drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  /* Match .rd-report-scroll gutters + .rd-report-paper max-width */
+  padding: 0 24px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  pointer-events: none;
+}
+.rd-chat-drawer > * {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 760px;
+}
+
+/* Card that wraps the chat history ABOVE the pill (only when the drawer is open).
+   The pill + mic always sit outside this card so the page background shows
+   through around them — matches the reference design. */
+.rd-chat-drawer-card {
+  display: flex;
+  flex-direction: column;
+  max-height: min(64vh, 560px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  box-shadow: 0 18px 48px rgba(31, 28, 24, 0.18);
+  overflow: hidden;
+  animation: rd-drawer-rise 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes rd-drawer-rise {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.rd-chat-drawer-head {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px 0;
+}
+.rd-chat-drawer-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.rd-chat-drawer-close:hover {
+  background: var(--color-muted);
+  color: var(--color-ink);
+}
+
+.rd-chat-drawer-card .rd-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 18px 14px;
+  overflow-y: auto;
+}
+
+/* The composer wrap floats on the page — no surface, no border. The pill
+   + mic provide their own chrome. */
+.rd-composer-wrap--drawer {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Pill composer: round mic on the left + pill input that owns send inside. */
+.rd-composer--pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.rd-mic-circle {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.rd-mic-circle:hover {
+  background: var(--color-muted);
+}
+.rd-mic-circle.rd-recording {
+  background: var(--color-terracotta);
+  border-color: var(--color-terracotta);
+  color: #fff;
+  animation: rd-mic-pulse 1.4s ease-in-out infinite;
+}
+@keyframes rd-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 106, 79, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(196, 106, 79, 0); }
+}
+
+.rd-composer-pill {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.rd-composer-pill:focus-within {
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
+}
+.rd-composer-pill textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-ink);
+  line-height: 1.4;
+  padding: 6px 0;
+  max-height: 96px;
+}
+.rd-composer-pill textarea::placeholder {
+  color: var(--color-ink-muted);
+}
+.rd-composer-pill .rd-composer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 2px;
+}
+.rd-composer-pill .rd-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+}
+.rd-composer-pill .rd-icon-btn.rd-primary {
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+.rd-composer-pill .rd-icon-btn.rd-primary:hover {
+  background: var(--color-ink);
+  opacity: 0.92;
+}
+.rd-composer-pill .rd-icon-btn.rd-primary:disabled {
+  background: var(--color-muted);
+  color: var(--color-ink-muted);
+}
+
+/* ---------- Mobile pill launcher (looks like the real pill, but tap = navigate) ---------- */
+
+.rd-chat-drawer--mobile {
+  /* No scrim, no animation — this just floats above the report content. */
+}
+
+.rd-composer-pill--launcher {
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  padding: 10px 6px 10px 18px;
+  /* min-height matches the real textarea pill so tapping the report page and
+     the chat page feel like the exact same control. */
+  min-height: 42px;
+}
+.rd-composer-pill--launcher:hover {
+  border-color: var(--color-border-strong);
+}
+.rd-composer-pill-placeholder {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-muted);
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Full-screen mobile chat (the `/chat` route) ---------- */
+
+.rd-root--chat-fullscreen {
+  height: 100dvh;
+  max-height: 100dvh;
+  background: var(--color-canvas);
+}
+.rd-chat-fullscreen-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.rd-chat-fullscreen-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.rd-chat-fullscreen-back:hover {
+  background: var(--color-muted);
+  color: var(--color-ink);
+}
+.rd-chat-fullscreen-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.rd-chat-fullscreen-title-name {
+  font-family: var(--font-display, "Fraunces", ui-serif, Georgia, serif);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+.rd-chat-fullscreen-title-sub {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
+.rd-chat-fullscreen-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-canvas);
+}
+/* In full-screen mode the chat fills the page; strip the card chrome that
+   the drawer uses on desktop. */
+.rd-chat-fullscreen-body .rd-chat-drawer-card {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+.rd-chat-fullscreen-body .rd-chat-drawer-head {
+  display: none;
+}
+.rd-chat-fullscreen-body .rd-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 14px 8px;
+  overflow-y: auto;
+}
+.rd-chat-fullscreen-body .rd-composer-wrap--drawer {
+  border-top: 1px solid var(--color-border);
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: var(--color-surface);
+}
+
 /* ---------- Page header (matches child-detail style) ---------- */
 .rd-page-header {
   padding: 26px 28px 18px;
@@ -611,6 +926,27 @@ main:has(.rd-root) {
   font-size: 10.5px;
   font-family: ui-monospace, monospace;
   color: var(--color-ink-secondary);
+}
+
+/* Bottom pill on report pages — must come AFTER .rd-composer-wrap / .rd-composer
+   so we beat the dock-side panel chrome. Only the mic circle + pill keep a fill. */
+.rd-chat-drawer .rd-composer-wrap.rd-composer-wrap--drawer {
+  background: transparent;
+  border: 0;
+  border-top: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.rd-chat-drawer .rd-composer.rd-composer--pill {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.rd-chat-drawer .rd-composer.rd-composer--pill:focus-within {
+  border-color: transparent;
+  box-shadow: none;
 }
 
 /* ---------- Report pane ---------- */
