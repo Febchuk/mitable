@@ -66,7 +66,7 @@ function ChildPickerList({
   onChange,
   roster,
   capturedToday,
-  rosterGroupLabel,
+  rosterGroupLabel = "Children",
 }: ChildPickerProps) {
   const [query, setQuery] = React.useState("");
   const { matches, todayChildren, otherChildren } = useFilteredRoster(roster, capturedToday, query);
