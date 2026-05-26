@@ -4,6 +4,12 @@ import { ctx } from "../context";
 import { consoleLogger } from "../loggers";
 import { isBoundsVisible, clampToDisplay } from "./window-geometry";
 
+function ensureTaskbarVisible(): void {
+  if (process.platform === "win32" && ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
+    ctx.consoleWindow.setSkipTaskbar(false);
+  }
+}
+
 export function createConsoleWindow() {
   consoleLogger.info(" Creating console window...");
   consoleLogger.info(" Preload script path:", join(__dirname, "../preload/console.cjs"));
@@ -93,6 +99,7 @@ export function createConsoleWindow() {
       ctx.consoleWindow.setBounds(clamped);
     }
 
+    ensureTaskbarVisible();
     ctx.consoleWindow.show();
   });
 
@@ -100,6 +107,7 @@ export function createConsoleWindow() {
   setTimeout(() => {
     if (ctx.consoleWindow && !ctx.consoleWindow.isVisible()) {
       consoleLogger.warn(" Force-showing window after timeout (ready-to-show didn't fire)");
+      ensureTaskbarVisible();
       ctx.consoleWindow.show();
     }
   }, 5000);

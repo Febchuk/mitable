@@ -42,8 +42,8 @@ const DESKTOP_CAPTURER_FALLBACK_COOLDOWN_MS = 10_000;
 // TTL for watched windows (10 minutes in ms)
 const WINDOW_TTL_MS = 10 * 60 * 1000;
 
-// Polling interval for active window detection (5 seconds — reduced from 2s to lower CPU)
-const POLL_INTERVAL_MS = 5000;
+// Polling interval for active window detection
+const POLL_INTERVAL_MS = 1000;
 
 // Cleanup interval for expired windows (30 seconds)
 const CLEANUP_INTERVAL_MS = 30 * 1000;

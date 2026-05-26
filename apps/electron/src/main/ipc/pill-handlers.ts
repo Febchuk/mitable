@@ -9,8 +9,8 @@ import { focusWindowTracker } from "../../services/focusWindowTracker";
 import { preferencesService } from "../../services/preferencesService";
 import { isBlockedByPolicy, getCapturePolicy } from "../../services/capturePolicy";
 import { authManager } from "../../services/authManager";
+import { showConsoleWindow } from "../tray";
 import {
-  createConsoleWindow,
   createWatchingPillWindow,
   createWatchingPillEyeDropdown,
   createWatchingPillMenuDropdown,
@@ -325,16 +325,9 @@ export function registerPillHandlers() {
 
             // Bring console to front so user sees summarization progress
             if (result.localMode) {
-              if (!ctx.consoleWindow || ctx.consoleWindow.isDestroyed()) {
-                createConsoleWindow();
-              }
-              if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-                if (ctx.consoleWindow.isMinimized()) ctx.consoleWindow.restore();
-                ctx.consoleWindow.show();
-                ctx.consoleWindow.focus();
-                if (process.platform === "darwin") {
-                  app.focus({ steal: true });
-                }
+              showConsoleWindow();
+              if (process.platform === "darwin") {
+                app.focus({ steal: true });
               }
             }
 
@@ -345,18 +338,9 @@ export function registerPillHandlers() {
           return { success: true, background: true };
         }
         case "show-console": {
-          if (!ctx.consoleWindow || ctx.consoleWindow.isDestroyed()) {
-            createConsoleWindow();
-          }
-          if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-            if (ctx.consoleWindow.isMinimized()) {
-              ctx.consoleWindow.restore();
-            }
-            ctx.consoleWindow.show();
-            ctx.consoleWindow.focus();
-            if (process.platform === "darwin") {
-              app.focus({ steal: true });
-            }
+          showConsoleWindow();
+          if (process.platform === "darwin") {
+            app.focus({ steal: true });
           }
           return { success: true };
         }

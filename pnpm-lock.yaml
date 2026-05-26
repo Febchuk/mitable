@@ -718,6 +718,19 @@ importers:
       zod:
         specifier: ^3.25.76
         version: 3.25.76
+    optionalDependencies:
+      "@native-audio-node/darwin-arm64":
+        specifier: 0.3.1
+        version: 0.3.1
+      "@native-audio-node/darwin-x64":
+        specifier: 0.3.0
+        version: 0.3.0
+      "@native-audio-node/win32-arm64":
+        specifier: 0.3.0
+        version: 0.3.0
+      "@native-audio-node/win32-x64":
+        specifier: 0.3.3
+        version: 0.3.3
     devDependencies:
       "@babel/preset-env":
         specifier: ^7.28.3
@@ -16637,6 +16650,7 @@ packages:
         integrity: sha512-1ZeUwSkJ9HHLX2LdbFz3YCfzIajhgw6uVKv8ZgWz92xQ37izRYm1aQHSdGOgwwIhUC1th3COuRhW9Te+A6+rJA==,
       }
     engines: { node: ">=20" }
+    cpu: [x64, arm64]
     os: [darwin, win32]
 
   native-promise-only@0.8.1:

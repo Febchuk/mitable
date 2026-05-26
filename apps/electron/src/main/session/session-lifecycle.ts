@@ -10,6 +10,7 @@ import {
   showPillReliably,
   startPillCursorTracking,
 } from "../windows/watching-pill-window";
+import { showConsoleWindow } from "../tray";
 import { cleanupAudioRecording } from "./audio-cleanup";
 
 /**
@@ -26,10 +27,7 @@ export async function startSessionFromMain(
 
   if (!ctx.currentUserContext) {
     shortcutLogger.warn(" Start session failed: User not logged in");
-    if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-      ctx.consoleWindow.show();
-      ctx.consoleWindow.focus();
-    }
+    showConsoleWindow();
     return { success: false, error: "Please log in through the Console first" };
   }
 

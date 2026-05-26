@@ -156,6 +156,7 @@ export default function App() {
       logger.info(" Pill display mode changed:", mode);
       setPillMode(mode);
       if (mode === "expanded") setIsExpanded(true);
+      else setIsExpanded(false);
     });
 
     return () => {
@@ -224,10 +225,14 @@ export default function App() {
     if (audioToggleBusyRef.current) return;
     audioToggleBusyRef.current = true;
 
-    try {
-      const newState = !audioRecordingEnabled;
-      setAudioRecordingEnabled(newState);
+    const newState = !audioRecordingEnabled;
 
+    // Optimistic update — both flags flip immediately so UI is instant
+    setAudioRecordingEnabled(newState);
+    setAudioRecordingActive(newState);
+    audioRecordingActiveRef.current = newState;
+
+    try {
       if (newState) {
         logger.info("🎤 Enabling audio recording");
 
@@ -236,6 +241,8 @@ export default function App() {
         if (!result?.success) {
           logger.error("❌ Failed to start audio recording:", result?.error);
           setAudioRecordingEnabled(false);
+          setAudioRecordingActive(false);
+          audioRecordingActiveRef.current = false;
           return;
         }
 
@@ -251,6 +258,8 @@ export default function App() {
             logger.error("❌ Failed to start audio capture:", captureResult.error);
             await window.watchingPillAPI?.stopAudioRecording();
             setAudioRecordingEnabled(false);
+            setAudioRecordingActive(false);
+            audioRecordingActiveRef.current = false;
             return;
           }
 
@@ -262,9 +271,6 @@ export default function App() {
             hasSystemAudio: result.hasSystemAudio,
           });
         }
-
-        setAudioRecordingActive(true);
-        audioRecordingActiveRef.current = true;
       } else {
         logger.info("🔇 Disabling audio recording");
 
@@ -279,9 +285,13 @@ export default function App() {
         }
 
         await window.watchingPillAPI?.stopAudioRecording();
-        setAudioRecordingActive(false);
-        audioRecordingActiveRef.current = false;
       }
+    } catch (err) {
+      // Revert optimistic update on unexpected error
+      logger.error("❌ Audio toggle error:", String(err));
+      setAudioRecordingEnabled(!newState);
+      setAudioRecordingActive(!newState);
+      audioRecordingActiveRef.current = !newState;
     } finally {
       audioToggleBusyRef.current = false;
     }
@@ -306,6 +316,7 @@ export default function App() {
             <img
               src={LogoIcon}
               alt="Mitable"
+              draggable={false}
               className={`h-5 w-auto transition-all duration-150 group-hover:scale-110 group-hover:brightness-125 ${isPaused ? "opacity-40" : "opacity-100"}`}
             />
 

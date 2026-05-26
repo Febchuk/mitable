@@ -121,6 +121,17 @@ export function registerUpdateHandlers() {
               percentage: Math.round((count / totalCaps) * 100),
             }));
 
+          let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> =
+            [];
+          if (story?.tasks) {
+            try {
+              const parsed = JSON.parse(story.tasks);
+              if (Array.isArray(parsed)) taskBreakdown = parsed;
+            } catch {
+              // malformed JSON — leave empty
+            }
+          }
+
           workBlocks.push({
             id: session.id,
             startTime: startTime.toISOString(),
@@ -130,7 +141,7 @@ export function registerUpdateHandlers() {
             summary: story?.narrative ?? session.finalSummary ?? "",
             captures: [],
             appBreakdown,
-            taskBreakdown: [],
+            taskBreakdown,
             isActive: session.status === "active",
             isFocusedSession: session.sessionType === "focused",
             goal: session.sessionGoal ?? undefined,

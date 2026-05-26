@@ -21,6 +21,31 @@ import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("AudioCapture");
 
+/**
+ * Convert float32 PCM (emitted by native-audio-node SystemAudioRecorder) to
+ * int16 PCM so all downstream consumers work with a consistent 2-bytes/sample
+ * format. If the buffer is already int16 (values outside -1..1 range) it is
+ * returned unchanged.
+ */
+function convertFloat32ToInt16(pcm: Buffer): Buffer {
+  if (pcm.length < 16) return pcm;
+  const probe = new Float32Array(
+    pcm.buffer,
+    pcm.byteOffset,
+    Math.min(16, Math.floor(pcm.byteLength / 4))
+  );
+  const looksFloat32 = Array.from(probe).every((v) => v >= -1.5 && v <= 1.5);
+  if (!looksFloat32) return pcm;
+
+  const floats = new Float32Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.byteLength / 4));
+  const out = Buffer.alloc(floats.length * 2);
+  for (let i = 0; i < floats.length; i++) {
+    const clamped = Math.max(-1, Math.min(1, floats[i]));
+    out.writeInt16LE(Math.round(clamped * 32767), i * 2);
+  }
+  return out;
+}
+
 type AudioSource = "user" | "remote";
 
 export interface NativeAudioChunk {
@@ -144,7 +169,11 @@ class NativeAudioCapture extends EventEmitter {
         if (this.emitCount < 5) {
           logger.info(`System audio data event: ${chunk.data?.length ?? 0}B`);
         }
-        this.emit("data", { source: "remote", data: chunk.data });
+        // SystemAudioRecorder emits float32 PCM. Convert to int16 so all
+        // downstream consumers (localAudioService byte accounting, energy gating,
+        // timestamp math) work correctly with BYTES_PER_SAMPLE = 2.
+        const int16 = convertFloat32ToInt16(chunk.data);
+        this.emit("data", { source: "remote", data: int16 });
       });
 
       this.systemRecorder.on("error", (err: Error) => {

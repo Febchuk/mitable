@@ -32,6 +32,13 @@ const FLUSH_SIZE_THRESHOLD = 5 * 1024 * 1024; // 5 MB
 const TRANSCRIBE_INTERVAL_MS = 30_000;
 
 const MIC_ENERGY_GATE_THRESHOLD = 300;
+// Mic window is kept only if its RMS is this much louder than the system audio
+// RMS in the same time window. Prevents speaker bleed from passing through.
+const BLEED_REJECTION_RATIO = 1.3;
+// For windows that pass the gate, attenuate proportionally if bleed is present.
+// gain = max(MIN_GAIN, 1 - (sysRms/micRms) * DIM_STRENGTH)
+const BLEED_DIM_STRENGTH = 1.5; // how aggressively to reduce bleed-contaminated windows
+const BLEED_DIM_MIN_GAIN = 0.4; // never drop below 40% amplitude (preserve speech quality)
 const ENERGY_WINDOW_SECS = 5;
 const ENERGY_WINDOW_BYTES = ENERGY_WINDOW_SECS * SAMPLE_RATE * BYTES_PER_SAMPLE;
 
@@ -160,6 +167,24 @@ class LocalAudioService {
 
     sessionTimeline.recordAudioEnd();
 
+    // Write debug WAV files alongside the PCM files so audio can be played back
+    // directly from the session folder without any extra conversion step.
+    if (this.sessionDir) {
+      for (const source of ["user", "remote"] as AudioSource[]) {
+        try {
+          const pcmPath = this.audioFilePath(source);
+          if (existsSync(pcmPath)) {
+            const { writeFileSync } = await import("fs");
+            const pcm = readFileSync(pcmPath);
+            const wav = LocalAudioService.pcmToWav(pcm);
+            writeFileSync(pcmPath.replace(".pcm", ".wav"), wav);
+          }
+        } catch {
+          // Non-critical — WAV files are debug aids only
+        }
+      }
+    }
+
     this.active = false;
     logger.info("Stopped audio capture (final flush + transcription done)");
   }
@@ -276,9 +301,22 @@ class LocalAudioService {
         const aligned = Math.floor(newPcm.length / BYTES_PER_SAMPLE) * BYTES_PER_SAMPLE;
         let chunk: Buffer = Buffer.from(newPcm.subarray(0, aligned));
 
-        // For mic audio, apply energy gating to filter out speaker bleed
+        // For mic audio, apply energy gating to filter out speaker bleed.
+        // Pass the matching byte range of system audio so the gate can compare
+        // energies window-by-window and reject windows dominated by bleed.
         if (source === "user") {
-          const gated = this.energyGateMicAudio(Buffer.from(chunk));
+          const remoteFilePath = this.audioFilePath("remote");
+          let remoteRef: Buffer | null = null;
+          if (existsSync(remoteFilePath)) {
+            try {
+              const remoteFull = readFileSync(remoteFilePath);
+              const remoteSlice = remoteFull.subarray(already, already + aligned);
+              remoteRef = remoteSlice.length > 0 ? Buffer.from(remoteSlice) : null;
+            } catch {
+              // non-critical — gate will fall back to absolute threshold
+            }
+          }
+          const gated = this.energyGateMicAudio(Buffer.from(chunk), remoteRef);
           if (gated.length === 0) {
             this.sourceState[source].bytesTranscribed = already + aligned;
             logger.info("Energy gate: all windows below threshold, skipping user transcription");
@@ -330,36 +368,69 @@ class LocalAudioService {
   }
 
   /**
-   * Split mic PCM into 5s windows and discard windows below the energy
-   * threshold (speaker bleed). Returns only the windows where the user
-   * is actually speaking, stitched back into a contiguous buffer.
+   * Split mic PCM into 5s windows and discard windows that are either:
+   *   (a) below the absolute silence threshold, or
+   *   (b) not meaningfully louder than the system audio in the same window
+   *       (i.e. the mic energy is dominated by speaker bleed).
+   *
+   * When systemAudio is provided, a window must satisfy:
+   *   micRms >= MIC_ENERGY_GATE_THRESHOLD  AND  micRms >= systemRms * BLEED_REJECTION_RATIO
+   *
+   * Without systemAudio (remote stream unavailable), falls back to the
+   * absolute threshold only.
    */
-  private energyGateMicAudio(pcm: Buffer): Buffer {
+  private energyGateMicAudio(pcm: Buffer, systemAudio: Buffer | null = null): Buffer {
     const totalWindows = Math.ceil(pcm.length / ENERGY_WINDOW_BYTES);
     const kept: Buffer[] = [];
     let skipped = 0;
-    let maxRms = 0;
-    let minRms = Infinity;
+    let skippedBleed = 0;
 
     for (let i = 0; i < totalWindows; i++) {
       const start = i * ENERGY_WINDOW_BYTES;
       const end = Math.min(start + ENERGY_WINDOW_BYTES, pcm.length);
       const window = pcm.subarray(start, end);
-      const rms = LocalAudioService.computeRMS(window);
+      const micRms = LocalAudioService.computeRMS(window);
 
-      if (rms > maxRms) maxRms = rms;
-      if (rms < minRms) minRms = rms;
-
-      if (rms >= MIC_ENERGY_GATE_THRESHOLD) {
-        kept.push(Buffer.from(window));
-      } else {
+      if (micRms < MIC_ENERGY_GATE_THRESHOLD) {
         skipped++;
+        continue;
       }
+
+      let sysRms = 0;
+      if (systemAudio && systemAudio.length > start) {
+        const sysEnd = Math.min(start + ENERGY_WINDOW_BYTES, systemAudio.length);
+        const sysWindow = systemAudio.subarray(start, sysEnd);
+        sysRms = LocalAudioService.computeRMS(sysWindow);
+
+        if (sysRms > 0 && micRms < sysRms * BLEED_REJECTION_RATIO) {
+          skippedBleed++;
+          continue;
+        }
+      }
+
+      // Window passed — apply proportional gain reduction if bleed is present
+      if (sysRms > 0 && micRms > 0) {
+        const bleedFraction = sysRms / micRms; // 0 = no bleed, 1 = equal energy
+        const gain = Math.max(BLEED_DIM_MIN_GAIN, 1 - bleedFraction * BLEED_DIM_STRENGTH);
+        if (gain < 0.99) {
+          const dimmed = Buffer.alloc(window.length);
+          for (let j = 0; j < window.length - 1; j += BYTES_PER_SAMPLE) {
+            const sample = window.readInt16LE(j);
+            const scaled = Math.max(-32768, Math.min(32767, Math.round(sample * gain)));
+            dimmed.writeInt16LE(scaled, j);
+          }
+          kept.push(dimmed);
+          continue;
+        }
+      }
+
+      kept.push(Buffer.from(window));
     }
 
     logger.info(
-      `Energy gate: ${totalWindows} windows, ${kept.length} passed, ${skipped} skipped ` +
-        `(threshold=${MIC_ENERGY_GATE_THRESHOLD}, rms min=${Math.round(minRms)} max=${Math.round(maxRms)})`
+      `Energy gate: ${totalWindows} windows, ${kept.length} passed, ` +
+        `${skipped} silent, ${skippedBleed} bleed-rejected ` +
+        `(absThresh=${MIC_ENERGY_GATE_THRESHOLD}, bleedRatio=${BLEED_REJECTION_RATIO})`
     );
 
     if (kept.length === 0) return Buffer.alloc(0);

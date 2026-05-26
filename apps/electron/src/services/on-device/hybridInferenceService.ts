@@ -460,25 +460,21 @@ class HybridInferenceService {
         logger.info(`Batch ${batchIdx} complete: ${result.batchNarrative.slice(0, 120)}`);
       }
 
-      // Generate final summary via storyteller RLM (iterative tool loop)
+      // Generate task breakdown via storyteller RLM (iterative tool loop)
       const existingStory = await pgDb.getStoryForSession(sessionId);
       if (existingStory) {
-        logger.info("Summary already exists — skipping");
+        logger.info("Task breakdown already exists — skipping");
       } else {
-        emit("generating_summary", 85, "Writing summary...");
-        const summary = await this.generateStorytellerSummary(sessionId);
+        emit("generating_summary", 85, "Building task breakdown...");
+        const tasks = await this.generateStorytellerTasks(sessionId);
         await pgDb.insertStory({
           id: randomUUID(),
           sessionId,
-          narrative: summary,
-          tasks: "[]",
+          narrative: "",
+          tasks: JSON.stringify(tasks),
           timeBreakdown: null,
           modelUsed: this.provider?.model ?? "byok",
         });
-
-        if (mdPath) {
-          await this.prependSummaryToMarkdown(mdPath, sessionId);
-        }
       }
 
       // Aggregate classifications into structured activity blocks + daily summary
@@ -522,19 +518,21 @@ class HybridInferenceService {
   }
 
   /**
-   * Generate session summary using the storyteller RLM (iterative tool loop).
-   * Reads block.md via tools, synthesizes a narrative — no sub-LLM calls.
+   * Generate task breakdown using the storyteller RLM (iterative tool loop).
+   * Reads block.md via tools and returns a structured list of tasks.
    */
-  private async generateStorytellerSummary(sessionId: string): Promise<string> {
+  private async generateStorytellerTasks(
+    sessionId: string
+  ): Promise<Array<{ shortTitle: string; description: string; minutes: number }>> {
     if (!this.provider) {
       logger.warn("No BYOK provider for storyteller RLM");
-      return "Session completed.";
+      return [];
     }
 
     const mdPath = this.currentMdPath;
     if (!mdPath) {
       logger.warn("No block.md path — cannot run storyteller");
-      return "Session completed.";
+      return [];
     }
 
     let blockContent: string;
@@ -543,11 +541,11 @@ class HybridInferenceService {
       logger.info(`Storyteller: read ${blockContent.length} chars from ${mdPath}`);
     } catch (err) {
       logger.error("Failed to read block.md for storyteller:", String(err));
-      return "Session completed.";
+      return [];
     }
 
     if (blockContent.length < 100) {
-      return "No activity was recorded during this session.";
+      return [];
     }
 
     const env = new StorytellerEnvironment({ sessionId, blockContent });
@@ -567,7 +565,10 @@ class HybridInferenceService {
       );
     };
 
-    const result = await runRLMLoop<StorytellerEnvironment, { narrative: string }>(
+    const result = await runRLMLoop<
+      StorytellerEnvironment,
+      { tasks: Array<{ shortTitle: string; description: string; minutes: number }> }
+    >(
       getStorytellerSystemPrompt(),
       getStorytellerUserPrompt(env.metadata.totalLines),
       STORYTELLER_TOOLS,
@@ -581,21 +582,22 @@ class HybridInferenceService {
       }
     );
 
-    let narrative = result.result?.narrative || "";
-
-    narrative = narrative
-      .replace(/[",}\s]*<\/?tool_call\|?>.*$/s, "")
-      .replace(/[",}\s]*\}\s*\}\s*$/, "")
-      .replace(/\\n/g, "\n")
-      .trim();
-
-    if (narrative.length < 30) {
-      logger.warn("RLM narrative too short, using block.md header as fallback");
-      narrative = "Session completed.";
+    const tasks = result.result?.tasks;
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+      logger.warn("Storyteller RLM returned no tasks");
+      return [];
     }
 
-    logger.info(`Storyteller RLM produced ${narrative.length} char narrative`);
-    return narrative;
+    const validated = tasks
+      .filter((t) => t && typeof t.shortTitle === "string" && typeof t.description === "string")
+      .map((t) => ({
+        shortTitle: String(t.shortTitle).slice(0, 50),
+        description: String(t.description),
+        minutes: typeof t.minutes === "number" ? Math.max(1, Math.round(t.minutes)) : 1,
+      }));
+
+    logger.info(`Storyteller RLM produced ${validated.length} tasks`);
+    return validated;
   }
 
   getCurrentTier(): InferenceTier | null {

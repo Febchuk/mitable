@@ -5,7 +5,7 @@ import { ctx } from "../context";
 import { authLogger, consoleLogger, notificationLogger, recoveryLogger } from "../loggers";
 import { initActiveWindowBridge } from "../activeWindowBridge";
 import { createConsoleWindow } from "../windows/console-window";
-import { createTrayIfSupported } from "../tray";
+import { createTrayIfSupported, showConsoleWindow } from "../tray";
 import { registerGlobalShortcuts } from "../shortcuts";
 import { initOnDeviceAI, eagerPreloadModels } from "./on-device-init";
 import { restoreAuthOnStartup } from "./startup-auth";
@@ -73,11 +73,7 @@ export async function onAppReady(opts: AppReadyOptions): Promise<void> {
       return;
     }
 
-    if (ctx.consoleWindow) {
-      if (ctx.consoleWindow.isMinimized()) ctx.consoleWindow.restore();
-      ctx.consoleWindow.show();
-      ctx.consoleWindow.focus();
-    }
+    showConsoleWindow();
   });
 
   // ── Active window bridge ──────────────────────────────────────────────────

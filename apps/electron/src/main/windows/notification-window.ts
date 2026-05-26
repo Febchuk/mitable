@@ -4,6 +4,7 @@ import { IPC_CHANNELS } from "@mitable/shared";
 import { ctx } from "../context";
 import { notificationLogger } from "../loggers";
 import { updateService } from "../../services/updateService";
+import { showConsoleWindow } from "../tray";
 
 export interface NotificationConfig {
   title: string;
@@ -166,27 +167,15 @@ export function handleNotificationAction(actionId: string) {
   switch (actionId) {
     case "turn-on":
     case "focus":
-      // Show console and navigate to start session
-      if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-        ctx.consoleWindow.show();
-        ctx.consoleWindow.focus();
-      }
+      showConsoleWindow();
       break;
     case "view-recap":
-      // Show console and navigate to recaps page
-      if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-        ctx.consoleWindow.show();
-        ctx.consoleWindow.focus();
-        ctx.consoleWindow.webContents.send("navigate-to-recaps");
-      }
+      showConsoleWindow();
+      ctx.consoleWindow?.webContents.send("navigate-to-recaps");
       break;
     case "view-update":
-      // Show console and navigate to profile/update section
-      if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-        ctx.consoleWindow.show();
-        ctx.consoleWindow.focus();
-        ctx.consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_UPDATE);
-      }
+      showConsoleWindow();
+      ctx.consoleWindow?.webContents.send(IPC_CHANNELS.NAVIGATE_TO_UPDATE);
       break;
     case "install-update":
       // Quit and install the downloaded update
@@ -194,12 +183,8 @@ export function handleNotificationAction(actionId: string) {
       updateService.quitAndInstall();
       break;
     case "view-active-session":
-      // Show console and navigate to active session
-      if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
-        ctx.consoleWindow.show();
-        ctx.consoleWindow.focus();
-        ctx.consoleWindow.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
-      }
+      showConsoleWindow();
+      ctx.consoleWindow?.webContents.send(IPC_CHANNELS.NAVIGATE_TO_ACTIVE_SESSION);
       break;
     case "dismiss":
       // No-op — notification already dismissed

@@ -87,30 +87,13 @@ class WhisperCliService {
    * Detect whether a PCM buffer contains float32 samples (4 bytes, -1..1)
    * or int16 samples (2 bytes, -32768..32767).
    */
-  private isFloat32Pcm(pcm: Buffer): boolean {
-    if (pcm.length < 400) return false;
-    const floats = new Float32Array(pcm.buffer, pcm.byteOffset, Math.min(100, pcm.byteLength / 4));
-    return Array.from(floats).every((v) => v >= -1.5 && v <= 1.5);
-  }
-
   /**
-   * Convert raw PCM to a 16kHz mono 16-bit WAV file.
-   * Auto-detects float32 vs int16 input from native-audio-node.
+   * Convert raw PCM (int16 LE, 16kHz mono) to a WAV buffer.
+   * All audio sources are int16 at this point — mic via ffmpeg DirectShow,
+   * system audio converted in nativeAudioCapture before emitting.
    */
   private pcmToWav(pcm: Buffer): Buffer {
-    let int16Pcm: Buffer;
-
-    if (this.isFloat32Pcm(pcm)) {
-      const floats = new Float32Array(pcm.buffer, pcm.byteOffset, pcm.byteLength / 4);
-      int16Pcm = Buffer.alloc(floats.length * 2);
-      for (let i = 0; i < floats.length; i++) {
-        const clamped = Math.max(-1, Math.min(1, floats[i]));
-        int16Pcm.writeInt16LE(Math.round(clamped * 32767), i * 2);
-      }
-      logger.info(`Converted float32 PCM → int16 (${pcm.length}B → ${int16Pcm.length}B)`);
-    } else {
-      int16Pcm = pcm;
-    }
+    const int16Pcm = pcm;
 
     const SAMPLE_RATE = 16_000;
     const CHANNELS = 1;

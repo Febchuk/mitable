@@ -381,11 +381,7 @@ class LocalInferenceService {
         await this.generateSummary(sessionId, realDurationMin);
       }
 
-      // ── Step 6: Prepend summary to .md ────────────────────────────────
       emit("exporting", 95, "Finalizing...");
-      if (mdPath) {
-        await this.prependSummaryToMarkdown(mdPath, sessionId);
-      }
     } finally {
       logger.info("Unloading Ollama model from VRAM...");
       await ollamaService.forceUnloadModel();
@@ -636,7 +632,7 @@ class LocalInferenceService {
 
   // ── Session-end summary (RLM storyteller) ───────────────────────────────
 
-  async generateSummary(sessionId: string, _totalMinutes?: number): Promise<string> {
+  async generateSummary(sessionId: string, _totalMinutes?: number): Promise<void> {
     const mdPath = this.currentMdPath;
     let blockContent = "";
 
@@ -649,16 +645,15 @@ class LocalInferenceService {
     }
 
     if (blockContent.length < 100) {
-      const narrative = "No activity was recorded during this session.";
       await pgDb.insertStory({
         id: randomUUID(),
         sessionId,
-        narrative,
+        narrative: "",
         tasks: "[]",
         timeBreakdown: null,
         modelUsed: ollamaService.getLoadedModel() ?? "gemma4",
       });
-      return narrative;
+      return;
     }
 
     const completionFn: CompletionFn = (msgs, opts) =>
@@ -670,7 +665,10 @@ class LocalInferenceService {
 
     const env = new StorytellerEnvironment({ sessionId, blockContent });
 
-    const result = await runRLMLoop<StorytellerEnvironment, { narrative: string }>(
+    const result = await runRLMLoop<
+      StorytellerEnvironment,
+      { tasks: Array<{ shortTitle: string; description: string; minutes: number }> }
+    >(
       getStorytellerSystemPrompt(),
       getStorytellerUserPrompt(env.metadata.totalLines),
       STORYTELLER_TOOLS,
@@ -684,31 +682,29 @@ class LocalInferenceService {
       }
     );
 
-    let narrative = result.result?.narrative || "";
-
-    narrative = narrative
-      .replace(/[",}\s]*<\/?tool_call\|?>.*$/s, "")
-      .replace(/[",}\s]*\}\s*\}\s*$/, "")
-      .replace(/\\n/g, "\n")
-      .trim();
-
-    if (narrative.length < 30) {
-      narrative = "Session completed.";
-    }
+    const rawTasks = result.result?.tasks;
+    const tasks = Array.isArray(rawTasks)
+      ? rawTasks
+          .filter((t) => t && typeof t.shortTitle === "string" && typeof t.description === "string")
+          .map((t) => ({
+            shortTitle: String(t.shortTitle).slice(0, 50),
+            description: String(t.description),
+            minutes: typeof t.minutes === "number" ? Math.max(1, Math.round(t.minutes)) : 1,
+          }))
+      : [];
 
     await pgDb.insertStory({
       id: randomUUID(),
       sessionId,
-      narrative,
-      tasks: "[]",
+      narrative: "",
+      tasks: JSON.stringify(tasks),
       timeBreakdown: null,
       modelUsed: ollamaService.getLoadedModel() ?? "gemma4",
     });
 
     logger.info(
-      `Summary generated for session ${sessionId}: ${narrative.length} chars, ${result.iterations} iterations`
+      `Task breakdown generated for session ${sessionId}: ${tasks.length} tasks, ${result.iterations} iterations`
     );
-    return narrative;
   }
 
   // ── Export for backend ──────────────────────────────────────────────────
