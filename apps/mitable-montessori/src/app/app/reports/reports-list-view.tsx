@@ -107,9 +107,7 @@ export function ReportsListView({
   }, [pendingDelete, router]);
   const isAdmin = variant === "admin";
   const detailHref = (id: string) =>
-    isAdmin
-      ? `/admin/reports?open=${encodeURIComponent(id)}`
-      : `/app/reports?open=${encodeURIComponent(id)}`;
+    isAdmin ? `/admin/reports?open=${encodeURIComponent(id)}` : `/app/reports/${id}`;
 
   const drafts = reports.filter((r) => r.status === "draft").length;
   const reviews = reports.filter(
