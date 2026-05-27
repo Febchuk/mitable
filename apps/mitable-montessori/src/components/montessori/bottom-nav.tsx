@@ -24,7 +24,7 @@ const TABS: Tab[] = [
   },
   {
     id: "roster",
-    label: "Roster",
+    label: "Classroom",
     href: "/app/roster",
     renderIcon: (size) => <Users size={size} strokeWidth={1.5} />,
   },
