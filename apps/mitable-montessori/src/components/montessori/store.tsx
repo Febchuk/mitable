@@ -177,7 +177,9 @@ export function MontessoriProvider({
   const [notesByTopic, setNotesByTopic] = React.useState<
     Record<string, Record<string, CellNote[]>>
   >({});
-  const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>([]);
+  const [recentUpdates, setRecentUpdates] = React.useState<RecentUpdateEntry[]>(
+    () => initialClassroomProgress?.recentUpdates ?? []
+  );
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
 
   const [reportsFilter, setReportsFilter] = React.useState("All");
