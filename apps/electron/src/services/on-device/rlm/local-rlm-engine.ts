@@ -30,7 +30,7 @@ export interface RLMTool<TEnv = unknown> {
  *  RLM engine can be used standalone (e.g. reprocess script). */
 export type CompletionFn = (
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-  options?: { temperature?: number; max_tokens?: number }
+  options?: { temperature?: number; max_tokens?: number; format?: "json" | "text" }
 ) => Promise<string>;
 
 export interface RLMConfig {

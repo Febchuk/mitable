@@ -795,6 +795,24 @@ class PgDatabase {
     }
   }
 
+  async deleteCapturesForSession(sessionId: string): Promise<void> {
+    if (!db) return;
+    try {
+      await db.query(`DELETE FROM captures WHERE session_id = $1`, [sessionId]);
+    } catch (err) {
+      logger.error("deleteCapturesForSession failed:", String(err));
+    }
+  }
+
+  async deleteClassificationsForSession(sessionId: string): Promise<void> {
+    if (!db) return;
+    try {
+      await db.query(`DELETE FROM classifications WHERE session_id = $1`, [sessionId]);
+    } catch (err) {
+      logger.error("deleteClassificationsForSession failed:", String(err));
+    }
+  }
+
   async getAllStories(): Promise<LocalStory[]> {
     if (!db) {
       logger.warn("getAllStories: DB unavailable");

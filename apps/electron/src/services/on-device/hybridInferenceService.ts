@@ -487,6 +487,7 @@ class HybridInferenceService {
                 {
                   temperature: opts?.temperature ?? 0.1,
                   max_tokens: opts?.max_tokens ?? 2048,
+                  format: opts?.format ?? "json",
                 }
               );
             }
@@ -561,6 +562,7 @@ class HybridInferenceService {
         {
           temperature: opts?.temperature ?? 0.2,
           max_tokens: opts?.max_tokens ?? 2048,
+          format: opts?.format ?? "json",
         }
       );
     };
@@ -610,6 +612,11 @@ class HybridInferenceService {
 
   isCloudConfigured(): boolean {
     return this.provider !== null;
+  }
+
+  resetSessionState(): void {
+    this.currentMdPath = null;
+    this.sessionStartMs = 0;
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -885,6 +892,7 @@ Return JSON:
     }
   }
 
+  // @ts-expect-error — reserved for future use, not yet called
   private async prependSummaryToMarkdown(mdPath: string, sessionId: string): Promise<void> {
     try {
       const story = await pgDb.getStoryForSession(sessionId);

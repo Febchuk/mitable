@@ -21,6 +21,11 @@ export async function initOnDeviceAI(): Promise<void> {
   } catch (err) {
     consoleLogger.error("On-device init failed:", String(err));
   }
+
+  // Purge frames/audio older than 24h — non-blocking, best-effort
+  import("../../services/localFrameStorage")
+    .then(({ localFrameStorage }) => localFrameStorage.cleanupSessionAssets(24))
+    .catch((err) => consoleLogger.warn("[Cleanup] Session asset cleanup failed:", String(err)));
 }
 
 /**

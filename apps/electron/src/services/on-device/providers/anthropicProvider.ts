@@ -36,6 +36,12 @@ export class AnthropicProvider implements InferenceProvider {
       content: this.convertContent(m.content),
     }));
 
+    const forceJson = options?.format === "json";
+
+    if (forceJson) {
+      anthropicMessages.push({ role: "assistant", content: "{" });
+    }
+
     const body: Record<string, unknown> = {
       model: this.model,
       max_tokens: options?.max_tokens ?? 2048,
@@ -75,7 +81,7 @@ export class AnthropicProvider implements InferenceProvider {
     if (!text) {
       logger.warn("Anthropic returned empty response");
     }
-    return text;
+    return forceJson ? `{${text}` : text;
   }
 
   async testConnection(): Promise<{ ok: boolean; error?: string }> {

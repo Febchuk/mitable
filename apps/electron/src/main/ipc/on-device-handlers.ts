@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain, BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "@mitable/shared";
 import { ctx } from "../context";
 import { authManager } from "../../services/authManager";
@@ -347,8 +347,14 @@ export function registerOnDeviceHandlers() {
         return { success: false, error: "Session frame data not found on disk" };
       }
 
-      // Clear any existing story so it gets regenerated
+      // Full reset: wipe all stale AI output so every batch re-runs from scratch
+      await pgDb.deleteActivityBlocksForSession(sessionId);
+      await pgDb.deleteCapturesForSession(sessionId);
+      await pgDb.deleteClassificationsForSession(sessionId);
       await pgDb.deleteStoryForSession(sessionId);
+
+      // Reset in-memory state so a fresh block.md is created
+      hybridInferenceService.resetSessionState();
 
       const broadcastProgress = (progress: {
         sessionId: string;
@@ -361,11 +367,25 @@ export function registerOnDeviceHandlers() {
         if (ctx.consoleWindow && !ctx.consoleWindow.isDestroyed()) {
           ctx.consoleWindow.webContents.send(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, progress);
         }
+        BrowserWindow.getAllWindows().forEach((win) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, progress);
+          }
+        });
       };
 
       // Run in background — don't block the IPC response
       hybridInferenceService
         .processAllAtEnd(sessionId, sessionDir, broadcastProgress)
+        .then(async () => {
+          const { pgDb } = await import("../../services/on-device");
+          await pgDb.updateMonitoringSessionStatus(sessionId, "ready");
+          BrowserWindow.getAllWindows().forEach((win) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send(IPC_CHANNELS.MONITORING_SESSION_UPDATE, null);
+            }
+          });
+        })
         .catch((err) => {
           console.error("[Reprocess] Pipeline failed:", err);
         });
