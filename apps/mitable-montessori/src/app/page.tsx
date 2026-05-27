@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
+import { teacherAppHomePath } from "@/lib/feature-flags";
 
 export default async function RootPage() {
   const cookieStore = await cookies();
@@ -15,7 +16,7 @@ export default async function RootPage() {
     if (ctx?.role === "admin") {
       redirect("/admin/today");
     }
-    redirect("/app/reports");
+    redirect(teacherAppHomePath());
   }
   redirect("/login");
 }

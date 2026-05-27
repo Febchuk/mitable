@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { teacherAppHomePath } from "@/lib/feature-flags";
 
 /**
  * OAuth callback. Supabase Auth redirects here with `?code=...` after Google
  * sign-in. We exchange it for a session, then route the user based on whether
  * they already have a `users` row tied to a school:
- *   - has row → continue to original `redirect` target (default /app/today)
+ *   - has row → continue to original `redirect` target (default teacher home)
  *   - no row  → bounce to /signup?provider=google&email=... so they finish
  *     creating their school
  *
@@ -16,8 +17,9 @@ import { createClient } from "@/utils/supabase/server";
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = req.nextUrl;
   const code = searchParams.get("code");
-  const requested = searchParams.get("redirect") ?? "/app/today";
-  const safeRedirect = requested.startsWith("/") ? requested : "/app/today";
+  const defaultHome = teacherAppHomePath();
+  const requested = searchParams.get("redirect") ?? defaultHome;
+  const safeRedirect = requested.startsWith("/") ? requested : defaultHome;
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=no_code", origin));
