@@ -15,7 +15,7 @@ import {
   teacherShouldSeeSpeechProgressTab,
 } from "@/lib/app/active-classroom";
 import { getClassroomProgress } from "@/lib/queries/classroom-progress";
-import { addTodayProgressAndAgent } from "@/lib/feature-flags";
+import { addTodayProgressAndAgent, reportFirstExperience } from "@/lib/feature-flags";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCurrentUserContext();
@@ -30,7 +30,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const initialClassroomProgress = isAdmin ? null : await getClassroomProgress();
   const showIepProgressTab = !isAdmin && (await teacherShouldSeeIepProgressTab());
   const showSpeechProgressTab = !isAdmin && (await teacherShouldSeeSpeechProgressTab());
-  const showLegacyTeacherSurfaces = !isAdmin && addTodayProgressAndAgent();
+  const showTodayAndAgent = !isAdmin && addTodayProgressAndAgent();
+  const showReportFirstNav = !isAdmin && reportFirstExperience();
 
   return (
     <MontessoriProvider
@@ -42,7 +43,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
           <MontessoriSidebar
             variant={isAdmin ? "admin" : "teacher"}
-            showLegacyNav={showLegacyTeacherSurfaces}
+            showTodayNav={showTodayAndAgent}
+            reportFirstNav={showReportFirstNav}
             classroomName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
             contextSubtitle={isAdmin ? "Admin workspace" : undefined}
             userMenuSlot={
@@ -67,8 +69,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           >
             <MontessoriMobileShell
               variant={isAdmin ? "admin" : "teacher"}
-              showLegacyNav={showLegacyTeacherSurfaces}
-              showLegacyChat={showLegacyTeacherSurfaces}
+              showTodayNav={showTodayAndAgent}
+              reportFirstNav={showReportFirstNav}
+              showLegacyChat={showTodayAndAgent}
               firstName={ctx.firstName}
               email={ctx.email}
               schoolName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
@@ -90,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </main>
           </div>
         </div>
-        {showLegacyTeacherSurfaces && (
+        {showTodayAndAgent && (
           <ChatDock
             classroomId={classroom?.id ?? null}
             classroomName={classroomName}

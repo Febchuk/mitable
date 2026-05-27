@@ -60,16 +60,21 @@ const TEACHER_NAV_LEGACY: NavItem[] = [
 ];
 
 const TEACHER_NAV_CORE: NavItem[] = [
-  { href: "/app/roster", label: "Roster", icon: <Users {...lu} /> },
+  { href: "/app/roster", label: "Classroom", icon: <Users {...lu} /> },
   { href: "/app/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
   { href: "/app/attendance", label: "Attendance", icon: <CalendarBlank {...ph} /> },
 ];
 
-const TEACHER_NAV: NavItem[] = [...TEACHER_NAV_LEGACY, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
+const TEACHER_PROGRESS: NavItem = {
+  href: "/app/progress",
+  label: "Progress",
+  icon: <SquaresFour {...ph} />,
+};
 
-function teacherNavItems(showLegacyNav: boolean): NavItem[] {
-  if (showLegacyNav) return TEACHER_NAV;
-  return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+function teacherNavItems(options: { showToday: boolean; reportFirst: boolean }): NavItem[] {
+  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+  const head = options.showToday ? TEACHER_NAV_LEGACY : [TEACHER_PROGRESS];
+  return [...head, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
 }
 
 const ADMIN_NAV: NavItem[] = [
@@ -89,7 +94,8 @@ const ADMIN_NAV: NavItem[] = [
 
 export interface MontessoriMobileShellProps {
   variant: Variant;
-  showLegacyNav?: boolean;
+  showTodayNav?: boolean;
+  reportFirstNav?: boolean;
   showLegacyChat?: boolean;
   /** First name for the drawer profile block. Falls back to email local part. */
   firstName?: string | null;
@@ -172,7 +178,8 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
       <MobileDrawer
         open={drawerOpen}
         variant={props.variant}
-        showLegacyNav={props.showLegacyNav ?? false}
+        showTodayNav={props.showTodayNav ?? false}
+        reportFirstNav={props.reportFirstNav ?? false}
         firstName={props.firstName}
         email={props.email}
         schoolName={props.schoolName}
@@ -297,7 +304,8 @@ function MobileScrim({ open, onClick }: { open: boolean; onClick: () => void }) 
 function MobileDrawer({
   open,
   variant,
-  showLegacyNav,
+  showTodayNav,
+  reportFirstNav,
   firstName,
   email,
   schoolName,
@@ -306,7 +314,8 @@ function MobileDrawer({
 }: {
   open: boolean;
   variant: Variant;
-  showLegacyNav: boolean;
+  showTodayNav: boolean;
+  reportFirstNav: boolean;
   firstName?: string | null;
   email: string;
   schoolName: string;
@@ -321,7 +330,10 @@ function MobileDrawer({
     store.reports.filter((r) => r.status === "review").length;
   const [signingOut, setSigningOut] = React.useState(false);
 
-  const items = variant === "admin" ? ADMIN_NAV : teacherNavItems(showLegacyNav);
+  const items =
+    variant === "admin"
+      ? ADMIN_NAV
+      : teacherNavItems({ showToday: showTodayNav, reportFirst: reportFirstNav });
 
   const localPart = email.split("@")[0] ?? email;
   const displayName =
