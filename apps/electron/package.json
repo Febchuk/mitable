@@ -1,6 +1,6 @@
 {
   "name": "@mitable/electron",
-  "version": "0.1.60",
+  "version": "0.1.61",
   "description": "Mitable AI Onboarding Buddy - Desktop Application",
   "author": "Mitable",
   "type": "module",
@@ -118,7 +118,7 @@
     "keytar": "^7.9.0",
     "lodash": "^4.17.21",
     "lowlight": "^1.20.0",
-    "lucide-react": "^0.545.0",
+    "lucide-react": "^1.0.0",
     "mammoth": "^1.11.0",
     "marked": "^15.0.12",
     "mermaid": "^11.12.1",

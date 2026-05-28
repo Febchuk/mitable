@@ -274,6 +274,7 @@ export default function ActivityBlock({
   onDelete,
 }: ActivityBlockProps) {
   const isSummarizing = block.status === "summarizing";
+  const isFailed = block.status === "failed";
   const [isExpanded, setIsExpanded] = useState(defaultExpanded || isSummarizing);
   const [isReprocessing, setIsReprocessing] = useState(false);
   const progress = usePipelineProgress(block.id, isSummarizing || isReprocessing);
@@ -291,6 +292,13 @@ export default function ActivityBlock({
 
   const hasTasks = block.taskBreakdown && block.taskBreakdown.length > 0;
   const hasSummary = !!block.summary && block.summary.length > 40;
+
+  // Clear reprocessing state when pipeline finishes (block gets tasks/summary back)
+  useEffect(() => {
+    if (isReprocessing && (hasTasks || hasSummary)) {
+      setIsReprocessing(false);
+    }
+  }, [isReprocessing, hasTasks, hasSummary]);
   const canReprocess =
     !isActive && !isSummarizing && !isReprocessing && !hasSummary && !hasTasks && !isMeeting;
 
@@ -457,6 +465,32 @@ export default function ActivityBlock({
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
               Summarizing
+            </span>
+          ) : isFailed ? (
+            <span
+              title={block.summary || "Pipeline failed - click to reprocess"}
+              style={{
+                padding: "3px 8px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "rgba(239, 68, 68, 0.14)",
+                color: "#EF4444",
+                border: "0.5px solid rgba(239, 68, 68, 0.28)",
+                cursor: "pointer",
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReprocess(e);
+              }}
+            >
+              <RotateCw size={10} />
+              Failed — Retry
             </span>
           ) : canReprocess ? (
             <button

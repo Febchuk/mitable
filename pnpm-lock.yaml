@@ -596,8 +596,8 @@ importers:
         specifier: ^1.20.0
         version: 1.20.0
       lucide-react:
-        specifier: ^0.545.0
-        version: 0.545.0(react@18.3.1)
+        specifier: ^1.0.0
+        version: 1.14.0(react@18.3.1)
       mammoth:
         specifier: ^1.11.0
         version: 1.12.0
@@ -15569,14 +15569,6 @@ packages:
       }
     engines: { node: ">=12" }
 
-  lucide-react@0.545.0:
-    resolution:
-      {
-        integrity: sha512-7r1/yUuflQDSt4f1bpn5ZAocyIxcTyVyBBChSVtBKn5M+392cPmI5YJMWOJKk/HUWGm5wg83chlAZtCcGbEZtw==,
-      }
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
   lucide-react@1.14.0:
     resolution:
       {
@@ -16650,7 +16642,6 @@ packages:
         integrity: sha512-1ZeUwSkJ9HHLX2LdbFz3YCfzIajhgw6uVKv8ZgWz92xQ37izRYm1aQHSdGOgwwIhUC1th3COuRhW9Te+A6+rJA==,
       }
     engines: { node: ">=20" }
-    cpu: [x64, arm64]
     os: [darwin, win32]
 
   native-promise-only@0.8.1:
@@ -31905,7 +31896,7 @@ snapshots:
   lru-cache@7.18.3:
     optional: true
 
-  lucide-react@0.545.0(react@18.3.1):
+  lucide-react@1.14.0(react@18.3.1):
     dependencies:
       react: 18.3.1
 

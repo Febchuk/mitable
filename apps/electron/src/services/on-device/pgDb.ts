@@ -145,7 +145,7 @@ export interface LocalMonitoringSession {
   id: string;
   userId: string;
   organizationId: string;
-  status: "active" | "paused" | "summarizing" | "ended" | "ready";
+  status: "active" | "paused" | "summarizing" | "ended" | "ready" | "failed";
   sessionType: string;
   startedAt: number;
   endedAt: number | null;
@@ -1386,14 +1386,15 @@ class PgDatabase {
 
   async updateMonitoringSessionStatus(
     id: string,
-    status: "active" | "paused" | "summarizing" | "ended" | "ready",
-    endedAt?: number
+    status: "active" | "paused" | "summarizing" | "ended" | "ready" | "failed",
+    endedAt?: number,
+    errorMessage?: string
   ): Promise<void> {
     if (!db) return;
     try {
       await db.query(
-        `UPDATE monitoring_sessions SET status = $1, ended_at = $2, updated_at = $3 WHERE id = $4`,
-        [status, endedAt ?? null, Date.now(), id]
+        `UPDATE monitoring_sessions SET status = $1, ended_at = $2, updated_at = $3, final_summary = COALESCE($4, final_summary) WHERE id = $5`,
+        [status, endedAt ?? null, Date.now(), errorMessage ?? null, id]
       );
     } catch (err) {
       logger.error("updateMonitoringSessionStatus failed:", String(err));
