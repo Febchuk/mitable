@@ -86,7 +86,7 @@ export async function eagerPreloadModels(): Promise<void> {
 
       for (const { sessionId, sessionDir } of pending) {
         try {
-          const { localInferenceService } = await import("../../services/on-device");
+          const { hybridInferenceService } = await import("../../services/on-device");
 
           const broadcastProgress = (progress: Record<string, unknown>) => {
             BrowserWindow.getAllWindows().forEach((win) => {
@@ -97,9 +97,9 @@ export async function eagerPreloadModels(): Promise<void> {
           };
 
           consoleLogger.info(`[EagerPreload] Processing queued session: ${sessionId}`);
-          const timeoutMs = 1_200_000;
+          const timeoutMs = 600_000;
           await Promise.race([
-            localInferenceService.processAllAtEnd(sessionId, sessionDir, broadcastProgress),
+            hybridInferenceService.processAllAtEnd(sessionId, sessionDir, broadcastProgress),
             new Promise<never>((_, reject) =>
               setTimeout(
                 () => reject(new Error(`processAllAtEnd timed out after ${timeoutMs / 1000}s`)),
@@ -113,8 +113,8 @@ export async function eagerPreloadModels(): Promise<void> {
           const story = await pgDb.getStoryForSession(sessionId);
           await pgDb.updateMonitoringSessionStatus(
             sessionId,
-            "ended",
-            story?.narrative ? Date.now() : undefined
+            "ready",
+            story ? Date.now() : undefined
           );
 
           // Broadcast session update so UI refreshes
