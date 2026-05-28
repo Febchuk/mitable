@@ -11,7 +11,6 @@ import { MontessoriProvider } from "@/components/montessori/store";
 import {
   getActiveClassroomForCurrentUser,
   getCurrentUserContext,
-  teacherShouldSeeIepProgressTab,
   teacherShouldSeeSpeechProgressTab,
 } from "@/lib/app/active-classroom";
 import { getClassroomProgress } from "@/lib/queries/classroom-progress";
@@ -28,7 +27,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // hydrated server-side. Skipped for admins (their /app shell shows admin
   // pages, not the teacher Progress tab).
   const initialClassroomProgress = isAdmin ? null : await getClassroomProgress();
-  const showIepProgressTab = !isAdmin && (await teacherShouldSeeIepProgressTab());
   const showSpeechProgressTab = !isAdmin && (await teacherShouldSeeSpeechProgressTab());
   const showTodayAndAgent = !isAdmin && addTodayProgressAndAgent();
   const showReportFirstNav = !isAdmin && reportFirstExperience();
@@ -36,7 +34,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <MontessoriProvider
       initialClassroomProgress={initialClassroomProgress}
-      showIepProgressTab={showIepProgressTab}
       showSpeechProgressTab={showSpeechProgressTab}
     >
       <ActiveReportProvider>
@@ -45,8 +42,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             variant={isAdmin ? "admin" : "teacher"}
             showTodayNav={showTodayAndAgent}
             reportFirstNav={showReportFirstNav}
-            classroomName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
-            contextSubtitle={isAdmin ? "Admin workspace" : undefined}
             userMenuSlot={
               <UserMenu
                 email={ctx.email}

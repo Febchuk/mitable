@@ -3,9 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, ChevronRight, LayoutTemplate, Users } from "lucide-react";
+import { Book, Building2, LayoutTemplate, Users } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
-import { CHILDREN } from "./data";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
 
@@ -78,8 +77,6 @@ export function MontessoriSidebar({
   variant = "teacher",
   showTodayNav = false,
   reportFirstNav = false,
-  classroomName,
-  contextSubtitle,
   userMenuSlot,
 }: {
   variant?: "teacher" | "admin";
@@ -87,9 +84,6 @@ export function MontessoriSidebar({
   showTodayNav?: boolean;
   /** When true, Reports-first nav (hides Progress link). */
   reportFirstNav?: boolean;
-  classroomName: string;
-  /** Replaces the default “{n} children” line under the workspace title */
-  contextSubtitle?: string;
   /**
    * Footer slot — renders directly above the bottom of the sidebar. Layouts
    * pass a `<UserMenu variant="row" … />` here; the menu is responsible for
@@ -106,10 +100,6 @@ export function MontessoriSidebar({
     variant === "admin"
       ? ADMIN_NAV
       : teacherNavItems({ showToday: showTodayNav, reportFirst: reportFirstNav });
-  const subtitleLine =
-    contextSubtitle ??
-    (variant === "admin" ? "People, curriculum, and reports" : `${CHILDREN.length} children`);
-
   return (
     <aside
       className="hidden lg:flex"
@@ -147,51 +137,6 @@ export function MontessoriSidebar({
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginTop: 2 }}>
           Montessori
         </div>
-      </div>
-      <div
-        style={{
-          padding: "8px 10px",
-          background: "var(--color-surface)",
-          borderRadius: 10,
-          border: "1px solid var(--color-border)",
-          marginBottom: 14,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: 8,
-            background: "var(--color-terracotta-soft)",
-            color: "var(--color-terracotta-deep)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          {classroomName.charAt(0).toUpperCase()}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-ink)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {classroomName}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{subtitleLine}</div>
-        </div>
-        <ChevronRight size={14} strokeWidth={1.5} />
       </div>
       <nav>
         {navItems.map((n) => {

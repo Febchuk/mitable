@@ -56,6 +56,7 @@ export function NewReportModal({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
+        showCloseButton={false}
         className="nr-modal-dialog flex h-[min(90vh,840px)] max-h-[90vh] w-[min(94vw,640px)] max-w-[94vw] flex-col gap-0 overflow-hidden rounded-2xl border-ink/10 bg-canvas p-0 shadow-[0_24px_64px_rgba(31,28,24,0.14)]"
         onPointerDownOutside={(e) => e.preventDefault()}
       >
