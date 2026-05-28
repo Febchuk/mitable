@@ -124,6 +124,7 @@ class NativeAudioCapture extends EventEmitter {
   private systemRecorder: any = null;
   private active = false;
   private emitCount = 0;
+  private sysEmitCount = 0;
   private ffmpegPath: string | null = null;
 
   on<K extends keyof NativeAudioEvents>(event: K, listener: NativeAudioEvents[K]): this {
@@ -147,6 +148,7 @@ class NativeAudioCapture extends EventEmitter {
       return { micStarted: !!this.ffmpegProc, systemStarted: !!this.systemRecorder };
     }
     this.emitCount = 0;
+    this.sysEmitCount = 0;
 
     let micStarted = false;
     let systemStarted = false;
@@ -166,8 +168,9 @@ class NativeAudioCapture extends EventEmitter {
       });
 
       this.systemRecorder.on("data", (chunk: { data: Buffer }) => {
-        if (this.emitCount < 5) {
-          logger.info(`System audio data event: ${chunk.data?.length ?? 0}B`);
+        this.sysEmitCount++;
+        if (this.sysEmitCount === 1) {
+          logger.info(`System audio recorder receiving data: ${chunk.data?.length ?? 0}B/chunk`);
         }
         // SystemAudioRecorder emits float32 PCM. Convert to int16 so all
         // downstream consumers (localAudioService byte accounting, energy gating,

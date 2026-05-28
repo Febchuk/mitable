@@ -11,11 +11,17 @@ import { authManager } from "../../services/authManager";
 export async function cleanupAudioRecording(sessionId?: string): Promise<void> {
   ctx.audioCleanupDone = true;
 
-  // Stop native audio capture if running
+  // Stop native audio capture — fire and forget so the final Whisper transcription
+  // pass doesn't block processAllAtEnd from starting. Transcript segments already
+  // accumulated during recording are in the timeline and available immediately.
   try {
     const { localAudioService, nativeAudioCapture } = await import("../../services/on-device");
     if (nativeAudioCapture.isActive()) {
-      await localAudioService.stop();
+      localAudioService
+        .stop()
+        .catch((err: unknown) =>
+          monitoringLogger.debug("On-device audio stop error (non-blocking):", String(err))
+        );
     }
   } catch (err) {
     monitoringLogger.debug("On-device audio cleanup skipped:", String(err));

@@ -29,6 +29,7 @@ class WhisperCliService {
   private modelPath: string = "";
   private tmpDir: string = "";
   private ready = false;
+  private gpuFailed = false;
 
   async initialize(): Promise<boolean> {
     if (this.ready) return true;
@@ -136,8 +137,15 @@ class WhisperCliService {
       const wav = this.pcmToWav(pcm);
       writeFileSync(wavPath, wav);
 
-      const text = await this.runCli(wavPath);
-      return text;
+      if (!this.gpuFailed) {
+        try {
+          return await this.runCli(wavPath, true);
+        } catch (gpuErr) {
+          logger.warn("Whisper GPU failed, falling back to CPU:", String(gpuErr).slice(0, 120));
+          this.gpuFailed = true;
+        }
+      }
+      return await this.runCli(wavPath, false);
     } finally {
       try {
         unlinkSync(wavPath);
@@ -151,7 +159,7 @@ class WhisperCliService {
    * Transcribe a long PCM buffer by splitting into chunks.
    * Each chunk is processed independently and results are concatenated.
    */
-  async transcribeChunked(pcm: Buffer, chunkSecs = 25): Promise<string> {
+  async transcribeChunked(pcm: Buffer, chunkSecs = 45): Promise<string> {
     const BYTES_PER_SAMPLE = 2;
     const SAMPLE_RATE = 16_000;
     const chunkBytes = chunkSecs * SAMPLE_RATE * BYTES_PER_SAMPLE;
@@ -165,20 +173,26 @@ class WhisperCliService {
       `Chunking ${(pcm.length / SAMPLE_RATE / BYTES_PER_SAMPLE).toFixed(0)}s audio into ${totalChunks} × ${chunkSecs}s chunks`
     );
 
-    const parts: string[] = [];
+    const chunks: Buffer[] = [];
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkBytes;
-      const end = Math.min(start + chunkBytes, pcm.length);
-      const chunk = pcm.subarray(start, end);
-      const text = await this.transcribe(chunk);
-      if (text.length > 0) {
-        parts.push(text);
-      }
+      chunks.push(pcm.subarray(start, Math.min(start + chunkBytes, pcm.length)));
     }
-    return parts.join(" ");
+
+    // Run up to 3 chunks in parallel to saturate GPU/CPU
+    const CONCURRENCY = 3;
+    const results: string[] = new Array(totalChunks).fill("");
+    for (let i = 0; i < totalChunks; i += CONCURRENCY) {
+      const batch = chunks.slice(i, i + CONCURRENCY);
+      const texts = await Promise.all(batch.map((c) => this.transcribe(c)));
+      texts.forEach((t, j) => {
+        results[i + j] = t;
+      });
+    }
+    return results.filter((t) => t.length > 0).join(" ");
   }
 
-  private runCli(wavPath: string): Promise<string> {
+  private runCli(wavPath: string, useGpu = true): Promise<string> {
     return new Promise((resolve, reject) => {
       const args = [
         "-m",
@@ -191,6 +205,7 @@ class WhisperCliService {
         "4",
         "-l",
         "en",
+        ...(useGpu ? [] : ["--no-gpu"]),
       ];
 
       const child = execFile(
