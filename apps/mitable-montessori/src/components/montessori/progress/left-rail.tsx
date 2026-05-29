@@ -4,28 +4,41 @@ import * as React from "react";
 import { STATUS_COLOR, STATUS_LABEL, type ProgressMark } from "@/components/montessori/data";
 import type { ProgressByTopic } from "@/components/montessori/store";
 import type {
+  ClassroomGroup,
   ClassroomProgressStudent,
   ClassroomProgressSubject,
-  ClassroomProgressSubtopic,
   ClassroomProgressTopic,
 } from "@/lib/queries/classroom-progress";
+import { GROUP_COLOR_META } from "@/lib/classroom-groups";
+import styles from "./progress.module.css";
 
 const MASTERY_ORDER: ProgressMark[] = ["m", "p", "i", "-"];
 
 type LeftRailProps = {
+  /** Admin-defined classroom groups ("teams"). Empty hides the Group filter. */
+  groups: ClassroomGroup[];
+  /** null = whole class. */
+  groupId: string | null;
+  onGroupChange: (id: string | null) => void;
   subjects: ClassroomProgressSubject[];
   /** null = "All subjects". */
   subjectId: string | null;
   onSubjectChange: (id: string | null) => void;
   topics: ClassroomProgressTopic[];
+  /** null = "All topics" (grouped full-curriculum view). */
   topicId: string | null;
-  onTopicChange: (id: string) => void;
+  onTopicChange: (id: string | null) => void;
   students: ClassroomProgressStudent[];
-  currentSubtopics: ClassroomProgressSubtopic[];
+  /** Every subtopic currently on screen, with its topic — drives the mastery
+   *  tally across one or many topics. */
+  visibleSubtopics: Array<{ id: string; topicId: string }>;
   progressByTopic: ProgressByTopic;
 };
 
 export function LeftRail({
+  groups,
+  groupId,
+  onGroupChange,
   subjects,
   subjectId,
   onSubjectChange,
@@ -33,35 +46,21 @@ export function LeftRail({
   topicId,
   onTopicChange,
   students,
-  currentSubtopics,
+  visibleSubtopics,
   progressByTopic,
 }: LeftRailProps) {
-  const currentTopicData = React.useMemo(
-    () => (topicId ? (progressByTopic[topicId] ?? {}) : {}),
-    [progressByTopic, topicId]
-  );
-  const currentTopic = topics.find((t) => t.id === topicId) ?? null;
-
-  const dueCount = students.filter((s) => {
-    const row = currentTopicData[s.id] ?? {};
-    return Object.values(row).some((m) => m === "p" || m === "i");
-  }).length;
-
   const counts = React.useMemo(() => {
     const o: Record<ProgressMark, number> = { m: 0, p: 0, i: 0, "-": 0 };
     let total = 0;
     for (const s of students) {
-      const row = currentTopicData[s.id] ?? {};
-      // Only count cells whose subtopic is part of the current topic — guards
-      // against any stale entries lingering after a curriculum edit.
-      for (const st of currentSubtopics) {
-        const v = row[st.id] ?? "-";
+      for (const st of visibleSubtopics) {
+        const v = progressByTopic[st.topicId]?.[s.id]?.[st.id] ?? "-";
         o[v]++;
         total++;
       }
     }
     return { ...o, total };
-  }, [currentTopicData, students, currentSubtopics]);
+  }, [progressByTopic, students, visibleSubtopics]);
 
   const subtopicCountByTopicId = React.useMemo(() => {
     const m = new Map<string, number>();
@@ -83,6 +82,7 @@ export function LeftRail({
 
   return (
     <div
+      className={`${styles.leftRail} scroll-quiet`}
       style={{
         borderRight: "1px solid var(--color-border)",
         padding: "20px 18px 24px",
@@ -92,26 +92,29 @@ export function LeftRail({
         gap: 18,
       }}
     >
-      <div>
-        <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
-          Today&rsquo;s focus
-        </div>
-        <div
-          style={{
-            background: "var(--color-butter-soft)",
-            borderRadius: 10,
-            padding: "10px 12px",
-            border: "1px solid color-mix(in srgb, var(--color-butter) 40%, transparent)",
-          }}
-        >
-          <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--color-butter-deep)" }}>
-            {currentTopic?.name ?? "—"}
+      {groups.length > 0 && (
+        <div>
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
+            Group
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--color-ink-secondary)", marginTop: 2 }}>
-            {dueCount} {dueCount === 1 ? "child" : "children"} with work in progress
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <GroupButton
+              label="Whole class"
+              isActive={groupId === null}
+              onClick={() => onGroupChange(null)}
+            />
+            {groups.map((g) => (
+              <GroupButton
+                key={g.id}
+                label={g.name}
+                color={GROUP_COLOR_META[g.color].cssVar}
+                isActive={groupId === g.id}
+                onClick={() => onGroupChange(g.id)}
+              />
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
       {subjects.length > 0 && (
         <div>
@@ -141,6 +144,25 @@ export function LeftRail({
           Topic
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <button
+            type="button"
+            className="tap"
+            onClick={() => onTopicChange(null)}
+            style={{
+              textAlign: "left",
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: 0,
+              background: topicId === null ? "var(--color-muted)" : "transparent",
+              color: topicId === null ? "var(--color-ink)" : "var(--color-ink-secondary)",
+              fontSize: 13,
+              fontWeight: topicId === null ? 500 : 400,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            All topics
+          </button>
           {topics.map((t) => {
             const subCount = subtopicCountByTopicId.get(t.id) ?? 0;
             const isActive = topicId === t.id;
@@ -184,7 +206,7 @@ export function LeftRail({
 
       <div>
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
-          Mastery · this topic
+          {topicId === null ? "Mastery · all visible" : "Mastery · this topic"}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {MASTERY_ORDER.map((s) => (
@@ -245,6 +267,54 @@ export function LeftRail({
         </div>
       </div>
     </div>
+  );
+}
+
+function GroupButton({
+  label,
+  color,
+  isActive,
+  onClick,
+}: {
+  label: string;
+  color?: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="tap"
+      onClick={onClick}
+      style={{
+        textAlign: "left",
+        padding: "8px 10px",
+        borderRadius: 8,
+        border: 0,
+        background: isActive ? "var(--color-muted)" : "transparent",
+        color: isActive ? "var(--color-ink)" : "var(--color-ink-secondary)",
+        fontSize: 13,
+        fontWeight: isActive ? 500 : 400,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 9,
+          height: 9,
+          borderRadius: 999,
+          flexShrink: 0,
+          background: color ?? "transparent",
+          border: color ? undefined : "1px dashed var(--color-border)",
+        }}
+      />
+      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+    </button>
   );
 }
 

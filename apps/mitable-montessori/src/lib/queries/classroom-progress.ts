@@ -4,8 +4,10 @@ import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import type { ProgressMark, RecentUpdateEntry } from "@/components/montessori/data";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import type { ProgressProgram } from "@/lib/queries/progress-programs";
+import { normalizeGroupColor, type ClassroomGroup } from "@/lib/classroom-groups";
 
 export type { ProgressProgram };
+export type { ClassroomGroup };
 
 export type ClassroomProgressSubject = {
   id: string;
@@ -37,6 +39,8 @@ export type ClassroomProgressStudent = {
   iepItemCount: number;
   /** Active (non-archived) speech target rows for this child. 0 when classroom has no Speech program. */
   speechTargetCount: number;
+  /** The classroom group ("team") this child belongs to, or null when ungrouped. */
+  groupId: string | null;
 };
 
 export type ClassroomProgress = {
@@ -50,6 +54,8 @@ export type ClassroomProgress = {
    *  route exposes. Defaults to ["montessori"] when not declared on the
    *  classroom row. */
   programs: ProgressProgram[];
+  /** Admin-defined groups ("teams") for this classroom, ordered. Empty when none. */
+  groups: ClassroomGroup[];
   subjects: ClassroomProgressSubject[];
   topics: ClassroomProgressTopic[];
   subtopics: ClassroomProgressSubtopic[];
@@ -123,12 +129,21 @@ function formatProgressWhen(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/** Internal carrier so progress changes and free-form comments can be merged
+ *  into one feed in true timestamp order before the `when` string is built. */
+type TimedEntry = { ts: number; entry: RecentUpdateEntry };
+
+function tsOf(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 async function listRecentProgressUpdates(
   supabase: ReturnType<typeof createClient>,
   studentIds: string[],
   subtopics: ClassroomProgressSubtopic[],
   topics: ClassroomProgressTopic[]
-): Promise<RecentUpdateEntry[]> {
+): Promise<TimedEntry[]> {
   if (studentIds.length === 0 || subtopics.length === 0) return [];
 
   const subtopicById = new Map(subtopics.map((s) => [s.id, s] as const));
@@ -148,7 +163,7 @@ async function listRecentProgressUpdates(
 
   if (error || !data) return [];
 
-  const out: RecentUpdateEntry[] = [];
+  const out: TimedEntry[] = [];
   for (const row of data) {
     const sub = subtopicById.get(row.curriculum_subtopic_id);
     if (!sub) continue;
@@ -157,14 +172,63 @@ async function listRecentProgressUpdates(
     const noteText = row.comment?.trim() || null;
     if (!noteText && !row.new_status) continue;
     out.push({
-      id: row.id,
-      topic: topic.name,
-      subtopicName: sub.name,
-      childId: row.student_id,
-      subtopicId: sub.id,
-      status: dbStatusToMark(row.new_status),
-      noteText,
-      when: formatProgressWhen(row.changed_at),
+      ts: tsOf(row.changed_at),
+      entry: {
+        id: row.id,
+        kind: "progress",
+        topic: topic.name,
+        subtopicName: sub.name,
+        childId: row.student_id,
+        subtopicId: sub.id,
+        status: dbStatusToMark(row.new_status),
+        noteText,
+        when: formatProgressWhen(row.changed_at),
+      },
+    });
+  }
+  return out;
+}
+
+type StudentCommentDbRow = {
+  id: string;
+  student_id: string;
+  comment: string;
+  created_at: string;
+};
+
+async function listRecentComments(
+  supabase: ReturnType<typeof createClient>,
+  studentIds: string[]
+): Promise<TimedEntry[]> {
+  if (studentIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("student_comments")
+    .select("id, student_id, comment, created_at")
+    .in("student_id", studentIds)
+    .order("created_at", { ascending: false })
+    .limit(60)
+    .returns<StudentCommentDbRow[]>();
+
+  if (error || !data) return [];
+
+  const out: TimedEntry[] = [];
+  for (const row of data) {
+    const noteText = row.comment?.trim();
+    if (!noteText) continue;
+    out.push({
+      ts: tsOf(row.created_at),
+      entry: {
+        id: row.id,
+        kind: "comment",
+        topic: "",
+        subtopicName: "",
+        childId: row.student_id,
+        subtopicId: "",
+        status: "-",
+        noteText,
+        when: formatProgressWhen(row.created_at),
+      },
     });
   }
   return out;
@@ -276,6 +340,34 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+  // Classroom groups ("teams") + per-child membership for this classroom.
+  const { data: groupRows } = await supabase
+    .from("classroom_groups")
+    .select("id, name, color, sort_order")
+    .eq("classroom_id", classroom.id)
+    .order("sort_order");
+  const groups: ClassroomGroup[] = (groupRows ?? []).map((g) => {
+    const row = g as { id: string; name: string; color: string | null; sort_order: number | null };
+    return {
+      id: row.id,
+      name: row.name,
+      color: normalizeGroupColor(row.color),
+      sortOrder: row.sort_order ?? 0,
+    };
+  });
+
+  const groupIdByStudent = new Map<string, string>();
+  if (groups.length > 0 && studentsBase.length > 0) {
+    const { data: memberRows } = await supabase
+      .from("classroom_group_members")
+      .select("student_id, group_id")
+      .eq("classroom_id", classroom.id);
+    for (const m of memberRows ?? []) {
+      const row = m as { student_id: string; group_id: string };
+      groupIdByStudent.set(row.student_id, row.group_id);
+    }
+  }
+
   const iepCounts =
     programs.includes("iep") && studentsBase.length > 0
       ? await iepItemCountByStudent(
@@ -296,6 +388,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     ...s,
     iepItemCount: iepCounts ? (iepCounts[s.id] ?? 0) : 0,
     speechTargetCount: speechCounts ? (speechCounts[s.id] ?? 0) : 0,
+    groupId: groupIdByStudent.get(s.id) ?? null,
   }));
 
   if (!curriculumId) {
@@ -305,6 +398,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
       curriculumAssigned: false,
       curriculumName: null,
       programs,
+      groups,
       subjects: [],
       topics: [],
       subtopics: [],
@@ -374,12 +468,17 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     }
   }
 
-  const recentUpdates = await listRecentProgressUpdates(
-    supabase,
-    students.map((s) => s.id),
-    subtopics,
-    topics
-  );
+  const studentIds = students.map((s) => s.id);
+  const [progressTimed, commentTimed] = await Promise.all([
+    listRecentProgressUpdates(supabase, studentIds, subtopics, topics),
+    listRecentComments(supabase, studentIds),
+  ]);
+  // Interleave progress changes and free-form comments by real timestamp, then
+  // drop down to the feed cap.
+  const recentUpdates = [...progressTimed, ...commentTimed]
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 60)
+    .map((t) => t.entry);
 
   return {
     classroomId: classroom.id,
@@ -387,6 +486,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     curriculumAssigned: true,
     curriculumName,
     programs,
+    groups,
     subjects,
     topics,
     subtopics,

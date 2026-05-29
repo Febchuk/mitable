@@ -192,6 +192,41 @@ export const EnrollStudentSchema = z.object({
     .optional(),
 });
 
+export const GroupColorSchema = z.enum(["terracotta", "sage", "butter", "blue", "clay"]);
+
+export const CreateClassroomGroupSchema = z.object({
+  classroom_id: z.string().uuid(),
+  name: z.string().min(1).max(60),
+  color: GroupColorSchema.default("terracotta"),
+});
+
+export const UpdateClassroomGroupSchema = z
+  .object({
+    group_id: z.string().uuid(),
+    name: z.string().min(1).max(60).optional(),
+    color: GroupColorSchema.optional(),
+    sort_order: z.number().int().min(0).max(10000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.name === undefined && data.color === undefined && data.sort_order === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide name, color, and/or sort_order",
+      });
+    }
+  });
+
+export const DeleteClassroomGroupSchema = z.object({
+  group_id: z.string().uuid(),
+});
+
+/** Assign a child to a group within a classroom. `group_id: null` clears it. */
+export const SetStudentGroupSchema = z.object({
+  classroom_id: z.string().uuid(),
+  student_id: z.string().uuid(),
+  group_id: z.union([z.string().uuid(), z.null()]),
+});
+
 export const ImportRosterSchema = z.object({
   csv_data: z.string().min(1).max(1_000_000),
   classroom_id: z.string().uuid(),

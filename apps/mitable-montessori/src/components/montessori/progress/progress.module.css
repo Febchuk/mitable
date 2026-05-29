@@ -90,8 +90,17 @@
 @media (min-width: 1024px) {
   .desktopGrid {
     grid-template-columns: 240px 1fr 320px;
+    /* Without minmax(0, 1fr) the row sizes to the tallest column's content
+       (often this nav), the page clips via .progress-root overflow:hidden,
+       and the rail never gets a scroll container. */
+    grid-template-rows: minmax(0, 1fr);
     flex: 1;
     min-height: 0;
+  }
+  .leftRail {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .matrixPane {
     padding: 20px 22px 24px;
@@ -130,16 +139,27 @@
   border-radius: 10px;
   overflow: hidden;
   align-self: flex-start;
+  /* Flex column with min-height:0 so the inner grid gets a *definite* height to
+     scroll against. A bare max-height:100% here is indefinite (content-sized),
+     so the grid's own max-height:100% never resolved and it grew past the pane
+     instead of scrolling — most visible in the tall full-curriculum view. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* min-width:0 lets the shell shrink below the grid's intrinsic width inside
+     the flex matrix pane, so the grid scrolls left/right instead of freezing /
+     pushing the layout wide when there are many children. */
+  min-width: 0;
   max-height: 100%;
   background: var(--color-surface);
 }
 .sheetGrid {
   background: var(--color-surface);
   overflow: auto;
-  /* Hug the grid's intrinsic row+column total instead of stretching to fill
-     the matrix pane (which produced a tall cream box with empty space below
-     the last row). */
+  /* Hug the grid's intrinsic row+column total when it fits (no tall empty cream
+     box below the last row); shrink + scroll when it doesn't. */
   height: fit-content;
+  min-height: 0;
   max-height: 100%;
 }
 
@@ -195,6 +215,41 @@
 }
 .rowHeader[data-armed="true"] {
   background: var(--color-muted);
+}
+
+/* ---------- topic section header (full-curriculum / grouped view) ----------
+   Spans every column and starts its own grid row. The label is sticky-left so
+   the topic name stays visible while the matrix scrolls horizontally. */
+.topicHeader {
+  grid-column: 1 / -1;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  background: color-mix(in srgb, var(--color-clay) 14%, var(--color-surface));
+  box-shadow:
+    inset 0 1px 0 var(--color-border),
+    inset 0 -1px 0 var(--color-border);
+  transition: background 120ms ease;
+}
+.topicHeader:hover {
+  background: color-mix(in srgb, var(--color-clay) 22%, var(--color-surface));
+}
+.topicHeader[data-armed="true"] {
+  background: color-mix(in srgb, var(--color-clay) 30%, var(--color-surface));
+}
+.topicHeaderLabel {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 12px;
 }
 
 /* ---------- cell ---------- */

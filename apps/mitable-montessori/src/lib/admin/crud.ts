@@ -428,6 +428,147 @@ export async function assignCurriculumToClassroom(
   await setClassroomMontessoriCurriculum(ctx, classroomId, curriculumId);
 }
 
+// === Classroom groups ("teams" within a classroom) ===
+
+/** Confirms a classroom belongs to the actor's school; returns its id or throws. */
+async function assertClassroomInSchool(ctx: AdminContext, classroomId: string): Promise<void> {
+  const { data: room } = await ctx.supabase
+    .from("classrooms")
+    .select("id")
+    .eq("id", classroomId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (!room) throw new AdminError("Classroom not found", "not_found");
+}
+
+/** Loads a group + its classroom, scoped to the actor's school. */
+async function getGroupInSchool(
+  ctx: AdminContext,
+  groupId: string
+): Promise<{ id: string; classroom_id: string }> {
+  const { data: group } = await ctx.supabase
+    .from("classroom_groups")
+    .select("id, classroom_id, classrooms!inner(school_id)")
+    .eq("id", groupId)
+    .maybeSingle();
+  const row = group as {
+    id: string;
+    classroom_id: string;
+    classrooms: { school_id: string } | null;
+  } | null;
+  if (!row || row.classrooms?.school_id !== ctx.schoolId) {
+    throw new AdminError("Group not found", "not_found");
+  }
+  return { id: row.id, classroom_id: row.classroom_id };
+}
+
+export async function createClassroomGroup(
+  ctx: AdminContext,
+  input: { classroom_id: string; name: string; color?: string }
+): Promise<string> {
+  await assertClassroomInSchool(ctx, input.classroom_id);
+
+  // Append to the end of the existing list.
+  const { data: last } = await ctx.supabase
+    .from("classroom_groups")
+    .select("sort_order")
+    .eq("classroom_id", input.classroom_id)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((last as { sort_order?: number } | null)?.sort_order ?? -1) + 1;
+
+  const { data, error } = await ctx.supabase
+    .from("classroom_groups")
+    .insert({
+      classroom_id: input.classroom_id,
+      name: input.name.trim(),
+      color: input.color ?? "terracotta",
+      sort_order: nextOrder,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    // 23505 = unique_violation on (classroom_id, lower(name)).
+    if ((error as { code?: string }).code === "23505") {
+      throw new AdminError("A group with this name already exists in this classroom", "conflict");
+    }
+    throw new AdminError(error.message, "db_error");
+  }
+  return (data as { id: string }).id;
+}
+
+export async function updateClassroomGroup(
+  ctx: AdminContext,
+  input: { group_id: string; name?: string; color?: string; sort_order?: number }
+): Promise<void> {
+  await getGroupInSchool(ctx, input.group_id);
+
+  const fields: Record<string, unknown> = {};
+  if (input.name !== undefined) fields.name = input.name.trim();
+  if (input.color !== undefined) fields.color = input.color;
+  if (input.sort_order !== undefined) fields.sort_order = input.sort_order;
+
+  const { error } = await ctx.supabase
+    .from("classroom_groups")
+    .update(fields)
+    .eq("id", input.group_id);
+  if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      throw new AdminError("A group with this name already exists in this classroom", "conflict");
+    }
+    throw new AdminError(error.message, "db_error");
+  }
+}
+
+export async function deleteClassroomGroup(ctx: AdminContext, groupId: string): Promise<void> {
+  await getGroupInSchool(ctx, groupId);
+  // Memberships cascade via the FK on classroom_group_members.group_id.
+  const { error } = await ctx.supabase.from("classroom_groups").delete().eq("id", groupId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
+/** Assigns a child to a group (replacing any existing group in that classroom),
+ *  or clears the assignment when `group_id` is null. The child must already be
+ *  actively enrolled in the classroom. */
+export async function setStudentGroup(
+  ctx: AdminContext,
+  input: { classroom_id: string; student_id: string; group_id: string | null }
+): Promise<void> {
+  await assertClassroomInSchool(ctx, input.classroom_id);
+
+  const { data: enrollment } = await ctx.supabase
+    .from("student_classroom_enrollments")
+    .select("id")
+    .eq("student_id", input.student_id)
+    .eq("classroom_id", input.classroom_id)
+    .is("end_date", null)
+    .maybeSingle();
+  if (!enrollment) throw new AdminError("Child is not enrolled in this classroom", "invalid");
+
+  // Always clear the child's current group in this classroom first.
+  const { error: delErr } = await ctx.supabase
+    .from("classroom_group_members")
+    .delete()
+    .eq("classroom_id", input.classroom_id)
+    .eq("student_id", input.student_id);
+  if (delErr) throw new AdminError(delErr.message, "db_error");
+
+  if (input.group_id === null) return;
+
+  const group = await getGroupInSchool(ctx, input.group_id);
+  if (group.classroom_id !== input.classroom_id) {
+    throw new AdminError("Group does not belong to this classroom", "invalid");
+  }
+
+  const { error: insErr } = await ctx.supabase.from("classroom_group_members").insert({
+    classroom_id: input.classroom_id,
+    group_id: input.group_id,
+    student_id: input.student_id,
+  });
+  if (insErr) throw new AdminError(insErr.message, "db_error");
+}
+
 // === Curriculum ===
 export async function createCurriculum(
   ctx: AdminContext,
