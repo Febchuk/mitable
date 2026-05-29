@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   Clock,
-  Mic,
   PanelLeftClose,
   Plus,
   RotateCcw,
@@ -27,9 +26,6 @@ import type {
 } from "@/lib/schemas/report-chat";
 import { startCamera, type CameraSession } from "@/lib/capture/camera-capture";
 import { TesseractOcrEngine } from "@/lib/capture/ocr-engine";
-import { WhisperAsrEngine } from "@/lib/capture/asr-engine";
-import { decodeBlobToMonoFloat32 } from "@/lib/capture/decode-audio-blob";
-import { useAudioRecorder } from "@/components/montessori/new-report/use-audio-recorder";
 
 const HISTORY_HIDDEN = "Conversation history will land later — one thread per report for now.";
 
@@ -155,17 +151,8 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     "idle" | "opening" | "ready" | "capturing" | "ocr" | "uploading" | "error"
   >("idle");
   const [cameraError, setCameraError] = React.useState<string | null>(null);
-  const [micStatus, setMicStatus] = React.useState<"idle" | "recording" | "transcribing" | "error">(
-    "idle"
-  );
-  const [micError, setMicError] = React.useState<string | null>(null);
-  const recorder = useAudioRecorder();
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const ocrRef = React.useRef<TesseractOcrEngine | null>(null);
-  const asrRef = React.useRef<WhisperAsrEngine | null>(null);
-  /** Tracks the most recent recorded memo we've already transcribed so the
-   *  transcription effect doesn't re-fire on re-renders. */
-  const transcribedMemoRef = React.useRef<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -362,86 +349,15 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     setPendingAttachments((prev) => prev.filter((a) => a.artifactId !== artifactId));
   }, []);
 
-  // Mic dictation: when the recorder transitions to "recorded" with a fresh
-  // memo, decode the blob → Whisper transcribe → append to composer.
-  React.useEffect(() => {
-    if (recorder.state !== "recorded" || !recorder.memo) return;
-    const memoKey = recorder.memo.url;
-    if (transcribedMemoRef.current === memoKey) return;
-
-    let cancelled = false;
-    void (async () => {
-      setMicStatus("transcribing");
-      setMicError(null);
-      try {
-        const blob = recorder.memo!.blob;
-        const { audio, sampleRate } = await decodeBlobToMonoFloat32(blob);
-        if (!asrRef.current) {
-          asrRef.current = new WhisperAsrEngine();
-          await asrRef.current.init();
-        }
-        const result = await asrRef.current.transcribe(audio, sampleRate);
-        if (cancelled) return;
-        const text = (result.text ?? "").trim();
-        if (text) {
-          setInput((prev) => (prev ? `${prev} ${text}` : text));
-          requestAnimationFrame(() => textareaRef.current?.focus());
-        }
-        if (!cancelled) transcribedMemoRef.current = memoKey;
-        setMicStatus("idle");
-      } catch (err) {
-        if (cancelled) return;
-        setMicStatus("error");
-        setMicError((err as Error).message || "Couldn't transcribe that — try typing.");
-      } finally {
-        recorder.clear();
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder.state, recorder.memo]);
-
-  const onToggleMic = React.useCallback(async () => {
-    if (recorder.state === "recording") {
-      recorder.stop();
-      return;
-    }
-    if (recorder.state === "denied") {
-      ToastBus.push({
-        message: "Microphone access denied. Enable it in your browser settings.",
-      });
-      return;
-    }
-    setMicStatus("recording");
-    setMicError(null);
-    await recorder.start();
-  }, [recorder]);
-
-  // Tear down ASR engine on unmount.
-  React.useEffect(() => {
-    return () => {
-      asrRef.current?.destroy();
-      asrRef.current = null;
-    };
-  }, []);
-
-  // Pre-warm Whisper + Tesseract workers when the capture flag is on so the
-  // first mic/photo press doesn't pay the model-download cost. Errors are
-  // ignored — we'll fall back to the slow path on demand.
+  // Pre-warm the Tesseract OCR worker when the capture flag is on so the first
+  // photo press doesn't pay the model-download cost. Errors are ignored — we'll
+  // fall back to the slow path on demand.
   React.useEffect(() => {
     if (typeof process === "undefined") return;
     if (process.env.NEXT_PUBLIC_ENABLE_CAPTURE_WORKER !== "1") return;
     let cancelled = false;
     const handle = window.setTimeout(() => {
       if (cancelled) return;
-      if (!asrRef.current) {
-        asrRef.current = new WhisperAsrEngine();
-        void asrRef.current.init().catch(() => {
-          /* pre-warm is best-effort */
-        });
-      }
       if (!ocrRef.current) {
         ocrRef.current = new TesseractOcrEngine();
         void ocrRef.current.init().catch(() => {
@@ -814,19 +730,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
           {cameraError}
         </div>
       ) : null}
-      {micStatus === "recording" ? (
-        <div className="rd-camera-progress" role="status" aria-live="polite">
-          🎤 Recording… {recorder.elapsed}s
-        </div>
-      ) : micStatus === "transcribing" ? (
-        <div className="rd-camera-progress" role="status" aria-live="polite">
-          Transcribing…
-        </div>
-      ) : micError ? (
-        <div className="rd-camera-progress" role="alert">
-          {micError}
-        </div>
-      ) : null}
       {slashOpen ? (
         <ul className="rd-slash-menu" role="listbox" aria-label="Pick a section">
           {slashMatches.map((s, i) => (
@@ -846,25 +749,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         </ul>
       ) : null}
       <div className={`rd-composer${isDrawer ? " rd-composer--pill" : ""}`}>
-        {isDrawer ? (
-          <button
-            type="button"
-            className={`rd-mic-circle${recorder.state === "recording" ? " rd-recording" : ""}`}
-            title={
-              recorder.state === "recording"
-                ? `Stop recording (${recorder.elapsed}s)`
-                : micStatus === "transcribing"
-                  ? "Transcribing…"
-                  : "Record voice note"
-            }
-            aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
-            aria-pressed={recorder.state === "recording"}
-            onClick={() => void onToggleMic()}
-            disabled={micStatus === "transcribing"}
-          >
-            <Mic size={18} strokeWidth={2} />
-          </button>
-        ) : null}
         <div className={isDrawer ? "rd-composer-pill" : "contents"}>
           <textarea
             ref={textareaRef}
@@ -884,25 +768,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
             aria-label="Message the editing assistant"
           />
           <div className="rd-composer-actions">
-            {!isDrawer ? (
-              <button
-                type="button"
-                className={`rd-icon-btn${recorder.state === "recording" ? " rd-recording" : ""}`}
-                title={
-                  recorder.state === "recording"
-                    ? `Stop recording (${recorder.elapsed}s)`
-                    : micStatus === "transcribing"
-                      ? "Transcribing…"
-                      : "Hold to talk — releases when you tap again"
-                }
-                aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
-                aria-pressed={recorder.state === "recording"}
-                onClick={() => void onToggleMic()}
-                disabled={micStatus === "transcribing"}
-              >
-                <Mic size={16} strokeWidth={2} />
-              </button>
-            ) : null}
             {!isDrawer ? (
               <button
                 type="button"
