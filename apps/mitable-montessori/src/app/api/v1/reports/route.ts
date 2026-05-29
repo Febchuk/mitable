@@ -6,6 +6,7 @@ import { listReports } from "@/lib/queries/reports";
 import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import { CreateReportRequestSchema, type ReportKind } from "@/lib/schemas/report";
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import { REPORTING_PERIOD_DAYS, type ReportingPeriod } from "@/lib/report-templates/admin-dto";
 import { fetchSpeechTargetLabels } from "@/lib/queries/speech-targets";
 import { initialParagraphHtmlForTemplateSection } from "@/lib/reports/template-field-payload";
 
@@ -69,13 +70,17 @@ export async function POST(req: Request) {
     heading: string;
     paragraphs: { id: string; html: string }[];
   }> | null = null;
+  // The template's reporting period defines how far back autofill looks for
+  // this child's profile data (progress, comments, observations, etc.).
+  let reportingPeriod: ReportingPeriod | null = null;
   if (input.templateId) {
     const { data: tpl } = await supabase
       .from("report_templates")
-      .select("id, sections, kind, school_id, section_guidance, section_meta")
+      .select("id, sections, kind, school_id, section_guidance, section_meta, reporting_period")
       .eq("id", input.templateId)
       .maybeSingle();
     if (tpl && (tpl.school_id as string) === auth.user.schoolId && tpl.sections) {
+      reportingPeriod = (tpl.reporting_period as ReportingPeriod | null) ?? null;
       const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
       const meta = (tpl.section_meta as SectionMeta | null) ?? {};
       const headings = tpl.sections as string[];
@@ -109,6 +114,14 @@ export async function POST(req: Request) {
   });
   const reportDate = today.toISOString().slice(0, 10);
 
+  // Window the autofill query: period_end is today, period_start reaches back
+  // by the template's reporting period (e.g. weekly = last 7 days). Reports
+  // with no template fall back to a single day (today only).
+  const periodDays = reportingPeriod ? REPORTING_PERIOD_DAYS[reportingPeriod] : 1;
+  const periodStartDate = new Date(today);
+  periodStartDate.setDate(periodStartDate.getDate() - (periodDays - 1));
+  const periodStart = periodStartDate.toISOString().slice(0, 10);
+
   const { data: inserted, error } = await supabase
     .from("reports")
     .insert({
@@ -116,7 +129,7 @@ export async function POST(req: Request) {
       classroom_id: classroom.id,
       report_type: KIND_TO_TYPE[input.kind],
       report_date: reportDate,
-      period_start: reportDate,
+      period_start: periodStart,
       period_end: reportDate,
       status: "draft",
       title: `${firstName} — ${dayLabel}`,
