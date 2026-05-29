@@ -3,9 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, ChevronRight, LayoutTemplate, Users } from "lucide-react";
+import { Book, Building2, LayoutTemplate, Users } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
-import { CHILDREN } from "./data";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
 
@@ -33,7 +32,7 @@ const TEACHER_NAV_LEGACY: NavItem[] = [
 ];
 
 const TEACHER_NAV_CORE: NavItem[] = [
-  { href: "/app/roster", label: "Roster", renderIcon: () => <Users {...lucide} /> },
+  { href: "/app/roster", label: "Classroom", renderIcon: () => <Users {...lucide} /> },
   { href: "/app/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
   {
     href: "/app/attendance",
@@ -42,12 +41,17 @@ const TEACHER_NAV_CORE: NavItem[] = [
   },
 ];
 
-/** Legacy order (Today first). Report-first puts Reports at the top. */
-const NAV: NavItem[] = [...TEACHER_NAV_LEGACY, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
+const TEACHER_PROGRESS: NavItem = {
+  href: "/app/progress",
+  label: "Progress",
+  renderIcon: () => <SquaresFour {...phosphor} />,
+};
 
-function teacherNavItems(showLegacyNav: boolean): NavItem[] {
-  if (showLegacyNav) return NAV;
-  return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+/** Default: Progress first. Report-first puts Reports at the top (no Progress link). */
+function teacherNavItems(options: { showToday: boolean; reportFirst: boolean }): NavItem[] {
+  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+  const head = options.showToday ? TEACHER_NAV_LEGACY : [TEACHER_PROGRESS];
+  return [...head, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
 }
 
 const ADMIN_NAV: NavItem[] = [
@@ -71,17 +75,15 @@ const ADMIN_NAV: NavItem[] = [
 
 export function MontessoriSidebar({
   variant = "teacher",
-  showLegacyNav = false,
-  classroomName,
-  contextSubtitle,
+  showTodayNav = false,
+  reportFirstNav = false,
   userMenuSlot,
 }: {
   variant?: "teacher" | "admin";
-  /** When false (default report-first), hides Today and Progress links. */
-  showLegacyNav?: boolean;
-  classroomName: string;
-  /** Replaces the default “{n} children” line under the workspace title */
-  contextSubtitle?: string;
+  /** When true, includes the Today link before Progress. */
+  showTodayNav?: boolean;
+  /** When true, Reports-first nav (hides Progress link). */
+  reportFirstNav?: boolean;
   /**
    * Footer slot — renders directly above the bottom of the sidebar. Layouts
    * pass a `<UserMenu variant="row" … />` here; the menu is responsible for
@@ -94,11 +96,10 @@ export function MontessoriSidebar({
   const draftCount =
     store.reports.filter((r) => r.status === "draft").length +
     store.reports.filter((r) => r.status === "review").length;
-  const navItems = variant === "admin" ? ADMIN_NAV : teacherNavItems(showLegacyNav);
-  const subtitleLine =
-    contextSubtitle ??
-    (variant === "admin" ? "People, curriculum, and reports" : `${CHILDREN.length} children`);
-
+  const navItems =
+    variant === "admin"
+      ? ADMIN_NAV
+      : teacherNavItems({ showToday: showTodayNav, reportFirst: reportFirstNav });
   return (
     <aside
       className="hidden lg:flex"
@@ -136,51 +137,6 @@ export function MontessoriSidebar({
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginTop: 2 }}>
           Montessori
         </div>
-      </div>
-      <div
-        style={{
-          padding: "8px 10px",
-          background: "var(--color-surface)",
-          borderRadius: 10,
-          border: "1px solid var(--color-border)",
-          marginBottom: 14,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: 8,
-            background: "var(--color-terracotta-soft)",
-            color: "var(--color-terracotta-deep)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          {classroomName.charAt(0).toUpperCase()}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-ink)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {classroomName}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{subtitleLine}</div>
-        </div>
-        <ChevronRight size={14} strokeWidth={1.5} />
       </div>
       <nav>
         {navItems.map((n) => {

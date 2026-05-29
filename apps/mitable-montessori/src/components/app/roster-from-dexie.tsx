@@ -79,7 +79,7 @@ export function RosterFromDexie({
   return (
     <RosterListView
       overline={overline}
-      title="Roster"
+      title="Classroom"
       rows={rows}
       emptyMessage={
         classroomName

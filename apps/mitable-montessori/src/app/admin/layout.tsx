@@ -19,8 +19,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
           variant="admin"
-          classroomName={ctx.schoolName ?? "School"}
-          contextSubtitle="Admin workspace"
           userMenuSlot={
             <UserMenu
               email={ctx.email}

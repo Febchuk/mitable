@@ -9,8 +9,21 @@ function readPublicFlag(name: string): boolean {
 }
 
 /**
- * When true, restores Today + Progress nav/routes and the global Ask Mitable
- * chatbot on top of the report-first teacher experience.
+ * When true, teachers land on Reports with the report-first nav (Reports at top,
+ * hero CTA list). When false (default), Progress is the home route and nav.
+ */
+export function reportFirstExperience(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_REPORT_FIRST_EXPERIENCE");
+}
+
+/** Default post-login path for teachers (admins use /admin/today). */
+export function teacherAppHomePath(): string {
+  return reportFirstExperience() ? "/app/reports" : "/app/progress";
+}
+
+/**
+ * When true, restores the Today route and the global Ask Mitable chatbot.
+ * Progress is always available regardless of this flag.
  */
 export function addTodayProgressAndAgent(): boolean {
   return readPublicFlag("NEXT_PUBLIC_ADD_TODAY_PROGRESS_AND_AGENT");

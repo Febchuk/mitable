@@ -5,7 +5,7 @@ export default function Loading() {
       role="status"
       aria-live="polite"
     >
-      Loading roster…
+      Loading classroom…
     </div>
   );
 }

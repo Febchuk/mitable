@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import type { ProgressMark, RecentUpdateEntry } from "@/components/montessori/data";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import type { ProgressProgram } from "@/lib/queries/progress-programs";
 
@@ -55,6 +56,8 @@ export type ClassroomProgress = {
   students: ClassroomProgressStudent[];
   /** progress[studentId][subtopicId] = CurriculumStatus */
   progress: Record<string, Record<string, CurriculumStatus>>;
+  /** Recent classroom progress events for the right-hand updates rail. */
+  recentUpdates: RecentUpdateEntry[];
 };
 
 type SubjectDbRow = {
@@ -89,6 +92,83 @@ type ProgressDbRow = {
   curriculum_subtopic_id: string;
   status: CurriculumStatus;
 };
+
+type ProgressHistoryDbRow = {
+  id: string;
+  student_id: string;
+  curriculum_subtopic_id: string;
+  new_status: string | null;
+  comment: string | null;
+  changed_at: string;
+};
+
+function dbStatusToMark(status: string | null | undefined): ProgressMark {
+  if (status === "mastered") return "m";
+  if (status === "practicing") return "p";
+  if (status === "introduced") return "i";
+  return "-";
+}
+
+function formatProgressWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const diffMs = Date.now() - d.getTime();
+  const diffM = Math.floor(diffMs / 60_000);
+  if (diffM < 1) return "just now";
+  if (diffM < 60) return `${diffM}m ago`;
+  const diffH = Math.floor(diffM / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return `${diffD}d ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+async function listRecentProgressUpdates(
+  supabase: ReturnType<typeof createClient>,
+  studentIds: string[],
+  subtopics: ClassroomProgressSubtopic[],
+  topics: ClassroomProgressTopic[]
+): Promise<RecentUpdateEntry[]> {
+  if (studentIds.length === 0 || subtopics.length === 0) return [];
+
+  const subtopicById = new Map(subtopics.map((s) => [s.id, s] as const));
+  const topicById = new Map(topics.map((t) => [t.id, t] as const));
+
+  const { data, error } = await supabase
+    .from("student_progress_history")
+    .select("id, student_id, curriculum_subtopic_id, new_status, comment, changed_at")
+    .in("student_id", studentIds)
+    .in(
+      "curriculum_subtopic_id",
+      subtopics.map((s) => s.id)
+    )
+    .order("changed_at", { ascending: false })
+    .limit(60)
+    .returns<ProgressHistoryDbRow[]>();
+
+  if (error || !data) return [];
+
+  const out: RecentUpdateEntry[] = [];
+  for (const row of data) {
+    const sub = subtopicById.get(row.curriculum_subtopic_id);
+    if (!sub) continue;
+    const topic = topicById.get(sub.topicId);
+    if (!topic) continue;
+    const noteText = row.comment?.trim() || null;
+    if (!noteText && !row.new_status) continue;
+    out.push({
+      id: row.id,
+      topic: topic.name,
+      subtopicName: sub.name,
+      childId: row.student_id,
+      subtopicId: sub.id,
+      status: dbStatusToMark(row.new_status),
+      noteText,
+      when: formatProgressWhen(row.changed_at),
+    });
+  }
+  return out;
+}
 
 async function iepItemCountByStudent(
   supabase: ReturnType<typeof createClient>,
@@ -230,6 +310,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
       subtopics: [],
       students,
       progress: {},
+      recentUpdates: [],
     };
   }
 
@@ -293,6 +374,13 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     }
   }
 
+  const recentUpdates = await listRecentProgressUpdates(
+    supabase,
+    students.map((s) => s.id),
+    subtopics,
+    topics
+  );
+
   return {
     classroomId: classroom.id,
     classroomName: classroom.name,
@@ -304,5 +392,6 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     subtopics,
     students,
     progress,
+    recentUpdates,
   };
 }
