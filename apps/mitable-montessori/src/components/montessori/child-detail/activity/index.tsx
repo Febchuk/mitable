@@ -331,6 +331,53 @@ function ReportEntry({
   );
 }
 
+function CommentEntry({
+  e,
+  mobile,
+}: {
+  e: Extract<ActivityFeedEntry, { kind: "comment" }>;
+  mobile: boolean;
+}) {
+  return (
+    <div
+      style={{
+        background: mobile ? "var(--color-canvas)" : "transparent",
+        border: mobile ? "1px solid var(--color-border)" : "0",
+        borderRadius: mobile ? 12 : 0,
+        padding: mobile ? "12px 14px" : "12px 0",
+        borderBottom: mobile ? undefined : "1px solid var(--color-border)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+          marginBottom: 6,
+          flexWrap: "wrap",
+        }}
+      >
+        <span className="label-cap" style={{ color: "var(--color-ink-secondary)" }}>
+          Comment
+        </span>
+        <span
+          className="font-numeric"
+          style={{ fontSize: 11, color: "var(--color-ink-muted)" }}
+          title={e.createdAt}
+        >
+          {formatRelative(e.createdAt)}
+        </span>
+      </div>
+      <div style={{ fontSize: 13, color: "var(--color-ink)", lineHeight: 1.45 }}>{e.note}</div>
+      {e.authorName && (
+        <div style={{ marginTop: 8, fontSize: 11, color: "var(--color-ink-muted)" }}>
+          {e.authorName}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ActivityView({
   mobile,
   entries,
@@ -371,6 +418,8 @@ export function ActivityView({
                 <CurriculumEntry key={`c-${e.id}`} e={e} mobile={mobile} />
               ) : e.kind === "whole-child" ? (
                 <WholeChildEntry key={`w-${e.id}`} e={e} mobile={mobile} />
+              ) : e.kind === "comment" ? (
+                <CommentEntry key={`m-${e.id}`} e={e} mobile={mobile} />
               ) : (
                 <ReportEntry
                   key={`r-${e.id}`}

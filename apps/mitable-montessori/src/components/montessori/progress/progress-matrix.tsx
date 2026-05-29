@@ -340,9 +340,6 @@ export function ProgressMatrix({
                       >
                         {section.topicName}
                       </span>
-                      <span style={{ fontSize: 10.5, color: "var(--color-ink-muted)" }}>
-                        {section.subtopics.length}
-                      </span>
                     </span>
                   </button>
                 )}

@@ -46,6 +46,13 @@ export type ActivityFeedEntry =
       status: ReportStatus;
       authorName: string | null;
       createdAt: string;
+    }
+  | {
+      kind: "comment";
+      id: string;
+      note: string;
+      authorName: string | null;
+      createdAt: string;
     };
 
 type CurriculumEventDbRow = {
@@ -80,6 +87,13 @@ type ReportDbRow = {
   users: { first_name: string | null; last_name: string | null } | null;
 };
 
+type StudentCommentDbRow = {
+  id: string;
+  comment: string;
+  created_at: string;
+  users: { first_name: string | null; last_name: string | null } | null;
+};
+
 function authorName(u: { first_name: string | null; last_name: string | null } | null) {
   if (!u) return null;
   return [u.first_name, u.last_name].filter(Boolean).join(" ") || null;
@@ -109,7 +123,7 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
   const ctx = await getCurrentUserContext();
   const schoolId = ctx?.schoolId ?? null;
 
-  const [studentResp, eventsResp, obsResp, axes] = await Promise.all([
+  const [studentResp, eventsResp, obsResp, commentsResp, axes] = await Promise.all([
     supabase.from("students").select("school_id").eq("id", studentId).maybeSingle(),
     supabase
       .from("curriculum_events")
@@ -132,6 +146,13 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
       .order("created_at", { ascending: false })
       .limit(100)
       .returns<Omit<WholeChildObsDbRow, "axes">[]>(),
+    supabase
+      .from("student_comments")
+      .select("id, comment, created_at, users:created_by_user_id(first_name, last_name)")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false })
+      .limit(100)
+      .returns<StudentCommentDbRow[]>(),
     getAxesForSchool(schoolId),
   ]);
 
@@ -189,7 +210,15 @@ export async function listActivityFeed(studentId: string): Promise<ActivityFeedE
     createdAt: r.created_at,
   }));
 
-  return [...curriculumEntries, ...wholeChildEntries, ...reportEntries].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt)
+  const commentEntries: ActivityFeedEntry[] = (commentsResp.data ?? []).map((c) => ({
+    kind: "comment",
+    id: c.id,
+    note: c.comment,
+    authorName: authorName(c.users),
+    createdAt: c.created_at,
+  }));
+
+  return [...curriculumEntries, ...wholeChildEntries, ...reportEntries, ...commentEntries].sort(
+    (a, b) => b.createdAt.localeCompare(a.createdAt)
   );
 }
