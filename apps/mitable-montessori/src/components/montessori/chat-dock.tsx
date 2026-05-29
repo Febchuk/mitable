@@ -12,6 +12,12 @@ export interface ChatDockProps {
   classroomName: string;
   schoolId: string;
   userId: string;
+  /**
+   * Whether the quick-capture chat is available (the Today/Agent flag). When
+   * false, the dock only appears while a report is open (report editing). It
+   * never shows the capture thread.
+   */
+  captureEnabled?: boolean;
 }
 
 export function ChatDock(props: ChatDockProps) {
@@ -27,6 +33,9 @@ export function ChatDock(props: ChatDockProps) {
   const dockHeight = editorMode ? 640 : 540;
   const dockWidth = editorMode ? 420 : 380;
   const collapseToPill = React.useCallback(() => store.setWebChatMode("pill"), [store]);
+
+  // No report open and capture is disabled → nothing to summon.
+  if (!editorMode && !props.captureEnabled) return null;
 
   return (
     <div className="hidden lg:block">

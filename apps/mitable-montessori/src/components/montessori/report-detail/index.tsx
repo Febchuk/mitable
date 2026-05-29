@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { usePublishActiveReport } from "../active-report-context";
 import { ChatPane, type ChatPaneHandle, type ChatPaneSection } from "./chat-pane";
-import { ReportChatDrawer } from "./report-chat-drawer";
+import { ReportChatLauncher } from "./report-chat-drawer";
 
 const DIRTY_LABEL = "Unsaved changes";
 const SAVING_LABEL = "Saving…";
@@ -175,8 +175,8 @@ export function ReportDetail({
   variant,
   onReportChanged,
   /**
-   * `dock`       — legacy floating ChatDock (flag on).
-   * `drawer`     — bottom pill on the report. Desktop opens drawer in place; mobile navigates to `fullscreen`.
+   * `dock`       — floating "Ask Mitable" ChatDock on desktop; on mobile a
+   *                bottom pill launches the `fullscreen` chat route.
    * `fullscreen` — chat owns the screen with a back link (the mobile `/chat` route).
    */
   chatMode = "dock",
@@ -202,7 +202,7 @@ export function ReportDetail({
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
   onReportChanged?: () => void;
-  chatMode?: "dock" | "drawer" | "fullscreen";
+  chatMode?: "dock" | "fullscreen";
 }) {
   const isAdmin = isAdminProp || variant === "admin";
   const router = useRouter();
@@ -886,17 +886,7 @@ export function ReportDetail({
           </div>
         </div>
 
-        {chatMode === "drawer" ? (
-          <ReportChatDrawer
-            chatPaneRef={chatPaneRef}
-            reportId={report.id}
-            sections={chatPaneSections}
-            onApplyProposal={applyProposalToDetail}
-            onApplyGhostEdits={applyGhostEditsToDetail}
-            onApplyNewSection={applyNewSectionToDetail}
-            flushPendingSave={flushPendingSave}
-          />
-        ) : null}
+        {chatMode === "dock" ? <ReportChatLauncher reportId={report.id} /> : null}
       </div>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
