@@ -79,6 +79,46 @@ export async function GET() {
     }
   }
 
+  // Groups ("teams") per classroom + each child's group membership.
+  const groupsByRoom = new Map<
+    string,
+    Array<{ id: string; name: string; color: string; sortOrder: number }>
+  >();
+  const groupIdByStudentRoom = new Map<string, string>();
+  if (roomIds.length > 0) {
+    const { data: groupRows } = await supabase
+      .from("classroom_groups")
+      .select("id, classroom_id, name, color, sort_order")
+      .in("classroom_id", roomIds)
+      .order("sort_order");
+    for (const g of groupRows ?? []) {
+      const row = g as {
+        id: string;
+        classroom_id: string;
+        name: string;
+        color: string | null;
+        sort_order: number | null;
+      };
+      const list = groupsByRoom.get(row.classroom_id) ?? [];
+      list.push({
+        id: row.id,
+        name: row.name,
+        color: row.color ?? "terracotta",
+        sortOrder: row.sort_order ?? 0,
+      });
+      groupsByRoom.set(row.classroom_id, list);
+    }
+
+    const { data: memberRows } = await supabase
+      .from("classroom_group_members")
+      .select("classroom_id, student_id, group_id")
+      .in("classroom_id", roomIds);
+    for (const m of memberRows ?? []) {
+      const row = m as { classroom_id: string; student_id: string; group_id: string };
+      groupIdByStudentRoom.set(`${row.classroom_id}:${row.student_id}`, row.group_id);
+    }
+  }
+
   const allTeacherIds = new Set<string>();
   assignsByRoom.forEach((list) => list.forEach((x) => allTeacherIds.add(x.teacher_user_id)));
 
@@ -146,6 +186,7 @@ export async function GET() {
       teachers,
       leadTeacherId: lead?.teacher_user_id ?? null,
       programTypes,
+      groups: groupsByRoom.get(id) ?? [],
     };
   });
 
@@ -173,6 +214,7 @@ export async function GET() {
     preferredName: string | null;
     birthDate: string | null;
     enrolledStart: string;
+    groupId: string | null;
     guardians: Array<{
       relationship: string | null;
       firstName: string;
@@ -237,6 +279,7 @@ export async function GET() {
         preferredName: s.preferred_name,
         birthDate: s.birth_date,
         enrolledStart: e.start_date,
+        groupId: groupIdByStudentRoom.get(`${e.classroom_id}:${s.id}`) ?? null,
         guardians: [],
       });
     }

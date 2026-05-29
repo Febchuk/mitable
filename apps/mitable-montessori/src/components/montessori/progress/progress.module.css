@@ -90,8 +90,17 @@
 @media (min-width: 1024px) {
   .desktopGrid {
     grid-template-columns: 240px 1fr 320px;
+    /* Without minmax(0, 1fr) the row sizes to the tallest column's content
+       (often this nav), the page clips via .progress-root overflow:hidden,
+       and the rail never gets a scroll container. */
+    grid-template-rows: minmax(0, 1fr);
     flex: 1;
     min-height: 0;
+  }
+  .leftRail {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .matrixPane {
     padding: 20px 22px 24px;

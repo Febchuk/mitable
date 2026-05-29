@@ -7,11 +7,13 @@ import { FilterChips, PageHeader } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
 import type {
+  ClassroomGroup,
   ClassroomProgressStudent,
   ClassroomProgressSubtopic,
   ClassroomProgressTopic,
   ClassroomProgressSubject,
 } from "@/lib/queries/classroom-progress";
+import { GROUP_COLOR_META } from "@/lib/classroom-groups";
 import { BulkBar } from "./bulk-bar";
 import { BulkSheet } from "./bulk-sheet";
 import { LeftRail } from "./left-rail";
@@ -23,6 +25,68 @@ import { SelectionCapsule } from "./selection-capsule";
 import { SubtopicPopover } from "./subtopic-popover";
 
 const ALL_SUBJECTS = "__all__";
+
+/** Horizontal group ("team") filter pills. Used in the mobile Progress layout;
+ *  the desktop layout shows the same filter inside the LeftRail. */
+function GroupFilterChips({
+  groups,
+  groupId,
+  onChange,
+}: {
+  groups: ClassroomGroup[];
+  groupId: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const chip = (active: boolean): React.CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 12,
+    fontWeight: 500,
+    padding: "6px 12px",
+    borderRadius: 999,
+    whiteSpace: "nowrap",
+    background: active ? "var(--color-ink)" : "var(--color-surface)",
+    color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
+    border: active ? "1px solid var(--color-ink)" : "1px solid var(--color-border)",
+  });
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        className="tap"
+        onClick={() => onChange(null)}
+        style={chip(groupId === null)}
+      >
+        All
+      </button>
+      {groups.map((g) => {
+        const active = groupId === g.id;
+        return (
+          <button
+            key={g.id}
+            type="button"
+            className="tap"
+            onClick={() => onChange(g.id)}
+            style={chip(active)}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: 999,
+                flexShrink: 0,
+                background: GROUP_COLOR_META[g.color].cssVar,
+              }}
+            />
+            {g.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function useSelection(presentStudents: ClassroomProgressStudent[]) {
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
@@ -86,49 +150,6 @@ function useSelection(presentStudents: ClassroomProgressStudent[]) {
     setDraftNote,
     count: selected.size,
   };
-}
-
-function TodaysFocusCard({
-  topicName,
-  subtopicCount,
-  inProgressChildren,
-}: {
-  topicName: string;
-  subtopicCount: number;
-  inProgressChildren: number;
-}) {
-  return (
-    <div
-      style={{
-        background: "var(--color-butter-soft)",
-        border: "1px solid color-mix(in srgb, var(--color-butter) 40%, transparent)",
-        borderRadius: 10,
-        padding: "8px 10px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 500, color: "var(--color-butter-deep)" }}>
-          Today&rsquo;s focus · {topicName}
-        </div>
-        <div style={{ fontSize: 11, color: "var(--color-ink-secondary)" }}>
-          {inProgressChildren} {inProgressChildren === 1 ? "child" : "children"} with work in
-          progress
-        </div>
-      </div>
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--color-butter-deep)",
-          fontWeight: 500,
-        }}
-      >
-        {subtopicCount} subtopics
-      </div>
-    </div>
-  );
 }
 
 function EmptyState({
@@ -232,6 +253,7 @@ export function ProgressFeature() {
   return (
     <ProgressFeatureLoaded
       classroomName={cp.classroomName}
+      groups={cp.groups}
       subjects={cp.subjects}
       topics={cp.topics}
       subtopics={cp.subtopics}
@@ -242,19 +264,38 @@ export function ProgressFeature() {
 
 function ProgressFeatureLoaded({
   classroomName,
+  groups,
   subjects,
   topics,
   subtopics,
   students,
 }: {
   classroomName: string;
+  groups: ClassroomGroup[];
   subjects: ClassroomProgressSubject[];
   topics: ClassroomProgressTopic[];
   subtopics: ClassroomProgressSubtopic[];
   students: ClassroomProgressStudent[];
 }) {
   const store = useMontessori();
-  const presentStudents = React.useMemo(() => students.filter((s) => s.present), [students]);
+
+  // Group ("team") filter. null = whole class. A group with no present children
+  // still selectable; the grid simply shows an empty-roster message.
+  const [groupId, setGroupId] = React.useState<string | null>(null);
+  const activeGroup = groupId ? (groups.find((g) => g.id === groupId) ?? null) : null;
+  // Fall back to whole class if the selected group was removed out from under us.
+  React.useEffect(() => {
+    if (groupId && !groups.some((g) => g.id === groupId)) setGroupId(null);
+  }, [groups, groupId]);
+
+  const visibleStudents = React.useMemo(
+    () => (groupId ? students.filter((s) => s.groupId === groupId) : students),
+    [students, groupId]
+  );
+  const presentStudents = React.useMemo(
+    () => visibleStudents.filter((s) => s.present),
+    [visibleStudents]
+  );
   const sel = useSelection(presentStudents);
 
   // Subject filter. ALL_SUBJECTS sentinel = no filter.
@@ -326,6 +367,16 @@ function ProgressFeatureLoaded({
     [sel, subjectId]
   );
 
+  const switchGroup = React.useCallback(
+    (id: string | null) => {
+      if (id === groupId) return;
+      sel.clear();
+      setInfo(null);
+      setGroupId(id);
+    },
+    [sel, groupId]
+  );
+
   // Mobile: when selection clears, close the sheet too.
   React.useEffect(() => {
     if (sel.count === 0) setSheetOpen(false);
@@ -376,14 +427,6 @@ function ProgressFeatureLoaded({
     ? (currentSubtopics.find((s) => s.id === info.subtopicId) ?? null)
     : null;
 
-  // Compute "in progress" count for Today's focus on mobile.
-  const inProgress = currentTopic
-    ? presentStudents.filter((s) => {
-        const row = store.progressByTopic[currentTopic.id]?.[s.id] ?? {};
-        return Object.values(row).some((m) => m === "p" || m === "i");
-      }).length
-    : 0;
-
   const subjectChipOptions = ["All", ...subjects.map((s) => s.name)];
   const subjectChipValue =
     subjectId === ALL_SUBJECTS ? "All" : (subjects.find((s) => s.id === subjectId)?.name ?? "All");
@@ -405,11 +448,14 @@ function ProgressFeatureLoaded({
   const overline = currentTopic
     ? `Lesson planner · ${currentTopic.name.toLowerCase()}`
     : "Lesson planner";
+  const presenceText = activeGroup
+    ? `${presentCount} in ${activeGroup.name} present`
+    : `${presentCount} children present`;
   const subtitle = currentTopic
     ? currentSubject
-      ? `${presentCount} children present · ${currentTopic.name} · ${currentSubject.name}`
-      : `${presentCount} children present · ${subCount} subtopics in ${currentTopic.name}`
-    : `${presentCount} children present`;
+      ? `${presenceText} · ${currentTopic.name} · ${currentSubject.name}`
+      : `${presenceText} · ${subCount} subtopics in ${currentTopic.name}`
+    : presenceText;
 
   return (
     <div className="progress-root">
@@ -431,6 +477,9 @@ function ProgressFeatureLoaded({
           {/* Desktop layout */}
           <div className={`hidden lg:grid ${styles.desktopGrid}`}>
             <LeftRail
+              groups={groups}
+              groupId={groupId}
+              onGroupChange={switchGroup}
               subjects={subjects}
               subjectId={subjectId === ALL_SUBJECTS ? null : subjectId}
               onSubjectChange={(id) => switchSubject(id ?? ALL_SUBJECTS)}
@@ -465,15 +514,18 @@ function ProgressFeatureLoaded({
 
           {/* Mobile layout */}
           <div className={`lg:hidden ${styles.mobileColumn}`}>
-            <div style={{ padding: "12px 16px 8px" }}>
-              {currentTopic && (
-                <TodaysFocusCard
-                  topicName={currentTopic.name}
-                  subtopicCount={subCount}
-                  inProgressChildren={inProgress}
-                />
-              )}
-            </div>
+            {groups.length > 0 && (
+              <div
+                style={{
+                  padding: "4px 16px 4px",
+                  display: "flex",
+                  gap: 6,
+                  overflowX: "auto",
+                }}
+              >
+                <GroupFilterChips groups={groups} groupId={groupId} onChange={switchGroup} />
+              </div>
+            )}
             {subjects.length > 1 && (
               <div
                 style={{

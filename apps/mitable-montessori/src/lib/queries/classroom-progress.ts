@@ -4,8 +4,10 @@ import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import type { ProgressMark, RecentUpdateEntry } from "@/components/montessori/data";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import type { ProgressProgram } from "@/lib/queries/progress-programs";
+import { normalizeGroupColor, type ClassroomGroup } from "@/lib/classroom-groups";
 
 export type { ProgressProgram };
+export type { ClassroomGroup };
 
 export type ClassroomProgressSubject = {
   id: string;
@@ -37,6 +39,8 @@ export type ClassroomProgressStudent = {
   iepItemCount: number;
   /** Active (non-archived) speech target rows for this child. 0 when classroom has no Speech program. */
   speechTargetCount: number;
+  /** The classroom group ("team") this child belongs to, or null when ungrouped. */
+  groupId: string | null;
 };
 
 export type ClassroomProgress = {
@@ -50,6 +54,8 @@ export type ClassroomProgress = {
    *  route exposes. Defaults to ["montessori"] when not declared on the
    *  classroom row. */
   programs: ProgressProgram[];
+  /** Admin-defined groups ("teams") for this classroom, ordered. Empty when none. */
+  groups: ClassroomGroup[];
   subjects: ClassroomProgressSubject[];
   topics: ClassroomProgressTopic[];
   subtopics: ClassroomProgressSubtopic[];
@@ -276,6 +282,34 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+  // Classroom groups ("teams") + per-child membership for this classroom.
+  const { data: groupRows } = await supabase
+    .from("classroom_groups")
+    .select("id, name, color, sort_order")
+    .eq("classroom_id", classroom.id)
+    .order("sort_order");
+  const groups: ClassroomGroup[] = (groupRows ?? []).map((g) => {
+    const row = g as { id: string; name: string; color: string | null; sort_order: number | null };
+    return {
+      id: row.id,
+      name: row.name,
+      color: normalizeGroupColor(row.color),
+      sortOrder: row.sort_order ?? 0,
+    };
+  });
+
+  const groupIdByStudent = new Map<string, string>();
+  if (groups.length > 0 && studentsBase.length > 0) {
+    const { data: memberRows } = await supabase
+      .from("classroom_group_members")
+      .select("student_id, group_id")
+      .eq("classroom_id", classroom.id);
+    for (const m of memberRows ?? []) {
+      const row = m as { student_id: string; group_id: string };
+      groupIdByStudent.set(row.student_id, row.group_id);
+    }
+  }
+
   const iepCounts =
     programs.includes("iep") && studentsBase.length > 0
       ? await iepItemCountByStudent(
@@ -296,6 +330,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     ...s,
     iepItemCount: iepCounts ? (iepCounts[s.id] ?? 0) : 0,
     speechTargetCount: speechCounts ? (speechCounts[s.id] ?? 0) : 0,
+    groupId: groupIdByStudent.get(s.id) ?? null,
   }));
 
   if (!curriculumId) {
@@ -305,6 +340,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
       curriculumAssigned: false,
       curriculumName: null,
       programs,
+      groups,
       subjects: [],
       topics: [],
       subtopics: [],
@@ -387,6 +423,7 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     curriculumAssigned: true,
     curriculumName,
     programs,
+    groups,
     subjects,
     topics,
     subtopics,
