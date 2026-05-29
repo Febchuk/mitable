@@ -7,7 +7,6 @@ import type {
   ClassroomGroup,
   ClassroomProgressStudent,
   ClassroomProgressSubject,
-  ClassroomProgressSubtopic,
   ClassroomProgressTopic,
 } from "@/lib/queries/classroom-progress";
 import { GROUP_COLOR_META } from "@/lib/classroom-groups";
@@ -26,10 +25,13 @@ type LeftRailProps = {
   subjectId: string | null;
   onSubjectChange: (id: string | null) => void;
   topics: ClassroomProgressTopic[];
+  /** null = "All topics" (grouped full-curriculum view). */
   topicId: string | null;
-  onTopicChange: (id: string) => void;
+  onTopicChange: (id: string | null) => void;
   students: ClassroomProgressStudent[];
-  currentSubtopics: ClassroomProgressSubtopic[];
+  /** Every subtopic currently on screen, with its topic — drives the mastery
+   *  tally across one or many topics. */
+  visibleSubtopics: Array<{ id: string; topicId: string }>;
   progressByTopic: ProgressByTopic;
 };
 
@@ -44,28 +46,21 @@ export function LeftRail({
   topicId,
   onTopicChange,
   students,
-  currentSubtopics,
+  visibleSubtopics,
   progressByTopic,
 }: LeftRailProps) {
-  const currentTopicData = React.useMemo(
-    () => (topicId ? (progressByTopic[topicId] ?? {}) : {}),
-    [progressByTopic, topicId]
-  );
   const counts = React.useMemo(() => {
     const o: Record<ProgressMark, number> = { m: 0, p: 0, i: 0, "-": 0 };
     let total = 0;
     for (const s of students) {
-      const row = currentTopicData[s.id] ?? {};
-      // Only count cells whose subtopic is part of the current topic — guards
-      // against any stale entries lingering after a curriculum edit.
-      for (const st of currentSubtopics) {
-        const v = row[st.id] ?? "-";
+      for (const st of visibleSubtopics) {
+        const v = progressByTopic[st.topicId]?.[s.id]?.[st.id] ?? "-";
         o[v]++;
         total++;
       }
     }
     return { ...o, total };
-  }, [currentTopicData, students, currentSubtopics]);
+  }, [progressByTopic, students, visibleSubtopics]);
 
   const subtopicCountByTopicId = React.useMemo(() => {
     const m = new Map<string, number>();
@@ -149,6 +144,25 @@ export function LeftRail({
           Topic
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <button
+            type="button"
+            className="tap"
+            onClick={() => onTopicChange(null)}
+            style={{
+              textAlign: "left",
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: 0,
+              background: topicId === null ? "var(--color-muted)" : "transparent",
+              color: topicId === null ? "var(--color-ink)" : "var(--color-ink-secondary)",
+              fontSize: 13,
+              fontWeight: topicId === null ? 500 : 400,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            All topics
+          </button>
           {topics.map((t) => {
             const subCount = subtopicCountByTopicId.get(t.id) ?? 0;
             const isActive = topicId === t.id;
@@ -192,7 +206,7 @@ export function LeftRail({
 
       <div>
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
-          Mastery · this topic
+          {topicId === null ? "Mastery · all visible" : "Mastery · this topic"}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {MASTERY_ORDER.map((s) => (

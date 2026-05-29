@@ -206,6 +206,41 @@
   background: var(--color-muted);
 }
 
+/* ---------- topic section header (full-curriculum / grouped view) ----------
+   Spans every column and starts its own grid row. The label is sticky-left so
+   the topic name stays visible while the matrix scrolls horizontally. */
+.topicHeader {
+  grid-column: 1 / -1;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  background: color-mix(in srgb, var(--color-clay) 14%, var(--color-surface));
+  box-shadow:
+    inset 0 1px 0 var(--color-border),
+    inset 0 -1px 0 var(--color-border);
+  transition: background 120ms ease;
+}
+.topicHeader:hover {
+  background: color-mix(in srgb, var(--color-clay) 22%, var(--color-surface));
+}
+.topicHeader[data-armed="true"] {
+  background: color-mix(in srgb, var(--color-clay) 30%, var(--color-surface));
+}
+.topicHeaderLabel {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 12px;
+}
+
 /* ---------- cell ---------- */
 .cell {
   width: 100%;
