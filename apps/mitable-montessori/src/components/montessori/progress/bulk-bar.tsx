@@ -152,7 +152,14 @@ function CommentBar({
         </div>
         <div
           className={styles.scrollQuiet}
-          style={{ display: "flex", gap: 6, flex: 1, overflowX: "auto", paddingBottom: 2 }}
+          style={{
+            display: "flex",
+            gap: 6,
+            flex: 1,
+            minWidth: 0,
+            overflowX: "auto",
+            paddingBottom: 2,
+          }}
         >
           {students.map((s) => {
             const active = s.id === commentChildId;
