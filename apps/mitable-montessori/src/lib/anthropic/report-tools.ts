@@ -10,7 +10,7 @@ export const REPORT_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_student_commands",
     description:
-      "List the structured observations (attendance + progress + notes) for a student between two dates. Returns tokenized payloads.",
+      "List everything recorded about a student between two dates: attendance, curriculum progress changes, free-form notes, child comments, curriculum events (subtopic notes / status moves), and whole-child observations (developmental axis notes). Each record has a `command_type` so you can tell them apart. Returns tokenized payloads.",
     input_schema: {
       type: "object",
       properties: {

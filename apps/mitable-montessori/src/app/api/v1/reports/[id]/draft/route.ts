@@ -230,21 +230,43 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!input.captureOnly && input.transcripts.length === 0 && input.notes.length === 0) {
     const studentRef = report.student_id as string;
     const periodEndDay = `${periodEnd}T23:59:59`;
-    const [{ count: cmdCount }, { count: progCount }] = await Promise.all([
-      supabase
-        .from("commands")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", auth.user.userId)
-        .gte("created_at", periodStart)
-        .lte("created_at", periodEndDay),
+    const [
+      { count: progCount },
+      { count: commentCount },
+      { count: eventCount },
+      { count: obsCount },
+    ] = await Promise.all([
       supabase
         .from("student_progress_history")
         .select("id", { count: "exact", head: true })
         .eq("student_id", studentRef)
         .gte("changed_at", periodStart)
         .lte("changed_at", periodEndDay),
+      supabase
+        .from("student_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", studentRef)
+        .gte("created_at", periodStart)
+        .lte("created_at", periodEndDay),
+      supabase
+        .from("curriculum_events")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", studentRef)
+        .gte("created_at", periodStart)
+        .lte("created_at", periodEndDay),
+      supabase
+        .from("whole_child_observations")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", studentRef)
+        .gte("created_at", periodStart)
+        .lte("created_at", periodEndDay),
     ]);
-    if ((cmdCount ?? 0) === 0 && (progCount ?? 0) === 0) {
+    if (
+      (progCount ?? 0) === 0 &&
+      (commentCount ?? 0) === 0 &&
+      (eventCount ?? 0) === 0 &&
+      (obsCount ?? 0) === 0
+    ) {
       let skipReportPayload: Record<string, unknown> | null = null;
       if (
         templateHeadings.length > 0 &&

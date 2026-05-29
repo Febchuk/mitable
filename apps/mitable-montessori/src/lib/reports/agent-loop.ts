@@ -146,6 +146,7 @@ export async function runReportAgent(input: AgentRunInput): Promise<AgentRunOutp
             studentRef: input.studentRef,
             periodStart: args.period_start,
             periodEnd: args.period_end,
+            classroomRef: input.classroomRef,
           });
           accumulatedRefs.push(data.references);
           toolResults.push({
