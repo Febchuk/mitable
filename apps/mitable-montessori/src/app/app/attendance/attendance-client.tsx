@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { initialsFor } from "@/components/montessori/data";
@@ -15,6 +16,13 @@ import {
   addDays,
   localDateString,
 } from "@/lib/queries/attendance-day-model";
+import {
+  BulkAttendancePanel,
+  BulkAttendanceToolbar,
+  type BulkAttendanceParams,
+  type BulkScope,
+} from "./bulk-attendance-panel";
+import styles from "./attendance.module.css";
 
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
 
@@ -31,17 +39,25 @@ function newClientId(): string {
   return `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function formatDateHeading(date: string, locale: string): string {
+function formatDateParts(
+  date: string,
+  locale: string
+): { weekday: string; primary: string; year: string | null } {
   const [y, m, d] = date.split("-").map(Number);
-  if (!y || !m || !d) return date;
+  if (!y || !m || !d) {
+    return { weekday: "", primary: date, year: null };
+  }
   const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-  return dt.toLocaleDateString(locale, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  const currentYear = new Date().getFullYear();
+  return {
+    weekday: dt.toLocaleDateString(locale, { weekday: "long", timeZone: "UTC" }),
+    primary: dt.toLocaleDateString(locale, {
+      day: "numeric",
+      month: "long",
+      timeZone: "UTC",
+    }),
+    year: y !== currentYear ? String(y) : null,
+  };
 }
 
 function firstName(fullName: string, preferred: string | null): string {
@@ -52,7 +68,6 @@ function firstName(fullName: string, preferred: string | null): string {
 type RowState = {
   status: AttendanceDayStatus;
   comment: string | null;
-  arrivalTime: string | null;
   saving: boolean;
 };
 
@@ -73,6 +88,35 @@ function isPreset(status: AttendanceDayStatus, comment: string | null): boolean 
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+type RowPayload = Omit<RowState, "saving">;
+
+const SYNC_BATCH_SIZE = 50;
+
+function buildAttendanceCommand(
+  classroomId: string,
+  studentId: string,
+  date: string,
+  row: RowPayload
+) {
+  const trimmedComment = row.comment?.trim() || undefined;
+  const nowIso = new Date().toISOString();
+  return {
+    client_id: newClientId(),
+    classroom_id: classroomId,
+    source: "text" as const,
+    raw_transcript: null,
+    command_type: "attendance" as const,
+    payload: {
+      student_id: studentId,
+      status: row.status,
+      date,
+      ...(trimmedComment ? { comment: trimmedComment } : {}),
+    },
+    created_at: nowIso,
+    approved_at: nowIso,
+  };
+}
+
 export default function AttendanceClient({ data }: { data: AttendanceDayData }) {
   // Remount the inner panel on date change so per-row local state always
   // mirrors the server-fetched data for the selected day.
@@ -89,7 +133,6 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
       out[s.id] = {
         status: s.status,
         comment: s.comment,
-        arrivalTime: s.arrivalTime,
         saving: false,
       };
     }
@@ -98,10 +141,17 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
 
   const [rows, setRows] = React.useState<Record<string, RowState>>(initialRows);
   const [saveStatus, setSaveStatus] = React.useState<SaveStatus>("idle");
+  const [bulkOpen, setBulkOpen] = React.useState(false);
+  const [bulkApplying, setBulkApplying] = React.useState(false);
   const inflight = React.useRef(0);
 
+  const unmarkedCount = React.useMemo(
+    () => data.students.filter((s) => (rows[s.id] ?? initialRows[s.id])?.status === null).length,
+    [data.students, rows, initialRows]
+  );
+
   const overline = (data.classroomName?.toUpperCase() ?? "CLASSROOM") + " · ATTENDANCE REGISTER";
-  const dateLabel = formatDateHeading(data.date, locale);
+  const dateParts = formatDateParts(data.date, locale);
 
   const goDay = React.useCallback(
     (delta: number) => {
@@ -136,33 +186,12 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
         } else {
-          const trimmedComment = next.comment?.trim() || undefined;
-          const arrivalTime =
-            next.status === "present" && next.arrivalTime ? next.arrivalTime : undefined;
-          const nowIso = new Date().toISOString();
           const res = await fetch("/api/v1/sync/commands", {
             method: "POST",
             headers: { "content-type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              commands: [
-                {
-                  client_id: newClientId(),
-                  classroom_id: data.classroomId,
-                  source: "text",
-                  raw_transcript: null,
-                  command_type: "attendance",
-                  payload: {
-                    student_id: studentId,
-                    status: next.status,
-                    date: data.date,
-                    ...(trimmedComment ? { comment: trimmedComment } : {}),
-                    ...(arrivalTime ? { arrival_time: arrivalTime } : {}),
-                  },
-                  created_at: nowIso,
-                  approved_at: nowIso,
-                },
-              ],
+              commands: [buildAttendanceCommand(data.classroomId, studentId, data.date, next)],
             }),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -185,35 +214,93 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
     [data.classroomId, data.date]
   );
 
+  const applyBulk = React.useCallback(
+    async (params: BulkAttendanceParams, scope: BulkScope) => {
+      if (!data.classroomId || bulkApplying) return;
+
+      const payload: RowPayload = {
+        status: params.status,
+        comment: params.comment,
+      };
+
+      const targets = data.students.filter((s) => {
+        if (scope === "all") return true;
+        return (rows[s.id] ?? initialRows[s.id])?.status === null;
+      });
+      if (targets.length === 0) return;
+
+      setBulkApplying(true);
+      inflight.current += 1;
+      setSaveStatus("saving");
+
+      const ids = targets.map((s) => s.id);
+      setRows((prev) => {
+        const next = { ...prev };
+        for (const id of ids) {
+          next[id] = { ...payload, saving: true };
+        }
+        return next;
+      });
+
+      try {
+        const commands = ids.map((id) =>
+          buildAttendanceCommand(data.classroomId!, id, data.date, payload)
+        );
+        for (let i = 0; i < commands.length; i += SYNC_BATCH_SIZE) {
+          const chunk = commands.slice(i, i + SYNC_BATCH_SIZE);
+          const res = await fetch("/api/v1/sync/commands", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ commands: chunk }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }
+
+        setRows((prev) => {
+          const next = { ...prev };
+          for (const id of ids) {
+            next[id] = { ...payload, saving: false };
+          }
+          return next;
+        });
+        setBulkOpen(false);
+        ToastBus.push({
+          message: `Marked ${ids.length} ${ids.length === 1 ? "child" : "children"} ${params.status}.`,
+        });
+      } catch {
+        setRows((prev) => {
+          const next = { ...prev };
+          for (const id of ids) {
+            const prior = initialRows[id] ?? prev[id];
+            next[id] = { ...prior, saving: false };
+          }
+          return next;
+        });
+        ToastBus.push({
+          message: "Couldn't apply bulk attendance. Check your connection and try again.",
+        });
+        setSaveStatus("error");
+      } finally {
+        setBulkApplying(false);
+        inflight.current = Math.max(0, inflight.current - 1);
+        if (inflight.current === 0) {
+          setSaveStatus((s) => (s === "error" ? "error" : "saved"));
+        }
+      }
+    },
+    [bulkApplying, data.classroomId, data.date, data.students, initialRows, rows]
+  );
+
+  const markAllPresent = React.useCallback(() => {
+    void applyBulk({ status: "present", comment: null }, "all");
+  }, [applyBulk]);
+
   return (
     <div>
       <PageHeader
         overline={overline}
-        title={
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <DayArrow direction="prev" onClick={() => goDay(-1)} />
-            <span style={{ minWidth: 0 }}>{dateLabel}</span>
-            <DayArrow direction="next" onClick={() => goDay(1)} />
-            {!isToday && (
-              <button
-                type="button"
-                onClick={goToday}
-                className="tap label-cap"
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-ink-secondary)",
-                  cursor: "pointer",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Today
-              </button>
-            )}
-          </div>
-        }
+        title="Attendance"
         subtitle={
           data.students.length === 0
             ? "No children enrolled in this classroom yet."
@@ -222,6 +309,40 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
       />
 
       <div style={{ padding: "16px 24px 80px" }}>
+        <div className={styles.dateNavWrap}>
+          <div className={styles.dateNav}>
+            <DayArrow direction="prev" onClick={() => goDay(-1)} large />
+            <div className={styles.dateNavCenter}>
+              {dateParts.weekday && (
+                <span className={`label-cap ${styles.dateNavWeekday}`}>{dateParts.weekday}</span>
+              )}
+              <span className={`font-display ${styles.dateNavPrimary}`}>
+                {dateParts.primary}
+                {dateParts.year ? `, ${dateParts.year}` : ""}
+              </span>
+            </div>
+            <DayArrow direction="next" onClick={() => goDay(1)} large />
+          </div>
+          {!isToday && (
+            <button
+              type="button"
+              onClick={goToday}
+              className="tap label-cap"
+              style={{
+                padding: "5px 12px",
+                borderRadius: 999,
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-ink-secondary)",
+                cursor: "pointer",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Today
+            </button>
+          )}
+        </div>
+
         {data.students.length === 0 ? (
           <div
             style={{
@@ -235,26 +356,44 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             Nothing to record for this day.
           </div>
         ) : (
-          <div style={{ ...cardStyle, padding: 0 }}>
-            {data.students.map((student, idx) => {
-              const row = rows[student.id] ?? initialRows[student.id];
-              return (
-                <StudentRow
-                  key={student.id}
-                  student={student}
-                  row={row}
-                  isFirst={idx === 0}
-                  onChange={(next) => {
-                    setRows((prev) => ({
-                      ...prev,
-                      [student.id]: { ...next, saving: row.saving },
-                    }));
-                  }}
-                  onCommit={(next) => void saveRow(student.id, next)}
-                />
-              );
-            })}
-          </div>
+          <>
+            <BulkAttendanceToolbar
+              totalStudents={data.students.length}
+              unmarkedCount={unmarkedCount}
+              applying={bulkApplying}
+              bulkOpen={bulkOpen}
+              onToggleBulk={() => setBulkOpen((v) => !v)}
+              onAllPresent={markAllPresent}
+            />
+            <BulkAttendancePanel
+              open={bulkOpen}
+              totalStudents={data.students.length}
+              unmarkedCount={unmarkedCount}
+              applying={bulkApplying}
+              onClose={() => setBulkOpen(false)}
+              onApply={(params, scope) => void applyBulk(params, scope)}
+            />
+            <div className={styles.registerGrid}>
+              {data.students.map((student) => {
+                const row = rows[student.id] ?? initialRows[student.id];
+                return (
+                  <StudentRow
+                    key={student.id}
+                    student={student}
+                    row={row}
+                    disabled={bulkApplying}
+                    onChange={(next) => {
+                      setRows((prev) => ({
+                        ...prev,
+                        [student.id]: { ...next, saving: row.saving },
+                      }));
+                    }}
+                    onCommit={(next) => void saveRow(student.id, next)}
+                  />
+                );
+              })}
+            </div>
+          </>
         )}
 
         <div
@@ -279,8 +418,18 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
   );
 }
 
-function DayArrow({ direction, onClick }: { direction: "prev" | "next"; onClick: () => void }) {
+function DayArrow({
+  direction,
+  onClick,
+  large,
+}: {
+  direction: "prev" | "next";
+  onClick: () => void;
+  large?: boolean;
+}) {
   const Icon = direction === "prev" ? ChevronLeft : ChevronRight;
+  const size = large ? 40 : 34;
+  const iconSize = large ? 20 : 16;
   return (
     <button
       type="button"
@@ -288,8 +437,8 @@ function DayArrow({ direction, onClick }: { direction: "prev" | "next"; onClick:
       onClick={onClick}
       className="tap"
       style={{
-        width: 34,
-        height: 34,
+        width: size,
+        height: size,
         borderRadius: 999,
         background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
@@ -301,7 +450,7 @@ function DayArrow({ direction, onClick }: { direction: "prev" | "next"; onClick:
         flexShrink: 0,
       }}
     >
-      <Icon size={16} strokeWidth={1.75} />
+      <Icon size={iconSize} strokeWidth={1.75} />
     </button>
   );
 }
@@ -309,22 +458,24 @@ function DayArrow({ direction, onClick }: { direction: "prev" | "next"; onClick:
 function StudentRow({
   student,
   row,
-  isFirst,
+  disabled,
   onChange,
   onCommit,
 }: {
   student: AttendanceDayStudent;
   row: RowState;
-  isFirst: boolean;
+  disabled?: boolean;
   onChange: (next: Omit<RowState, "saving">) => void;
   onCommit: (next: Omit<RowState, "saving">) => void;
 }) {
   const display = firstName(student.fullName, student.preferredName);
+  const [commentMenuOpen, setCommentMenuOpen] = React.useState(false);
 
   // Clicking the currently-active button clears the mark (undo). Otherwise
   // sets the new status; we drop a comment that no longer makes sense
   // (e.g. "Tardy" while marking absent) but keep custom free-text edits.
   const setStatus = (next: AttendanceDayStatus) => {
+    if (disabled) return;
     const target: AttendanceDayStatus = next === row.status ? null : next;
 
     let nextComment = row.comment;
@@ -337,7 +488,6 @@ function StudentRow({
     const nextRow = {
       status: target,
       comment: nextComment,
-      arrivalTime: target === "present" ? row.arrivalTime : null,
     };
     onChange(nextRow);
     onCommit(nextRow);
@@ -345,67 +495,60 @@ function StudentRow({
 
   return (
     <div
+      className={`${styles.registerCell} ${commentMenuOpen ? styles.registerCellMenuOpen : ""}`}
       style={{
-        display: "grid",
-        gridTemplateColumns: "auto 1fr auto",
-        alignItems: "center",
-        gap: 14,
-        padding: "14px 18px",
-        borderTop: isFirst ? "none" : "1px solid var(--color-border)",
+        ...cardStyle,
+        overflow: "visible",
+        opacity: disabled ? 0.55 : 1,
+        pointerEvents: disabled ? "none" : "auto",
       }}
     >
-      <Avatar initials={initialsFor(student.fullName)} tone={toneFor(student.id)} size={36} />
-
-      <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 600,
-            color: "var(--color-ink)",
-            lineHeight: 1.25,
-          }}
-        >
-          {display}
+      <div className={styles.registerCellInner}>
+        <div className={styles.registerHeader}>
+          <Avatar initials={initialsFor(student.fullName)} tone={toneFor(student.id)} size={36} />
+          <div className={styles.nameActions}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--color-ink)",
+                lineHeight: 1.25,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                minWidth: 0,
+              }}
+            >
+              {display}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              <StatusButton
+                label="Present"
+                active={row.status === "present"}
+                activeBg="var(--color-sage-soft)"
+                activeFg="var(--color-sage-deep)"
+                onClick={() => setStatus("present")}
+              />
+              <StatusButton
+                label="Absent"
+                active={row.status === "absent"}
+                activeBg="var(--color-clay-soft)"
+                activeFg="var(--color-terracotta-deep)"
+                onClick={() => setStatus("absent")}
+              />
+            </div>
+          </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            minWidth: 0,
-          }}
-        >
+
+        <div className={styles.registerFields}>
           <CommentField
             status={row.status}
             value={row.comment}
+            onMenuOpenChange={setCommentMenuOpen}
             onChange={(comment) => onChange({ ...row, comment })}
             onCommit={(comment) => onCommit({ ...row, comment })}
           />
-          {row.status === "present" && (
-            <ArrivalTimeField
-              value={row.arrivalTime}
-              onChange={(arrivalTime) => onChange({ ...row, arrivalTime })}
-              onCommit={(arrivalTime) => onCommit({ ...row, arrivalTime })}
-            />
-          )}
         </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 6 }}>
-        <StatusButton
-          label="Present"
-          active={row.status === "present"}
-          activeBg="var(--color-sage-soft)"
-          activeFg="var(--color-sage-deep)"
-          onClick={() => setStatus("present")}
-        />
-        <StatusButton
-          label="Absent"
-          active={row.status === "absent"}
-          activeBg="var(--color-clay-soft)"
-          activeFg="var(--color-terracotta-deep)"
-          onClick={() => setStatus("absent")}
-        />
       </div>
     </div>
   );
@@ -451,11 +594,13 @@ const FIELD_HEIGHT = 32;
 function CommentField({
   status,
   value,
+  onMenuOpenChange,
   onChange,
   onCommit,
 }: {
   status: AttendanceDayStatus;
   value: string | null;
+  onMenuOpenChange?: (open: boolean) => void;
   onChange: (next: string | null) => void;
   onCommit: (next: string | null) => void;
 }) {
@@ -467,8 +612,13 @@ function CommentField({
   // an inline text input. Driven by the value: any non-preset value implies
   // custom mode. Reset whenever status flips so the field can't get stuck.
   const [customMode, setCustomMode] = React.useState(false);
-  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const anchorRef = React.useRef<HTMLDivElement | null>(null);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    onMenuOpenChange?.(open);
+  }, [open, onMenuOpenChange]);
 
   React.useEffect(() => {
     if (!enabled) {
@@ -488,8 +638,10 @@ function CommentField({
   React.useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (!wrapperRef.current) return;
-      if (e.target instanceof Node && wrapperRef.current.contains(e.target)) return;
+      const t = e.target;
+      if (!(t instanceof Node)) return;
+      if (anchorRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
       setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
@@ -499,7 +651,7 @@ function CommentField({
   const placeholder = enabled ? "Add a note" : "Mark first to add a note";
 
   return (
-    <div ref={wrapperRef} style={{ position: "relative", flex: 1, minWidth: 0 }}>
+    <div ref={anchorRef} className={styles.commentField}>
       {enabled && customMode ? (
         <div
           style={{
@@ -591,21 +743,7 @@ function CommentField({
       )}
 
       {open && enabled && presets && (
-        <div
-          role="menu"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            zIndex: 30,
-            minWidth: 200,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
-            padding: 4,
-            boxShadow: "0 12px 24px rgba(42,39,35,0.12), 0 4px 8px rgba(42,39,35,0.06)",
-          }}
-        >
+        <CommentMenuPortal anchorRef={anchorRef} menuRef={menuRef}>
           {presets.map((p) => (
             <MenuItem
               key={p}
@@ -626,13 +764,82 @@ function CommentField({
               setCustomMode(true);
               if (value && presets.includes(value)) onChange(null);
               setOpen(false);
-              // Focus on next paint, after the input renders.
               window.requestAnimationFrame(() => inputRef.current?.focus());
             }}
           />
-        </div>
+        </CommentMenuPortal>
       )}
     </div>
+  );
+}
+
+function CommentMenuPortal({
+  anchorRef,
+  menuRef,
+  children,
+}: {
+  anchorRef: React.RefObject<HTMLDivElement | null>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+}) {
+  const [placement, setPlacement] = React.useState<{
+    left: number;
+    width: number;
+    top?: number;
+    bottom?: number;
+  } | null>(null);
+
+  const updatePlacement = React.useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const menuMaxH = 220;
+    const gap = 6;
+    const width = Math.max(rect.width, 200);
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const placeAbove = spaceBelow < menuMaxH && rect.top > menuMaxH + gap;
+    if (placeAbove) {
+      setPlacement({
+        left: rect.left,
+        width,
+        bottom: window.innerHeight - rect.top + gap,
+      });
+    } else {
+      setPlacement({
+        left: rect.left,
+        width,
+        top: rect.bottom + gap,
+      });
+    }
+  }, [anchorRef]);
+
+  React.useLayoutEffect(() => {
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+    return () => {
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+    };
+  }, [updatePlacement]);
+
+  if (!placement || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      className={styles.commentMenu}
+      style={{
+        left: placement.left,
+        width: placement.width,
+        ...(placement.top != null ? { top: placement.top } : {}),
+        ...(placement.bottom != null ? { bottom: placement.bottom } : {}),
+      }}
+    >
+      {children}
+    </div>,
+    document.body
   );
 }
 
@@ -691,53 +898,5 @@ function MenuItem({
     >
       {label}
     </button>
-  );
-}
-
-function ArrivalTimeField({
-  value,
-  onChange,
-  onCommit,
-}: {
-  value: string | null;
-  onChange: (next: string | null) => void;
-  onCommit: (next: string | null) => void;
-}) {
-  return (
-    <label
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        background: "var(--color-canvas)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 8,
-        paddingLeft: 10,
-        paddingRight: 8,
-        height: FIELD_HEIGHT,
-        fontSize: 12,
-        color: "var(--color-ink-secondary)",
-        flexShrink: 0,
-      }}
-    >
-      <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-        Arrived
-      </span>
-      <input
-        type="time"
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value || null)}
-        onBlur={(e) => onCommit(e.target.value || null)}
-        style={{
-          border: 0,
-          background: "transparent",
-          fontSize: 13,
-          color: "var(--color-ink)",
-          outline: "none",
-          fontVariantNumeric: "tabular-nums",
-          height: "100%",
-        }}
-      />
-    </label>
   );
 }

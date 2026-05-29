@@ -1,0 +1,120 @@
+.dateNavWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.dateNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 18px 20px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.dateNavCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.dateNavWeekday {
+  color: var(--color-terracotta-deep);
+  letter-spacing: 0.08em;
+}
+
+.dateNavPrimary {
+  font-size: clamp(22px, 4.5vw, 28px);
+  font-weight: 500;
+  color: var(--color-ink);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+/* Two-column register on wide viewports; single column on phones. */
+.registerGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .registerGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+.registerCell {
+  min-width: 0;
+  position: relative;
+  overflow: visible;
+}
+
+.registerCellMenuOpen {
+  z-index: 30;
+}
+
+.registerCellInner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.registerHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.nameActions {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.registerFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding-left: 48px;
+}
+
+.commentField {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Portaled menu — not clipped by card overflow */
+.commentMenu {
+  position: fixed;
+  z-index: 200;
+  min-width: 200px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow:
+    0 12px 24px rgba(42, 39, 35, 0.12),
+    0 4px 8px rgba(42, 39, 35, 0.06);
+}
