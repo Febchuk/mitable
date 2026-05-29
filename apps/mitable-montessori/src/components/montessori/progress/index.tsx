@@ -397,6 +397,7 @@ function ProgressFeatureLoaded({
       sel.clear();
       setInfo(null);
       setSheetOpen(false);
+      setComposerOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -431,6 +432,36 @@ function ProgressFeatureLoaded({
     },
     [sel, groupId]
   );
+
+  // Free-form comment composer (opened from the right-rail "New comment"
+  // button). Shares the bottom bar/sheet with cell editing, but in a mode that
+  // drops the IPM swatches and cell count — just a child picker + a note.
+  const [composerOpen, setComposerOpen] = React.useState(false);
+  const [commentChildId, setCommentChildId] = React.useState<string | null>(null);
+  const [commentText, setCommentText] = React.useState("");
+
+  const openComposer = React.useCallback(() => {
+    sel.clear();
+    setInfo(null);
+    setComposerOpen(true);
+  }, [sel]);
+  const closeComposer = React.useCallback(() => {
+    setComposerOpen(false);
+    setCommentChildId(null);
+    setCommentText("");
+  }, []);
+  const submitComment = React.useCallback(() => {
+    const text = commentText.trim();
+    if (!commentChildId || !text) return;
+    void store.addStudentComment({ studentId: commentChildId, comment: text });
+    closeComposer();
+  }, [commentChildId, commentText, store, closeComposer]);
+
+  // Cell editing and the comment composer are mutually exclusive — starting a
+  // selection dismisses the composer.
+  React.useEffect(() => {
+    if (sel.count > 0 && composerOpen) closeComposer();
+  }, [sel.count, composerOpen, closeComposer]);
 
   // Mobile: when selection clears, close the sheet too.
   React.useEffect(() => {
@@ -578,7 +609,11 @@ function ProgressFeatureLoaded({
               )}
             </div>
             <div className={styles.recentPanel}>
-              <RecentUpdatesPanel entries={store.recentUpdates} students={students} />
+              <RecentUpdatesPanel
+                entries={store.recentUpdates}
+                students={students}
+                onNewComment={openComposer}
+              />
             </div>
           </div>
 
@@ -661,37 +696,57 @@ function ProgressFeatureLoaded({
                   overflow: "hidden",
                 }}
               >
-                <RecentUpdatesPanel entries={store.recentUpdates} students={students} />
+                <RecentUpdatesPanel
+                  entries={store.recentUpdates}
+                  students={students}
+                  onNewComment={openComposer}
+                />
               </div>
             </div>
           </div>
         </>
       )}
 
-      {/* Desktop bulk bar — fixed bottom-center, only when selection > 0 */}
+      {/* Desktop bottom bar — comment composer takes priority over cell editing
+          (a selection can't be active while the composer is open). */}
       <div className="hidden lg:block">
-        <BulkBar
-          count={sel.count}
-          draftStatus={sel.draftStatus}
-          draftNote={sel.draftNote}
-          onDraftStatus={sel.setDraftStatus}
-          onDraftNote={sel.setDraftNote}
-          onApply={onApply}
-          onCancel={sel.clear}
-        />
+        {composerOpen ? (
+          <BulkBar
+            mode="comment"
+            students={presentStudents}
+            commentChildId={commentChildId}
+            onCommentChild={setCommentChildId}
+            commentText={commentText}
+            onCommentText={setCommentText}
+            onSubmit={submitComment}
+            onCancel={closeComposer}
+          />
+        ) : (
+          <BulkBar
+            mode="cells"
+            count={sel.count}
+            draftStatus={sel.draftStatus}
+            draftNote={sel.draftNote}
+            onDraftStatus={sel.setDraftStatus}
+            onDraftNote={sel.setDraftNote}
+            onApply={onApply}
+            onCancel={sel.clear}
+          />
+        )}
       </div>
 
       {/* Mobile selection capsule + bottom sheet */}
       <div className="lg:hidden">
-        {sel.count > 0 && !sheetOpen && (
+        {sel.count > 0 && !sheetOpen && !composerOpen && (
           <SelectionCapsule
             count={sel.count}
             onClear={sel.clear}
             onApply={() => setSheetOpen(true)}
           />
         )}
-        {sheetOpen && (
+        {sheetOpen && !composerOpen && (
           <BulkSheet
+            mode="cells"
             topic={currentTopic?.name ?? "Selected cells"}
             count={sel.count}
             draftStatus={sel.draftStatus}
@@ -703,6 +758,18 @@ function ProgressFeatureLoaded({
               setSheetOpen(false);
             }}
             onClose={() => setSheetOpen(false)}
+          />
+        )}
+        {composerOpen && (
+          <BulkSheet
+            mode="comment"
+            students={presentStudents}
+            commentChildId={commentChildId}
+            onCommentChild={setCommentChildId}
+            commentText={commentText}
+            onCommentText={setCommentText}
+            onSubmit={submitComment}
+            onClose={closeComposer}
           />
         )}
       </div>

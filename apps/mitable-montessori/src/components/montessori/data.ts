@@ -561,6 +561,10 @@ export const INITIAL_PROGRESS: Record<string, ProgressMark[]> = INITIAL_PROGRESS
 
 export type RecentUpdateEntry = {
   id: string;
+  /** "progress" = an introduced/practicing/mastered change on a subtopic.
+   *  "comment" = a free-form note about the child with no subtopic/status.
+   *  Absent is treated as "progress" for back-compat. */
+  kind?: "progress" | "comment";
   topic: Topic;
   subtopicName: string;
   childId: string;

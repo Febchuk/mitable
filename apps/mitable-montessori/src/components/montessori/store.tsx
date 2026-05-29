@@ -96,6 +96,11 @@ export type MontessoriStore = {
     note?: string;
   }) => Promise<void>;
 
+  /** Persist a free-form comment about a child that isn't tied to any subtopic
+   *  or status. Optimistically prepends it to `recentUpdates`, then POSTs to
+   *  /api/v1/student-comments. Rolls back the feed entry on failure. */
+  addStudentComment: (args: { studentId: string; comment: string }) => Promise<void>;
+
   clearAll: () => void;
 };
 
@@ -329,6 +334,41 @@ export function MontessoriProvider({
     [progressByTopic, classroomProgress, notesByTopic, recentUpdates]
   );
 
+  const addStudentComment = React.useCallback(
+    async ({ studentId, comment }: { studentId: string; comment: string }) => {
+      const trimmed = comment.trim();
+      if (!studentId || !trimmed) return;
+
+      const prevRecent = recentUpdates;
+      const optimistic: RecentUpdateEntry = {
+        id: Math.random().toString(36).slice(2),
+        kind: "comment",
+        topic: "",
+        subtopicName: "",
+        childId: studentId,
+        subtopicId: "",
+        status: "-",
+        noteText: trimmed,
+        when: "just now",
+      };
+      setRecentUpdates((prev) => [optimistic, ...prev].slice(0, 60));
+
+      try {
+        const res = await fetch("/api/v1/student-comments", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ studentId, comment: trimmed }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        ToastBus.push({ message: "Comment saved" });
+      } catch {
+        setRecentUpdates(prevRecent);
+        ToastBus.push({ message: "Couldn't save comment — try again" });
+      }
+    },
+    [recentUpdates]
+  );
+
   const setAsideObservation = React.useCallback((id: string) => {
     setChat((prev) => prev.filter((m) => m.id !== id));
     ToastBus.push({
@@ -479,6 +519,7 @@ export function MontessoriProvider({
     createReport,
     toggleAttendance,
     applyBulkProgress,
+    addStudentComment,
     clearAll,
   };
 

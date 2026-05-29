@@ -129,12 +129,21 @@ function formatProgressWhen(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/** Internal carrier so progress changes and free-form comments can be merged
+ *  into one feed in true timestamp order before the `when` string is built. */
+type TimedEntry = { ts: number; entry: RecentUpdateEntry };
+
+function tsOf(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 async function listRecentProgressUpdates(
   supabase: ReturnType<typeof createClient>,
   studentIds: string[],
   subtopics: ClassroomProgressSubtopic[],
   topics: ClassroomProgressTopic[]
-): Promise<RecentUpdateEntry[]> {
+): Promise<TimedEntry[]> {
   if (studentIds.length === 0 || subtopics.length === 0) return [];
 
   const subtopicById = new Map(subtopics.map((s) => [s.id, s] as const));
@@ -154,7 +163,7 @@ async function listRecentProgressUpdates(
 
   if (error || !data) return [];
 
-  const out: RecentUpdateEntry[] = [];
+  const out: TimedEntry[] = [];
   for (const row of data) {
     const sub = subtopicById.get(row.curriculum_subtopic_id);
     if (!sub) continue;
@@ -163,14 +172,63 @@ async function listRecentProgressUpdates(
     const noteText = row.comment?.trim() || null;
     if (!noteText && !row.new_status) continue;
     out.push({
-      id: row.id,
-      topic: topic.name,
-      subtopicName: sub.name,
-      childId: row.student_id,
-      subtopicId: sub.id,
-      status: dbStatusToMark(row.new_status),
-      noteText,
-      when: formatProgressWhen(row.changed_at),
+      ts: tsOf(row.changed_at),
+      entry: {
+        id: row.id,
+        kind: "progress",
+        topic: topic.name,
+        subtopicName: sub.name,
+        childId: row.student_id,
+        subtopicId: sub.id,
+        status: dbStatusToMark(row.new_status),
+        noteText,
+        when: formatProgressWhen(row.changed_at),
+      },
+    });
+  }
+  return out;
+}
+
+type StudentCommentDbRow = {
+  id: string;
+  student_id: string;
+  comment: string;
+  created_at: string;
+};
+
+async function listRecentComments(
+  supabase: ReturnType<typeof createClient>,
+  studentIds: string[]
+): Promise<TimedEntry[]> {
+  if (studentIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("student_comments")
+    .select("id, student_id, comment, created_at")
+    .in("student_id", studentIds)
+    .order("created_at", { ascending: false })
+    .limit(60)
+    .returns<StudentCommentDbRow[]>();
+
+  if (error || !data) return [];
+
+  const out: TimedEntry[] = [];
+  for (const row of data) {
+    const noteText = row.comment?.trim();
+    if (!noteText) continue;
+    out.push({
+      ts: tsOf(row.created_at),
+      entry: {
+        id: row.id,
+        kind: "comment",
+        topic: "",
+        subtopicName: "",
+        childId: row.student_id,
+        subtopicId: "",
+        status: "-",
+        noteText,
+        when: formatProgressWhen(row.created_at),
+      },
     });
   }
   return out;
@@ -410,12 +468,17 @@ export async function getClassroomProgress(): Promise<ClassroomProgress | null> 
     }
   }
 
-  const recentUpdates = await listRecentProgressUpdates(
-    supabase,
-    students.map((s) => s.id),
-    subtopics,
-    topics
-  );
+  const studentIds = students.map((s) => s.id);
+  const [progressTimed, commentTimed] = await Promise.all([
+    listRecentProgressUpdates(supabase, studentIds, subtopics, topics),
+    listRecentComments(supabase, studentIds),
+  ]);
+  // Interleave progress changes and free-form comments by real timestamp, then
+  // drop down to the feed cap.
+  const recentUpdates = [...progressTimed, ...commentTimed]
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 60)
+    .map((t) => t.entry);
 
   return {
     classroomId: classroom.id,
