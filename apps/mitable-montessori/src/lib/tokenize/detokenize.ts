@@ -47,6 +47,22 @@ function refFor(token: string, refs: TokenReference[]) {
   return refs.find((r) => r.token === token);
 }
 
+/**
+ * Replace every token literal (e.g. `[STUDENT_1]`) in a free-text field with
+ * its real display name. The parse LLM is instructed to keep names as tokens,
+ * so note/comment/question text comes back tokenized — this puts the real
+ * names back before anything is stored or shown in the app.
+ */
+export function detokenizeText(text: string, refs: TokenReference[]): string {
+  if (!text) return text;
+  let out = text;
+  for (const r of refs) {
+    if (!r.token || !r.display) continue;
+    out = out.split(r.token).join(r.display);
+  }
+  return out;
+}
+
 export function detokenizeToolCall(
   call: ParsedToolCall,
   refs: TokenReference[],
@@ -64,7 +80,7 @@ export function detokenizeToolCall(
         classroomId: c?.id ?? fallbackClassroomId,
         status: call.args.status,
         date: call.args.date,
-        comment: call.args.comment,
+        comment: call.args.comment ? detokenizeText(call.args.comment, refs) : call.args.comment,
       };
     }
     case "record_progress": {
@@ -80,7 +96,7 @@ export function detokenizeToolCall(
         subtopicDisplay: sub.display,
         classroomId: c?.id ?? fallbackClassroomId,
         status: call.args.status,
-        comment: call.args.comment,
+        comment: call.args.comment ? detokenizeText(call.args.comment, refs) : call.args.comment,
       };
     }
     case "add_observation_note": {
@@ -90,13 +106,13 @@ export function detokenizeToolCall(
         kind: "note",
         studentId: s.id,
         studentDisplay: s.display,
-        text: call.args.text,
+        text: detokenizeText(call.args.text, refs),
       };
     }
     case "request_clarification":
       return {
         kind: "clarification",
-        question: call.args.question,
+        question: detokenizeText(call.args.question, refs),
         candidates: call.args.candidates ?? [],
       };
   }

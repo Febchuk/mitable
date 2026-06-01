@@ -88,12 +88,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </main>
           </div>
         </div>
-        {showTodayAndAgent && (
+        {!isAdmin && (
           <ChatDock
             classroomId={classroom?.id ?? null}
             classroomName={classroomName}
             schoolId={ctx.schoolId}
             userId={ctx.userId}
+            captureEnabled={showTodayAndAgent}
           />
         )}
         <ToastHost />

@@ -1,19 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Camera,
-  Check,
-  ChevronDown,
-  Clock,
-  Mic,
-  PanelLeftClose,
-  Plus,
-  RotateCcw,
-  Send,
-  Undo2,
-  X,
-} from "lucide-react";
+import { Camera, Check, ChevronDown, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
 import { ToastBus } from "../primitives";
 import { SparkleGlyph } from "./icons";
 import type {
@@ -27,11 +15,6 @@ import type {
 } from "@/lib/schemas/report-chat";
 import { startCamera, type CameraSession } from "@/lib/capture/camera-capture";
 import { TesseractOcrEngine } from "@/lib/capture/ocr-engine";
-import { WhisperAsrEngine } from "@/lib/capture/asr-engine";
-import { decodeBlobToMonoFloat32 } from "@/lib/capture/decode-audio-blob";
-import { useAudioRecorder } from "@/components/montessori/new-report/use-audio-recorder";
-
-const HISTORY_HIDDEN = "Conversation history will land later — one thread per report for now.";
 
 type ChatMessage = ChatTurnMessage | { kind: "error"; id: string; body: string };
 
@@ -107,11 +90,11 @@ export interface ChatPaneProps {
    */
   onCollapse?: () => void;
   /**
-   * `panel` (default) renders the full chat panel with header + messages + composer.
-   * `drawer` renders a pill composer with the mic as a separate round button on the
-   * left; the host controls whether messages are visible via `messagesVisible`.
+   * `panel` — split report view (legacy).
+   * `dock` — floating ChatDock: messages fill the middle, composer pinned to bottom.
+   * `drawer` — pill composer; host toggles `messagesVisible` for history.
    */
-  layout?: "panel" | "drawer";
+  layout?: "panel" | "dock" | "drawer";
   /** In `drawer` layout, when false the message history is hidden (collapsed pill). */
   messagesVisible?: boolean;
   /** In `drawer` layout, fired when the composer input gains focus so the host can open the drawer. */
@@ -135,6 +118,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
   ref
 ) {
   const isDrawer = layout === "drawer";
+  const isDock = layout === "dock";
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -155,17 +139,8 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     "idle" | "opening" | "ready" | "capturing" | "ocr" | "uploading" | "error"
   >("idle");
   const [cameraError, setCameraError] = React.useState<string | null>(null);
-  const [micStatus, setMicStatus] = React.useState<"idle" | "recording" | "transcribing" | "error">(
-    "idle"
-  );
-  const [micError, setMicError] = React.useState<string | null>(null);
-  const recorder = useAudioRecorder();
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const ocrRef = React.useRef<TesseractOcrEngine | null>(null);
-  const asrRef = React.useRef<WhisperAsrEngine | null>(null);
-  /** Tracks the most recent recorded memo we've already transcribed so the
-   *  transcription effect doesn't re-fire on re-renders. */
-  const transcribedMemoRef = React.useRef<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -362,86 +337,15 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     setPendingAttachments((prev) => prev.filter((a) => a.artifactId !== artifactId));
   }, []);
 
-  // Mic dictation: when the recorder transitions to "recorded" with a fresh
-  // memo, decode the blob → Whisper transcribe → append to composer.
-  React.useEffect(() => {
-    if (recorder.state !== "recorded" || !recorder.memo) return;
-    const memoKey = recorder.memo.url;
-    if (transcribedMemoRef.current === memoKey) return;
-
-    let cancelled = false;
-    void (async () => {
-      setMicStatus("transcribing");
-      setMicError(null);
-      try {
-        const blob = recorder.memo!.blob;
-        const { audio, sampleRate } = await decodeBlobToMonoFloat32(blob);
-        if (!asrRef.current) {
-          asrRef.current = new WhisperAsrEngine();
-          await asrRef.current.init();
-        }
-        const result = await asrRef.current.transcribe(audio, sampleRate);
-        if (cancelled) return;
-        const text = (result.text ?? "").trim();
-        if (text) {
-          setInput((prev) => (prev ? `${prev} ${text}` : text));
-          requestAnimationFrame(() => textareaRef.current?.focus());
-        }
-        if (!cancelled) transcribedMemoRef.current = memoKey;
-        setMicStatus("idle");
-      } catch (err) {
-        if (cancelled) return;
-        setMicStatus("error");
-        setMicError((err as Error).message || "Couldn't transcribe that — try typing.");
-      } finally {
-        recorder.clear();
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder.state, recorder.memo]);
-
-  const onToggleMic = React.useCallback(async () => {
-    if (recorder.state === "recording") {
-      recorder.stop();
-      return;
-    }
-    if (recorder.state === "denied") {
-      ToastBus.push({
-        message: "Microphone access denied. Enable it in your browser settings.",
-      });
-      return;
-    }
-    setMicStatus("recording");
-    setMicError(null);
-    await recorder.start();
-  }, [recorder]);
-
-  // Tear down ASR engine on unmount.
-  React.useEffect(() => {
-    return () => {
-      asrRef.current?.destroy();
-      asrRef.current = null;
-    };
-  }, []);
-
-  // Pre-warm Whisper + Tesseract workers when the capture flag is on so the
-  // first mic/photo press doesn't pay the model-download cost. Errors are
-  // ignored — we'll fall back to the slow path on demand.
+  // Pre-warm the Tesseract OCR worker when the capture flag is on so the first
+  // photo press doesn't pay the model-download cost. Errors are ignored — we'll
+  // fall back to the slow path on demand.
   React.useEffect(() => {
     if (typeof process === "undefined") return;
     if (process.env.NEXT_PUBLIC_ENABLE_CAPTURE_WORKER !== "1") return;
     let cancelled = false;
     const handle = window.setTimeout(() => {
       if (cancelled) return;
-      if (!asrRef.current) {
-        asrRef.current = new WhisperAsrEngine();
-        void asrRef.current.init().catch(() => {
-          /* pre-warm is best-effort */
-        });
-      }
       if (!ocrRef.current) {
         ocrRef.current = new TesseractOcrEngine();
         void ocrRef.current.init().catch(() => {
@@ -814,19 +718,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
           {cameraError}
         </div>
       ) : null}
-      {micStatus === "recording" ? (
-        <div className="rd-camera-progress" role="status" aria-live="polite">
-          🎤 Recording… {recorder.elapsed}s
-        </div>
-      ) : micStatus === "transcribing" ? (
-        <div className="rd-camera-progress" role="status" aria-live="polite">
-          Transcribing…
-        </div>
-      ) : micError ? (
-        <div className="rd-camera-progress" role="alert">
-          {micError}
-        </div>
-      ) : null}
       {slashOpen ? (
         <ul className="rd-slash-menu" role="listbox" aria-label="Pick a section">
           {slashMatches.map((s, i) => (
@@ -846,25 +737,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         </ul>
       ) : null}
       <div className={`rd-composer${isDrawer ? " rd-composer--pill" : ""}`}>
-        {isDrawer ? (
-          <button
-            type="button"
-            className={`rd-mic-circle${recorder.state === "recording" ? " rd-recording" : ""}`}
-            title={
-              recorder.state === "recording"
-                ? `Stop recording (${recorder.elapsed}s)`
-                : micStatus === "transcribing"
-                  ? "Transcribing…"
-                  : "Record voice note"
-            }
-            aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
-            aria-pressed={recorder.state === "recording"}
-            onClick={() => void onToggleMic()}
-            disabled={micStatus === "transcribing"}
-          >
-            <Mic size={18} strokeWidth={2} />
-          </button>
-        ) : null}
         <div className={isDrawer ? "rd-composer-pill" : "contents"}>
           <textarea
             ref={textareaRef}
@@ -884,25 +756,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
             aria-label="Message the editing assistant"
           />
           <div className="rd-composer-actions">
-            {!isDrawer ? (
-              <button
-                type="button"
-                className={`rd-icon-btn${recorder.state === "recording" ? " rd-recording" : ""}`}
-                title={
-                  recorder.state === "recording"
-                    ? `Stop recording (${recorder.elapsed}s)`
-                    : micStatus === "transcribing"
-                      ? "Transcribing…"
-                      : "Hold to talk — releases when you tap again"
-                }
-                aria-label={recorder.state === "recording" ? "Stop recording" : "Start dictating"}
-                aria-pressed={recorder.state === "recording"}
-                onClick={() => void onToggleMic()}
-                disabled={micStatus === "transcribing"}
-              >
-                <Mic size={16} strokeWidth={2} />
-              </button>
-            ) : null}
             {!isDrawer ? (
               <button
                 type="button"
@@ -958,21 +811,19 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
               </div>
             ) : null}
             <div className="rd-chat-scroll scroll-quiet" ref={scrollRef}>
-              {historyLoaded && messages.length === 0 ? (
-                <EmptyState />
-              ) : (
-                messages.map((m) => (
-                  <MessageView
-                    key={m.id}
-                    message={m}
-                    onApply={onApply}
-                    onSkip={onSkip}
-                    onTryAnother={onTryAnother}
-                    onChipClick={onChipClick}
-                    onPullIn={onPullIn}
-                  />
-                ))
-              )}
+              {historyLoaded && messages.length === 0
+                ? null
+                : messages.map((m) => (
+                    <MessageView
+                      key={m.id}
+                      message={m}
+                      onApply={onApply}
+                      onSkip={onSkip}
+                      onTryAnother={onTryAnother}
+                      onChipClick={onChipClick}
+                      onPullIn={onPullIn}
+                    />
+                  ))}
               {sending ? <ThinkingIndicator /> : null}
               {undo ? (
                 <div className="rd-chat-undo" role="status">
@@ -991,43 +842,45 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     );
   }
 
+  const messageList = (
+    <>
+      {messages.map((m) => (
+        <MessageView
+          key={m.id}
+          message={m}
+          onApply={onApply}
+          onSkip={onSkip}
+          onTryAnother={onTryAnother}
+          onChipClick={onChipClick}
+          onPullIn={onPullIn}
+        />
+      ))}
+      {sending ? <ThinkingIndicator /> : null}
+    </>
+  );
+
+  if (isDock) {
+    return (
+      <div className="rd-chat-pane-dock" aria-label="Report editing chat">
+        {undo ? (
+          <div className="rd-chat-undo" role="status">
+            <Undo2 size={12} strokeWidth={2.5} />
+            <span>Applied edit to {undo.label}.</span>
+            <button type="button" onClick={onUndo} className="rd-chat-undo-btn">
+              Undo
+            </button>
+          </div>
+        ) : null}
+        <div className="rd-chat-scroll scroll-quiet" ref={scrollRef}>
+          {messageList}
+        </div>
+        {composerNode}
+      </div>
+    );
+  }
+
   return (
     <aside className="rd-pane rd-chat-pane" aria-label="Editing assistant">
-      <div className="rd-chat-header">
-        <div className="rd-chat-header-left">
-          <div className="rd-chat-title">
-            <span className="rd-ai-glyph">
-              <SparkleGlyph size={12} />
-            </span>
-            <span>Editing assistant</span>
-          </div>
-          <div className="rd-chat-subtitle">
-            Discuss edits, pull from today&rsquo;s observations
-          </div>
-        </div>
-        <div className="rd-chat-header-right">
-          <button
-            type="button"
-            className="rd-icon-btn"
-            title={HISTORY_HIDDEN}
-            onClick={() => ToastBus.push({ message: HISTORY_HIDDEN })}
-          >
-            <Clock size={16} strokeWidth={2} />
-          </button>
-          {onCollapse && (
-            <button
-              type="button"
-              className="rd-panel-toggle"
-              title="Collapse assistant"
-              aria-label="Collapse assistant"
-              onClick={onCollapse}
-            >
-              <PanelLeftClose size={16} strokeWidth={1.8} />
-            </button>
-          )}
-        </div>
-      </div>
-
       {undo ? (
         <div className="rd-chat-undo" role="status">
           <Undo2 size={12} strokeWidth={2.5} />
@@ -1039,42 +892,13 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
       ) : null}
 
       <div className="rd-chat-scroll scroll-quiet" ref={scrollRef}>
-        {historyLoaded && messages.length === 0 ? (
-          <EmptyState />
-        ) : (
-          messages.map((m) => (
-            <MessageView
-              key={m.id}
-              message={m}
-              onApply={onApply}
-              onSkip={onSkip}
-              onTryAnother={onTryAnother}
-              onChipClick={onChipClick}
-              onPullIn={onPullIn}
-            />
-          ))
-        )}
-        {sending ? <ThinkingIndicator /> : null}
+        {historyLoaded && messages.length === 0 ? null : messageList}
       </div>
 
       {composerNode}
     </aside>
   );
 });
-
-function EmptyState() {
-  return (
-    <div className="rd-msg rd-msg-ai">
-      <div className="rd-avatar">
-        <SparkleGlyph size={12} />
-      </div>
-      <div className="rd-body">
-        Ask me to refine this report — for example, &ldquo;make the morning paragraph warmer&rdquo;
-        or &ldquo;does anything sound clinical?&rdquo;
-      </div>
-    </div>
-  );
-}
 
 function ThinkingIndicator() {
   return (

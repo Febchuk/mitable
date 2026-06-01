@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
-import { addTodayProgressAndAgent } from "@/lib/feature-flags";
 import { ReportDetail } from "./index";
 
 export function ReportWorkspace({
@@ -11,8 +10,7 @@ export function ReportWorkspace({
   report: ReportDetailRow;
   backHref?: string;
 }) {
-  const legacyChat = addTodayProgressAndAgent();
-  const chatMode = legacyChat ? "dock" : "drawer";
-
-  return <ReportDetail report={report} backToReportsHref={backHref} chatMode={chatMode} />;
+  // Report editing always lives in the floating "Ask Mitable" pill (ChatDock on
+  // desktop, full-screen route on mobile) — no in-page drawer.
+  return <ReportDetail report={report} backToReportsHref={backHref} chatMode="dock" />;
 }

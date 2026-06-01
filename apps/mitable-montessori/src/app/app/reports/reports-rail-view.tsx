@@ -231,7 +231,6 @@ export function ReportsRailView({
   // Bumped after server-side mutations (e.g. send-to-parents) so the
   // selected report's cache is invalidated and the SWR effect re-fetches.
   const [refreshTick, setRefreshTick] = React.useState(0);
-
   const refreshSelectedDetail = React.useCallback(() => {
     if (selectedId) detailCacheRef.current.delete(selectedId);
     setRefreshTick((t) => t + 1);

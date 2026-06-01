@@ -18,13 +18,29 @@ export class SupabaseReportDataAdapter implements ReportDataAdapter {
     studentRef: string;
     periodStart: string;
     periodEnd: string;
+    classroomRef?: string;
   }): Promise<{ commands: TokenizedCommandRecord[]; references: ReportReferenceSet }> {
     const tokenizer = new IncrementalTokenizer();
+    const periodEndDay = `${args.periodEnd}T23:59:59`;
 
     const studentToken = tokenizer.studentToken(args.studentRef, "");
-    // Pull commands. We use the projections (attendance_records,
-    // student_progress) plus the raw notes from `commands`.
-    const [{ data: attendance }, { data: progress }, { data: notes }] = await Promise.all([
+    // Token for the report's classroom — used for sources (curriculum events,
+    // whole-child observations) that don't carry a classroom_id column.
+    const reportClassroomToken = args.classroomRef
+      ? tokenizer.classroomToken(args.classroomRef, "")
+      : "[CLASSROOM_0]";
+    // Pull everything tied to this child over the window. The projections
+    // (attendance_records, student_progress) plus the append-only logs
+    // (notes/comments in `commands` + `student_comments`, curriculum_events,
+    // whole_child_observations) together form the autofill context.
+    const [
+      { data: attendance },
+      { data: progress },
+      { data: notes },
+      { data: comments },
+      { data: curriculumEvents },
+      { data: observations },
+    ] = await Promise.all([
       this.supabase
         .from("attendance_records")
         .select("student_id, classroom_id, attendance_date, status, comment")
@@ -38,14 +54,34 @@ export class SupabaseReportDataAdapter implements ReportDataAdapter {
         )
         .eq("student_id", args.studentRef)
         .gte("changed_at", args.periodStart)
-        .lte("changed_at", `${args.periodEnd}T23:59:59`),
+        .lte("changed_at", periodEndDay),
       this.supabase
         .from("commands")
         .select("classroom_id, payload, created_at")
-        .eq("user_id", null)
         .eq("command_type", "note")
+        .eq("payload->>student_id", args.studentRef)
         .gte("created_at", args.periodStart)
-        .lte("created_at", `${args.periodEnd}T23:59:59`),
+        .lte("created_at", periodEndDay),
+      this.supabase
+        .from("student_comments")
+        .select("classroom_id, comment, created_at")
+        .eq("student_id", args.studentRef)
+        .gte("created_at", args.periodStart)
+        .lte("created_at", periodEndDay),
+      this.supabase
+        .from("curriculum_events")
+        .select(
+          "subtopic_id, comment, transition_to_status, created_at, curriculum_subtopics(name)"
+        )
+        .eq("student_id", args.studentRef)
+        .gte("created_at", args.periodStart)
+        .lte("created_at", periodEndDay),
+      this.supabase
+        .from("whole_child_observations")
+        .select("axis_key, from_level, to_level, note, created_at")
+        .eq("student_id", args.studentRef)
+        .gte("created_at", args.periodStart)
+        .lte("created_at", periodEndDay),
     ]);
 
     const out: TokenizedCommandRecord[] = [];
@@ -106,6 +142,69 @@ export class SupabaseReportDataAdapter implements ReportDataAdapter {
         status: null,
         date: row.created_at.slice(0, 10),
         comment: row.payload?.text ?? null,
+      });
+    }
+
+    for (const r of comments ?? []) {
+      const row = r as {
+        classroom_id: string | null;
+        comment: string;
+        created_at: string;
+      };
+      out.push({
+        student_token: studentToken,
+        classroom_token: row.classroom_id
+          ? tokenizer.classroomToken(row.classroom_id, "")
+          : reportClassroomToken,
+        subtopic_token: null,
+        command_type: "comment",
+        status: null,
+        date: row.created_at.slice(0, 10),
+        comment: row.comment,
+      });
+    }
+
+    for (const r of curriculumEvents ?? []) {
+      const row = r as {
+        subtopic_id: string;
+        comment: string;
+        transition_to_status: string | null;
+        created_at: string;
+        curriculum_subtopics: { name: string } | { name: string }[] | null;
+      };
+      const subtopicName = Array.isArray(row.curriculum_subtopics)
+        ? (row.curriculum_subtopics[0]?.name ?? "")
+        : (row.curriculum_subtopics?.name ?? "");
+      out.push({
+        student_token: studentToken,
+        classroom_token: reportClassroomToken,
+        subtopic_token: tokenizer.subtopicToken(row.subtopic_id, subtopicName),
+        command_type: "curriculum_event",
+        status: row.transition_to_status,
+        date: row.created_at.slice(0, 10),
+        comment: row.comment,
+      });
+    }
+
+    for (const r of observations ?? []) {
+      const row = r as {
+        axis_key: string;
+        from_level: string | null;
+        to_level: string | null;
+        note: string;
+        created_at: string;
+      };
+      const levelMove =
+        row.from_level && row.to_level ? `${row.from_level} → ${row.to_level}` : null;
+      out.push({
+        student_token: studentToken,
+        classroom_token: reportClassroomToken,
+        subtopic_token: null,
+        command_type: "observation",
+        status: levelMove,
+        date: row.created_at.slice(0, 10),
+        // axis_key (e.g. "concentration") is a developmental dimension, not PII.
+        comment: row.axis_key ? `${row.axis_key}: ${row.note}` : row.note,
       });
     }
 

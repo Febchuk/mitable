@@ -76,10 +76,12 @@ describe("ChatPane (Phase 3)", () => {
     vi.clearAllMocks();
   });
 
-  it("shows the empty-state prompt once history loads with no prior messages", async () => {
+  it("shows the composer once history loads with no prior messages", async () => {
     setupFetch({ history: { messages: [] } });
     render(<ChatPane {...defaultProps()} />);
-    await waitFor(() => expect(screen.getByText(/Ask me to refine this report/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/Ask the assistant to refine this report/i)).toBeTruthy()
+    );
   });
 
   it("renders persisted history on mount", async () => {
@@ -99,7 +101,7 @@ describe("ChatPane (Phase 3)", () => {
     render(<ChatPane {...defaultProps()} />);
     await waitFor(() => expect(screen.getByText("make morning warmer")).toBeTruthy());
     expect(screen.getByText(/lead with how she walked in/i)).toBeTruthy();
-    expect(screen.queryByText(/Ask me to refine this report/i)).toBeNull();
+    expect(screen.queryByPlaceholderText(/Ask the assistant to refine this report/i)).toBeTruthy();
   });
 
   it("posts a user message and renders the assistant prose reply", async () => {
@@ -124,7 +126,9 @@ describe("ChatPane (Phase 3)", () => {
     });
 
     render(<ChatPane {...props} />);
-    await waitFor(() => expect(screen.getByText(/Ask me to refine this report/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/Ask the assistant to refine this report/i)).toBeTruthy()
+    );
 
     const textarea = screen.getByLabelText(/Message the editing assistant/i);
     fireEvent.change(textarea, { target: { value: "make morning warmer" } });
@@ -146,7 +150,9 @@ describe("ChatPane (Phase 3)", () => {
     });
 
     render(<ChatPane {...defaultProps()} />);
-    await waitFor(() => expect(screen.getByText(/Ask me to refine this report/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/Ask the assistant to refine this report/i)).toBeTruthy()
+    );
     const textarea = screen.getByLabelText(/Message the editing assistant/i);
     fireEvent.change(textarea, { target: { value: "hi" } });
     fireEvent.keyDown(textarea, { key: "Enter" });
@@ -158,7 +164,9 @@ describe("ChatPane (Phase 3)", () => {
   it("does not POST when the textarea is empty", async () => {
     const fetchMock = setupFetch({});
     render(<ChatPane {...defaultProps()} />);
-    await waitFor(() => expect(screen.getByText(/Ask me to refine this report/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/Ask the assistant to refine this report/i)).toBeTruthy()
+    );
     const textarea = screen.getByLabelText(/Message the editing assistant/i);
     fireEvent.keyDown(textarea, { key: "Enter" });
     const postCalls = fetchMock.mock.calls.filter(
@@ -170,7 +178,9 @@ describe("ChatPane (Phase 3)", () => {
   it("Shift+Enter inserts a newline instead of sending", async () => {
     const fetchMock = setupFetch({});
     render(<ChatPane {...defaultProps()} />);
-    await waitFor(() => expect(screen.getByText(/Ask me to refine this report/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/Ask the assistant to refine this report/i)).toBeTruthy()
+    );
     const textarea = screen.getByLabelText(/Message the editing assistant/i);
     fireEvent.change(textarea, { target: { value: "line one" } });
     fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
@@ -330,7 +340,9 @@ describe("ChatPane (Phase 3)", () => {
     setupFetch({});
     const ref = React.createRef<ChatPaneHandle>();
     render(<ChatPane ref={ref} {...defaultProps()} />);
-    await waitFor(() => expect(screen.getByText(/Ask me to refine this report/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/Ask the assistant to refine this report/i)).toBeTruthy()
+    );
     ref.current!.seedTurn({
       targetRef: { sectionId: "morning", paragraphId: "morning-p1" },
       targetLabel: "Morning paragraph",

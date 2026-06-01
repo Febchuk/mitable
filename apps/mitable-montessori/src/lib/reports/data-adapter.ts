@@ -12,7 +12,7 @@ export interface TokenizedCommandRecord {
   student_token: string;
   classroom_token: string;
   subtopic_token: string | null;
-  command_type: "attendance" | "progress" | "note";
+  command_type: "attendance" | "progress" | "note" | "comment" | "curriculum_event" | "observation";
   status: string | null;
   date: string;
   comment: string | null;
@@ -36,6 +36,8 @@ export interface ReportDataAdapter {
     studentRef: string;
     periodStart: string;
     periodEnd: string;
+    /** Report's classroom — used to tokenize sources that have no classroom column. */
+    classroomRef?: string;
   }): Promise<{ commands: TokenizedCommandRecord[]; references: ReportReferenceSet }>;
 
   /** Returns the current progress projection, scoped to a student. */
