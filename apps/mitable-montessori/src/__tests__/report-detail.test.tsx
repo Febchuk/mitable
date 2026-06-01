@@ -113,6 +113,30 @@ afterEach(() => {
 });
 
 describe("ReportDetail", () => {
+  it("POSTs /draft when Autofill is clicked on a draft report", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : "url" in input ? input.url : String(input);
+      if (url.includes("/draft") && init?.method === "POST") {
+        return new Response(JSON.stringify({ report: AFTER_DRAFT_REPORT }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("{}", { status: 200 });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<ReportDetail report={ADA_REPORT} />);
+    fireEvent.click(screen.getByRole("button", { name: /Autofill from observations/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/reports/r1/draft"),
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+  });
+
   it("renders the seeded title and section headings", () => {
     render(<ReportDetail report={ADA_REPORT} />);
     const title = screen.getByLabelText("Report title") as HTMLInputElement;

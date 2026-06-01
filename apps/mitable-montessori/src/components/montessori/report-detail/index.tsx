@@ -237,9 +237,72 @@ export function ReportDetail({
         );
       }));
 
-  // Auto-trigger draft for fresh empty drafts. The new-report flow creates a
-  // row with status='draft' and empty body; the editor opens here and
-  // immediately fires /draft to fill it.
+  const runAutofill = React.useCallback(async () => {
+    if (isDrafting || report.status !== "draft") return;
+
+    setIsDrafting(true);
+    const ac = new AbortController();
+    draftAbortRef.current = ac;
+    const stash = readStoredDraftCapture(report.id);
+
+    try {
+      const res = await fetch(`/api/v1/reports/${report.id}/draft`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          transcripts: stash?.transcripts ?? [],
+          notes: stash?.notes ?? [],
+          tokenMap: stash?.tokenMap ?? [],
+          captureOnly: stash?.captureOnly === true,
+        }),
+        signal: ac.signal,
+      });
+      if (ac.signal.aborted) return;
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        ToastBus.push({
+          message: j.error || "Couldn't autofill the report. You can edit it manually.",
+        });
+        return;
+      }
+      const json = (await res.json().catch(() => ({}))) as {
+        report?: ReportDetailRow;
+      };
+      clearStoredDraftCapture(report.id);
+      if (json.report) {
+        setDetail(buildLocalDetail(json.report, locale));
+        setIsDirty(false);
+      }
+      router.refresh();
+    } catch (err: unknown) {
+      const name =
+        err instanceof DOMException
+          ? err.name
+          : err && typeof err === "object" && "name" in err
+            ? String((err as { name: unknown }).name)
+            : "";
+      if (name === "AbortError") return;
+      console.warn("[report-detail] autofill fetch failed:", err);
+    } finally {
+      if (draftAbortRef.current === ac) draftAbortRef.current = null;
+      setIsDrafting(false);
+    }
+  }, [isDrafting, report.id, report.status, router, locale]);
+
+  const handleAutofill = React.useCallback(() => {
+    if (report.status !== "draft") {
+      ToastBus.push({ message: "Autofill is only available for draft reports." });
+      return;
+    }
+    void runAutofill();
+  }, [report.status, runAutofill]);
+
+  const canAutofill = report.status === "draft";
+
+  // Auto-trigger for fresh empty drafts. The new-report flow creates a row
+  // with status='draft' and empty body; the editor opens here and immediately
+  // fires /draft to fill it.
   //
   // We deliberately do NOT use a `cancelled` flag tied to effect cleanup. In
   // dev with React Strict Mode the cleanup runs synchronously after the first
@@ -251,59 +314,8 @@ export function ReportDetail({
   React.useEffect(() => {
     if (!empty || draftKickedRef.current || report.status !== "draft") return;
     draftKickedRef.current = true;
-    setIsDrafting(true);
-    const ac = new AbortController();
-    draftAbortRef.current = ac;
-    const stash = readStoredDraftCapture(report.id);
-    void fetch(`/api/v1/reports/${report.id}/draft`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        transcripts: stash?.transcripts ?? [],
-        notes: stash?.notes ?? [],
-        tokenMap: stash?.tokenMap ?? [],
-        captureOnly: stash?.captureOnly === true,
-      }),
-      signal: ac.signal,
-    })
-      .then(async (res) => {
-        if (ac.signal.aborted) return;
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          ToastBus.push({
-            message: j.error || "Couldn't draft the report. You can edit it manually.",
-          });
-          return;
-        }
-        const json = (await res.json().catch(() => ({}))) as {
-          report?: ReportDetailRow;
-        };
-        clearStoredDraftCapture(report.id);
-        // Apply the freshly-drafted row to local state immediately so the
-        // editor shows filled sections without waiting for an RSC refresh.
-        if (json.report) {
-          setDetail(buildLocalDetail(json.report, locale));
-        }
-        // Backup: still refresh so the server tree is in sync (e.g. status,
-        // updatedAt) the next time we navigate.
-        router.refresh();
-      })
-      .catch((err: unknown) => {
-        const name =
-          err instanceof DOMException
-            ? err.name
-            : err && typeof err === "object" && "name" in err
-              ? String((err as { name: unknown }).name)
-              : "";
-        if (name === "AbortError") return;
-        console.warn("[report-detail] draft fetch failed:", err);
-      })
-      .finally(() => {
-        if (draftAbortRef.current === ac) draftAbortRef.current = null;
-        setIsDrafting(false);
-      });
-  }, [empty, report.id, report.status, router, locale]);
+    void runAutofill();
+  }, [empty, report.status, runAutofill]);
 
   const cancelDraftGeneration = React.useCallback(() => {
     draftAbortRef.current?.abort();
@@ -847,6 +859,8 @@ export function ReportDetail({
             viewModeSlot={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
             hideActions={hideTopBarActions}
             onBackClick={hideBackLink ? undefined : handleBackClick}
+            onAutofill={canAutofill ? handleAutofill : undefined}
+            autofillBusy={isDrafting}
             onSaveDraft={
               topbarStatus === "draft"
                 ? () => {
@@ -877,6 +891,7 @@ export function ReportDetail({
                 detail={detail}
                 onChange={onChange}
                 isDrafting={isDrafting}
+                onAutofill={canAutofill ? handleAutofill : undefined}
                 onCancelDrafting={cancelDraftGeneration}
                 onAcceptGhostEdit={acceptGhostEditOnSection}
                 onDismissGhostEdit={dismissGhostEditOnSection}
