@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Clock, FileText, Pencil, RotateCcw, Send, Sparkles, Trash2 } from "lucide-react";
+import { Check, Clock, FileText, Pencil, RotateCcw, Send, Trash2 } from "lucide-react";
 import type { ReportListRow } from "@/lib/queries/reports";
 import type { ViewMode } from "@/components/montessori/report-detail/view-mode-toggle";
 import styles from "./reports-rail.module.css";
@@ -63,8 +63,6 @@ export function ActionRail({
   aiScore = null,
   viewMode = "editor",
   onViewModeChange,
-  onAutofill,
-  autofillBusy = false,
   pendingReviewerBadge = 0,
   reviewerSummary = [],
 }: {
@@ -80,9 +78,6 @@ export function ActionRail({
    *  anymore; the editor pane swaps in-place. */
   viewMode?: ViewMode;
   onViewModeChange?: (next: ViewMode) => void;
-  /** Fills the open draft from observations (reports rail hides the page header). */
-  onAutofill?: () => void;
-  autofillBusy?: boolean;
   /** Unread reviewer-comment count, surfaced as a terracotta dot on the History icon. */
   pendingReviewerBadge?: number;
   /** Compact reviewer indicators (≤3 shown). */
@@ -114,17 +109,6 @@ export function ActionRail({
         >
           <span className={styles.rrRailScoreNumber}>{aiScore}</span>
         </button>
-      )}
-
-      {onAutofill && (
-        <RailButton
-          tip="Autofill from observations"
-          aria-label="Autofill"
-          onClick={onAutofill}
-          active={autofillBusy}
-        >
-          <Sparkles size={17} strokeWidth={1.8} />
-        </RailButton>
       )}
 
       {onViewModeChange && (

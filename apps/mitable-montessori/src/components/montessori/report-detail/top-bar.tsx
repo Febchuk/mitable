@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, Check, FileText, Mail, Send, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, Check, FileText, Mail, Send, Trash2 } from "lucide-react";
 import type { Tone } from "../data";
 import { initialsFor } from "../data";
 
@@ -39,8 +39,6 @@ export function ReportTopBar({
   hasBeenSubmitted = false,
   viewModeSlot,
   hideActions = false,
-  onAutofill,
-  autofillBusy = false,
   onSaveDraft,
   onSubmitForReview,
   onApprove,
@@ -64,8 +62,6 @@ export function ReportTopBar({
   viewModeSlot?: React.ReactNode;
   /** When true, suppresses the inline action button row (Save/Submit/Approve/Send/Delete). The rail-view owns these via its action rail + modals; we keep the view-mode toggle so the editor/preview switch still works. */
   hideActions?: boolean;
-  onAutofill?: () => void;
-  autofillBusy?: boolean;
   onSaveDraft?: () => void;
   onSubmitForReview?: () => void;
   onApprove?: () => void;
@@ -136,8 +132,6 @@ export function ReportTopBar({
               isAdmin={isAdmin}
               actionBusy={actionBusy}
               hasBeenSubmitted={hasBeenSubmitted}
-              onAutofill={onAutofill}
-              autofillBusy={autofillBusy}
               onSaveDraft={onSaveDraft}
               onSubmitForReview={onSubmitForReview}
               onApprove={onApprove}
@@ -156,8 +150,6 @@ function TopBarActions({
   isAdmin,
   actionBusy,
   hasBeenSubmitted,
-  onAutofill,
-  autofillBusy,
   onSaveDraft,
   onSubmitForReview,
   onApprove,
@@ -168,8 +160,6 @@ function TopBarActions({
   isAdmin: boolean;
   actionBusy: boolean;
   hasBeenSubmitted: boolean;
-  onAutofill?: () => void;
-  autofillBusy?: boolean;
   onSaveDraft?: () => void;
   onSubmitForReview?: () => void;
   onApprove?: () => void;
@@ -234,17 +224,6 @@ function TopBarActions({
   if ((status === "draft" || status === "review") && isAdmin) {
     return (
       <>
-        {onAutofill && (
-          <button
-            type="button"
-            className="rd-btn rd-btn-secondary"
-            disabled={autofillBusy || actionBusy}
-            onClick={onAutofill}
-          >
-            <Sparkles size={14} strokeWidth={2} />
-            {autofillBusy ? "Autofilling…" : "Autofill"}
-          </button>
-        )}
         <button
           type="button"
           className="rd-btn rd-btn-primary"
@@ -278,17 +257,6 @@ function TopBarActions({
   // draft or changes_requested — teacher actions
   return (
     <>
-      {onAutofill && (
-        <button
-          type="button"
-          className="rd-btn rd-btn-secondary"
-          disabled={autofillBusy || actionBusy}
-          onClick={onAutofill}
-        >
-          <Sparkles size={14} strokeWidth={2} />
-          {autofillBusy ? "Autofilling…" : "Autofill"}
-        </button>
-      )}
       {onSaveDraft && (
         <button type="button" className="rd-btn rd-btn-secondary" onClick={onSaveDraft}>
           <FileText size={14} strokeWidth={2} />

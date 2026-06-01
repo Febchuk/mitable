@@ -174,7 +174,6 @@ export function ReportDetail({
   onViewModeChange,
   variant,
   onReportChanged,
-  onAutofillActionsChange,
   /**
    * `dock`       — floating "Ask Mitable" ChatDock on desktop; on mobile a
    *                bottom pill launches the `fullscreen` chat route.
@@ -203,11 +202,6 @@ export function ReportDetail({
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
   onReportChanged?: () => void;
-  /**
-   * When the top bar is hidden (reports rail), the parent can mount Autofill on
-   * the action rail from this callback.
-   */
-  onAutofillActionsChange?: (actions: { run: () => void; busy: boolean } | null) => void;
   chatMode?: "dock" | "fullscreen";
 }) {
   const isAdmin = isAdminProp || variant === "admin";
@@ -268,7 +262,7 @@ export function ReportDetail({
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         ToastBus.push({
-          message: j.error || "Couldn't autofill the report. You can edit it manually.",
+          message: j.error || "Couldn't draft the report. You can edit it manually.",
         });
         return;
       }
@@ -289,27 +283,12 @@ export function ReportDetail({
             ? String((err as { name: unknown }).name)
             : "";
       if (name === "AbortError") return;
-      console.warn("[report-detail] autofill fetch failed:", err);
+      console.warn("[report-detail] draft fetch failed:", err);
     } finally {
       if (draftAbortRef.current === ac) draftAbortRef.current = null;
       setIsDrafting(false);
     }
   }, [isDrafting, report.id, report.status, router, locale]);
-
-  const handleAutofill = React.useCallback(() => {
-    if (report.status !== "draft") {
-      ToastBus.push({ message: "Autofill is only available for draft reports." });
-      return;
-    }
-    void runAutofill();
-  }, [report.status, runAutofill]);
-
-  const canAutofill = report.status === "draft";
-
-  React.useEffect(() => {
-    onAutofillActionsChange?.(canAutofill ? { run: handleAutofill, busy: isDrafting } : null);
-    return () => onAutofillActionsChange?.(null);
-  }, [canAutofill, handleAutofill, isDrafting, onAutofillActionsChange]);
 
   // Auto-trigger for fresh empty drafts. The new-report flow creates a row
   // with status='draft' and empty body; the editor opens here and immediately
@@ -870,8 +849,6 @@ export function ReportDetail({
             viewModeSlot={<ViewModeToggle value={viewMode} onChange={setViewMode} />}
             hideActions={hideTopBarActions}
             onBackClick={hideBackLink ? undefined : handleBackClick}
-            onAutofill={canAutofill ? handleAutofill : undefined}
-            autofillBusy={isDrafting}
             onSaveDraft={
               topbarStatus === "draft"
                 ? () => {
