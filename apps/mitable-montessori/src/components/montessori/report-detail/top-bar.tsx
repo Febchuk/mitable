@@ -234,6 +234,17 @@ function TopBarActions({
   if ((status === "draft" || status === "review") && isAdmin) {
     return (
       <>
+        {onAutofill && (
+          <button
+            type="button"
+            className="rd-btn rd-btn-secondary"
+            disabled={autofillBusy || actionBusy}
+            onClick={onAutofill}
+          >
+            <Sparkles size={14} strokeWidth={2} />
+            {autofillBusy ? "Autofilling…" : "Autofill"}
+          </button>
+        )}
         <button
           type="button"
           className="rd-btn rd-btn-primary"

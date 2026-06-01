@@ -127,7 +127,7 @@ describe("ReportDetail", () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     render(<ReportDetail report={ADA_REPORT} />);
-    fireEvent.click(screen.getByRole("button", { name: /Autofill from observations/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Autofill$/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

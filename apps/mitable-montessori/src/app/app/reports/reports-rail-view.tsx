@@ -231,6 +231,10 @@ export function ReportsRailView({
   // Bumped after server-side mutations (e.g. send-to-parents) so the
   // selected report's cache is invalidated and the SWR effect re-fetches.
   const [refreshTick, setRefreshTick] = React.useState(0);
+  const [autofillActions, setAutofillActions] = React.useState<{
+    run: () => void;
+    busy: boolean;
+  } | null>(null);
 
   const refreshSelectedDetail = React.useCallback(() => {
     if (selectedId) detailCacheRef.current.delete(selectedId);
@@ -496,6 +500,7 @@ export function ReportsRailView({
               onViewModeChange={setViewMode}
               variant={variant}
               onReportChanged={refreshSelectedDetail}
+              onAutofillActionsChange={setAutofillActions}
             />
           ) : detailLoading && selectedRow ? (
             <ReportLoadingSkeleton row={selectedRow} locale={locale} />
@@ -534,6 +539,8 @@ export function ReportsRailView({
             aiScore={selectedRow.displayScore}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            onAutofill={selectedRow.status === "draft" ? () => autofillActions?.run() : undefined}
+            autofillBusy={autofillActions?.busy ?? false}
           />
         ) : (
           <div className={styles.rrActionRail} aria-hidden />
@@ -569,6 +576,7 @@ export function ReportsRailView({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onReportChanged={refreshSelectedDetail}
+          onAutofillActionsChange={setAutofillActions}
         />
       )}
     </div>
@@ -680,6 +688,7 @@ function MobileReportOverlay({
   viewMode,
   onViewModeChange,
   onReportChanged,
+  onAutofillActionsChange,
 }: {
   row: ReportListRow;
   detail: ReportDetailRow | null;
@@ -692,6 +701,7 @@ function MobileReportOverlay({
   viewMode: ViewMode;
   onViewModeChange: (next: ViewMode) => void;
   onReportChanged: () => void;
+  onAutofillActionsChange?: (actions: { run: () => void; busy: boolean } | null) => void;
 }) {
   const tone = STATUS_TONE[row.status];
 
@@ -759,6 +769,7 @@ function MobileReportOverlay({
               onViewModeChange={onViewModeChange}
               variant={variant}
               onReportChanged={onReportChanged}
+              onAutofillActionsChange={onAutofillActionsChange}
             />
           ) : detailLoading ? (
             <ReportLoadingSkeleton row={row} locale={locale} />

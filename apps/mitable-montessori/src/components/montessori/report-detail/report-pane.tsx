@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, MessageSquare, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Check, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import type { ReportDetail, ReportSection } from "../data";
 import type { SectionMetaEntry } from "@/lib/report-templates/sections";
 import {
@@ -23,8 +23,6 @@ type ReportPaneProps = {
   onChange: (next: ReportDetail) => void;
   /** True while POST /draft is filling the report from capture — blocks edits on this pane only. */
   isDrafting?: boolean;
-  /** Fills the report from observations and progress (POST /draft). */
-  onAutofill?: () => void;
   /** Aborts the in-flight /draft request (client-side); optional for tests. */
   onCancelDrafting?: () => void;
   /** When the user clicks "Discuss" on a paragraph, scope the chat to it. */
@@ -48,7 +46,6 @@ export function ReportPane({
   detail,
   onChange,
   isDrafting = false,
-  onAutofill,
   onCancelDrafting,
   onDiscussParagraph,
   onAcceptGhostEdit,
@@ -112,19 +109,6 @@ export function ReportPane({
 
   return (
     <main className="rd-pane rd-report-pane">
-      {onAutofill ? (
-        <div className="rd-report-toolbar">
-          <button
-            type="button"
-            className="rd-btn rd-btn-secondary rd-report-autofill-btn"
-            disabled={isDrafting}
-            onClick={onAutofill}
-          >
-            <Sparkles size={14} strokeWidth={2} />
-            {isDrafting ? "Autofilling…" : "Autofill from observations"}
-          </button>
-        </div>
-      ) : null}
       <div className="rd-report-scroll scroll-quiet">
         <article className="rd-report-paper">
           {detail.templateLogoUrl ? (

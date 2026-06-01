@@ -174,6 +174,7 @@ export function ReportDetail({
   onViewModeChange,
   variant,
   onReportChanged,
+  onAutofillActionsChange,
   /**
    * `dock`       — floating "Ask Mitable" ChatDock on desktop; on mobile a
    *                bottom pill launches the `fullscreen` chat route.
@@ -202,6 +203,11 @@ export function ReportDetail({
   variant?: "teacher" | "admin";
   /** Called after server-side mutations so the parent can refresh without a full page reload. */
   onReportChanged?: () => void;
+  /**
+   * When the top bar is hidden (reports rail), the parent can mount Autofill on
+   * the action rail from this callback.
+   */
+  onAutofillActionsChange?: (actions: { run: () => void; busy: boolean } | null) => void;
   chatMode?: "dock" | "fullscreen";
 }) {
   const isAdmin = isAdminProp || variant === "admin";
@@ -299,6 +305,11 @@ export function ReportDetail({
   }, [report.status, runAutofill]);
 
   const canAutofill = report.status === "draft";
+
+  React.useEffect(() => {
+    onAutofillActionsChange?.(canAutofill ? { run: handleAutofill, busy: isDrafting } : null);
+    return () => onAutofillActionsChange?.(null);
+  }, [canAutofill, handleAutofill, isDrafting, onAutofillActionsChange]);
 
   // Auto-trigger for fresh empty drafts. The new-report flow creates a row
   // with status='draft' and empty body; the editor opens here and immediately
@@ -891,7 +902,6 @@ export function ReportDetail({
                 detail={detail}
                 onChange={onChange}
                 isDrafting={isDrafting}
-                onAutofill={canAutofill ? handleAutofill : undefined}
                 onCancelDrafting={cancelDraftGeneration}
                 onAcceptGhostEdit={acceptGhostEditOnSection}
                 onDismissGhostEdit={dismissGhostEditOnSection}
