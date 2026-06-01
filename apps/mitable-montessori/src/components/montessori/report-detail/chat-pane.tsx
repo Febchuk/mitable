@@ -1,18 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Camera,
-  Check,
-  ChevronDown,
-  Clock,
-  PanelLeftClose,
-  Plus,
-  RotateCcw,
-  Send,
-  Undo2,
-  X,
-} from "lucide-react";
+import { Camera, Check, ChevronDown, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
 import { ToastBus } from "../primitives";
 import { SparkleGlyph } from "./icons";
 import type {
@@ -26,8 +15,6 @@ import type {
 } from "@/lib/schemas/report-chat";
 import { startCamera, type CameraSession } from "@/lib/capture/camera-capture";
 import { TesseractOcrEngine } from "@/lib/capture/ocr-engine";
-
-const HISTORY_HIDDEN = "Conversation history will land later — one thread per report for now.";
 
 type ChatMessage = ChatTurnMessage | { kind: "error"; id: string; body: string };
 
@@ -103,11 +90,11 @@ export interface ChatPaneProps {
    */
   onCollapse?: () => void;
   /**
-   * `panel` (default) renders the full chat panel with header + messages + composer.
-   * `drawer` renders a pill composer with the mic as a separate round button on the
-   * left; the host controls whether messages are visible via `messagesVisible`.
+   * `panel` — split report view (legacy).
+   * `dock` — floating ChatDock: messages fill the middle, composer pinned to bottom.
+   * `drawer` — pill composer; host toggles `messagesVisible` for history.
    */
-  layout?: "panel" | "drawer";
+  layout?: "panel" | "dock" | "drawer";
   /** In `drawer` layout, when false the message history is hidden (collapsed pill). */
   messagesVisible?: boolean;
   /** In `drawer` layout, fired when the composer input gains focus so the host can open the drawer. */
@@ -131,6 +118,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
   ref
 ) {
   const isDrawer = layout === "drawer";
+  const isDock = layout === "dock";
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -823,21 +811,19 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
               </div>
             ) : null}
             <div className="rd-chat-scroll scroll-quiet" ref={scrollRef}>
-              {historyLoaded && messages.length === 0 ? (
-                <EmptyState />
-              ) : (
-                messages.map((m) => (
-                  <MessageView
-                    key={m.id}
-                    message={m}
-                    onApply={onApply}
-                    onSkip={onSkip}
-                    onTryAnother={onTryAnother}
-                    onChipClick={onChipClick}
-                    onPullIn={onPullIn}
-                  />
-                ))
-              )}
+              {historyLoaded && messages.length === 0
+                ? null
+                : messages.map((m) => (
+                    <MessageView
+                      key={m.id}
+                      message={m}
+                      onApply={onApply}
+                      onSkip={onSkip}
+                      onTryAnother={onTryAnother}
+                      onChipClick={onChipClick}
+                      onPullIn={onPullIn}
+                    />
+                  ))}
               {sending ? <ThinkingIndicator /> : null}
               {undo ? (
                 <div className="rd-chat-undo" role="status">
@@ -856,43 +842,45 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     );
   }
 
+  const messageList = (
+    <>
+      {messages.map((m) => (
+        <MessageView
+          key={m.id}
+          message={m}
+          onApply={onApply}
+          onSkip={onSkip}
+          onTryAnother={onTryAnother}
+          onChipClick={onChipClick}
+          onPullIn={onPullIn}
+        />
+      ))}
+      {sending ? <ThinkingIndicator /> : null}
+    </>
+  );
+
+  if (isDock) {
+    return (
+      <div className="rd-chat-pane-dock" aria-label="Report editing chat">
+        {undo ? (
+          <div className="rd-chat-undo" role="status">
+            <Undo2 size={12} strokeWidth={2.5} />
+            <span>Applied edit to {undo.label}.</span>
+            <button type="button" onClick={onUndo} className="rd-chat-undo-btn">
+              Undo
+            </button>
+          </div>
+        ) : null}
+        <div className="rd-chat-scroll scroll-quiet" ref={scrollRef}>
+          {messageList}
+        </div>
+        {composerNode}
+      </div>
+    );
+  }
+
   return (
     <aside className="rd-pane rd-chat-pane" aria-label="Editing assistant">
-      <div className="rd-chat-header">
-        <div className="rd-chat-header-left">
-          <div className="rd-chat-title">
-            <span className="rd-ai-glyph">
-              <SparkleGlyph size={12} />
-            </span>
-            <span>Editing assistant</span>
-          </div>
-          <div className="rd-chat-subtitle">
-            Discuss edits, pull from today&rsquo;s observations
-          </div>
-        </div>
-        <div className="rd-chat-header-right">
-          <button
-            type="button"
-            className="rd-icon-btn"
-            title={HISTORY_HIDDEN}
-            onClick={() => ToastBus.push({ message: HISTORY_HIDDEN })}
-          >
-            <Clock size={16} strokeWidth={2} />
-          </button>
-          {onCollapse && (
-            <button
-              type="button"
-              className="rd-panel-toggle"
-              title="Collapse assistant"
-              aria-label="Collapse assistant"
-              onClick={onCollapse}
-            >
-              <PanelLeftClose size={16} strokeWidth={1.8} />
-            </button>
-          )}
-        </div>
-      </div>
-
       {undo ? (
         <div className="rd-chat-undo" role="status">
           <Undo2 size={12} strokeWidth={2.5} />
@@ -904,42 +892,13 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
       ) : null}
 
       <div className="rd-chat-scroll scroll-quiet" ref={scrollRef}>
-        {historyLoaded && messages.length === 0 ? (
-          <EmptyState />
-        ) : (
-          messages.map((m) => (
-            <MessageView
-              key={m.id}
-              message={m}
-              onApply={onApply}
-              onSkip={onSkip}
-              onTryAnother={onTryAnother}
-              onChipClick={onChipClick}
-              onPullIn={onPullIn}
-            />
-          ))
-        )}
-        {sending ? <ThinkingIndicator /> : null}
+        {historyLoaded && messages.length === 0 ? null : messageList}
       </div>
 
       {composerNode}
     </aside>
   );
 });
-
-function EmptyState() {
-  return (
-    <div className="rd-msg rd-msg-ai">
-      <div className="rd-avatar">
-        <SparkleGlyph size={12} />
-      </div>
-      <div className="rd-body">
-        Ask me to refine this report — for example, &ldquo;make the morning paragraph warmer&rdquo;
-        or &ldquo;does anything sound clinical?&rdquo;
-      </div>
-    </div>
-  );
-}
 
 function ThinkingIndicator() {
   return (

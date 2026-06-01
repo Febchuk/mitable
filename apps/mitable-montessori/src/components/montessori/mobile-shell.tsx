@@ -127,14 +127,19 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
     [setWebChatMode]
   );
 
-  // If the user navigates onto a report-detail route while the generic sheet
-  // was left open, force it back to "pill" so the desktop ChatDock and the
-  // store stay consistent — the report editor's own chat takes over here.
+  // If the user navigates onto a report-detail route while the generic mobile
+  // sheet was left open, collapse it. Do not run when webChatMode flips to
+  // "open" on an already-open report — that would block the desktop ChatDock
+  // "Edit with Mitable" pill from opening.
+  const wasReportDetailRef = React.useRef(isReportDetail);
   React.useEffect(() => {
-    if (isReportDetail && store.webChatMode === "open") {
+    const enteredReportDetail = isReportDetail && !wasReportDetailRef.current;
+    wasReportDetailRef.current = isReportDetail;
+    if (enteredReportDetail && store.webChatMode === "open") {
       setWebChatMode("pill");
     }
-  }, [isReportDetail, store.webChatMode, setWebChatMode]);
+    // webChatMode read only when entering a report route (not in deps).
+  }, [isReportDetail, setWebChatMode, store]);
 
   // Close drawer on Escape
   React.useEffect(() => {

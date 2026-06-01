@@ -130,7 +130,7 @@ export function ChatDock(props: ChatDockProps) {
                 onApplyNewSection={activeReport.handlers.onApplyNewSection}
                 onPullObservation={activeReport.handlers.onPullObservation}
                 flushPendingSave={activeReport.handlers.flushPendingSave}
-                onCollapse={collapseToPill}
+                layout="dock"
               />
             ) : props.classroomId ? (
               <ChatThread
