@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import {
+  getActiveClassroomForCurrentUser,
+  listTeacherClassroomsForCurrentUser,
+} from "@/lib/app/active-classroom";
 
 export type RosterRow = {
   id: string;
@@ -95,4 +98,49 @@ export async function listClassroomRoster(): Promise<RosterResult> {
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   return { classroomName: classroom.name, rows };
+}
+
+/**
+ * Roster across EVERY classroom the teacher leads, deduped by child. Used by
+ * the New report child picker so a teacher can write a report for any of their
+ * children regardless of which class they're currently viewing.
+ */
+export async function listAllTeacherClassroomsRoster(): Promise<RosterResult> {
+  const classrooms = await listTeacherClassroomsForCurrentUser();
+  if (classrooms.length === 0) return { classroomName: null, rows: [] };
+  const classroomIds = new Set(classrooms.map((c) => c.id));
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data } = await supabase
+    .from("students")
+    .select(
+      "id, first_name, last_name, preferred_name, birth_date, " +
+        "student_classroom_enrollments(classroom_id, start_date, end_date, is_primary), " +
+        "student_guardians(guardian_id)"
+    )
+    .is("archived_at", null)
+    .returns<StudentDbRow[]>();
+
+  const rows: RosterRow[] = (data ?? [])
+    .map((s) => {
+      // Pick this child's active enrollment in any of the teacher's rooms.
+      const enrollment = s.student_classroom_enrollments.find(
+        (e) => e.end_date === null && classroomIds.has(e.classroom_id)
+      );
+      if (!enrollment) return null;
+      return {
+        id: s.id,
+        fullName: `${s.first_name} ${s.last_name}`.trim(),
+        preferredName: s.preferred_name,
+        age: ageFromBirthDate(s.birth_date),
+        enrolledAt: formatEnrolled(enrollment.start_date),
+        guardianCount: s.student_guardians.length,
+      };
+    })
+    .filter((r): r is RosterRow => r !== null)
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  return { classroomName: classrooms.length === 1 ? classrooms[0].name : null, rows };
 }

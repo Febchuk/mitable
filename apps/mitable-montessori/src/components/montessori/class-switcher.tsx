@@ -9,7 +9,14 @@ import { useMontessori } from "./store";
  * selection straight from the store, so switching here keeps every page in
  * sync. Renders nothing when the teacher has only one class to show.
  */
-export function ClassSwitcher({ style }: { style?: React.CSSProperties }) {
+export function ClassSwitcher({
+  style,
+  afterSelect,
+}: {
+  style?: React.CSSProperties;
+  /** Runs after the store selection updates — e.g. to reload a server page. */
+  afterSelect?: (id: string) => void;
+}) {
   const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = useMontessori();
   if (classrooms.length <= 1) return null;
 
@@ -44,7 +51,10 @@ export function ClassSwitcher({ style }: { style?: React.CSSProperties }) {
           key={c.id}
           type="button"
           className="tap"
-          onClick={() => void selectClassroom(c.id)}
+          onClick={() => {
+            void selectClassroom(c.id);
+            afterSelect?.(c.id);
+          }}
           style={chip(selectedClassroomId === c.id)}
         >
           {c.name}

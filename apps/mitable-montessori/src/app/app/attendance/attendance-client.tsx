@@ -8,6 +8,8 @@ import { initialsFor } from "@/components/montessori/data";
 import type { Tone } from "@/components/montessori/data";
 import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { Avatar, ToastBus } from "@/components/montessori/primitives";
+import { ClassSwitcher } from "@/components/montessori/class-switcher";
+import { useMontessori } from "@/components/montessori/store";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import {
   type AttendanceDayData,
@@ -118,14 +120,25 @@ function buildAttendanceCommand(
 }
 
 export default function AttendanceClient({ data }: { data: AttendanceDayData }) {
-  // Remount the inner panel on date change so per-row local state always
-  // mirrors the server-fetched data for the selected day.
-  return <AttendanceDay key={data.date} data={data} />;
+  // Remount the inner panel on date or class change so per-row local state
+  // always mirrors the server-fetched data for the selected day + classroom.
+  return <AttendanceDay key={`${data.date}:${data.classroomId ?? "none"}`} data={data} />;
 }
 
 function AttendanceDay({ data }: { data: AttendanceDayData }) {
   const router = useRouter();
   const locale = useUiLocale();
+  const { selectedClassroomId } = useMontessori();
+
+  // The register is URL-driven (?date&classroom). If the teacher picked a
+  // different class elsewhere, redirect so the server renders that room.
+  React.useEffect(() => {
+    if (selectedClassroomId && data.classroomId && selectedClassroomId !== data.classroomId) {
+      router.replace(`/app/attendance?date=${data.date}&classroom=${selectedClassroomId}`);
+    }
+  }, [selectedClassroomId, data.classroomId, data.date, router]);
+
+  const classroomParam = data.classroomId ? `&classroom=${data.classroomId}` : "";
 
   const initialRows = React.useMemo<Record<string, RowState>>(() => {
     const out: Record<string, RowState> = {};
@@ -156,15 +169,15 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
   const goDay = React.useCallback(
     (delta: number) => {
       const next = addDays(data.date, delta);
-      router.push(`/app/attendance?date=${next}`);
+      router.push(`/app/attendance?date=${next}${classroomParam}`);
     },
-    [data.date, router]
+    [data.date, router, classroomParam]
   );
 
   const goToday = React.useCallback(() => {
     const today = localDateString();
-    if (today !== data.date) router.push(`/app/attendance?date=${today}`);
-  }, [data.date, router]);
+    if (today !== data.date) router.push(`/app/attendance?date=${today}${classroomParam}`);
+  }, [data.date, router, classroomParam]);
 
   const isToday = data.date === localDateString();
 
@@ -306,6 +319,11 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             ? "No children enrolled in this classroom yet."
             : `${data.students.length} ${data.students.length === 1 ? "child" : "children"} on the register.`
         }
+      />
+
+      <ClassSwitcher
+        style={{ padding: "4px 24px 0" }}
+        afterSelect={(id) => router.push(`/app/attendance?date=${data.date}&classroom=${id}`)}
       />
 
       <div style={{ padding: "16px 24px 80px" }}>
