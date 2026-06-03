@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import {
+  getActiveClassroomForCurrentUser,
+  listTeacherClassroomsForCurrentUser,
+} from "@/lib/app/active-classroom";
 import {
   type AttendanceDayData,
   type AttendanceDayStudent,
@@ -40,9 +43,17 @@ function trimSeconds(t: string | null): string | null {
  *
  * If `date` is missing or malformed, falls back to today (server's local TZ).
  */
-export async function getAttendanceDay(date?: string): Promise<AttendanceDayData> {
+export async function getAttendanceDay(
+  date?: string,
+  classroomId?: string
+): Promise<AttendanceDayData> {
   const safeDate = date && isValidDateString(date) ? date : localDateString();
-  const classroom = await getActiveClassroomForCurrentUser();
+  let classroom: { id: string; name: string } | null = null;
+  if (classroomId) {
+    const all = await listTeacherClassroomsForCurrentUser();
+    classroom = all.find((c) => c.id === classroomId) ?? null;
+  }
+  if (!classroom) classroom = await getActiveClassroomForCurrentUser();
   if (!classroom) {
     return {
       classroomId: null,

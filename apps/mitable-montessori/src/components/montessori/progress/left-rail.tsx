@@ -15,6 +15,12 @@ import styles from "./progress.module.css";
 const MASTERY_ORDER: ProgressMark[] = ["m", "p", "i", "-"];
 
 type LeftRailProps = {
+  /** Every classroom the teacher can switch between. ≤1 hides the Class picker. */
+  classrooms: Array<{ id: string; name: string }>;
+  selectedClassroomId: string | null;
+  onClassChange: (id: string) => void;
+  /** True while a class swap is in flight — dims the picker. */
+  classroomBusy?: boolean;
   /** Admin-defined classroom groups ("teams"). Empty hides the Group filter. */
   groups: ClassroomGroup[];
   /** null = whole class. */
@@ -36,6 +42,10 @@ type LeftRailProps = {
 };
 
 export function LeftRail({
+  classrooms,
+  selectedClassroomId,
+  onClassChange,
+  classroomBusy = false,
   groups,
   groupId,
   onGroupChange,
@@ -92,6 +102,29 @@ export function LeftRail({
         gap: 18,
       }}
     >
+      {classrooms.length > 1 && (
+        <div
+          style={{
+            opacity: classroomBusy ? 0.5 : 1,
+            pointerEvents: classroomBusy ? "none" : "auto",
+          }}
+        >
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
+            Class
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {classrooms.map((c) => (
+              <SubjectButton
+                key={c.id}
+                label={c.name}
+                isActive={selectedClassroomId === c.id}
+                onClick={() => onClassChange(c.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {groups.length > 0 && (
         <div>
           <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>

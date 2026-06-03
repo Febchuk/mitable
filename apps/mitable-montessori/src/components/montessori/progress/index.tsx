@@ -14,6 +14,7 @@ import type {
   ClassroomProgressSubject,
 } from "@/lib/queries/classroom-progress";
 import { GROUP_COLOR_META } from "@/lib/classroom-groups";
+import { classroomGroupsEnabled } from "@/lib/feature-flags";
 import { BulkBar } from "./bulk-bar";
 import { BulkSheet } from "./bulk-sheet";
 import { LeftRail } from "./left-rail";
@@ -84,6 +85,57 @@ function GroupFilterChips({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Horizontal class switcher pills. Used in the mobile Progress layout and the
+ *  curriculum-less empty state; the desktop layout shows the same picker inside
+ *  the LeftRail. */
+function ClassFilterChips({
+  classrooms,
+  selectedClassroomId,
+  onChange,
+  busy = false,
+}: {
+  classrooms: Array<{ id: string; name: string }>;
+  selectedClassroomId: string | null;
+  onChange: (id: string) => void;
+  busy?: boolean;
+}) {
+  const chip = (active: boolean): React.CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    fontSize: 12,
+    fontWeight: 500,
+    padding: "6px 12px",
+    borderRadius: 999,
+    whiteSpace: "nowrap",
+    background: active ? "var(--color-ink)" : "var(--color-surface)",
+    color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
+    border: active ? "1px solid var(--color-ink)" : "1px solid var(--color-border)",
+  });
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap",
+        opacity: busy ? 0.5 : 1,
+        pointerEvents: busy ? "none" : "auto",
+      }}
+    >
+      {classrooms.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          className="tap"
+          onClick={() => onChange(c.id)}
+          style={chip(selectedClassroomId === c.id)}
+        >
+          {c.name}
+        </button>
+      ))}
     </div>
   );
 }
@@ -236,6 +288,7 @@ function EmptyState({
 export function ProgressFeature() {
   const store = useMontessori();
   const cp = store.classroomProgress;
+  const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = store;
 
   // No active classroom at all (admin or unseated teacher).
   if (!cp) {
@@ -263,6 +316,16 @@ export function ProgressFeature() {
           title="Progress"
           subtitle={`${cp.students.length} children in ${cp.classroomName} · curriculum not assigned`}
         />
+        {classrooms.length > 1 && (
+          <div style={{ padding: "4px 16px 0" }}>
+            <ClassFilterChips
+              classrooms={classrooms}
+              selectedClassroomId={selectedClassroomId}
+              onChange={selectClassroom}
+              busy={classroomBusy}
+            />
+          </div>
+        )}
         <EmptyState
           title="No curriculum yet"
           body="Once an admin assigns a curriculum to this classroom, you'll see subjects, topics, and subtopics here so you can record progress for each child."
@@ -275,6 +338,8 @@ export function ProgressFeature() {
 
   return (
     <ProgressFeatureLoaded
+      // Remount on class switch so selection/subject/topic reset cleanly.
+      key={cp.classroomId}
       classroomName={cp.classroomName}
       groups={cp.groups}
       subjects={cp.subjects}
@@ -301,6 +366,11 @@ function ProgressFeatureLoaded({
   students: ClassroomProgressStudent[];
 }) {
   const store = useMontessori();
+  const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = store;
+
+  // Group ("team") filtering is gated by a feature flag; the Class picker owns
+  // this slot by default and the Group filter only appears when enabled.
+  const groupsEnabled = classroomGroupsEnabled();
 
   // Group ("team") filter. null = whole class. A group with no present children
   // still selectable; the grid simply shows an empty-roster message.
@@ -578,7 +648,11 @@ function ProgressFeatureLoaded({
           {/* Desktop layout */}
           <div className={`hidden lg:grid ${styles.desktopGrid}`}>
             <LeftRail
-              groups={groups}
+              classrooms={classrooms}
+              selectedClassroomId={selectedClassroomId}
+              onClassChange={selectClassroom}
+              classroomBusy={classroomBusy}
+              groups={groupsEnabled ? groups : []}
               groupId={groupId}
               onGroupChange={switchGroup}
               subjects={subjects}
@@ -619,7 +693,24 @@ function ProgressFeatureLoaded({
 
           {/* Mobile layout */}
           <div className={`lg:hidden ${styles.mobileColumn}`}>
-            {groups.length > 0 && (
+            {classrooms.length > 1 && (
+              <div
+                style={{
+                  padding: "4px 16px 4px",
+                  display: "flex",
+                  gap: 6,
+                  overflowX: "auto",
+                }}
+              >
+                <ClassFilterChips
+                  classrooms={classrooms}
+                  selectedClassroomId={selectedClassroomId}
+                  onChange={selectClassroom}
+                  busy={classroomBusy}
+                />
+              </div>
+            )}
+            {groupsEnabled && groups.length > 0 && (
               <div
                 style={{
                   padding: "4px 16px 4px",

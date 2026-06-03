@@ -4,6 +4,7 @@ import * as React from "react";
 import { BookOpen } from "lucide-react";
 import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { useMontessori } from "@/components/montessori/store";
+import { ClassSwitcher } from "@/components/montessori/class-switcher";
 import type {
   ClassroomProgress,
   ClassroomProgressSubject,
@@ -213,6 +214,7 @@ export function ClassroomCurriculumReader() {
           title="Curriculum"
           subtitle="View your class program once you have an assignment."
         />
+        <ClassSwitcher style={{ padding: "4px 24px 0" }} />
         <div style={{ padding: "20px 24px 64px" }}>
           <section style={cardStyle}>
             <div style={{ padding: 28, textAlign: "center" }}>
@@ -230,6 +232,7 @@ export function ClassroomCurriculumReader() {
     return (
       <div>
         <PageHeader title="Curriculum" subtitle={cp.classroomName} />
+        <ClassSwitcher style={{ padding: "4px 24px 0" }} />
         <div style={{ padding: "20px 24px 64px" }}>
           <section style={cardStyle}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--color-border)" }}>
@@ -259,6 +262,7 @@ export function ClassroomCurriculumReader() {
   return (
     <div>
       <PageHeader title="Curriculum" subtitle={`${cp.classroomName} · ${displayName}`} />
+      <ClassSwitcher style={{ padding: "4px 24px 0" }} />
       <div style={{ padding: "20px 24px 64px" }}>
         <section style={cardStyle}>
           <div

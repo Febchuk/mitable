@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import {
+  getActiveClassroomForCurrentUser,
+  listTeacherClassroomsForCurrentUser,
+} from "@/lib/app/active-classroom";
 import type { ProgressMark, RecentUpdateEntry } from "@/components/montessori/data";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import type { ProgressProgram } from "@/lib/queries/progress-programs";
@@ -280,9 +283,19 @@ async function speechTargetCountByStudent(
  * Returns null when the caller has no active classroom assignment.
  * Returns curriculumAssigned=false (with empty subject/topic/subtopic arrays
  * but a populated roster) when the classroom has no curriculum_id.
+ *
+ * When `classroomId` is supplied and the teacher is actively assigned to it,
+ * that room is loaded; otherwise we fall back to their most recent assignment.
  */
-export async function getClassroomProgress(): Promise<ClassroomProgress | null> {
-  const classroom = await getActiveClassroomForCurrentUser();
+export async function getClassroomProgress(
+  classroomId?: string
+): Promise<ClassroomProgress | null> {
+  let classroom: { id: string; name: string } | null = null;
+  if (classroomId) {
+    const all = await listTeacherClassroomsForCurrentUser();
+    classroom = all.find((c) => c.id === classroomId) ?? null;
+  }
+  if (!classroom) classroom = await getActiveClassroomForCurrentUser();
   if (!classroom) return null;
 
   const cookieStore = await cookies();

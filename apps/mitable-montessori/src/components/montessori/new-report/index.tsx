@@ -70,7 +70,7 @@ export function NewReportTrigger({
     let cancelled = false;
     void Promise.all([
       fetch("/api/v1/templates", { credentials: "include" }).then((r) => r.json()),
-      fetch("/api/v1/roster", { credentials: "include" }).then((r) => r.json()),
+      fetch("/api/v1/roster?scope=all", { credentials: "include" }).then((r) => r.json()),
       fetch("/api/v1/captured-today", { credentials: "include" }).then((r) => r.json()),
     ])
       .then(([tpls, rost, capt]) => {

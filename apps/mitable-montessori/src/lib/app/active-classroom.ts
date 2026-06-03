@@ -9,6 +9,9 @@ export interface ActiveClassroom {
   role: "lead" | "support" | "assistant" | null;
 }
 
+/** Same shape as ActiveClassroom — one entry per active teacher assignment. */
+export type TeacherClassroom = ActiveClassroom;
+
 export const getActiveClassroomForCurrentUser = cache(
   async function getActiveClassroomForCurrentUser(): Promise<ActiveClassroom | null> {
     const cookieStore = await cookies();
@@ -77,6 +80,57 @@ export const getActiveClassroomForCurrentUser = cache(
       code: classroom.code,
       role: assignment.classroom_role,
     };
+  }
+);
+
+/**
+ * Returns every classroom the current teacher has an active assignment to,
+ * sorted by name. The single-classroom `getActiveClassroomForCurrentUser`
+ * picks the most recent of these; this returns all of them so the teacher
+ * can switch between rooms on the Progress / Curriculum / Attendance pages.
+ */
+export const listTeacherClassroomsForCurrentUser = cache(
+  async function listTeacherClassroomsForCurrentUser(): Promise<TeacherClassroom[]> {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: assignments } = await supabase
+      .from("classroom_teacher_assignments")
+      .select("classroom_id, classroom_role, start_date")
+      .eq("teacher_user_id", user.id)
+      .is("end_date", null)
+      .order("start_date", { ascending: false });
+    if (!assignments?.length) return [];
+
+    // Dedupe by classroom, keeping the most recent assignment's role.
+    const roleById = new Map<string, ActiveClassroom["role"]>();
+    for (const a of assignments as Array<{
+      classroom_id: string;
+      classroom_role: ActiveClassroom["role"];
+    }>) {
+      if (!roleById.has(a.classroom_id)) roleById.set(a.classroom_id, a.classroom_role ?? null);
+    }
+    const ids = [...roleById.keys()];
+    if (ids.length === 0) return [];
+
+    const { data: rooms } = await supabase
+      .from("classrooms")
+      .select("id, name, code")
+      .in("id", ids);
+    if (!rooms?.length) return [];
+
+    return (rooms as Array<{ id: string; name: string; code: string | null }>)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        role: roleById.get(c.id) ?? null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 );
 
