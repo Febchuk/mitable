@@ -14,6 +14,7 @@ import type {
   ClassroomProgressSubject,
 } from "@/lib/queries/classroom-progress";
 import { GROUP_COLOR_META } from "@/lib/classroom-groups";
+import { classroomGroupsEnabled } from "@/lib/feature-flags";
 import { BulkBar } from "./bulk-bar";
 import { BulkSheet } from "./bulk-sheet";
 import { LeftRail } from "./left-rail";
@@ -367,10 +368,9 @@ function ProgressFeatureLoaded({
   const store = useMontessori();
   const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = store;
 
-  // Group ("team") filtering ships behind a feature flag (wired up in a
-  // follow-up commit). Until then the Class picker takes the slot the old Group
-  // filter used to occupy, so we keep the machinery but render nothing.
-  const groupsEnabled = false;
+  // Group ("team") filtering is gated by a feature flag; the Class picker owns
+  // this slot by default and the Group filter only appears when enabled.
+  const groupsEnabled = classroomGroupsEnabled();
 
   // Group ("team") filter. null = whole class. A group with no present children
   // still selectable; the grid simply shows an empty-roster message.

@@ -36,3 +36,12 @@ export function enableCaptureWorker(): boolean {
 export function enableLocalIntent(): boolean {
   return readPublicFlag("NEXT_PUBLIC_ENABLE_LOCAL_INTENT");
 }
+
+/**
+ * When true, the Progress grid shows the in-class Group ("team") filter
+ * alongside the Class picker. Off by default — most schools just switch
+ * between whole classrooms.
+ */
+export function classroomGroupsEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_CLASSROOM_GROUPS");
+}
