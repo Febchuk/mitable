@@ -30,6 +30,11 @@ export type ChatMode = "open" | "pill";
  *  silently misalign cells. */
 export type ProgressByTopic = Record<string, Record<string, Record<string, ProgressMark>>>;
 
+/** Minimal classroom shape for the Progress class switcher. */
+export type ProgressClassroom = { id: string; name: string };
+
+const SELECTED_CLASSROOM_KEY = "mitable.selectedClassroom";
+
 export type MontessoriStore = {
   // navigation per surface
   webRoute: WebRoute;
@@ -44,6 +49,15 @@ export type MontessoriStore = {
    *  Null when the page that owns the provider didn't pass an initial payload
    *  (mock-only surfaces) or when there's no active classroom. */
   classroomProgress: ClassroomProgress | null;
+  /** Every classroom the teacher is assigned to — drives the class switcher. */
+  classrooms: ProgressClassroom[];
+  /** The classroom currently shown across Progress/Curriculum. */
+  selectedClassroomId: string | null;
+  /** True while `selectClassroom` is fetching a new room's payload. */
+  classroomBusy: boolean;
+  /** Swap the active classroom: refetch its roster/curriculum/progress and
+   *  rehydrate the store. Persists the choice so other pages stay in sync. */
+  selectClassroom: (id: string) => Promise<void>;
   /** When false, hide Speech progress (no speech program on assigned classrooms). */
   showSpeechProgressTab: boolean;
   progressByTopic: ProgressByTopic;
@@ -159,10 +173,12 @@ function progressFromClassroom(initial: ClassroomProgress): ProgressByTopic {
 export function MontessoriProvider({
   children,
   initialClassroomProgress = null,
+  initialClassrooms = [],
   showSpeechProgressTab = false,
 }: {
   children: React.ReactNode;
   initialClassroomProgress?: ClassroomProgress | null;
+  initialClassrooms?: ProgressClassroom[];
   showSpeechProgressTab?: boolean;
 }) {
   const [webRoute, setWebRouteState] = React.useState<WebRoute>("today");
@@ -182,6 +198,53 @@ export function MontessoriProvider({
     () => initialClassroomProgress?.recentUpdates ?? []
   );
   const [attendance, setAttendance] = React.useState(INITIAL_ATTENDANCE);
+
+  const [classrooms] = React.useState<ProgressClassroom[]>(initialClassrooms);
+  const [selectedClassroomId, setSelectedClassroomId] = React.useState<string | null>(
+    initialClassroomProgress?.classroomId ?? null
+  );
+  const [classroomBusy, setClassroomBusy] = React.useState(false);
+
+  const selectClassroom = React.useCallback(
+    async (id: string) => {
+      if (!id || id === selectedClassroomId || classroomBusy) return;
+      setClassroomBusy(true);
+      try {
+        const res = await fetch(
+          `/api/v1/classroom-progress?classroomId=${encodeURIComponent(id)}`,
+          { credentials: "include" }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = (await res.json()) as ClassroomProgress | null;
+        if (!payload) throw new Error("empty classroom payload");
+        setClassroomProgress(payload);
+        setProgressByTopic(progressFromClassroom(payload));
+        setNotesByTopic({});
+        setRecentUpdates(payload.recentUpdates ?? []);
+        setSelectedClassroomId(payload.classroomId);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(SELECTED_CLASSROOM_KEY, payload.classroomId);
+        }
+      } catch {
+        ToastBus.push({ message: "Couldn't switch class — try again" });
+      } finally {
+        setClassroomBusy(false);
+      }
+    },
+    [selectedClassroomId, classroomBusy]
+  );
+
+  // Restore the teacher's last-picked class on mount. The layout server-renders
+  // their most recent classroom; if they last chose a different one, swap to it.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(SELECTED_CLASSROOM_KEY);
+    if (stored && stored !== selectedClassroomId && classrooms.some((c) => c.id === stored)) {
+      void selectClassroom(stored);
+    }
+    // Run once on mount; selectClassroom guards against redundant swaps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [reportsFilter, setReportsFilter] = React.useState("All");
   const [rosterFilter, setRosterFilter] = React.useState("All");
@@ -492,6 +555,10 @@ export function MontessoriProvider({
     chat,
     reports,
     classroomProgress,
+    classrooms,
+    selectedClassroomId,
+    classroomBusy,
+    selectClassroom,
     showSpeechProgressTab,
     progressByTopic,
     notesByTopic,

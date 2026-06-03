@@ -11,6 +11,7 @@ import { MontessoriProvider } from "@/components/montessori/store";
 import {
   getActiveClassroomForCurrentUser,
   getCurrentUserContext,
+  listTeacherClassroomsForCurrentUser,
   teacherShouldSeeSpeechProgressTab,
 } from "@/lib/app/active-classroom";
 import { getClassroomProgress } from "@/lib/queries/classroom-progress";
@@ -27,6 +28,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // hydrated server-side. Skipped for admins (their /app shell shows admin
   // pages, not the teacher Progress tab).
   const initialClassroomProgress = isAdmin ? null : await getClassroomProgress();
+  // All rooms the teacher can switch between (Progress class picker).
+  const teacherClassrooms = isAdmin ? [] : await listTeacherClassroomsForCurrentUser();
   const showSpeechProgressTab = !isAdmin && (await teacherShouldSeeSpeechProgressTab());
   const showTodayAndAgent = !isAdmin && addTodayProgressAndAgent();
   const showReportFirstNav = !isAdmin && reportFirstExperience();
@@ -34,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <MontessoriProvider
       initialClassroomProgress={initialClassroomProgress}
+      initialClassrooms={teacherClassrooms.map((c) => ({ id: c.id, name: c.name }))}
       showSpeechProgressTab={showSpeechProgressTab}
     >
       <ActiveReportProvider>
