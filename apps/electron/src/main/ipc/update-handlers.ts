@@ -98,28 +98,55 @@ export function registerUpdateHandlers() {
         const date = new Date(dateKey + "T00:00:00");
         const workBlocks = [];
 
+        // Lazy-load the duration helpers (same gap-capped active-time definition
+        // used by the BlockAggregator) so the live block duration matches the
+        // final block duration instead of wall-clock.
+        const { captureIntervalDurationMs, captureAppBreakdown } = await import(
+          "../../services/on-device/blockAggregator"
+        );
+
         for (const session of daySessions) {
           const story = await pgDb.getStoryForSession(session.id);
           const captures = await pgDb.getCapturesForSession(session.id);
 
           const startTime = new Date(session.startedAt);
           const endTime = session.endedAt ? new Date(session.endedAt) : null;
-          const durationMs =
-            (session.endedAt ?? Date.now()) - session.startedAt - session.totalPausedMs;
-          const durationMin = Math.round(durationMs / 60_000);
 
-          const appCounts = new Map<string, number>();
-          for (const cap of captures) {
-            appCounts.set(cap.appName, (appCounts.get(cap.appName) ?? 0) + 1);
-          }
-          const totalCaps = captures.length || 1;
-          const appBreakdown = [...appCounts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([appName, count]) => ({
-              app: appName,
-              minutes: Math.round((count / totalCaps) * durationMin),
-              percentage: Math.round((count / totalCaps) * 100),
-            }));
+          // For active sessions there are no classifications/block boundaries
+          // yet, but we still have capture timestamps. Use them with the same
+          // 60s gap-cap as the aggregator so the live card never inflates to
+          // wall-clock. For ended sessions, fall back to wall-clock minus
+          // paused time; the aggregator overwrites this once its pipeline
+          // completes, so this only matters as a first-paint estimate.
+          const activeDurationMs = captureIntervalDurationMs(captures);
+          const wallClockMs =
+            (session.endedAt ?? Date.now()) - session.startedAt - session.totalPausedMs;
+          const durationMs = session.endedAt ? wallClockMs : Math.min(wallClockMs, activeDurationMs);
+          const durationMin = Math.max(1, Math.round(durationMs / 60_000));
+
+          // Per-app minutes: prefer the aggregator's gap-capped version.
+          // For a single capture (durationMin would still be 1 from min-floor),
+          // attribute that minute to the one app we have data for.
+          const appMs = captureAppBreakdown(captures);
+          const totalAppMs = Object.values(appMs).reduce((a, b) => a + b, 0);
+          const appBreakdown = (() => {
+            if (totalAppMs > 0) {
+              return Object.entries(appMs)
+                .sort((a, b) => b[1] - a[1])
+                .map(([appName, ms]) => ({
+                  app: appName,
+                  minutes: Math.max(1, Math.round(ms / 60_000)),
+                  percentage: Math.round((ms / totalAppMs) * 100),
+                }));
+            }
+            if (captures.length > 0) {
+              // Single capture / no pairs — attribute the floored minute to the
+              // most-recent app seen.
+              const last = [...captures].sort((a, b) => a.capturedAt - b.capturedAt).pop()!;
+              return [{ app: last.appName, minutes: durationMin, percentage: 100 }];
+            }
+            return [];
+          })();
 
           let taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }> =
             [];
