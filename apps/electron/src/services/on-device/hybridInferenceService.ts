@@ -54,6 +54,7 @@ export interface InferenceTier {
 class HybridInferenceService {
   private currentTier: InferenceTier | null = null;
   private currentMdPath: string | null = null;
+  private currentUserId: string | undefined = undefined;
   private sessionStartMs: number = 0;
   private provider: InferenceProvider | null = null;
 
@@ -233,6 +234,15 @@ class HybridInferenceService {
     const t0 = Date.now();
     logger.info(`Hybrid processAllAtEnd starting for session ${sessionId}`);
 
+    // Look up the active local user once so the cloud prompt can ground itself
+    // in the user's identity (avoid "user meets user"-style hallucination).
+    try {
+      const activeId = await pgDb.getUserPreference("system", "activeLocalUserId");
+      this.currentUserId = activeId ?? undefined;
+    } catch {
+      this.currentUserId = undefined;
+    }
+
     const emit = (
       step: string,
       percent: number,
@@ -402,7 +412,7 @@ class HybridInferenceService {
           .join("\n");
 
         // Analyze batch (routes to local or cloud)
-        const result = await this.analyzeBatch(batch, transcriptText);
+        const result = await this.analyzeBatch(batch, transcriptText, this.currentUserId);
         batchNarratives.push(result.batchNarrative);
 
         // Store captures
@@ -511,12 +521,13 @@ class HybridInferenceService {
    */
   private async analyzeBatch(
     frames: BufferedFrame[],
-    transcriptSegments: string
+    transcriptSegments: string,
+    userId?: string
   ): Promise<BatchAnalysisResult> {
     if (!this.provider) {
       throw new Error("No BYOK provider configured");
     }
-    return this.analyzeBatchCloud(frames, transcriptSegments);
+    return this.analyzeBatchCloud(frames, transcriptSegments, userId);
   }
 
   /**
@@ -626,7 +637,8 @@ class HybridInferenceService {
 
   private async analyzeBatchCloud(
     frames: BufferedFrame[],
-    transcriptSegments: string
+    transcriptSegments: string,
+    userId?: string
   ): Promise<BatchAnalysisResult> {
     if (!this.provider) {
       throw new Error("No BYOK provider configured for cloud batch analysis");
@@ -640,20 +652,59 @@ class HybridInferenceService {
       if (ev?.copyCount) parts.push(`${ev.copyCount} copies`);
       if (ev?.pasteCount) parts.push(`${ev.pasteCount} pastes`);
 
-      return `Frame ${i + 1}: ${f.appName} - ${f.windowTitle}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+      const wallClock = new Date(f.capturedAt).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      return `Frame ${i + 1} (${wallClock}): ${f.appName} - ${f.windowTitle}${parts.length ? ` (${parts.join(", ")})` : ""}`;
     });
+
+    // Resolve the user's display name so we can ground the model and avoid
+    // "user is in a meeting with user" hallucinations.
+    let userDisplayName = "";
+    if (userId) {
+      try {
+        const account = await pgDb.getLocalAccountById(userId);
+        if (account) {
+          const full = [account.firstName, account.lastName].filter(Boolean).join(" ").trim();
+          if (full) userDisplayName = full;
+          else if (account.email) userDisplayName = account.email.split("@")[0];
+        }
+      } catch {
+        // Non-fatal — prompt just won't include the name
+      }
+    }
+
+    const hasTranscripts = transcriptSegments.trim().length > 0;
 
     const promptText = `Analyze ${frames.length} sequential screenshots from a work session.
 
-Per-frame metadata:
+${
+  userDisplayName
+    ? `THE USER VIEWING THESE SCREENS IS: ${userDisplayName}
+The user is one of the people on screen. If a participant's name in a meeting matches the user, they are the SAME PERSON — describe them in the third person but do not treat them as a separate colleague.
+`
+    : ""
+}Per-frame metadata (the wall-clock time is the real capturedAt of the frame, not a time read off the image):
 ${metadataLines.join("\n")}
 
-${transcriptSegments ? `Audio transcript during this period:\n${transcriptSegments}\n\n` : ""}For each frame, describe what you see on screen in detail. Read the CONTENT, not just the container:
+${hasTranscripts ? `Audio transcripts during this period (these are real — trust them):\n${transcriptSegments}\n\n` : `No audio transcripts are available for this batch — there is NO audio data. Do not describe voice, speech, mic activity, screen-sharing audio, or what anyone "said". A highlighted mic button is a UI state, not proof of audio.\n`}
+Hard rules — read carefully:
+
+1. NO FABRICATED AUDIO. If transcripts are not provided above, do not describe anyone's voice, what was "said", who "spoke", or whether the microphone is "active". Button states are UI affordances, not events.
+2. NO INVENTED TIMESTAMPS. The wall-clock time shown in the metadata is the real capturedAt of the screenshot. If a clock on screen shows a different time (a meeting timer, a stale system tray, a tab clock), it is NOT the time of the frame — use the metadata time, not the visible clock.
+3. NO INVENTED DURATIONS. Do not write "this spans 2 hours" or "this took 30 minutes". Describe only what is on screen. If the timestamps tell you something concrete (e.g. 20 screenshots across 60 seconds), say that.
+4. COPY IDs AND NAMES EXACTLY. If you see "VIT1500389", write "VIT1500389" — do not turn it into "VIT15003899" or "VIT1500399". If a name is "Aurel Npounengnong", write it that way. The model has been observed to hallucinate extra/missing digits and reorder name parts — be strict.
+5. NO EXTRANEOUS FRAMING. Do not write "A Microsoft Teams meeting was in progress" as if a third party were describing it. Either write from the user's perspective ("In a Teams meeting, …") or describe what is literally on screen.
+6. DO NOT INFER PARTICIPATION FROM UI STATES. A highlighted mic icon does not mean someone is speaking. A "Raise Hand" button being visible does not mean anyone raised their hand. Report only what is concretely visible (names in the participant list, a chat message, a screen-share indicator with content).
+
+Per-frame instructions — read the CONTENT, not just the container:
 
 - VIDEO/MEDIA: Read the video title, channel name, topic. What is the content about?
 - CODE EDITOR: Read file names in tabs/sidebar, function/class names visible in code, language. Is there a terminal with errors, build output, or test results? Is there an AI chat panel (Cursor, Copilot, ChatGPT) — what's the conversation about?
 - IDE CONTEXT: What's in the file explorer? Any git diff views? What branch? What files changed?
-- MEETINGS/CALLS: Who's on the call? What app? Any shared screen, presentation, or agenda visible?
+- MEETINGS/CALLS: List the visible participants by name. What app? Is there a shared screen, presentation, or agenda visible? If you can read chat messages, summarise them. If transcripts are present, integrate them.
 - BROWSER: What site and page? Article titles, search queries, form content, documentation topics?
 - EMAIL/MESSAGING: Who's the conversation with? Subject line? What's being discussed?
 - ISSUE TRACKERS: Jira/Linear/GitHub issue title and number? Status?
@@ -662,7 +713,7 @@ ${transcriptSegments ? `Audio transcript during this period:\n${transcriptSegmen
 
 Scale detail to richness: a static idle screen = 1 sentence. A rich IDE with code, terminal, sidebar, and chat = 3-4 sentences covering each visible element.
 
-Then write a batchNarrative summarizing WHAT was being worked on across all frames — the subject matter, not just which apps were open.
+Then write a batchNarrative summarising WHAT was being worked on across all frames — the subject matter, not just which apps were open. Keep the narrative grounded in observable evidence; do not pad with invented context.
 
 Return JSON:
 {
