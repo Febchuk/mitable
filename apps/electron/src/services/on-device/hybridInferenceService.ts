@@ -344,6 +344,9 @@ class HybridInferenceService {
         );
       }
 
+      const remainingBatchCount = totalBatches - processedBatchIndices.size;
+      let remainingIdx = 0;
+
       for (
         let offset = 0, batchIdx = 0;
         offset < allFrameMeta.length;
@@ -357,13 +360,19 @@ class HybridInferenceService {
           continue;
         }
 
-        const batchPercent = 20 + Math.round((batchIdx / totalBatches) * 60);
-        emit(
-          "processing_batch",
-          batchPercent,
-          `Analyzing frames (${batchIdx + 1} of ${totalBatches})...`,
-          { batchIndex: batchIdx, totalBatches }
-        );
+        // Progress accounts only for remaining batches so the UI doesn't show
+        // "1 of 8" when streaming has already finished 7.
+        const batchPercent =
+          remainingBatchCount > 0 ? 20 + Math.round((remainingIdx / remainingBatchCount) * 60) : 80;
+        const progressLabel =
+          remainingBatchCount > 0
+            ? `Analyzing frames (${remainingIdx + 1} of ${remainingBatchCount})...`
+            : "Finalizing remaining analysis...";
+        emit("processing_batch", batchPercent, progressLabel, {
+          batchIndex: batchIdx,
+          totalBatches: remainingBatchCount,
+        });
+        remainingIdx++;
 
         // Load frame images
         const batch: BufferedFrame[] = [];
