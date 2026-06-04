@@ -14,6 +14,7 @@ import type {
   ProviderName,
 } from "./types";
 import { DEFAULT_MODELS } from "./types";
+import { classifyApiError } from "./imageValidation";
 
 const logger = createLogger("GeminiProvider");
 
@@ -55,6 +56,8 @@ export class GeminiProvider implements InferenceProvider {
 
     if (!response.ok) {
       const errText = await response.text();
+      const billing = classifyApiError(this.name, response.status, errText);
+      if (billing) throw billing;
       throw new Error(`Gemini API error ${response.status}: ${errText.slice(0, 300)}`);
     }
 

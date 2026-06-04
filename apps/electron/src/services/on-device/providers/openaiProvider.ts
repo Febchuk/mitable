@@ -8,6 +8,7 @@
 import { createLogger } from "../../../lib/logger";
 import type { InferenceProvider, ChatMessage, ChatCompletionOptions, ProviderName } from "./types";
 import { DEFAULT_MODELS } from "./types";
+import { classifyApiError } from "./imageValidation";
 
 const logger = createLogger("OpenAIProvider");
 
@@ -45,6 +46,8 @@ export class OpenAIProvider implements InferenceProvider {
 
     if (!response.ok) {
       const errText = await response.text();
+      const billing = classifyApiError(this.name, response.status, errText);
+      if (billing) throw billing;
       throw new Error(`OpenAI API error ${response.status}: ${errText.slice(0, 300)}`);
     }
 

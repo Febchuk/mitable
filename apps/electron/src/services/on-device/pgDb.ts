@@ -665,6 +665,33 @@ class PgDatabase {
     return row ? parseInt(row.cnt, 10) : 0;
   }
 
+  /**
+   * All captures for a user that overlap a date range.
+   * Used by blockAggregator to compute per-app "active capture time" for the
+   * daily summary, since per-block durations are an unreliable proxy.
+   *
+   * `startMs` / `endMs` are inclusive epoch-ms bounds. The captures table
+   * doesn't have a user_id column directly, so we join through
+   * monitoring_sessions.
+   */
+  async getCapturesForUserDateRange(
+    userId: string,
+    startMs: number,
+    endMs: number
+  ): Promise<LocalCapture[]> {
+    if (!db) return [];
+    const result = await db.query(
+      `SELECT c.* FROM captures c
+       JOIN monitoring_sessions s ON s.id = c.session_id
+       WHERE s.user_id = $1
+         AND c.captured_at >= $2
+         AND c.captured_at <= $3
+       ORDER BY c.captured_at ASC`,
+      [userId, startMs, endMs]
+    );
+    return mapRows<LocalCapture>(result.rows as Record<string, unknown>[]);
+  }
+
   // ── Classifications ─────────────────────────────────────────────────────
 
   async insertClassification(

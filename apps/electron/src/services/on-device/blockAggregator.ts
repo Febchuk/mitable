@@ -37,6 +37,56 @@ const logger = createLogger("BlockAggregator");
 
 const MIN_BLOCK_DURATION_MS = 30_000;
 
+/**
+ * Cap on how much "active time" we credit per capture interval. If the user
+ * sat idle for 10 minutes between captures, we still only count 60s — that's
+ * the most conservative definition of "they were actually doing work".
+ */
+const MAX_INTERVAL_CREDIT_MS = 60_000;
+
+/**
+ * Sum of "active capture time" across the given captures.
+ *
+ * Wall-clock `endedAt - startedAt` is misleading because:
+ *   - For a still-running session, there's no `endedAt`, so Date.now() keeps
+ *     the duration growing forever (see incident 2026-06-04: 20-min session
+ *     showed 2h 28m).
+ *   - It includes long idle gaps (user in a meeting, app paused in background).
+ *
+ * Definition: for each consecutive pair of captures, add the gap, but cap
+ * the gap at MAX_INTERVAL_CREDIT_MS. Single capture = 0.
+ */
+export function captureIntervalDurationMs(captures: LocalCapture[]): number {
+  if (captures.length < 2) return 0;
+  const sorted = [...captures].sort((a, b) => a.capturedAt - b.capturedAt);
+  let total = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i].capturedAt - sorted[i - 1].capturedAt;
+    if (gap > 0) total += Math.min(gap, MAX_INTERVAL_CREDIT_MS);
+  }
+  return total;
+}
+
+/**
+ * Per-app "active capture time" from a session's captures, using the same
+ * gap-capped definition as `captureIntervalDurationMs`.
+ */
+export function captureAppBreakdown(captures: LocalCapture[]): Record<string, number> {
+  if (captures.length < 2) return {};
+  const sorted = [...captures].sort((a, b) => a.capturedAt - b.capturedAt);
+  const appMs: Record<string, number> = {};
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    if (prev.appName !== curr.appName) continue; // only credit same-app gaps
+    const gap = curr.capturedAt - prev.capturedAt;
+    if (gap <= 0) continue;
+    const credit = Math.min(gap, MAX_INTERVAL_CREDIT_MS);
+    appMs[curr.appName] = (appMs[curr.appName] ?? 0) + credit;
+  }
+  return appMs;
+}
+
 function dateKeyFromMs(ms: number): string {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -167,6 +217,11 @@ function fallbackGroupBlocks(
   const tsMap = new Map<number, number>();
   for (const c of captures) tsMap.set(c.sequenceNumber, c.capturedAt);
 
+  // Pre-index captures by sequence for fast block-scoped lookups.
+  // Captures in a block are those whose sequenceNumber is in [cl.startSequence, cl.endSequence].
+  const capturesBySeq = new Map<number, LocalCapture>();
+  for (const c of captures) capturesBySeq.set(c.sequenceNumber, c);
+
   const blocks: EmittedBlock[] = [];
   let current: EmittedBlock | null = null;
 
@@ -174,6 +229,16 @@ function fallbackGroupBlocks(
     const category = normalizeCategory(cl.activityType);
     const startMs = tsMap.get(cl.startSequence) ?? cl.createdAt;
     const endMs = tsMap.get(cl.endSequence) ?? cl.createdAt;
+
+    // Block-scoped captures for accurate per-block duration (active capture time,
+    // not first-to-last wall-clock). Falls back to the previously used
+    // (endMs - startMs) for the merge case below.
+    const blockCaptures: LocalCapture[] = [];
+    for (let seq = cl.startSequence; seq <= cl.endSequence; seq++) {
+      const c = capturesBySeq.get(seq);
+      if (c) blockCaptures.push(c);
+    }
+    const blockDurationMs = Math.max(captureIntervalDurationMs(blockCaptures), endMs - startMs);
 
     if (current && current.category === category) {
       current.endMs = Math.max(current.endMs, endMs);
@@ -187,7 +252,7 @@ function fallbackGroupBlocks(
         name: cl.activityDescription || category,
         startMs,
         endMs: Math.max(endMs, startMs),
-        durationMs: Math.max(endMs - startMs, 0),
+        durationMs: Math.max(blockDurationMs, 0),
         description: cl.activityDescription || category,
         apps: appName ? [appName] : [],
         category,
@@ -337,17 +402,22 @@ export async function aggregateSession(
 async function rebuildDailySummary(userId: string, date: string): Promise<void> {
   const blocks = await pgDb.getActivityBlocksForDate(userId, date);
 
-  let totalActiveMs = 0;
-  const categoryMs: Record<string, number> = {};
-  const appMs: Record<string, number> = {};
-  const sessionIds = new Set<string>();
+  // Day boundary in local time — matches `dateKeyFromMs` above.
+  const [yyyy, mm, dd] = date.split("-").map(Number);
+  const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
+  const dayEnd = new Date(yyyy, mm - 1, dd, 23, 59, 59, 999).getTime();
+  const captures = await pgDb.getCapturesForUserDateRange(userId, dayStart, dayEnd);
 
+  // Total + per-app time come from the captures themselves (gap-capped active
+  // time). Per-category time still comes from blocks, since categories are a
+  // block-level concept assigned by the Block Analyzer.
+  const totalActiveMs = captureIntervalDurationMs(captures);
+  const appMs = captureAppBreakdown(captures);
+
+  const categoryMs: Record<string, number> = {};
+  const sessionIds = new Set<string>();
   for (const b of blocks) {
-    totalActiveMs += b.durationMs;
     categoryMs[b.category] = (categoryMs[b.category] ?? 0) + b.durationMs;
-    if (b.appName) {
-      appMs[b.appName] = (appMs[b.appName] ?? 0) + b.durationMs;
-    }
     sessionIds.add(b.sessionId);
   }
 
@@ -362,6 +432,7 @@ async function rebuildDailySummary(userId: string, date: string): Promise<void> 
   });
 
   logger.info(
-    `Daily summary for ${date}: ${(totalActiveMs / 60000).toFixed(0)}min across ${sessionIds.size} sessions`
+    `Daily summary for ${date}: ${(totalActiveMs / 60000).toFixed(0)}min ` +
+      `active across ${sessionIds.size} sessions, ${Object.keys(appMs).length} apps`
   );
 }

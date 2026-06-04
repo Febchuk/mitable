@@ -21,6 +21,7 @@ import { localAudioService } from "./localAudioService";
 import { localFrameStorage } from "../localFrameStorage";
 import { keyVault } from "./keyVault";
 import { createProvider, type InferenceProvider } from "./providers";
+import { isValidBase64Image } from "./providers/imageValidation";
 import { runRLMLoop, type CompletionFn } from "./rlm/local-rlm-engine";
 import { StorytellerEnvironment } from "./rlm/storyteller-rlm-environment";
 import { STORYTELLER_TOOLS } from "./rlm/storyteller-rlm-tools";
@@ -672,7 +673,40 @@ Return JSON:
   "batchNarrative": "Summary of what was being worked on across all frames..."
 }`;
 
-    const imageContent = frames.map((frame) => ({
+    // Pre-flight: drop frames whose base64 payload won't decode, log and move on.
+    // Don't retry the whole batch for one bad image — that wastes API calls and
+    // can hang a single batch indefinitely (see incident 2026-06-04 Batch 3).
+    const validFrames: BufferedFrame[] = [];
+    const skippedSeqs: number[] = [];
+    for (const f of frames) {
+      if (isValidBase64Image(f.imageBase64)) {
+        validFrames.push(f);
+      } else {
+        skippedSeqs.push(f.sequenceNumber);
+        logger.warn(`analyzeBatchCloud: dropping frame seq=${f.sequenceNumber} (invalid base64)`);
+      }
+    }
+
+    if (validFrames.length === 0) {
+      logger.warn("analyzeBatchCloud: no valid frames in batch — returning fallback");
+      return {
+        frameDescriptions: frames.map((f) => ({
+          sequenceNumber: f.sequenceNumber,
+          description: `[${f.appName}] ${f.windowTitle}`,
+          userAction: null,
+        })),
+        batchNarrative: "Activity recorded (frames unreadable).",
+      };
+    }
+
+    if (skippedSeqs.length > 0) {
+      logger.info(
+        `analyzeBatchCloud: sending ${validFrames.length}/${frames.length} frames ` +
+          `(skipped seq: ${skippedSeqs.join(", ")})`
+      );
+    }
+
+    const imageContent = validFrames.map((frame) => ({
       type: "image_url" as const,
       image_url: {
         url: frame.imageBase64.startsWith("data:")
@@ -698,11 +732,22 @@ Return JSON:
 
     try {
       const parsed = JSON.parse(text) as BatchAnalysisResult;
-      // Remap 1-indexed relative sequenceNumbers to actual frame sequenceNumbers
+      // Remap 1-indexed relative sequenceNumbers back to the actual frame
+      // sequenceNumbers (only for frames we actually sent).
       for (let i = 0; i < parsed.frameDescriptions.length; i++) {
-        if (i < frames.length) {
-          parsed.frameDescriptions[i].sequenceNumber = frames[i].sequenceNumber;
+        if (i < validFrames.length) {
+          parsed.frameDescriptions[i].sequenceNumber = validFrames[i].sequenceNumber;
         }
+      }
+      // Append a placeholder for any frame we couldn't send so callers see
+      // every original sequence number in the captures table.
+      for (const seq of skippedSeqs) {
+        const original = frames.find((f) => f.sequenceNumber === seq);
+        parsed.frameDescriptions.push({
+          sequenceNumber: seq,
+          description: `[${original?.appName ?? "Unknown"}] ${original?.windowTitle ?? ""}`.trim(),
+          userAction: null,
+        });
       }
       return parsed;
     } catch {
