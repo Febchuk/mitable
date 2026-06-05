@@ -12,10 +12,11 @@
  */
 
 import { createLogger } from "../lib/logger";
+import { KEYCHAIN_SERVICE } from "../lib/env";
 
 const logger = createLogger("KeychainService");
 
-const SERVICE_NAME = "Mitable";
+const SERVICE_NAME = KEYCHAIN_SERVICE;
 
 // Lazy-load keytar to avoid blocking the main process at import time.
 // keytar is a native module that may take time to initialize.
@@ -94,8 +95,19 @@ class KeychainService {
   }
 
   /**
-   * Find ALL stored refresh tokens for the Mitable service.
-   * Returns account keys so we can clear them on full logout.
+   * Remove a single credential by raw account key.
+   */
+  async clearRefreshTokenByAccount(account: string): Promise<void> {
+    try {
+      const keytar = await getKeytar();
+      await keytar.deletePassword(SERVICE_NAME, account);
+    } catch {
+      // may not exist
+    }
+  }
+
+  /**
+   * Find ALL stored credentials for the Mitable service.
    */
   async findAllCredentials(): Promise<Array<{ account: string; password: string }>> {
     try {

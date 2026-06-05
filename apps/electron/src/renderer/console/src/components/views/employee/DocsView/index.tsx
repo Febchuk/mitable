@@ -1,57 +1,157 @@
 /**
- * DocsView — Redesigned
+ * DocsView — Redesigned (Local)
  *
  * Clean document list grouped by date, with a "New doc" button top-right.
- * Styled to match the new design system (dark canvas, Inter/Newsreader).
+ * Styled to match the design system (dark canvas, Inter/Newsreader).
+ * Data sourced from local SQLite via IPC instead of backend HTTP.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDocuments } from "@/console/src/hooks/queries/documents";
-import { AlertCircle, Plus, Lock } from "lucide-react";
+import { AlertCircle, Plus, Trash2, CheckCircle, Clock } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import CreateDocumentModal from "./dialogs/CreateDocumentModal";
-import { groupByDay } from "@/console/src/components/shared/groupByDay";
-import DocsViewSkeleton from "./DocsViewSkeleton";
-import type { Document } from "@mitable/shared";
 
-function isReportDocument(doc: Document): boolean {
-  return doc.tags?.includes("report") ?? false;
+interface LocalDoc {
+  id: string;
+  userId: string;
+  filePath: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  pageCount: number;
+  chunkCount: number;
+  status: string;
+  error: string | null;
+  content?: string | null;
+  title?: string | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
-function formatTime(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", {
+interface DateGroup {
+  label: string;
+  items: LocalDoc[];
+}
+
+function formatTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: false,
   });
 }
 
-function getDocInitial(doc: Document): string {
-  return (doc.title || "U").charAt(0).toUpperCase();
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+function getDocInitial(doc: LocalDoc): string {
+  return doc.fileType.charAt(0).toUpperCase();
+}
+
+function groupByDay(docs: LocalDoc[]): DateGroup[] {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const yesterdayStart = todayStart - 86400000;
+
+  const groups = new Map<string, LocalDoc[]>();
+
+  for (const doc of docs) {
+    let label: string;
+    if (doc.createdAt >= todayStart) label = "Today";
+    else if (doc.createdAt >= yesterdayStart) label = "Yesterday";
+    else {
+      label = new Date(doc.createdAt).toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      });
+    }
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label)!.push(doc);
+  }
+
+  return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
+}
+
+const STATUS_ICON: Record<string, React.ReactNode> = {
+  ready: <CheckCircle size={12} style={{ color: "var(--status-success)" }} />,
+  parsing: <Clock size={12} style={{ color: "var(--status-warning)" }} />,
+  error: <AlertCircle size={12} style={{ color: "var(--status-error)" }} />,
+};
 
 export default function DocsView() {
   const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [documents, setDocuments] = useState<LocalDoc[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading, error } = useDocuments();
-  const documents = (data?.documents || []).filter((doc) => !isReportDocument(doc));
+  const loadDocs = useCallback(async () => {
+    try {
+      if (!window.consoleAPI?.localDocsList) {
+        console.warn("[DocsView] consoleAPI.localDocsList not available");
+        setDocuments([]);
+        setIsLoading(false);
+        return;
+      }
+      const result = await window.consoleAPI.localDocsList();
+      setDocuments((result?.documents as LocalDoc[]) ?? []);
+      setError(null);
+    } catch (err) {
+      console.error("[DocsView] Failed to load docs:", err);
+      setError(String(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDocs();
+  }, [loadDocs]);
+
+  // Poll while any doc is still parsing
+  useEffect(() => {
+    const hasPending = documents.some((d) => d.status === "parsing" || d.status === "pending");
+    if (!hasPending) return;
+    const interval = setInterval(loadDocs, 2000);
+    return () => clearInterval(interval);
+  }, [documents, loadDocs]);
+
+  // Reload after modal closes (new doc may have been added)
+  useEffect(() => {
+    if (!isCreateModalOpen) loadDocs();
+  }, [isCreateModalOpen, loadDocs]);
 
   const sortedDocuments = useMemo(() => {
-    return [...documents].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    return [...documents].sort((a, b) => b.createdAt - a.createdAt);
   }, [documents]);
 
-  const groupedDocuments = useMemo(
-    () => groupByDay(sortedDocuments, (doc) => doc.updatedAt),
-    [sortedDocuments]
-  );
+  const groupedDocuments = useMemo(() => groupByDay(sortedDocuments), [sortedDocuments]);
+
+  const handleDelete = async (docId: string) => {
+    await window.consoleAPI.localDocsDelete?.(docId);
+    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+  };
 
   if (isLoading) {
-    return <DocsViewSkeleton />;
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: 80 }}>
+        <div
+          style={{
+            width: 20,
+            height: 20,
+            border: "2px solid rgba(var(--ui-rgb), 0.1)",
+            borderTopColor: "var(--text-tertiary)",
+            borderRadius: "50%",
+            animation: "spin 0.6s linear infinite",
+          }}
+        />
+      </div>
+    );
   }
 
   if (error) {
@@ -108,42 +208,44 @@ export default function DocsView() {
               margin: "12px 0 0",
             }}
           >
-            Generate docs from your work context
+            Your documents and imported files
           </p>
         </div>
 
-        {/* New doc button */}
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 12px",
-            borderRadius: 8,
-            border: "var(--border-subtle)",
-            background: "transparent",
-            color: "var(--text-primary)",
-            fontSize: 12,
-            fontFamily: "var(--font-sans)",
-            fontWeight: 500,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-            transition: "all 0.15s ease",
-            marginTop: 4,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
-            e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
-          }}
-        >
-          <Plus size={12} strokeWidth={2} />
-          New
-        </button>
+        {/* New doc button — only shown when docs exist (empty state has its own CTA) */}
+        {sortedDocuments.length > 0 && (
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 8,
+              border: "var(--border-subtle)",
+              background: "transparent",
+              color: "var(--text-primary)",
+              fontSize: 12,
+              fontFamily: "var(--font-sans)",
+              fontWeight: 500,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              transition: "all 0.15s ease",
+              marginTop: 4,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.05)";
+              e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.borderColor = "rgba(var(--ui-rgb), 0.12)";
+            }}
+          >
+            <Plus size={12} strokeWidth={2} />
+            New
+          </button>
+        )}
       </div>
 
       {/* Document list */}
@@ -167,21 +269,22 @@ export default function DocsView() {
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {group.items.map((doc) => {
                   const initial = getDocInitial(doc);
-                  const creatorName = doc.creator
-                    ? `${doc.creator.firstName} ${doc.creator.lastName}`.trim()
-                    : "Unknown";
+
+                  const hasContent = doc.fileType === "generated" || !!doc.content;
 
                   return (
                     <div
                       key={doc.id}
-                      onClick={() => navigate(`/docs/${doc.id}`)}
+                      onClick={() => {
+                        if (hasContent) navigate(`/docs/${doc.id}`);
+                      }}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
                         padding: "10px 12px",
                         borderRadius: 8,
-                        cursor: "pointer",
+                        cursor: hasContent ? "pointer" : "default",
                         transition: "background 0.12s ease",
                       }}
                       onMouseEnter={(e) => {
@@ -210,7 +313,7 @@ export default function DocsView() {
                         {initial}
                       </div>
 
-                      {/* Title + author */}
+                      {/* Title + meta */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
@@ -222,26 +325,25 @@ export default function DocsView() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {doc.title || "Untitled"}
+                          {doc.title || doc.fileName}
                         </div>
                         <div
                           style={{
                             fontSize: 12,
                             color: "var(--text-tertiary)",
                             marginTop: 1,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
+                            display: "flex",
+                            gap: 8,
                           }}
                         >
-                          {creatorName}
+                          <span>{formatBytes(doc.fileSize)}</span>
+                          {doc.chunkCount > 0 && <span>{doc.chunkCount} chunks</span>}
+                          {doc.pageCount > 1 && <span>{doc.pageCount} pages</span>}
                         </div>
                       </div>
 
                       {/* Status */}
-                      {doc.status === "draft" && (
-                        <Lock size={12} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-                      )}
+                      {STATUS_ICON[doc.status] ?? null}
 
                       {/* Time */}
                       <span
@@ -252,8 +354,34 @@ export default function DocsView() {
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {formatTime(doc.updatedAt)}
+                        {formatTime(doc.createdAt)}
                       </span>
+
+                      {/* Delete */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(doc.id);
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 4,
+                          borderRadius: 4,
+                          color: "var(--text-tertiary)",
+                          display: "flex",
+                          transition: "color 0.12s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = "var(--status-error)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = "var(--text-tertiary)";
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   );
                 })}
@@ -266,7 +394,7 @@ export default function DocsView() {
         <div style={{ paddingTop: 40 }}>
           <EmptyState
             title="No documents yet"
-            description="Create your first document or generate one from a work session."
+            description="Add a file or generate a document from your work sessions."
             actions={
               <button
                 onClick={() => setIsCreateModalOpen(true)}

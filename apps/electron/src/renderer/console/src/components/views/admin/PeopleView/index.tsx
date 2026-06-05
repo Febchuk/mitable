@@ -1,3 +1,7 @@
+/**
+ * @deprecated Admin/Team views no longer in use in the desktop app.
+ * Admin experience moves to the web app. Scheduled for migration.
+ */
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, ChevronRight, Zap } from "lucide-react";

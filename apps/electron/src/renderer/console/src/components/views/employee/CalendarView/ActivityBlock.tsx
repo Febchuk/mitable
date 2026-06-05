@@ -1,9 +1,84 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { ChevronRight, Clock, TrendingUp, LayoutList, Trash2, Users, User } from "lucide-react";
+import {
+  ChevronRight,
+  Clock,
+  TrendingUp,
+  LayoutList,
+  Trash2,
+  Users,
+  User,
+  Clipboard,
+  Check,
+  RotateCw,
+} from "lucide-react";
 import type { WorkBlock } from "./types";
 import { GranolaIcon } from "../../../../../../components/icons/integrations/GranolaIcon";
+
+function usePipelineProgress(sessionId: string | undefined, enabled: boolean) {
+  const [percent, setPercent] = useState(0);
+  const [label, setLabel] = useState("Preparing...");
+  const displayRef = useRef(0);
+  const [displayPercent, setDisplayPercent] = useState(0);
+  const animRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !sessionId || !window.consoleAPI?.onPipelineProgress) return;
+    const unsub = window.consoleAPI.onPipelineProgress((p) => {
+      if (p.sessionId !== sessionId) return;
+      setPercent(p.percent);
+      setLabel(p.label);
+    });
+    return () => unsub();
+  }, [sessionId, enabled]);
+
+  useEffect(() => {
+    const start = displayRef.current;
+    const diff = percent - start;
+    if (diff === 0) return;
+    const duration = 500;
+    const t0 = performance.now();
+    const animate = (now: number) => {
+      const t = Math.min((now - t0) / duration, 1);
+      const val = Math.round(start + diff * (1 - Math.pow(1 - t, 3)));
+      displayRef.current = val;
+      setDisplayPercent(val);
+      if (t < 1) animRef.current = requestAnimationFrame(animate);
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [percent]);
+
+  return { percent: displayPercent, label };
+}
+
+function useDeviceNotReady(sessionId: string | undefined) {
+  const [notReadyMessage, setNotReadyMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sessionId || !window.consoleAPI?.onDeviceNotReady) return;
+    const unsub = window.consoleAPI.onDeviceNotReady((data) => {
+      if (data.sessionId === sessionId) {
+        setNotReadyMessage(data.message);
+      }
+    });
+    return () => unsub();
+  }, [sessionId]);
+
+  // Clear message when readiness update arrives
+  useEffect(() => {
+    if (!notReadyMessage || !window.consoleAPI?.onDeviceReadinessUpdate) return;
+    const unsub = window.consoleAPI.onDeviceReadinessUpdate((data) => {
+      if (data.ready) setNotReadyMessage(null);
+    });
+    return () => unsub();
+  }, [notReadyMessage]);
+
+  return notReadyMessage;
+}
 
 interface ActivityBlockProps {
   block: WorkBlock;
@@ -198,7 +273,16 @@ export default function ActivityBlock({
   defaultExpanded = false,
   onDelete,
 }: ActivityBlockProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const isSummarizing = block.status === "summarizing";
+  const isFailed = block.status === "failed";
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded || isSummarizing);
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const progress = usePipelineProgress(block.id, isSummarizing || isReprocessing);
+  const notReadyMessage = useDeviceNotReady(block.id);
+
+  useEffect(() => {
+    if (isSummarizing) setIsExpanded(true);
+  }, [isSummarizing]);
 
   const isGranola = block.source === "granola";
   const isFireflies = block.source === "fireflies";
@@ -207,6 +291,24 @@ export default function ActivityBlock({
   const timeRange = `${formatTime(block.startTime)} - ${block.endTime ? formatTime(block.endTime) : "now"}`;
 
   const hasTasks = block.taskBreakdown && block.taskBreakdown.length > 0;
+  const hasSummary = !!block.summary && block.summary.length > 40;
+
+  // Clear reprocessing state when pipeline finishes (block gets tasks/summary back)
+  useEffect(() => {
+    if (isReprocessing && (hasTasks || hasSummary)) {
+      setIsReprocessing(false);
+    }
+  }, [isReprocessing, hasTasks, hasSummary]);
+  const canReprocess =
+    !isActive && !isSummarizing && !isReprocessing && !hasSummary && !hasTasks && !isMeeting;
+
+  const handleReprocess = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.consoleAPI?.reprocessSession) return;
+    setIsReprocessing(true);
+    setIsExpanded(true);
+    await window.consoleAPI.reprocessSession(block.id);
+  };
 
   // Render markdown summary for meeting blocks and task-less session blocks
   const renderedSummaryHtml = useMemo(() => {
@@ -332,7 +434,7 @@ export default function ActivityBlock({
             >
               Active
             </span>
-          ) : block.status === "summarizing" ? (
+          ) : isSummarizing ? (
             <span
               style={{
                 padding: "3px 8px",
@@ -358,13 +460,91 @@ export default function ActivityBlock({
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{
-                  animation: "spin 1s linear infinite",
-                }}
+                style={{ animation: "spin 1s linear infinite" }}
               >
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
               Summarizing
+            </span>
+          ) : isFailed ? (
+            <span
+              title={block.summary || "Pipeline failed - click to reprocess"}
+              style={{
+                padding: "3px 8px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "rgba(239, 68, 68, 0.14)",
+                color: "#EF4444",
+                border: "0.5px solid rgba(239, 68, 68, 0.28)",
+                cursor: "pointer",
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReprocess(e);
+              }}
+            >
+              <RotateCw size={10} />
+              Failed — Retry
+            </span>
+          ) : canReprocess ? (
+            <button
+              onClick={handleReprocess}
+              style={{
+                padding: "3px 8px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                background: "rgba(var(--mi-accent-rgb), 0.1)",
+                color: "var(--mi-accent)",
+                border: "0.5px solid rgba(var(--mi-accent-rgb), 0.25)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <RotateCw size={10} />
+              Reprocess
+            </button>
+          ) : isReprocessing ? (
+            <span
+              style={{
+                padding: "3px 8px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "rgba(99, 102, 241, 0.14)",
+                color: "#818CF8",
+                border: "0.5px solid rgba(99, 102, 241, 0.28)",
+              }}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ animation: "spin 1s linear infinite" }}
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Reprocessing
             </span>
           ) : (
             <span
@@ -522,8 +702,114 @@ export default function ActivityBlock({
           {/* -- Regular work block body -- */}
           {!isMeeting && (
             <>
+              {/* Summarization progress bar or "not ready" message */}
+              {isSummarizing && notReadyMessage && (
+                <div
+                  style={{
+                    padding: "16px 0 8px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: "rgba(99, 102, 241, 0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#818CF8"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
+                      lineHeight: 1.5,
+                      margin: 0,
+                    }}
+                  >
+                    {notReadyMessage}
+                  </p>
+                </div>
+              )}
+              {(isSummarizing || isReprocessing) && !notReadyMessage && (
+                <div style={{ padding: "16px 0 8px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: "#818CF8", fontWeight: 500 }}>
+                      {progress.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-tertiary)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {progress.percent}%
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 6,
+                      borderRadius: 3,
+                      background: "rgba(99, 102, 241, 0.1)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${progress.percent}%`,
+                        borderRadius: 3,
+                        background: "linear-gradient(90deg, #6366f1, #818cf8)",
+                        transition: "width 0.6s cubic-bezier(0.33, 1, 0.68, 1)",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background:
+                            "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)",
+                          animation: "shimmer 2s ease-in-out infinite",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <style>{`@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }`}</style>
+                </div>
+              )}
+
               {/* Tasks section */}
-              {block.taskBreakdown && block.taskBreakdown.length > 0 ? (
+              {!isSummarizing && block.taskBreakdown && block.taskBreakdown.length > 0 ? (
                 <>
                   <div
                     style={{
@@ -555,7 +841,7 @@ export default function ActivityBlock({
                     );
                   })}
                 </>
-              ) : block.summary ? (
+              ) : !isSummarizing && block.summary ? (
                 <>
                   <div
                     style={{
@@ -584,6 +870,11 @@ export default function ActivityBlock({
                   />
                 </>
               ) : null}
+
+              {/* AI export prompt — any completed session block with an export */}
+              {!isMeeting && (block.status === "ready" || block.status === "ended") && (
+                <BlockExportPath block={block} />
+              )}
 
               {/* App breakdown section */}
               {block.appBreakdown && block.appBreakdown.length > 0 && (
@@ -680,6 +971,108 @@ export default function ActivityBlock({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function BlockExportPath({ block }: { block: WorkBlock }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!block.exportPath) return null;
+
+  const handleCopy = async () => {
+    if (copied) return;
+    try {
+      await (window as any).consoleAPI?.copyFileToClipboard?.(block.exportPath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  return (
+    <div
+      onClick={handleCopy}
+      title={copied ? "Copied to clipboard" : "Copy block data to clipboard"}
+      style={{
+        marginTop: 12,
+        padding: "10px 14px",
+        borderRadius: 10,
+        background: copied ? "rgba(107, 143, 113, 0.08)" : "rgba(255, 255, 255, 0.025)",
+        border: copied
+          ? "1px solid rgba(107, 143, 113, 0.2)"
+          : "1px solid rgba(255, 255, 255, 0.06)",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background: copied ? "rgba(107, 143, 113, 0.15)" : "rgba(255, 255, 255, 0.04)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          transition: "all 0.2s ease",
+        }}
+      >
+        {copied ? (
+          <Check size={16} color="#6B8F71" strokeWidth={2.5} />
+        ) : (
+          <Clipboard size={15} color="#7C6F5B" />
+        )}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: copied ? "#6B8F71" : "#B0A48E",
+            lineHeight: 1.3,
+            marginBottom: 2,
+            transition: "color 0.2s ease",
+          }}
+        >
+          {copied ? "Copied to clipboard" : "Copy block data"}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            color: "#665C4D",
+            lineHeight: 1.3,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {copied
+            ? "Paste into ChatGPT, Claude, Notion, or anywhere else"
+            : "Paste into your favorite AI for reports, emails, and insights"}
+        </div>
+      </div>
+
+      <div
+        style={{
+          fontSize: 11,
+          color: copied ? "#6B8F71" : "#7C6F5B",
+          fontWeight: 500,
+          flexShrink: 0,
+          padding: "4px 10px",
+          borderRadius: 6,
+          background: copied ? "rgba(107, 143, 113, 0.12)" : "rgba(255, 255, 255, 0.04)",
+          transition: "all 0.2s ease",
+        }}
+      >
+        {copied ? "Done" : "Copy"}
+      </div>
     </div>
   );
 }

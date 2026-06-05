@@ -29,7 +29,9 @@ import { focusWindowTracker } from "./focusWindowTracker";
 import { activityTracker, type IntervalEvidence } from "./activityTracker";
 import { windowDetectionService } from "./windowDetectionService";
 import { browserBridgeService } from "./browserBridgeService";
+import { ctx } from "../main/context";
 import { IPC_CHANNELS, SESSION_DEFAULTS } from "@mitable/shared";
+import { sessionWatchdog } from "./sessionWatchdog";
 import type {
   SelectedWindowInfo,
   MonitoringSessionState,
@@ -61,6 +63,7 @@ interface ActiveSession {
   lastCaptureHashByWindow: Map<string, string>; // Per-window deduplication
   consecutiveEmptyCaptures: number; // Track consecutive capture cycles with 0 captures
   lastSuccessfulCaptureAt: number; // Timestamp of last successful capture
+  localMode: boolean; // True when on-device AI is active — all inference stays local
 }
 
 // ===========================
@@ -91,6 +94,25 @@ class MonitoringSessionService {
   }
 
   /**
+   * Check whether the on-device inference server is running.
+   * If so, frames will be routed to the local pipeline instead of the cloud.
+   */
+  private async shouldUseLocalInference(): Promise<boolean> {
+    try {
+      const { ollamaService } = await import("./on-device/ollamaService");
+      // In deferred-inference mode Ollama isn't loaded until session end,
+      // so checking isReady() would always return false. Instead, check
+      // whether the Ollama binary exists on this machine — that's enough
+      // to know we *can* run local inference later.
+      if (ollamaService.isReady()) return true;
+      return await ollamaService.isInstalled();
+    } catch (err) {
+      logger.debug("On-device module not available:", String(err));
+      return false;
+    }
+  }
+
+  /**
    * Start a new monitoring session
    * @param config - Session config including sessionId from backend
    *
@@ -106,42 +128,12 @@ class MonitoringSessionService {
       };
     }
 
-    // Wait for auth token with timeout (handles IPC sync delay from Console renderer)
-    // The Console window syncs tokens via IPC before calling this method,
-    // but we add a wait here to handle any race conditions
-    const maxWaitMs = 5000;
-    const pollIntervalMs = 100;
-    const startTime = Date.now();
-
-    logger.info("[MonitoringSessionService] Waiting for auth token...", {
-      hasTokenNow: !!authManager.getAccessToken(),
-    });
-
-    while (!authManager.getAccessToken() && Date.now() - startTime < maxWaitMs) {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-    }
-
-    const waitedMs = Date.now() - startTime;
-    const hasToken = !!authManager.getAccessToken();
-
-    logger.info("[MonitoringSessionService] Auth wait completed", {
-      waitedMs,
-      hasToken,
-      timedOut: !hasToken && waitedMs >= maxWaitMs,
-    });
-
-    // Require authentication before starting session (prevents 401 errors on analyze-frame)
-    if (!authManager.getAccessToken()) {
-      return {
-        sessionId: "",
-        error: "Authentication required. Please log in before starting a monitoring session.",
-      };
-    }
+    logger.info("[MonitoringSessionService] Starting session (local-first, no auth gate)");
 
     if (!config.sessionId) {
       return {
         sessionId: "",
-        error: "Session ID from backend is required",
+        error: "Session ID is required",
       };
     }
 
@@ -180,6 +172,17 @@ class MonitoringSessionService {
 
       logger.info(` Session folder created: ${localPath}`);
 
+      // Create the session timeline ledger (master clock for temporal alignment)
+      try {
+        const { sessionTimeline } = await import("./on-device/sessionTimeline");
+        sessionTimeline.create(sessionId, localPath, config.captureIntervalMs);
+      } catch (err) {
+        logger.warn("Failed to create session timeline:", String(err));
+      }
+
+      // Determine local mode once at session start — persists for the entire session
+      const localMode = await this.shouldUseLocalInference();
+
       // Initialize active session
       const startedAt = Date.now();
       this.activeSession = {
@@ -192,6 +195,7 @@ class MonitoringSessionService {
         lastCaptureHashByWindow: new Map(),
         consecutiveEmptyCaptures: 0,
         lastSuccessfulCaptureAt: startedAt,
+        localMode,
       };
 
       // Start checkpoint tracking for crash recovery
@@ -218,6 +222,48 @@ class MonitoringSessionService {
 
       // Start capture loop
       this.startCaptureLoop();
+
+      // Start local inference service if on-device AI is active for this session
+      if (localMode) {
+        try {
+          const { localInferenceService, pgDb, hybridInferenceService } =
+            await import("./on-device");
+          localInferenceService.start(sessionId);
+
+          // Write session row to local PGlite (mirrors monitoring_sessions schema)
+          await pgDb.insertMonitoringSession({
+            id: sessionId,
+            organizationId: config.organizationId,
+            userId: config.userId,
+            name: config.name ?? null,
+            sessionGoal: config.sessionGoal ?? null,
+            sessionType: "focused",
+            status: "active",
+            startedAt,
+            endedAt: null,
+            totalPausedMs: 0,
+            finalSummary: null,
+          });
+
+          // Create block.md file NOW at session start (so transcripts can append during session)
+          const mdPath = await hybridInferenceService.createBlockMarkdown(
+            sessionId,
+            startedAt,
+            config.sessionGoal,
+            config.userId
+          );
+          if (mdPath) {
+            logger.info(`Block markdown ready: ${mdPath}`);
+          } else {
+            logger.warn("Block markdown creation failed - will retry at session end");
+          }
+
+          logger.info("On-device session started for session", sessionId);
+        } catch (err) {
+          logger.error("Failed to start local inference pipeline:", String(err));
+          this.activeSession.localMode = false;
+        }
+      }
 
       // Broadcast session started
       this.broadcastSessionUpdate();
@@ -335,7 +381,6 @@ class MonitoringSessionService {
       windowTitle?: string;
       screenshotHash?: string;
       imageData?: string;
-      // Analysis metadata
       deltaChanged?: boolean;
       deltaChangeType?: string;
       deltaChangeDescription?: string;
@@ -346,6 +391,8 @@ class MonitoringSessionService {
       importanceReason?: string;
     }>;
     error?: string;
+    localMode?: boolean;
+    storyGenerationFailed?: boolean;
   }> {
     if (!this.activeSession) {
       return { success: false, error: "No active session" };
@@ -367,47 +414,453 @@ class MonitoringSessionService {
     }
 
     const sessionId = this.activeSession.id;
+    const localMode = this.activeSession.localMode;
 
-    try {
-      // End checkpoint tracking (removes checkpoint file)
-      await checkpointService.endSession();
+    const MIN_SESSION_DURATION_MS = 3 * 60 * 1000;
+    const activeDurationMs =
+      Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs;
+    const tooShort = activeDurationMs < MIN_SESSION_DURATION_MS;
 
-      // End session in local storage (no Top-K selection needed — captures
-      // are already analyzed and stored on the backend during the session)
-      const manifest = await localFrameStorage.loadManifest(sessionId);
-      const captureCount = manifest?.totalFrameCount ?? 0;
-      await localFrameStorage.endSession(sessionId, []);
+    if (tooShort) {
+      logger.info(
+        `Session too short (${Math.round(activeDurationMs / 1000)}s < ${MIN_SESSION_DURATION_MS / 1000}s) — skipping story generation, cleaning up`
+      );
+    }
 
-      // Update internal state
-      this.activeSession.status = "ended";
-
-      // Broadcast update immediately so renderer sees "ended"
+    // Immediately transition to "summarizing" so the pill disappears and the
+    // console shows the summarizing state — don't block on AI work.
+    if (localMode && !tooShort) {
+      this.activeSession.status = "summarizing";
       this.broadcastSessionUpdate();
 
-      const duration = Date.now() - this.activeSession.startedAt - this.activeSession.totalPausedMs;
-      logger.info(` Session ended: ${sessionId}`, {
-        totalCaptureCount: captureCount,
-        duration,
+      try {
+        const { pgDb } = await import("./on-device");
+        await pgDb.updateMonitoringSessionStatus(sessionId, "summarizing", Date.now());
+      } catch {
+        /* best effort */
+      }
+    }
+
+    // End the session timeline (finalizes all clocks)
+    try {
+      const { sessionTimeline } = await import("./on-device/sessionTimeline");
+      sessionTimeline.endSession();
+    } catch {
+      /* timeline not critical */
+    }
+
+    // Grab manifest info before clearing activeSession
+    const manifest = await localFrameStorage.loadManifest(sessionId);
+    const captureCount = manifest?.totalFrameCount ?? 0;
+
+    // Release session state immediately so the UI is unblocked
+    this.activeSession = null;
+    if (!localMode || tooShort) {
+      this.broadcastSessionUpdate();
+    }
+
+    // Fire off AI work in the background — not blocking the return
+    this.finishSessionAsync(sessionId, localMode, tooShort, captureCount, activeDurationMs);
+
+    return {
+      success: true,
+      sessionId,
+      captureCount,
+      captures: [],
+      localMode,
+      storyGenerationFailed: false,
+    };
+  }
+
+  /**
+   * Transaction log for session pipeline debugging.
+   * Appends structured log entries to a session-specific log file.
+   */
+  private async logPipelineStep(
+    sessionId: string,
+    step: string,
+    status: "started" | "completed" | "failed" | "retry",
+    details?: string
+  ): Promise<void> {
+    try {
+      const { promises: fs } = await import("fs");
+      const { join } = await import("path");
+      const { app } = await import("electron");
+      const logDir = join(app.getPath("userData"), "session_logs");
+      await fs.mkdir(logDir, { recursive: true });
+      const logPath = join(logDir, `${sessionId}.log`);
+      const timestamp = new Date().toISOString();
+      const line = `[${timestamp}] [${status.toUpperCase()}] ${step}${details ? ` | ${details}` : ""}\n`;
+      await fs.appendFile(logPath, line, "utf-8");
+    } catch {
+      // Non-critical: logger already logs to main.log
+    }
+  }
+
+  /**
+   * Pre-flight check: verify AI provider connectivity before starting pipeline.
+   */
+  private async preflightCheck(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const { keyVault } = await import("./on-device/keyVault");
+      const { createProvider } = await import("./on-device/providers");
+      const config = await keyVault.load();
+      if (!config) {
+        return { ok: false, error: "No API key configured" };
+      }
+      const provider = createProvider(config.provider, config.apiKey, config.model);
+      // Lightweight ping: 1-token completion to verify connectivity
+      await provider.chatCompletion([{ role: "user", content: "Ping" }], {
+        temperature: 0,
+        max_tokens: 1,
       });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: `Provider check failed: ${String(err).slice(0, 200)}` };
+    }
+  }
 
-      // Cleanup session state
-      this.activeSession = null;
+  /**
+   * Run AI pipeline with retry logic and exponential backoff.
+   */
+  private async runPipelineWithRetry(
+    sessionId: string,
+    sessionDir: string,
+    broadcastProgress: (progress: Record<string, unknown>) => void,
+    maxRetries = 3
+  ): Promise<{ success: boolean; error?: string }> {
+    const { hybridInferenceService } = await import("./on-device");
+    const baseTimeoutMs = 600_000; // 10 minutes base
 
-      // Schedule cleanup of local frames after 10 minutes (allows for re-summarization)
-      setTimeout(
-        () => {
-          this.cleanupSessionFiles(sessionId);
-        },
-        10 * 60 * 1000
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await this.logPipelineStep(
+        sessionId,
+        "pipeline_attempt",
+        "started",
+        `attempt=${attempt}/${maxRetries}`
       );
 
-      return { success: true, sessionId, captureCount, captures: [] };
+      try {
+        // Exponential backoff: 1x, 2x, 4x timeout
+        const timeoutMs = baseTimeoutMs * Math.pow(2, attempt - 1);
+
+        await Promise.race([
+          hybridInferenceService.processAllAtEnd(sessionId, sessionDir, broadcastProgress),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(`Pipeline timeout after ${timeoutMs / 1000}s (attempt ${attempt})`)
+                ),
+              timeoutMs
+            )
+          ),
+        ]);
+
+        await this.logPipelineStep(
+          sessionId,
+          "pipeline_attempt",
+          "completed",
+          `attempt=${attempt}`
+        );
+        return { success: true };
+      } catch (err) {
+        const errorMsg = String(err).slice(0, 500);
+        await this.logPipelineStep(
+          sessionId,
+          "pipeline_attempt",
+          "failed",
+          `attempt=${attempt}, error=${errorMsg}`
+        );
+        logger.error(`Pipeline attempt ${attempt}/${maxRetries} failed:`, errorMsg);
+
+        if (attempt < maxRetries) {
+          const delayMs = 5000 * attempt; // 5s, 10s, 15s backoff between retries
+          await this.logPipelineStep(sessionId, "pipeline_retry", "retry", `delay=${delayMs}ms`);
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+    }
+
+    return { success: false, error: `All ${maxRetries} pipeline attempts failed` };
+  }
+
+  /**
+   * Background work after endSession returns: run the full AI pipeline
+   * (sensor, transcribe, classify, summarize, export) on all captured data.
+   * Includes: transaction logging, pre-flight check, retry logic, watchdog registration.
+   */
+  private async finishSessionAsync(
+    sessionId: string,
+    localMode: boolean,
+    tooShort: boolean,
+    captureCount: number,
+    activeDurationMs: number
+  ): Promise<void> {
+    let storyGenerationFailed = false;
+    let pipelineError: string | null = null;
+
+    await this.logPipelineStep(sessionId, "finishSessionAsync", "started");
+
+    // Register with watchdog
+    sessionWatchdog.register(sessionId);
+
+    try {
+      if (localMode) {
+        try {
+          const { pgDb } = await import("./on-device");
+
+          // Check user inference mode preference
+          let inferenceMode = "auto";
+          try {
+            const userId = this.activeSession?.config.userId;
+            if (userId) {
+              inferenceMode = (await pgDb.getUserPreference(userId, "inferenceMode")) ?? "auto";
+            }
+          } catch {
+            // Default to auto
+          }
+
+          const forceCloud = inferenceMode === "cloud";
+          const skipOnDeviceCheck = forceCloud;
+
+          if (tooShort) {
+            logger.info("Cleared local inference state (short session)");
+            await this.logPipelineStep(sessionId, "short_session", "completed");
+          } else {
+            const sessionDir = localFrameStorage.getSessionPath(sessionId);
+
+            // If models aren't ready yet and not forcing cloud, queue and notify
+            if (!ctx.onDeviceReady && !skipOnDeviceCheck) {
+              logger.info("On-device AI not ready yet — queuing session for later processing");
+              await this.logPipelineStep(
+                sessionId,
+                "queue_for_later",
+                "completed",
+                "models_not_ready"
+              );
+              ctx.pendingSessions.push({ sessionId, sessionDir });
+              BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                  win.webContents.send(IPC_CHANNELS.ON_DEVICE_NOT_READY, {
+                    sessionId,
+                    message:
+                      "Your session was recorded successfully! We're still setting up your on-device AI — your block will be summarized automatically once it's ready.",
+                  });
+                }
+              });
+              sessionWatchdog.unregister(sessionId);
+              return;
+            }
+
+            logger.info(
+              `Running deferred AI pipeline (${forceCloud ? "cloud" : "hybrid"} mode)...`
+            );
+            await this.logPipelineStep(
+              sessionId,
+              "pipeline",
+              "started",
+              `mode=${forceCloud ? "cloud" : "hybrid"}`
+            );
+
+            // Pre-flight check
+            await this.logPipelineStep(sessionId, "preflight", "started");
+            const preflight = await this.preflightCheck();
+            if (!preflight.ok) {
+              logger.error("Pre-flight check failed:", preflight.error);
+              await this.logPipelineStep(sessionId, "preflight", "failed", preflight.error);
+              storyGenerationFailed = true;
+              pipelineError = preflight.error ?? "Pre-flight check failed";
+            } else {
+              await this.logPipelineStep(sessionId, "preflight", "completed");
+
+              const broadcastProgress = (progress: Record<string, unknown>) => {
+                BrowserWindow.getAllWindows().forEach((win) => {
+                  if (!win.isDestroyed()) {
+                    win.webContents.send(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, progress);
+                  }
+                });
+              };
+
+              // Run with retry logic
+              const result = await this.runPipelineWithRetry(
+                sessionId,
+                sessionDir,
+                broadcastProgress,
+                3
+              );
+              if (!result.success) {
+                storyGenerationFailed = true;
+                pipelineError = result.error ?? "Pipeline failed after retries";
+              }
+            }
+          }
+        } catch (err) {
+          logger.error("Deferred AI pipeline failed:", String(err));
+          await this.logPipelineStep(sessionId, "pipeline", "failed", String(err).slice(0, 500));
+          storyGenerationFailed = true;
+          pipelineError = String(err).slice(0, 500);
+        }
+      }
+
+      // Deliver on-device summary to backend
+      if (localMode && !storyGenerationFailed && !tooShort) {
+        try {
+          const { localInferenceService } = await import("./on-device");
+          const exported = await localInferenceService.exportResultsForBackend(
+            sessionId,
+            activeDurationMs
+          );
+          if (exported) {
+            try {
+              const resp = await authManager.authenticatedFetch(
+                `/api/monitoring/sessions/${sessionId}/on-device-summary`,
+                {
+                  method: "PUT",
+                  body: JSON.stringify({ onDeviceSummary: exported }),
+                }
+              );
+              if (resp.ok) {
+                logger.info("On-device summary delivered to backend");
+                await this.logPipelineStep(sessionId, "backend_delivery", "completed");
+              } else {
+                logger.warn("Backend rejected on-device summary:", resp.status);
+                await this.logPipelineStep(
+                  sessionId,
+                  "backend_delivery",
+                  "failed",
+                  `status=${resp.status}`
+                );
+              }
+            } catch {
+              logger.debug("Backend delivery skipped (offline or local-only)");
+              await this.logPipelineStep(sessionId, "backend_delivery", "failed", "offline");
+            }
+          }
+        } catch (err) {
+          logger.warn("Failed to deliver session:", String(err));
+          await this.logPipelineStep(
+            sessionId,
+            "backend_delivery",
+            "failed",
+            String(err).slice(0, 200)
+          );
+        }
+      }
+
+      await checkpointService.endSession();
+      await localFrameStorage.endSession(sessionId, []);
+
+      // Mark session status in local PGlite
+      if (localMode) {
+        try {
+          const { pgDb: db } = await import("./on-device");
+          const story = await db.getStoryForSession(sessionId);
+
+          if (storyGenerationFailed) {
+            // Mark as failed with error message
+            await db.updateMonitoringSessionStatus(
+              sessionId,
+              "failed",
+              Date.now(),
+              pipelineError ?? "Pipeline failed"
+            );
+            await this.logPipelineStep(
+              sessionId,
+              "session_status",
+              "failed",
+              pipelineError ?? "unknown error"
+            );
+          } else {
+            // Success: ready
+            await db.updateMonitoringSessionStatus(
+              sessionId,
+              story ? "ready" : "ended",
+              story ? Date.now() : undefined
+            );
+            if (story?.narrative) {
+              await db.updateMonitoringSessionSummary(sessionId, story.narrative);
+            }
+            await this.logPipelineStep(
+              sessionId,
+              "session_status",
+              "completed",
+              `status=${story ? "ready" : "ended"}`
+            );
+          }
+        } catch (dbErr) {
+          logger.error("Failed to update session status in DB:", String(dbErr));
+          await this.logPipelineStep(
+            sessionId,
+            "db_status_update",
+            "failed",
+            String(dbErr).slice(0, 200)
+          );
+        }
+      }
+
+      logger.info(` Session ended: ${sessionId}`, {
+        totalCaptureCount: captureCount,
+        duration: activeDurationMs,
+        localMode,
+        storyGenerationFailed,
+        pipelineError,
+        tooShort,
+      });
+
+      // Broadcast final state
+      BrowserWindow.getAllWindows().forEach((window) => {
+        if (!window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.MONITORING_SESSION_UPDATE, null);
+        }
+      });
+
+      if (tooShort) {
+        this.cleanupSessionFiles(sessionId);
+        try {
+          const { pgDb } = await import("./on-device");
+          await pgDb.deleteMonitoringSession(sessionId);
+        } catch {
+          /* best effort */
+        }
+        logger.info("Immediately cleaned up files and DB record for short session");
+      } else {
+        setTimeout(() => this.cleanupSessionFiles(sessionId), 10 * 60 * 1000);
+      }
     } catch (error) {
-      logger.error(" Failed to end session:", error);
-      return {
-        success: false,
-        error: `Failed to end session: ${error instanceof Error ? error.message : "Unknown error"}`,
-      };
+      logger.error("finishSessionAsync critical failure:", error);
+      await this.logPipelineStep(
+        sessionId,
+        "finishSessionAsync",
+        "failed",
+        String(error).slice(0, 500)
+      );
+
+      // Mark as failed even on critical error
+      try {
+        const { pgDb } = await import("./on-device");
+        await pgDb.updateMonitoringSessionStatus(
+          sessionId,
+          "failed",
+          Date.now(),
+          `Critical error: ${String(error).slice(0, 400)}`
+        );
+      } catch {
+        /* best effort */
+      }
+
+      BrowserWindow.getAllWindows().forEach((window) => {
+        if (!window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.MONITORING_SESSION_UPDATE, null);
+        }
+      });
+    } finally {
+      sessionWatchdog.unregister(sessionId);
+      await this.logPipelineStep(
+        sessionId,
+        "finishSessionAsync",
+        storyGenerationFailed ? "failed" : "completed"
+      );
     }
   }
 
@@ -420,6 +873,15 @@ class MonitoringSessionService {
     focusWindowTracker.stop();
     activityTracker.stop();
     this.activeSession = null;
+    this.broadcastSessionUpdate();
+  }
+
+  /**
+   * Update session status and broadcast to all UIs immediately.
+   */
+  setStatus(status: MonitoringSessionStatus): void {
+    if (!this.activeSession) return;
+    this.activeSession.status = status;
     this.broadcastSessionUpdate();
   }
 
@@ -502,6 +964,7 @@ class MonitoringSessionService {
         lastCaptureHashByWindow: new Map(),
         consecutiveEmptyCaptures: 0,
         lastSuccessfulCaptureAt: Date.now(),
+        localMode: await this.shouldUseLocalInference(),
       };
 
       // Resume capture loop if session was active
@@ -562,6 +1025,149 @@ class MonitoringSessionService {
   // ===========================
   // Private Methods
   // ===========================
+
+  private cloudBatchInFlight = false;
+
+  /**
+   * During-session cloud batch: if BYOK is configured, analyze the last 20
+   * frames immediately (non-blocking). Results are appended to block.md.
+   */
+  private async maybeFlushCloudBatch(sessionId: string, captureCount: number): Promise<void> {
+    if (this.cloudBatchInFlight) return;
+
+    try {
+      const { hybridInferenceService } = await import("./on-device");
+      if (!hybridInferenceService.isCloudConfigured()) return;
+
+      this.cloudBatchInFlight = true;
+      const batchIdx = Math.floor((captureCount - 1) / 20);
+
+      logger.info(`Cloud batch flush triggered: batch ${batchIdx} (captureCount=${captureCount})`);
+
+      const manifest = await localFrameStorage.loadManifest(sessionId);
+      if (!manifest) return;
+
+      const startFrame = batchIdx * 20;
+      const batchMeta = manifest.frames.slice(startFrame, startFrame + 20);
+      if (batchMeta.length === 0) return;
+
+      const { localAudioService } = await import("./on-device/localAudioService");
+
+      const sessionStartMs = hybridInferenceService["sessionStartMs"] || Date.now();
+
+      const batch: Array<{
+        frameId: string;
+        sessionId: string;
+        sequenceNumber: number;
+        capturedAt: number;
+        offsetMs: number;
+        imageBase64: string;
+        previousImageBase64: string | null;
+        windowId: string;
+        appName: string;
+        windowTitle: string;
+        intervalEvidence?: any;
+        browserContext?: any;
+      }> = [];
+      for (const frameMeta of batchMeta) {
+        const imageBase64 = await localFrameStorage.getFrameAsDataUrl(
+          sessionId,
+          frameMeta.filename
+        );
+        if (!imageBase64) continue;
+        const capturedAt = new Date(frameMeta.timestamp).getTime();
+        batch.push({
+          frameId: frameMeta.frameId,
+          sessionId,
+          sequenceNumber: frameMeta.sequenceNumber,
+          capturedAt,
+          offsetMs: capturedAt - sessionStartMs,
+          imageBase64,
+          previousImageBase64: null,
+          windowId: frameMeta.windowSourceId,
+          appName: frameMeta.appName,
+          windowTitle: frameMeta.windowTitle,
+          intervalEvidence: frameMeta.intervalEvidence,
+          browserContext: frameMeta.browserContext,
+        });
+      }
+
+      if (batch.length === 0) return;
+
+      const allTranscripts = localAudioService.getAccumulatedTranscripts();
+      const batchStartOffset = batch[0].offsetMs;
+      const batchEndOffset = batch[batch.length - 1].offsetMs;
+      const matchedTranscripts = allTranscripts.filter(
+        (seg) => seg.endOffsetMs > batchStartOffset && seg.startOffsetMs < batchEndOffset
+      );
+      const transcriptText = matchedTranscripts
+        .map((seg) => `${seg.source === "user" ? "User" : "Remote"}: ${seg.text}`)
+        .join("\n");
+
+      // Run the cloud batch analysis via the provider
+      const result = await hybridInferenceService["analyzeBatchCloud"](batch, transcriptText);
+
+      // Write results to block.md
+      const mdPath = hybridInferenceService.getMarkdownPath();
+      if (mdPath) {
+        await hybridInferenceService["appendBatchToMarkdown"](
+          mdPath,
+          batchIdx,
+          batch,
+          result.frameDescriptions,
+          matchedTranscripts,
+          result.batchNarrative,
+          sessionStartMs
+        );
+      }
+
+      // Store in local PGlite
+      const { pgDb } = await import("./on-device");
+      const crypto = await import("crypto");
+      for (const frame of batch) {
+        const fd = result.frameDescriptions.find((d) => d.sequenceNumber === frame.sequenceNumber);
+        const ev = frame.intervalEvidence;
+        await pgDb.insertCapture({
+          id: crypto.randomUUID(),
+          sessionId,
+          frameId: frame.frameId,
+          sequenceNumber: frame.sequenceNumber,
+          capturedAt: frame.capturedAt,
+          windowId: frame.windowId,
+          appName: frame.appName,
+          windowTitle: frame.windowTitle,
+          sensorOutput: fd?.description ?? `[${frame.appName}] ${frame.windowTitle}`,
+          deltaChanged: (ev?.keyboardEventCount ?? 0) > 0 || (ev?.mouseClickCount ?? 0) > 0,
+          changeType:
+            (ev?.keyboardEventCount ?? 0) > 0 || (ev?.mouseClickCount ?? 0) > 0
+              ? "user_interaction"
+              : "passive_view",
+          userAction: fd?.userAction ?? null,
+        });
+      }
+      await pgDb.insertClassification({
+        id: crypto.randomUUID(),
+        sessionId,
+        batchIndex: batchIdx,
+        startSequence: batch[0].sequenceNumber,
+        endSequence: batch[batch.length - 1].sequenceNumber,
+        activityDescription: result.batchNarrative,
+        activityType: null,
+        onTask: true,
+        taskRelevance: null,
+        importanceScore: 0.5,
+        rawOutput: "",
+      });
+
+      logger.info(
+        `Cloud batch ${batchIdx} processed during session: ${result.batchNarrative.slice(0, 100)}`
+      );
+    } catch (err) {
+      logger.warn("During-session cloud batch failed (non-critical):", String(err));
+    } finally {
+      this.cloudBatchInFlight = false;
+    }
+  }
 
   /**
    * Start the periodic capture loop
@@ -719,6 +1325,9 @@ class MonitoringSessionService {
         this.activeSession.config.userId
       );
 
+      // Session may have ended while we were awaiting the capture
+      if (!this.activeSession || this.activeSession.status !== "active") return;
+
       if (!result.success) {
         logger.warn(" Capture failed:", result.error);
         this.activeSession.consecutiveEmptyCaptures++;
@@ -731,6 +1340,7 @@ class MonitoringSessionService {
         // or other edge case), try screen capture as last resort.
         if (trackedWindowIds.length > 0) {
           const screenshot = await captureService.captureScreen();
+          if (!this.activeSession || this.activeSession.status !== "active") return;
           if (screenshot) {
             // Enrich generic "Screen" appName with actual frontmost tracked app
             const tracked = focusWindowTracker.getTrackedWindows();
@@ -864,8 +1474,23 @@ class MonitoringSessionService {
         trigger,
       });
 
-      // Update capture count
+      // Update capture count and timeline
       this.activeSession.captureCount++;
+      try {
+        const { sessionTimeline } = await import("./on-device/sessionTimeline");
+        sessionTimeline.recordFrame(frameMetadata.sequenceNumber);
+      } catch {
+        /* timeline not critical for capture */
+      }
+
+      // BYOK cloud: trigger batch analysis every 20 frames during session
+      if (
+        this.activeSession.localMode &&
+        this.activeSession.captureCount > 0 &&
+        this.activeSession.captureCount % 20 === 0
+      ) {
+        this.maybeFlushCloudBatch(this.activeSession.id, this.activeSession.captureCount);
+      }
 
       // Update checkpoint
       await checkpointService.onFrameCaptured(frameMetadata.frameId, frameMetadata.timestamp);
@@ -935,21 +1560,27 @@ class MonitoringSessionService {
         }
       }
 
-      // Trigger async frame analysis (don't block capture loop)
-      this.analyzeFrameAsync(
-        this.activeSession.id,
-        frameMetadata.frameId,
-        base64Data,
-        previousFrame?.imageData || null,
-        windowInfo,
-        {
-          sequenceNumber: frameMetadata.sequenceNumber,
-          captureTrigger: trigger,
-          capturedAt: new Date(frameMetadata.timestamp).getTime(),
-        },
-        intervalEvidence,
-        browserContext
-      );
+      // In local mode, frames are already saved to disk by localFrameStorage.
+      // All AI inference is deferred to session end — no mid-session GPU usage.
+      // Only cloud mode sends frames to the backend for real-time analysis.
+      if (this.activeSession.localMode) {
+        // No-op: frames persisted on disk, processing happens at session end
+      } else {
+        this.analyzeFrameAsync(
+          this.activeSession.id,
+          frameMetadata.frameId,
+          base64Data,
+          previousFrame?.imageData || null,
+          windowInfo,
+          {
+            sequenceNumber: frameMetadata.sequenceNumber,
+            captureTrigger: trigger,
+            capturedAt: new Date(frameMetadata.timestamp).getTime(),
+          },
+          intervalEvidence,
+          browserContext
+        );
+      }
     } catch (error) {
       logger.error(" Error saving capture:", error);
     }
@@ -1068,15 +1699,13 @@ class MonitoringSessionService {
   }
 
   /**
-   * Cleanup session files
+   * Session assets (PNGs, audio, timeline) persist in AppData permanently.
+   * cleanupOldSessions() in localFrameStorage handles TTL-based eviction
+   * for sessions older than 7 days with status "delivered".
    */
-  private async cleanupSessionFiles(sessionId: string): Promise<void> {
-    try {
-      await localFrameStorage.deleteSession(sessionId);
-      logger.info(` Cleaned up session: ${sessionId}`);
-    } catch (error) {
-      logger.error(" Error cleaning up session:", error);
-    }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async cleanupSessionFiles(_sessionId: string): Promise<void> {
+    // No-op: assets kept for crash resilience and AI pipeline re-processing
   }
 
   /**

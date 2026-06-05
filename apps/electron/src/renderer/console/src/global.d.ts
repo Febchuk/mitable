@@ -57,8 +57,33 @@ interface ConsoleAPI {
     callback: (tokens: { accessToken: string; refreshToken: string }) => void
   ) => (() => void) | undefined;
 
+  // Offline user - main process pushes cached profile when backend is unreachable
+  onOfflineUser: (
+    callback: (user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+      organizationId: string;
+      organizationName: string;
+      avatarUrl: string | null;
+    }) => void
+  ) => (() => void) | undefined;
+
   // User context - share userId/orgId with main process for cross-window access
-  setCurrentUser: (user: { userId: string; organizationId: string; role?: string }) => void;
+  setCurrentUser: (user: {
+    userId: string;
+    organizationId: string;
+    role?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+    jobTitle?: string;
+    organizationName?: string;
+    organizationDomain?: string;
+  }) => void;
 
   // Monitoring session management
   startMonitoringSession: (config: {
@@ -89,6 +114,7 @@ interface ConsoleAPI {
     error?: string;
   }>;
   resetMonitoringSession: () => Promise<{ success: boolean }>;
+  deleteMonitoringSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
   getMonitoringSessionState: () => Promise<MonitoringSessionState | null>;
   onMonitoringSessionUpdate: (
     callback: (state: MonitoringSessionState | null) => void
@@ -316,6 +342,415 @@ interface ConsoleAPI {
     rendererLogs: string;
     error?: string;
   }>;
+  analyzeLogsLocally?: (args: {
+    message: string;
+    mainLogs: string;
+    rendererLogs: string;
+  }) => Promise<{
+    success: boolean;
+    analysis: string;
+    diagnostics: string;
+    error?: string;
+  }>;
+  submitFeedback?: (args: {
+    message: string;
+    logAnalysis: string;
+    ollamaDiagnostics: string;
+    mainLogs: string;
+    rendererLogs: string;
+    userName: string;
+    userEmail: string;
+    token: string | null;
+    apiBaseUrl: string;
+    isAnonymous: boolean;
+  }) => Promise<{ success: boolean; error?: string }>;
+
+  // On-Device AI (Ollama + Gemma 4)
+  onDeviceGetStatus: () => Promise<{
+    isSetUp: boolean;
+    serverStatus: string;
+    model: string | null;
+    tier: string | null;
+    gpuDescription: string;
+    vramMB: number;
+    hasNativeAudio: boolean;
+    enabled: boolean;
+    onDeviceAllowed: boolean;
+    onDeviceBlockReason: string | null;
+    sqliteAvailable: boolean;
+    error?: string;
+  }>;
+  onDeviceGetPlatform: () => Promise<Record<string, unknown>>;
+  onDeviceGetDownloadSummary: () => Promise<{
+    assets: Array<{ id: string; label: string; description: string; sizeBytes: number }>;
+    totalBytes: number;
+    error?: string;
+  }>;
+  onDeviceDownloadAsset: (assetId: string) => Promise<{ success: boolean; error?: string }>;
+  onDeviceDownloadAll: () => Promise<{ success: boolean; error?: string }>;
+  onDeviceRemoveAll: () => Promise<{ success: boolean; error?: string }>;
+  onDeviceRemoveAsset: (assetId: string) => Promise<{ success: boolean; error?: string }>;
+  onDeviceStartServer: () => Promise<{
+    success: boolean;
+    model?: string;
+    tier?: string;
+    error?: string;
+  }>;
+  onDeviceStopServer: () => Promise<{ success: boolean; error?: string }>;
+  onDeviceServerStatus: () => Promise<{
+    status: string;
+    model: string | null;
+    tier: string | null;
+    error?: string;
+  }>;
+  onDeviceDownloadProgress: (
+    callback: (progress: {
+      assetId: string;
+      label: string;
+      phase: string;
+      bytesDownloaded: number;
+      totalBytes: number;
+      percent: number;
+      error?: string;
+    }) => void
+  ) => () => void;
+  onDeviceGetSystemInfo: () => Promise<{
+    cpu: string;
+    ramMB: number;
+    os: string;
+    gpus: Array<{
+      name: string;
+      vramMB: number;
+      type: "dedicated" | "integrated";
+      vendor: "nvidia" | "amd" | "intel" | "apple" | "unknown";
+    }>;
+    platform: string;
+    error?: string;
+  }>;
+  onDeviceGetGpuPreference: (userId: string) => Promise<string | null>;
+  onDeviceSetGpuPreference: (
+    userId: string,
+    gpuName: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  onPipelineProgress: (
+    callback: (progress: {
+      sessionId: string;
+      step: string;
+      batchIndex?: number;
+      totalBatches?: number;
+      percent: number;
+      label: string;
+    }) => void
+  ) => () => void;
+
+  onDeviceReadinessUpdate: (
+    callback: (data: { ready: boolean; error?: string }) => void
+  ) => () => void;
+
+  onDeviceNotReady: (
+    callback: (data: { sessionId: string; message: string }) => void
+  ) => () => void;
+
+  // Local-first data access
+  getBlockExportPath: (sessionId: string) => Promise<string | null>;
+  getLocalCalendarDays: (startMs: number, endMs: number) => Promise<unknown[]>;
+  getLocalSessionDetail: (sessionId: string) => Promise<unknown>;
+  getRecentSessions: () => Promise<
+    Array<{
+      id: string;
+      name: string | null;
+      status: string;
+      startedAt: number;
+      endedAt: number | null;
+      captureCount: number;
+      duration: number;
+    }>
+  >;
+
+  // Inference mode preference (hybrid pipeline testing)
+  getInferenceMode?: (userId: string) => Promise<{ mode: "auto" | "local" | "cloud" } | null>;
+  setInferenceMode?: (
+    userId: string,
+    mode: "auto" | "local" | "cloud"
+  ) => Promise<{ success: boolean; error?: string }>;
+
+  // BYOK provider test — with args: tests explicit key; without: tests saved keyVault config
+  testInferenceProvider?: (
+    provider?: string,
+    apiKey?: string
+  ) => Promise<{ ok: boolean; error?: string }>;
+  /** @deprecated Use saveInferenceConfig / loadInferenceConfig / clearInferenceConfig */
+  refreshInferenceConfig?: () => Promise<{ success: boolean; provider?: string; error?: string }>;
+  // Re-run the AI pipeline on a session that failed or has no summary
+  reprocessSession?: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+
+  // BYOK — direct keyVault operations (no backend round-trip)
+  saveInferenceConfig?: (
+    provider: string,
+    apiKey?: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  loadInferenceConfig?: () => Promise<{ provider: string; maskedKey: string } | null>;
+  clearInferenceConfig?: () => Promise<{ success: boolean; error?: string }>;
+
+  // Resend key management
+  saveResendKey?: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
+  hasResendKey?: () => Promise<boolean>;
+  clearResendKey?: () => Promise<{ success: boolean; error?: string }>;
+
+  // Local docs (on-device document RAG)
+  localDocsPickFile?: () => Promise<{
+    document?: unknown;
+    canceled?: boolean;
+    error?: string;
+  }>;
+  localDocsList?: () => Promise<{
+    documents: Array<{
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }>;
+  localDocsDelete?: (docId: string) => Promise<{ success?: boolean; error?: string }>;
+  localDocsQuery?: (question: string) => Promise<{
+    answer?: string;
+    sources?: Array<{ documentName: string; chunkIndex: number }>;
+    error?: string;
+  }>;
+  localDocsGetChunks?: (docId: string) => Promise<{
+    chunks: Array<{
+      id: string;
+      documentId: string;
+      chunkIndex: number;
+      content: string;
+      charStart: number;
+      charEnd: number;
+      createdAt: number;
+    }>;
+  }>;
+
+  localDocsGenerate?: (
+    prompt: string,
+    sessionIds?: string[]
+  ) => Promise<{
+    documentId?: string;
+    title?: string;
+    content?: string;
+    error?: string;
+  }>;
+
+  localDocsGet?: (docId: string) => Promise<{
+    document?: {
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      content: string | null;
+      title: string | null;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }>;
+
+  localDocsUpdate?: (
+    docId: string,
+    data: { content?: string; title?: string }
+  ) => Promise<{
+    success?: boolean;
+    error?: string;
+  }>;
+
+  localDocsRevise?: (
+    instruction: string,
+    currentContent: string
+  ) => Promise<{
+    suggestion?: string;
+    error?: string;
+  }>;
+
+  // Local agent (on-device RLM chat)
+  localAgentAsk?: (data: {
+    message: string;
+    conversationId?: string;
+    timezone?: string;
+  }) => Promise<{ response?: string; error?: string }>;
+  localAgentListChats?: () => Promise<{
+    conversations: Array<{
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }>;
+  localAgentGetChat?: (chatId: string) => Promise<{
+    conversation: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    messages: Array<{
+      id: string;
+      conversationId: string;
+      role: string;
+      content: string;
+      toolCalls: string;
+      createdAt: number;
+    }>;
+  } | null>;
+  localAgentCreateChat?: (data?: { id?: string; title?: string }) => Promise<{
+    conversation?: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }>;
+  localAgentRenameChat?: (
+    chatId: string,
+    title: string
+  ) => Promise<{ success?: boolean; error?: string }>;
+  localAgentDeleteChat?: (chatId: string) => Promise<{ success?: boolean; error?: string }>;
+  onAgentProgress?: (
+    callback: (event: { phase: string; tool?: string; iteration: number }) => void
+  ) => () => void;
+  localAgentAddMessage?: (data: {
+    conversationId: string;
+    role: string;
+    content: string;
+    toolCalls?: unknown[];
+  }) => Promise<{ message?: unknown; error?: string }>;
+
+  // Whisper setup
+  whisperStatus?: () => Promise<{ ready: boolean; downloading: boolean; percent: number }>;
+  whisperRunSetup?: () => Promise<{ success: boolean }>;
+  onWhisperProgress?: (
+    callback: (event: { stage: string; percent: number; label: string }) => void
+  ) => () => void;
+
+  // Local auth (on-device accounts)
+  localAuthListAccounts?: () => Promise<
+    Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    }>
+  >;
+  localAuthCreate?: (data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) => Promise<{ success: boolean; userId?: string; error?: string }>;
+  localAuthLogin?: (
+    email: string,
+    password: string
+  ) => Promise<{
+    success: boolean;
+    userId?: string;
+    firstName?: string;
+    lastName?: string;
+    error?: string;
+  }>;
+  localAuthLogout?: () => Promise<void>;
+  localAuthGetUser?: () => Promise<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null>;
+  localAuthHasAccount?: () => Promise<boolean>;
+  localAuthResetPassword?: (
+    email: string,
+    oldPassword: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; error?: string }>;
+
+  // Me Activity (local activity blocks + daily summaries)
+  getMyActivity?: (
+    userId: string,
+    period: string
+  ) => Promise<{
+    totalActiveMs: number;
+    categoryBreakdown: Record<string, number>;
+    appBreakdown: Record<string, number>;
+    clientBreakdown: Record<string, number>;
+    dailySummaries: Array<{
+      date: string;
+      totalActiveMs: number;
+      sessionCount: number;
+      categoryBreakdown: Record<string, number>;
+    }>;
+    recentBlocks: Array<{
+      id: string;
+      sessionId: string;
+      narrative: string;
+      startMs: number;
+      endMs: number;
+      durationMs: number;
+      date: string;
+      topCategory: string | null;
+      topApp: string | null;
+    }>;
+    period: string;
+    startDate: string;
+    endDate: string;
+  }>;
+  getMyActivityBlocks?: (
+    userId: string,
+    startDate: string,
+    endDate: string
+  ) => Promise<
+    Array<{
+      id: string;
+      sessionId: string;
+      category: string;
+      appName: string;
+      description: string;
+      clientName: string | null;
+      startMs: number;
+      endMs: number;
+      durationMs: number;
+      blockType: string;
+      date: string;
+    }>
+  >;
+  getMyDailySummaries?: (
+    userId: string,
+    startDate: string,
+    endDate: string
+  ) => Promise<
+    Array<{
+      date: string;
+      totalActiveMs: number;
+      sessionCount: number;
+      categoryBreakdown: string;
+      appBreakdown: string;
+    }>
+  >;
+  onMeActivityUpdated?: (
+    callback: (data: { sessionId: string; date: string }) => void
+  ) => () => void;
 }
 
 declare global {

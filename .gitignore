@@ -74,6 +74,10 @@ temp/
 # electron-vite temp compiled configs
 apps/electron/electron.vite.config.*.mjs
 
+# Whisper.cpp binaries and models (auto-downloaded)
+apps/electron/bin/
+apps/electron/resources/whisper/
+
 # OCR/ML Models (auto-downloaded by tesseract.js)
 *.traineddata
 
@@ -81,3 +85,8 @@ apps/electron/electron.vite.config.*.mjs
 
 # User specific files
 *cursor-rules.mdc.claude-flow/
+
+# Dev scripts (local-only backfill, shims, DB inspection)
+scripts/backfill-blocks.ts
+scripts/check-db.ts
+scripts/shims/

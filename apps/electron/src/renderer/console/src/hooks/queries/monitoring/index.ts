@@ -197,7 +197,13 @@ export function useDeleteSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (sessionId: string) => monitoringService.deleteSession(sessionId),
+    mutationFn: async (sessionId: string) => {
+      const result = await window.consoleAPI?.deleteMonitoringSession(sessionId);
+      if (result && !result.success) {
+        throw new Error(result.error ?? "Failed to delete session");
+      }
+      return { success: true };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: monitoringKeys.sessions() });
     },
@@ -281,33 +287,31 @@ export function useUpdateSessionSettings() {
 
 /**
  * Fetch all recaps for the current user
+ * @deprecated Recaps feature is being removed. Query disabled to stop polling.
  */
 export function useRecapsList() {
-  const { user } = useUser();
-
   return useQuery({
     queryKey: monitoringKeys.recaps(),
     queryFn: async () => {
       const response = await monitoringService.fetchRecaps();
       return response.recaps;
     },
-    enabled: !!user,
+    enabled: false, // @deprecated — recaps being removed, disable to prevent ERR_CONNECTION_REFUSED spam
   });
 }
 
 /**
  * Fetch a single recap by ID
+ * @deprecated Recaps feature is being removed. Query disabled to stop polling.
  */
 export function useRecapQuery(id: string | undefined) {
-  const { user } = useUser();
-
   return useQuery({
     queryKey: monitoringKeys.recap(id ?? ""),
     queryFn: async () => {
       const response = await monitoringService.fetchRecap(id!);
       return response.recap;
     },
-    enabled: !!user && !!id,
+    enabled: false, // @deprecated — recaps being removed
   });
 }
 

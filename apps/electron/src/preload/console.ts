@@ -16,6 +16,19 @@ const logger = {
 
 logger.info(" Preload script starting...");
 
+// Buffer for offline user event — main process may push before React mounts
+type OfflineUserPayload = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  organizationId: string;
+  organizationName: string;
+  avatarUrl: string | null;
+};
+let pendingOfflineUser: OfflineUserPayload | null = null;
+
 // IPC channel constants (inlined to avoid chunking issues)
 const IPC_CHANNELS = {
   CAPTURE_SCREENSHOT: "capture-screenshot",
@@ -31,6 +44,8 @@ const IPC_CHANNELS = {
   MONITORING_SESSION_RESUME: "monitoring-session-resume",
   MONITORING_SESSION_END: "monitoring-session-end",
   MONITORING_SESSION_RESET: "monitoring-session-reset",
+  MONITORING_SESSION_DELETE: "monitoring-session-delete",
+  MONITORING_RESYNC_LOCAL: "monitoring-resync-local",
   MONITORING_SESSION_STATUS: "monitoring-session-status",
   MONITORING_SESSION_UPDATE: "monitoring-session-update",
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress",
@@ -117,7 +132,86 @@ const IPC_CHANNELS = {
   // Feedback
   FEEDBACK_GET_LOGS: "feedback:get-logs",
   FEEDBACK_APPEND_RENDERER_LOG: "feedback:append-renderer-log",
+  // On-Device AI
+  ON_DEVICE_GET_STATUS: "on-device:get-status",
+  ON_DEVICE_GET_PLATFORM: "on-device:get-platform",
+  ON_DEVICE_GET_DOWNLOAD_SUMMARY: "on-device:get-download-summary",
+  ON_DEVICE_DOWNLOAD_ASSET: "on-device:download-asset",
+  ON_DEVICE_DOWNLOAD_ALL: "on-device:download-all",
+  ON_DEVICE_REMOVE_ALL: "on-device:remove-all",
+  ON_DEVICE_REMOVE_ASSET: "on-device:remove-asset",
+  ON_DEVICE_START_SERVER: "on-device:start-server",
+  ON_DEVICE_STOP_SERVER: "on-device:stop-server",
+  ON_DEVICE_SERVER_STATUS: "on-device:server-status",
+  ON_DEVICE_DOWNLOAD_PROGRESS: "on-device:download-progress",
+  ON_DEVICE_GET_SYSTEM_INFO: "on-device:get-system-info",
+  ON_DEVICE_SET_GPU_PREFERENCE: "on-device:set-gpu-preference",
+  ON_DEVICE_GET_GPU_PREFERENCE: "on-device:get-gpu-preference",
+  ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
+  ON_DEVICE_READINESS_UPDATE: "on-device:readiness-update",
+  ON_DEVICE_NOT_READY: "on-device:not-ready",
+  // Inference mode preference (hybrid testing)
+  INFERENCE_MODE_GET: "inference-mode:get",
+  INFERENCE_MODE_SET: "inference-mode:set",
+  INFERENCE_TEST_PROVIDER: "inference:test-provider",
+  INFERENCE_REFRESH_CONFIG: "inference:refresh-config",
+  REPROCESS_SESSION: "session:reprocess",
+  // BYOK — direct keyVault operations
+  INFERENCE_SAVE_CONFIG: "inference:save-config",
+  INFERENCE_LOAD_CONFIG: "inference:load-config",
+  INFERENCE_CLEAR_CONFIG: "inference:clear-config",
+  // Resend (feedback email key)
+  RESEND_SAVE_KEY: "resend:save-key",
+  RESEND_HAS_KEY: "resend:has-key",
+  RESEND_CLEAR_KEY: "resend:clear-key",
+  // Local docs (on-device document RAG)
+  LOCAL_DOCS_PICK_FILE: "local-docs:pick-file",
+  LOCAL_DOCS_LIST: "local-docs:list",
+  LOCAL_DOCS_DELETE: "local-docs:delete",
+  LOCAL_DOCS_QUERY: "local-docs:query",
+  LOCAL_DOCS_GET_CHUNKS: "local-docs:get-chunks",
+  LOCAL_DOCS_GENERATE: "local-docs:generate",
+  LOCAL_DOCS_GET: "local-docs:get",
+  LOCAL_DOCS_UPDATE: "local-docs:update",
+  LOCAL_DOCS_REVISE: "local-docs:revise",
+
+  // Local agent (on-device RLM chat)
+  LOCAL_AGENT_ASK: "local-agent:ask",
+  LOCAL_AGENT_LIST_CHATS: "local-agent:list-chats",
+  LOCAL_AGENT_GET_CHAT: "local-agent:get-chat",
+  LOCAL_AGENT_CREATE_CHAT: "local-agent:create-chat",
+  LOCAL_AGENT_RENAME_CHAT: "local-agent:rename-chat",
+  LOCAL_AGENT_DELETE_CHAT: "local-agent:delete-chat",
+  LOCAL_AGENT_ADD_MESSAGE: "local-agent:add-message",
+  LOCAL_AGENT_PROGRESS: "local-agent:progress",
+
+  // Whisper setup
+  WHISPER_STATUS: "whisper:status",
+  WHISPER_RUN_SETUP: "whisper:run-setup",
+  WHISPER_SETUP_PROGRESS: "whisper:setup-progress",
+
+  // Local auth (on-device accounts)
+  LOCAL_AUTH_LIST_ACCOUNTS: "local-auth:list-accounts",
+  LOCAL_AUTH_CREATE: "local-auth:create",
+  LOCAL_AUTH_LOGIN: "local-auth:login",
+  LOCAL_AUTH_LOGOUT: "local-auth:logout",
+  LOCAL_AUTH_GET_USER: "local-auth:get-user",
+  LOCAL_AUTH_HAS_ACCOUNT: "local-auth:has-account",
+  LOCAL_AUTH_RESET_PASSWORD: "local-auth:reset-password",
+  // Me Activity (local activity blocks + daily summaries)
+  ME_ACTIVITY_GET: "me-activity:get",
+  ME_ACTIVITY_BLOCKS: "me-activity:blocks",
+  ME_ACTIVITY_DAILY_SUMMARIES: "me-activity:daily-summaries",
+  ME_ACTIVITY_UPDATED: "me-activity:updated",
+  // Offline auth (main → renderer)
+  AUTH_OFFLINE_USER: "auth-offline-user",
 } as const;
+
+// Buffer offline user events that arrive before React mounts its listener
+ipcRenderer.on(IPC_CHANNELS.AUTH_OFFLINE_USER, (_event, user: OfflineUserPayload) => {
+  logger.info(" Buffered offline user event (React not mounted yet)");
+  pendingOfflineUser = user;
+});
 
 contextBridge.exposeInMainWorld("consoleAPI", {
   // PDF Export
@@ -206,9 +300,39 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.AUTH_SESSION_RESTORED, handler);
   },
 
+  // Offline user - main process pushes cached user profile when backend is unreachable.
+  // Replays any buffered event that arrived before React mounted its listener.
+  onOfflineUser: (callback: (user: OfflineUserPayload) => void): (() => void) => {
+    // Replay buffered event that arrived before this listener was attached
+    if (pendingOfflineUser) {
+      logger.info(" Replaying buffered offline user to React listener");
+      const buffered = pendingOfflineUser;
+      pendingOfflineUser = null;
+      queueMicrotask(() => callback(buffered));
+    }
+
+    const handler = (_event: IpcRendererEvent, user: OfflineUserPayload) => {
+      logger.info("Offline user identity received from main process");
+      pendingOfflineUser = null;
+      callback(user);
+    };
+    ipcRenderer.on(IPC_CHANNELS.AUTH_OFFLINE_USER, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AUTH_OFFLINE_USER, handler);
+  },
+
   // User context - Share userId/orgId with main process for cross-window access
-  setCurrentUser: (user: { userId: string; organizationId: string; role?: string }) =>
-    ipcRenderer.send(IPC_CHANNELS.USER_CONTEXT_SET, user),
+  setCurrentUser: (user: {
+    userId: string;
+    organizationId: string;
+    role?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+    jobTitle?: string;
+    organizationName?: string;
+    organizationDomain?: string;
+  }) => ipcRenderer.send(IPC_CHANNELS.USER_CONTEXT_SET, user),
 
   // Monitoring session management
   startMonitoringSession: (config: {
@@ -247,6 +371,17 @@ contextBridge.exposeInMainWorld("consoleAPI", {
 
   resetMonitoringSession: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_RESET),
+
+  deleteMonitoringSession: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_DELETE, sessionId),
+
+  resyncLocalStories: (): Promise<{
+    success: boolean;
+    synced?: number;
+    total?: number;
+    errors?: string[];
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.MONITORING_RESYNC_LOCAL),
 
   getMonitoringSessionState: (): Promise<MonitoringSessionState | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.MONITORING_SESSION_STATUS),
@@ -708,6 +843,496 @@ contextBridge.exposeInMainWorld("consoleAPI", {
     rendererLogs: string;
     error?: string;
   }> => ipcRenderer.invoke(IPC_CHANNELS.FEEDBACK_GET_LOGS),
+
+  analyzeLogsLocally: (args: {
+    message: string;
+    mainLogs: string;
+    rendererLogs: string;
+  }): Promise<{ success: boolean; analysis: string; error?: string }> =>
+    ipcRenderer.invoke("feedback:analyze-logs", args),
+
+  submitFeedback: (args: {
+    message: string;
+    logAnalysis: string;
+    ollamaDiagnostics: string;
+    mainLogs: string;
+    rendererLogs: string;
+    userName: string;
+    userEmail: string;
+    token: string | null;
+    apiBaseUrl: string;
+    isAnonymous: boolean;
+  }): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke("feedback:submit", args),
+
+  // On-Device AI
+  onDeviceGetStatus: (): Promise<{
+    isSetUp: boolean;
+    serverStatus: string;
+    model: string | null;
+    tier: string | null;
+    gpuDescription: string;
+    vramMB: number;
+    hasNativeAudio: boolean;
+    enabled: boolean;
+    onDeviceAllowed: boolean;
+    onDeviceBlockReason: string | null;
+    sqliteAvailable: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_STATUS),
+
+  onDeviceGetPlatform: (): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_PLATFORM),
+
+  onDeviceGetSystemInfo: (): Promise<{
+    cpu: string;
+    ramMB: number;
+    os: string;
+    gpus: Array<{
+      name: string;
+      vramMB: number;
+      type: "dedicated" | "integrated";
+      vendor: "nvidia" | "amd" | "intel" | "apple" | "unknown";
+    }>;
+    platform: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_SYSTEM_INFO),
+
+  onDeviceGetGpuPreference: (userId: string): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_GPU_PREFERENCE, userId),
+
+  onDeviceSetGpuPreference: (
+    userId: string,
+    gpuName: string
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_SET_GPU_PREFERENCE, userId, gpuName),
+
+  onDeviceGetDownloadSummary: (): Promise<{
+    assets: Array<{ id: string; label: string; description: string; sizeBytes: number }>;
+    totalBytes: number;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_GET_DOWNLOAD_SUMMARY),
+
+  onDeviceDownloadAsset: (assetId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ASSET, assetId),
+
+  onDeviceDownloadAll: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_ALL),
+
+  onDeviceRemoveAll: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_REMOVE_ALL),
+
+  onDeviceRemoveAsset: (assetId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_REMOVE_ASSET, assetId),
+
+  onDeviceStartServer: (): Promise<{
+    success: boolean;
+    model?: string;
+    tier?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_START_SERVER),
+
+  onDeviceStopServer: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_STOP_SERVER),
+
+  onDeviceServerStatus: (): Promise<{
+    status: string;
+    model: string | null;
+    tier: string | null;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.ON_DEVICE_SERVER_STATUS),
+
+  onDeviceDownloadProgress: (
+    callback: (progress: {
+      assetId: string;
+      label: string;
+      phase: string;
+      bytesDownloaded: number;
+      totalBytes: number;
+      percent: number;
+      error?: string;
+    }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_DOWNLOAD_PROGRESS, handler);
+  },
+
+  onPipelineProgress: (
+    callback: (progress: {
+      sessionId: string;
+      step: string;
+      batchIndex?: number;
+      totalBatches?: number;
+      percent: number;
+      label: string;
+    }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, progress: any) => callback(progress);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_PIPELINE_PROGRESS, handler);
+  },
+
+  onDeviceReadinessUpdate: (
+    callback: (data: { ready: boolean; error?: string }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_READINESS_UPDATE, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_READINESS_UPDATE, handler);
+  },
+
+  onDeviceNotReady: (
+    callback: (data: { sessionId: string; message: string }) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ON_DEVICE_NOT_READY, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_DEVICE_NOT_READY, handler);
+  },
+
+  getBlockExportPath: (sessionId: string): Promise<string | null> =>
+    ipcRenderer.invoke("get-block-export-path", sessionId),
+
+  getBlockExportContent: (sessionId: string): Promise<{ content: string; path: string } | null> =>
+    ipcRenderer.invoke("get-block-export-content", sessionId),
+
+  copyToClipboard: (text: string): Promise<void> => ipcRenderer.invoke("copy-to-clipboard", text),
+
+  copyFileToClipboard: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke("copy-file-to-clipboard", filePath),
+
+  // Local-first data access
+  getLocalCalendarDays: (startMs: number, endMs: number): Promise<unknown[]> =>
+    ipcRenderer.invoke("get-local-calendar-days", startMs, endMs),
+
+  getLocalSessionDetail: (sessionId: string): Promise<unknown> =>
+    ipcRenderer.invoke("get-local-session-detail", sessionId),
+
+  getRecentSessions: (): Promise<
+    Array<{
+      id: string;
+      name: string | null;
+      status: string;
+      startedAt: number;
+      endedAt: number | null;
+      captureCount: number;
+      duration: number;
+    }>
+  > => ipcRenderer.invoke("get-recent-sessions"),
+
+  // Inference mode preference (for hybrid pipeline testing)
+  getInferenceMode: (userId: string): Promise<{ mode: "auto" | "local" | "cloud" } | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_MODE_GET, userId),
+
+  setInferenceMode: (
+    userId: string,
+    mode: "auto" | "local" | "cloud"
+  ): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_MODE_SET, userId, mode),
+
+  testInferenceProvider: (
+    provider?: string,
+    apiKey?: string
+  ): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_TEST_PROVIDER, provider, apiKey),
+
+  /** @deprecated Use saveInferenceConfig / loadInferenceConfig / clearInferenceConfig */
+  refreshInferenceConfig: (): Promise<{ success: boolean; provider?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_REFRESH_CONFIG),
+
+  reprocessSession: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.REPROCESS_SESSION, sessionId),
+
+  // BYOK — direct keyVault operations
+  saveInferenceConfig: (
+    provider: string,
+    apiKey?: string
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_SAVE_CONFIG, provider, apiKey),
+
+  loadInferenceConfig: (): Promise<{ provider: string; maskedKey: string } | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LOAD_CONFIG),
+
+  clearInferenceConfig: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_CLEAR_CONFIG),
+
+  // Resend key
+  saveResendKey: (apiKey: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEND_SAVE_KEY, apiKey),
+
+  hasResendKey: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.RESEND_HAS_KEY),
+
+  clearResendKey: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RESEND_CLEAR_KEY),
+
+  // Local docs (on-device document RAG)
+  localDocsPickFile: (): Promise<{
+    document?: unknown;
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_PICK_FILE),
+
+  localDocsList: (): Promise<{
+    documents: Array<{
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_LIST),
+
+  localDocsDelete: (docId: string): Promise<{ success?: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_DELETE, docId),
+
+  localDocsQuery: (
+    question: string
+  ): Promise<{
+    answer?: string;
+    sources?: Array<{ documentName: string; chunkIndex: number }>;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_QUERY, question),
+
+  localDocsGetChunks: (
+    docId: string
+  ): Promise<{
+    chunks: Array<{
+      id: string;
+      documentId: string;
+      chunkIndex: number;
+      content: string;
+      charStart: number;
+      charEnd: number;
+      createdAt: number;
+    }>;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_GET_CHUNKS, docId),
+
+  localDocsGenerate: (
+    prompt: string,
+    sessionIds?: string[]
+  ): Promise<{
+    documentId?: string;
+    title?: string;
+    content?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_GENERATE, prompt, sessionIds),
+
+  localDocsGet: (
+    docId: string
+  ): Promise<{
+    document?: {
+      id: string;
+      userId: string;
+      filePath: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      pageCount: number;
+      chunkCount: number;
+      status: string;
+      error: string | null;
+      content: string | null;
+      title: string | null;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_GET, docId),
+
+  localDocsUpdate: (
+    docId: string,
+    data: { content?: string; title?: string }
+  ): Promise<{
+    success?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_UPDATE, docId, data),
+
+  localDocsRevise: (
+    instruction: string,
+    currentContent: string
+  ): Promise<{
+    suggestion?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_DOCS_REVISE, instruction, currentContent),
+
+  // Local agent (on-device RLM chat)
+  localAgentAsk: (data: {
+    message: string;
+    conversationId?: string;
+    timezone?: string;
+  }): Promise<{ response?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_ASK, data),
+
+  localAgentListChats: (): Promise<{
+    conversations: Array<{
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_LIST_CHATS),
+
+  localAgentGetChat: (
+    chatId: string
+  ): Promise<{
+    conversation: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    messages: Array<{
+      id: string;
+      conversationId: string;
+      role: string;
+      content: string;
+      toolCalls: string;
+      createdAt: number;
+    }>;
+  } | null> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_GET_CHAT, chatId),
+
+  localAgentCreateChat: (data?: {
+    id?: string;
+    title?: string;
+  }): Promise<{
+    conversation?: {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: number;
+      updatedAt: number;
+    };
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_CREATE_CHAT, data),
+
+  localAgentRenameChat: (
+    chatId: string,
+    title: string
+  ): Promise<{ success?: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_RENAME_CHAT, chatId, title),
+
+  localAgentDeleteChat: (chatId: string): Promise<{ success?: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_DELETE_CHAT, chatId),
+
+  onAgentProgress: (
+    callback: (event: { phase: string; tool?: string; iteration: number }) => void
+  ) => {
+    const handler = (_: unknown, event: { phase: string; tool?: string; iteration: number }) =>
+      callback(event);
+    ipcRenderer.on(IPC_CHANNELS.LOCAL_AGENT_PROGRESS, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.LOCAL_AGENT_PROGRESS, handler);
+    };
+  },
+
+  localAgentAddMessage: (data: {
+    conversationId: string;
+    role: string;
+    content: string;
+    toolCalls?: unknown[];
+  }): Promise<{
+    message?: {
+      id: string;
+      conversationId: string;
+      role: string;
+      content: string;
+      toolCalls: string;
+      createdAt: number;
+    };
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AGENT_ADD_MESSAGE, data),
+
+  // Whisper setup
+  whisperStatus: (): Promise<{ ready: boolean; downloading: boolean; percent: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WHISPER_STATUS),
+
+  whisperRunSetup: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WHISPER_RUN_SETUP),
+
+  onWhisperProgress: (
+    callback: (event: { stage: string; percent: number; label: string }) => void
+  ) => {
+    const handler = (_: unknown, event: { stage: string; percent: number; label: string }) =>
+      callback(event);
+    ipcRenderer.on(IPC_CHANNELS.WHISPER_SETUP_PROGRESS, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.WHISPER_SETUP_PROGRESS, handler);
+    };
+  },
+
+  // Local auth (on-device accounts)
+  localAuthListAccounts: (): Promise<
+    Array<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    }>
+  > => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_LIST_ACCOUNTS),
+
+  localAuthCreate: (data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<{ success: boolean; userId?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_CREATE, data),
+
+  localAuthLogin: (
+    email: string,
+    password: string
+  ): Promise<{
+    success: boolean;
+    userId?: string;
+    firstName?: string;
+    lastName?: string;
+    error?: string;
+  }> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_LOGIN, email, password),
+
+  localAuthLogout: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_LOGOUT),
+
+  localAuthGetUser: (): Promise<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null> => ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_GET_USER),
+
+  localAuthHasAccount: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_HAS_ACCOUNT),
+
+  localAuthResetPassword: (
+    email: string,
+    oldPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LOCAL_AUTH_RESET_PASSWORD, email, oldPassword, newPassword),
+
+  // Me Activity
+  getMyActivity: (userId: string, period: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ME_ACTIVITY_GET, userId, period),
+
+  getMyActivityBlocks: (userId: string, startDate: string, endDate: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ME_ACTIVITY_BLOCKS, userId, startDate, endDate),
+
+  getMyDailySummaries: (userId: string, startDate: string, endDate: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ME_ACTIVITY_DAILY_SUMMARIES, userId, startDate, endDate),
+
+  onMeActivityUpdated: (callback: (data: { sessionId: string; date: string }) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { sessionId: string; date: string }) =>
+      callback(data);
+    ipcRenderer.on(IPC_CHANNELS.ME_ACTIVITY_UPDATED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.ME_ACTIVITY_UPDATED, handler);
+    };
+  },
 });
 
 logger.info(" Console preload script finished - window.consoleAPI exposed");

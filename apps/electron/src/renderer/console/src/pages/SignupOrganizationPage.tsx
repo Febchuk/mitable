@@ -78,6 +78,7 @@ export default function SignupOrganizationPage() {
         id: response.profile.id,
         name: `${response.profile.firstName || ""} ${response.profile.lastName || ""}`.trim(),
         firstName: response.profile.firstName || "",
+        email: response.profile.email || formData.email,
         avatarUrl: response.profile.avatarUrl || undefined,
         currentWeek: response.profile.currentWeek || 1,
         role: response.profile.role,

@@ -1,16 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowUp,
-  Square,
-  Check,
-  X,
-  ExternalLink,
-  Pencil,
-  Zap,
-  CalendarDays,
-  Lightbulb,
-} from "lucide-react";
+import { ArrowUp, Square, Pencil, Zap, CalendarDays, Lightbulb, Settings } from "lucide-react";
 import AgentMessage, { AgentThinking } from "./AgentMessage";
 import ChatHistorySidebar from "./ChatHistorySidebar";
 import { useUser } from "../../../../context/UserContext";
@@ -21,7 +11,6 @@ import {
   useDeleteAgentChat,
   useRenameAgentChat,
   useAddAgentMessage,
-  useUpdateAgentChatSession,
 } from "../../../../hooks/queries/agent-chats";
 import { askAgentQuery } from "../../../../services/agentChatService";
 import { trackEvent } from "@/lib/posthog";
@@ -31,7 +20,6 @@ interface ChatMessage {
   role: "user" | "assistant" | "tool" | "error";
   content: string;
   toolName?: string;
-  isPlan?: boolean;
 }
 
 function generateId(): string {
@@ -65,7 +53,10 @@ const SUGGESTION_CHIPS = [
 ];
 
 function getGreeting(): string {
-  return "Hello";
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 export default function AgentView() {
@@ -76,25 +67,22 @@ export default function AgentView() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTool, setActiveTool] = useState<{ name: string; detail?: string } | null>(null);
-  const [pendingPlan, setPendingPlan] = useState(false);
+  const [agentProgress, setAgentProgress] = useState<{ phase: string; tool?: string } | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
   // API hooks
   const { data: conversations = [] } = useAgentChats();
   const createChat = useCreateAgentChat();
   const deleteChat = useDeleteAgentChat();
   const renameChat = useRenameAgentChat();
   const addMessage = useAddAgentMessage();
-  const updateSession = useUpdateAgentChatSession();
 
   // The active conversation ID — from URL or null (new chat)
   const activeIdRef = useRef<string | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const turnStartIndexRef = useRef<number>(0);
   const layer1AbortRef = useRef<AbortController | null>(null);
-  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const turnToolCallsRef = useRef<Array<{ name: string; detail?: string }>>([]);
+  const progressCleanupRef = useRef<(() => void) | null>(null);
 
   // Load conversation from DB when URL changes
   const { data: chatData } = useAgentChat(chatId);
@@ -118,17 +106,8 @@ export default function AgentView() {
       activeIdRef.current = null;
     }
     setIsLoading(false);
-    setPendingPlan(false);
-    setActiveTool(null);
+    setAgentProgress(null);
   }, [chatId, chatData]);
-
-  const [bridgeConnected, setBridgeConnected] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    window.consoleAPI?.getBrowserBridgeStatus().then(setBridgeConnected);
-    const unsub = window.consoleAPI?.onBrowserBridgeConnectionUpdate(setBridgeConnected);
-    return () => unsub?.();
-  }, []);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -142,123 +121,20 @@ export default function AgentView() {
     }
   }, [messages]);
 
-  useEffect(() => {
-    if (!window.consoleAPI?.onAgentMessageEvent) return;
-
-    const unsubscribe = window.consoleAPI.onAgentMessageEvent((event) => {
-      const convId = activeIdRef.current;
-
-      switch (event.type) {
-        case "result": {
-          setActiveTool(null);
-          const resultText = String(event.data);
-          const toolCalls = [...turnToolCallsRef.current];
-          turnToolCallsRef.current = [];
-          setMessages((prev) => {
-            const startIdx = turnStartIndexRef.current;
-            const beforeTurn = prev.slice(0, startIdx);
-            const duringTurn = prev.slice(startIdx);
-            const nonStreamed = duringTurn.filter(
-              (m) => m.role !== "assistant" && m.role !== "tool"
-            );
-            return [
-              ...beforeTurn,
-              ...nonStreamed,
-              { id: generateId(), role: "assistant" as const, content: resultText },
-            ];
-          });
-          setIsLoading(false);
-          // Save assistant message to DB
-          if (convId) {
-            addMessage.mutate({
-              conversationId: convId,
-              role: "assistant",
-              content: resultText,
-              toolCalls,
-            });
-          }
-          break;
-        }
-        case "plan_proposed": {
-          setActiveTool(null);
-          const planText = String(event.data);
-          const toolCalls = [...turnToolCallsRef.current];
-          turnToolCallsRef.current = [];
-          setMessages((prev) => {
-            const startIdx = turnStartIndexRef.current;
-            const beforeTurn = prev.slice(0, startIdx);
-            const duringTurn = prev.slice(startIdx);
-            const nonStreamed = duringTurn.filter(
-              (m) => m.role !== "assistant" && m.role !== "tool"
-            );
-            return [
-              ...beforeTurn,
-              ...nonStreamed,
-              { id: generateId(), role: "assistant" as const, content: planText, isPlan: true },
-            ];
-          });
-          setPendingPlan(true);
-          setIsLoading(false);
-          // Save plan message to DB
-          if (convId) {
-            addMessage.mutate({
-              conversationId: convId,
-              role: "plan",
-              content: planText,
-              toolCalls,
-            });
-          }
-          break;
-        }
-        case "assistant_text":
-          setActiveTool(null);
-          setMessages((prev) => [
-            ...prev,
-            { id: generateId(), role: "assistant", content: String(event.data) },
-          ]);
-          break;
-        case "tool_use": {
-          const toolData = event.data as { name?: string; detail?: string };
-          if (toolData?.name) {
-            turnToolCallsRef.current.push({ name: toolData.name, detail: toolData.detail });
-          }
-          setActiveTool(toolData?.name ? { name: toolData.name, detail: toolData.detail } : null);
-          break;
-        }
-        case "init": {
-          const initData = event.data as { sessionId?: string };
-          if (convId && initData?.sessionId) {
-            updateSession.mutate({ id: convId, sessionId: initData.sessionId });
-          }
-          break;
-        }
-        case "error":
-          setActiveTool(null);
-          setMessages((prev) => [
-            ...prev,
-            { id: generateId(), role: "error", content: String(event.data) },
-          ]);
-          setIsLoading(false);
-          setPendingPlan(false);
-          turnToolCallsRef.current = [];
-          // Save error to DB
-          if (convId) {
-            addMessage.mutate({
-              conversationId: convId,
-              role: "error",
-              content: String(event.data),
-            });
-          }
-          break;
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!text.trim() || isLoading || pendingPlan) return;
+      if (!text.trim() || isLoading) return;
+
+      // Check if a BYOK AI provider is configured
+      try {
+        const config = await window.consoleAPI?.loadInferenceConfig?.();
+        if (!config) {
+          setShowProviderModal(true);
+          return;
+        }
+      } catch {
+        /* allow to proceed if check fails */
+      }
 
       // Create conversation on first message if this is a new chat
       let convId = activeIdRef.current ?? "";
@@ -281,12 +157,7 @@ export default function AgentView() {
         content: trimmed,
       };
 
-      turnToolCallsRef.current = [];
-      setMessages((prev) => {
-        const next = [...prev, userMessage];
-        turnStartIndexRef.current = next.length;
-        return next;
-      });
+      setMessages((prev) => [...prev, userMessage]);
       setInput("");
       setIsLoading(true);
 
@@ -301,44 +172,28 @@ export default function AgentView() {
       addMessage.mutate({ conversationId: convId, role: "user", content: trimmed });
 
       try {
-        // Always try Layer 1 (lightweight RLM) first
         const abort = new AbortController();
         layer1AbortRef.current = abort;
 
-        // Cycling progress messages while the RLM works
-        const progressSteps = [
-          "Searching your activity...",
-          "Fetching sessions & meetings...",
-          "Analyzing daily summaries...",
-          "Reviewing meeting notes...",
-          "Compiling insights...",
-          "Synthesizing patterns...",
-        ];
-        let stepIdx = 0;
-        setActiveTool({ name: "layer1_progress", detail: progressSteps[0] });
-        progressTimerRef.current = setInterval(() => {
-          stepIdx = Math.min(stepIdx + 1, progressSteps.length - 1);
-          setActiveTool({ name: "layer1_progress", detail: progressSteps[stepIdx] });
-        }, 4000);
+        // Listen for real-time progress from the RLM loop
+        setAgentProgress({ phase: "thinking" });
+        progressCleanupRef.current =
+          window.consoleAPI?.onAgentProgress?.((event) => {
+            setAgentProgress({ phase: event.phase, tool: event.tool });
+          }) ?? null;
 
         const result = await askAgentQuery(trimmed, convId, abort.signal);
 
-        // Clean up progress timer
-        if (progressTimerRef.current) {
-          clearInterval(progressTimerRef.current);
-          progressTimerRef.current = null;
-        }
-        setActiveTool(null);
+        // Clean up progress listener
+        progressCleanupRef.current?.();
+        progressCleanupRef.current = null;
+        setAgentProgress(null);
         layer1AbortRef.current = null;
 
         // Guard: only apply if this conversation is still active
         if (activeIdRef.current !== convId) return;
 
-        if (result.escalate) {
-          // Layer 1 can't handle it — fall back to Layer 2 (Claude Code SDK)
-          await window.consoleAPI?.agentSendMessage(convId, trimmed);
-        } else if (result.response) {
-          // Layer 1 handled it
+        if (result.response) {
           const assistantMsg: ChatMessage = {
             id: generateId(),
             role: "assistant",
@@ -363,69 +218,27 @@ export default function AgentView() {
         setIsLoading(false);
       }
     },
-    [isLoading, pendingPlan, navigate, createChat, addMessage]
+    [isLoading, navigate, createChat, addMessage]
   );
 
   const handleCancel = useCallback(() => {
-    window.consoleAPI?.agentCancel();
     layer1AbortRef.current?.abort();
     layer1AbortRef.current = null;
-    if (progressTimerRef.current) {
-      clearInterval(progressTimerRef.current);
-      progressTimerRef.current = null;
-    }
+    progressCleanupRef.current?.();
+    progressCleanupRef.current = null;
     setIsLoading(false);
-    setActiveTool(null);
-  }, []);
-
-  const handleApprove = useCallback(async () => {
-    const convId = activeIdRef.current;
-    if (!convId) return;
-    setPendingPlan(false);
-    setIsLoading(true);
-    setMessages((prev) => {
-      turnStartIndexRef.current = prev.length;
-      return prev;
-    });
-    try {
-      await window.consoleAPI?.agentApprovePlan(convId, true);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { id: generateId(), role: "error", content: "Failed to execute plan. Please try again." },
-      ]);
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handleDeny = useCallback(() => {
-    const convId = activeIdRef.current;
-    if (!convId) return;
-    setPendingPlan(false);
-    window.consoleAPI?.agentApprovePlan(convId, false);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: generateId(),
-        role: "assistant",
-        content: "Plan cancelled. What would you like to do instead?",
-      },
-    ]);
+    setAgentProgress(null);
   }, []);
 
   const handleDeleteChat = useCallback(
     (id: string) => {
       if (id === activeIdRef.current) {
-        window.consoleAPI?.agentCancel();
         layer1AbortRef.current?.abort();
         layer1AbortRef.current = null;
-        if (progressTimerRef.current) {
-          clearInterval(progressTimerRef.current);
-          progressTimerRef.current = null;
-        }
+        progressCleanupRef.current?.();
+        progressCleanupRef.current = null;
         setIsLoading(false);
-        setActiveTool(null);
-        setPendingPlan(false);
+        setAgentProgress(null);
         setMessages([]);
         navigate("/agent", { replace: true });
       }
@@ -449,7 +262,7 @@ export default function AgentView() {
   };
 
   const isEmpty = messages.length === 0 && !chatId;
-  const inputDisabled = isLoading || pendingPlan;
+  const inputDisabled = isLoading;
 
   // ── Shared input area ──────────────────────────────────────────────
   const renderInput = (variant: "center" | "bottom") => {
@@ -484,7 +297,7 @@ export default function AgentView() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={pendingPlan ? "Accept or deny the plan above..." : "What can I help with?"}
+          placeholder="What can I help with?"
           rows={1}
           disabled={inputDisabled}
           style={{
@@ -633,60 +446,6 @@ export default function AgentView() {
           overflow: "hidden",
         }}
       >
-        {bridgeConnected === false && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "5px 10px",
-              fontSize: 11,
-              fontFamily: "var(--font-sans)",
-              borderRadius: 6,
-              marginBottom: 8,
-              background: "rgba(var(--ui-rgb), 0.04)",
-              color: "var(--text-secondary)",
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                width: 5,
-                height: 5,
-                borderRadius: "50%",
-                background: "var(--text-tertiary)",
-                flexShrink: 0,
-              }}
-            />
-            <span>Browser extension not connected</span>
-            <span style={{ opacity: 0.3 }}>·</span>
-            <button
-              onClick={() =>
-                window.open(
-                  "https://pub-56941275957b42049f3bad9b4bf1daa9.r2.dev/mitable-browser-bridge.zip",
-                  "_blank"
-                )
-              }
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-secondary)",
-                textDecoration: "underline",
-                textUnderlineOffset: 2,
-                cursor: "pointer",
-                fontSize: 11,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                padding: 0,
-              }}
-            >
-              Download
-              <ExternalLink size={10} />
-            </button>
-          </div>
-        )}
-
         {/* Scrollable messages */}
         <div ref={scrollContainerRef} style={{ flex: 1, overflowY: "auto", padding: "0 40px" }}>
           <div style={{ maxWidth: 680, margin: "0 auto" }}>
@@ -696,72 +455,11 @@ export default function AgentView() {
                 role={msg.role}
                 content={msg.content}
                 toolName={msg.toolName}
-                isPlan={msg.isPlan}
               />
             ))}
-            {isLoading && (
-              <AgentThinking toolName={activeTool?.name} toolDetail={activeTool?.detail} />
-            )}
+            {isLoading && <AgentThinking phase={agentProgress?.phase} tool={agentProgress?.tool} />}
           </div>
         </div>
-
-        {/* Plan approval */}
-        {pendingPlan && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "0.5px solid rgba(var(--mi-accent-rgb, 130,192,204), 0.15)",
-              background: "rgba(var(--mi-accent-rgb, 130,192,204), 0.04)",
-              margin: "12px 40px 0",
-              maxWidth: 680,
-            }}
-          >
-            <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)" }}>
-              Execute this plan?
-            </span>
-            <button
-              onClick={handleDeny}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "6px 12px",
-                borderRadius: 7,
-                border: "var(--border-subtle)",
-                background: "transparent",
-                color: "var(--text-secondary)",
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              <X size={13} />
-              Deny
-            </button>
-            <button
-              onClick={handleApprove}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "6px 12px",
-                borderRadius: 7,
-                border: "none",
-                background: "var(--mi-accent)",
-                color: "var(--bg-base)",
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
-              <Check size={13} />
-              Accept
-            </button>
-          </div>
-        )}
 
         {/* Bottom input */}
         <div
@@ -786,6 +484,71 @@ export default function AgentView() {
         onRename={handleRenameChat}
       />
       {renderChat()}
+
+      {/* No AI provider modal */}
+      {showProviderModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0, 0, 0, 0.5)" }}
+          onClick={() => setShowProviderModal(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl p-6 space-y-4"
+            style={{
+              background: "var(--bg-raised)",
+              border: "0.5px solid rgba(var(--ui-rgb), 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(var(--mi-accent-rgb), 0.12)" }}
+              >
+                <Settings size={20} style={{ color: "var(--mi-accent)" }} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  AI Provider Required
+                </h3>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  Add your API key to get started
+                </p>
+              </div>
+            </div>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              The agent needs an AI provider to respond. Go to{" "}
+              <strong style={{ color: "var(--text-primary)" }}>Settings</strong> and add your API
+              key for Google, OpenAI, or Anthropic.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setShowProviderModal(false)}
+                className="flex-1 px-4 py-2 text-sm rounded-lg transition-colors"
+                style={{
+                  background: "var(--bg-overlay)",
+                  color: "var(--text-secondary)",
+                  borderWidth: "0.5px",
+                  borderStyle: "solid",
+                  borderColor: "rgba(var(--ui-rgb), 0.10)",
+                }}
+              >
+                Later
+              </button>
+              <button
+                onClick={() => {
+                  setShowProviderModal(false);
+                  navigate("/profile");
+                }}
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                style={{ background: "var(--mi-accent)", color: "var(--bg-base)" }}
+              >
+                Open Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

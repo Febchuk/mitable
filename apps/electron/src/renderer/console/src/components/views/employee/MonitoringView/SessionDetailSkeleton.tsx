@@ -1,3 +1,6 @@
+/**
+ * @deprecated SessionDetailSkeleton — replaced by CalendarView. Set up for deletion.
+ */
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonText, SkeletonBadge } from "@/console/src/components/skeletons";
 

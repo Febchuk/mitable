@@ -1,3 +1,7 @@
+/**
+ * @deprecated Admin/Team views no longer in use in the desktop app.
+ * Admin experience moves to the web app. Scheduled for migration.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDashboardMetrics } from "@/console/src/hooks/queries/admin";

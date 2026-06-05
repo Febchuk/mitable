@@ -11,6 +11,7 @@
     "prepare": "husky",
     "postinstall": "(node scripts/fix-esbuild.js || true) && (node scripts/patch-node-cron.js || true)",
     "dev": "turbo run dev",
+    "dev:local": "npm run build -w packages/shared && npm run dev -w apps/electron",
     "dev:debug-screenshots": "cross-env DEBUG_SAVE_SCREENSHOTS=true turbo run dev",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:website": "npm run dev --workspace=apps/website",
@@ -31,7 +32,11 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "ci": "npm run build --workspace=packages/shared && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "audio-experiment": "npx tsx scripts/audio-experiment.ts",
+    "audio-experiment:prod": "npx tsx scripts/audio-experiment.ts --prod",
+    "audio-bleed": "npx tsx scripts/audio-experiment.ts --bleed",
+    "audio-bleed:prod": "npx tsx scripts/audio-experiment.ts --bleed --prod"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

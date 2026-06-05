@@ -26,7 +26,10 @@ export interface DateGroup<T> {
  *
  * Items must already be sorted newest-first.
  */
-export function groupByDay<T>(items: T[], getDate: (item: T) => Date | string): DateGroup<T>[] {
+export function groupByDay<T>(
+  items: T[],
+  getDate: (item: T) => Date | string | number
+): DateGroup<T>[] {
   if (!items.length) return [];
 
   const now = new Date();
@@ -43,7 +46,7 @@ export function groupByDay<T>(items: T[], getDate: (item: T) => Date | string): 
 
   for (const item of items) {
     const raw = getDate(item);
-    const d = typeof raw === "string" ? new Date(raw) : raw;
+    const d = raw instanceof Date ? raw : new Date(raw);
     const itemDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const ts = itemDay.getTime();
 
