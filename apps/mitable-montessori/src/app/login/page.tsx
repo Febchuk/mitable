@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { AuthHero, AuthHeroMobile } from "@/components/auth/auth-hero";
 import { GoogleIcon } from "@/components/auth/google-icon";
 import { OrDivider } from "@/components/auth/or-divider";
-import { teacherAppHomePath } from "@/lib/feature-flags";
 
 export default function LoginPage() {
   return (
@@ -23,7 +22,7 @@ function LoginInner() {
   const supabase = createClient();
   const router = useRouter();
   const params = useSearchParams();
-  const redirect = params.get("redirect") ?? teacherAppHomePath();
+  const redirect = params.get("redirect") ?? "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

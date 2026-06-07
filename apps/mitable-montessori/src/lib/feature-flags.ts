@@ -21,6 +21,15 @@ export function teacherAppHomePath(): string {
   return reportFirstExperience() ? "/app/reports" : "/app/progress";
 }
 
+export function adminAppHomePath(): string {
+  return "/admin/today";
+}
+
+/** Role-aware home after login or visiting `/`. */
+export function appHomePathForRole(role: "admin" | "teacher"): string {
+  return role === "admin" ? adminAppHomePath() : teacherAppHomePath();
+}
+
 /**
  * When true, restores the Today route and the global Ask Mitable chatbot.
  * Progress is always available regardless of this flag.

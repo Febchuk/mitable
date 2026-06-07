@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { teacherAppHomePath } from "@/lib/feature-flags";
+import { appHomePathForRole, teacherAppHomePath } from "@/lib/feature-flags";
 
 /**
  * OAuth callback. Supabase Auth redirects here with `?code=...` after Google
@@ -17,7 +17,7 @@ import { teacherAppHomePath } from "@/lib/feature-flags";
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = req.nextUrl;
   const code = searchParams.get("code");
-  const defaultHome = teacherAppHomePath();
+  const defaultHome = "/";
   const requested = searchParams.get("redirect") ?? defaultHome;
   const safeRedirect = requested.startsWith("/") ? requested : defaultHome;
 
@@ -44,12 +44,17 @@ export async function GET(req: NextRequest) {
   // Does this auth user have a Mitable users row yet?
   const { data: profile } = await supabase
     .from("users")
-    .select("id")
+    .select("id, role")
     .eq("id", user.id)
     .maybeSingle();
 
   if (profile) {
-    return NextResponse.redirect(new URL(safeRedirect, origin));
+    const teacherDefault = teacherAppHomePath();
+    const destination =
+      safeRedirect === "/" || safeRedirect === teacherDefault
+        ? appHomePathForRole(profile.role as "admin" | "teacher")
+        : safeRedirect;
+    return NextResponse.redirect(new URL(destination, origin));
   }
 
   // First-time Google user — bounce them to /signup with their email prefilled.

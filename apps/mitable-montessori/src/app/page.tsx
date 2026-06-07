@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
-import { teacherAppHomePath } from "@/lib/feature-flags";
+import { appHomePathForRole } from "@/lib/feature-flags";
 
 export default async function RootPage() {
   const cookieStore = await cookies();
@@ -13,10 +13,10 @@ export default async function RootPage() {
 
   if (user) {
     const ctx = await getCurrentUserContext();
-    if (ctx?.role === "admin") {
-      redirect("/admin/today");
+    if (ctx?.role) {
+      redirect(appHomePathForRole(ctx.role));
     }
-    redirect(teacherAppHomePath());
+    redirect("/login");
   }
   redirect("/login");
 }
