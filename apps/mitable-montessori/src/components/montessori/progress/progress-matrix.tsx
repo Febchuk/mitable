@@ -107,11 +107,11 @@ export function ProgressMatrix({
   // the "is this whole column on?" header state across all topics on screen.
   const allSubtopicIds = React.useMemo(() => flatRows.map((r) => r.sub.id), [flatRows]);
 
-  // Airy density only — spacious, touch-friendly cells. Mobile keeps the same
-  // size but tightens the label column so long subtopic names ellipsize.
+  // Airy density only — spacious, touch-friendly cells. Label column is wide
+  // enough for two wrapped lines; rows grow via minmax when a name runs long.
   const colSize = 44;
   const rowH = colSize;
-  const labelColW = mobile ? 116 : 178;
+  const labelColW = mobile ? 128 : 220;
   const headerH = mobile ? 108 : 110;
   const sectionH = mobile ? 32 : 36;
   const labelFontSize = mobile ? 12 : 13.5;
@@ -122,7 +122,7 @@ export function ProgressMatrix({
     const tracks: string[] = [`${headerH}px`];
     for (const section of sections) {
       if (showSectionHeaders) tracks.push(`${sectionH}px`);
-      for (let i = 0; i < section.subtopics.length; i++) tracks.push(`${rowH}px`);
+      for (let i = 0; i < section.subtopics.length; i++) tracks.push(`minmax(${rowH}px, auto)`);
     }
     return tracks.join(" ");
   }, [sections, showSectionHeaders, headerH, sectionH, rowH]);
@@ -153,36 +153,17 @@ export function ProgressMatrix({
     const isInfoOpen = openInfoId === sub.id;
     return (
       <React.Fragment key={sub.id}>
-        <div
-          className={styles.rowHeader}
-          data-armed={isHotRow ? "true" : "false"}
-          style={{ height: rowH }}
-        >
+        <div className={styles.rowHeader} data-armed={isHotRow ? "true" : "false"}>
           <button
             type="button"
-            className="tap"
+            className={`tap ${styles.subtopicLabelBtn}`}
+            title={sub.name}
             onClick={(e) => {
               if ((e.target as HTMLElement).closest('[data-info-btn="true"]')) return;
               sel.selectRow(sub.id);
             }}
             aria-label={`Select all children for ${sub.name}`}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              background: "transparent",
-              border: 0,
-              textAlign: "right",
-              padding: 0,
-              fontFamily: "inherit",
-              fontSize: labelFontSize,
-              fontWeight: isHotRow ? 600 : 500,
-              color: isHotRow ? "var(--color-ink)" : "var(--color-ink-secondary)",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              lineHeight: 1.2,
-            }}
+            style={{ fontSize: labelFontSize }}
           >
             {sub.name}
           </button>
