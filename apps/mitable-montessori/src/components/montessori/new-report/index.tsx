@@ -8,6 +8,10 @@ import { useMontessori } from "../store";
 import { useIsMobile } from "../child-detail/use-is-mobile";
 import type { Tone } from "../data";
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import {
+  DEFAULT_REPORT_TEMPLATE_ID,
+  withDefaultReportTemplate,
+} from "@/lib/reports/default-template";
 import { NewReportModal } from "./new-report-modal";
 import { NewReportMobile } from "./new-report-mobile";
 import type { PickerChild } from "./child-picker";
@@ -64,6 +68,16 @@ export function NewReportTrigger({
   const router = useRouter();
   const classroomName = useMontessori().classroomProgress?.classroomName?.trim() || "Classroom";
 
+  // Keep the pinned default row in sync when the teacher switches classrooms.
+  React.useEffect(() => {
+    setTemplates((prev) =>
+      withDefaultReportTemplate(
+        prev.filter((t) => t.id !== DEFAULT_REPORT_TEMPLATE_ID),
+        classroomName
+      )
+    );
+  }, [classroomName]);
+
   // Lazy-load on first open.
   React.useEffect(() => {
     if (!open || loaded) return;
@@ -85,7 +99,7 @@ export function NewReportTrigger({
           logoUrl: t.logoUrl ?? null,
           iconTone: t.iconTone,
         }));
-        setTemplates(tplRows);
+        setTemplates(withDefaultReportTemplate(tplRows, classroomName));
         const rosterRows = (
           (rost?.rows ?? []) as Array<{ id: string; fullName: string; age: string | null }>
         ).map((r) => ({
@@ -100,12 +114,13 @@ export function NewReportTrigger({
       })
       .catch((err) => {
         console.error("new-report data fetch failed", err);
+        setTemplates(withDefaultReportTemplate([], classroomName));
         ToastBus.push({ message: "Couldn't load roster/templates. Try again." });
       });
     return () => {
       cancelled = true;
     };
-  }, [open, loaded]);
+  }, [open, loaded, classroomName]);
 
   const onSubmit = React.useCallback(
     async (payload: NewReportPayload) => {

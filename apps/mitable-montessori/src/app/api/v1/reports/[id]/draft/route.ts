@@ -15,6 +15,7 @@ import {
   plainTextToReportParagraphHtml,
   speechLabelsToReportHtml,
 } from "@/lib/reports/template-field-payload";
+import { refreshDefaultTemplateProgressSections } from "@/lib/reports/default-template";
 
 function sectionSlug(heading: string, i: number): string {
   return (
@@ -56,7 +57,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { data: report, error: readErr } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, period_start, period_end, report_date, status, template_id, students!inner(school_id, first_name, last_name, preferred_name)"
+      "id, student_id, classroom_id, report_type, period_start, period_end, report_date, status, template_id, sections, section_meta, section_guidance, students!inner(school_id, first_name, last_name, preferred_name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -118,6 +119,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   let templateSections: { heading: string; guidance: string }[] = [];
   let writingStyle = "";
   let templateSectionMeta: SectionMeta = {};
+  const storedSections = (report.sections as Array<{ heading: string }> | null) ?? [];
+  const storedSectionMeta = (report.section_meta as SectionMeta | null) ?? {};
+  const storedSectionGuidance = (report.section_guidance as Record<string, string> | null) ?? {};
+
   if (report.template_id) {
     const { data: tpl } = await supabase
       .from("report_templates")
@@ -138,6 +143,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         }));
       writingStyle = ((tpl.writing_style as string | null) ?? "").trim();
     }
+  } else if (storedSections.length > 0 && Object.keys(storedSectionMeta).length > 0) {
+    templateSectionMeta = storedSectionMeta;
+    templateHeadings = storedSections.map((s) => s.heading);
+    sectionGuidance = storedSectionGuidance;
+    templateSections = templateHeadings
+      .filter((heading) => !sectionExcludedFromAgent(templateSectionMeta[heading]))
+      .map((heading) => ({
+        heading,
+        guidance: sectionGuidance[heading] ?? "",
+      }));
   }
 
   // Seed the agent's reference set with every student the client tokenized
@@ -219,6 +234,29 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const periodStart = (report.period_start || report.report_date) as string;
   const periodEnd = (report.period_end || report.report_date) as string;
+
+  type StoredSection = {
+    id: string;
+    heading: string;
+    paragraphs: { id: string; html: string }[];
+  };
+  let seededSections: StoredSection[] = (report.sections as StoredSection[] | null) ?? [];
+  const isDefaultTemplateReport =
+    !report.template_id && Object.keys(storedSectionMeta).length > 0 && seededSections.length > 0;
+
+  if (isDefaultTemplateReport) {
+    seededSections = await refreshDefaultTemplateProgressSections(supabase, {
+      classroomId: report.classroom_id as string,
+      studentId: report.student_id as string,
+      periodStart,
+      periodEnd,
+      sections: seededSections,
+      sectionMeta: templateSectionMeta,
+    });
+  }
+
+  const htmlForServerFilledSection = (heading: string): string =>
+    seededSections.find((s) => s.heading === heading)?.paragraphs[0]?.html ?? "";
 
   // Pre-flight: if there's no captured context for this student in the
   // period AND the client didn't supply transcripts/notes, the agent has
@@ -304,6 +342,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
                   html: speechLabelsToReportHtml(skipSpeechLabels),
                 },
               ],
+            };
+          }
+          if (meta?.type === "progress_topic") {
+            return {
+              id: `s-${i}-${slug}`,
+              heading,
+              paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
           }
           return {
@@ -477,6 +522,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             ],
           };
         }
+        if (meta?.type === "progress_topic") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
+          };
+        }
         return {
           id: `s-${i}-${slug}`,
           heading,
@@ -530,6 +582,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
                 html: speechLabelsToReportHtml(speechLabelsForReport),
               },
             ],
+          };
+        }
+        if (cur?.type === "progress_topic") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
         const s = agentResult!.draft.sections[agentIdx++];

@@ -20,6 +20,7 @@ import {
   inferChecklistSelections,
   inferSingleSelect,
 } from "@/lib/reports/template-field-payload";
+import { progressTopicToReadableText } from "@/lib/reports/progress-topic-payload";
 
 type RawParagraph = { html: string };
 type RawSection = { heading: string; paragraphs: RawParagraph[] };
@@ -29,6 +30,9 @@ export function paragraphToPdf(
   isFirstInSection: boolean,
   meta: SectionMetaEntry | undefined
 ): ReportPdfParagraph {
+  if (isFirstInSection && meta?.type === "progress_topic") {
+    return { text: progressTopicToReadableText(html) };
+  }
   if (isFirstInSection && meta && (meta.type === "checklist" || meta.type === "single_select")) {
     const decoded = decodeFieldPayload(html);
     if (meta.type === "checklist") {

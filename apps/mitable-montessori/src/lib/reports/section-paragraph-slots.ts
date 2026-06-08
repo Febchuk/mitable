@@ -11,6 +11,7 @@ export function firstOpenParagraphIndex(
       const structured =
         fieldMeta.type === "hardcoded" ||
         fieldMeta.type === "curriculum" ||
+        fieldMeta.type === "progress_topic" ||
         fieldMeta.type === "checklist" ||
         fieldMeta.type === "single_select";
       if (structured) continue;

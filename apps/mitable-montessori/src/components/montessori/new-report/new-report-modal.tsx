@@ -6,6 +6,10 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { ChildPicker, type PickerChild } from "./child-picker";
 import { MobileTemplateList } from "./template-block";
 import { TemplatePreview } from "./template-block";
+import {
+  buildDefaultReportTemplate,
+  isDefaultReportTemplateId,
+} from "@/lib/reports/default-template";
 import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
 type CapturedToday = Record<string, { voice: number; photos: number }>;
@@ -42,6 +46,20 @@ export function NewReportModal({
     }
   }, [open]);
 
+  React.useEffect(() => {
+    if (step === 2 && !template) {
+      setTemplate(buildDefaultReportTemplate(classroomName));
+    }
+  }, [step, template, classroomName]);
+
+  React.useEffect(() => {
+    setTemplate((current) => {
+      if (!current || !isDefaultReportTemplateId(current.id)) return current;
+      const next = buildDefaultReportTemplate(classroomName);
+      return current.name === next.name ? current : next;
+    });
+  }, [classroomName]);
+
   const canSubmit = !!child && !!template && !submitting;
 
   const submit = () => {
@@ -76,7 +94,7 @@ export function NewReportModal({
                   <X size={18} strokeWidth={2} />
                 </button>
               </header>
-              <div className="nr-modal-body nr-modal-body--child scroll-quiet flex min-h-0 flex-1 flex-col">
+              <div className="nr-modal-body nr-modal-body--child scroll-quiet flex min-h-0 flex-1 flex-col overflow-y-auto">
                 <ChildPicker
                   layout="list"
                   value={child}
@@ -125,15 +143,18 @@ export function NewReportModal({
                   <X size={18} strokeWidth={2} />
                 </button>
               </header>
-              <div className="nr-modal-body nr-modal-body--template scroll-quiet flex min-h-0 flex-1 flex-col">
-                <MobileTemplateList
-                  selected={template}
-                  onPick={setTemplate}
-                  templates={templates}
-                  child={child!}
-                />
+              <div className="nr-modal-body nr-modal-body--template flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="nr-modal-template-scroll scroll-quiet min-h-0 flex-1 overflow-y-auto">
+                  <MobileTemplateList
+                    selected={template}
+                    onPick={setTemplate}
+                    templates={templates}
+                    child={child!}
+                    classroomName={classroomName}
+                  />
+                </div>
                 {template ? (
-                  <div className="nr-modal-preview shrink-0">
+                  <div className="nr-modal-preview shrink-0 scroll-quiet overflow-y-auto">
                     <TemplatePreview template={template} child={child} locked />
                   </div>
                 ) : null}

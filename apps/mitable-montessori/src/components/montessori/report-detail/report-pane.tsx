@@ -12,6 +12,8 @@ import {
   inferSingleSelect,
 } from "@/lib/reports/template-field-payload";
 import { firstOpenParagraphIndex } from "@/lib/reports/section-paragraph-slots";
+import { decodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
+import { STATUS_COLOR, STATUS_LABEL } from "@/components/montessori/data";
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
 
@@ -346,6 +348,63 @@ function TemplateSingleSelectField({
   );
 }
 
+function ProgressTopicGrid({ heading, html }: { heading: string; html: string }) {
+  const rows = decodeProgressTopic(html) ?? [];
+  return (
+    <div className="rd-template-field rd-progress-topic" aria-readonly>
+      <p className="sr-only">{heading} — progress grid</p>
+      {rows.length === 0 ? (
+        <p
+          className="rd-template-hardcoded-body"
+          style={{ fontStyle: "italic", color: "var(--color-ink-muted)" }}
+        >
+          No materials were marked during this period.
+        </p>
+      ) : (
+        <table className="rd-progress-topic-table">
+          <thead>
+            <tr>
+              <th scope="col">Material</th>
+              <th scope="col">Status</th>
+              <th scope="col">Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <ProgressTopicRow key={row.subtopicId} row={row} />
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p className="rd-template-field-hint">
+        Pulled from progress marks during this report&rsquo;s period — edit comments below each
+        topic.
+      </p>
+    </div>
+  );
+}
+
+function ProgressTopicRow({ row }: { row: ProgressTopicRow }) {
+  const mark = row.status === "introduced" ? "i" : row.status === "practicing" ? "p" : "m";
+  return (
+    <tr>
+      <td>{row.name}</td>
+      <td>
+        <span
+          className="rd-progress-topic-badge"
+          style={{
+            background: STATUS_COLOR[mark],
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          {STATUS_LABEL[mark]}
+        </span>
+      </td>
+      <td>{row.comment?.trim() || "—"}</td>
+    </tr>
+  );
+}
+
 function TemplateHardcodedField({
   heading,
   html,
@@ -474,7 +533,10 @@ function SectionBlock({
           fieldMeta &&
           (fieldMeta.type === "checklist" || fieldMeta.type === "single_select");
         const serverFilledFirst =
-          paraIndex === 0 && (fieldMeta?.type === "hardcoded" || fieldMeta?.type === "curriculum");
+          paraIndex === 0 &&
+          (fieldMeta?.type === "hardcoded" ||
+            fieldMeta?.type === "curriculum" ||
+            fieldMeta?.type === "progress_topic");
         const hideParagraphDelete = structuredFirst || serverFilledFirst;
 
         return (
@@ -558,6 +620,8 @@ function SectionBlock({
                 radioName={radioGroupName}
                 onCommit={(next) => onParagraphCommit(p.id, next)}
               />
+            ) : serverFilledFirst && fieldMeta?.type === "progress_topic" ? (
+              <ProgressTopicGrid heading={section.heading} html={p.html} />
             ) : serverFilledFirst ? (
               <TemplateHardcodedField
                 heading={section.heading}

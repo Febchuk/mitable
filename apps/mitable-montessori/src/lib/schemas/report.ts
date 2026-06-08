@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/default-template";
 
 /**
  * Phase 3 report schemas. Tokens flow through agent context exactly like Phase
@@ -22,7 +23,10 @@ export type TokenMapEntry = z.infer<typeof TokenMapEntrySchema>;
 export const CreateReportRequestSchema = z.object({
   childId: z.string().uuid(),
   kind: ReportKind,
-  templateId: z.string().uuid().nullable().optional(),
+  templateId: z
+    .union([z.string().uuid(), z.literal(DEFAULT_REPORT_TEMPLATE_ID)])
+    .nullable()
+    .optional(),
   /** Client-derived transcripts — never persisted as binary. */
   transcripts: z.array(z.string().min(1)).max(8).optional().default([]),
   /** Client-derived OCR text from handwritten notes. */

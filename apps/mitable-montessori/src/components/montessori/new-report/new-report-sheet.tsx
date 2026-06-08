@@ -4,6 +4,7 @@ import * as React from "react";
 import { ArrowRight, LayoutTemplate, X } from "lucide-react";
 import { ChildPicker, type PickerChild } from "./child-picker";
 import { TemplatePicker, TemplatePreview } from "./template-block";
+import { buildDefaultReportTemplate } from "@/lib/reports/default-template";
 import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
 type CapturedToday = Record<string, { voice: number; photos: number }>;
@@ -91,7 +92,10 @@ export function NewReportSheet({
               <ChildPicker
                 layout="list"
                 value={child}
-                onChange={setChild}
+                onChange={(c) => {
+                  setChild(c);
+                  if (!template) setTemplate(buildDefaultReportTemplate(classroomName));
+                }}
                 roster={roster}
                 capturedToday={capturedToday}
                 rosterGroupLabel={classroomName}
@@ -108,6 +112,7 @@ export function NewReportSheet({
                 onPick={setTemplate}
                 onHighlight={setHighlight}
                 templates={templates}
+                classroomName={classroomName}
               />
             </div>
           </div>
