@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Clock, Search, X } from "lucide-react";
 import { initialsFor } from "../data";
 import { type PickerChild } from "./child-picker";
 import { MobileTemplateList } from "./template-block";
+import { buildDefaultReportTemplate } from "@/lib/reports/default-template";
 import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
 type Step = 1 | 2;
@@ -72,6 +73,7 @@ export function NewReportMobile({
           setQuery={setQuery}
           onPick={(c) => {
             setChild(c);
+            setTemplate(buildDefaultReportTemplate(classroomName));
             setStep(2);
           }}
           onClose={onClose}
@@ -87,6 +89,7 @@ export function NewReportMobile({
           onPick={setTemplate}
           templates={templates}
           submitting={submitting}
+          classroomName={classroomName}
           onBack={() => setStep(1)}
           onSubmit={submit}
         />
@@ -242,6 +245,7 @@ function Step2Template({
   onPick,
   templates,
   submitting,
+  classroomName,
   onBack,
   onSubmit,
 }: {
@@ -250,6 +254,7 @@ function Step2Template({
   onPick: (t: ReportTemplate) => void;
   templates: ReportTemplate[];
   submitting?: boolean;
+  classroomName: string;
   onBack: () => void;
   onSubmit: () => void;
 }) {
@@ -282,6 +287,7 @@ function Step2Template({
           onPick={onPick}
           templates={templates}
           child={child}
+          classroomName={classroomName}
         />
       </div>
 

@@ -72,13 +72,16 @@ export type SectionMetaEntry =
   | { type: "hardcoded" }
   | { type: "checklist"; options: string[] }
   | { type: "single_select"; options: string[] }
-  | { type: "curriculum"; program: CurriculumProgram };
+  | { type: "curriculum"; program: CurriculumProgram }
+  | { type: "progress_topic"; topicId: string };
 
 export type SectionMeta = Record<string, SectionMetaEntry>;
 
 /** Sections filled server-side (not sent to the drafting agent as empty prose). */
 export function sectionExcludedFromAgent(meta: SectionMetaEntry | undefined): boolean {
-  return meta?.type === "hardcoded" || meta?.type === "curriculum";
+  return (
+    meta?.type === "hardcoded" || meta?.type === "curriculum" || meta?.type === "progress_topic"
+  );
 }
 
 export function rowsToDb(rows: TemplateSectionRow[]): {

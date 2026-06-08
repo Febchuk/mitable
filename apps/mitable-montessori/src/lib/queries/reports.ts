@@ -106,6 +106,7 @@ type ReportsRow = {
   body: string | null;
   sections: ReportSection[] | null;
   template_id: string | null;
+  section_meta: SectionMeta | null;
   created_by_user_id: string | null;
   approved_by_user_id: string | null;
   approved_at: string | null;
@@ -393,7 +394,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id, section_meta)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, section_meta, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id, section_meta)"
     )
     .eq("id", id)
     .eq("students.school_id", ctx.schoolId)
@@ -405,10 +406,13 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   if (!data) return null;
   const row = data as unknown as ReportsRow;
   const tplJoin = row.report_templates;
+  const reportSectionMeta = (row.section_meta as SectionMeta | null) ?? {};
   const templateSectionMeta: SectionMeta =
     tplJoin && (tplJoin.school_id as string) === ctx.schoolId
       ? ((tplJoin.section_meta as SectionMeta | null) ?? {})
-      : {};
+      : Object.keys(reportSectionMeta).length > 0
+        ? reportSectionMeta
+        : {};
   const [templateLogoUrl, { count: priorSubmissionCount }] = await Promise.all([
     fetchTemplateLogoUrl(supabase, row.template_id, ctx.schoolId),
     supabase

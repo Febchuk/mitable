@@ -4,6 +4,11 @@ import * as React from "react";
 import { ChevronDown, LayoutTemplate } from "lucide-react";
 import { PdfPreviewPane } from "@/components/montessori/report-detail/pdf-preview-pane";
 import type { ReportPdfData } from "@/lib/pdf/report-template";
+import { progressTopicToReadableText } from "@/lib/reports/progress-topic-payload";
+import {
+  isDefaultReportTemplateId,
+  withDefaultReportTemplate,
+} from "@/lib/reports/default-template";
 import { type PickerChild } from "./child-picker";
 import { type ReportTemplate } from "./mock-data";
 
@@ -22,6 +27,7 @@ export function TemplatePicker({
   onPick,
   onHighlight,
   templates,
+  classroomName = "Classroom",
 }: {
   selected: ReportTemplate | null;
   onPick: (t: ReportTemplate) => void;
@@ -29,18 +35,14 @@ export function TemplatePicker({
    *  Selection always wins over hover for what's shown. */
   onHighlight?: (t: ReportTemplate | null) => void;
   templates: ReportTemplate[];
+  classroomName?: string;
 }) {
-  if (templates.length === 0) {
-    return (
-      <div className="nr-empty-row" style={{ padding: "16px 14px" }}>
-        Loading templates…
-      </div>
-    );
-  }
+  const visibleTemplates =
+    templates.length > 0 ? templates : withDefaultReportTemplate([], classroomName);
 
   return (
     <div className="nr-template-list" role="radiogroup" aria-label="Templates">
-      {templates.map((t) => (
+      {visibleTemplates.map((t) => (
         <TemplateRow
           key={t.id}
           template={t}
@@ -127,6 +129,12 @@ function templateToPdfData(template: ReportTemplate, child: PickerChild | null):
     logoUrl: template.logoUrl,
     sections: template.sections.map((heading) => {
       const meta = template.sectionMeta?.[heading];
+      if (meta?.type === "progress_topic") {
+        const previewText = isDefaultReportTemplateId(template.id)
+          ? "Pink Tower (Introduced)\nBrown Stair (Practicing)"
+          : progressTopicToReadableText("");
+        return { heading, paragraphs: [{ text: previewText }] };
+      }
       if (meta?.type === "checklist") {
         return {
           heading,
@@ -195,28 +203,24 @@ export function MobileTemplateList({
   onPick,
   templates,
   child = null,
+  classroomName = "Classroom",
 }: {
   selected: ReportTemplate | null;
   onPick: (t: ReportTemplate) => void;
   templates: ReportTemplate[];
   /** Thread the picked child into the inline PDF preview header. */
   child?: PickerChild | null;
+  classroomName?: string;
 }) {
+  const visibleTemplates =
+    templates.length > 0 ? templates : withDefaultReportTemplate([], classroomName);
   // Independent of selection — the user can preview a different template
   // than the one currently selected without losing their pick.
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
-  if (templates.length === 0) {
-    return (
-      <div className="nr-empty-row" style={{ padding: "16px 14px" }}>
-        Loading templates…
-      </div>
-    );
-  }
-
   return (
     <div className="nr-m-template-list">
-      {templates.map((t) => {
+      {visibleTemplates.map((t) => {
         const isExpanded = expandedId === t.id;
         const isSelected = selected?.id === t.id;
         return (

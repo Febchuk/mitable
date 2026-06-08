@@ -9,6 +9,11 @@ import type { SectionMeta } from "@/lib/report-templates/sections";
 import { REPORTING_PERIOD_DAYS, type ReportingPeriod } from "@/lib/report-templates/admin-dto";
 import { fetchSpeechTargetLabels } from "@/lib/queries/speech-targets";
 import { initialParagraphHtmlForTemplateSection } from "@/lib/reports/template-field-payload";
+import {
+  buildDefaultReportSections,
+  DEFAULT_REPORT_TEMPLATE_ID,
+  isDefaultReportTemplateId,
+} from "@/lib/reports/default-template";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
   Daily: "daily",
@@ -70,10 +75,32 @@ export async function POST(req: Request) {
     heading: string;
     paragraphs: { id: string; html: string }[];
   }> | null = null;
+  let sectionMeta: SectionMeta = {};
+  let sectionGuidance: Record<string, string> = {};
   // The template's reporting period defines how far back autofill looks for
   // this child's profile data (progress, comments, observations, etc.).
   let reportingPeriod: ReportingPeriod | null = null;
-  if (input.templateId) {
+  const useDefaultTemplate = isDefaultReportTemplateId(input.templateId ?? null);
+
+  if (useDefaultTemplate) {
+    const today = new Date();
+    const reportDate = today.toISOString().slice(0, 10);
+    const periodDays = REPORTING_PERIOD_DAYS.weekly;
+    const periodStartDate = new Date(today);
+    periodStartDate.setDate(periodStartDate.getDate() - (periodDays - 1));
+    const periodStart = periodStartDate.toISOString().slice(0, 10);
+
+    const built = await buildDefaultReportSections(supabase, {
+      classroomId: classroom.id,
+      studentId: input.childId,
+      periodStart,
+      periodEnd: reportDate,
+    });
+    sections = built.sections;
+    sectionMeta = built.sectionMeta;
+    sectionGuidance = built.sectionGuidance;
+    reportingPeriod = built.reportingPeriod;
+  } else if (input.templateId) {
     const { data: tpl } = await supabase
       .from("report_templates")
       .select("id, sections, kind, school_id, section_guidance, section_meta, reporting_period")
@@ -135,7 +162,9 @@ export async function POST(req: Request) {
       title: `${firstName} — ${dayLabel}`,
       body: null,
       sections,
-      template_id: input.templateId ?? null,
+      template_id: useDefaultTemplate ? null : (input.templateId ?? null),
+      section_meta: useDefaultTemplate ? sectionMeta : {},
+      section_guidance: useDefaultTemplate ? sectionGuidance : {},
       created_by_user_id: auth.user.userId,
     })
     .select("id")
@@ -159,7 +188,8 @@ export async function POST(req: Request) {
       classroom_id: classroom.id,
       has_audio: input.transcripts.length > 0,
       has_notes: input.notes.length > 0,
-      template_id: input.templateId ?? null,
+      template_id: useDefaultTemplate ? DEFAULT_REPORT_TEMPLATE_ID : (input.templateId ?? null),
+      uses_default_template: useDefaultTemplate,
     },
   });
 

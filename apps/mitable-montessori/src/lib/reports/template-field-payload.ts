@@ -5,6 +5,7 @@
  */
 
 import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
+import { progressTopicToReadableText } from "@/lib/reports/progress-topic-payload";
 
 const PREFIX = "__MITABLE_FIELD_V1__";
 
@@ -131,6 +132,9 @@ export function inferSingleSelect(proseHtml: string, options: string[]): string 
 
 /** Plain text for PDF, chat tokenization, and markdown `body` — never exposes raw JSON prefixes. */
 export function fieldPayloadToReadableText(html: string): string {
+  if (html.trim().startsWith("__MITABLE_PROGRESS_TOPIC_V1__")) {
+    return progressTopicToReadableText(html);
+  }
   const d = decodeFieldPayload(html);
   if (d.kind === "checklist") {
     if (d.selected.length === 0) return "";
@@ -163,7 +167,13 @@ export function paragraphCountsTowardDraftReadiness(
   html: string,
   fieldMeta?: SectionMetaEntry | null
 ): boolean {
-  if (fieldMeta?.type === "hardcoded" || fieldMeta?.type === "curriculum") return false;
+  if (
+    fieldMeta?.type === "hardcoded" ||
+    fieldMeta?.type === "curriculum" ||
+    fieldMeta?.type === "progress_topic"
+  ) {
+    return false;
+  }
   return paragraphHasTeacherContent(html);
 }
 
@@ -174,8 +184,15 @@ export function normalizeSectionHtmlForTemplate(
   meta: SectionMeta
 ): string {
   const entry = meta[heading];
-  if (!entry || entry.type === "text" || entry.type === "hardcoded" || entry.type === "curriculum")
+  if (
+    !entry ||
+    entry.type === "text" ||
+    entry.type === "hardcoded" ||
+    entry.type === "curriculum" ||
+    entry.type === "progress_topic"
+  ) {
     return html;
+  }
 
   const decoded = decodeFieldPayload(html);
   if (entry.type === "checklist") {

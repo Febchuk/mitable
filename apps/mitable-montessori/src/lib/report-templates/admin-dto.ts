@@ -40,6 +40,9 @@ export const REPORTING_PERIOD_DAYS: Record<ReportingPeriod, number> = {
   end_of_term: 120,
 };
 
+/** Classroom default report template always uses a weekly lookback. */
+export const DEFAULT_REPORTING_PERIOD: ReportingPeriod = "weekly";
+
 export type ContextModeDefault = "history" | "input_only";
 
 export type AdminReportTemplateDto = {

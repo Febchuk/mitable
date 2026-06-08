@@ -54,7 +54,7 @@ export async function drainPendingReports(
   const { data: rows, error } = await supabase
     .from("report_recipients")
     .select(
-      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, status, report_date, report_type, students(first_name, last_name), classrooms(name), report_templates(logo_url, section_meta))"
+      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, section_meta, status, report_date, report_type, students(first_name, last_name), classrooms(name), report_templates(logo_url, section_meta))"
     )
     .eq("delivery_status", "pending")
     .limit(limit);
@@ -76,6 +76,7 @@ export async function drainPendingReports(
             title: string | null;
             body: string | null;
             sections: ReportSection[] | null;
+            section_meta: SectionMeta | null;
             status: string;
             report_date: string | null;
             report_type: string | null;
@@ -93,6 +94,7 @@ export async function drainPendingReports(
             title: string | null;
             body: string | null;
             sections: ReportSection[] | null;
+            section_meta: SectionMeta | null;
             status: string;
             report_date: string | null;
             report_type: string | null;
@@ -163,7 +165,8 @@ export async function drainPendingReports(
       classroomName: classroom?.name ?? null,
       messageBody: row.message_body,
       templateLogoUrl: template?.logo_url ?? null,
-      templateSectionMeta: template?.section_meta ?? null,
+      templateSectionMeta:
+        template?.section_meta ?? (report.section_meta as SectionMeta | null) ?? null,
     });
 
     if (sendResult.ok) {

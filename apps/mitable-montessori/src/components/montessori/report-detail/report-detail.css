@@ -1963,6 +1963,37 @@ main:has(.rd-root) {
   color: var(--color-ink);
 }
 
+.rd-progress-topic-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rd-progress-topic-table th,
+.rd-progress-topic-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rd-progress-topic-table th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.rd-progress-topic-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
 /* ---------- View-mode toggle + PDF preview pane ---------- */
 .rd-view-toggle {
   display: none;
