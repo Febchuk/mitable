@@ -12,10 +12,12 @@ import { ClassSwitcher } from "@/components/montessori/class-switcher";
 import { useMontessori } from "@/components/montessori/store";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import {
+  ALL_CLASSROOMS_ID,
   type AttendanceDayData,
   type AttendanceDayStudent,
   type AttendanceDayStatus,
   addDays,
+  attendanceStudentRowKey,
   localDateString,
 } from "@/lib/queries/attendance-day-model";
 import {
@@ -130,20 +132,24 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
   const locale = useUiLocale();
   const { selectedClassroomId } = useMontessori();
 
+  const isAllClasses = data.classroomId === ALL_CLASSROOMS_ID;
+
   // The register is URL-driven (?date&classroom). If the teacher picked a
-  // different class elsewhere, redirect so the server renders that room.
+  // different class elsewhere, redirect so the server renders that room —
+  // unless they're viewing the combined roster.
   React.useEffect(() => {
+    if (isAllClasses) return;
     if (selectedClassroomId && data.classroomId && selectedClassroomId !== data.classroomId) {
       router.replace(`/app/attendance?date=${data.date}&classroom=${selectedClassroomId}`);
     }
-  }, [selectedClassroomId, data.classroomId, data.date, router]);
+  }, [isAllClasses, selectedClassroomId, data.classroomId, data.date, router]);
 
   const classroomParam = data.classroomId ? `&classroom=${data.classroomId}` : "";
 
   const initialRows = React.useMemo<Record<string, RowState>>(() => {
     const out: Record<string, RowState> = {};
     for (const s of data.students) {
-      out[s.id] = {
+      out[attendanceStudentRowKey(s)] = {
         status: s.status,
         comment: s.comment,
         saving: false,
@@ -159,7 +165,12 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
   const inflight = React.useRef(0);
 
   const unmarkedCount = React.useMemo(
-    () => data.students.filter((s) => (rows[s.id] ?? initialRows[s.id])?.status === null).length,
+    () =>
+      data.students.filter(
+        (s) =>
+          (rows[attendanceStudentRowKey(s)] ?? initialRows[attendanceStudentRowKey(s)])?.status ===
+          null
+      ).length,
     [data.students, rows, initialRows]
   );
 
@@ -182,12 +193,13 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
   const isToday = data.date === localDateString();
 
   const saveRow = React.useCallback(
-    async (studentId: string, next: Omit<RowState, "saving">) => {
+    async (student: AttendanceDayStudent, next: Omit<RowState, "saving">) => {
       if (!data.classroomId) return;
 
+      const rowKey = attendanceStudentRowKey(student);
       inflight.current += 1;
       setSaveStatus("saving");
-      setRows((prev) => ({ ...prev, [studentId]: { ...next, saving: true } }));
+      setRows((prev) => ({ ...prev, [rowKey]: { ...next, saving: true } }));
 
       try {
         if (next.status === null) {
@@ -195,7 +207,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             method: "DELETE",
             headers: { "content-type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ student_id: studentId, date: data.date }),
+            body: JSON.stringify({ student_id: student.id, date: data.date }),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
         } else {
@@ -204,15 +216,15 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             headers: { "content-type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              commands: [buildAttendanceCommand(data.classroomId, studentId, data.date, next)],
+              commands: [buildAttendanceCommand(student.classroomId, student.id, data.date, next)],
             }),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
         }
 
-        setRows((prev) => ({ ...prev, [studentId]: { ...next, saving: false } }));
+        setRows((prev) => ({ ...prev, [rowKey]: { ...next, saving: false } }));
       } catch {
-        setRows((prev) => ({ ...prev, [studentId]: { ...next, saving: false } }));
+        setRows((prev) => ({ ...prev, [rowKey]: { ...next, saving: false } }));
         ToastBus.push({
           message: "Couldn't save attendance. Check your connection and try again.",
         });
@@ -237,8 +249,9 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
       };
 
       const targets = data.students.filter((s) => {
+        const rowKey = attendanceStudentRowKey(s);
         if (scope === "all") return true;
-        return (rows[s.id] ?? initialRows[s.id])?.status === null;
+        return (rows[rowKey] ?? initialRows[rowKey])?.status === null;
       });
       if (targets.length === 0) return;
 
@@ -246,18 +259,18 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
       inflight.current += 1;
       setSaveStatus("saving");
 
-      const ids = targets.map((s) => s.id);
+      const rowKeys = targets.map((s) => attendanceStudentRowKey(s));
       setRows((prev) => {
         const next = { ...prev };
-        for (const id of ids) {
-          next[id] = { ...payload, saving: true };
+        for (const rowKey of rowKeys) {
+          next[rowKey] = { ...payload, saving: true };
         }
         return next;
       });
 
       try {
-        const commands = ids.map((id) =>
-          buildAttendanceCommand(data.classroomId!, id, data.date, payload)
+        const commands = targets.map((s) =>
+          buildAttendanceCommand(s.classroomId, s.id, data.date, payload)
         );
         for (let i = 0; i < commands.length; i += SYNC_BATCH_SIZE) {
           const chunk = commands.slice(i, i + SYNC_BATCH_SIZE);
@@ -272,21 +285,22 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
 
         setRows((prev) => {
           const next = { ...prev };
-          for (const id of ids) {
-            next[id] = { ...payload, saving: false };
+          for (const rowKey of rowKeys) {
+            next[rowKey] = { ...payload, saving: false };
           }
           return next;
         });
         setBulkOpen(false);
         ToastBus.push({
-          message: `Marked ${ids.length} ${ids.length === 1 ? "child" : "children"} ${params.status}.`,
+          message: `Marked ${targets.length} ${targets.length === 1 ? "child" : "children"} ${params.status}.`,
         });
       } catch {
         setRows((prev) => {
           const next = { ...prev };
-          for (const id of ids) {
-            const prior = initialRows[id] ?? prev[id];
-            next[id] = { ...prior, saving: false };
+          for (let i = 0; i < rowKeys.length; i++) {
+            const rowKey = rowKeys[i];
+            const prior = initialRows[rowKey] ?? prev[rowKey];
+            next[rowKey] = { ...prior, saving: false };
           }
           return next;
         });
@@ -323,6 +337,8 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
 
       <ClassSwitcher
         style={{ padding: "4px 24px 0" }}
+        includeAllOption
+        selectedId={data.classroomId}
         afterSelect={(id) => router.push(`/app/attendance?date=${data.date}&classroom=${id}`)}
       />
 
@@ -393,20 +409,22 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             />
             <div className={styles.registerGrid}>
               {data.students.map((student) => {
-                const row = rows[student.id] ?? initialRows[student.id];
+                const rowKey = attendanceStudentRowKey(student);
+                const row = rows[rowKey] ?? initialRows[rowKey];
                 return (
                   <StudentRow
-                    key={student.id}
+                    key={rowKey}
                     student={student}
+                    showClassroom={isAllClasses}
                     row={row}
                     disabled={bulkApplying}
                     onChange={(next) => {
                       setRows((prev) => ({
                         ...prev,
-                        [student.id]: { ...next, saving: row.saving },
+                        [rowKey]: { ...next, saving: row.saving },
                       }));
                     }}
-                    onCommit={(next) => void saveRow(student.id, next)}
+                    onCommit={(next) => void saveRow(student, next)}
                   />
                 );
               })}
@@ -475,12 +493,14 @@ function DayArrow({
 
 function StudentRow({
   student,
+  showClassroom,
   row,
   disabled,
   onChange,
   onCommit,
 }: {
   student: AttendanceDayStudent;
+  showClassroom?: boolean;
   row: RowState;
   disabled?: boolean;
   onChange: (next: Omit<RowState, "saving">) => void;
@@ -525,19 +545,34 @@ function StudentRow({
         <div className={styles.registerHeader}>
           <Avatar initials={initialsFor(student.fullName)} tone={toneFor(student.id)} size={36} />
           <div className={styles.nameActions}>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: "var(--color-ink)",
-                lineHeight: 1.25,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                minWidth: 0,
-              }}
-            >
-              {display}
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "var(--color-ink)",
+                  lineHeight: 1.25,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {display}
+              </div>
+              {showClassroom && (
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--color-ink-muted)",
+                    lineHeight: 1.2,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {student.classroomName}
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <StatusButton
