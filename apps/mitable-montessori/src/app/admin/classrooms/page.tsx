@@ -62,6 +62,7 @@ import {
   normalizeGroupColor,
   type GroupColor,
 } from "@/lib/classroom-groups";
+import { classroomGroupsEnabled } from "@/lib/feature-flags";
 
 type AdminChild = {
   id: string;
@@ -244,6 +245,7 @@ const FIELD_OPTIONS: ImportField[] = [
 ];
 
 export default function AdminClassroomsPage() {
+  const groupsEnabled = classroomGroupsEnabled();
   const [classrooms, setClassrooms] = React.useState<AdminClassroom[]>([]);
   const [teacherPool, setTeacherPool] = React.useState<ApiTeacher[]>([]);
   const [children, setChildren] = React.useState<AdminChild[]>([]);
@@ -863,7 +865,7 @@ export default function AdminClassroomsPage() {
                       · {selectedClassroom.curriculumName}
                     </span>
                   ) : null}
-                  {selectedClassroom.groups.length > 0 ? (
+                  {groupsEnabled && selectedClassroom.groups.length > 0 ? (
                     <span style={{ marginLeft: 8, color: "var(--color-ink-muted)" }}>
                       · {selectedClassroom.groups.length}{" "}
                       {selectedClassroom.groups.length === 1 ? "group" : "groups"}
@@ -883,6 +885,7 @@ export default function AdminClassroomsPage() {
 
             <ClassroomSettingsSection
               classroom={selectedClassroom}
+              groupsEnabled={groupsEnabled}
               teacherPool={teacherPool}
               montessoriCurricula={montessoriCurricula}
               memberCountByGroup={memberCountByGroup}
@@ -937,12 +940,17 @@ export default function AdminClassroomsPage() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.8fr 0.5fr 0.8fr 1.4fr 40px",
+                      gridTemplateColumns: groupsEnabled
+                        ? "1.8fr 0.5fr 0.8fr 1.4fr 40px"
+                        : "1.8fr 0.5fr 0.8fr 40px",
                       padding: "12px 20px",
                       borderBottom: "1px solid var(--color-border)",
                     }}
                   >
-                    {["Child", "Age", "Enrolled", "Group", ""].map((header, i) => (
+                    {(groupsEnabled
+                      ? ["Child", "Age", "Enrolled", "Group", ""]
+                      : ["Child", "Age", "Enrolled", ""]
+                    ).map((header, i) => (
                       <div
                         key={`${header}-${i}`}
                         className="label-cap"
@@ -956,6 +964,7 @@ export default function AdminClassroomsPage() {
                     <RosterRow
                       key={child.id}
                       child={child}
+                      groupsEnabled={groupsEnabled}
                       groups={selectedClassroom.groups}
                       onAssignGroup={(groupId) =>
                         void assignChildGroup(selectedClassroom.id, child.id, groupId)
@@ -971,6 +980,7 @@ export default function AdminClassroomsPage() {
                       key={child.id}
                       child={child}
                       index={index}
+                      groupsEnabled={groupsEnabled}
                       groups={selectedClassroom.groups}
                       onAssignGroup={(groupId) =>
                         void assignChildGroup(selectedClassroom.id, child.id, groupId)
@@ -1289,6 +1299,7 @@ function SettingsCard({ children }: { children: React.ReactNode }) {
 
 function ClassroomSettingsSection({
   classroom,
+  groupsEnabled,
   teacherPool,
   montessoriCurricula,
   memberCountByGroup,
@@ -1301,6 +1312,7 @@ function ClassroomSettingsSection({
   onDeleteGroup,
 }: {
   classroom: AdminClassroom;
+  groupsEnabled: boolean;
   teacherPool: ApiTeacher[];
   montessoriCurricula: Array<{ id: string; name: string }>;
   memberCountByGroup: Map<string, number>;
@@ -1321,7 +1333,9 @@ function ClassroomSettingsSection({
   const summary = [
     `${classroom.teachers.length} ${classroom.teachers.length === 1 ? "teacher" : "teachers"}`,
     classroom.programTypes.map((p) => PROGRAM_LABEL[p]).join(", "),
-    `${classroom.groups.length} ${classroom.groups.length === 1 ? "group" : "groups"}`,
+    ...(groupsEnabled
+      ? [`${classroom.groups.length} ${classroom.groups.length === 1 ? "group" : "groups"}`]
+      : []),
   ].join(" · ");
 
   return (
@@ -1397,16 +1411,18 @@ function ClassroomSettingsSection({
             />
           </SettingsCard>
 
-          <SettingsCard>
-            <ClassroomGroupsPanel
-              classroomId={classroom.id}
-              groups={classroom.groups}
-              memberCountByGroup={memberCountByGroup}
-              onCreate={onCreateGroup}
-              onUpdate={onUpdateGroup}
-              onDelete={onDeleteGroup}
-            />
-          </SettingsCard>
+          {groupsEnabled ? (
+            <SettingsCard>
+              <ClassroomGroupsPanel
+                classroomId={classroom.id}
+                groups={classroom.groups}
+                memberCountByGroup={memberCountByGroup}
+                onCreate={onCreateGroup}
+                onUpdate={onUpdateGroup}
+                onDelete={onDeleteGroup}
+              />
+            </SettingsCard>
+          ) : null}
 
           <SettingsCard>
             <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
@@ -2648,11 +2664,13 @@ function SelectInput({
 
 function RosterRow({
   child,
+  groupsEnabled,
   groups,
   onAssignGroup,
   onRemove,
 }: {
   child: AdminChild;
+  groupsEnabled: boolean;
   groups: AdminClassroomGroup[];
   onAssignGroup: (groupId: string | null) => void;
   onRemove: () => void;
@@ -2661,7 +2679,9 @@ function RosterRow({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "1.8fr 0.5fr 0.8fr 1.4fr 40px",
+        gridTemplateColumns: groupsEnabled
+          ? "1.8fr 0.5fr 0.8fr 1.4fr 40px"
+          : "1.8fr 0.5fr 0.8fr 40px",
         alignItems: "center",
         padding: "12px 20px",
         width: "100%",
@@ -2688,9 +2708,11 @@ function RosterRow({
         {child.age || "-"}
       </div>
       <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>{child.enrolled}</div>
-      <div style={{ minWidth: 0 }}>
-        <RosterGroupSelect groups={groups} value={child.groupId} onChange={onAssignGroup} />
-      </div>
+      {groupsEnabled ? (
+        <div style={{ minWidth: 0 }}>
+          <RosterGroupSelect groups={groups} value={child.groupId} onChange={onAssignGroup} />
+        </div>
+      ) : null}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
           type="button"
@@ -2811,12 +2833,14 @@ function RosterGroupSelect({
 function RosterMobileRow({
   child,
   index,
+  groupsEnabled,
   groups,
   onAssignGroup,
   onRemove,
 }: {
   child: AdminChild;
   index: number;
+  groupsEnabled: boolean;
   groups: AdminClassroomGroup[];
   onAssignGroup: (groupId: string | null) => void;
   onRemove: () => void;
@@ -2857,9 +2881,11 @@ function RosterMobileRow({
           </div>
         </div>
       </Link>
-      <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-        <RosterGroupSelect groups={groups} value={child.groupId} onChange={onAssignGroup} />
-      </div>
+      {groupsEnabled ? (
+        <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+          <RosterGroupSelect groups={groups} value={child.groupId} onChange={onAssignGroup} />
+        </div>
+      ) : null}
       <button
         type="button"
         className="tap shrink-0 rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"

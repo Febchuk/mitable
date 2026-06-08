@@ -217,6 +217,31 @@
   background: var(--color-muted);
 }
 
+/* Subtopic name in the sticky left column — up to two lines, then clip. */
+.subtopicLabelBtn {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  text-align: right;
+  padding: 4px 0;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+.rowHeader[data-armed="true"] .subtopicLabelBtn {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
 /* ---------- topic section header (full-curriculum / grouped view) ----------
    Spans every column and starts its own grid row. The label is sticky-left so
    the topic name stays visible while the matrix scrolls horizontally. */
