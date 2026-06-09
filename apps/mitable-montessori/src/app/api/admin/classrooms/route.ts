@@ -5,6 +5,7 @@ import { CreateClassroomSchema, PatchClassroomSchema } from "@/lib/schemas/admin
 import {
   createClassroom,
   setClassroomMontessoriCurriculum,
+  updateClassroomName,
   updateClassroomPrograms,
 } from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/api/admin-auth";
@@ -350,6 +351,12 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   return adminWriteRoute(req, PatchClassroomSchema, "admin_patch_classroom", async (input, ctx) => {
+    if (input.name !== undefined) {
+      await updateClassroomName(ctx, {
+        classroom_id: input.classroom_id,
+        name: input.name,
+      });
+    }
     if (input.program_types) {
       await updateClassroomPrograms(ctx, {
         classroom_id: input.classroom_id,
@@ -362,6 +369,7 @@ export async function PATCH(req: Request) {
     return {
       id: input.classroom_id,
       meta: {
+        updated_name: input.name !== undefined,
         updated_programs: Boolean(input.program_types),
         updated_curriculum: input.curriculum_id !== undefined,
       },
