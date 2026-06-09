@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, LayoutTemplate, Pencil, Trash2 } from "lucide-react";
+import { Copy, Pencil, Trash2 } from "lucide-react";
 import type { AdminReportTemplateDto } from "@/lib/report-templates/admin-dto";
 import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
@@ -93,12 +93,6 @@ export default function AdminReportTemplatesPage() {
   return (
     <div>
       <PageHeader
-        overline={
-          <span className="inline-flex items-center gap-2">
-            <LayoutTemplate size={14} strokeWidth={1.6} />
-            Admin
-          </span>
-        }
         title="Report templates"
         subtitle="Define section structure, assistant guidance, tone, and an optional school logo. Duplicate a row to start from an existing template."
         actions={

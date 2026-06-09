@@ -174,7 +174,6 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
     [data.students, rows, initialRows]
   );
 
-  const overline = (data.classroomName?.toUpperCase() ?? "CLASSROOM") + " · ATTENDANCE REGISTER";
   const dateParts = formatDateParts(data.date, locale);
 
   const goDay = React.useCallback(
@@ -325,18 +324,12 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
 
   return (
     <div>
-      <PageHeader
-        overline={overline}
-        title="Attendance"
-        subtitle={
-          data.students.length === 0
-            ? "No children enrolled in this classroom yet."
-            : `${data.students.length} ${data.students.length === 1 ? "child" : "children"} on the register.`
-        }
-      />
+      <PageHeader title="Attendance" subtitle="Take daily attendance for your classrooms." />
 
       <ClassSwitcher
-        style={{ padding: "4px 24px 0" }}
+        variant="dropdown"
+        label="Classroom"
+        style={{ padding: "20px 24px 0" }}
         includeAllOption
         selectedId={data.classroomId}
         afterSelect={(id) => router.push(`/app/attendance?date=${data.date}&classroom=${id}`)}

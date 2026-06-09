@@ -113,7 +113,12 @@ export function RecentUpdatesPanel({ entries, students, onNewComment }: RecentUp
             <Avatar initials={initialsFor(student.fullName)} tone={toneFor(student.id)} size={26} />
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-ink)" }}>
-                {display}
+                <span
+                  className="font-display"
+                  style={{ fontSize: 17, fontWeight: 500, color: "var(--color-ink)" }}
+                >
+                  {display}
+                </span>
                 {isComment ? (
                   <span
                     style={{
@@ -190,12 +195,12 @@ export function RecentUpdatesPanel({ entries, students, onNewComment }: RecentUp
               )}
               {e.noteText && (
                 <div
-                  className="font-display"
                   style={{
                     marginTop: 6,
-                    fontSize: 17,
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 13.5,
                     color: "var(--color-ink)",
-                    lineHeight: 1.25,
+                    lineHeight: 1.45,
                   }}
                 >
                   &ldquo;{e.noteText}&rdquo;

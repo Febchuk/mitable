@@ -295,9 +295,8 @@ export function ProgressFeature() {
     return (
       <div className="progress-root">
         <PageHeader
-          overline="Lesson planner"
           title="Progress"
-          subtitle="No active classroom assigned to your account."
+          subtitle="Record children's progress through the curriculum."
         />
         <EmptyState
           title="No active classroom"
@@ -312,9 +311,8 @@ export function ProgressFeature() {
     return (
       <div className="progress-root">
         <PageHeader
-          overline="Lesson planner"
           title="Progress"
-          subtitle={`${cp.students.length} children in ${cp.classroomName} · curriculum not assigned`}
+          subtitle="Record children's progress through the curriculum."
         />
         {classrooms.length > 1 && (
           <div style={{ padding: "4px 16px 0" }}>
@@ -340,7 +338,6 @@ export function ProgressFeature() {
     <ProgressFeatureLoaded
       // Remount on class switch so selection/subject/topic reset cleanly.
       key={cp.classroomId}
-      classroomName={cp.classroomName}
       groups={cp.groups}
       subjects={cp.subjects}
       topics={cp.topics}
@@ -351,14 +348,12 @@ export function ProgressFeature() {
 }
 
 function ProgressFeatureLoaded({
-  classroomName,
   groups,
   subjects,
   topics,
   subtopics,
   students,
 }: {
-  classroomName: string;
   groups: ClassroomGroup[];
   subjects: ClassroomProgressSubject[];
   topics: ClassroomProgressTopic[];
@@ -375,7 +370,6 @@ function ProgressFeatureLoaded({
   // Group ("team") filter. null = whole class. A group with no present children
   // still selectable; the grid simply shows an empty-roster message.
   const [groupId, setGroupId] = React.useState<string | null>(null);
-  const activeGroup = groupId ? (groups.find((g) => g.id === groupId) ?? null) : null;
   // Fall back to whole class if the selected group was removed out from under us.
   React.useEffect(() => {
     if (groupId && !groups.some((g) => g.id === groupId)) setGroupId(null);
@@ -456,9 +450,6 @@ function ProgressFeatureLoaded({
       ),
     [sections]
   );
-
-  const currentSubject =
-    subjectId === ALL_SUBJECTS ? null : (subjects.find((s) => s.id === subjectId) ?? null);
 
   // ESC clears selection + closes any popover/sheet.
   React.useEffect(() => {
@@ -591,7 +582,6 @@ function ProgressFeatureLoaded({
     sel.clear();
   };
 
-  const presentCount = presentStudents.length;
   const subtopicAtInfo = info ? (subtopics.find((s) => s.id === info.subtopicId) ?? null) : null;
 
   const subjectChipOptions = ["All", ...subjects.map((s) => s.name)];
@@ -617,24 +607,9 @@ function ProgressFeatureLoaded({
     if (found) switchTopic(found.id);
   };
 
-  const overline = currentTopic
-    ? `Lesson planner · ${currentTopic.name.toLowerCase()}`
-    : "Lesson planner";
-  const presenceText = activeGroup
-    ? `${presentCount} in ${activeGroup.name} present`
-    : `${presentCount} children present`;
-  const scopeText = currentSubject ? currentSubject.name : "Full curriculum";
-  const subtitle = currentTopic
-    ? `${presenceText} · ${currentTopic.name} · ${visibleSubtopics.length} subtopics`
-    : `${presenceText} · ${scopeText} · ${sections.length} topic${sections.length === 1 ? "" : "s"}`;
-
   return (
     <div className="progress-root">
-      <PageHeader
-        overline={`${overline} · ${classroomName}`}
-        title="Progress"
-        subtitle={subtitle}
-      />
+      <PageHeader title="Progress" subtitle="Record children's progress through the curriculum." />
 
       {visibleTopics.length === 0 ? (
         <EmptyState
