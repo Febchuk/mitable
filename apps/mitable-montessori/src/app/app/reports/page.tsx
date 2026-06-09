@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import { reportFirstExperience } from "@/lib/feature-flags";
 import { listReportsV2 } from "@/lib/queries/reports";
 import { ReportsLandingView } from "./reports-landing-view";
@@ -15,7 +16,11 @@ export default async function ReportsPage({
   const openParam =
     typeof rawOpen === "string" ? rawOpen : Array.isArray(rawOpen) ? rawOpen[0] : undefined;
 
-  const reports = await listReportsV2();
+  const [reports, classroom] = await Promise.all([
+    listReportsV2(),
+    getActiveClassroomForCurrentUser(),
+  ]);
+  const classroomName = classroom?.name?.trim() || null;
 
   if (openParam && reports.some((r) => r.id === openParam)) {
     redirect(`/app/reports/${openParam}`);
@@ -26,9 +31,9 @@ export default async function ReportsPage({
   return (
     <Suspense fallback={null}>
       {reportFirst ? (
-        <ReportsLandingView reports={reports} />
+        <ReportsLandingView reports={reports} classroomName={classroomName} />
       ) : (
-        <ReportsListView reports={reports} variant="teacher" />
+        <ReportsListView reports={reports} variant="teacher" classroomName={classroomName} />
       )}
     </Suspense>
   );

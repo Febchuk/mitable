@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { Sparkles, Trash2 } from "lucide-react";
 import { initialsFor } from "@/components/montessori/data";
 import type { ReportListRow } from "@/lib/queries/reports";
-import { FilterChips, PageHeader, cardStyle } from "@/components/montessori/page-header";
+import {
+  FilterChips,
+  FilterSelect,
+  PageHeader,
+  cardStyle,
+} from "@/components/montessori/page-header";
 import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck, ToastBus } from "@/components/montessori/primitives";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
@@ -73,16 +78,26 @@ function tonesByIndex(i: number): "clay" | "sage" | "butter" | "blue" | "terraco
   return (["clay", "sage", "butter", "blue", "terracotta"] as const)[i % 5];
 }
 
+function teacherReportsSubtitle(classroomName: string | null | undefined): string {
+  if (classroomName) {
+    return `Draft and send ${classroomName} progress reports to families.`;
+  }
+  return "Draft and send progress reports to families.";
+}
+
 export function ReportsListView({
   reports,
   variant = "teacher",
+  classroomName,
 }: {
   reports: ReportListRow[];
   variant?: "teacher" | "admin";
+  classroomName?: string | null;
 }) {
   const router = useRouter();
   const locale = useUiLocale();
-  const [filter, setFilter] = React.useState("All");
+  const isAdmin = variant === "admin";
+  const [filter, setFilter] = React.useState(variant === "admin" ? "All" : "all");
   const [pendingDelete, setPendingDelete] = React.useState<ReportListRow | null>(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
 
@@ -105,7 +120,6 @@ export function ReportsListView({
       setDeleteBusy(false);
     }
   }, [pendingDelete, router]);
-  const isAdmin = variant === "admin";
   const detailHref = (id: string) =>
     isAdmin ? `/admin/reports?open=${encodeURIComponent(id)}` : `/app/reports/${id}`;
 
@@ -115,7 +129,7 @@ export function ReportsListView({
   ).length;
   const sent = reports.filter((r) => r.status === "sent" || r.status === "approved").length;
 
-  const filters = [
+  const chipFilters = [
     "All",
     `Drafts · ${drafts}`,
     `Awaiting review · ${reviews}`,
@@ -125,33 +139,57 @@ export function ReportsListView({
     "Incident",
   ];
 
+  const selectFilters = [
+    { value: "all", label: "All reports" },
+    { value: "drafts", label: "Drafts" },
+    { value: "awaiting", label: "Awaiting review" },
+    { value: "sent", label: "Sent" },
+    { value: "daily", label: "Daily" },
+    { value: "major", label: "Major" },
+    { value: "incident", label: "Incident" },
+  ];
+
   const filtered = reports.filter((r) => {
-    if (filter === "All") return true;
-    if (filter.startsWith("Drafts")) return r.status === "draft";
-    if (filter.startsWith("Awaiting"))
+    if (isAdmin) {
+      if (filter === "All") return true;
+      if (filter.startsWith("Drafts")) return r.status === "draft";
+      if (filter.startsWith("Awaiting"))
+        return r.status === "submitted_for_review" || r.status === "in_review";
+      if (filter.startsWith("Sent")) return r.status === "sent" || r.status === "approved";
+      if (filter === "Daily") return r.reportType === "daily";
+      if (filter === "Major") return r.reportType === "major";
+      if (filter === "Incident") return r.reportType === "incident";
+      return true;
+    }
+    if (filter === "all") return true;
+    if (filter === "drafts") return r.status === "draft";
+    if (filter === "awaiting")
       return r.status === "submitted_for_review" || r.status === "in_review";
-    if (filter.startsWith("Sent")) return r.status === "sent" || r.status === "approved";
-    if (filter === "Daily") return r.reportType === "daily";
-    if (filter === "Major") return r.reportType === "major";
-    if (filter === "Incident") return r.reportType === "incident";
+    if (filter === "sent") return r.status === "sent" || r.status === "approved";
+    if (filter === "daily") return r.reportType === "daily";
+    if (filter === "major") return r.reportType === "major";
+    if (filter === "incident") return r.reportType === "incident";
     return true;
   });
 
   return (
     <div>
       <PageHeader
-        overline={isAdmin ? "Across the school" : "My drafts + approved"}
         title="Reports"
         subtitle={
           isAdmin
-            ? `${reviews} awaiting review · ${drafts} drafts · ${sent} sent`
-            : `${drafts} drafts · ${reviews} awaiting review · ${sent} sent`
+            ? "Review and manage reports across the school."
+            : teacherReportsSubtitle(classroomName)
         }
         actions={isAdmin ? undefined : <NewReportTrigger />}
       />
 
       <div style={{ padding: "16px 24px 0" }}>
-        <FilterChips options={filters} value={filter} onChange={setFilter} />
+        {isAdmin ? (
+          <FilterChips options={chipFilters} value={filter} onChange={setFilter} />
+        ) : (
+          <FilterSelect label="Show" value={filter} onChange={setFilter} options={selectFilters} />
+        )}
       </div>
 
       {/* Empty state */}

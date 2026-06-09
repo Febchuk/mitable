@@ -38,7 +38,13 @@ function kindLabel(t: ReportListRow["reportType"]): string {
   return "Incident";
 }
 
-export function ReportsLandingView({ reports }: { reports: ReportListRow[] }) {
+export function ReportsLandingView({
+  reports,
+  classroomName,
+}: {
+  reports: ReportListRow[];
+  classroomName?: string | null;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const locale = useUiLocale();
@@ -63,6 +69,11 @@ export function ReportsLandingView({ reports }: { reports: ReportListRow[] }) {
       {notice ? <p className={styles.notice}>{notice}</p> : null}
 
       <h1 className={styles.pageH1}>Reports</h1>
+      <p className={styles.pageSubtitle}>
+        {classroomName
+          ? `Draft and send ${classroomName} progress reports to families.`
+          : "Draft and send progress reports to families."}
+      </p>
 
       <button
         type="button"
