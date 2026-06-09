@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_REPORT_TEMPLATE_ID } from "@/lib/reports/default-template";
+import { isDefaultReportTemplateId } from "@/lib/reports/default-template";
 
 /**
  * Phase 3 report schemas. Tokens flow through agent context exactly like Phase
@@ -24,7 +24,10 @@ export const CreateReportRequestSchema = z.object({
   childId: z.string().uuid(),
   kind: ReportKind,
   templateId: z
-    .union([z.string().uuid(), z.literal(DEFAULT_REPORT_TEMPLATE_ID)])
+    .string()
+    .refine((id) => z.string().uuid().safeParse(id).success || isDefaultReportTemplateId(id), {
+      message: "Invalid template id",
+    })
     .nullable()
     .optional(),
   /** Client-derived transcripts — never persisted as binary. */

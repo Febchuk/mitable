@@ -1,5 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
+export type ChatSectionRole = "progress_grid" | "topic_comments" | "text";
+
 /**
  * Phase 4 tool surface for the report-editing chat agent. The agent sees only
  * tokenized text (same privacy contract as the draft agent). Read tools return
@@ -339,3 +341,15 @@ Style:
 - Don't restate large chunks of the report; reference it specifically.
 
 Stop after at most 4 tool turns total per request.`;
+
+export const REPORT_CHAT_DEFAULT_CLASSROOM_SUPPLEMENT = `Default classroom report (curriculum progress template):
+- read_report_sections may tag sections with sectionRole. progress_grid sections are I/P/M grids synced from progress history — LOCKED. Never call propose_rewrite or propose_ghost_edit on those paragraphs.
+- topic_comments sections (paired comment prose for a curriculum topic) are the editable areas for teacher voice and edits about that subject and its lessons/materials. Target them with propose_ghost_edit (additive) or propose_rewrite (replace existing comment text).
+- Map each voice-dictated observation to the Comments section for the matching topic when the speech mentions that subject area or specific materials within it.
+- If the teacher narrates content for a curriculum area with NO matching section yet, call propose_new_section to add the missing topic section(s), mirroring the existing pattern (topic progress section + "{Topic} — Comments" prose section when both are needed), then propose_ghost_edit on the new Comments paragraph with the narrated prose.
+- Do not invent or edit progress-grid marks — only comment prose from what the teacher said.`;
+
+export function buildReportChatSystemPrompt(opts?: { defaultClassroomReport?: boolean }): string {
+  if (!opts?.defaultClassroomReport) return REPORT_CHAT_SYSTEM_PROMPT;
+  return `${REPORT_CHAT_SYSTEM_PROMPT}\n\n${REPORT_CHAT_DEFAULT_CLASSROOM_SUPPLEMENT}`;
+}

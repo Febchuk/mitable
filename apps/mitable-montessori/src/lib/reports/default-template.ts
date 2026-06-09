@@ -1,54 +1,147 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ReportTemplate } from "@/components/montessori/new-report/mock-data";
+import type { ReportTemplate, ReportKind } from "@/components/montessori/new-report/mock-data";
 import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
-import { DEFAULT_REPORTING_PERIOD, type ReportingPeriod } from "@/lib/report-templates/admin-dto";
+import { REPORTING_PERIOD_LABEL, type ReportingPeriod } from "@/lib/report-templates/admin-dto";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import { encodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
 
-/** Sentinel id — always injected client-side; never stored in report_templates. */
+/** Legacy sentinel — still accepted when creating reports from old clients. */
 export const DEFAULT_REPORT_TEMPLATE_ID = "__default__";
 
+const DEFAULT_ID_PREFIX = "__default:";
+const DEFAULT_KINDS: ReportKind[] = ["Daily", "Major"];
+
+export type DefaultTemplateClassroom = { id: string; name: string };
+
+export type ParsedDefaultReportTemplate = {
+  classroomId: string;
+  kind: ReportKind;
+  reportingPeriod: ReportingPeriod;
+};
+
+const DEFAULT_KIND_META: Record<
+  ReportKind,
+  { reportingPeriod: ReportingPeriod; iconTone: ReportTemplate["iconTone"] }
+> = {
+  Daily: { reportingPeriod: "daily", iconTone: "butter" },
+  Major: { reportingPeriod: "weekly", iconTone: "sage" },
+  Incident: { reportingPeriod: "daily", iconTone: "blue" },
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function buildDefaultReportTemplateId(classroomId: string, kind: ReportKind): string {
+  return `${DEFAULT_ID_PREFIX}${kind.toLowerCase()}:${classroomId}`;
+}
+
 export function isDefaultReportTemplateId(id: string | null | undefined): boolean {
-  return id === DEFAULT_REPORT_TEMPLATE_ID;
+  if (!id) return false;
+  if (id === DEFAULT_REPORT_TEMPLATE_ID) return true;
+  return id.startsWith(DEFAULT_ID_PREFIX);
 }
 
-export function defaultReportTemplateName(className: string): string {
-  const label = className.trim() || "Classroom";
-  return `Default report - ${label}`;
-}
-
-/** Virtual template pinned at the top of the picker for the active classroom. */
-export function buildDefaultReportTemplate(className: string): ReportTemplate {
+export function parseDefaultReportTemplateId(
+  id: string | null | undefined
+): ParsedDefaultReportTemplate | null {
+  if (!id || id === DEFAULT_REPORT_TEMPLATE_ID) return null;
+  const match = id.match(/^__default:(daily|major):(.+)$/i);
+  if (!match) return null;
+  const classroomId = match[2];
+  if (!UUID_RE.test(classroomId)) return null;
+  const kind = (match[1][0].toUpperCase() + match[1].slice(1)) as ReportKind;
+  if (kind !== "Daily" && kind !== "Major") return null;
   return {
-    id: DEFAULT_REPORT_TEMPLATE_ID,
-    name: defaultReportTemplateName(className),
-    description: "Progress marks from this classroom, grouped by topic",
-    kind: "Major",
+    classroomId,
+    kind,
+    reportingPeriod: DEFAULT_KIND_META[kind].reportingPeriod,
+  };
+}
+
+export function reportingPeriodForDefaultKind(kind: ReportKind): ReportingPeriod {
+  return DEFAULT_KIND_META[kind].reportingPeriod;
+}
+
+function defaultKindLabelInName(kind: ReportKind): string {
+  if (kind === "Major") return "End-of-term";
+  return kind;
+}
+
+export function defaultReportTemplateName(className: string, kind: ReportKind): string {
+  const label = className.trim() || "Classroom";
+  return `${label} — ${defaultKindLabelInName(kind)}`;
+}
+
+export function defaultReportTemplateDescription(kind: ReportKind): string {
+  const period = REPORTING_PERIOD_LABEL[DEFAULT_KIND_META[kind].reportingPeriod];
+  return `Progress marks from this classroom · ${period} lookback`;
+}
+
+/** Virtual template pinned at the top of the picker for one classroom + kind. */
+export function buildDefaultReportTemplate(
+  classroom: DefaultTemplateClassroom,
+  kind: ReportKind
+): ReportTemplate {
+  const meta = DEFAULT_KIND_META[kind];
+  return {
+    id: buildDefaultReportTemplateId(classroom.id, kind),
+    name: defaultReportTemplateName(classroom.name, kind),
+    description: defaultReportTemplateDescription(kind),
+    kind,
     sections: ["Practical Life", "Practical Life — Comments"],
     sectionMeta: {
       "Practical Life": { type: "progress_topic", topicId: "__preview__" },
       "Practical Life — Comments": { type: "text" },
     },
     logoUrl: null,
-    iconTone: "sage",
+    iconTone: meta.iconTone,
   };
 }
 
+/** Daily + end-of-term (Major) defaults for every classroom the teacher leads. */
+export function buildDefaultReportTemplatesForClassrooms(
+  classrooms: DefaultTemplateClassroom[]
+): ReportTemplate[] {
+  const sorted = [...classrooms].sort((a, b) => a.name.localeCompare(b.name));
+  const out: ReportTemplate[] = [];
+  for (const room of sorted) {
+    for (const kind of DEFAULT_KINDS) {
+      out.push(buildDefaultReportTemplate(room, kind));
+    }
+  }
+  return out;
+}
+
+export function defaultReportTemplateForClassroom(
+  classrooms: DefaultTemplateClassroom[],
+  classroomId: string | null | undefined,
+  kind: ReportKind = "Daily"
+): ReportTemplate {
+  const room = (classroomId ? classrooms.find((c) => c.id === classroomId) : null) ??
+    classrooms[0] ?? { id: "unknown", name: "Classroom" };
+  return buildDefaultReportTemplate(room, kind);
+}
+
+export function withDefaultReportTemplates(
+  templates: ReportTemplate[],
+  classrooms: DefaultTemplateClassroom[]
+): ReportTemplate[] {
+  const rest = templates.filter((t) => !isDefaultReportTemplateId(t.id));
+  return [...buildDefaultReportTemplatesForClassrooms(classrooms), ...rest];
+}
+
+/** @deprecated Use withDefaultReportTemplates */
 export function withDefaultReportTemplate(
   templates: ReportTemplate[],
   className: string
 ): ReportTemplate[] {
-  const rest = templates.filter((t) => t.id !== DEFAULT_REPORT_TEMPLATE_ID);
-  return [buildDefaultReportTemplate(className), ...rest];
+  return withDefaultReportTemplates(templates, [{ id: "unknown", name: className }]);
 }
 
 export function topicCommentsHeading(topicName: string): string {
   return `${topicName} — Comments`;
 }
 
-export function isTopicCommentsHeading(heading: string): boolean {
-  return heading.endsWith(" — Comments");
-}
+export { isTopicCommentsHeading } from "@/lib/reports/default-classroom-report";
 
 export function commentSectionGuidance(topicName: string): string {
   return `Write 1–2 warm paragraphs about ${topicName} for this child during the report period. Use progress marks and teacher notes from the read tools. Reference specific materials by token when you can. If nothing was captured for this area, say so in one honest sentence.`;
@@ -192,8 +285,10 @@ export async function buildDefaultReportSections(
     studentId: string;
     periodStart: string;
     periodEnd: string;
+    reportingPeriod?: ReportingPeriod;
   }
 ): Promise<DefaultTemplateBuildResult> {
+  const reportingPeriod = args.reportingPeriod ?? "weekly";
   const topics = await loadClassroomTopics(supabase, args.classroomId);
   const bySubtopic = await loadPeriodProgressBySubtopic(
     supabase,
@@ -248,7 +343,7 @@ export async function buildDefaultReportSections(
     sections,
     sectionMeta,
     sectionGuidance,
-    reportingPeriod: DEFAULT_REPORTING_PERIOD,
+    reportingPeriod,
   };
 }
 

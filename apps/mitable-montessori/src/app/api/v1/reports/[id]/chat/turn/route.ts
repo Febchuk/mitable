@@ -15,6 +15,11 @@ import type { ReportReferenceSet } from "@/lib/reports/data-adapter";
 import { rowToChatMessage, type StoredChatRow } from "@/lib/reports/chat-message";
 import { auditLog } from "@/lib/audit/log";
 import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
+import type { SectionMeta } from "@/lib/report-templates/sections";
+import {
+  defaultClassroomSectionRole,
+  isDefaultClassroomReport,
+} from "@/lib/reports/default-classroom-report";
 
 export const runtime = "nodejs";
 
@@ -50,7 +55,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { data: report, error: readErr } = await supabase
     .from("reports")
     .select(
-      "id, classroom_id, student_id, title, sections, students!inner(school_id, first_name, last_name, preferred_name)"
+      "id, classroom_id, student_id, title, sections, template_id, section_meta, students!inner(school_id, first_name, last_name, preferred_name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -112,6 +117,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const references: ReportReferenceSet = { refs };
 
   const sections = (report.sections as ReportSection[] | null) ?? [];
+  const sectionMeta = (report.section_meta as SectionMeta | null) ?? {};
+  const defaultClassroomReport = isDefaultClassroomReport(
+    report.template_id as string | null,
+    sectionMeta
+  );
   const tokenizedSections: ChatTokenizedSection[] = sections.map((s) => ({
     id: s.id,
     heading: tokenizeText(s.heading, references),
@@ -119,6 +129,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       id: p.id,
       html: tokenizeText(fieldPayloadToReadableText(p.html), references),
     })),
+    ...(defaultClassroomReport
+      ? { sectionRole: defaultClassroomSectionRole(s.heading, sectionMeta) }
+      : {}),
   }));
   const tokenizedTitle = tokenizeText((report.title as string | null) ?? "", references);
 
@@ -211,6 +224,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       userMessage: userMessageForAgent,
       targetHint,
       searchArtifacts,
+      defaultClassroomReport,
     });
 
     const meta = {

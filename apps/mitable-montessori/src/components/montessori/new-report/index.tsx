@@ -9,8 +9,9 @@ import { useIsMobile } from "../child-detail/use-is-mobile";
 import type { Tone } from "../data";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 import {
-  DEFAULT_REPORT_TEMPLATE_ID,
-  withDefaultReportTemplate,
+  isDefaultReportTemplateId,
+  withDefaultReportTemplates,
+  type DefaultTemplateClassroom,
 } from "@/lib/reports/default-template";
 import { NewReportModal } from "./new-report-modal";
 import { NewReportMobile } from "./new-report-mobile";
@@ -66,17 +67,25 @@ export function NewReportTrigger({
 
   const mobile = useIsMobile();
   const router = useRouter();
-  const classroomName = useMontessori().classroomProgress?.classroomName?.trim() || "Classroom";
+  const { classroomProgress, classrooms, selectedClassroomId } = useMontessori();
+  const classroomName = classroomProgress?.classroomName?.trim() || "Classroom";
+  const teacherClassrooms = React.useMemo<DefaultTemplateClassroom[]>(() => {
+    if (classrooms.length > 0) return classrooms;
+    if (selectedClassroomId && classroomName) {
+      return [{ id: selectedClassroomId, name: classroomName }];
+    }
+    return [];
+  }, [classrooms, selectedClassroomId, classroomName]);
 
-  // Keep the pinned default row in sync when the teacher switches classrooms.
+  // Keep pinned default rows in sync when assignments or the active class change.
   React.useEffect(() => {
     setTemplates((prev) =>
-      withDefaultReportTemplate(
-        prev.filter((t) => t.id !== DEFAULT_REPORT_TEMPLATE_ID),
-        classroomName
+      withDefaultReportTemplates(
+        prev.filter((t) => !isDefaultReportTemplateId(t.id)),
+        teacherClassrooms
       )
     );
-  }, [classroomName]);
+  }, [teacherClassrooms]);
 
   // Lazy-load on first open.
   React.useEffect(() => {
@@ -99,7 +108,7 @@ export function NewReportTrigger({
           logoUrl: t.logoUrl ?? null,
           iconTone: t.iconTone,
         }));
-        setTemplates(withDefaultReportTemplate(tplRows, classroomName));
+        setTemplates(withDefaultReportTemplates(tplRows, teacherClassrooms));
         const rosterRows = (
           (rost?.rows ?? []) as Array<{ id: string; fullName: string; age: string | null }>
         ).map((r) => ({
@@ -114,13 +123,13 @@ export function NewReportTrigger({
       })
       .catch((err) => {
         console.error("new-report data fetch failed", err);
-        setTemplates(withDefaultReportTemplate([], classroomName));
+        setTemplates(withDefaultReportTemplates([], teacherClassrooms));
         ToastBus.push({ message: "Couldn't load roster/templates. Try again." });
       });
     return () => {
       cancelled = true;
     };
-  }, [open, loaded, classroomName]);
+  }, [open, loaded, teacherClassrooms]);
 
   const onSubmit = React.useCallback(
     async (payload: NewReportPayload) => {
@@ -189,6 +198,8 @@ export function NewReportTrigger({
           templates={templates}
           submitting={submitting}
           classroomName={classroomName}
+          teacherClassrooms={teacherClassrooms}
+          selectedClassroomId={selectedClassroomId}
         />
       )}
       {mobile && (
@@ -201,6 +212,8 @@ export function NewReportTrigger({
           templates={templates}
           submitting={submitting}
           classroomName={classroomName}
+          teacherClassrooms={teacherClassrooms}
+          selectedClassroomId={selectedClassroomId}
         />
       )}
     </>
