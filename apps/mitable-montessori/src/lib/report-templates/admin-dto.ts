@@ -40,7 +40,7 @@ export const REPORTING_PERIOD_DAYS: Record<ReportingPeriod, number> = {
   end_of_term: 120,
 };
 
-/** Classroom default report template always uses a weekly lookback. */
+/** Major classroom default templates use a weekly lookback; Daily uses `daily`. */
 export const DEFAULT_REPORTING_PERIOD: ReportingPeriod = "weekly";
 
 export type ContextModeDefault = "history" | "input_only";

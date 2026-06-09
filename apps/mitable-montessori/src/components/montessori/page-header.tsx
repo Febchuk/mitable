@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ChevronDown } from "lucide-react";
 
 export function PageHeader({
   overline,
@@ -79,6 +80,71 @@ export const cardHeaderStyle: React.CSSProperties = {
   padding: "14px 18px",
   borderBottom: "1px solid var(--color-border)",
 };
+
+export function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  style,
+  maxWidth = 280,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  style?: React.CSSProperties;
+  maxWidth?: number;
+}) {
+  return (
+    <label style={{ display: "block", maxWidth, ...style }}>
+      <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ position: "relative" }}>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={label}
+          style={{
+            width: "100%",
+            appearance: "none",
+            WebkitAppearance: "none",
+            MozAppearance: "none",
+            fontSize: 14,
+            fontWeight: 500,
+            padding: "10px 36px 10px 12px",
+            borderRadius: 10,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
+            color: "var(--color-ink)",
+            fontFamily: "inherit",
+            cursor: "pointer",
+          }}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={15}
+          strokeWidth={1.6}
+          aria-hidden
+          style={{
+            position: "absolute",
+            right: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            pointerEvents: "none",
+            color: "var(--color-ink-muted)",
+          }}
+        />
+      </div>
+    </label>
+  );
+}
 
 export function FilterChips({
   options,

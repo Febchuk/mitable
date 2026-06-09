@@ -214,6 +214,18 @@ export async function updateClassroomPrograms(
   if (error) throw new AdminError(error.message, "db_error");
 }
 
+export async function updateClassroomName(
+  ctx: AdminContext,
+  input: { classroom_id: string; name: string }
+): Promise<void> {
+  const { error } = await ctx.supabase
+    .from("classrooms")
+    .update({ name: input.name })
+    .eq("id", input.classroom_id)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
 export async function assignTeacherToClassroom(
   ctx: AdminContext,
   input: {
@@ -577,7 +589,7 @@ export async function createCurriculum(
   return insertReturningId(ctx, "curricula", {
     school_id: ctx.schoolId,
     name: input.name,
-    framework: input.framework ?? "montessori",
+    framework: (input.framework ?? "montessori").trim().toLowerCase() || "montessori",
     is_active: true,
     created_by_user_id: ctx.actorUserId,
   });

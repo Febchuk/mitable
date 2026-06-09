@@ -4,7 +4,10 @@ import * as React from "react";
 import { ArrowRight, LayoutTemplate, X } from "lucide-react";
 import { ChildPicker, type PickerChild } from "./child-picker";
 import { TemplatePicker, TemplatePreview } from "./template-block";
-import { buildDefaultReportTemplate } from "@/lib/reports/default-template";
+import {
+  defaultReportTemplateForClassroom,
+  type DefaultTemplateClassroom,
+} from "@/lib/reports/default-template";
 import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
 type CapturedToday = Record<string, { voice: number; photos: number }>;
@@ -18,6 +21,8 @@ export function NewReportSheet({
   templates,
   submitting,
   classroomName = "Classroom",
+  teacherClassrooms = [],
+  selectedClassroomId = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +32,8 @@ export function NewReportSheet({
   templates: ReportTemplate[];
   submitting?: boolean;
   classroomName?: string;
+  teacherClassrooms?: DefaultTemplateClassroom[];
+  selectedClassroomId?: string | null;
 }) {
   const [child, setChild] = React.useState<PickerChild | null>(null);
   const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
@@ -94,7 +101,15 @@ export function NewReportSheet({
                 value={child}
                 onChange={(c) => {
                   setChild(c);
-                  if (!template) setTemplate(buildDefaultReportTemplate(classroomName));
+                  if (!template) {
+                    setTemplate(
+                      defaultReportTemplateForClassroom(
+                        teacherClassrooms,
+                        selectedClassroomId,
+                        "Daily"
+                      )
+                    );
+                  }
                 }}
                 roster={roster}
                 capturedToday={capturedToday}

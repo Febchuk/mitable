@@ -151,8 +151,8 @@ function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail 
       : [];
   return {
     title: report.title || `${report.studentName} — ${fmtDay(report.reportDate, locale)}`,
-    observer: "You",
-    classroom: "Your classroom",
+    observer: report.authorName?.trim() || "Teacher",
+    classroom: report.classroomName?.trim() || "Classroom",
     dayLabel: fmtDay(report.reportDate, locale),
     savedMeta: relSavedAt(report.updatedAt, locale),
     sources: { voiceNotes: 0, photos: 0, worksheets: 0 },

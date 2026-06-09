@@ -5,10 +5,10 @@ import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ChildPicker, type PickerChild } from "./child-picker";
 import { MobileTemplateList } from "./template-block";
-import { TemplatePreview } from "./template-block";
 import {
-  buildDefaultReportTemplate,
+  defaultReportTemplateForClassroom,
   isDefaultReportTemplateId,
+  type DefaultTemplateClassroom,
 } from "@/lib/reports/default-template";
 import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
@@ -24,6 +24,8 @@ export function NewReportModal({
   templates,
   submitting,
   classroomName,
+  teacherClassrooms,
+  selectedClassroomId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -33,6 +35,8 @@ export function NewReportModal({
   templates: ReportTemplate[];
   submitting?: boolean;
   classroomName: string;
+  teacherClassrooms: DefaultTemplateClassroom[];
+  selectedClassroomId: string | null;
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
@@ -46,19 +50,24 @@ export function NewReportModal({
     }
   }, [open]);
 
+  const pickDefaultTemplate = React.useCallback(
+    () => defaultReportTemplateForClassroom(teacherClassrooms, selectedClassroomId, "Daily"),
+    [teacherClassrooms, selectedClassroomId]
+  );
+
   React.useEffect(() => {
     if (step === 2 && !template) {
-      setTemplate(buildDefaultReportTemplate(classroomName));
+      setTemplate(pickDefaultTemplate());
     }
-  }, [step, template, classroomName]);
+  }, [step, template, pickDefaultTemplate]);
 
   React.useEffect(() => {
     setTemplate((current) => {
       if (!current || !isDefaultReportTemplateId(current.id)) return current;
-      const next = buildDefaultReportTemplate(classroomName);
-      return current.name === next.name ? current : next;
+      const next = pickDefaultTemplate();
+      return current.id === next.id ? current : next;
     });
-  }, [classroomName]);
+  }, [pickDefaultTemplate]);
 
   const canSubmit = !!child && !!template && !submitting;
 
@@ -87,7 +96,7 @@ export function NewReportModal({
                     Start a new report
                   </DialogTitle>
                   <DialogDescription className="text-sm leading-relaxed text-ink-secondary">
-                    Step 1 of 2 — pick a child from your classroom.
+                    Step 1 of 2 — pick a child from {classroomName}.
                   </DialogDescription>
                 </div>
                 <button type="button" className="nr-close tap" onClick={onClose} aria-label="Close">
@@ -143,21 +152,13 @@ export function NewReportModal({
                   <X size={18} strokeWidth={2} />
                 </button>
               </header>
-              <div className="nr-modal-body nr-modal-body--template flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="nr-modal-template-scroll scroll-quiet min-h-0 flex-1 overflow-y-auto">
-                  <MobileTemplateList
-                    selected={template}
-                    onPick={setTemplate}
-                    templates={templates}
-                    child={child!}
-                    classroomName={classroomName}
-                  />
-                </div>
-                {template ? (
-                  <div className="nr-modal-preview shrink-0 scroll-quiet overflow-y-auto">
-                    <TemplatePreview template={template} child={child} locked />
-                  </div>
-                ) : null}
+              <div className="nr-modal-body nr-modal-body--template scroll-quiet flex min-h-0 flex-1 flex-col overflow-y-auto">
+                <MobileTemplateList
+                  selected={template}
+                  onPick={setTemplate}
+                  templates={templates}
+                  classroomName={classroomName}
+                />
               </div>
               <footer className="nr-modal-foot">
                 <button

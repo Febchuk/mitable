@@ -79,18 +79,23 @@ export const CreateClassroomSchema = z.object({
   program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
 });
 
-/** Patch program_types, curriculum_id, or both. At least one field required. */
+/** Patch name, program_types, curriculum_id, or any combination. At least one field required. */
 export const PatchClassroomSchema = z
   .object({
     classroom_id: z.string().uuid(),
+    name: z.string().min(1).max(200).optional(),
     program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
     curriculum_id: z.union([z.string().uuid(), z.null()]).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.program_types === undefined && data.curriculum_id === undefined) {
+    if (
+      data.name === undefined &&
+      data.program_types === undefined &&
+      data.curriculum_id === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Provide program_types and/or curriculum_id",
+        message: "Provide name, program_types, and/or curriculum_id",
       });
     }
   });

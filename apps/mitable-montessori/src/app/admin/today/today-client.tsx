@@ -143,7 +143,7 @@ export default function AdminTodayClient({
 
       {/* Desktop header */}
       <div className="hidden lg:block">
-        <PageHeader overline={dateLabel} title="Today" subtitle="Across the school today." />
+        <PageHeader title="Today" subtitle="Across the school today." />
       </div>
 
       <div

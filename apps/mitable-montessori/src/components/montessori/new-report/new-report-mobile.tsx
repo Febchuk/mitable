@@ -5,7 +5,10 @@ import { ArrowLeft, ArrowRight, Clock, Search, X } from "lucide-react";
 import { initialsFor } from "../data";
 import { type PickerChild } from "./child-picker";
 import { MobileTemplateList } from "./template-block";
-import { buildDefaultReportTemplate } from "@/lib/reports/default-template";
+import {
+  defaultReportTemplateForClassroom,
+  type DefaultTemplateClassroom,
+} from "@/lib/reports/default-template";
 import { type NewReportPayload, type ReportTemplate } from "./mock-data";
 
 type Step = 1 | 2;
@@ -20,6 +23,8 @@ export function NewReportMobile({
   templates,
   submitting,
   classroomName,
+  teacherClassrooms,
+  selectedClassroomId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -29,6 +34,8 @@ export function NewReportMobile({
   templates: ReportTemplate[];
   submitting?: boolean;
   classroomName: string;
+  teacherClassrooms: DefaultTemplateClassroom[];
+  selectedClassroomId: string | null;
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
@@ -73,7 +80,9 @@ export function NewReportMobile({
           setQuery={setQuery}
           onPick={(c) => {
             setChild(c);
-            setTemplate(buildDefaultReportTemplate(classroomName));
+            setTemplate(
+              defaultReportTemplateForClassroom(teacherClassrooms, selectedClassroomId, "Daily")
+            );
             setStep(2);
           }}
           onClose={onClose}
@@ -237,7 +246,7 @@ function MobileChildRow({
 }
 
 /* ============================================================
- *  Step 2 — Template (with inline preview)
+ *  Step 2 — Template
  * ============================================================ */
 function Step2Template({
   child,
@@ -276,9 +285,7 @@ function Step2Template({
       <div className="nr-m-page-head">
         <div className="nr-m-crest">pick a template</div>
         <h1>Template</h1>
-        <p>
-          We&rsquo;ll draft the empty form. Tap the chevron to preview a template&rsquo;s sections.
-        </p>
+        <p>We&rsquo;ll draft the empty form from the template you pick.</p>
       </div>
 
       <div className="nr-m-body">
@@ -286,7 +293,6 @@ function Step2Template({
           selected={template}
           onPick={onPick}
           templates={templates}
-          child={child}
           classroomName={classroomName}
         />
       </div>

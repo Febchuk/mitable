@@ -2,8 +2,11 @@ import type Anthropic from "@anthropic-ai/sdk";
 import {
   CHAT_TERMINAL_TOOL_NAMES,
   CHAT_TOOLS,
-  REPORT_CHAT_SYSTEM_PROMPT,
+  buildReportChatSystemPrompt,
+  type ChatSectionRole,
 } from "@/lib/anthropic/report-chat-tools";
+
+export type { ChatSectionRole };
 import type { ReportReferenceSet } from "@/lib/reports/data-adapter";
 import { detokenizeReportText } from "@/lib/reports/detokenize";
 import { validateTokenPreservation } from "@/lib/reports/token-preservation";
@@ -139,12 +142,16 @@ export interface ChatAgentInput {
    * agent gets an empty array.
    */
   searchArtifacts?: SearchArtifactsFn;
+  /** Classroom default template — comment sections only unless a new topic is needed. */
+  defaultClassroomReport?: boolean;
 }
 
 export interface ChatTokenizedSection {
   id: string;
   heading: string;
   paragraphs: { id: string; html: string }[];
+  /** Set on default classroom reports so the agent knows which sections are editable. */
+  sectionRole?: ChatSectionRole;
 }
 
 interface ChatAgentMeta {
@@ -269,7 +276,9 @@ export async function runReportChatAgent(input: ChatAgentInput): Promise<ChatAge
         system: [
           {
             type: "text",
-            text: REPORT_CHAT_SYSTEM_PROMPT,
+            text: buildReportChatSystemPrompt({
+              defaultClassroomReport: input.defaultClassroomReport,
+            }),
             cache_control: { type: "ephemeral" },
           } as Anthropic.TextBlockParam,
         ],

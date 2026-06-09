@@ -57,12 +57,12 @@ const noteTextareaStyle: React.CSSProperties = {
   border: "1px solid var(--color-border)",
   borderRadius: 12,
   padding: "10px 12px",
-  fontFamily: "var(--font-display)",
-  fontSize: 19,
+  fontFamily: "var(--font-sans)",
+  fontSize: 15,
   color: "var(--color-ink)",
   minHeight: 56,
   resize: "none",
-  lineHeight: 1.25,
+  lineHeight: 1.45,
 };
 
 function CloseButton({ onClose }: { onClose: () => void }) {
@@ -160,6 +160,7 @@ function CellSheet({
                   height: 13,
                   borderRadius: 4,
                   display: "inline-block",
+                  flexShrink: 0,
                   background: s === "-" ? "transparent" : STATUS_COLOR[s],
                   border: s === "-" ? "1px dashed currentColor" : "1px solid transparent",
                 }}

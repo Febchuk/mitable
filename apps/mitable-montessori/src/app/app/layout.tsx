@@ -81,11 +81,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               userId={ctx.userId}
             />
             <main
-              className="scroll-quiet"
+              className="scroll-quiet pb-24 lg:pb-0"
               style={{
                 flex: 1,
                 position: "relative",
-                paddingBottom: 96,
               }}
             >
               {children}

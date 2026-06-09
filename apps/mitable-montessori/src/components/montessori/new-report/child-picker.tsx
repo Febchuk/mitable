@@ -83,7 +83,10 @@ function ChildPickerList({
           aria-label="Search children"
         />
       </div>
-      <div className="nr-child-list-scroll scroll-quiet" aria-label="Children in your classrooms">
+      <div
+        className="nr-child-list-scroll scroll-quiet"
+        aria-label={`Children in ${rosterGroupLabel}`}
+      >
         {roster.length === 0 ? (
           <div className="nr-empty-row">Loading children…</div>
         ) : matches.length === 0 ? (

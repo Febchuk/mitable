@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, LayoutTemplate } from "lucide-react";
+import { LayoutTemplate } from "lucide-react";
 import { PdfPreviewPane } from "@/components/montessori/report-detail/pdf-preview-pane";
 import type { ReportPdfData } from "@/lib/pdf/report-template";
 import { progressTopicToReadableText } from "@/lib/reports/progress-topic-payload";
 import {
   isDefaultReportTemplateId,
-  withDefaultReportTemplate,
+  withDefaultReportTemplates,
 } from "@/lib/reports/default-template";
 import { type PickerChild } from "./child-picker";
 import { type ReportTemplate } from "./mock-data";
@@ -38,7 +38,9 @@ export function TemplatePicker({
   classroomName?: string;
 }) {
   const visibleTemplates =
-    templates.length > 0 ? templates : withDefaultReportTemplate([], classroomName);
+    templates.length > 0
+      ? templates
+      : withDefaultReportTemplates([], [{ id: "unknown", name: classroomName }]);
 
   return (
     <div className="nr-template-list" role="radiogroup" aria-label="Templates">
@@ -195,76 +197,50 @@ export function TemplatePreview({
 }
 
 /* ============================================================
- *  Mobile template card — list row + chevron accordion that expands
- *  to show the PDF preview inline beneath the row.
+ *  Mobile template list — tap a row to select.
  * ============================================================ */
 export function MobileTemplateList({
   selected,
   onPick,
   templates,
-  child = null,
   classroomName = "Classroom",
 }: {
   selected: ReportTemplate | null;
   onPick: (t: ReportTemplate) => void;
   templates: ReportTemplate[];
-  /** Thread the picked child into the inline PDF preview header. */
-  child?: PickerChild | null;
   classroomName?: string;
 }) {
   const visibleTemplates =
-    templates.length > 0 ? templates : withDefaultReportTemplate([], classroomName);
-  // Independent of selection — the user can preview a different template
-  // than the one currently selected without losing their pick.
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+    templates.length > 0
+      ? templates
+      : withDefaultReportTemplates([], [{ id: "unknown", name: classroomName }]);
 
   return (
     <div className="nr-m-template-list">
       {visibleTemplates.map((t) => {
-        const isExpanded = expandedId === t.id;
         const isSelected = selected?.id === t.id;
         return (
           <div key={t.id} className="nr-m-template-item">
-            <div className={`nr-m-template-row${isSelected ? " nr-selected" : ""}`}>
-              <button
-                type="button"
-                className="nr-m-template-rowMain"
-                role="radio"
-                aria-checked={isSelected}
-                onClick={() => onPick(t)}
-              >
-                <span className={`nr-tpl-icon ${TONE_TO_CLASS[t.iconTone]}`}>
-                  <LayoutTemplate size={14} strokeWidth={2} aria-hidden />
+            <button
+              type="button"
+              className={`nr-m-template-row${isSelected ? " nr-selected" : ""}`}
+              role="radio"
+              aria-checked={isSelected}
+              onClick={() => onPick(t)}
+            >
+              <span className={`nr-tpl-icon ${TONE_TO_CLASS[t.iconTone]}`}>
+                <LayoutTemplate size={14} strokeWidth={2} aria-hidden />
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span className="nr-tpl-name" style={{ display: "block" }}>
+                  {t.name}
                 </span>
-                <span style={{ minWidth: 0 }}>
-                  <span className="nr-tpl-name" style={{ display: "block" }}>
-                    {t.name}
-                  </span>
-                  <span className="nr-tpl-meta" style={{ display: "block" }}>
-                    {t.description || `${t.sections.length} sections`}
-                  </span>
+                <span className="nr-tpl-meta" style={{ display: "block" }}>
+                  {t.description || `${t.sections.length} sections`}
                 </span>
-                <span className="nr-tpl-tag">{t.kind}</span>
-              </button>
-              <button
-                type="button"
-                className="nr-m-template-previewBtn"
-                aria-expanded={isExpanded}
-                aria-label={isExpanded ? "Hide preview" : "Preview empty form"}
-                onClick={() => setExpandedId(isExpanded ? null : t.id)}
-              >
-                <ChevronDown
-                  size={16}
-                  strokeWidth={2}
-                  style={{ transform: isExpanded ? "rotate(180deg)" : "none" }}
-                />
-              </button>
-            </div>
-            {isExpanded && (
-              <div className="nr-m-template-preview">
-                <TemplatePreview template={t} child={child} />
-              </div>
-            )}
+              </span>
+              <span className="nr-tpl-tag">{t.kind}</span>
+            </button>
           </div>
         );
       })}

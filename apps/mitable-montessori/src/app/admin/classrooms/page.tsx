@@ -62,7 +62,15 @@ import {
   normalizeGroupColor,
   type GroupColor,
 } from "@/lib/classroom-groups";
-import { classroomGroupsEnabled } from "@/lib/feature-flags";
+import { classroomGroupsEnabled, classroomProgramsEnabled } from "@/lib/feature-flags";
+import {
+  adminSplitDetailScrollStyle,
+  adminSplitDetailStyle,
+  adminSplitGridStyle,
+  adminSplitPageStyle,
+  adminSplitRailScrollStyle,
+  adminSplitRailStyle,
+} from "@/components/admin/split-pane-layout";
 
 type AdminChild = {
   id: string;
@@ -246,6 +254,7 @@ const FIELD_OPTIONS: ImportField[] = [
 
 export default function AdminClassroomsPage() {
   const groupsEnabled = classroomGroupsEnabled();
+  const programsEnabled = classroomProgramsEnabled();
   const [classrooms, setClassrooms] = React.useState<AdminClassroom[]>([]);
   const [teacherPool, setTeacherPool] = React.useState<ApiTeacher[]>([]);
   const [children, setChildren] = React.useState<AdminChild[]>([]);
@@ -523,6 +532,23 @@ export default function AdminClassroomsPage() {
     }
   };
 
+  const renameClassroom = async (classroomId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const current = classrooms.find((c) => c.id === classroomId);
+    if (current && current.name === trimmed) return;
+    setMutationError(null);
+    try {
+      await apiJson("/api/admin/classrooms", {
+        method: "PATCH",
+        body: JSON.stringify({ classroom_id: classroomId, name: trimmed }),
+      });
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not rename classroom");
+    }
+  };
+
   const confirmArchiveChild = React.useCallback(async () => {
     if (!pendingArchiveChild) return;
     setArchiveBusy(true);
@@ -728,285 +754,298 @@ export default function AdminClassroomsPage() {
   }
 
   return (
-    <div>
-      <PageHeader
-        title="Classrooms"
-        subtitle="View and modify classrooms."
-        actions={
-          <Button variant="default" onClick={() => setCreateClassroomOpen(true)}>
-            <Plus size={16} strokeWidth={1.7} /> Add classroom
-          </Button>
-        }
-      />
+    <div style={adminSplitPageStyle}>
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader
+          title="Classrooms"
+          subtitle="View and modify classrooms."
+          actions={
+            <Button variant="default" onClick={() => setCreateClassroomOpen(true)}>
+              <Plus size={16} strokeWidth={1.7} /> Add classroom
+            </Button>
+          }
+        />
 
-      {mutationError ? (
-        <div
-          style={{
-            margin: "0 24px",
-            padding: "10px 14px",
-            borderRadius: 10,
-            background: "rgba(180, 35, 24, 0.08)",
-            color: "var(--color-status-error, #b42318)",
-            fontSize: 13,
-          }}
-        >
-          {mutationError}
-        </div>
-      ) : null}
+        {mutationError ? (
+          <div
+            style={{
+              margin: "0 24px 12px",
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "rgba(180, 35, 24, 0.08)",
+              color: "var(--color-status-error, #b42318)",
+              fontSize: 13,
+            }}
+          >
+            {mutationError}
+          </div>
+        ) : null}
+      </div>
 
-      <div
-        style={{
-          padding: "20px 24px 64px",
-          display: "grid",
-          gridTemplateColumns: "minmax(240px, 320px) minmax(0, 1fr)",
-          gap: 18,
-          alignItems: "start",
-        }}
-      >
-        <aside style={cardStyle}>
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--color-border)" }}>
+      <div style={adminSplitGridStyle}>
+        <aside style={adminSplitRailStyle}>
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "14px 16px",
+              borderBottom: "1px solid var(--color-border)",
+            }}
+          >
             <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
               Classrooms
             </div>
           </div>
-          {classrooms.length === 0 ? (
-            <div
-              style={{ padding: "18px 16px", fontSize: 13, color: "var(--color-ink-secondary)" }}
-            >
-              No classrooms yet. Use &quot;Add classroom&quot; to create one.
-            </div>
-          ) : (
-            classrooms.map((classroom, index) => {
-              const active = classroom.id === selectedClassroomId;
-              return (
-                <button
-                  key={classroom.id}
-                  type="button"
-                  className="tap"
-                  onClick={() => setSelectedClassroomId(classroom.id)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "14px 16px",
-                    border: 0,
-                    borderTop: index ? "1px solid var(--color-border)" : 0,
-                    background: active ? "var(--color-terracotta-soft)" : "transparent",
-                    textAlign: "left",
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
-                      {classroom.name}
-                    </div>
-                    <div
-                      style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}
-                    >
-                      {counts.get(classroom.id) ?? 0} children
-                    </div>
-                    {classroom.programTypes.length > 0 && (
-                      <div
-                        style={{
-                          marginTop: 4,
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 4,
-                        }}
-                      >
-                        {classroom.programTypes.map((p) => (
-                          <span
-                            key={p}
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 500,
-                              padding: "1px 6px",
-                              borderRadius: 999,
-                              background: "var(--color-surface)",
-                              border: "1px solid var(--color-border)",
-                              color: "var(--color-ink-muted)",
-                              letterSpacing: "0.02em",
-                            }}
-                          >
-                            {PROGRAM_LABEL[p]}
-                          </span>
-                        ))}
+          <div className="scroll-quiet" style={adminSplitRailScrollStyle}>
+            {classrooms.length === 0 ? (
+              <div
+                style={{ padding: "18px 16px", fontSize: 13, color: "var(--color-ink-secondary)" }}
+              >
+                No classrooms yet. Use &quot;Add classroom&quot; to create one.
+              </div>
+            ) : (
+              classrooms.map((classroom, index) => {
+                const active = classroom.id === selectedClassroomId;
+                return (
+                  <button
+                    key={classroom.id}
+                    type="button"
+                    className="tap"
+                    onClick={() => setSelectedClassroomId(classroom.id)}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "14px 16px",
+                      border: 0,
+                      borderTop: index ? "1px solid var(--color-border)" : 0,
+                      background: active ? "var(--color-terracotta-soft)" : "transparent",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
+                        {classroom.name}
                       </div>
-                    )}
-                  </div>
-                  <ChevronRight size={15} strokeWidth={1.5} />
-                </button>
-              );
-            })
-          )}
+                      <div
+                        style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}
+                      >
+                        {counts.get(classroom.id) ?? 0} children
+                      </div>
+                      {programsEnabled && classroom.programTypes.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: 4,
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 4,
+                          }}
+                        >
+                          {classroom.programTypes.map((p) => (
+                            <span
+                              key={p}
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 500,
+                                padding: "1px 6px",
+                                borderRadius: 999,
+                                background: "var(--color-surface)",
+                                border: "1px solid var(--color-border)",
+                                color: "var(--color-ink-muted)",
+                                letterSpacing: "0.02em",
+                              }}
+                            >
+                              {PROGRAM_LABEL[p]}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight size={15} strokeWidth={1.5} />
+                  </button>
+                );
+              })
+            )}
+          </div>
         </aside>
 
         {selectedClassroom ? (
-          <section style={cardStyle}>
-            <div
-              style={{
-                padding: "18px 20px",
-                borderBottom: "1px solid var(--color-border)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <h2 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: "var(--color-ink)" }}>
-                  {selectedClassroom.name}
-                </h2>
-                <div style={{ fontSize: 12.5, color: "var(--color-ink-secondary)", marginTop: 3 }}>
-                  {totalInClassroom} {totalInClassroom === 1 ? "child" : "children"}
-                  {selectedClassroom.curriculumName ? (
-                    <span style={{ marginLeft: 8, color: "var(--color-ink-muted)" }}>
-                      · {selectedClassroom.curriculumName}
-                    </span>
-                  ) : null}
-                  {groupsEnabled && selectedClassroom.groups.length > 0 ? (
-                    <span style={{ marginLeft: 8, color: "var(--color-ink-muted)" }}>
-                      · {selectedClassroom.groups.length}{" "}
-                      {selectedClassroom.groups.length === 1 ? "group" : "groups"}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <Button variant="default" onClick={() => setImportOpen(true)}>
-                  <Upload size={16} strokeWidth={1.7} /> Import children
-                </Button>
-                <Button variant="secondary" onClick={() => setAddChildOpen(true)}>
-                  <Plus size={16} strokeWidth={1.7} /> Add child
-                </Button>
-              </div>
-            </div>
-
-            <ClassroomSettingsSection
-              classroom={selectedClassroom}
-              groupsEnabled={groupsEnabled}
-              teacherPool={teacherPool}
-              montessoriCurricula={montessoriCurricula}
-              memberCountByGroup={memberCountByGroup}
-              onAssignTeacher={(teacherUserId, role) =>
-                void assignTeacherToRoom(selectedClassroom.id, teacherUserId, role)
-              }
-              onRemoveTeacher={(assignmentId) => void removeTeacherFromRoom(assignmentId)}
-              onSavePrograms={(next) => setClassroomPrograms(selectedClassroom.id, next)}
-              onPickCurriculum={(next) => setClassroomCurriculum(selectedClassroom.id, next)}
-              onCreateGroup={(name, color) => createGroup(selectedClassroom.id, name, color)}
-              onUpdateGroup={(groupId, fields) => updateGroup(groupId, fields)}
-              onDeleteGroup={(groupId) => deleteGroup(groupId)}
-            />
-
-            {totalInClassroom === 0 ? (
-              <EmptyClassroomState
-                onImport={() => setImportOpen(true)}
-                onAddChild={() => setAddChildOpen(true)}
-              />
-            ) : (
-              <>
-                <div
-                  style={{
-                    padding: "12px 20px",
-                    borderBottom: "1px solid var(--color-border)",
-                    display: "flex",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <div style={{ position: "relative", width: 240, maxWidth: "100%" }}>
-                    <Search
-                      size={15}
-                      strokeWidth={1.5}
-                      style={{
-                        position: "absolute",
-                        left: 10,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        color: "var(--color-ink-muted)",
-                      }}
+          <section style={adminSplitDetailStyle}>
+            <div className="scroll-quiet" style={adminSplitDetailScrollStyle}>
+              <div
+                style={{
+                  padding: "18px 20px",
+                  borderBottom: "1px solid var(--color-border)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <h2
+                    style={{ margin: 0, fontSize: 19, fontWeight: 700, color: "var(--color-ink)" }}
+                  >
+                    <InlineEditableText
+                      value={selectedClassroom.name}
+                      onCommit={(next) => void renameClassroom(selectedClassroom.id, next)}
+                      textStyle={{ fontSize: 19, fontWeight: 700, color: "var(--color-ink)" }}
                     />
-                    <Input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Search children"
-                      style={{ paddingLeft: 32 }}
-                    />
+                  </h2>
+                  <div
+                    style={{ fontSize: 12.5, color: "var(--color-ink-secondary)", marginTop: 3 }}
+                  >
+                    {totalInClassroom} {totalInClassroom === 1 ? "child" : "children"}
+                    {selectedClassroom.curriculumName ? (
+                      <span style={{ marginLeft: 8, color: "var(--color-ink-muted)" }}>
+                        · {selectedClassroom.curriculumName}
+                      </span>
+                    ) : null}
+                    {groupsEnabled && selectedClassroom.groups.length > 0 ? (
+                      <span style={{ marginLeft: 8, color: "var(--color-ink-muted)" }}>
+                        · {selectedClassroom.groups.length}{" "}
+                        {selectedClassroom.groups.length === 1 ? "group" : "groups"}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {totalInClassroom > 0 ? (
+                    <div style={{ position: "relative", width: 220, maxWidth: "100%" }}>
+                      <Search
+                        size={15}
+                        strokeWidth={1.5}
+                        style={{
+                          position: "absolute",
+                          left: 10,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          color: "var(--color-ink-muted)",
+                        }}
+                      />
+                      <Input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Search children"
+                        style={{ paddingLeft: 32 }}
+                      />
+                    </div>
+                  ) : null}
+                  <Button variant="default" onClick={() => setImportOpen(true)}>
+                    <Upload size={16} strokeWidth={1.7} /> Import children
+                  </Button>
+                  <Button variant="secondary" onClick={() => setAddChildOpen(true)}>
+                    <Plus size={16} strokeWidth={1.7} /> Add child
+                  </Button>
+                </div>
+              </div>
 
-                <div className="hidden lg:block">
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: groupsEnabled
-                        ? "1.8fr 0.5fr 0.8fr 1.4fr 40px"
-                        : "1.8fr 0.5fr 0.8fr 40px",
-                      padding: "12px 20px",
-                      borderBottom: "1px solid var(--color-border)",
-                    }}
-                  >
-                    {(groupsEnabled
-                      ? ["Child", "Age", "Enrolled", "Group", ""]
-                      : ["Child", "Age", "Enrolled", ""]
-                    ).map((header, i) => (
-                      <div
-                        key={`${header}-${i}`}
-                        className="label-cap"
-                        style={{ color: "var(--color-ink-muted)" }}
-                      >
-                        {header}
-                      </div>
+              <ClassroomSettingsSection
+                classroom={selectedClassroom}
+                groupsEnabled={groupsEnabled}
+                programsEnabled={programsEnabled}
+                teacherPool={teacherPool}
+                montessoriCurricula={montessoriCurricula}
+                memberCountByGroup={memberCountByGroup}
+                onAssignTeacher={(teacherUserId, role) =>
+                  void assignTeacherToRoom(selectedClassroom.id, teacherUserId, role)
+                }
+                onRemoveTeacher={(assignmentId) => void removeTeacherFromRoom(assignmentId)}
+                onSavePrograms={(next) => setClassroomPrograms(selectedClassroom.id, next)}
+                onPickCurriculum={(next) => setClassroomCurriculum(selectedClassroom.id, next)}
+                onCreateGroup={(name, color) => createGroup(selectedClassroom.id, name, color)}
+                onUpdateGroup={(groupId, fields) => updateGroup(groupId, fields)}
+                onDeleteGroup={(groupId) => deleteGroup(groupId)}
+              />
+
+              {totalInClassroom === 0 ? (
+                <EmptyClassroomState
+                  onImport={() => setImportOpen(true)}
+                  onAddChild={() => setAddChildOpen(true)}
+                />
+              ) : (
+                <>
+                  <div className="hidden lg:block">
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: groupsEnabled
+                          ? "1.8fr 0.5fr 0.8fr 1.4fr 40px"
+                          : "1.8fr 0.5fr 0.8fr 40px",
+                        padding: "12px 20px",
+                        borderBottom: "1px solid var(--color-border)",
+                      }}
+                    >
+                      {(groupsEnabled
+                        ? ["Child", "Age", "Enrolled", "Group", ""]
+                        : ["Child", "Age", "Enrolled", ""]
+                      ).map((header, i) => (
+                        <div
+                          key={`${header}-${i}`}
+                          className="label-cap"
+                          style={{ color: "var(--color-ink-muted)" }}
+                        >
+                          {header}
+                        </div>
+                      ))}
+                    </div>
+                    {selectedChildren.map((child) => (
+                      <RosterRow
+                        key={child.id}
+                        child={child}
+                        groupsEnabled={groupsEnabled}
+                        groups={selectedClassroom.groups}
+                        onAssignGroup={(groupId) =>
+                          void assignChildGroup(selectedClassroom.id, child.id, groupId)
+                        }
+                        onRemove={() => setPendingArchiveChild(child)}
+                      />
                     ))}
                   </div>
-                  {selectedChildren.map((child) => (
-                    <RosterRow
-                      key={child.id}
-                      child={child}
-                      groupsEnabled={groupsEnabled}
-                      groups={selectedClassroom.groups}
-                      onAssignGroup={(groupId) =>
-                        void assignChildGroup(selectedClassroom.id, child.id, groupId)
-                      }
-                      onRemove={() => setPendingArchiveChild(child)}
-                    />
-                  ))}
-                </div>
 
-                <div className="lg:hidden">
-                  {selectedChildren.map((child, index) => (
-                    <RosterMobileRow
-                      key={child.id}
-                      child={child}
-                      index={index}
-                      groupsEnabled={groupsEnabled}
-                      groups={selectedClassroom.groups}
-                      onAssignGroup={(groupId) =>
-                        void assignChildGroup(selectedClassroom.id, child.id, groupId)
-                      }
-                      onRemove={() => setPendingArchiveChild(child)}
-                    />
-                  ))}
-                </div>
-
-                {selectedChildren.length === 0 && (
-                  <div
-                    style={{
-                      padding: 28,
-                      textAlign: "center",
-                      fontSize: 13,
-                      color: "var(--color-ink-muted)",
-                    }}
-                  >
-                    No children match this search.
+                  <div className="lg:hidden">
+                    {selectedChildren.map((child, index) => (
+                      <RosterMobileRow
+                        key={child.id}
+                        child={child}
+                        index={index}
+                        groupsEnabled={groupsEnabled}
+                        groups={selectedClassroom.groups}
+                        onAssignGroup={(groupId) =>
+                          void assignChildGroup(selectedClassroom.id, child.id, groupId)
+                        }
+                        onRemove={() => setPendingArchiveChild(child)}
+                      />
+                    ))}
                   </div>
-                )}
-              </>
-            )}
+
+                  {selectedChildren.length === 0 && (
+                    <div
+                      style={{
+                        padding: 28,
+                        textAlign: "center",
+                        fontSize: 13,
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      No children match this search.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </section>
         ) : (
-          <section style={cardStyle}>
+          <section
+            style={{
+              ...cardStyle,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
             <div
               style={{
                 padding: 40,
@@ -1037,6 +1076,7 @@ export default function AdminClassroomsPage() {
         onOpenChange={setCreateClassroomOpen}
         onCreate={createClassroom}
         teachers={teacherPool}
+        programsEnabled={programsEnabled}
       />
 
       <AddChildDialog
@@ -1300,6 +1340,7 @@ function SettingsCard({ children }: { children: React.ReactNode }) {
 function ClassroomSettingsSection({
   classroom,
   groupsEnabled,
+  programsEnabled,
   teacherPool,
   montessoriCurricula,
   memberCountByGroup,
@@ -1313,6 +1354,7 @@ function ClassroomSettingsSection({
 }: {
   classroom: AdminClassroom;
   groupsEnabled: boolean;
+  programsEnabled: boolean;
   teacherPool: ApiTeacher[];
   montessoriCurricula: Array<{ id: string; name: string }>;
   memberCountByGroup: Map<string, number>;
@@ -1328,11 +1370,12 @@ function ClassroomSettingsSection({
   onDeleteGroup: (groupId: string) => void;
 }) {
   const [open, setOpen] = React.useState(false);
-  const montessoriOn = classroom.programTypes.includes("montessori");
+  const montessoriOn = programsEnabled ? classroom.programTypes.includes("montessori") : true;
+  const showCurriculum = montessoriOn;
 
   const summary = [
     `${classroom.teachers.length} ${classroom.teachers.length === 1 ? "teacher" : "teachers"}`,
-    classroom.programTypes.map((p) => PROGRAM_LABEL[p]).join(", "),
+    ...(programsEnabled ? [classroom.programTypes.map((p) => PROGRAM_LABEL[p]).join(", ")] : []),
     ...(groupsEnabled
       ? [`${classroom.groups.length} ${classroom.groups.length === 1 ? "group" : "groups"}`]
       : []),
@@ -1424,17 +1467,22 @@ function ClassroomSettingsSection({
             </SettingsCard>
           ) : null}
 
-          <SettingsCard>
-            <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
-              Programs
-            </div>
-            <p style={{ margin: "0 0 6px", fontSize: 12, color: "var(--color-ink-secondary)" }}>
-              Drives which Progress modes teachers see.
-            </p>
-            <ProgramTypesEditor value={classroom.programTypes} onSave={onSavePrograms} />
-          </SettingsCard>
+          {programsEnabled ? (
+            <SettingsCard>
+              <div
+                className="label-cap"
+                style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}
+              >
+                Programs
+              </div>
+              <p style={{ margin: "0 0 6px", fontSize: 12, color: "var(--color-ink-secondary)" }}>
+                Drives which Progress modes teachers see.
+              </p>
+              <ProgramTypesEditor value={classroom.programTypes} onSave={onSavePrograms} />
+            </SettingsCard>
+          ) : null}
 
-          {montessoriOn && (
+          {showCurriculum ? (
             <SettingsCard>
               <MontessoriCurriculumPicker
                 programTypes={classroom.programTypes}
@@ -1442,9 +1490,10 @@ function ClassroomSettingsSection({
                 curriculumName={classroom.curriculumName ?? null}
                 options={montessoriCurricula}
                 onPick={onPickCurriculum}
+                programsEnabled={programsEnabled}
               />
             </SettingsCard>
-          )}
+          ) : null}
         </div>
       )}
     </div>
@@ -1766,6 +1815,7 @@ function CreateClassroomDialog({
   onOpenChange,
   onCreate,
   teachers,
+  programsEnabled,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1776,6 +1826,7 @@ function CreateClassroomDialog({
     programTypes: ProgressProgram[];
   }) => void | Promise<void>;
   teachers: ApiTeacher[];
+  programsEnabled: boolean;
 }) {
   const [name, setName] = React.useState("");
   const [level, setLevel] = React.useState(LEVEL_OPTIONS[0]);
@@ -1791,7 +1842,7 @@ function CreateClassroomDialog({
     }
   }, [open]);
 
-  const canSubmit = name.trim().length > 0 && programTypes.length > 0;
+  const canSubmit = name.trim().length > 0 && (programsEnabled ? programTypes.length > 0 : true);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1836,13 +1887,15 @@ function CreateClassroomDialog({
             />
           </FieldLabel>
 
-          <FieldLabel label="Programs (drives the Progress route for teachers)">
-            <ProgramPicker value={programTypes} onChange={setProgramTypes} />
-            <p className="mt-1 text-xs text-ink-muted">
-              Pick at least one. A classroom with multiple programs surfaces a top switcher in
-              Progress.
-            </p>
-          </FieldLabel>
+          {programsEnabled ? (
+            <FieldLabel label="Programs (drives the Progress route for teachers)">
+              <ProgramPicker value={programTypes} onChange={setProgramTypes} />
+              <p className="mt-1 text-xs text-ink-muted">
+                Pick at least one. A classroom with multiple programs surfaces a top switcher in
+                Progress.
+              </p>
+            </FieldLabel>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
@@ -1854,7 +1907,12 @@ function CreateClassroomDialog({
             disabled={!canSubmit}
             onClick={() => {
               if (!canSubmit) return;
-              onCreate({ name, level, mainTeacherId, programTypes });
+              onCreate({
+                name,
+                level,
+                mainTeacherId,
+                programTypes: programsEnabled ? programTypes : ["montessori"],
+              });
               onOpenChange(false);
             }}
           >
@@ -2457,15 +2515,17 @@ function MontessoriCurriculumPicker({
   curriculumName,
   options,
   onPick,
+  programsEnabled,
 }: {
   programTypes: ProgressProgram[];
   curriculumId: string | null;
   curriculumName: string | null;
   options: Array<{ id: string; name: string }>;
   onPick: (curriculumId: string | null) => Promise<void>;
+  programsEnabled: boolean;
 }) {
   const [busy, setBusy] = React.useState(false);
-  const montessoriOn = programTypes.includes("montessori");
+  const montessoriOn = programsEnabled ? programTypes.includes("montessori") : true;
 
   const selectOptions = React.useMemo(() => {
     if (curriculumId && !options.some((o) => o.id === curriculumId)) {
@@ -2659,6 +2719,64 @@ function SelectInput({
         </option>
       ))}
     </select>
+  );
+}
+
+function InlineEditableText({
+  value,
+  onCommit,
+  textStyle,
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+  textStyle?: React.CSSProperties;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+
+  React.useEffect(() => setDraft(value), [value]);
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          onCommit(draft);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            (event.target as HTMLInputElement).blur();
+          }
+          if (event.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
+        }}
+        className="h-9 max-w-md bg-canvas"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="tap"
+      style={{
+        background: "transparent",
+        border: 0,
+        padding: 0,
+        textAlign: "left",
+        cursor: "text",
+        ...textStyle,
+      }}
+      title="Click to rename"
+    >
+      {value}
+    </button>
   );
 }
 

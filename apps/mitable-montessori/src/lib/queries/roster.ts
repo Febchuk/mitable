@@ -144,3 +144,46 @@ export async function listAllTeacherClassroomsRoster(): Promise<RosterResult> {
 
   return { classroomName: classrooms.length === 1 ? classrooms[0].name : null, rows };
 }
+
+/**
+ * Roster for one classroom the current teacher is assigned to. Used by the
+ * teacher Classrooms split view when switching rooms in the left rail.
+ */
+export async function listRosterForTeacherClassroom(classroomId: string): Promise<RosterResult> {
+  const classrooms = await listTeacherClassroomsForCurrentUser();
+  const classroom = classrooms.find((c) => c.id === classroomId);
+  if (!classroom) return { classroomName: null, rows: [] };
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const { data } = await supabase
+    .from("students")
+    .select(
+      "id, first_name, last_name, preferred_name, birth_date, " +
+        "student_classroom_enrollments(classroom_id, start_date, end_date, is_primary), " +
+        "student_guardians(guardian_id)"
+    )
+    .is("archived_at", null)
+    .returns<StudentDbRow[]>();
+
+  const rows: RosterRow[] = (data ?? [])
+    .map((s) => {
+      const activeEnrollment = s.student_classroom_enrollments.find(
+        (e) => e.end_date === null && e.classroom_id === classroomId
+      );
+      if (!activeEnrollment) return null;
+      return {
+        id: s.id,
+        fullName: `${s.first_name} ${s.last_name}`.trim(),
+        preferredName: s.preferred_name,
+        age: ageFromBirthDate(s.birth_date),
+        enrolledAt: formatEnrolled(activeEnrollment.start_date),
+        guardianCount: s.student_guardians.length,
+      };
+    })
+    .filter((r): r is RosterRow => r !== null)
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  return { classroomName: classroom.name, rows };
+}

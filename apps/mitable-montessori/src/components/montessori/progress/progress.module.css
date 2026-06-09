@@ -372,21 +372,21 @@
   background: rgba(255, 251, 243, 0.08);
   border: 1px solid rgba(255, 251, 243, 0.14);
   color: var(--color-surface);
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 400;
   padding: 10px 12px;
   border-radius: 10px;
   resize: none;
   flex: 1;
   width: 100%;
-  min-height: 44px;
-  max-height: 88px;
-  line-height: 1.3;
+  min-height: 48px;
+  max-height: 96px;
+  line-height: 1.45;
 }
 .bulkBar textarea::placeholder {
   color: rgba(255, 251, 243, 0.45);
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
 }
 .bulkBar textarea:focus {
   outline: none;
@@ -394,7 +394,8 @@
 }
 
 .statusBtn {
-  font-size: 12px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
   font-weight: 500;
   padding: 7px 11px;
   border-radius: 999px;
@@ -404,7 +405,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: inherit;
   cursor: pointer;
   transition:
     background 120ms ease,

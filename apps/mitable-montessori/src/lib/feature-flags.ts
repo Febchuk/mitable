@@ -54,3 +54,12 @@ export function enableLocalIntent(): boolean {
 export function classroomGroupsEnabled(): boolean {
   return readPublicFlag("NEXT_PUBLIC_CLASSROOM_GROUPS");
 }
+
+/**
+ * When true, admins can assign Progress programs (Montessori / IEP / Speech) per
+ * classroom and teachers see the program switcher. Off by default — classrooms
+ * behave as single-program Montessori rooms.
+ */
+export function classroomProgramsEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_CLASSROOM_PROGRAMS");
+}

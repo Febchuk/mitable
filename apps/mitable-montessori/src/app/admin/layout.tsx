@@ -50,11 +50,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             userId={ctx.userId}
           />
           <main
-            className="scroll-quiet"
+            className="scroll-quiet pb-24 lg:pb-0"
             style={{
               flex: 1,
               position: "relative",
-              paddingBottom: 96,
             }}
           >
             {children}

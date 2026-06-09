@@ -3,7 +3,10 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { listReports } from "@/lib/queries/reports";
-import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import {
+  getActiveClassroomForCurrentUser,
+  listTeacherClassroomsForCurrentUser,
+} from "@/lib/app/active-classroom";
 import { CreateReportRequestSchema, type ReportKind } from "@/lib/schemas/report";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 import { REPORTING_PERIOD_DAYS, type ReportingPeriod } from "@/lib/report-templates/admin-dto";
@@ -13,6 +16,8 @@ import {
   buildDefaultReportSections,
   DEFAULT_REPORT_TEMPLATE_ID,
   isDefaultReportTemplateId,
+  parseDefaultReportTemplateId,
+  reportingPeriodForDefaultKind,
 } from "@/lib/reports/default-template";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
@@ -42,8 +47,8 @@ export async function POST(req: Request) {
   }
   const input = parsed.data;
 
-  const classroom = await getActiveClassroomForCurrentUser();
-  if (!classroom) {
+  const activeClassroom = await getActiveClassroomForCurrentUser();
+  if (!activeClassroom) {
     return NextResponse.json({ error: "No active classroom" }, { status: 403 });
   }
 
@@ -80,26 +85,57 @@ export async function POST(req: Request) {
   // The template's reporting period defines how far back autofill looks for
   // this child's profile data (progress, comments, observations, etc.).
   let reportingPeriod: ReportingPeriod | null = null;
+  let reportClassroomId = activeClassroom.id;
   const useDefaultTemplate = isDefaultReportTemplateId(input.templateId ?? null);
 
   if (useDefaultTemplate) {
+    const parsedDefault = parseDefaultReportTemplateId(input.templateId ?? null);
+    const defaultKind = parsedDefault?.kind ?? input.kind;
+    reportingPeriod = parsedDefault?.reportingPeriod ?? reportingPeriodForDefaultKind(input.kind);
+
+    const teacherClassrooms = await listTeacherClassroomsForCurrentUser();
+    const defaultClassroomId = parsedDefault?.classroomId ?? activeClassroom.id;
+    const defaultClassroom = teacherClassrooms.find((c) => c.id === defaultClassroomId);
+    if (!defaultClassroom) {
+      return NextResponse.json({ error: "Not assigned to that classroom" }, { status: 403 });
+    }
+    reportClassroomId = defaultClassroom.id;
+
+    const { data: enrollment } = await supabase
+      .from("student_classroom_enrollments")
+      .select("id")
+      .eq("student_id", input.childId)
+      .eq("classroom_id", reportClassroomId)
+      .is("end_date", null)
+      .maybeSingle();
+    if (!enrollment) {
+      return NextResponse.json(
+        { error: "Child is not in the classroom for this template" },
+        { status: 400 }
+      );
+    }
+
+    if (defaultKind !== input.kind) {
+      return NextResponse.json({ error: "Template kind mismatch" }, { status: 400 });
+    }
+
     const today = new Date();
     const reportDate = today.toISOString().slice(0, 10);
-    const periodDays = REPORTING_PERIOD_DAYS.weekly;
+    const periodDays = REPORTING_PERIOD_DAYS[reportingPeriod];
     const periodStartDate = new Date(today);
     periodStartDate.setDate(periodStartDate.getDate() - (periodDays - 1));
     const periodStart = periodStartDate.toISOString().slice(0, 10);
 
     const built = await buildDefaultReportSections(supabase, {
-      classroomId: classroom.id,
+      classroomId: reportClassroomId,
       studentId: input.childId,
       periodStart,
       periodEnd: reportDate,
+      reportingPeriod,
     });
     sections = built.sections;
     sectionMeta = built.sectionMeta;
     sectionGuidance = built.sectionGuidance;
-    reportingPeriod = built.reportingPeriod;
   } else if (input.templateId) {
     const { data: tpl } = await supabase
       .from("report_templates")
@@ -153,7 +189,7 @@ export async function POST(req: Request) {
     .from("reports")
     .insert({
       student_id: input.childId,
-      classroom_id: classroom.id,
+      classroom_id: reportClassroomId,
       report_type: KIND_TO_TYPE[input.kind],
       report_date: reportDate,
       period_start: periodStart,
@@ -185,10 +221,12 @@ export async function POST(req: Request) {
     target_id: inserted.id as string,
     metadata: {
       kind: input.kind,
-      classroom_id: classroom.id,
+      classroom_id: reportClassroomId,
       has_audio: input.transcripts.length > 0,
       has_notes: input.notes.length > 0,
-      template_id: useDefaultTemplate ? DEFAULT_REPORT_TEMPLATE_ID : (input.templateId ?? null),
+      template_id: useDefaultTemplate
+        ? (input.templateId ?? DEFAULT_REPORT_TEMPLATE_ID)
+        : (input.templateId ?? null),
       uses_default_template: useDefaultTemplate,
     },
   });

@@ -1590,27 +1590,10 @@
 }
 .nr-modal-body--template {
   gap: 0;
-  padding-top: 20px;
-  padding-bottom: 0;
-  overflow: hidden;
-}
-.nr-modal-template-scroll {
-  min-height: 0;
-  flex: 1 1 auto;
-  padding: 0 28px 16px;
+  padding: 20px 28px 20px;
 }
 .nr-modal-body--template .nr-m-template-list {
   padding: 0;
-}
-.nr-modal-preview {
-  border-top: 1px solid var(--color-border);
-  padding: 16px 28px 20px;
-  max-height: min(38vh, 320px);
-  background: color-mix(in srgb, var(--color-canvas) 92%, var(--color-surface));
-}
-.nr-modal-preview .nr-preview-pdf {
-  max-height: min(28vh, 220px);
-  overflow: auto;
 }
 .nr-modal-foot {
   display: flex;
@@ -1783,80 +1766,30 @@
   line-height: 1.5;
 }
 
-/* ---------- Mobile template list (chevron-accordion preview) ---------- */
+/* ---------- Mobile template list ---------- */
 .nr-m-template-item {
   display: flex;
   flex-direction: column;
 }
 .nr-m-template-row {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  padding: 0;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.nr-m-template-row.nr-selected {
-  border-color: var(--color-terracotta);
-  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
-}
-.nr-m-template-rowMain {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   display: grid;
   grid-template-columns: 28px 1fr auto;
   gap: 10px;
   align-items: center;
   padding: 12px 12px;
-  background: transparent;
-  border: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
   cursor: pointer;
   font-family: inherit;
   color: inherit;
   text-align: left;
 }
-.nr-m-template-previewBtn {
-  flex-shrink: 0;
-  width: 40px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-left: 1px solid var(--color-border);
-  background: transparent;
-  cursor: pointer;
-  color: var(--color-ink-muted);
-}
-.nr-m-template-previewBtn:hover {
-  background: var(--color-muted);
-  color: var(--color-ink);
-}
-.nr-m-template-previewBtn[aria-expanded="true"] {
-  background: var(--color-muted);
-  color: var(--color-ink);
-}
-.nr-m-template-preview {
-  background: var(--color-canvas);
-  border: 1px solid var(--color-border);
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
-  margin-top: -3px;
-  padding: 12px;
-  animation: nr-fade-in 160ms ease both;
-}
-.nr-m-template-preview .nr-preview {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  /* Fixed height for the inline mobile preview so the PDF iframe has a
-     concrete container to render into. */
-  height: 60vh;
-  overflow: hidden;
-}
-.nr-m-template-preview .nr-preview-pdf {
-  margin: 4px 0 0;
-  border-top: 1px solid var(--color-border);
+.nr-m-template-row.nr-selected {
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-soft);
 }
 
 /* Mobile body keeps the list breathing. */

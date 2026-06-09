@@ -5,6 +5,7 @@ import { CreateCurriculumSchema, SetCurriculumActiveSchema } from "@/lib/schemas
 import { createCurriculum, setCurriculumActive } from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { createClient } from "@/utils/supabase/server";
+import { normalizeCurriculumFramework } from "@/lib/queries/curriculum-tree";
 
 export async function GET() {
   const auth = await requireAdmin();
@@ -22,7 +23,11 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ curricula: data ?? [] });
+  const curricula = (data ?? []).map((row) => ({
+    ...row,
+    framework: normalizeCurriculumFramework(row.framework as string),
+  }));
+  return NextResponse.json({ curricula });
 }
 
 export async function POST(req: Request) {

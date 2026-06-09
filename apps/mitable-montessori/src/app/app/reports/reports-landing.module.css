@@ -17,7 +17,13 @@
   line-height: 1.05;
   letter-spacing: -0.015em;
   color: var(--color-ink);
+  margin: 0 0 4px;
+}
+
+.pageSubtitle {
   margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
 }
 
 .ctaBig {

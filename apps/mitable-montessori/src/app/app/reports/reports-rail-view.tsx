@@ -314,23 +314,6 @@ export function ReportsRailView({
       });
   }, []);
 
-  // Per-bucket counts drive both the page-header subtitle and the segmented
-  // status tabs in the rail head, so they stay in sync without re-deriving.
-  const counts = React.useMemo<Record<StatusFilter, number>>(() => {
-    const acc: Record<StatusFilter, number> = {
-      drafts: 0,
-      review: 0,
-      approved: 0,
-      sent: 0,
-    };
-    for (const r of scopedReports) acc[statusBucket(r.status)] += 1;
-    return acc;
-  }, [scopedReports]);
-
-  const subtitle = isAdmin
-    ? `${counts.review} in review · ${counts.drafts} drafts · ${counts.approved} approved · ${counts.sent} sent`
-    : `${counts.drafts} drafts · ${counts.review} in review · ${counts.approved} approved · ${counts.sent} sent`;
-
   /* Modal state — driven by the action rail (desktop) and the bottom action
      bar (mobile overlay). One state powers both surfaces; the rail-view owns
      it so the modals live above any layout boundary. */
@@ -395,9 +378,12 @@ export function ReportsRailView({
   return (
     <div className={styles.rrRoot}>
       <PageHeader
-        overline={isAdmin ? "Across the school" : "My drafts + approved"}
         title="Reports"
-        subtitle={subtitle}
+        subtitle={
+          isAdmin
+            ? "Review and manage reports across the school."
+            : "Draft and send progress reports to families."
+        }
         actions={!isAdmin ? <NewReportTrigger /> : undefined}
       />
 
