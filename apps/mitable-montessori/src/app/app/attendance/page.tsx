@@ -1,5 +1,9 @@
 import { getAttendanceDay } from "@/lib/queries/attendance-day";
-import { isValidDateString, localDateString } from "@/lib/queries/attendance-day-model";
+import {
+  ALL_CLASSROOMS_ID,
+  isValidDateString,
+  localDateString,
+} from "@/lib/queries/attendance-day-model";
 import AttendanceClient from "./attendance-client";
 
 export default async function AttendancePage({
@@ -9,6 +13,7 @@ export default async function AttendancePage({
 }) {
   const params = await searchParams;
   const date = params.date && isValidDateString(params.date) ? params.date : localDateString();
-  const data = await getAttendanceDay(date, params.classroom);
+  const classroom = params.classroom ?? ALL_CLASSROOMS_ID;
+  const data = await getAttendanceDay(date, classroom);
   return <AttendanceClient data={data} />;
 }

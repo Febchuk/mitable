@@ -12,13 +12,25 @@ import { useMontessori } from "./store";
 export function ClassSwitcher({
   style,
   afterSelect,
+  selectedId,
+  includeAllOption = false,
+  allOptionId = "__all__",
+  allOptionLabel = "All classes",
 }: {
   style?: React.CSSProperties;
   /** Runs after the store selection updates — e.g. to reload a server page. */
   afterSelect?: (id: string) => void;
+  /** When set, drives which pill is highlighted (e.g. attendance URL param). */
+  selectedId?: string | null;
+  /** Adds a combined-roster option; does not change the global class selection. */
+  includeAllOption?: boolean;
+  allOptionId?: string;
+  allOptionLabel?: string;
 }) {
   const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = useMontessori();
-  if (classrooms.length <= 1) return null;
+  if (classrooms.length <= 1 && !includeAllOption) return null;
+
+  const activeId = selectedId ?? selectedClassroomId;
 
   const chip = (active: boolean): React.CSSProperties => ({
     display: "inline-flex",
@@ -46,6 +58,17 @@ export function ClassSwitcher({
         ...style,
       }}
     >
+      {includeAllOption && classrooms.length > 1 && (
+        <button
+          key={allOptionId}
+          type="button"
+          className="tap"
+          onClick={() => afterSelect?.(allOptionId)}
+          style={chip(activeId === allOptionId)}
+        >
+          {allOptionLabel}
+        </button>
+      )}
       {classrooms.map((c) => (
         <button
           key={c.id}
@@ -55,7 +78,7 @@ export function ClassSwitcher({
             void selectClassroom(c.id);
             afterSelect?.(c.id);
           }}
-          style={chip(selectedClassroomId === c.id)}
+          style={chip(activeId === c.id)}
         >
           {c.name}
         </button>

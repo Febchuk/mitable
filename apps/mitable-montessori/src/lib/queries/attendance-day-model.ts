@@ -2,10 +2,16 @@
 // component. Kept in their own file so the client can import them without
 // pulling in `next/headers` (which would crash at build time on the client).
 
+/** URL / query param for the combined roster across all assigned classrooms. */
+export const ALL_CLASSROOMS_ID = "__all__";
+
 export type AttendanceDayStatus = "present" | "absent" | null;
 
 export type AttendanceDayStudent = {
   id: string;
+  /** Classroom this row's attendance is recorded against. */
+  classroomId: string;
+  classroomName: string;
   fullName: string;
   preferredName: string | null;
   status: AttendanceDayStatus;
@@ -13,6 +19,10 @@ export type AttendanceDayStudent = {
   /** "HH:MM" (24h) or null. Only meaningful when status = "present". */
   arrivalTime: string | null;
 };
+
+export function attendanceStudentRowKey(student: Pick<AttendanceDayStudent, "id" | "classroomId">) {
+  return `${student.classroomId}:${student.id}`;
+}
 
 export type AttendanceDayData = {
   classroomId: string | null;
