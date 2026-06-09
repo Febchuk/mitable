@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Camera, Check, ChevronDown, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
+import { Check, ChevronDown, Plus, RotateCcw, Send, Undo2, X } from "lucide-react";
+import { DictationButton } from "@/components/chat/DictationButton";
+import { captureSupported } from "@/lib/capture/engines";
 import { ToastBus } from "../primitives";
 import { SparkleGlyph } from "./icons";
 import type {
-  ChatAttachment,
   ChatChip,
   ChatGhostEdit,
   ChatObsRefSuggestedTarget,
@@ -13,8 +14,6 @@ import type {
   ChatTurnMessage,
   TargetRef,
 } from "@/lib/schemas/report-chat";
-import { startCamera, type CameraSession } from "@/lib/capture/camera-capture";
-import { TesseractOcrEngine } from "@/lib/capture/ocr-engine";
 
 type ChatMessage = ChatTurnMessage | { kind: "error"; id: string; body: string };
 
@@ -133,14 +132,7 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     before: string;
     label: string;
   } | null>(null);
-  const [pendingAttachments, setPendingAttachments] = React.useState<ChatAttachment[]>([]);
-  const [cameraSession, setCameraSession] = React.useState<CameraSession | null>(null);
-  const [cameraStatus, setCameraStatus] = React.useState<
-    "idle" | "opening" | "ready" | "capturing" | "ocr" | "uploading" | "error"
-  >("idle");
-  const [cameraError, setCameraError] = React.useState<string | null>(null);
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-  const ocrRef = React.useRef<TesseractOcrEngine | null>(null);
+  const voiceSupported = React.useMemo(() => captureSupported().voice, []);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -229,136 +221,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
     }
   }, [messages, onApplyNewSection]);
 
-  // Bind the live camera stream to the inline viewfinder once both exist.
-  React.useEffect(() => {
-    if (!cameraSession || !videoRef.current) return;
-    videoRef.current.srcObject = cameraSession.stream;
-    void videoRef.current.play().catch(() => {
-      /* autoplay policy — user can hit capture anyway */
-    });
-  }, [cameraSession]);
-
-  // Tear down camera + OCR worker when the chat pane unmounts.
-  React.useEffect(() => {
-    return () => {
-      cameraSession?.stop();
-      ocrRef.current?.destroy();
-      ocrRef.current = null;
-    };
-  }, [cameraSession]);
-
-  const openCamera = React.useCallback(async () => {
-    if (cameraSession) return;
-    setCameraStatus("opening");
-    setCameraError(null);
-    try {
-      const session = await startCamera({ facingMode: "environment" });
-      setCameraSession(session);
-      setCameraStatus("ready");
-      // Pre-warm Tesseract in the background so the first capture isn't slow.
-      if (!ocrRef.current) {
-        ocrRef.current = new TesseractOcrEngine();
-        void ocrRef.current.init().catch(() => {
-          // OCR isn't fatal — we'll skip it on failure and let the agent
-          // search by recency only.
-        });
-      }
-    } catch (err) {
-      setCameraStatus("error");
-      setCameraError((err as Error).message || "Couldn't open the camera.");
-    }
-  }, [cameraSession]);
-
-  const closeCamera = React.useCallback(() => {
-    cameraSession?.stop();
-    setCameraSession(null);
-    setCameraStatus("idle");
-    setCameraError(null);
-  }, [cameraSession]);
-
-  const captureAndAttach = React.useCallback(async () => {
-    if (!cameraSession) return;
-    setCameraStatus("capturing");
-    setCameraError(null);
-    try {
-      const blob = await cameraSession.capture();
-      // Run OCR client-side. If the engine isn't ready or fails, ship the
-      // photo without text — the agent can still surface it by recency.
-      let ocrText = "";
-      if (ocrRef.current) {
-        setCameraStatus("ocr");
-        try {
-          const r = await ocrRef.current.recognize(blob);
-          ocrText = (r.text ?? "").trim();
-        } catch {
-          // Skip OCR on engine error.
-        }
-      }
-      setCameraStatus("uploading");
-      const form = new FormData();
-      form.append("photo", blob, "capture.jpg");
-      if (ocrText) form.append("ocrText", ocrText);
-      form.append("capturedAt", new Date().toISOString());
-      const res = await fetch(`/api/v1/reports/${reportId}/chat/artifacts`, {
-        method: "POST",
-        credentials: "include",
-        body: form,
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || "Upload failed");
-      }
-      const json = (await res.json()) as {
-        artifactId: string;
-        ocrText: string | null;
-        capturedAt: string;
-      };
-      setPendingAttachments((prev) => [
-        ...prev,
-        {
-          kind: "photo",
-          artifactId: json.artifactId,
-          ...(json.ocrText ? { ocrText: json.ocrText } : {}),
-          ...(json.capturedAt ? { capturedAt: json.capturedAt } : {}),
-        },
-      ]);
-      // Close the viewfinder once the attachment chip lands so the teacher
-      // can keep typing without dismissing the camera manually.
-      cameraSession.stop();
-      setCameraSession(null);
-      setCameraStatus("idle");
-    } catch (err) {
-      setCameraStatus("error");
-      setCameraError((err as Error).message || "Capture failed.");
-    }
-  }, [cameraSession, reportId]);
-
-  const removeAttachment = React.useCallback((artifactId: string) => {
-    setPendingAttachments((prev) => prev.filter((a) => a.artifactId !== artifactId));
-  }, []);
-
-  // Pre-warm the Tesseract OCR worker when the capture flag is on so the first
-  // photo press doesn't pay the model-download cost. Errors are ignored — we'll
-  // fall back to the slow path on demand.
-  React.useEffect(() => {
-    if (typeof process === "undefined") return;
-    if (process.env.NEXT_PUBLIC_ENABLE_CAPTURE_WORKER !== "1") return;
-    let cancelled = false;
-    const handle = window.setTimeout(() => {
-      if (cancelled) return;
-      if (!ocrRef.current) {
-        ocrRef.current = new TesseractOcrEngine();
-        void ocrRef.current.init().catch(() => {
-          /* pre-warm is best-effort */
-        });
-      }
-    }, 1500); // give the report editor itself a head start
-    return () => {
-      cancelled = true;
-      window.clearTimeout(handle);
-    };
-  }, []);
-
   // Load persisted thread on mount.
   React.useEffect(() => {
     let cancelled = false;
@@ -405,10 +267,8 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
       };
       setMessages((prev) => [...prev, optimistic]);
       const sentTargetRef = pinnedTarget?.ref;
-      const sentAttachments = pendingAttachments;
       setInput("");
       setPinnedTarget(null);
-      setPendingAttachments([]);
       setSending(true);
 
       try {
@@ -419,7 +279,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
           body: JSON.stringify({
             userMessage: trimmed,
             ...(sentTargetRef ? { targetRef: sentTargetRef } : {}),
-            ...(sentAttachments.length > 0 ? { attachments: sentAttachments } : {}),
           }),
         });
         if (!res.ok) {
@@ -433,7 +292,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
               body: j.error || "Something went wrong. Try again.",
             },
           ]);
-          if (sentAttachments.length > 0) setPendingAttachments(sentAttachments);
           return;
         }
         const json = (await res.json()) as { messages: ChatTurnMessage[] };
@@ -454,7 +312,14 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
         }
       }
     },
-    [reportId, sending, pinnedTarget, pendingAttachments, flushPendingSave, isDrawer]
+    [reportId, sending, pinnedTarget, flushPendingSave, isDrawer]
+  );
+
+  const onVoiceTranscript = React.useCallback(
+    (text: string) => {
+      void sendUserMessage(text);
+    },
+    [sendUserMessage]
   );
 
   const onSend = React.useCallback(async () => {
@@ -660,64 +525,6 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
           </button>
         </div>
       ) : null}
-      {pendingAttachments.length > 0 ? (
-        <div className="rd-attachments" aria-label="Attached photos">
-          {pendingAttachments.map((a) => (
-            <span key={a.artifactId} className="rd-attachment">
-              <span className="rd-attachment-thumb" aria-hidden="true">
-                📷
-              </span>
-              <span>Photo</span>
-              <button
-                type="button"
-                className="rd-attachment-remove"
-                onClick={() => removeAttachment(a.artifactId)}
-                aria-label="Remove attachment"
-              >
-                <X size={11} strokeWidth={2.5} />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {cameraSession ? (
-        <div className="rd-camera" aria-label="Camera viewfinder">
-          <video ref={videoRef} autoPlay playsInline muted />
-          <div className="rd-camera-actions">
-            <button
-              type="button"
-              className="rd-btn rd-btn-primary"
-              onClick={() => void captureAndAttach()}
-              disabled={
-                cameraStatus === "capturing" ||
-                cameraStatus === "ocr" ||
-                cameraStatus === "uploading"
-              }
-            >
-              {cameraStatus === "capturing"
-                ? "Capturing…"
-                : cameraStatus === "ocr"
-                  ? "Reading text…"
-                  : cameraStatus === "uploading"
-                    ? "Uploading…"
-                    : "Capture"}
-            </button>
-            <button
-              type="button"
-              className="rd-btn rd-btn-ghost"
-              onClick={closeCamera}
-              disabled={cameraStatus === "uploading"}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {cameraError ? (
-        <div className="rd-camera-progress" role="alert">
-          {cameraError}
-        </div>
-      ) : null}
       {slashOpen ? (
         <ul className="rd-slash-menu" role="listbox" aria-label="Pick a section">
           {slashMatches.map((s, i) => (
@@ -756,17 +563,14 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
             aria-label="Message the editing assistant"
           />
           <div className="rd-composer-actions">
-            {!isDrawer ? (
-              <button
-                type="button"
+            {voiceSupported ? (
+              <DictationButton
+                presentation="icon"
                 className="rd-icon-btn"
-                title={cameraSession ? "Close camera" : "Attach a photo"}
-                aria-label="Attach a photo"
-                onClick={() => (cameraSession ? closeCamera() : void openCamera())}
-                disabled={cameraStatus === "opening" || cameraStatus === "uploading"}
-              >
-                <Camera size={16} strokeWidth={2} />
-              </button>
+                disabled={sending}
+                onTranscript={onVoiceTranscript}
+                onError={(msg) => ToastBus.push({ message: msg })}
+              />
             ) : null}
             <button
               type="button"
@@ -782,6 +586,13 @@ export const ChatPane = React.forwardRef<ChatPaneHandle, ChatPaneProps>(function
       </div>
       {!isDrawer ? (
         <div className="rd-composer-hints">
+          {voiceSupported ? (
+            <>
+              <span>Mic</span>
+              <span>dictate</span>
+              <span style={{ margin: "0 6px", opacity: 0.35 }}>·</span>
+            </>
+          ) : null}
           <span className="rd-kbd">Enter</span>
           <span>send</span>
           <span className="rd-kbd" style={{ marginLeft: 8 }}>

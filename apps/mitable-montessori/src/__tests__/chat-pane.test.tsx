@@ -8,6 +8,25 @@ import {
   type ChatPaneProps,
 } from "@/components/montessori/report-detail/chat-pane";
 
+vi.mock("@/components/chat/DictationButton", () => ({
+  DictationButton: ({
+    onTranscript,
+    disabled,
+  }: {
+    onTranscript: (text: string) => void;
+    disabled?: boolean;
+  }) => (
+    <button
+      type="button"
+      aria-label="Dictate with voice"
+      disabled={disabled}
+      onClick={() => onTranscript("voice note")}
+    >
+      Mic
+    </button>
+  ),
+}));
+
 void React;
 
 type FetchMock = ReturnType<typeof vi.fn>;

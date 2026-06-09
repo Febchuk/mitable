@@ -12,6 +12,9 @@ export interface DictationButtonProps {
   disabled?: boolean;
   onTranscript: (text: string) => void;
   onError?: (message: string) => void;
+  /** `button` — shadcn outline + hint below. `icon` — single compact control. */
+  presentation?: "button" | "icon";
+  className?: string;
 }
 
 type State = "idle" | "loading-model" | "recording" | "transcribing" | "error";
@@ -21,7 +24,13 @@ type State = "idle" | "loading-model" | "recording" | "transcribing" | "error";
  * is intentionally absent in v1 — we record the full utterance, then transcribe
  * on stop. Streaming Whisper-tiny is brittle on low-end devices.
  */
-export function DictationButton({ disabled, onTranscript, onError }: DictationButtonProps) {
+export function DictationButton({
+  disabled,
+  onTranscript,
+  onError,
+  presentation = "button",
+  className,
+}: DictationButtonProps) {
   const [state, setState] = useState<State>("idle");
   const [hint, setHint] = useState<string>("");
   const recordingRef = useRef<RecordingHandle | null>(null);
@@ -128,6 +137,34 @@ export function DictationButton({ disabled, onTranscript, onError }: DictationBu
 
   const isBusy = state === "loading-model" || state === "transcribing";
   const isRecording = state === "recording";
+  const ariaLabel = isRecording
+    ? "Stop recording"
+    : isBusy
+      ? hint || "Preparing voice"
+      : "Dictate with voice";
+
+  const icon = isBusy ? (
+    <Loader2 size={16} strokeWidth={2} className="animate-spin" />
+  ) : isRecording ? (
+    <MicOff size={16} strokeWidth={2} />
+  ) : (
+    <Mic size={16} strokeWidth={2} />
+  );
+
+  if (presentation === "icon") {
+    return (
+      <button
+        type="button"
+        className={`${className ?? "rd-icon-btn"}${isRecording ? " rd-recording" : ""}`}
+        onClick={() => void handleClick()}
+        disabled={disabled || isBusy}
+        aria-label={ariaLabel}
+        title={hint || (isRecording ? "Listening — tap to stop" : "Dictate with voice")}
+      >
+        {icon}
+      </button>
+    );
+  }
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -135,9 +172,9 @@ export function DictationButton({ disabled, onTranscript, onError }: DictationBu
         type="button"
         variant={isRecording ? "destructive" : "outline"}
         size="icon"
-        onClick={handleClick}
+        onClick={() => void handleClick()}
         disabled={disabled || isBusy}
-        aria-label={isRecording ? "Stop recording" : "Start dictation"}
+        aria-label={ariaLabel}
       >
         {isBusy ? (
           <Loader2 className="h-4 w-4 animate-spin" />
