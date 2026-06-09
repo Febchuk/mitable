@@ -27,7 +27,7 @@ function counts(cp: ClassroomProgress) {
 }
 
 /** Read-only subject block — matches admin `SubjectCard` layout and colors. */
-function ReadOnlySubjectCard({
+export function ReadOnlySubjectCard({
   subject,
   topics,
   subtopics,

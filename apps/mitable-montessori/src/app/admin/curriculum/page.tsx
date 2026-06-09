@@ -1,12 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { BookOpen, ChevronRight, Plus, Trash2, X } from "lucide-react";
-import { PageHeader, cardStyle } from "@/components/montessori/page-header";
+import { BookOpen, Plus, Trash2, X } from "lucide-react";
+import { PageHeader } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { DEFAULT_CURRICULA, type DefaultCurriculum } from "@/lib/admin/curriculum-data";
+import {
+  adminSplitDetailHeaderStyle,
+  adminSplitDetailMetaStyle,
+  adminSplitDetailScrollStyle,
+  adminSplitDetailStyle,
+  adminSplitDetailTitleStyle,
+  adminSplitGridStyle,
+  adminSplitPageStyle,
+  adminSplitRailScrollStyle,
+  adminSplitRailStyle,
+  adminSplitSubnavStyle,
+  adminSplitTabPanelStyle,
+} from "@/components/admin/split-pane-layout";
+import type { CurriculumTree } from "@/lib/queries/curriculum-tree";
+import { classroomProgramsEnabled } from "@/lib/feature-flags";
 import { IepAdminTab } from "./iep-tab";
 import { SpeechAdminTab } from "./speech-tab";
 
@@ -35,25 +49,24 @@ function uid(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function fromDefault(curriculum: DefaultCurriculum): AdminCurriculum {
+function mapTreeToAdmin(tree: CurriculumTree): AdminCurriculum {
   return {
-    id: curriculum.id,
-    name: curriculum.name,
-    ageRange: curriculum.ageRange,
-    subjects: curriculum.subjects.map((subject) => ({
-      id: uid("subject"),
+    id: tree.id,
+    name: tree.name,
+    ageRange: tree.framework,
+    subjects: tree.subjects.map((subject) => ({
+      id: subject.id,
       name: subject.name,
       topics: subject.topics.map((topic) => ({
-        id: uid("topic"),
+        id: topic.id,
         name: topic.name,
-        subtopics: topic.subtopics.map((name) => ({ id: uid("sub"), name })),
+        subtopics: topic.subtopics.map((subtopic) => ({
+          id: subtopic.id,
+          name: subtopic.name,
+        })),
       })),
     })),
   };
-}
-
-function initialCurricula(): AdminCurriculum[] {
-  return DEFAULT_CURRICULA.map(fromDefault);
 }
 
 function topicCount(curriculum: AdminCurriculum): number {
@@ -76,10 +89,19 @@ type DbSchoolCurriculum = {
   is_active: boolean;
 };
 
+const PROGRAM_CURRICULUM_TABS = [
+  { id: "curricula", label: "Curricula" },
+  { id: "iep", label: "IEP" },
+  { id: "speech", label: "Speech" },
+] as const satisfies ReadonlyArray<{ id: AdminCurriculumTab; label: string }>;
+
 export default function AdminCurriculumPage() {
+  const programsEnabled = classroomProgramsEnabled();
   const [activeTab, setActiveTab] = React.useState<AdminCurriculumTab>("curricula");
-  const [curricula, setCurricula] = React.useState<AdminCurriculum[]>(() => initialCurricula());
-  const [selectedId, setSelectedId] = React.useState(curricula[0]?.id ?? "");
+  const [selectedDbId, setSelectedDbId] = React.useState("");
+  const [selectedTree, setSelectedTree] = React.useState<AdminCurriculum | null>(null);
+  const [treeLoading, setTreeLoading] = React.useState(false);
+  const [treeError, setTreeError] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
 
   const [dbCurricula, setDbCurricula] = React.useState<DbSchoolCurriculum[] | null>(null);
@@ -87,6 +109,12 @@ export default function AdminCurriculumPage() {
   const [dbActionError, setDbActionError] = React.useState<string | null>(null);
   const [patchBusyId, setPatchBusyId] = React.useState<string | null>(null);
   const [seedBusy, setSeedBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!programsEnabled && activeTab !== "curricula") {
+      setActiveTab("curricula");
+    }
+  }, [programsEnabled, activeTab]);
 
   const reloadDbCurricula = React.useCallback(async () => {
     setDbLoadError(null);
@@ -102,12 +130,47 @@ export default function AdminCurriculumPage() {
         setDbCurricula(null);
         return;
       }
-      setDbCurricula(data.curricula ?? []);
+      const rows = data.curricula ?? [];
+      setDbCurricula(rows);
+      setSelectedDbId((prev) =>
+        prev && rows.some((r) => r.id === prev) ? prev : (rows[0]?.id ?? "")
+      );
     } catch {
       setDbLoadError("Could not load");
       setDbCurricula(null);
     }
   }, []);
+
+  React.useEffect(() => {
+    if (!selectedDbId) {
+      setSelectedTree(null);
+      return;
+    }
+    let cancelled = false;
+    setTreeLoading(true);
+    setTreeError(null);
+    void fetch(`/api/admin/curricula/${selectedDbId}`, {
+      cache: "no-store",
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data: { error?: string; curriculum?: CurriculumTree }) => {
+        if (cancelled) return;
+        if (!data.curriculum) throw new Error(data.error ?? "Could not load curriculum");
+        setSelectedTree(mapTreeToAdmin(data.curriculum));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setSelectedTree(null);
+        setTreeError(e instanceof Error ? e.message : "Could not load curriculum");
+      })
+      .finally(() => {
+        if (!cancelled) setTreeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDbId]);
 
   React.useEffect(() => {
     if (activeTab === "curricula") void reloadDbCurricula();
@@ -147,21 +210,16 @@ export default function AdminCurriculumPage() {
     }
   };
 
-  const dbByName = React.useMemo(() => {
-    const m = new Map<string, DbSchoolCurriculum>();
-    for (const r of dbCurricula ?? []) m.set(r.name, r);
-    return m;
-  }, [dbCurricula]);
-
-  const selected = curricula.find((curriculum) => curriculum.id === selectedId) ?? curricula[0];
+  const selected = selectedTree;
 
   const updateCurriculum = (
     id: string,
     update: (curriculum: AdminCurriculum) => AdminCurriculum
   ) => {
-    setCurricula((prev) =>
-      prev.map((curriculum) => (curriculum.id === id ? update(curriculum) : curriculum))
-    );
+    setSelectedTree((prev) => {
+      if (!prev || prev.id !== id) return prev;
+      return update(prev);
+    });
   };
 
   const updateSubject = (
@@ -189,24 +247,29 @@ export default function AdminCurriculumPage() {
     }));
   };
 
-  const addCurriculum = (input: { name: string; ageRange?: string }) => {
-    const id = uid("curriculum");
-    const next: AdminCurriculum = {
-      id,
-      name: input.name.trim(),
-      ageRange: input.ageRange?.trim() ?? "",
-      subjects: [],
-    };
-    setCurricula((prev) => [...prev, next]);
-    setSelectedId(id);
+  const addCurriculum = async (input: { name: string; ageRange?: string }) => {
+    setDbActionError(null);
+    try {
+      const res = await fetch("/api/admin/curricula", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: input.name.trim(),
+          framework: "montessori",
+          description: input.ageRange?.trim() || undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; id?: string };
+      if (!res.ok || !data.id) throw new Error(data.error ?? "Could not create curriculum");
+      await reloadDbCurricula();
+      setSelectedDbId(data.id);
+    } catch (e) {
+      setDbActionError(e instanceof Error ? e.message : "Could not create curriculum");
+    }
   };
 
-  const removeCurriculum = (id: string) => {
-    setCurricula((prev) => {
-      const next = prev.filter((curriculum) => curriculum.id !== id);
-      if (id === selectedId) setSelectedId(next[0]?.id ?? "");
-      return next;
-    });
+  const removeCurriculum = (_id: string) => {
+    setDbActionError("Removing curricula from the database is not supported here yet.");
   };
 
   const addSubject = (curriculumId: string, name: string) => {
@@ -288,224 +351,251 @@ export default function AdminCurriculumPage() {
     }));
   };
 
-  return (
-    <div>
-      <PageHeader
-        title="Curriculum"
-        subtitle="View and modify curricula."
-        actions={
-          activeTab === "curricula" ? (
-            <Button variant="default" onClick={() => setCreateOpen(true)}>
-              <Plus size={16} strokeWidth={1.7} /> Add curriculum
-            </Button>
-          ) : null
-        }
-      />
+  const showCurriculaPane = !programsEnabled || activeTab === "curricula";
 
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          padding: "0 24px",
-          borderBottom: "1px solid var(--color-border)",
-        }}
-      >
-        {(
-          [
-            { id: "curricula", label: "Curricula" },
-            { id: "iep", label: "IEP" },
-            { id: "speech", label: "Speech" },
-          ] as const
-        ).map((tab) => {
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: "10px 14px",
-                border: 0,
-                background: "transparent",
-                color: active ? "var(--color-ink)" : "var(--color-ink-muted)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                borderBottom: `2px solid ${active ? "var(--color-ink)" : "transparent"}`,
-                marginBottom: -1,
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+  return (
+    <div style={adminSplitPageStyle}>
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader
+          title="Curriculum"
+          subtitle="View and modify curricula."
+          actions={
+            showCurriculaPane ? (
+              <Button variant="default" onClick={() => setCreateOpen(true)}>
+                <Plus size={16} strokeWidth={1.7} /> Add curriculum
+              </Button>
+            ) : null
+          }
+        />
+
+        {(dbLoadError || dbActionError) && showCurriculaPane ? (
+          <div
+            style={{
+              margin: "0 24px 12px",
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "rgba(180, 35, 24, 0.08)",
+              color: "var(--color-status-error, #b42318)",
+              fontSize: 13,
+            }}
+          >
+            {dbLoadError ?? dbActionError}
+          </div>
+        ) : null}
+
+        {programsEnabled ? (
+          <div style={adminSplitSubnavStyle}>
+            {PROGRAM_CURRICULUM_TABS.map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    padding: "10px 14px",
+                    border: 0,
+                    background: "transparent",
+                    color: active ? "var(--color-ink)" : "var(--color-ink-muted)",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    borderBottom: `2px solid ${active ? "var(--color-ink)" : "transparent"}`,
+                    marginBottom: -1,
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
-      {activeTab === "iep" ? <IepAdminTab /> : null}
-      {activeTab === "speech" ? <SpeechAdminTab /> : null}
+      {programsEnabled && activeTab === "iep" ? (
+        <div className="scroll-quiet" style={adminSplitTabPanelStyle}>
+          <IepAdminTab />
+        </div>
+      ) : null}
+      {programsEnabled && activeTab === "speech" ? (
+        <div className="scroll-quiet" style={adminSplitTabPanelStyle}>
+          <SpeechAdminTab />
+        </div>
+      ) : null}
 
-      {activeTab === "curricula" ? (
-        <div
-          style={{
-            padding: "20px 24px 64px",
-            display: "grid",
-            gridTemplateColumns: "minmax(240px, 320px) minmax(0, 1fr)",
-            gap: 18,
-            alignItems: "start",
-          }}
-        >
-          <aside style={cardStyle}>
-            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--color-border)" }}>
+      {showCurriculaPane ? (
+        <div style={adminSplitGridStyle}>
+          <aside style={adminSplitRailStyle}>
+            <div
+              style={{
+                flexShrink: 0,
+                padding: "14px 16px",
+                borderBottom: "1px solid var(--color-border)",
+              }}
+            >
               <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
                 Curricula
               </div>
             </div>
-            {curricula.map((curriculum, index) => {
-              const active = curriculum.id === selected?.id;
-              const sCount = curriculum.subjects.length;
-              const tCount = topicCount(curriculum);
-              const dbRow = dbCurricula !== null ? dbByName.get(curriculum.name) : undefined;
-              const dbLoading = dbCurricula === null && !dbLoadError;
-              return (
+            <div className="scroll-quiet" style={adminSplitRailScrollStyle}>
+              {dbCurricula === null && !dbLoadError ? (
                 <div
-                  key={curriculum.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "stretch",
-                    borderTop: index ? "1px solid var(--color-border)" : 0,
-                    background: active ? "var(--color-terracotta-soft)" : "transparent",
-                  }}
+                  style={{ padding: "18px 16px", fontSize: 13, color: "var(--color-ink-muted)" }}
                 >
-                  <button
+                  Loading…
+                </div>
+              ) : (dbCurricula ?? []).length === 0 ? (
+                <div style={{ padding: "14px 16px" }}>
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--color-ink-secondary)" }}>
+                    No curricula in the database yet. Seed the standard programs or add one.
+                  </p>
+                  <Button
                     type="button"
-                    className="tap"
-                    onClick={() => setSelectedId(curriculum.id)}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "14px 10px 14px 16px",
-                      border: 0,
-                      background: "transparent",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
+                    size="sm"
+                    variant="secondary"
+                    className="mt-2"
+                    disabled={seedBusy}
+                    onClick={() => void runStandardSeed()}
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
-                        {curriculum.name}
-                      </div>
-                      <div
-                        style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}
+                    {seedBusy ? "Adding…" : "Add standard programs"}
+                  </Button>
+                </div>
+              ) : (
+                (dbCurricula ?? []).map((row, index, rows) => {
+                  const active = row.id === selectedDbId;
+                  const sCount = active && selected ? selected.subjects.length : null;
+                  const tCount = active && selected ? topicCount(selected) : null;
+                  const isLast = index === rows.length - 1;
+                  return (
+                    <div
+                      key={row.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "stretch",
+                        borderTop: index ? "1px solid var(--color-border)" : 0,
+                        borderBottom: isLast ? "1px solid var(--color-border)" : 0,
+                        background: active ? "var(--color-terracotta-soft)" : "transparent",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="tap"
+                        onClick={() => setSelectedDbId(row.id)}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "14px 10px 14px 16px",
+                          border: 0,
+                          background: "transparent",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
                       >
-                        {curriculum.ageRange
-                          ? `${curriculum.ageRange} · ${sCount} subjects · ${tCount} topics`
-                          : `${sCount} subjects · ${tCount} topics`}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-ink)" }}>
+                            {row.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--color-ink-secondary)",
+                              marginTop: 2,
+                            }}
+                          >
+                            {[
+                              programsEnabled ? row.framework : null,
+                              sCount != null && tCount != null
+                                ? `${sCount} subjects · ${tCount} topics`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        </div>
+                      </button>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          paddingRight: 12,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={row.is_active ? "secondary" : "outline"}
+                          disabled={patchBusyId === row.id || seedBusy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void setDbCurriculumActive(row, !row.is_active);
+                          }}
+                          className="shrink-0"
+                        >
+                          {patchBusyId === row.id ? "…" : row.is_active ? "Active" : "Inactive"}
+                        </Button>
                       </div>
                     </div>
-                    <ChevronRight size={15} strokeWidth={1.5} style={{ flexShrink: 0 }} />
-                  </button>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      paddingRight: 12,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {dbLoading ? (
-                      <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>…</span>
-                    ) : dbCurricula === null ? (
-                      <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>—</span>
-                    ) : dbRow ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={dbRow.is_active ? "secondary" : "outline"}
-                        disabled={patchBusyId === dbRow.id || seedBusy}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void setDbCurriculumActive(dbRow, !dbRow.is_active);
-                        }}
-                        className="shrink-0"
-                      >
-                        {patchBusyId === dbRow.id ? "…" : dbRow.is_active ? "Active" : "Inactive"}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-            {dbCurricula !== null && dbCurricula.length === 0 && !dbLoadError ? (
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderTop: curricula.length ? "1px solid var(--color-border)" : 0,
-                }}
-              >
-                <p style={{ margin: 0, fontSize: 12, color: "var(--color-ink-secondary)" }}>
-                  Your account does not have the five standard programs yet. Add them here, then you
-                  can turn each one on or off with the buttons next to the list.
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="mt-2"
-                  disabled={seedBusy}
-                  onClick={() => void runStandardSeed()}
-                >
-                  {seedBusy ? "Adding…" : "Add standard programs"}
-                </Button>
-              </div>
-            ) : null}
-            {(dbLoadError || dbActionError) && (
-              <div
-                style={{
-                  padding: "10px 16px 14px",
-                  borderTop: "1px solid var(--color-border)",
-                  fontSize: 12,
-                  color: "var(--status-error, #e87474)",
-                }}
-              >
-                {dbLoadError ?? dbActionError}
-              </div>
-            )}
+                  );
+                })
+              )}
+            </div>
           </aside>
 
-          <section style={cardStyle}>
-            {selected ? (
-              <CurriculumDetail
-                curriculum={selected}
-                topicCount={topicCount(selected)}
-                subtopicCount={subtopicCount(selected)}
-                onAddSubject={(name) => addSubject(selected.id, name)}
-                onRemoveSubject={(subjectId) => removeSubject(selected.id, subjectId)}
-                onRenameSubject={(subjectId, name) => renameSubject(selected.id, subjectId, name)}
-                onAddTopic={(subjectId, name) => addTopic(selected.id, subjectId, name)}
-                onRemoveTopic={(subjectId, topicId) => removeTopic(selected.id, subjectId, topicId)}
-                onRenameTopic={(subjectId, topicId, name) =>
-                  renameTopic(selected.id, subjectId, topicId, name)
-                }
-                onAddSubtopic={(subjectId, topicId, name) =>
-                  addSubtopic(selected.id, subjectId, topicId, name)
-                }
-                onRemoveSubtopic={(subjectId, topicId, subtopicId) =>
-                  removeSubtopic(selected.id, subjectId, topicId, subtopicId)
-                }
-                onRenameSubtopic={(subjectId, topicId, subtopicId, name) =>
-                  renameSubtopic(selected.id, subjectId, topicId, subtopicId, name)
-                }
-                onRemoveCurriculum={() => removeCurriculum(selected.id)}
-              />
-            ) : (
-              <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
-                No curricula yet. Add one to get started.
-              </div>
-            )}
+          <section style={adminSplitDetailStyle}>
+            <div className="scroll-quiet" style={adminSplitDetailScrollStyle}>
+              {treeLoading ? (
+                <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
+                  Loading curriculum…
+                </div>
+              ) : treeError ? (
+                <div
+                  style={{
+                    padding: 28,
+                    textAlign: "center",
+                    color: "var(--status-error, #e87474)",
+                    fontSize: 13,
+                  }}
+                >
+                  {treeError}
+                </div>
+              ) : selected ? (
+                <CurriculumDetail
+                  curriculum={selected}
+                  showFramework={programsEnabled}
+                  topicCount={topicCount(selected)}
+                  subtopicCount={subtopicCount(selected)}
+                  onAddSubject={(name) => addSubject(selected.id, name)}
+                  onRemoveSubject={(subjectId) => removeSubject(selected.id, subjectId)}
+                  onRenameSubject={(subjectId, name) => renameSubject(selected.id, subjectId, name)}
+                  onAddTopic={(subjectId, name) => addTopic(selected.id, subjectId, name)}
+                  onRemoveTopic={(subjectId, topicId) =>
+                    removeTopic(selected.id, subjectId, topicId)
+                  }
+                  onRenameTopic={(subjectId, topicId, name) =>
+                    renameTopic(selected.id, subjectId, topicId, name)
+                  }
+                  onAddSubtopic={(subjectId, topicId, name) =>
+                    addSubtopic(selected.id, subjectId, topicId, name)
+                  }
+                  onRemoveSubtopic={(subjectId, topicId, subtopicId) =>
+                    removeSubtopic(selected.id, subjectId, topicId, subtopicId)
+                  }
+                  onRenameSubtopic={(subjectId, topicId, subtopicId, name) =>
+                    renameSubtopic(selected.id, subjectId, topicId, subtopicId, name)
+                  }
+                  onRemoveCurriculum={() => removeCurriculum(selected.id)}
+                />
+              ) : (
+                <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
+                  Select a curriculum to view and edit.
+                </div>
+              )}
+            </div>
           </section>
         </div>
       ) : null}
@@ -521,6 +611,7 @@ export default function AdminCurriculumPage() {
 
 function CurriculumDetail({
   curriculum,
+  showFramework,
   topicCount,
   subtopicCount,
   onAddSubject,
@@ -535,6 +626,7 @@ function CurriculumDetail({
   onRemoveCurriculum,
 }: {
   curriculum: AdminCurriculum;
+  showFramework: boolean;
   topicCount: number;
   subtopicCount: number;
   onAddSubject: (name: string) => void;
@@ -561,27 +653,17 @@ function CurriculumDetail({
 
   return (
     <>
-      <div
-        style={{
-          padding: "16px 18px",
-          borderBottom: "1px solid var(--color-border)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ minWidth: 0 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--color-ink)" }}>
-            {curriculum.name}
-          </h2>
-          <div style={{ fontSize: 12, color: "var(--color-ink-secondary)", marginTop: 2 }}>
+      <div style={adminSplitDetailHeaderStyle}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h2 style={adminSplitDetailTitleStyle}>{curriculum.name}</h2>
+          <div style={adminSplitDetailMetaStyle}>
             {curriculum.subjects.length} subjects · {topicCount} topics · {subtopicCount} lessons
-            {curriculum.ageRange ? ` · ${curriculum.ageRange}` : ""}
+            {showFramework && curriculum.ageRange ? ` · ${curriculum.ageRange}` : ""}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}
+        >
           <Button variant="default" onClick={() => setShowAddSubject(true)}>
             <Plus size={16} strokeWidth={1.7} /> Add subject
           </Button>
@@ -1075,7 +1157,7 @@ function CreateCurriculumDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (input: { name: string; ageRange?: string }) => void;
+  onCreate: (input: { name: string; ageRange?: string }) => void | Promise<void>;
 }) {
   const [name, setName] = React.useState("");
   const [ageRange, setAgeRange] = React.useState("");
@@ -1135,8 +1217,9 @@ function CreateCurriculumDialog({
             disabled={!canSubmit}
             onClick={() => {
               if (!canSubmit) return;
-              onCreate({ name, ageRange: ageRange || undefined });
-              onOpenChange(false);
+              void Promise.resolve(onCreate({ name, ageRange: ageRange || undefined })).then(() =>
+                onOpenChange(false)
+              );
             }}
           >
             Add curriculum
