@@ -27,6 +27,10 @@ export async function fetchTemplateLogoUrl(
  * a recursion (42P17) under the FK-join select. The explicit school_id
  * filter gives us the same isolation guarantee RLS would, without the cycle.
  *
+ * Teachers are further scoped to reports they authored (`created_by_user_id`)
+ * or that list them in `report_reviewers`. Admins see every report in the
+ * school (optional `classroomIds` filter on the admin queue).
+ *
  * Writes still go through the user-cookie client (see API routes), where
  * RLS continues to enforce policy.
  */
@@ -135,22 +139,60 @@ function fullName(s: ReportsRow["students"]): string {
   return `${first} ${last}`.trim() || "Unknown";
 }
 
-/** All reports the caller can see (school-scoped via explicit filter on
- *  the joined students.school_id column). Most recent first. */
+const REPORT_LIST_SELECT =
+  "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name)";
+
+async function fetchReviewerReportIds(
+  supabase: MontessoriSupabase,
+  userId: string
+): Promise<string[]> {
+  const { data } = await supabase
+    .from("report_reviewers")
+    .select("report_id")
+    .eq("reviewer_user_id", userId);
+  return [...new Set((data ?? []).map((r) => (r as { report_id: string }).report_id))];
+}
+
+async function teacherCanAccessReport(
+  supabase: MontessoriSupabase,
+  userId: string,
+  reportId: string,
+  createdByUserId: string | null
+): Promise<boolean> {
+  if (createdByUserId === userId) return true;
+  const { data } = await supabase
+    .from("report_reviewers")
+    .select("id")
+    .eq("report_id", reportId)
+    .eq("reviewer_user_id", userId)
+    .maybeSingle();
+  return !!data;
+}
+
+/** Reports the caller can see. Admins: whole school. Teachers: authored or
+ *  assigned as reviewer. Most recent first. */
 export async function listReports(opts?: { classroomIds?: string[] }): Promise<ReportListRow[]> {
   const ctx = await getCurrentUserContext();
   if (!ctx) return [];
 
   const supabase = createAdminClient();
+  const isAdmin = ctx.role === "admin";
   let query = supabase
     .from("reports")
-    .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name)"
-    )
+    .select(REPORT_LIST_SELECT)
     .eq("students.school_id", ctx.schoolId)
     .order("created_at", { ascending: false });
 
-  if (opts?.classroomIds?.length) {
+  if (!isAdmin) {
+    const reviewerReportIds = await fetchReviewerReportIds(supabase, ctx.userId);
+    if (reviewerReportIds.length === 0) {
+      query = query.eq("created_by_user_id", ctx.userId);
+    } else {
+      query = query.or(
+        `created_by_user_id.eq.${ctx.userId},id.in.(${reviewerReportIds.join(",")})`
+      );
+    }
+  } else if (opts?.classroomIds?.length) {
     query = query.in("classroom_id", opts.classroomIds);
   }
 
@@ -405,6 +447,10 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   }
   if (!data) return null;
   const row = data as unknown as ReportsRow;
+  if (ctx.role !== "admin") {
+    const allowed = await teacherCanAccessReport(supabase, ctx.userId, id, row.created_by_user_id);
+    if (!allowed) return null;
+  }
   const tplJoin = row.report_templates;
   const reportSectionMeta = (row.section_meta as SectionMeta | null) ?? {};
   const templateSectionMeta: SectionMeta =
