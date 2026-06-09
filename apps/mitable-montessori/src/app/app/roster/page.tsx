@@ -1,12 +1,5 @@
-import { RosterFromDexie } from "@/components/app/roster-from-dexie";
-import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import { TeacherClassroomsView } from "@/components/classrooms/teacher-classrooms-view";
 
-export default async function RosterPage() {
-  const classroom = await getActiveClassroomForCurrentUser();
-  return (
-    <RosterFromDexie
-      classroomId={classroom?.id ?? null}
-      classroomName={classroom?.name ?? null}
-    />
-  );
+export default function RosterPage() {
+  return <TeacherClassroomsView />;
 }

@@ -262,11 +262,6 @@ export default function AdminSchoolRosterPage() {
   }
 
   const total = allRows.length;
-  const shown = visibleRows.length;
-  const overline =
-    q && total > 0
-      ? `Whole school · ${shown} of ${total} ${total === 1 ? "child" : "children"}`
-      : `Whole school · ${total} ${total === 1 ? "child" : "children"}`;
 
   const emptyMessage =
     total === 0
@@ -290,21 +285,23 @@ export default function AdminSchoolRosterPage() {
       ) : null}
 
       <RosterListView
-        overline={overline}
         title="Roster"
+        subtitle="View and manage children across the school."
+        actions={
+          <>
+            <Button variant="default" onClick={() => setImportOpen(true)}>
+              <Upload size={16} strokeWidth={1.7} /> Import children
+            </Button>
+            <Button variant="secondary" onClick={() => setAddChildOpen(true)}>
+              <Plus size={16} strokeWidth={1.7} /> Add child
+            </Button>
+          </>
+        }
         rows={visibleRows}
         emptyMessage={emptyMessage}
         scrollMode="stickyHeader"
         toolbar={
-          <div className="flex flex-col gap-4" style={{ padding: "20px 24px 16px" }}>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="default" onClick={() => setImportOpen(true)}>
-                <Upload size={16} strokeWidth={1.7} /> Import children
-              </Button>
-              <Button variant="secondary" onClick={() => setAddChildOpen(true)}>
-                <Plus size={16} strokeWidth={1.7} /> Add child
-              </Button>
-            </div>
+          <div style={{ padding: "0 24px 16px" }}>
             <div style={{ position: "relative", maxWidth: 400 }}>
               <Search
                 size={15}

@@ -55,13 +55,17 @@ export type RosterListViewRow = {
 export function RosterListView({
   overline,
   title,
+  subtitle,
+  actions,
   rows,
   emptyMessage,
   toolbar,
   scrollMode = "default",
 }: {
-  overline: string;
+  overline?: string;
   title: string;
+  subtitle?: React.ReactNode;
+  actions?: React.ReactNode;
   rows: RosterListViewRow[];
   emptyMessage: string;
   /** Renders between the page title and the roster table (e.g. search). */
@@ -69,6 +73,9 @@ export function RosterListView({
   /** When `stickyHeader`, title + toolbar stay fixed and only the roster body scrolls. */
   scrollMode?: "default" | "stickyHeader";
 }) {
+  const header = (
+    <PageHeader overline={overline} title={title} subtitle={subtitle} actions={actions} />
+  );
   const showClassrooms = rows.some((r) => r.classroomsLine != null && r.classroomsLine !== "");
 
   const listContent =
@@ -125,11 +132,11 @@ export function RosterListView({
         <div
           className="shrink-0"
           style={{
-            background: "var(--color-muted)",
+            background: "var(--color-canvas)",
             borderBottom: "1px solid var(--color-border)",
           }}
         >
-          <PageHeader overline={overline} title={title} />
+          {header}
           {toolbar}
         </div>
         <div
@@ -144,7 +151,7 @@ export function RosterListView({
 
   return (
     <div>
-      <PageHeader overline={overline} title={title} />
+      {header}
       {toolbar}
       <div style={{ padding: "16px 24px 60px" }}>{listContent}</div>
     </div>
