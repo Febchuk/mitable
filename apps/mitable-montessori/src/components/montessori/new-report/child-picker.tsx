@@ -18,8 +18,6 @@ type ChildPickerProps = {
   onChange: (child: PickerChild) => void;
   roster: PickerChild[];
   capturedToday: CapturedToday;
-  /** Shown above the roster (e.g. classroom name). */
-  rosterGroupLabel?: string;
   /** List shows the full roster with optional search; dropdown is legacy typeahead. */
   layout?: "list" | "dropdown";
 };
@@ -37,7 +35,6 @@ export function ChildPicker({
   onChange,
   roster,
   capturedToday,
-  rosterGroupLabel = "Children",
   layout = "list",
 }: ChildPickerProps) {
   if (layout === "dropdown") {
@@ -56,18 +53,11 @@ export function ChildPicker({
       onChange={onChange}
       roster={roster}
       capturedToday={capturedToday}
-      rosterGroupLabel={rosterGroupLabel}
     />
   );
 }
 
-function ChildPickerList({
-  value,
-  onChange,
-  roster,
-  capturedToday,
-  rosterGroupLabel = "Children",
-}: ChildPickerProps) {
+function ChildPickerList({ value, onChange, roster, capturedToday }: ChildPickerProps) {
   const [query, setQuery] = React.useState("");
   const { matches, todayChildren, otherChildren } = useFilteredRoster(roster, capturedToday, query);
 
@@ -83,10 +73,7 @@ function ChildPickerList({
           aria-label="Search children"
         />
       </div>
-      <div
-        className="nr-child-list-scroll scroll-quiet"
-        aria-label={`Children in ${rosterGroupLabel}`}
-      >
+      <div className="nr-child-list-scroll scroll-quiet" aria-label="Children">
         {roster.length === 0 ? (
           <div className="nr-empty-row">Loading children…</div>
         ) : matches.length === 0 ? (
@@ -107,16 +94,27 @@ function ChildPickerList({
               </ChildListGroup>
             ) : null}
             {otherChildren.length > 0 ? (
-              <ChildListGroup label={todayChildren.length > 0 ? "All children" : rosterGroupLabel}>
-                {otherChildren.map((c) => (
+              todayChildren.length > 0 ? (
+                <ChildListGroup label="All children">
+                  {otherChildren.map((c) => (
+                    <PickerRow
+                      key={c.id}
+                      child={c}
+                      selected={value?.id === c.id}
+                      onPick={() => onChange(c)}
+                    />
+                  ))}
+                </ChildListGroup>
+              ) : (
+                otherChildren.map((c) => (
                   <PickerRow
                     key={c.id}
                     child={c}
                     selected={value?.id === c.id}
                     onPick={() => onChange(c)}
                   />
-                ))}
-              </ChildListGroup>
+                ))
+              )
             ) : null}
           </>
         )}
