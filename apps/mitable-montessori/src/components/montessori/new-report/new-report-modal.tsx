@@ -96,7 +96,7 @@ export function NewReportModal({
                     Start a new report
                   </DialogTitle>
                   <DialogDescription className="text-sm leading-relaxed text-ink-secondary">
-                    Step 1 of 2 — pick a child from {classroomName}.
+                    Step 1 of 2 — pick a child.
                   </DialogDescription>
                 </div>
                 <button type="button" className="nr-close tap" onClick={onClose} aria-label="Close">
@@ -110,7 +110,6 @@ export function NewReportModal({
                   onChange={setChild}
                   roster={roster}
                   capturedToday={capturedToday}
-                  rosterGroupLabel={classroomName}
                 />
               </div>
               <footer className="nr-modal-foot">

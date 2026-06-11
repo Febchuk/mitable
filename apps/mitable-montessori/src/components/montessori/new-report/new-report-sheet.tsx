@@ -113,7 +113,6 @@ export function NewReportSheet({
                 }}
                 roster={roster}
                 capturedToday={capturedToday}
-                rosterGroupLabel={classroomName}
               />
             </div>
 
