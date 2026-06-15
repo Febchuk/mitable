@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import { reportAiScoringEnabled } from "@/lib/feature-flags";
 
 type MontessoriSupabase = ReturnType<typeof createAdminClient>;
 
@@ -427,16 +428,19 @@ export async function listReportsV2(opts?: {
   return baseRows.map((row) => {
     const reviewers = reviewersByReport.get(row.id) ?? [];
     const approvedCount = reviewers.filter((r) => r.status === "approved").length;
-    // Real score when present; deterministic placeholder otherwise so the
-    // chip color is stable across renders for un-scored rows.
-    const aiScored = row.aiScore !== null;
-    const displayScore = aiScored ? (row.aiScore as number) : stubAiScore(row.id);
+    const scoringOn = reportAiScoringEnabled();
+    const aiScored = scoringOn && row.aiScore !== null;
+    const displayScore = aiScored ? (row.aiScore as number) : 0;
     return {
       ...row,
       tab: statusToTab(row.status),
       aiScored,
       displayScore,
-      completenessPercent: stubCompleteness(displayScore),
+      completenessPercent: scoringOn
+        ? aiScored
+          ? stubCompleteness(row.aiScore as number)
+          : stubCompleteness(stubAiScore(row.id))
+        : 0,
       reviewers,
       reviewerTicks: { approved: approvedCount, total: reviewers.length },
       lastSubmittedAt: lastSubmittedByReport.get(row.id) ?? null,

@@ -79,3 +79,11 @@ export function classroomProgramsEnabled(): boolean {
 export function adminReportTemplatesEnabled(): boolean {
   return readPublicFlag("NEXT_PUBLIC_ADMIN_REPORT_TEMPLATES");
 }
+
+/**
+ * When true, reports are AI-scored on submit and edit (confidence score, flags,
+ * completeness bar in the list). Off by default.
+ */
+export function reportAiScoringEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_REPORT_AI_SCORING");
+}

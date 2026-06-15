@@ -28,6 +28,7 @@ import { ActionRail, railIcons, scoreToneBand, type ActionRailModal } from "./ac
 import type { ViewMode } from "@/components/montessori/report-detail/view-mode-toggle";
 import { ReportModalsHost, type ReportModal } from "./report-modals";
 import styles from "./reports-rail.module.css";
+import { reportAiScoringEnabled } from "@/lib/feature-flags";
 
 const STATUS_TONE: Record<
   ReportListRow["status"],
@@ -166,6 +167,7 @@ export function ReportsRailView({
   const locale = useUiLocale();
   const router = useRouter();
   const isAdmin = variant === "admin";
+  const aiScoringEnabled = reportAiScoringEnabled();
   const statusFilters = isAdmin ? ADMIN_STATUS_FILTERS : TEACHER_STATUS_FILTERS;
   const defaultFilter: StatusFilter = isAdmin ? "review" : "drafts";
 
@@ -465,7 +467,12 @@ export function ReportsRailView({
                       </div>
                       <div className={styles.rrRowTitle}>{r.title || "Untitled report"}</div>
                       <div className={styles.rrRowMeta}>
-                        <RowSignal row={r} bucket={filter} locale={locale} />
+                        <RowSignal
+                          row={r}
+                          bucket={filter}
+                          locale={locale}
+                          aiScoringEnabled={aiScoringEnabled}
+                        />
                       </div>
                     </div>
                   </button>
@@ -526,7 +533,7 @@ export function ReportsRailView({
             status={selectedRow.status}
             isAdmin={isAdmin}
             onOpenModal={openModal}
-            aiScore={selectedRow.displayScore}
+            aiScore={aiScoringEnabled && selectedRow.aiScored ? selectedRow.displayScore : null}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
           />
@@ -582,12 +589,17 @@ function RowSignal({
   row,
   bucket,
   locale,
+  aiScoringEnabled,
 }: {
   row: ReportListRow;
   bucket: StatusFilter;
   locale: string;
+  aiScoringEnabled: boolean;
 }) {
   if (bucket === "drafts") {
+    if (!aiScoringEnabled) {
+      return <span className={styles.rrSignalMeta}>{formatRelative(row.updatedAt, locale)}</span>;
+    }
     const tone = scoreTone(row.completenessPercent);
     return (
       <span className={`${styles.rrSignal} ${styles.rrSignalCompleteness}`}>
@@ -809,6 +821,8 @@ function KebabMenu({
   const showRequestChanges = actions.includes("request_changes");
   const showDelete = actions.includes("delete");
   const inPreview = viewMode === "preview";
+  const aiScoringEnabled = reportAiScoringEnabled();
+  const showAiScore = aiScoringEnabled && row.aiScored;
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -830,7 +844,7 @@ function KebabMenu({
     <>
       <div className={styles.rrKebabScrim} role="presentation" onClick={onClose} aria-hidden />
       <div className={styles.rrKebabMenu} role="menu" aria-label="Report actions">
-        {row.displayScore != null && (
+        {showAiScore && (
           <button
             type="button"
             className={`${styles.rrKebabItem} tap`}
