@@ -19,12 +19,34 @@ import {
   parseDefaultReportTemplateId,
   reportingPeriodForDefaultKind,
 } from "@/lib/reports/default-template";
+import {
+  buildIncidentReportSections,
+  resolveStudentClassroomId,
+} from "@/lib/reports/create-report-sections";
+import { endOfTermPeriodBounds } from "@/lib/reports/term-period";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
   Daily: "daily",
   Major: "major",
   Incident: "incident",
 };
+
+async function resolvePeriodBounds(
+  supabase: ReturnType<typeof createAdminClient>,
+  schoolId: string,
+  reportingPeriod: ReportingPeriod,
+  today: Date
+): Promise<{ periodStart: string; periodEnd: string }> {
+  const periodEnd = today.toISOString().slice(0, 10);
+  if (reportingPeriod === "end_of_term") {
+    const term = await endOfTermPeriodBounds(supabase, schoolId, today);
+    return { periodStart: term.periodStart, periodEnd: term.periodEnd };
+  }
+  const periodDays = REPORTING_PERIOD_DAYS[reportingPeriod];
+  const periodStartDate = new Date(today);
+  periodStartDate.setDate(periodStartDate.getDate() - (periodDays - 1));
+  return { periodStart: periodStartDate.toISOString().slice(0, 10), periodEnd };
+}
 
 export async function GET() {
   const auth = await requireUser();
@@ -86,56 +108,68 @@ export async function POST(req: Request) {
   // this child's profile data (progress, comments, observations, etc.).
   let reportingPeriod: ReportingPeriod | null = null;
   let reportClassroomId = activeClassroom.id;
+  let resolvedTemplateId: string | null = input.templateId ?? null;
   const useDefaultTemplate = isDefaultReportTemplateId(input.templateId ?? null);
+  const teacherClassrooms = await listTeacherClassroomsForCurrentUser();
+  const teacherClassroomIds = teacherClassrooms.map((c) => c.id);
 
   if (useDefaultTemplate) {
     const parsedDefault = parseDefaultReportTemplateId(input.templateId ?? null);
     const defaultKind = parsedDefault?.kind ?? input.kind;
     reportingPeriod = parsedDefault?.reportingPeriod ?? reportingPeriodForDefaultKind(input.kind);
 
-    const teacherClassrooms = await listTeacherClassroomsForCurrentUser();
-    const defaultClassroomId = parsedDefault?.classroomId ?? activeClassroom.id;
-    const defaultClassroom = teacherClassrooms.find((c) => c.id === defaultClassroomId);
-    if (!defaultClassroom) {
-      return NextResponse.json({ error: "Not assigned to that classroom" }, { status: 403 });
-    }
-    reportClassroomId = defaultClassroom.id;
-
-    const { data: enrollment } = await supabase
-      .from("student_classroom_enrollments")
-      .select("id")
-      .eq("student_id", input.childId)
-      .eq("classroom_id", reportClassroomId)
-      .is("end_date", null)
-      .maybeSingle();
-    if (!enrollment) {
-      return NextResponse.json(
-        { error: "Child is not in the classroom for this template" },
-        { status: 400 }
-      );
-    }
-
     if (defaultKind !== input.kind) {
       return NextResponse.json({ error: "Template kind mismatch" }, { status: 400 });
     }
 
-    const today = new Date();
-    const reportDate = today.toISOString().slice(0, 10);
-    const periodDays = REPORTING_PERIOD_DAYS[reportingPeriod];
-    const periodStartDate = new Date(today);
-    periodStartDate.setDate(periodStartDate.getDate() - (periodDays - 1));
-    const periodStart = periodStartDate.toISOString().slice(0, 10);
+    const hintedClassroomId = parsedDefault?.classroomId ?? activeClassroom.id;
+    const studentClassroomId = await resolveStudentClassroomId(
+      supabase,
+      input.childId,
+      teacherClassroomIds,
+      hintedClassroomId
+    );
+    if (!studentClassroomId) {
+      return NextResponse.json(
+        { error: "Child is not enrolled in any of your classrooms" },
+        { status: 400 }
+      );
+    }
+    reportClassroomId = studentClassroomId;
 
-    const built = await buildDefaultReportSections(supabase, {
-      classroomId: reportClassroomId,
-      studentId: input.childId,
-      periodStart,
-      periodEnd: reportDate,
-      reportingPeriod,
-    });
-    sections = built.sections;
-    sectionMeta = built.sectionMeta;
-    sectionGuidance = built.sectionGuidance;
+    const today = new Date();
+
+    if (defaultKind === "Incident") {
+      const incidentTranscript = input.transcripts[0]?.trim() ?? "";
+      const built = await buildIncidentReportSections(
+        supabase,
+        auth.user.schoolId,
+        incidentTranscript
+      );
+      sections = built.sections;
+      sectionMeta = built.sectionMeta;
+      sectionGuidance = built.sectionGuidance;
+      resolvedTemplateId = built.templateId;
+      reportingPeriod = "daily";
+    } else {
+      const { periodStart, periodEnd } = await resolvePeriodBounds(
+        supabase,
+        auth.user.schoolId,
+        reportingPeriod,
+        today
+      );
+      const built = await buildDefaultReportSections(supabase, {
+        classroomId: reportClassroomId,
+        studentId: input.childId,
+        periodStart,
+        periodEnd,
+        reportingPeriod,
+      });
+      sections = built.sections;
+      sectionMeta = built.sectionMeta;
+      sectionGuidance = built.sectionGuidance;
+      resolvedTemplateId = null;
+    }
   } else if (input.templateId) {
     const { data: tpl } = await supabase
       .from("report_templates")
@@ -177,13 +211,9 @@ export async function POST(req: Request) {
   });
   const reportDate = today.toISOString().slice(0, 10);
 
-  // Window the autofill query: period_end is today, period_start reaches back
-  // by the template's reporting period (e.g. weekly = last 7 days). Reports
-  // with no template fall back to a single day (today only).
-  const periodDays = reportingPeriod ? REPORTING_PERIOD_DAYS[reportingPeriod] : 1;
-  const periodStartDate = new Date(today);
-  periodStartDate.setDate(periodStartDate.getDate() - (periodDays - 1));
-  const periodStart = periodStartDate.toISOString().slice(0, 10);
+  const { periodStart, periodEnd } = reportingPeriod
+    ? await resolvePeriodBounds(supabase, auth.user.schoolId, reportingPeriod, today)
+    : { periodStart: reportDate, periodEnd: reportDate };
 
   const { data: inserted, error } = await supabase
     .from("reports")
@@ -193,12 +223,16 @@ export async function POST(req: Request) {
       report_type: KIND_TO_TYPE[input.kind],
       report_date: reportDate,
       period_start: periodStart,
-      period_end: reportDate,
+      period_end: periodEnd,
       status: "draft",
       title: `${firstName} — ${dayLabel}`,
       body: null,
       sections,
-      template_id: useDefaultTemplate ? null : (input.templateId ?? null),
+      template_id: useDefaultTemplate
+        ? input.kind === "Incident"
+          ? resolvedTemplateId
+          : null
+        : (input.templateId ?? null),
       section_meta: useDefaultTemplate ? sectionMeta : {},
       section_guidance: useDefaultTemplate ? sectionGuidance : {},
       created_by_user_id: auth.user.userId,
