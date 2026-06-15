@@ -4,14 +4,12 @@ import * as React from "react";
 import { ArrowLeft, ArrowRight, Clock, Search, X } from "lucide-react";
 import { initialsFor } from "../data";
 import { type PickerChild } from "./child-picker";
-import { MobileTemplateList } from "./template-block";
-import {
-  defaultReportTemplateForClassroom,
-  type DefaultTemplateClassroom,
-} from "@/lib/reports/default-template";
-import { type NewReportPayload, type ReportTemplate } from "./mock-data";
+import { IncidentCaptureStep } from "./incident-capture-step";
+import { ReportTypePicker } from "./report-type-picker";
+import { buildBuiltinReportTemplateId } from "@/lib/reports/default-template";
+import { type NewReportPayload, type ReportKind } from "./mock-data";
 
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
 type CapturedToday = Record<string, { voice: number; photos: number }>;
 
 export function NewReportMobile({
@@ -20,33 +18,25 @@ export function NewReportMobile({
   onSubmit,
   roster,
   capturedToday,
-  templates,
   submitting,
-  classroomName,
-  teacherClassrooms,
-  selectedClassroomId,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (payload: NewReportPayload) => void;
   roster: PickerChild[];
   capturedToday: CapturedToday;
-  templates: ReportTemplate[];
   submitting?: boolean;
-  classroomName: string;
-  teacherClassrooms: DefaultTemplateClassroom[];
-  selectedClassroomId: string | null;
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
-  const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
+  const [reportKind, setReportKind] = React.useState<ReportKind | null>(null);
   const [query, setQuery] = React.useState("");
 
   React.useEffect(() => {
     if (open) {
       setStep(1);
       setChild(null);
-      setTemplate(null);
+      setReportKind(null);
       setQuery("");
     }
   }, [open]);
@@ -62,12 +52,13 @@ export function NewReportMobile({
 
   if (!open) return null;
 
-  const submit = () => {
-    if (!child || !template) return;
+  const submitPayload = (kind: ReportKind, incidentTranscript?: string) => {
+    if (!child) return;
     onSubmit({
       childId: child.id,
-      kind: template.kind,
-      templateId: template.id,
+      kind,
+      templateId: buildBuiltinReportTemplateId(kind),
+      incidentTranscript,
     });
   };
 
@@ -80,9 +71,6 @@ export function NewReportMobile({
           setQuery={setQuery}
           onPick={(c) => {
             setChild(c);
-            setTemplate(
-              defaultReportTemplateForClassroom(teacherClassrooms, selectedClassroomId, "Daily")
-            );
             setStep(2);
           }}
           onClose={onClose}
@@ -90,25 +78,33 @@ export function NewReportMobile({
           capturedToday={capturedToday}
         />
       )}
-      {step === 2 && (
-        <Step2Template
-          child={child!}
-          template={template}
-          onPick={setTemplate}
-          templates={templates}
+      {step === 2 && child && (
+        <Step2Type
+          child={child}
+          reportKind={reportKind}
+          onPick={(kind) => {
+            setReportKind(kind);
+            if (kind === "Incident") setStep(3);
+            else submitPayload(kind);
+          }}
           submitting={submitting}
-          classroomName={classroomName}
           onBack={() => setStep(1)}
-          onSubmit={submit}
         />
+      )}
+      {step === 3 && child && (
+        <div className="nr-m-incident-wrap">
+          <IncidentCaptureStep
+            childFirstName={child.name.split(" ")[0]}
+            onBack={() => setStep(2)}
+            onContinue={(transcript) => submitPayload("Incident", transcript)}
+            submitting={submitting}
+          />
+        </div>
       )}
     </div>
   );
 }
 
-/* ============================================================
- *  Step 1 — Child
- * ============================================================ */
 function Step1Child({
   child,
   query,
@@ -140,7 +136,7 @@ function Step1Child({
           </button>
           <span className="nr-m-title">New report</span>
         </div>
-        <DotRail step={1} />
+        <DotRail step={1} total={3} />
       </div>
 
       <div className="nr-m-page-head">
@@ -207,6 +203,58 @@ function Step1Child({
   );
 }
 
+function Step2Type({
+  child,
+  reportKind,
+  onPick,
+  submitting,
+  onBack,
+}: {
+  child: PickerChild;
+  reportKind: ReportKind | null;
+  onPick: (kind: ReportKind) => void;
+  submitting?: boolean;
+  onBack: () => void;
+}) {
+  return (
+    <>
+      <div className="nr-m-head">
+        <div className="nr-m-left">
+          <button type="button" className="nr-m-iconbtn" onClick={onBack} aria-label="Back">
+            <ArrowLeft size={18} strokeWidth={2} />
+          </button>
+          <div>
+            <span className="nr-m-title">For {child.name.split(" ")[0]}</span>
+            <div className="nr-m-subtitle">{child.age}</div>
+          </div>
+        </div>
+        <DotRail step={2} total={3} />
+      </div>
+
+      <div className="nr-m-page-head">
+        <div className="nr-m-crest">report type</div>
+        <h1>What kind of report?</h1>
+        <p>We&rsquo;ll pull progress from their classroom curriculum.</p>
+      </div>
+
+      <div className="nr-m-body">
+        <ReportTypePicker selected={reportKind} onPick={onPick} variant="mobile" />
+      </div>
+
+      <div className="nr-m-foot">
+        <button
+          type="button"
+          className="nr-m-btn-primary"
+          disabled={!reportKind || reportKind === "Incident" || submitting}
+        >
+          {submitting ? "Starting…" : "Tap a type above to continue"}
+          <ArrowRight size={14} strokeWidth={2.5} />
+        </button>
+      </div>
+    </>
+  );
+}
+
 function MobileChildRow({
   child,
   selected,
@@ -242,77 +290,10 @@ function MobileChildRow({
   );
 }
 
-/* ============================================================
- *  Step 2 — Template
- * ============================================================ */
-function Step2Template({
-  child,
-  template,
-  onPick,
-  templates,
-  submitting,
-  classroomName,
-  onBack,
-  onSubmit,
-}: {
-  child: PickerChild;
-  template: ReportTemplate | null;
-  onPick: (t: ReportTemplate) => void;
-  templates: ReportTemplate[];
-  submitting?: boolean;
-  classroomName: string;
-  onBack: () => void;
-  onSubmit: () => void;
-}) {
+function DotRail({ step, total }: { step: number; total: number }) {
   return (
-    <>
-      <div className="nr-m-head">
-        <div className="nr-m-left">
-          <button type="button" className="nr-m-iconbtn" onClick={onBack} aria-label="Back">
-            <ArrowLeft size={18} strokeWidth={2} />
-          </button>
-          <div>
-            <span className="nr-m-title">For {child.name.split(" ")[0]}</span>
-            <div className="nr-m-subtitle">{child.age}</div>
-          </div>
-        </div>
-        <DotRail step={2} />
-      </div>
-
-      <div className="nr-m-page-head">
-        <div className="nr-m-crest">pick a template</div>
-        <h1>Template</h1>
-        <p>We&rsquo;ll draft the empty form from the template you pick.</p>
-      </div>
-
-      <div className="nr-m-body">
-        <MobileTemplateList
-          selected={template}
-          onPick={onPick}
-          templates={templates}
-          classroomName={classroomName}
-        />
-      </div>
-
-      <div className="nr-m-foot">
-        <button
-          type="button"
-          className="nr-m-btn-primary"
-          disabled={!template || submitting}
-          onClick={onSubmit}
-        >
-          {submitting ? "Starting…" : "Start drafting"}
-          <ArrowRight size={14} strokeWidth={2.5} />
-        </button>
-      </div>
-    </>
-  );
-}
-
-function DotRail({ step }: { step: Step }) {
-  return (
-    <div className="nr-dot-rail" aria-label={`Step ${step} of 2`}>
-      {[1, 2].map((s) => (
+    <div className="nr-dot-rail" aria-label={`Step ${step} of ${total}`}>
+      {Array.from({ length: total }, (_, i) => i + 1).map((s) => (
         <span
           key={s}
           className={`nr-dot${s < step ? " nr-done" : ""}${s === step ? " nr-active" : ""}`}

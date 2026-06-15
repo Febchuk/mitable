@@ -4,19 +4,12 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { ToastBus } from "../primitives";
-import { useMontessori } from "../store";
 import { useIsMobile } from "../child-detail/use-is-mobile";
 import type { Tone } from "../data";
-import type { SectionMeta } from "@/lib/report-templates/sections";
-import {
-  isDefaultReportTemplateId,
-  withDefaultReportTemplates,
-  type DefaultTemplateClassroom,
-} from "@/lib/reports/default-template";
 import { NewReportModal } from "./new-report-modal";
 import { NewReportMobile } from "./new-report-mobile";
 import type { PickerChild } from "./child-picker";
-import { type NewReportPayload, type ReportTemplate } from "./mock-data";
+import { type NewReportPayload } from "./mock-data";
 import "./new-report.css";
 
 const TONE_CYCLE: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
@@ -27,17 +20,6 @@ function toneFor(id: string): Tone {
 }
 
 type CapturedToday = Record<string, { voice: number; photos: number }>;
-
-type ApiTemplateRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  kind: ReportTemplate["kind"];
-  sections: string[];
-  sectionMeta: SectionMeta | null;
-  logoUrl: string | null;
-  iconTone: ReportTemplate["iconTone"];
-};
 
 type NewReportTriggerProps = {
   /** Controlled open state (e.g. hero CTA on reports landing). */
@@ -61,54 +43,22 @@ export function NewReportTrigger({
   const setOpen = onOpenChange ?? setOpenInternal;
   const [submitting, setSubmitting] = React.useState(false);
   const [roster, setRoster] = React.useState<PickerChild[]>([]);
-  const [templates, setTemplates] = React.useState<ReportTemplate[]>([]);
   const [capturedToday, setCapturedToday] = React.useState<CapturedToday>({});
   const [loaded, setLoaded] = React.useState(false);
 
   const mobile = useIsMobile();
   const router = useRouter();
-  const { classroomProgress, classrooms, selectedClassroomId } = useMontessori();
-  const classroomName = classroomProgress?.classroomName?.trim() || "Classroom";
-  const teacherClassrooms = React.useMemo<DefaultTemplateClassroom[]>(() => {
-    if (classrooms.length > 0) return classrooms;
-    if (selectedClassroomId && classroomName) {
-      return [{ id: selectedClassroomId, name: classroomName }];
-    }
-    return [];
-  }, [classrooms, selectedClassroomId, classroomName]);
-
-  // Keep pinned default rows in sync when assignments or the active class change.
-  React.useEffect(() => {
-    setTemplates((prev) =>
-      withDefaultReportTemplates(
-        prev.filter((t) => !isDefaultReportTemplateId(t.id)),
-        teacherClassrooms
-      )
-    );
-  }, [teacherClassrooms]);
 
   // Lazy-load on first open.
   React.useEffect(() => {
     if (!open || loaded) return;
     let cancelled = false;
     void Promise.all([
-      fetch("/api/v1/templates", { credentials: "include" }).then((r) => r.json()),
       fetch("/api/v1/roster?scope=all", { credentials: "include" }).then((r) => r.json()),
       fetch("/api/v1/captured-today", { credentials: "include" }).then((r) => r.json()),
     ])
-      .then(([tpls, rost, capt]) => {
+      .then(([rost, capt]) => {
         if (cancelled) return;
-        const tplRows = ((tpls?.templates ?? []) as ApiTemplateRow[]).map((t) => ({
-          id: t.id,
-          name: t.name,
-          description: t.description ?? "",
-          kind: t.kind,
-          sections: t.sections,
-          sectionMeta: t.sectionMeta ?? {},
-          logoUrl: t.logoUrl ?? null,
-          iconTone: t.iconTone,
-        }));
-        setTemplates(withDefaultReportTemplates(tplRows, teacherClassrooms));
         const rosterRows = (
           (rost?.rows ?? []) as Array<{ id: string; fullName: string; age: string | null }>
         ).map((r) => ({
@@ -123,23 +73,21 @@ export function NewReportTrigger({
       })
       .catch((err) => {
         console.error("new-report data fetch failed", err);
-        setTemplates(withDefaultReportTemplates([], teacherClassrooms));
-        ToastBus.push({ message: "Couldn't load roster/templates. Try again." });
+        ToastBus.push({ message: "Couldn't load roster. Try again." });
       });
     return () => {
       cancelled = true;
     };
-  }, [open, loaded, teacherClassrooms]);
+  }, [open, loaded]);
 
   const onSubmit = React.useCallback(
     async (payload: NewReportPayload) => {
       if (submitting) return;
       setSubmitting(true);
       try {
-        // No audio / handwritten notes any more — the assistant drafts the
-        // empty template. The backend still accepts the legacy capture
-        // fields; we send them as empty so the "from scratch" code path
-        // runs server-side.
+        const transcripts = payload.incidentTranscript?.trim()
+          ? [payload.incidentTranscript.trim()]
+          : [];
         const res = await fetch("/api/v1/reports", {
           method: "POST",
           credentials: "include",
@@ -148,7 +96,7 @@ export function NewReportTrigger({
             childId: payload.childId,
             kind: payload.kind,
             templateId: payload.templateId,
-            transcripts: [],
+            transcripts,
             notes: [],
             tokenMap: [],
           }),
@@ -162,8 +110,8 @@ export function NewReportTrigger({
         const child = roster.find((c) => c.id === payload.childId);
         ToastBus.push({
           message: child
-            ? `Drafting ${payload.kind.toLowerCase()} report for ${child.name.split(" ")[0]}…`
-            : "Drafting new report…",
+            ? `Opening ${payload.kind === "Major" ? "end-of-term" : payload.kind.toLowerCase()} report for ${child.name.split(" ")[0]}…`
+            : "Opening new report…",
         });
         setOpen(false);
         router.push(createdReportHref(json.reportId));
@@ -195,11 +143,7 @@ export function NewReportTrigger({
           onSubmit={onSubmit}
           roster={roster}
           capturedToday={capturedToday}
-          templates={templates}
           submitting={submitting}
-          classroomName={classroomName}
-          teacherClassrooms={teacherClassrooms}
-          selectedClassroomId={selectedClassroomId}
         />
       )}
       {mobile && (
@@ -209,11 +153,7 @@ export function NewReportTrigger({
           onSubmit={onSubmit}
           roster={roster}
           capturedToday={capturedToday}
-          templates={templates}
           submitting={submitting}
-          classroomName={classroomName}
-          teacherClassrooms={teacherClassrooms}
-          selectedClassroomId={selectedClassroomId}
         />
       )}
     </>

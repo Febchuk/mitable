@@ -29,9 +29,12 @@ export type ReportKind = "Daily" | "Major" | "Incident";
  *  empty arrays for those fields. */
 export type NewReportPayload = {
   childId: string;
-  /** Mirrors the chosen template's kind. */
+  /** Mirrors the chosen report type. */
   kind: ReportKind;
+  /** Built-in sentinel or admin template uuid. */
   templateId: string;
+  /** Incident flow — voice transcript for the "What happened" section. */
+  incidentTranscript?: string;
 };
 
 /** Legacy — kept alive because `use-audio-recorder.ts` (consumed by the

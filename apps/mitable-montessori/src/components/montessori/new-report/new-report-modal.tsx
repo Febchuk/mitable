@@ -4,16 +4,13 @@ import * as React from "react";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ChildPicker, type PickerChild } from "./child-picker";
-import { MobileTemplateList } from "./template-block";
-import {
-  defaultReportTemplateForClassroom,
-  isDefaultReportTemplateId,
-  type DefaultTemplateClassroom,
-} from "@/lib/reports/default-template";
-import { type NewReportPayload, type ReportTemplate } from "./mock-data";
+import { IncidentCaptureStep } from "./incident-capture-step";
+import { ReportTypePicker } from "./report-type-picker";
+import { buildBuiltinReportTemplateId } from "@/lib/reports/default-template";
+import { type NewReportPayload, type ReportKind } from "./mock-data";
 
 type CapturedToday = Record<string, { voice: number; photos: number }>;
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
 
 export function NewReportModal({
   open,
@@ -21,63 +18,59 @@ export function NewReportModal({
   onSubmit,
   roster,
   capturedToday,
-  templates,
   submitting,
-  classroomName,
-  teacherClassrooms,
-  selectedClassroomId,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (payload: NewReportPayload) => void;
   roster: PickerChild[];
   capturedToday: CapturedToday;
-  templates: ReportTemplate[];
   submitting?: boolean;
-  classroomName: string;
-  teacherClassrooms: DefaultTemplateClassroom[];
-  selectedClassroomId: string | null;
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
-  const [template, setTemplate] = React.useState<ReportTemplate | null>(null);
+  const [reportKind, setReportKind] = React.useState<ReportKind | null>(null);
 
   React.useEffect(() => {
     if (open) {
       setStep(1);
       setChild(null);
-      setTemplate(null);
+      setReportKind(null);
     }
   }, [open]);
 
-  const pickDefaultTemplate = React.useCallback(
-    () => defaultReportTemplateForClassroom(teacherClassrooms, selectedClassroomId, "Daily"),
-    [teacherClassrooms, selectedClassroomId]
-  );
-
-  React.useEffect(() => {
-    if (step === 2 && !template) {
-      setTemplate(pickDefaultTemplate());
-    }
-  }, [step, template, pickDefaultTemplate]);
-
-  React.useEffect(() => {
-    setTemplate((current) => {
-      if (!current || !isDefaultReportTemplateId(current.id)) return current;
-      const next = pickDefaultTemplate();
-      return current.id === next.id ? current : next;
-    });
-  }, [pickDefaultTemplate]);
-
-  const canSubmit = !!child && !!template && !submitting;
-
-  const submit = () => {
-    if (!child || !template) return;
+  const submitDailyOrTerm = () => {
+    if (!child || !reportKind || reportKind === "Incident") return;
     onSubmit({
       childId: child.id,
-      kind: template.kind,
-      templateId: template.id,
+      kind: reportKind,
+      templateId: buildBuiltinReportTemplateId(reportKind),
     });
+  };
+
+  const submitIncident = (transcript: string) => {
+    if (!child) return;
+    onSubmit({
+      childId: child.id,
+      kind: "Incident",
+      templateId: buildBuiltinReportTemplateId("Incident"),
+      incidentTranscript: transcript,
+    });
+  };
+
+  const onTypePicked = (kind: ReportKind) => {
+    setReportKind(kind);
+    if (kind === "Incident") {
+      setStep(3);
+      return;
+    }
+    if (child) {
+      onSubmit({
+        childId: child.id,
+        kind,
+        templateId: buildBuiltinReportTemplateId(kind),
+      });
+    }
   };
 
   return (
@@ -127,7 +120,7 @@ export function NewReportModal({
                 </button>
               </footer>
             </>
-          ) : (
+          ) : step === 2 ? (
             <>
               <header className="nr-modal-head nr-modal-head--back">
                 <button
@@ -141,10 +134,10 @@ export function NewReportModal({
                 </button>
                 <div className="nr-modal-head-text">
                   <DialogTitle className="font-display text-[1.35rem] font-medium leading-snug text-ink">
-                    Choose a template
+                    Report type
                   </DialogTitle>
                   <DialogDescription className="text-sm leading-relaxed text-ink-secondary">
-                    Step 2 of 2 — for {child?.name.split(" ")[0]}.
+                    For {child?.name.split(" ")[0]} — we&rsquo;ll pull progress from their class.
                   </DialogDescription>
                 </div>
                 <button type="button" className="nr-close tap" onClick={onClose} aria-label="Close">
@@ -152,25 +145,27 @@ export function NewReportModal({
                 </button>
               </header>
               <div className="nr-modal-body nr-modal-body--template scroll-quiet flex min-h-0 flex-1 flex-col overflow-y-auto">
-                <MobileTemplateList
-                  selected={template}
-                  onPick={setTemplate}
-                  templates={templates}
-                  classroomName={classroomName}
-                />
+                <ReportTypePicker selected={reportKind} onPick={onTypePicked} />
               </div>
               <footer className="nr-modal-foot">
                 <button
                   type="button"
                   className="nr-btn nr-btn-primary"
-                  disabled={!canSubmit}
-                  onClick={submit}
+                  disabled={!reportKind || reportKind === "Incident" || submitting}
+                  onClick={submitDailyOrTerm}
                 >
-                  {submitting ? "Starting…" : "Start drafting"}
+                  {submitting ? "Starting…" : "Start report"}
                   <ArrowRight size={14} strokeWidth={2.5} />
                 </button>
               </footer>
             </>
+          ) : (
+            <IncidentCaptureStep
+              childFirstName={child?.name.split(" ")[0] ?? "this child"}
+              onBack={() => setStep(2)}
+              onContinue={submitIncident}
+              submitting={submitting}
+            />
           )}
         </div>
       </DialogContent>
