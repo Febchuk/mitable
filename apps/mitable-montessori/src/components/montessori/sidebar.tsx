@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, LayoutTemplate, Users } from "lucide-react";
+import { Book, Building2, CalendarRange, LayoutTemplate, Users } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
+import { adminReportTemplatesEnabled } from "@/lib/feature-flags";
 
 type NavItem = {
   href: string;
@@ -64,11 +65,16 @@ const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/classrooms", label: "Classrooms", renderIcon: () => <Building2 {...lucide} /> },
   { href: "/admin/roster", label: "Roster", renderIcon: () => <Users {...lucide} /> },
   { href: "/admin/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
-  {
-    href: "/admin/report-templates",
-    label: "Templates",
-    renderIcon: () => <LayoutTemplate {...lucide} />,
-  },
+  { href: "/admin/terms", label: "Terms", renderIcon: () => <CalendarRange {...lucide} /> },
+  ...(adminReportTemplatesEnabled()
+    ? [
+        {
+          href: "/admin/report-templates",
+          label: "Templates",
+          renderIcon: () => <LayoutTemplate {...lucide} />,
+        },
+      ]
+    : []),
   { href: "/admin/teachers", label: "Teachers", renderIcon: () => <Users {...lucide} /> },
   {
     href: "/admin/reports",

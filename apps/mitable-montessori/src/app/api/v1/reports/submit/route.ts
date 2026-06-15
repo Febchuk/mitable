@@ -6,6 +6,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { SubmitReportSchema } from "@/lib/schemas/report";
 import { submitReportForReview, WorkflowError } from "@/lib/reports/workflow";
 import { scoreAndPersistReport } from "@/lib/reports/score-and-persist";
+import { reportAiScoringEnabled } from "@/lib/feature-flags";
 
 export async function POST(req: Request) {
   const auth = await requireUser();
@@ -50,11 +51,13 @@ export async function POST(req: Request) {
     // roll back the submit transition — the report is already in
     // submitted_for_review by this point.
     let scoredOk = true;
-    try {
-      await scoreAndPersistReport({ supabase, reportId });
-    } catch (scoreErr) {
-      scoredOk = false;
-      console.error("scoreAndPersistReport on submit failed", scoreErr);
+    if (reportAiScoringEnabled()) {
+      try {
+        await scoreAndPersistReport({ supabase, reportId });
+      } catch (scoreErr) {
+        scoredOk = false;
+        console.error("scoreAndPersistReport on submit failed", scoreErr);
+      }
     }
 
     await auditLog({

@@ -97,7 +97,7 @@ export function ReportsListView({
   const router = useRouter();
   const locale = useUiLocale();
   const isAdmin = variant === "admin";
-  const [filter, setFilter] = React.useState(variant === "admin" ? "All" : "all");
+  const [filter, setFilter] = React.useState(isAdmin ? "In review · 0" : "all");
   const [pendingDelete, setPendingDelete] = React.useState<ReportListRow | null>(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
 
@@ -127,9 +127,19 @@ export function ReportsListView({
   const reviews = reports.filter(
     (r) => r.status === "submitted_for_review" || r.status === "in_review"
   ).length;
-  const sent = reports.filter((r) => r.status === "sent" || r.status === "approved").length;
+  const approved = reports.filter((r) => r.status === "approved").length;
+  const sent = reports.filter((r) => r.status === "sent").length;
 
-  const chipFilters = [
+  const adminChipFilters = [
+    `In review · ${reviews}`,
+    `Approved · ${approved}`,
+    `Sent · ${sent}`,
+    "Daily",
+    "Major",
+    "Incident",
+  ];
+
+  const teacherChipFilters = [
     "All",
     `Drafts · ${drafts}`,
     `Awaiting review · ${reviews}`,
@@ -138,6 +148,8 @@ export function ReportsListView({
     "Major",
     "Incident",
   ];
+
+  const chipFilters = isAdmin ? adminChipFilters : teacherChipFilters;
 
   const selectFilters = [
     { value: "all", label: "All reports" },
@@ -151,11 +163,10 @@ export function ReportsListView({
 
   const filtered = reports.filter((r) => {
     if (isAdmin) {
-      if (filter === "All") return true;
-      if (filter.startsWith("Drafts")) return r.status === "draft";
-      if (filter.startsWith("Awaiting"))
+      if (filter.startsWith("In review"))
         return r.status === "submitted_for_review" || r.status === "in_review";
-      if (filter.startsWith("Sent")) return r.status === "sent" || r.status === "approved";
+      if (filter.startsWith("Approved")) return r.status === "approved";
+      if (filter.startsWith("Sent")) return r.status === "sent";
       if (filter === "Daily") return r.reportType === "daily";
       if (filter === "Major") return r.reportType === "major";
       if (filter === "Incident") return r.reportType === "incident";

@@ -13,6 +13,7 @@ import {
 import { ToastBus } from "@/components/montessori/primitives";
 import { fetchReviewerCandidates, type ReviewerCandidate } from "@/lib/reports/api";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
+import { reportAiScoringEnabled } from "@/lib/feature-flags";
 import styles from "./reports-rail.module.css";
 import { scoreToneBand, type ActionRailModal } from "./action-rail";
 
@@ -101,6 +102,7 @@ function AiScoreDialog({
   report: ReportDetailRow;
 }) {
   const score = report.aiScore;
+  if (!reportAiScoringEnabled()) return null;
   const tone = scoreToneBand(score ?? 0);
   const flags: AiFlag[] = report.aiFlags ?? [];
   const reasoning: string[] = report.aiReasoning ?? [];
@@ -413,7 +415,7 @@ function buildHistory(report: ReportDetailRow, locale: string): HistoryEvent[] {
       time: fmtTime(report.updatedAt, locale),
     });
   }
-  if (report.aiScoredAt && typeof report.aiScore === "number") {
+  if (report.aiScoredAt && typeof report.aiScore === "number" && reportAiScoringEnabled()) {
     events.push({
       id: "scored",
       dot: "clay",
@@ -491,7 +493,7 @@ function initials(name: string): string {
   );
 }
 
-function SubmitForReviewDialog({
+export function SubmitForReviewDialog({
   open,
   onClose,
   report,

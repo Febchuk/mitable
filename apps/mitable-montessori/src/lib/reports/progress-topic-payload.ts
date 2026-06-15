@@ -13,6 +13,8 @@ export type ProgressTopicRow = {
   name: string;
   status: Exclude<CurriculumStatusValue, "na">;
   comment: string | null;
+  /** Parent topic name — used for grouped display under a subject heading. */
+  topicName?: string;
 };
 
 export function encodeProgressTopic(rows: ProgressTopicRow[]): string {
@@ -37,6 +39,7 @@ export function decodeProgressTopic(html: string): ProgressTopicRow[] | null {
         name: row.name,
         status,
         comment: typeof row.comment === "string" ? row.comment : null,
+        topicName: typeof row.topicName === "string" ? row.topicName : undefined,
       });
     }
     return rows;

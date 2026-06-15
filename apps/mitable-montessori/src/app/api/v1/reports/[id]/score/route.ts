@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/api/auth";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { scoreAndPersistReport } from "@/lib/reports/score-and-persist";
 import { auditLog } from "@/lib/audit/log";
+import { reportAiScoringEnabled } from "@/lib/feature-flags";
 
 /**
  * Re-score a report on demand. Most scoring happens implicitly (autosave +
@@ -33,6 +34,10 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     ?.school_id;
   if (studentSchool !== auth.user.schoolId) {
     return NextResponse.json({ error: "Not in your school" }, { status: 403 });
+  }
+
+  if (!reportAiScoringEnabled()) {
+    return NextResponse.json({ error: "AI scoring is not enabled" }, { status: 404 });
   }
 
   try {

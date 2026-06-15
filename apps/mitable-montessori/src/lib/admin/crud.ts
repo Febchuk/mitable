@@ -685,3 +685,44 @@ export async function renameTopic(
     .eq("id", topicId);
   if (error) throw new AdminError(error.message, "db_error");
 }
+
+// === School terms ===
+export async function createSchoolTerm(
+  ctx: AdminContext,
+  input: { name: string; start_date: string; end_date: string; sort_order?: number }
+) {
+  return insertReturningId(ctx, "school_terms", {
+    school_id: ctx.schoolId,
+    name: input.name.trim(),
+    start_date: input.start_date,
+    end_date: input.end_date,
+    sort_order: input.sort_order ?? 0,
+  });
+}
+
+export async function updateSchoolTerm(
+  ctx: AdminContext,
+  termId: string,
+  fields: { name?: string; start_date?: string; end_date?: string; sort_order?: number }
+): Promise<void> {
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (fields.name !== undefined) patch.name = fields.name.trim();
+  if (fields.start_date !== undefined) patch.start_date = fields.start_date;
+  if (fields.end_date !== undefined) patch.end_date = fields.end_date;
+  if (fields.sort_order !== undefined) patch.sort_order = fields.sort_order;
+  const { error } = await ctx.supabase
+    .from("school_terms")
+    .update(patch)
+    .eq("id", termId)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function deleteSchoolTerm(ctx: AdminContext, termId: string): Promise<void> {
+  const { error } = await ctx.supabase
+    .from("school_terms")
+    .delete()
+    .eq("id", termId)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
+}

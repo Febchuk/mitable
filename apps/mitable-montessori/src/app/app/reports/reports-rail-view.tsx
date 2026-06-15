@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Check,
   ChevronDown,
@@ -27,6 +28,7 @@ import { ActionRail, railIcons, scoreToneBand, type ActionRailModal } from "./ac
 import type { ViewMode } from "@/components/montessori/report-detail/view-mode-toggle";
 import { ReportModalsHost, type ReportModal } from "./report-modals";
 import styles from "./reports-rail.module.css";
+import { reportAiScoringEnabled } from "@/lib/feature-flags";
 
 const STATUS_TONE: Record<
   ReportListRow["status"],
@@ -111,11 +113,16 @@ function toneFor(id: string): Tone {
   return TONES[h % TONES.length];
 }
 
-/** Status filter is fixed to the four lifecycle buckets in the prototype. */
+/** Status filter buckets for the reports rail. */
 type StatusFilter = "drafts" | "review" | "approved" | "sent";
-const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+const TEACHER_STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "drafts", label: "Drafts" },
   { id: "review", label: "In Review" },
+  { id: "approved", label: "Approved" },
+  { id: "sent", label: "Sent" },
+];
+const ADMIN_STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: "review", label: "In review" },
   { id: "approved", label: "Approved" },
   { id: "sent", label: "Sent" },
 ];
@@ -158,7 +165,11 @@ export function ReportsRailView({
   initialOpenReportId?: string | null;
 }) {
   const locale = useUiLocale();
+  const router = useRouter();
   const isAdmin = variant === "admin";
+  const aiScoringEnabled = reportAiScoringEnabled();
+  const statusFilters = isAdmin ? ADMIN_STATUS_FILTERS : TEACHER_STATUS_FILTERS;
+  const defaultFilter: StatusFilter = isAdmin ? "review" : "drafts";
 
   // Distinct (id, name) pairs derived from the loaded reports for the admin
   // classroom scope dropdown. Sorted by name with a stable fallback.
@@ -176,7 +187,7 @@ export function ReportsRailView({
   }, [reports]);
 
   const [classroomScope, setClassroomScope] = React.useState<string>(ALL_CLASSROOMS);
-  const [filter, setFilter] = React.useState<StatusFilter>("drafts");
+  const [filter, setFilter] = React.useState<StatusFilter>(defaultFilter);
 
   const scopedReports = React.useMemo(() => {
     if (!isAdmin || classroomScope === ALL_CLASSROOMS) return reports;
@@ -190,7 +201,7 @@ export function ReportsRailView({
     if (initialOpenReportId && reports.some((r) => r.id === initialOpenReportId)) {
       return initialOpenReportId;
     }
-    return firstSelectableReportId(reports, variant, ALL_CLASSROOMS, "drafts");
+    return firstSelectableReportId(reports, variant, ALL_CLASSROOMS, defaultFilter);
   });
 
   React.useEffect(() => {
@@ -369,9 +380,10 @@ export function ReportsRailView({
   // get stuck on a gone report.
   const handleReportChanged = React.useCallback(() => {
     refreshSelectedDetail();
+    router.refresh();
     // If the report no longer exists in the list after the next render, the
     // existing useEffect that watches `filtered` will reset selection.
-  }, [refreshSelectedDetail]);
+  }, [refreshSelectedDetail, router]);
 
   const backHref = isAdmin ? "/admin/reports" : "/app/reports";
 
@@ -402,7 +414,7 @@ export function ReportsRailView({
 
           <div className={styles.rrFilterBar}>
             <div className={styles.rrTabs} role="tablist" aria-label="Report status">
-              {STATUS_FILTERS.map((t) => {
+              {statusFilters.map((t) => {
                 const active = filter === t.id;
                 return (
                   <button
@@ -426,7 +438,7 @@ export function ReportsRailView({
               <div className={styles.rrEmpty}>
                 {scopedReports.length === 0
                   ? isAdmin
-                    ? "No reports in this classroom yet."
+                    ? "No reports awaiting review yet."
                     : "No reports yet. Tap + above to draft the first one."
                   : "No reports match this filter."}
               </div>
@@ -455,7 +467,12 @@ export function ReportsRailView({
                       </div>
                       <div className={styles.rrRowTitle}>{r.title || "Untitled report"}</div>
                       <div className={styles.rrRowMeta}>
-                        <RowSignal row={r} bucket={filter} locale={locale} />
+                        <RowSignal
+                          row={r}
+                          bucket={filter}
+                          locale={locale}
+                          aiScoringEnabled={aiScoringEnabled}
+                        />
                       </div>
                     </div>
                   </button>
@@ -516,7 +533,7 @@ export function ReportsRailView({
             status={selectedRow.status}
             isAdmin={isAdmin}
             onOpenModal={openModal}
-            aiScore={selectedRow.displayScore}
+            aiScore={aiScoringEnabled && selectedRow.aiScored ? selectedRow.displayScore : null}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
           />
@@ -572,12 +589,17 @@ function RowSignal({
   row,
   bucket,
   locale,
+  aiScoringEnabled,
 }: {
   row: ReportListRow;
   bucket: StatusFilter;
   locale: string;
+  aiScoringEnabled: boolean;
 }) {
   if (bucket === "drafts") {
+    if (!aiScoringEnabled) {
+      return <span className={styles.rrSignalMeta}>{formatRelative(row.updatedAt, locale)}</span>;
+    }
     const tone = scoreTone(row.completenessPercent);
     return (
       <span className={`${styles.rrSignal} ${styles.rrSignalCompleteness}`}>
@@ -799,6 +821,8 @@ function KebabMenu({
   const showRequestChanges = actions.includes("request_changes");
   const showDelete = actions.includes("delete");
   const inPreview = viewMode === "preview";
+  const aiScoringEnabled = reportAiScoringEnabled();
+  const showAiScore = aiScoringEnabled && row.aiScored;
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -820,7 +844,7 @@ function KebabMenu({
     <>
       <div className={styles.rrKebabScrim} role="presentation" onClick={onClose} aria-hidden />
       <div className={styles.rrKebabMenu} role="menu" aria-label="Report actions">
-        {row.displayScore != null && (
+        {showAiScore && (
           <button
             type="button"
             className={`${styles.rrKebabItem} tap`}

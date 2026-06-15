@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReportTemplate, ReportKind } from "@/components/montessori/new-report/mock-data";
 import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
-import { REPORTING_PERIOD_LABEL, type ReportingPeriod } from "@/lib/report-templates/admin-dto";
+import { type ReportingPeriod } from "@/lib/report-templates/admin-dto";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import { encodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
 
@@ -9,12 +9,12 @@ import { encodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progre
 export const DEFAULT_REPORT_TEMPLATE_ID = "__default__";
 
 const DEFAULT_ID_PREFIX = "__default:";
-const DEFAULT_KINDS: ReportKind[] = ["Daily", "Major"];
+const BUILTIN_ID_PREFIX = "__builtin:";
 
 export type DefaultTemplateClassroom = { id: string; name: string };
 
 export type ParsedDefaultReportTemplate = {
-  classroomId: string;
+  classroomId: string | null;
   kind: ReportKind;
   reportingPeriod: ReportingPeriod;
 };
@@ -24,32 +24,61 @@ const DEFAULT_KIND_META: Record<
   { reportingPeriod: ReportingPeriod; iconTone: ReportTemplate["iconTone"] }
 > = {
   Daily: { reportingPeriod: "daily", iconTone: "butter" },
-  Major: { reportingPeriod: "weekly", iconTone: "sage" },
+  Major: { reportingPeriod: "end_of_term", iconTone: "sage" },
   Incident: { reportingPeriod: "daily", iconTone: "blue" },
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Built-in picker id — classroom is resolved from the child at create time. */
+export function buildBuiltinReportTemplateId(kind: ReportKind): string {
+  return `${BUILTIN_ID_PREFIX}${kind.toLowerCase()}`;
+}
+
 export function buildDefaultReportTemplateId(classroomId: string, kind: ReportKind): string {
   return `${DEFAULT_ID_PREFIX}${kind.toLowerCase()}:${classroomId}`;
+}
+
+export function isBuiltinReportTemplateId(id: string | null | undefined): boolean {
+  return !!id && id.startsWith(BUILTIN_ID_PREFIX);
 }
 
 export function isDefaultReportTemplateId(id: string | null | undefined): boolean {
   if (!id) return false;
   if (id === DEFAULT_REPORT_TEMPLATE_ID) return true;
+  if (id.startsWith(BUILTIN_ID_PREFIX)) return true;
   return id.startsWith(DEFAULT_ID_PREFIX);
+}
+
+export function parseBuiltinReportTemplateId(
+  id: string | null | undefined
+): (Omit<ParsedDefaultReportTemplate, "classroomId"> & { classroomId: null }) | null {
+  if (!id?.startsWith(BUILTIN_ID_PREFIX)) return null;
+  const kindRaw = id.slice(BUILTIN_ID_PREFIX.length);
+  const kind =
+    kindRaw === "daily"
+      ? "Daily"
+      : kindRaw === "major"
+        ? "Major"
+        : kindRaw === "incident"
+          ? "Incident"
+          : null;
+  if (!kind) return null;
+  return { classroomId: null, kind, reportingPeriod: DEFAULT_KIND_META[kind].reportingPeriod };
 }
 
 export function parseDefaultReportTemplateId(
   id: string | null | undefined
 ): ParsedDefaultReportTemplate | null {
+  const builtin = parseBuiltinReportTemplateId(id);
+  if (builtin) return builtin;
   if (!id || id === DEFAULT_REPORT_TEMPLATE_ID) return null;
-  const match = id.match(/^__default:(daily|major):(.+)$/i);
+  const match = id.match(/^__default:(daily|major|incident):(.+)$/i);
   if (!match) return null;
   const classroomId = match[2];
   if (!UUID_RE.test(classroomId)) return null;
   const kind = (match[1][0].toUpperCase() + match[1].slice(1)) as ReportKind;
-  if (kind !== "Daily" && kind !== "Major") return null;
+  if (kind !== "Daily" && kind !== "Major" && kind !== "Incident") return null;
   return {
     classroomId,
     kind,
@@ -72,19 +101,17 @@ export function defaultReportTemplateName(className: string, kind: ReportKind): 
 }
 
 export function defaultReportTemplateDescription(kind: ReportKind): string {
-  const period = REPORTING_PERIOD_LABEL[DEFAULT_KIND_META[kind].reportingPeriod];
-  return `Progress marks from this classroom · ${period} lookback`;
+  if (kind === "Daily") return "Progress marked in the last day";
+  if (kind === "Major") return "Progress since the current term started";
+  return "Describe what happened — we'll draft the incident report";
 }
 
-/** Virtual template pinned at the top of the picker for one classroom + kind. */
-export function buildDefaultReportTemplate(
-  classroom: DefaultTemplateClassroom,
-  kind: ReportKind
-): ReportTemplate {
+/** Virtual template for the new-report type picker (one row per kind). */
+export function buildBuiltinReportTemplate(kind: ReportKind): ReportTemplate {
   const meta = DEFAULT_KIND_META[kind];
   return {
-    id: buildDefaultReportTemplateId(classroom.id, kind),
-    name: defaultReportTemplateName(classroom.name, kind),
+    id: buildBuiltinReportTemplateId(kind),
+    name: kind === "Major" ? "End-of-term" : kind,
     description: defaultReportTemplateDescription(kind),
     kind,
     sections: ["Practical Life", "Practical Life — Comments"],
@@ -97,36 +124,24 @@ export function buildDefaultReportTemplate(
   };
 }
 
-/** Daily + end-of-term (Major) defaults for every classroom the teacher leads. */
-export function buildDefaultReportTemplatesForClassrooms(
-  classrooms: DefaultTemplateClassroom[]
-): ReportTemplate[] {
-  const sorted = [...classrooms].sort((a, b) => a.name.localeCompare(b.name));
-  const out: ReportTemplate[] = [];
-  for (const room of sorted) {
-    for (const kind of DEFAULT_KINDS) {
-      out.push(buildDefaultReportTemplate(room, kind));
-    }
-  }
-  return out;
-}
+export const BUILTIN_REPORT_TEMPLATES: ReportTemplate[] = (
+  ["Daily", "Major", "Incident"] as ReportKind[]
+).map((kind) => buildBuiltinReportTemplate(kind));
 
 export function defaultReportTemplateForClassroom(
-  classrooms: DefaultTemplateClassroom[],
-  classroomId: string | null | undefined,
+  _classrooms: DefaultTemplateClassroom[],
+  _classroomId: string | null | undefined,
   kind: ReportKind = "Daily"
 ): ReportTemplate {
-  const room = (classroomId ? classrooms.find((c) => c.id === classroomId) : null) ??
-    classrooms[0] ?? { id: "unknown", name: "Classroom" };
-  return buildDefaultReportTemplate(room, kind);
+  return buildBuiltinReportTemplate(kind);
 }
 
 export function withDefaultReportTemplates(
   templates: ReportTemplate[],
-  classrooms: DefaultTemplateClassroom[]
+  _classrooms: DefaultTemplateClassroom[]
 ): ReportTemplate[] {
   const rest = templates.filter((t) => !isDefaultReportTemplateId(t.id));
-  return [...buildDefaultReportTemplatesForClassrooms(classrooms), ...rest];
+  return [...BUILTIN_REPORT_TEMPLATES, ...rest];
 }
 
 /** @deprecated Use withDefaultReportTemplates */
@@ -160,6 +175,13 @@ type TopicDbRow = {
   curriculum_subtopics: Array<{ id: string; name: string; sort_order: number }>;
 };
 
+type SubjectDbRow = {
+  id: string;
+  name: string;
+  sort_order: number;
+  curriculum_topics: TopicDbRow[];
+};
+
 type HistoryRow = {
   curriculum_subtopic_id: string;
   new_status: string | null;
@@ -179,11 +201,11 @@ function sectionSlug(heading: string, i: number): string {
   );
 }
 
-/** Pull the classroom curriculum tree (topics → subtopics) in display order. */
-async function loadClassroomTopics(
+/** Pull the classroom curriculum tree (subjects → topics → subtopics) in display order. */
+async function loadClassroomSubjects(
   supabase: SupabaseClient,
   classroomId: string
-): Promise<TopicDbRow[]> {
+): Promise<SubjectDbRow[]> {
   const { data: classroom } = await supabase
     .from("classrooms")
     .select("curriculum_id")
@@ -195,28 +217,25 @@ async function loadClassroomTopics(
   const { data } = await supabase
     .from("curriculum_subjects")
     .select(
-      "id, sort_order, curriculum_topics(id, name, sort_order, curriculum_subtopics(id, name, sort_order))"
+      "id, name, sort_order, curriculum_topics(id, name, sort_order, curriculum_subtopics(id, name, sort_order))"
     )
     .eq("curriculum_id", curriculumId);
 
-  const topics: TopicDbRow[] = [];
-  const subjects = [...(data ?? [])].sort(
-    (a, b) => ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0)
-  );
-  for (const subj of subjects) {
-    const topicList = [...((subj.curriculum_topics as TopicDbRow[]) ?? [])].sort(
-      (a, b) => a.sort_order - b.sort_order
-    );
-    for (const t of topicList) {
-      topics.push({
-        ...t,
-        curriculum_subtopics: [...(t.curriculum_subtopics ?? [])].sort(
-          (a, b) => a.sort_order - b.sort_order
-        ),
-      });
-    }
-  }
-  return topics;
+  return [...(data ?? [])]
+    .sort((a, b) => ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0))
+    .map((subj) => ({
+      id: subj.id as string,
+      name: subj.name as string,
+      sort_order: (subj.sort_order as number) ?? 0,
+      curriculum_topics: [...((subj.curriculum_topics as TopicDbRow[]) ?? [])]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((t) => ({
+          ...t,
+          curriculum_subtopics: [...(t.curriculum_subtopics ?? [])].sort(
+            (a, b) => a.sort_order - b.sort_order
+          ),
+        })),
+    }));
 }
 
 /** Latest I/P/M mark per subtopic within the report window. */
@@ -246,6 +265,27 @@ async function loadPeriodProgressBySubtopic(
     });
   }
   return out;
+}
+
+function rowsForSubject(
+  subject: SubjectDbRow,
+  bySubtopic: Map<string, { status: CurriculumStatus; comment: string | null }>
+): ProgressTopicRow[] {
+  const rows: ProgressTopicRow[] = [];
+  for (const topic of subject.curriculum_topics) {
+    for (const st of topic.curriculum_subtopics) {
+      const hit = bySubtopic.get(st.id);
+      if (!hit || hit.status === "na") continue;
+      rows.push({
+        subtopicId: st.id,
+        name: st.name,
+        topicName: topic.name,
+        status: hit.status as ProgressTopicRow["status"],
+        comment: hit.comment,
+      });
+    }
+  }
+  return rows;
 }
 
 function rowsForTopic(
@@ -288,8 +328,8 @@ export async function buildDefaultReportSections(
     reportingPeriod?: ReportingPeriod;
   }
 ): Promise<DefaultTemplateBuildResult> {
-  const reportingPeriod = args.reportingPeriod ?? "weekly";
-  const topics = await loadClassroomTopics(supabase, args.classroomId);
+  const reportingPeriod = args.reportingPeriod ?? "daily";
+  const subjects = await loadClassroomSubjects(supabase, args.classroomId);
   const bySubtopic = await loadPeriodProgressBySubtopic(
     supabase,
     args.studentId,
@@ -302,9 +342,9 @@ export async function buildDefaultReportSections(
   const sectionGuidance: Record<string, string> = {};
   let idx = 0;
 
-  const topicsWithActivity = topics.filter((t) => rowsForTopic(t, bySubtopic).length > 0);
+  const subjectsWithActivity = subjects.filter((s) => rowsForSubject(s, bySubtopic).length > 0);
 
-  if (topicsWithActivity.length === 0) {
+  if (subjectsWithActivity.length === 0) {
     const heading = "Curriculum progress";
     const slug = sectionSlug(heading, idx);
     sectionMeta[heading] = { type: "progress_topic", topicId: "__none__" };
@@ -315,11 +355,11 @@ export async function buildDefaultReportSections(
     });
     idx++;
   } else {
-    for (const topic of topicsWithActivity) {
-      const gridHeading = topic.name;
+    for (const subject of subjectsWithActivity) {
+      const gridHeading = subject.name;
       const gridSlug = sectionSlug(gridHeading, idx);
-      const rows = rowsForTopic(topic, bySubtopic);
-      sectionMeta[gridHeading] = { type: "progress_topic", topicId: topic.id };
+      const rows = rowsForSubject(subject, bySubtopic);
+      sectionMeta[gridHeading] = { type: "progress_topic", topicId: subject.id };
       sections.push({
         id: `s-${idx}-${gridSlug}`,
         heading: gridHeading,
@@ -327,9 +367,9 @@ export async function buildDefaultReportSections(
       });
       idx++;
 
-      const commentsHeading = topicCommentsHeading(topic.name);
+      const commentsHeading = topicCommentsHeading(subject.name);
       const commentsSlug = sectionSlug(commentsHeading, idx);
-      sectionGuidance[commentsHeading] = commentSectionGuidance(topic.name);
+      sectionGuidance[commentsHeading] = commentSectionGuidance(subject.name);
       sections.push({
         id: `s-${idx}-${commentsSlug}`,
         heading: commentsHeading,
@@ -359,8 +399,8 @@ export async function refreshDefaultTemplateProgressSections(
     sectionMeta: SectionMeta;
   }
 ): Promise<ReportSection[]> {
-  const topics = await loadClassroomTopics(supabase, args.classroomId);
-  const topicById = new Map(topics.map((t) => [t.id, t] as const));
+  const subjects = await loadClassroomSubjects(supabase, args.classroomId);
+  const subjectById = new Map(subjects.map((s) => [s.id, s] as const));
   const bySubtopic = await loadPeriodProgressBySubtopic(
     supabase,
     args.studentId,
@@ -379,9 +419,21 @@ export async function refreshDefaultTemplateProgressSections(
         ),
       };
     }
-    const topic = topicById.get(meta.topicId);
-    if (!topic) return section;
-    const rows = rowsForTopic(topic, bySubtopic);
+    const subject = subjectById.get(meta.topicId);
+    if (!subject) {
+      // Legacy: section keyed to a topic id instead of subject
+      const topics = subjects.flatMap((s) => s.curriculum_topics);
+      const topic = topics.find((t) => t.id === meta.topicId);
+      if (!topic) return section;
+      const rows = rowsForTopic(topic, bySubtopic);
+      return {
+        ...section,
+        paragraphs: section.paragraphs.map((p, i) =>
+          i === 0 ? { ...p, html: encodeProgressTopic(rows) } : p
+        ),
+      };
+    }
+    const rows = rowsForSubject(subject, bySubtopic);
     return {
       ...section,
       paragraphs: section.paragraphs.map((p, i) =>

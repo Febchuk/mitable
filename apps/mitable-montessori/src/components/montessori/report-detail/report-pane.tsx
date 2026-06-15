@@ -13,7 +13,8 @@ import {
 } from "@/lib/reports/template-field-payload";
 import { firstOpenParagraphIndex } from "@/lib/reports/section-paragraph-slots";
 import { decodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
-import { STATUS_COLOR, STATUS_LABEL } from "@/components/montessori/data";
+import { isTopicCommentsHeading } from "@/lib/reports/default-classroom-report";
+import { STATUS_COLOR, STATUS_LABEL, statusToMark } from "@/components/montessori/data";
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
 
@@ -109,6 +110,11 @@ export function ReportPane({
 
   const sectionMeta = detail.templateSectionMeta ?? {};
 
+  const sectionGroups = React.useMemo(
+    () => groupReportSections(detail.sections, sectionMeta),
+    [detail.sections, sectionMeta]
+  );
+
   return (
     <main className="rd-pane rd-report-pane">
       <div className="rd-report-scroll scroll-quiet">
@@ -143,31 +149,51 @@ export function ReportPane({
             </p>
           </div>
 
-          {detail.sections.map((section) => (
-            <SectionBlock
-              key={section.id}
-              section={section}
-              fieldMeta={sectionMeta[section.heading]}
-              pendingFocusParagraphId={pendingFocusParagraphId}
-              onParagraphFocused={clearPendingFocus}
-              onParagraphCommit={(paragraphId, html) =>
-                onParagraphCommit(section.id, paragraphId, html)
-              }
-              onDelete={() => onDeleteSection(section.id)}
-              onDeleteParagraph={(paragraphId) => onDeleteParagraph(section.id, paragraphId)}
-              onDiscussParagraph={
-                onDiscussParagraph
-                  ? (paragraphId) => onDiscussParagraph(section.id, paragraphId)
-                  : undefined
-              }
-              onAcceptGhostEdit={
-                onAcceptGhostEdit ? () => onAcceptGhostEdit(section.id) : undefined
-              }
-              onDismissGhostEdit={
-                onDismissGhostEdit ? () => onDismissGhostEdit(section.id) : undefined
-              }
-            />
-          ))}
+          {sectionGroups.map((group) =>
+            group.type === "subject" ? (
+              <SubjectTopicBlock
+                key={group.grid.id}
+                index={group.index}
+                gridSection={group.grid}
+                commentsSection={group.comments}
+                fieldMeta={sectionMeta[group.grid.heading]}
+                pendingFocusParagraphId={pendingFocusParagraphId}
+                onParagraphFocused={clearPendingFocus}
+                onParagraphCommit={onParagraphCommit}
+                onDeleteSection={onDeleteSection}
+                onDeleteParagraph={onDeleteParagraph}
+                onDiscussParagraph={onDiscussParagraph}
+                onAcceptGhostEdit={onAcceptGhostEdit}
+                onDismissGhostEdit={onDismissGhostEdit}
+              />
+            ) : (
+              <SectionBlock
+                key={group.section.id}
+                section={group.section}
+                fieldMeta={sectionMeta[group.section.heading]}
+                pendingFocusParagraphId={pendingFocusParagraphId}
+                onParagraphFocused={clearPendingFocus}
+                onParagraphCommit={(paragraphId, html) =>
+                  onParagraphCommit(group.section.id, paragraphId, html)
+                }
+                onDelete={() => onDeleteSection(group.section.id)}
+                onDeleteParagraph={(paragraphId) =>
+                  onDeleteParagraph(group.section.id, paragraphId)
+                }
+                onDiscussParagraph={
+                  onDiscussParagraph
+                    ? (paragraphId) => onDiscussParagraph(group.section.id, paragraphId)
+                    : undefined
+                }
+                onAcceptGhostEdit={
+                  onAcceptGhostEdit ? () => onAcceptGhostEdit(group.section.id) : undefined
+                }
+                onDismissGhostEdit={
+                  onDismissGhostEdit ? () => onDismissGhostEdit(group.section.id) : undefined
+                }
+              />
+            )
+          )}
 
           {addingSection ? (
             <NewSectionPrompt onCreate={onCreateSection} onCancel={() => setAddingSection(false)} />
@@ -348,8 +374,19 @@ function TemplateSingleSelectField({
   );
 }
 
-function ProgressTopicGrid({ heading, html }: { heading: string; html: string }) {
+function ProgressTopicGrid({
+  heading,
+  html,
+  variant = "table",
+}: {
+  heading: string;
+  html: string;
+  variant?: "table" | "subject";
+}) {
   const rows = decodeProgressTopic(html) ?? [];
+  if (variant === "subject") {
+    return <SubjectProgressList heading={heading} rows={rows} />;
+  }
   return (
     <div className="rd-template-field rd-progress-topic" aria-readonly>
       <p className="sr-only">{heading} — progress grid</p>
@@ -371,7 +408,7 @@ function ProgressTopicGrid({ heading, html }: { heading: string; html: string })
           </thead>
           <tbody>
             {rows.map((row) => (
-              <ProgressTopicRow key={row.subtopicId} row={row} />
+              <ProgressTopicTableRow key={row.subtopicId} row={row} />
             ))}
           </tbody>
         </table>
@@ -384,7 +421,66 @@ function ProgressTopicGrid({ heading, html }: { heading: string; html: string })
   );
 }
 
-function ProgressTopicRow({ row }: { row: ProgressTopicRow }) {
+/** Group flat rows by topicName for the Greenhouse-style subject layout. */
+function groupRowsByTopic(
+  rows: ProgressTopicRow[]
+): Array<{ topicName: string; rows: ProgressTopicRow[] }> {
+  const order: string[] = [];
+  const map = new Map<string, ProgressTopicRow[]>();
+  for (const row of rows) {
+    const key = row.topicName?.trim() || "Uncategorized";
+    if (!map.has(key)) {
+      map.set(key, []);
+      order.push(key);
+    }
+    map.get(key)!.push(row);
+  }
+  return order.map((topicName) => ({ topicName, rows: map.get(topicName)! }));
+}
+
+function SubjectProgressList({ heading, rows }: { heading: string; rows: ProgressTopicRow[] }) {
+  const groups = groupRowsByTopic(rows);
+  return (
+    <div className="rd-subject-markings" aria-readonly>
+      <p className="sr-only">{heading} — progress markings</p>
+      {rows.length === 0 ? (
+        <p className="rd-subject-empty">No materials were marked during this period.</p>
+      ) : (
+        groups.map((group) => (
+          <div key={group.topicName} className="rd-subject-topic-group">
+            <div className="rd-subject-topic-name">{group.topicName}</div>
+            <ul className="rd-subject-row-list">
+              {group.rows.map((row) => (
+                <li key={row.subtopicId} className="rd-subject-row">
+                  <span className="rd-subject-row-name">{row.name}</span>
+                  <ProgressStatusBadge row={row} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function ProgressStatusBadge({ row }: { row: ProgressTopicRow }) {
+  const mark = statusToMark(row.status);
+  return (
+    <span
+      className="rd-subject-badge"
+      style={{
+        background: STATUS_COLOR[mark],
+        color: "var(--color-ink)",
+        border: "1px solid var(--color-border)",
+      }}
+    >
+      {STATUS_LABEL[mark]}
+    </span>
+  );
+}
+
+function ProgressTopicTableRow({ row }: { row: ProgressTopicRow }) {
   const mark = row.status === "introduced" ? "i" : row.status === "practicing" ? "p" : "m";
   return (
     <tr>
@@ -402,6 +498,105 @@ function ProgressTopicRow({ row }: { row: ProgressTopicRow }) {
       </td>
       <td>{row.comment?.trim() || "—"}</td>
     </tr>
+  );
+}
+
+type SectionGroup =
+  | {
+      type: "subject";
+      index: number;
+      grid: ReportSection;
+      comments?: ReportSection;
+    }
+  | { type: "plain"; section: ReportSection };
+
+function groupReportSections(
+  sections: ReportSection[],
+  sectionMeta: Record<string, SectionMetaEntry | undefined>
+): SectionGroup[] {
+  const groups: SectionGroup[] = [];
+  let subjectIndex = 0;
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i];
+    const meta = sectionMeta[section.heading];
+    if (meta?.type === "progress_topic") {
+      const next = sections[i + 1];
+      const comments = next && isTopicCommentsHeading(next.heading) ? next : undefined;
+      if (comments) i++;
+      subjectIndex++;
+      groups.push({ type: "subject", index: subjectIndex, grid: section, comments });
+      continue;
+    }
+    groups.push({ type: "plain", section });
+  }
+  return groups;
+}
+
+function SubjectTopicBlock({
+  index,
+  gridSection,
+  commentsSection,
+  fieldMeta,
+  pendingFocusParagraphId,
+  onParagraphFocused,
+  onParagraphCommit,
+  onAcceptGhostEdit,
+  onDismissGhostEdit,
+}: {
+  index: number;
+  gridSection: ReportSection;
+  commentsSection?: ReportSection;
+  fieldMeta?: SectionMetaEntry;
+  pendingFocusParagraphId: string | null;
+  onParagraphFocused: () => void;
+  onParagraphCommit: (sectionId: string, paragraphId: string, html: string) => void;
+  onDeleteSection: (sectionId: string) => void;
+  onDeleteParagraph: (sectionId: string, paragraphId: string) => void;
+  onDiscussParagraph?: (sectionId: string, paragraphId: string) => void;
+  onAcceptGhostEdit?: (sectionId: string) => void;
+  onDismissGhostEdit?: (sectionId: string) => void;
+}) {
+  const gridHtml = gridSection.paragraphs[0]?.html ?? "";
+  const commentPara = commentsSection?.paragraphs[0];
+  const commentHtml = commentPara?.html ?? "";
+  const commentEmpty = !commentHtml.replace(/<[^>]+>/g, "").trim();
+
+  return (
+    <section className="rd-subject-block">
+      <h2 className="rd-subject-heading">
+        <span className="rd-subject-index">{String(index).padStart(2, "0")}</span>
+        {gridSection.heading}
+      </h2>
+
+      {fieldMeta?.type === "progress_topic" ? (
+        <ProgressTopicGrid heading={gridSection.heading} html={gridHtml} variant="subject" />
+      ) : null}
+
+      {commentsSection && commentPara ? (
+        <div className="rd-subject-comments">
+          <EditableParagraph
+            html={commentHtml}
+            ariaLabel={`Comments for ${gridSection.heading}`}
+            placeholder={commentEmpty ? "Leave a comment" : undefined}
+            className="rd-comment-field"
+            autoFocus={pendingFocusParagraphId === commentPara.id}
+            onAutoFocused={onParagraphFocused}
+            onCommit={(next) => onParagraphCommit(commentsSection.id, commentPara.id, next)}
+          />
+          {commentsSection.ghostEdit ? (
+            <GhostSuggestionBlock
+              ghost={commentsSection.ghostEdit}
+              onAcceptGhostEdit={
+                onAcceptGhostEdit ? () => onAcceptGhostEdit(commentsSection.id) : undefined
+              }
+              onDismissGhostEdit={
+                onDismissGhostEdit ? () => onDismissGhostEdit(commentsSection.id) : undefined
+              }
+            />
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -721,14 +916,21 @@ function EditableParagraph({
   autoFocus = false,
   onAutoFocused,
   onCommit,
+  placeholder,
+  className,
+  id,
 }: {
   html: string;
   ariaLabel: string;
   autoFocus?: boolean;
   onAutoFocused?: () => void;
   onCommit: (next: string) => void;
+  placeholder?: string;
+  className?: string;
+  id?: string;
 }) {
   const ref = React.useRef<HTMLParagraphElement>(null);
+  const isEmpty = !html.replace(/<[^>]+>/g, "").trim();
 
   React.useEffect(() => {
     const el = ref.current;
@@ -748,13 +950,20 @@ function EditableParagraph({
   return (
     <p
       ref={ref}
-      className="rd-para-text"
+      id={id}
+      className={`rd-para-text${className ? ` ${className}` : ""}${isEmpty && placeholder ? " rd-para-empty" : ""}`}
       contentEditable
       suppressContentEditableWarning
       spellCheck
       role="textbox"
       aria-multiline="true"
       aria-label={ariaLabel}
+      data-placeholder={placeholder}
+      onFocus={(e) => {
+        if (placeholder && !e.currentTarget.textContent?.trim()) {
+          e.currentTarget.innerHTML = "";
+        }
+      }}
       onBlur={(e) => {
         const next = (e.currentTarget as HTMLElement).innerHTML;
         if (next !== html) onCommit(next);

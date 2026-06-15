@@ -71,3 +71,19 @@ export function classroomGroupsEnabled(): boolean {
 export function classroomProgramsEnabled(): boolean {
   return readPublicFlag("NEXT_PUBLIC_CLASSROOM_PROGRAMS");
 }
+
+/**
+ * When true, admins see Report templates in nav and can edit school templates.
+ * Off by default — teachers use the built-in Daily / End-of-term / Incident flow.
+ */
+export function adminReportTemplatesEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_ADMIN_REPORT_TEMPLATES");
+}
+
+/**
+ * When true, reports are AI-scored on submit and edit (confidence score, flags,
+ * completeness bar in the list). Off by default.
+ */
+export function reportAiScoringEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_REPORT_AI_SCORING");
+}

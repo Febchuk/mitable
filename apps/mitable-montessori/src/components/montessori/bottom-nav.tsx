@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, LayoutTemplate, MessageSquare, Users } from "lucide-react";
+import { Book, Building2, CalendarRange, LayoutTemplate, MessageSquare, Users } from "lucide-react";
 import { HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { useMontessori } from "./store";
+import { adminReportTemplatesEnabled } from "@/lib/feature-flags";
 
 type Tab = {
   id: string;
@@ -69,11 +70,21 @@ const ADMIN_TABS_CORE: Tab[] = [
     renderIcon: (size) => <Book size={size} strokeWidth={1.5} />,
   },
   {
-    id: "templates",
-    label: "Templates",
-    href: "/admin/report-templates",
-    renderIcon: (size) => <LayoutTemplate size={size} strokeWidth={1.5} />,
+    id: "terms",
+    label: "Terms",
+    href: "/admin/terms",
+    renderIcon: (size) => <CalendarRange size={size} strokeWidth={1.5} />,
   },
+  ...(adminReportTemplatesEnabled()
+    ? [
+        {
+          id: "templates",
+          label: "Templates",
+          href: "/admin/report-templates",
+          renderIcon: (size: number) => <LayoutTemplate size={size} strokeWidth={1.5} />,
+        },
+      ]
+    : []),
   {
     id: "teachers",
     label: "Teachers",

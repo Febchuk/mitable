@@ -19,7 +19,7 @@ interface TransitionContext {
 }
 
 const ALLOWED_FROM: Record<ReportReviewActionType, ReportStatus[]> = {
-  submitted: ["draft"],
+  submitted: ["draft", "changes_requested"],
   commented: ["submitted_for_review", "in_review", "changes_requested"],
   edited: ["draft", "changes_requested"],
   approved: ["draft", "submitted_for_review", "in_review"],
