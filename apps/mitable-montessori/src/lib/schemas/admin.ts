@@ -243,3 +243,55 @@ export const ImportCurriculumSchema = z.object({
   curriculum_id: z.string().uuid(),
   dry_run: z.boolean().default(true),
 });
+
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const CreateSchoolTermSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    start_date: dateString,
+    end_date: dateString,
+    sort_order: z.number().int().min(0).max(10000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.end_date < data.start_date) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End date must be on or after start date",
+        path: ["end_date"],
+      });
+    }
+  });
+
+export const UpdateSchoolTermSchema = z
+  .object({
+    term_id: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    start_date: dateString.optional(),
+    end_date: dateString.optional(),
+    sort_order: z.number().int().min(0).max(10000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.name === undefined &&
+      data.start_date === undefined &&
+      data.end_date === undefined &&
+      data.sort_order === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide at least one field to update",
+      });
+    }
+    if (data.start_date && data.end_date && data.end_date < data.start_date) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End date must be on or after start date",
+        path: ["end_date"],
+      });
+    }
+  });
+
+export const DeleteSchoolTermSchema = z.object({
+  term_id: z.string().uuid(),
+});
