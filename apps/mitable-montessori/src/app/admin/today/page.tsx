@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
+import { adminAppHomePath, adminTodayEnabled } from "@/lib/feature-flags";
 import { getAdminTodayData } from "@/lib/queries/admin-today";
 import AdminTodayClient from "./today-client";
 
 export default async function AdminTodayPage() {
+  if (!adminTodayEnabled()) redirect(adminAppHomePath());
+
   const ctx = await getCurrentUserContext();
   if (!ctx || ctx.role !== "admin") redirect("/app/today");
 

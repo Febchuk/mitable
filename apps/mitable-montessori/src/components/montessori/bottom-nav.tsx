@@ -48,13 +48,14 @@ const TABS: Tab[] = [
   },
 ];
 
-const ADMIN_TABS: Tab[] = [
-  {
-    id: "today",
-    label: "Today",
-    href: "/admin/today",
-    renderIcon: (size) => <HouseSimple size={size} weight="regular" />,
-  },
+const ADMIN_TODAY_TAB: Tab = {
+  id: "today",
+  label: "Today",
+  href: "/admin/today",
+  renderIcon: (size) => <HouseSimple size={size} weight="regular" />,
+};
+
+const ADMIN_TABS_CORE: Tab[] = [
   {
     id: "classrooms",
     label: "Classrooms",
@@ -87,7 +88,17 @@ const ADMIN_TABS: Tab[] = [
   },
 ];
 
-export function MontessoriBottomNav({ variant = "teacher" }: { variant?: "teacher" | "admin" }) {
+function adminTabs(options: { showToday: boolean }): Tab[] {
+  return options.showToday ? [ADMIN_TODAY_TAB, ...ADMIN_TABS_CORE] : ADMIN_TABS_CORE;
+}
+
+export function MontessoriBottomNav({
+  variant = "teacher",
+  showTodayNav = false,
+}: {
+  variant?: "teacher" | "admin";
+  showTodayNav?: boolean;
+}) {
   const pathname = usePathname();
   const store = useMontessori();
   const draftCount = store.reports.filter((r) => r.status === "draft").length;
@@ -96,6 +107,7 @@ export function MontessoriBottomNav({ variant = "teacher" }: { variant?: "teache
   const isChatActive = pathname?.startsWith("/app/chat");
 
   if (variant === "admin") {
+    const adminTabsList = adminTabs({ showToday: showTodayNav });
     return (
       <nav
         className="grid lg:hidden"
@@ -108,13 +120,13 @@ export function MontessoriBottomNav({ variant = "teacher" }: { variant?: "teache
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
           background: "var(--color-surface)",
           borderTop: "1px solid var(--color-border)",
-          gridTemplateColumns: "repeat(6, 1fr)",
+          gridTemplateColumns: `repeat(${adminTabsList.length}, 1fr)`,
           alignItems: "center",
           gap: 4,
           zIndex: 30,
         }}
       >
-        {ADMIN_TABS.map((t) => {
+        {adminTabsList.map((t) => {
           const isActive = pathname?.startsWith(t.href ?? "");
           const showBadge = t.id === "reports" && reportBadgeCount > 0;
           return (

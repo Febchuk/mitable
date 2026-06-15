@@ -77,8 +77,13 @@ function teacherNavItems(options: { showToday: boolean; reportFirst: boolean }):
   return [...head, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
 }
 
-const ADMIN_NAV: NavItem[] = [
-  { href: "/admin/today", label: "Today", icon: <HouseSimple {...ph} /> },
+const ADMIN_TODAY: NavItem = {
+  href: "/admin/today",
+  label: "Today",
+  icon: <HouseSimple {...ph} />,
+};
+
+const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/classrooms", label: "Classrooms", icon: <Building2 {...lu} /> },
   { href: "/admin/roster", label: "Roster", icon: <Users {...lu} /> },
   { href: "/admin/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
@@ -91,6 +96,10 @@ const ADMIN_NAV: NavItem[] = [
     withDraftBadge: true,
   },
 ];
+
+function adminNavItems(options: { showToday: boolean }): NavItem[] {
+  return options.showToday ? [ADMIN_TODAY, ...ADMIN_NAV_CORE] : ADMIN_NAV_CORE;
+}
 
 export interface MontessoriMobileShellProps {
   variant: Variant;
@@ -337,7 +346,7 @@ function MobileDrawer({
 
   const items =
     variant === "admin"
-      ? ADMIN_NAV
+      ? adminNavItems({ showToday: showTodayNav })
       : teacherNavItems({ showToday: showTodayNav, reportFirst: reportFirstNav });
 
   const localPart = email.split("@")[0] ?? email;

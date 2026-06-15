@@ -54,8 +54,13 @@ function teacherNavItems(options: { showToday: boolean; reportFirst: boolean }):
   return [...head, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
 }
 
-const ADMIN_NAV: NavItem[] = [
-  { href: "/admin/today", label: "Today", renderIcon: () => <HouseSimple {...phosphor} /> },
+const ADMIN_TODAY: NavItem = {
+  href: "/admin/today",
+  label: "Today",
+  renderIcon: () => <HouseSimple {...phosphor} />,
+};
+
+const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/classrooms", label: "Classrooms", renderIcon: () => <Building2 {...lucide} /> },
   { href: "/admin/roster", label: "Roster", renderIcon: () => <Users {...lucide} /> },
   { href: "/admin/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
@@ -72,6 +77,10 @@ const ADMIN_NAV: NavItem[] = [
     withDraftBadge: true,
   },
 ];
+
+function adminNavItems(options: { showToday: boolean }): NavItem[] {
+  return options.showToday ? [ADMIN_TODAY, ...ADMIN_NAV_CORE] : ADMIN_NAV_CORE;
+}
 
 export function MontessoriSidebar({
   variant = "teacher",
@@ -98,7 +107,7 @@ export function MontessoriSidebar({
     store.reports.filter((r) => r.status === "review").length;
   const navItems =
     variant === "admin"
-      ? ADMIN_NAV
+      ? adminNavItems({ showToday: showTodayNav })
       : teacherNavItems({ showToday: showTodayNav, reportFirst: reportFirstNav });
   return (
     <aside

@@ -7,6 +7,7 @@ import { ToastHost } from "@/components/montessori/primitives";
 import { MontessoriSidebar } from "@/components/montessori/sidebar";
 import { MontessoriProvider } from "@/components/montessori/store";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
+import { adminTodayEnabled } from "@/lib/feature-flags";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCurrentUserContext();
@@ -19,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
           variant="admin"
+          showTodayNav={adminTodayEnabled()}
           userMenuSlot={
             <UserMenu
               email={ctx.email}
@@ -41,6 +43,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         >
           <MontessoriMobileShell
             variant="admin"
+            showTodayNav={adminTodayEnabled()}
             firstName={ctx.firstName}
             email={ctx.email}
             schoolName={ctx.schoolName ?? "School"}

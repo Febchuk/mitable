@@ -15,7 +15,11 @@ import {
   teacherShouldSeeSpeechProgressTab,
 } from "@/lib/app/active-classroom";
 import { getClassroomProgress } from "@/lib/queries/classroom-progress";
-import { addTodayProgressAndAgent, reportFirstExperience } from "@/lib/feature-flags";
+import {
+  addTodayProgressAndAgent,
+  adminTodayEnabled,
+  reportFirstExperience,
+} from "@/lib/feature-flags";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getCurrentUserContext();
@@ -31,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // All rooms the teacher can switch between (Progress class picker).
   const teacherClassrooms = isAdmin ? [] : await listTeacherClassroomsForCurrentUser();
   const showSpeechProgressTab = !isAdmin && (await teacherShouldSeeSpeechProgressTab());
-  const showTodayAndAgent = !isAdmin && addTodayProgressAndAgent();
+  const showTodayAndAgent = isAdmin ? adminTodayEnabled() : addTodayProgressAndAgent();
   const showReportFirstNav = !isAdmin && reportFirstExperience();
 
   return (
