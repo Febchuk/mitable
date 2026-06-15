@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Book,
   Building2,
+  CalendarRange,
   HelpCircle,
   LayoutTemplate,
   LogOut,
@@ -21,6 +22,7 @@ import { clearDb } from "@/lib/db/schema";
 import { clearSessionKeys } from "@/lib/crypto/session-key";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
+import { adminReportTemplatesEnabled } from "@/lib/feature-flags";
 
 /**
  * Mobile shell for Mitable Montessori.
@@ -87,7 +89,10 @@ const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/classrooms", label: "Classrooms", icon: <Building2 {...lu} /> },
   { href: "/admin/roster", label: "Roster", icon: <Users {...lu} /> },
   { href: "/admin/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
-  { href: "/admin/report-templates", label: "Templates", icon: <LayoutTemplate {...lu} /> },
+  { href: "/admin/terms", label: "Terms", icon: <CalendarRange {...lu} /> },
+  ...(adminReportTemplatesEnabled()
+    ? [{ href: "/admin/report-templates", label: "Templates", icon: <LayoutTemplate {...lu} /> }]
+    : []),
   { href: "/admin/teachers", label: "Teachers", icon: <Users {...lu} /> },
   {
     href: "/admin/reports",
