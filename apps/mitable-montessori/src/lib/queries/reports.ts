@@ -206,8 +206,12 @@ export async function listReports(opts?: { classroomIds?: string[] }): Promise<R
         `created_by_user_id.eq.${ctx.userId},id.in.(${reviewerReportIds.join(",")})`
       );
     }
-  } else if (opts?.classroomIds?.length) {
-    query = query.in("classroom_id", opts.classroomIds);
+  } else {
+    // Admins only see reports that entered the review pipeline — not teacher drafts.
+    query = query.in("status", ["submitted_for_review", "in_review", "approved", "sent"]);
+    if (opts?.classroomIds?.length) {
+      query = query.in("classroom_id", opts.classroomIds);
+    }
   }
 
   const { data, error } = await query;

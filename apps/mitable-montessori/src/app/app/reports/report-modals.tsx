@@ -491,7 +491,7 @@ function initials(name: string): string {
   );
 }
 
-function SubmitForReviewDialog({
+export function SubmitForReviewDialog({
   open,
   onClose,
   report,

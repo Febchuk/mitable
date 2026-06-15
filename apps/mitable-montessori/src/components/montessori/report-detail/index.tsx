@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SubmitForReviewDialog } from "@/app/app/reports/report-modals";
 import { usePublishActiveReport } from "../active-report-context";
 import { ChatPane, type ChatPaneHandle, type ChatPaneSection } from "./chat-pane";
 import { ReportChatLauncher } from "./report-chat-drawer";
@@ -213,6 +214,7 @@ export function ReportDetail({
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDrafting, setIsDrafting] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [submitDialogOpen, setSubmitDialogOpen] = React.useState(false);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = React.useState(false);
   /** href captured when the user attempted to navigate while dirty; consumed by the leave dialog. */
@@ -726,27 +728,10 @@ export function ReportDetail({
   const topbarKind =
     report.reportType === "daily" ? "Daily" : report.reportType === "major" ? "Major" : "Incident";
 
-  const handleSubmitForReview = React.useCallback(async () => {
-    setActionBusy(true);
-    try {
-      const res = await fetch("/api/v1/reports/submit", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reportId: report.id }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        ToastBus.push({ message: data.error || "Couldn't submit for review." });
-        return;
-      }
-      ToastBus.push({ message: "Report submitted for review." });
-      if (onReportChanged) onReportChanged();
-      else router.refresh();
-    } finally {
-      setActionBusy(false);
-    }
-  }, [report.id, router, onReportChanged]);
+  const handleSubmitDialogChanged = React.useCallback(() => {
+    if (onReportChanged) onReportChanged();
+    else router.refresh();
+  }, [onReportChanged, router]);
 
   const handleApprove = React.useCallback(async () => {
     setActionBusy(true);
@@ -859,7 +844,7 @@ export function ReportDetail({
                 : undefined
             }
             onSubmitForReview={
-              topbarStatus === "draft" && !isAdmin ? () => void handleSubmitForReview() : undefined
+              topbarStatus === "draft" && !isAdmin ? () => setSubmitDialogOpen(true) : undefined
             }
             onApprove={
               (topbarStatus === "draft" || topbarStatus === "review") && isAdmin
@@ -921,6 +906,13 @@ export function ReportDetail({
           </div>
         </DialogContent>
       </Dialog>
+
+      <SubmitForReviewDialog
+        open={submitDialogOpen}
+        onClose={() => setSubmitDialogOpen(false)}
+        report={report}
+        onChanged={handleSubmitDialogChanged}
+      />
 
       <Dialog
         open={leaveDialogOpen}
