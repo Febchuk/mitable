@@ -16,13 +16,21 @@ export function reportFirstExperience(): boolean {
   return readPublicFlag("NEXT_PUBLIC_REPORT_FIRST_EXPERIENCE");
 }
 
-/** Default post-login path for teachers (admins use /admin/today). */
+/** Default post-login path for teachers. */
 export function teacherAppHomePath(): string {
   return reportFirstExperience() ? "/app/reports" : "/app/progress";
 }
 
+/**
+ * When true, admins see the school-wide Today dashboard and it is the default
+ * admin home. Off by default — admins land on Classrooms.
+ */
+export function adminTodayEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_ADMIN_TODAY");
+}
+
 export function adminAppHomePath(): string {
-  return "/admin/today";
+  return adminTodayEnabled() ? "/admin/today" : "/admin/classrooms";
 }
 
 /** Role-aware home after login or visiting `/`. */
