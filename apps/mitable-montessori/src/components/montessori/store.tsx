@@ -371,11 +371,22 @@ export function MontessoriProvider({
 
       // Persist via the canonical commands path. The trigger writes both
       // student_progress (upsert) and student_progress_history atomically.
+      const classroomId = classroomProgress?.classroomId ?? selectedClassroomId;
+      if (!classroomId) {
+        setProgressByTopic(prevProgressByTopic);
+        setClassroomProgress(prevClassroomProgress);
+        setNotesByTopic(prevNotes);
+        setRecentUpdates(prevRecent);
+        ToastBus.push({ message: "Couldn't save — try again" });
+        return;
+      }
+
       try {
         const res = await fetch("/api/v1/student-progress/bulk", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
+            classroomId,
             updates: cells.map((c) => ({
               studentId: c.studentId,
               subtopicId: c.subtopicId,
@@ -394,7 +405,7 @@ export function MontessoriProvider({
         ToastBus.push({ message: "Couldn't save — try again" });
       }
     },
-    [progressByTopic, classroomProgress, notesByTopic, recentUpdates]
+    [progressByTopic, classroomProgress, notesByTopic, recentUpdates, selectedClassroomId]
   );
 
   const addStudentComment = React.useCallback(
@@ -417,10 +428,13 @@ export function MontessoriProvider({
       setRecentUpdates((prev) => [optimistic, ...prev].slice(0, 60));
 
       try {
+        const classroomId = classroomProgress?.classroomId ?? selectedClassroomId;
+        if (!classroomId) throw new Error("no classroom");
+
         const res = await fetch("/api/v1/student-comments", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ studentId, comment: trimmed }),
+          body: JSON.stringify({ classroomId, studentId, comment: trimmed }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         ToastBus.push({ message: "Comment saved" });
@@ -429,7 +443,7 @@ export function MontessoriProvider({
         ToastBus.push({ message: "Couldn't save comment — try again" });
       }
     },
-    [recentUpdates]
+    [recentUpdates, classroomProgress, selectedClassroomId]
   );
 
   const setAsideObservation = React.useCallback((id: string) => {

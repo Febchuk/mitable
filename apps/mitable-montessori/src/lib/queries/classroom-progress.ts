@@ -1,9 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import {
-  getActiveClassroomForCurrentUser,
-  listTeacherClassroomsForCurrentUser,
-} from "@/lib/app/active-classroom";
+import { resolveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import type { ProgressMark, RecentUpdateEntry } from "@/components/montessori/data";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import type { ProgressProgram } from "@/lib/queries/progress-programs";
@@ -290,12 +287,7 @@ async function speechTargetCountByStudent(
 export async function getClassroomProgress(
   classroomId?: string
 ): Promise<ClassroomProgress | null> {
-  let classroom: { id: string; name: string } | null = null;
-  if (classroomId) {
-    const all = await listTeacherClassroomsForCurrentUser();
-    classroom = all.find((c) => c.id === classroomId) ?? null;
-  }
-  if (!classroom) classroom = await getActiveClassroomForCurrentUser();
+  const classroom = await resolveClassroomForCurrentUser(classroomId);
   if (!classroom) return null;
 
   const cookieStore = await cookies();
