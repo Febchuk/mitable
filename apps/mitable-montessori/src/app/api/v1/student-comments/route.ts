@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
-import { getActiveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import { resolveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import { createClient } from "@/utils/supabase/server";
 
 const StudentCommentSchema = z.object({
+  classroomId: z.string().uuid().optional(),
   studentId: z.string().uuid(),
   comment: z.string().trim().min(1).max(500),
 });
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const classroom = await getActiveClassroomForCurrentUser();
+  const classroom = await resolveClassroomForCurrentUser(parsed.data.classroomId);
   if (!classroom) {
     return NextResponse.json({ error: "No active classroom" }, { status: 403 });
   }

@@ -12,6 +12,23 @@ export interface ActiveClassroom {
 /** Same shape as ActiveClassroom — one entry per active teacher assignment. */
 export type TeacherClassroom = ActiveClassroom;
 
+/**
+ * Resolves which classroom a teacher is acting in. When `classroomId` is
+ * supplied and the teacher has an active assignment to it, that room wins;
+ * otherwise falls back to their most recent assignment (same rule as
+ * `getClassroomProgress`).
+ */
+export const resolveClassroomForCurrentUser = cache(async function resolveClassroomForCurrentUser(
+  classroomId?: string
+): Promise<ActiveClassroom | null> {
+  if (classroomId) {
+    const all = await listTeacherClassroomsForCurrentUser();
+    const found = all.find((c) => c.id === classroomId);
+    if (found) return found;
+  }
+  return getActiveClassroomForCurrentUser();
+});
+
 export const getActiveClassroomForCurrentUser = cache(
   async function getActiveClassroomForCurrentUser(): Promise<ActiveClassroom | null> {
     const cookieStore = await cookies();
