@@ -31,8 +31,8 @@ export function scoreToneBand(score: number): "high" | "med" | "low" {
  * place so desktop and mobile share the exact same affordances.
  *
  * - History is always visible.
- * - Submit for review only on `draft` (teachers re-submit from draft after
- *   `changes_requested`, so we include that too).
+ * - Send to parents on `draft` and `changes_requested` — teachers send directly
+ *   without a review step.
  * - Delete on draft for anyone; on approved / sent for admins only.
  *
  * The preview/edit toggle is rendered separately (not modal-routed) and the
@@ -140,8 +140,8 @@ export function ActionRail({
 
       {showSend && (
         <RailButton
-          tip="Submit for review"
-          aria-label="Submit for review"
+          tip="Send to parents"
+          aria-label="Send to parents"
           onClick={() => onOpenModal("send")}
         >
           <Send size={17} strokeWidth={2} />

@@ -41,14 +41,16 @@ const STATUS_TONE: Record<
     sparkle: true,
   },
   submitted_for_review: {
-    bg: "var(--color-clay-soft)",
-    fg: "var(--color-terracotta-deep)",
-    label: "Awaiting review",
+    bg: "var(--color-butter-soft)",
+    fg: "var(--color-butter-deep)",
+    label: "Drafted",
+    sparkle: true,
   },
   in_review: {
-    bg: "var(--color-clay-soft)",
-    fg: "var(--color-terracotta-deep)",
-    label: "In review",
+    bg: "var(--color-butter-soft)",
+    fg: "var(--color-butter-deep)",
+    label: "Drafted",
+    sparkle: true,
   },
   changes_requested: {
     bg: "var(--color-butter-soft)",
@@ -117,7 +119,6 @@ function toneFor(id: string): Tone {
 type StatusFilter = "drafts" | "review" | "approved" | "sent";
 const TEACHER_STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "drafts", label: "Drafts" },
-  { id: "review", label: "In Review" },
   { id: "approved", label: "Approved" },
   { id: "sent", label: "Sent" },
 ];
@@ -147,11 +148,21 @@ function firstSelectableReportId(
     !isAdmin || classroomScope === ALL_CLASSROOMS
       ? rows
       : rows.filter((r) => r.classroomId === classroomScope);
-  return applyFilter(scoped, filter)[0]?.id ?? null;
+  return applyFilter(scoped, filter, isAdmin)[0]?.id ?? null;
 }
 
-function applyFilter(rows: ReportListRow[], filter: StatusFilter): ReportListRow[] {
-  return rows.filter((r) => statusBucket(r.status) === filter);
+function applyFilter(
+  rows: ReportListRow[],
+  filter: StatusFilter,
+  isAdmin = false
+): ReportListRow[] {
+  return rows.filter((r) => {
+    const bucket = statusBucket(r.status);
+    // For teachers, legacy review-state reports surface in Drafts since the
+    // review step no longer exists in the teacher workflow.
+    if (!isAdmin && filter === "drafts" && bucket === "review") return true;
+    return bucket === filter;
+  });
 }
 
 export function ReportsRailView({
@@ -194,7 +205,10 @@ export function ReportsRailView({
     return reports.filter((r) => r.classroomId === classroomScope);
   }, [reports, isAdmin, classroomScope]);
 
-  const filtered = React.useMemo(() => applyFilter(scopedReports, filter), [scopedReports, filter]);
+  const filtered = React.useMemo(
+    () => applyFilter(scopedReports, filter, isAdmin),
+    [scopedReports, filter, isAdmin]
+  );
 
   // Selection: keep stable across reorders + filter changes when possible.
   const [selectedId, setSelectedId] = React.useState<string | null>(() => {
@@ -208,7 +222,9 @@ export function ReportsRailView({
     if (!initialOpenReportId) return;
     const target = reports.find((r) => r.id === initialOpenReportId);
     if (!target) return;
-    setFilter(statusBucket(target.status));
+    const bucket = statusBucket(target.status);
+    // For teachers, review-state reports live in the Drafts tab.
+    setFilter(!isAdmin && bucket === "review" ? "drafts" : bucket);
     if (isAdmin) setClassroomScope(ALL_CLASSROOMS);
     setSelectedId(initialOpenReportId);
   }, [initialOpenReportId, reports, isAdmin]);
@@ -905,7 +921,7 @@ function KebabMenu({
             <span className={styles.rrKebabIcon} aria-hidden>
               <Send size={16} strokeWidth={2} />
             </span>
-            <span className={styles.rrKebabLabel}>Submit for review</span>
+            <span className={styles.rrKebabLabel}>Send to parents</span>
           </button>
         )}
 
@@ -970,7 +986,10 @@ function ReportLoadingSkeleton({ row, locale }: { row: ReportListRow; locale: st
   const pillClass =
     row.status === "sent" || row.status === "approved"
       ? "rd-pill-approved"
-      : row.status === "draft"
+      : row.status === "draft" ||
+          row.status === "changes_requested" ||
+          row.status === "submitted_for_review" ||
+          row.status === "in_review"
         ? "rd-pill-draft"
         : "rd-pill-submitted";
 

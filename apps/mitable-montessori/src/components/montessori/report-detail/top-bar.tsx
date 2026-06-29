@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, Check, FileText, Mail, Send, Trash2 } from "lucide-react";
+import { Check, FileText, Mail, Send, Trash2 } from "lucide-react";
 import type { Tone } from "../data";
 import { initialsFor } from "../data";
 
@@ -36,11 +36,9 @@ export function ReportTopBar({
   reportsListHref = "/app/reports",
   isAdmin = false,
   actionBusy = false,
-  hasBeenSubmitted = false,
   viewModeSlot,
   hideActions = false,
   onSaveDraft,
-  onSubmitForReview,
   onApprove,
   onSendToParents,
   onDeleteClick,
@@ -56,14 +54,11 @@ export function ReportTopBar({
   reportsListHref?: string;
   isAdmin?: boolean;
   actionBusy?: boolean;
-  /** True iff the report has been submitted for review at least once. Drives the "Resubmit" vs "Submit" button label. */
-  hasBeenSubmitted?: boolean;
   /** Optional segmented toggle rendered left of the action buttons. Used for the Editor/Preview PDF switch. */
   viewModeSlot?: React.ReactNode;
-  /** When true, suppresses the inline action button row (Save/Submit/Approve/Send/Delete). The rail-view owns these via its action rail + modals; we keep the view-mode toggle so the editor/preview switch still works. */
+  /** When true, suppresses the inline action button row (Save/Send/Approve/Delete). The rail-view owns these via its action rail + modals; we keep the view-mode toggle so the editor/preview switch still works. */
   hideActions?: boolean;
   onSaveDraft?: () => void;
-  onSubmitForReview?: () => void;
   onApprove?: () => void;
   onSendToParents?: () => void;
   onDeleteClick?: () => void;
@@ -131,9 +126,7 @@ export function ReportTopBar({
               status={status}
               isAdmin={isAdmin}
               actionBusy={actionBusy}
-              hasBeenSubmitted={hasBeenSubmitted}
               onSaveDraft={onSaveDraft}
-              onSubmitForReview={onSubmitForReview}
               onApprove={onApprove}
               onSendToParents={onSendToParents}
               onDeleteClick={onDeleteClick}
@@ -149,9 +142,7 @@ function TopBarActions({
   status,
   isAdmin,
   actionBusy,
-  hasBeenSubmitted,
   onSaveDraft,
-  onSubmitForReview,
   onApprove,
   onSendToParents,
   onDeleteClick,
@@ -159,9 +150,7 @@ function TopBarActions({
   status: ReportStatus;
   isAdmin: boolean;
   actionBusy: boolean;
-  hasBeenSubmitted: boolean;
   onSaveDraft?: () => void;
-  onSubmitForReview?: () => void;
   onApprove?: () => void;
   onSendToParents?: () => void;
   onDeleteClick?: () => void;
@@ -254,7 +243,7 @@ function TopBarActions({
     );
   }
 
-  // draft or changes_requested — teacher actions
+  // draft or changes_requested — teacher sends directly to parents
   return (
     <>
       {onSaveDraft && (
@@ -263,23 +252,18 @@ function TopBarActions({
           Save draft
         </button>
       )}
-      {onSubmitForReview && (
+      {onSendToParents && (
         <button
           type="button"
           className="rd-btn rd-btn-primary"
           disabled={actionBusy}
-          onClick={onSubmitForReview}
+          onClick={onSendToParents}
         >
           {actionBusy ? (
-            hasBeenSubmitted ? (
-              "Resubmitting…"
-            ) : (
-              "Submitting…"
-            )
+            "Sending…"
           ) : (
             <>
-              <ArrowRight size={13} strokeWidth={2.5} />{" "}
-              {hasBeenSubmitted ? "Resubmit for review" : "Submit for review"}
+              <Send size={13} strokeWidth={2.5} /> Send to parents
             </>
           )}
         </button>
