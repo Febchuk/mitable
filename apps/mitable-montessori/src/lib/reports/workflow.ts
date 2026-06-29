@@ -24,7 +24,7 @@ const ALLOWED_FROM: Record<ReportReviewActionType, ReportStatus[]> = {
   edited: ["draft", "changes_requested"],
   approved: ["draft", "submitted_for_review", "in_review"],
   requested_changes: ["submitted_for_review", "in_review"],
-  sent: ["approved"],
+  sent: ["draft", "changes_requested", "approved"],
 };
 
 const NEW_STATUS: Record<ReportReviewActionType, ReportStatus | null> = {

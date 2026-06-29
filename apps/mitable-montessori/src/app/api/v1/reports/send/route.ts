@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/api/auth";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { SendReportSchema } from "@/lib/schemas/report";
 import { sendReport, WorkflowError } from "@/lib/reports/workflow";
+import { drainPendingReports, StubEmailSender } from "@/lib/admin/email-worker";
+import { ResendEmailSender } from "@/lib/email/resend";
 
 export async function POST(req: Request) {
   const auth = await requireUser();
@@ -71,6 +73,10 @@ export async function POST(req: Request) {
       target_id: parsed.data.reportId,
       metadata: { recipient_count: links.length },
     });
+    // Drain emails inline so any authenticated user (teacher or admin) can
+    // trigger delivery without needing to call the admin-only drain endpoint.
+    const sender = process.env.RESEND_API_KEY ? new ResendEmailSender() : new StubEmailSender();
+    await drainPendingReports(supabase, sender);
     return NextResponse.json({ ok: true, recipientCount: links.length });
   } catch (err) {
     if (err instanceof WorkflowError) {

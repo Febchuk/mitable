@@ -20,16 +20,22 @@ function toneFor(id: string): Tone {
 
 function statusLabel(status: ReportListRow["status"]): string {
   if (status === "draft" || status === "changes_requested") return "Draft";
-  if (status === "submitted_for_review" || status === "in_review") return "In review";
+  if (status === "submitted_for_review" || status === "in_review") return "Draft";
   if (status === "approved") return "Approved";
   if (status === "sent") return "Sent";
   return status;
 }
 
 function statusClass(status: ReportListRow["status"]): string {
-  if (status === "draft" || status === "changes_requested") return styles.statusDraft;
+  if (
+    status === "draft" ||
+    status === "changes_requested" ||
+    status === "submitted_for_review" ||
+    status === "in_review"
+  )
+    return styles.statusDraft;
   if (status === "approved" || status === "sent") return styles.statusApproved;
-  return styles.statusReview;
+  return styles.statusDraft;
 }
 
 function kindLabel(t: ReportListRow["reportType"]): string {
