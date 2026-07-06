@@ -23,7 +23,7 @@ jobs:
       id-token: write
     steps:
       # anthropics/claude-code-action@beta
-      - uses: anthropics/claude-code-action@28f83620103c48a57093dcc2837eec89e036bb9f
+      - uses: anthropics/claude-code-action@558b1d6cab4085c7753fe402c10bef0fbb92ac7a
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-sonnet-4-20250514
