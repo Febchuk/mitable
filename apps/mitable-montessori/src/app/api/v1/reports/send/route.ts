@@ -15,6 +15,16 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
+
+  // Production must have a real mailer — stub would mark delivery "sent" with no email.
+  const hasResendKey = Boolean(process.env.RESEND_API_KEY?.trim());
+  if (!hasResendKey && process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Email delivery is not configured. Ask an admin to set RESEND_API_KEY." },
+      { status: 503 }
+    );
+  }
+
   const supabase = createAdminClient();
 
   // Lookup guardian emails. Honors `student_guardians.receives_reports = true`.
@@ -75,9 +85,33 @@ export async function POST(req: Request) {
     });
     // Drain emails inline so any authenticated user (teacher or admin) can
     // trigger delivery without needing to call the admin-only drain endpoint.
-    const sender = process.env.RESEND_API_KEY ? new ResendEmailSender() : new StubEmailSender();
-    await drainPendingReports(supabase, sender);
-    return NextResponse.json({ ok: true, recipientCount: links.length });
+    const sender = hasResendKey ? new ResendEmailSender() : new StubEmailSender();
+    const drain = await drainPendingReports(supabase, sender, {
+      reportId: parsed.data.reportId,
+    });
+    if (drain.failed > 0) {
+      const detail = drain.failures
+        .map((f) => f.error)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join("; ");
+      return NextResponse.json(
+        {
+          error:
+            drain.sent === 0
+              ? `Couldn't deliver the report email${detail ? `: ${detail}` : "."}`
+              : `Delivered to ${drain.sent} guardian(s), but ${drain.failed} failed${detail ? `: ${detail}` : "."}`,
+          recipientCount: links.length,
+          drain,
+        },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      recipientCount: links.length,
+      drain,
+    });
   } catch (err) {
     if (err instanceof WorkflowError) {
       return NextResponse.json(

@@ -47,17 +47,21 @@ export interface DrainResult {
 export async function drainPendingReports(
   supabase: SupabaseClient,
   sender: EmailSender,
-  options: { limit?: number } = {}
+  options: { limit?: number; reportId?: string } = {}
 ): Promise<DrainResult> {
   const limit = options.limit ?? 50;
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("report_recipients")
     .select(
       "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, section_meta, status, report_date, report_type, students(first_name, last_name), classrooms(name), report_templates(logo_url, section_meta))"
     )
     .eq("delivery_status", "pending")
     .limit(limit);
+  if (options.reportId) {
+    query = query.eq("report_id", options.reportId);
+  }
+  const { data: rows, error } = await query;
   if (error) {
     throw new Error(`Failed to load pending recipients: ${error.message}`);
   }

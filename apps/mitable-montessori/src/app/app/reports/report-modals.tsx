@@ -855,12 +855,18 @@ export function SendToParentsDialog({
           messageBody: messageBody.trim() || undefined,
         }),
       });
-      const sendData = (await sendRes.json().catch(() => ({}))) as { error?: string };
+      const sendData = (await sendRes.json().catch(() => ({}))) as {
+        error?: string;
+        drain?: { sent?: number; failed?: number };
+      };
       if (!sendRes.ok) {
         setError(sendData.error || "Couldn't send report.");
         return;
       }
-      ToastBus.push({ message: `Report sent to ${selected.size} guardian(s).` });
+      const sentCount = sendData.drain?.sent ?? selected.size;
+      ToastBus.push({
+        message: `Report emailed to ${sentCount} guardian${sentCount === 1 ? "" : "s"}.`,
+      });
       onSent();
     } catch {
       setError("Something went wrong. Please try again.");
