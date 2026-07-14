@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { executeStudentImportPlan } from "@/lib/admin/execute-student-import-plan";
 import type { ClassroomOption, StudentImportPlan } from "@/lib/admin/student-import";
+import { adminFetch } from "@/lib/visibility/reveal-hidden";
 
 type ApiStudent = {
   id: string;
@@ -31,7 +32,7 @@ type ApiStudent = {
 };
 
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const res = await adminFetch(url, {
     ...init,
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
   });
@@ -124,6 +125,12 @@ export default function AdminSchoolRosterPage() {
 
   React.useEffect(() => {
     void reload();
+  }, [reload]);
+
+  React.useEffect(() => {
+    const onReveal = () => void reload();
+    window.addEventListener("mitable:reveal-hidden-changed", onReveal);
+    return () => window.removeEventListener("mitable:reveal-hidden-changed", onReveal);
   }, [reload]);
 
   const applyImportPlan = async (

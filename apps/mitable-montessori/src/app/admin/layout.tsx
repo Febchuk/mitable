@@ -29,6 +29,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               variant="row"
               direction="up"
               align="left"
+              showRevealHidden
             />
           }
         />

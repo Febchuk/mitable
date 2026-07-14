@@ -79,27 +79,35 @@ export const CreateClassroomSchema = z.object({
   program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
 });
 
-/** Patch name, program_types, curriculum_id, or any combination. At least one field required. */
+/** Patch name, program_types, curriculum_id, ui_hidden, or any combination. At least one field required. */
 export const PatchClassroomSchema = z
   .object({
     classroom_id: z.string().uuid(),
     name: z.string().min(1).max(200).optional(),
     program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
     curriculum_id: z.union([z.string().uuid(), z.null()]).optional(),
+    ui_hidden: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (
       data.name === undefined &&
       data.program_types === undefined &&
-      data.curriculum_id === undefined
+      data.curriculum_id === undefined &&
+      data.ui_hidden === undefined
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Provide name, program_types, and/or curriculum_id",
+        message: "Provide name, program_types, curriculum_id, and/or ui_hidden",
       });
     }
   });
 export type PatchClassroomInput = z.infer<typeof PatchClassroomSchema>;
+
+export const SetTeacherUiHiddenSchema = z.object({
+  teacher_user_id: z.string().uuid(),
+  ui_hidden: z.boolean(),
+});
+export type SetTeacherUiHiddenInput = z.infer<typeof SetTeacherUiHiddenSchema>;
 
 export const CreateCurriculumSchema = z.object({
   name: z.string().min(1).max(200),

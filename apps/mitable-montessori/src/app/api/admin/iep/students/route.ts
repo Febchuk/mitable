@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireAdmin } from "@/lib/api/admin-auth";
+import {
+  filterStudentIdsByUiHidden,
+  loadUiHiddenSets,
+  revealHiddenFromRequest,
+  shouldFilterUiHidden,
+} from "@/lib/visibility/ui-hidden";
 
 /**
  * Admin roster for the IEP tab. Returns active students in the admin's
  * school plus a count of domains/items they already have configured so the
  * chip row can hint which children still need a plan.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
   const supabase = createAdminClient();
+  const filterHidden = shouldFilterUiHidden(auth.user.role, revealHiddenFromRequest(req));
+  const hidden = filterHidden
+    ? await loadUiHiddenSets(supabase, auth.user.schoolId)
+    : { classroomIds: new Set<string>(), teacherIds: new Set<string>() };
 
   const { data: students, error } = await supabase
     .from("students")
@@ -23,7 +33,16 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const ids = (students ?? []).map((s) => s.id as string);
+  const allIds = (students ?? []).map((s) => s.id as string);
+  const visibleIds = await filterStudentIdsByUiHidden(
+    supabase,
+    allIds,
+    hidden.classroomIds,
+    filterHidden
+  );
+  const visibleStudents = (students ?? []).filter((s) => visibleIds.has(s.id as string));
+
+  const ids = visibleStudents.map((s) => s.id as string);
   const counts = new Map<string, { domains: number; items: number }>();
   if (ids.length > 0) {
     const { data: domainRows } = await supabase
@@ -49,7 +68,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    students: (students ?? []).map((s) => {
+    students: visibleStudents.map((s) => {
       const c = counts.get(s.id as string) ?? { domains: 0, items: 0 };
       return {
         id: s.id as string,

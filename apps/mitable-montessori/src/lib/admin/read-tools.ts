@@ -41,7 +41,8 @@ export async function listClassrooms(ctx: ReadToolContext) {
     .from("classrooms")
     .select("id, name, code, curriculum_id")
     .eq("school_id", ctx.schoolId)
-    .eq("status", "active");
+    .eq("status", "active")
+    .eq("ui_hidden", false);
   return (data ?? []).map((c) => {
     const row = c as {
       id: string;

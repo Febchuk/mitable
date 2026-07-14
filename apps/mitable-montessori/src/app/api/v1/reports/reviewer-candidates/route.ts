@@ -21,7 +21,7 @@ export async function GET() {
   // are missing (invited-but-not-yet-profiled accounts).
   const { data, error } = await supabase
     .from("users")
-    .select("id, email, first_name, last_name, role, school_id, status")
+    .select("id, email, first_name, last_name, role, school_id, status, ui_hidden")
     .eq("school_id", auth.user.schoolId)
     .in("role", ["teacher", "admin"])
     .neq("id", auth.user.userId)
@@ -32,22 +32,29 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const candidates = (data ?? []).map((u) => {
-    const row = u as {
-      id: string;
-      email: string | null;
-      first_name: string | null;
-      last_name: string | null;
-      role: string;
-    };
-    const fullName = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
-    return {
-      userId: row.id,
-      name: fullName || row.email || "Unnamed",
-      email: row.email,
-      role: row.role as "teacher" | "admin",
-    };
-  });
+  const candidates = (data ?? [])
+    .filter((u) => {
+      const row = u as { role: string; ui_hidden?: boolean };
+      // Admins are never soft-hidden; hide ui_hidden teachers.
+      if (row.role === "teacher" && row.ui_hidden) return false;
+      return true;
+    })
+    .map((u) => {
+      const row = u as {
+        id: string;
+        email: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        role: string;
+      };
+      const fullName = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
+      return {
+        userId: row.id,
+        name: fullName || row.email || "Unnamed",
+        email: row.email,
+        role: row.role as "teacher" | "admin",
+      };
+    });
 
   return NextResponse.json({ candidates });
 }

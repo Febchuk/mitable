@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronsUpDown, LogOut } from "lucide-react";
+import { ChevronsUpDown, Eye, EyeOff, LogOut } from "lucide-react";
 import { clearDb } from "@/lib/db/schema";
 import { clearSessionKeys } from "@/lib/crypto/session-key";
+import { getRevealHidden, setRevealHidden } from "@/lib/visibility/reveal-hidden";
 
 export interface UserMenuProps {
   email: string;
@@ -22,6 +23,8 @@ export interface UserMenuProps {
   direction?: "up" | "down";
   /** Horizontal alignment of the popup. */
   align?: "left" | "right";
+  /** When true, show the admin-only “Show hidden” toggle. */
+  showRevealHidden?: boolean;
 }
 
 /**
@@ -43,11 +46,18 @@ export function UserMenu({
   variant = "icon",
   direction = "down",
   align = "right",
+  showRevealHidden = false,
 }: UserMenuProps) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [revealHidden, setRevealHiddenState] = React.useState(false);
   const router = useRouter();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!showRevealHidden) return;
+    setRevealHiddenState(getRevealHidden());
+  }, [showRevealHidden]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -84,6 +94,16 @@ export function UserMenu({
     router.refresh();
   }
 
+  function toggleRevealHidden() {
+    const next = !revealHidden;
+    setRevealHidden(next);
+    setRevealHiddenState(next);
+    setOpen(false);
+    router.refresh();
+    // Client-fetched admin pages listen for this to reload lists.
+    window.dispatchEvent(new Event("mitable:reveal-hidden-changed"));
+  }
+
   const localPart = email.split("@")[0] ?? email;
   const fallbackName = localPart.length ? localPart[0].toUpperCase() + localPart.slice(1) : email;
   const displayName = firstName?.trim() || fallbackName;
@@ -118,6 +138,9 @@ export function UserMenu({
           roleLabel={roleLabel}
           busy={busy}
           onSignOut={signOut}
+          showRevealHidden={showRevealHidden}
+          revealHidden={revealHidden}
+          onToggleRevealHidden={toggleRevealHidden}
         />
       ) : null}
     </div>
@@ -273,6 +296,9 @@ function Popup({
   roleLabel,
   busy,
   onSignOut,
+  showRevealHidden,
+  revealHidden,
+  onToggleRevealHidden,
 }: {
   direction: "up" | "down";
   align: "left" | "right";
@@ -284,6 +310,9 @@ function Popup({
   roleLabel?: string;
   busy: boolean;
   onSignOut: () => void;
+  showRevealHidden: boolean;
+  revealHidden: boolean;
+  onToggleRevealHidden: () => void;
 }) {
   return (
     <div
@@ -401,8 +430,53 @@ function Popup({
         }}
       />
 
+      {showRevealHidden ? (
+        <RevealHiddenButton revealHidden={revealHidden} onClick={onToggleRevealHidden} />
+      ) : null}
+
       <SignOutButton busy={busy} onClick={onSignOut} />
     </div>
+  );
+}
+
+function RevealHiddenButton({
+  revealHidden,
+  onClick,
+}: {
+  revealHidden: boolean;
+  onClick: () => void;
+}) {
+  const [hover, setHover] = React.useState(false);
+  const Icon = revealHidden ? EyeOff : Eye;
+  return (
+    <button
+      type="button"
+      role="menuitemcheckbox"
+      aria-checked={revealHidden}
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "12px 16px",
+        background: hover ? "var(--color-canvas)" : "transparent",
+        color: "var(--color-ink)",
+        border: 0,
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 500,
+        textAlign: "left",
+        transition: "background 120ms ease",
+      }}
+    >
+      <Icon size={15} strokeWidth={1.75} />
+      <span style={{ flex: 1 }}>
+        {revealHidden ? "Hide soft-hidden items" : "Show hidden classrooms & teachers"}
+      </span>
+    </button>
   );
 }
 
