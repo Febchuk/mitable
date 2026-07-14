@@ -263,7 +263,7 @@ function ReportEntry({
         : "Major report");
   return (
     <Link
-      href={`${reportsRailBasePath}?open=${encodeURIComponent(e.id)}`}
+      href={`${reportsRailBasePath}/${e.id}`}
       style={{
         display: "block",
         background: mobile ? "var(--color-canvas)" : "transparent",

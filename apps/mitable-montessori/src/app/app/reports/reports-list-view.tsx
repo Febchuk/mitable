@@ -6,12 +6,7 @@ import { useRouter } from "next/navigation";
 import { Sparkles, Trash2 } from "lucide-react";
 import { initialsFor } from "@/components/montessori/data";
 import type { ReportListRow } from "@/lib/queries/reports";
-import {
-  FilterChips,
-  FilterSelect,
-  PageHeader,
-  cardStyle,
-} from "@/components/montessori/page-header";
+import { FilterSelect, PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { NewReportTrigger } from "@/components/montessori/new-report";
 import { Avatar, HandCheck, ToastBus } from "@/components/montessori/primitives";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
@@ -97,7 +92,7 @@ export function ReportsListView({
   const router = useRouter();
   const locale = useUiLocale();
   const isAdmin = variant === "admin";
-  const [filter, setFilter] = React.useState(isAdmin ? "In review · 0" : "all");
+  const [filter, setFilter] = React.useState("all");
   const [pendingDelete, setPendingDelete] = React.useState<ReportListRow | null>(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
 
@@ -120,63 +115,36 @@ export function ReportsListView({
       setDeleteBusy(false);
     }
   }, [pendingDelete, router]);
-  const detailHref = (id: string) =>
-    isAdmin ? `/admin/reports?open=${encodeURIComponent(id)}` : `/app/reports/${id}`;
+  const detailHref = (id: string) => (isAdmin ? `/admin/reports/${id}` : `/app/reports/${id}`);
 
-  const drafts = reports.filter((r) => r.status === "draft").length;
-  const reviews = reports.filter(
-    (r) => r.status === "submitted_for_review" || r.status === "in_review"
-  ).length;
-  const approved = reports.filter((r) => r.status === "approved").length;
-  const sent = reports.filter((r) => r.status === "sent").length;
-
-  const adminChipFilters = [
-    `In review · ${reviews}`,
-    `Approved · ${approved}`,
-    `Sent · ${sent}`,
-    "Daily",
-    "Major",
-    "Incident",
-  ];
-
-  const teacherChipFilters = [
-    "All",
-    `Drafts · ${drafts}`,
-    `Awaiting review · ${reviews}`,
-    `Sent · ${sent}`,
-    "Daily",
-    "Major",
-    "Incident",
-  ];
-
-  const chipFilters = isAdmin ? adminChipFilters : teacherChipFilters;
-
-  const selectFilters = [
-    { value: "all", label: "All reports" },
-    { value: "drafts", label: "Drafts" },
-    { value: "awaiting", label: "Awaiting review" },
-    { value: "sent", label: "Sent" },
-    { value: "daily", label: "Daily" },
-    { value: "major", label: "Major" },
-    { value: "incident", label: "Incident" },
-  ];
+  const selectFilters = isAdmin
+    ? [
+        { value: "all", label: "All reports" },
+        { value: "awaiting", label: "Awaiting review" },
+        { value: "approved", label: "Approved" },
+        { value: "sent", label: "Sent" },
+        { value: "daily", label: "Daily" },
+        { value: "major", label: "Major" },
+        { value: "incident", label: "Incident" },
+      ]
+    : [
+        { value: "all", label: "All reports" },
+        { value: "drafts", label: "Drafts" },
+        { value: "awaiting", label: "Awaiting review" },
+        { value: "sent", label: "Sent" },
+        { value: "daily", label: "Daily" },
+        { value: "major", label: "Major" },
+        { value: "incident", label: "Incident" },
+      ];
 
   const filtered = reports.filter((r) => {
-    if (isAdmin) {
-      if (filter.startsWith("In review"))
-        return r.status === "submitted_for_review" || r.status === "in_review";
-      if (filter.startsWith("Approved")) return r.status === "approved";
-      if (filter.startsWith("Sent")) return r.status === "sent";
-      if (filter === "Daily") return r.reportType === "daily";
-      if (filter === "Major") return r.reportType === "major";
-      if (filter === "Incident") return r.reportType === "incident";
-      return true;
-    }
     if (filter === "all") return true;
     if (filter === "drafts") return r.status === "draft";
     if (filter === "awaiting")
       return r.status === "submitted_for_review" || r.status === "in_review";
-    if (filter === "sent") return r.status === "sent" || r.status === "approved";
+    if (filter === "approved") return r.status === "approved";
+    if (filter === "sent")
+      return isAdmin ? r.status === "sent" : r.status === "sent" || r.status === "approved";
     if (filter === "daily") return r.reportType === "daily";
     if (filter === "major") return r.reportType === "major";
     if (filter === "incident") return r.reportType === "incident";
@@ -196,11 +164,7 @@ export function ReportsListView({
       />
 
       <div style={{ padding: "16px 24px 0" }}>
-        {isAdmin ? (
-          <FilterChips options={chipFilters} value={filter} onChange={setFilter} />
-        ) : (
-          <FilterSelect label="Show" value={filter} onChange={setFilter} options={selectFilters} />
-        )}
+        <FilterSelect label="Show" value={filter} onChange={setFilter} options={selectFilters} />
       </div>
 
       {/* Empty state */}
@@ -208,7 +172,9 @@ export function ReportsListView({
         <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--color-ink-muted)" }}>
           <p style={{ fontSize: 14, margin: 0 }}>
             {reports.length === 0
-              ? "No reports yet. Tap + to start drafting."
+              ? isAdmin
+                ? "No reports in review or sent yet."
+                : "No reports yet. Tap + to start drafting."
               : "No reports match this filter."}
           </p>
         </div>
