@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+import { getReport } from "@/lib/queries/reports";
+import { ReportWorkspace } from "@/components/montessori/report-detail/report-workspace";
 
-/** Full-page report UI — use the rail workspace instead. */
-export default async function AdminReportDetailPageRedirect({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function AdminReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  redirect(`/admin/reports?open=${encodeURIComponent(id)}`);
+  const report = await getReport(id);
+  if (!report) notFound();
+
+  return <ReportWorkspace report={report} backHref="/admin/reports" variant="admin" />;
 }

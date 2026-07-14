@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { listReportsV2 } from "@/lib/queries/reports";
-import { ReportsRailView } from "@/app/app/reports/reports-rail-view";
+import { ReportsListView } from "@/app/app/reports/reports-list-view";
 
 // Future split-view workspace UI archived at ./PHASE_8_FUTURE_WORKSPACE.md
 // (originally Phase 8 commit 49505b8f, dropped during the Supabase migration).
@@ -15,9 +17,14 @@ export default async function AdminReportsPage({
     typeof rawOpen === "string" ? rawOpen : Array.isArray(rawOpen) ? rawOpen[0] : undefined;
 
   const reports = await listReportsV2();
-  const initialOpenReportId =
-    openParam && reports.some((r) => r.id === openParam) ? openParam : null;
+
+  if (openParam && reports.some((r) => r.id === openParam)) {
+    redirect(`/admin/reports/${openParam}`);
+  }
+
   return (
-    <ReportsRailView reports={reports} variant="admin" initialOpenReportId={initialOpenReportId} />
+    <Suspense fallback={null}>
+      <ReportsListView reports={reports} variant="admin" />
+    </Suspense>
   );
 }
