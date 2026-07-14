@@ -5,23 +5,30 @@ import { CreateClassroomSchema, PatchClassroomSchema } from "@/lib/schemas/admin
 import {
   createClassroom,
   setClassroomMontessoriCurriculum,
+  setClassroomUiHidden,
   updateClassroomName,
   updateClassroomPrograms,
 } from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { createClient } from "@/utils/supabase/server";
+import {
+  loadUiHiddenSets,
+  revealHiddenFromRequest,
+  shouldFilterUiHidden,
+} from "@/lib/visibility/ui-hidden";
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const schoolId = auth.user.schoolId;
+  const filterHidden = shouldFilterUiHidden(auth.user.role, revealHiddenFromRequest(req));
 
   const { data: classrooms, error: cErr } = await supabase
     .from("classrooms")
-    .select("id, name, code, status, curriculum_id, program_types")
+    .select("id, name, code, status, curriculum_id, program_types, ui_hidden")
     .eq("school_id", schoolId)
     .eq("status", "active")
     .order("name");
@@ -30,7 +37,13 @@ export async function GET() {
     return NextResponse.json({ error: cErr.message }, { status: 500 });
   }
 
-  const roomRows = classrooms ?? [];
+  const hidden = filterHidden
+    ? await loadUiHiddenSets(supabase, schoolId)
+    : { classroomIds: new Set<string>(), teacherIds: new Set<string>() };
+
+  const roomRows = (classrooms ?? []).filter(
+    (r) => !filterHidden || !hidden.classroomIds.has(r.id as string)
+  );
   const curriculumIds = [
     ...new Set(roomRows.map((r) => r.curriculum_id).filter((id): id is string => Boolean(id))),
   ];
@@ -159,7 +172,9 @@ export async function GET() {
 
   const classroomsOut = roomRows.map((r) => {
     const id = r.id as string;
-    const assigns = assignsByRoom.get(id) ?? [];
+    const assigns = (assignsByRoom.get(id) ?? []).filter(
+      (a) => !filterHidden || !hidden.teacherIds.has(a.teacher_user_id)
+    );
     const teachers = assigns.map((a) => ({
       assignmentId: a.id,
       userId: a.teacher_user_id,
@@ -188,24 +203,33 @@ export async function GET() {
       leadTeacherId: lead?.teacher_user_id ?? null,
       programTypes,
       groups: groupsByRoom.get(id) ?? [],
+      uiHidden: Boolean((r as { ui_hidden?: boolean }).ui_hidden),
     };
   });
 
   const { data: teacherPool } = await supabase
     .from("users")
-    .select("id, first_name, last_name")
+    .select("id, first_name, last_name, ui_hidden")
     .eq("school_id", schoolId)
     .eq("role", "teacher")
     .eq("status", "active")
     .order("last_name");
 
-  const teachers = (teacherPool ?? []).map((u) => {
-    const row = u as { id: string; first_name: string | null; last_name: string | null };
-    return {
-      id: row.id,
-      name: `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim() || "Teacher",
-    };
-  });
+  const teachers = (teacherPool ?? [])
+    .filter((u) => !filterHidden || !hidden.teacherIds.has((u as { id: string }).id))
+    .map((u) => {
+      const row = u as {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        ui_hidden?: boolean;
+      };
+      return {
+        id: row.id,
+        name: `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim() || "Teacher",
+        uiHidden: Boolean(row.ui_hidden),
+      };
+    });
 
   const roster: Array<{
     id: string;
@@ -366,12 +390,16 @@ export async function PATCH(req: Request) {
     if (input.curriculum_id !== undefined) {
       await setClassroomMontessoriCurriculum(ctx, input.classroom_id, input.curriculum_id);
     }
+    if (input.ui_hidden !== undefined) {
+      await setClassroomUiHidden(ctx, input.classroom_id, input.ui_hidden);
+    }
     return {
       id: input.classroom_id,
       meta: {
         updated_name: input.name !== undefined,
         updated_programs: Boolean(input.program_types),
         updated_curriculum: input.curriculum_id !== undefined,
+        updated_ui_hidden: input.ui_hidden !== undefined,
       },
     };
   });

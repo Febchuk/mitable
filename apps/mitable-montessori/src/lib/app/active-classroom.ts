@@ -38,65 +38,47 @@ export const getActiveClassroomForCurrentUser = cache(
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // First try the join. Works whenever RLS lets us read both
-    // classroom_teacher_assignments AND classrooms — i.e. the JWT hook is
-    // registered and `school_id` is present in the token.
-    const joined = await supabase
+    const { data: assignments } = await supabase
       .from("classroom_teacher_assignments")
-      .select("classroom_role, classrooms ( id, name, code )")
+      .select("classroom_id, classroom_role, start_date")
       .eq("teacher_user_id", user.id)
       .is("end_date", null)
-      .order("start_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (joined.data) {
-      const c = (
-        joined.data as unknown as {
-          classrooms: { id: string; name: string; code: string | null } | null;
-        }
-      ).classrooms;
-      if (c) {
-        return {
-          id: c.id,
-          name: c.name,
-          code: c.code,
-          role: (joined.data.classroom_role as ActiveClassroom["role"]) ?? null,
-        };
-      }
-    }
+      .order("start_date", { ascending: false });
+    if (!assignments?.length) return null;
 
-    // Fallback: split into two queries. Avoids depending on the cross-table
-    // RLS join + the JWT `school_id` claim. The two SELECT policies that
-    // matter here are "scoped read classroom_teachers" (line 45 of 0002_rls)
-    // and "scoped read classrooms" (line 43); both still pass when the user's
-    // profile is in the school, even if the join planner stumbles on the
-    // claim.
-    const a = await supabase
-      .from("classroom_teacher_assignments")
-      .select("classroom_id, classroom_role")
-      .eq("teacher_user_id", user.id)
-      .is("end_date", null)
-      .order("start_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!a.data) return null;
-    const assignment = a.data as {
+    const ids = [
+      ...new Set((assignments as Array<{ classroom_id: string }>).map((a) => a.classroom_id)),
+    ];
+    const { data: rooms } = await supabase
+      .from("classrooms")
+      .select("id, name, code, ui_hidden")
+      .in("id", ids);
+    const roomById = new Map(
+      (rooms ?? []).map((r) => {
+        const row = r as {
+          id: string;
+          name: string;
+          code: string | null;
+          ui_hidden?: boolean;
+        };
+        return [row.id, row] as const;
+      })
+    );
+
+    for (const a of assignments as Array<{
       classroom_id: string;
       classroom_role: ActiveClassroom["role"];
-    };
-    const c = await supabase
-      .from("classrooms")
-      .select("id, name, code")
-      .eq("id", assignment.classroom_id)
-      .maybeSingle();
-    if (!c.data) return null;
-    const classroom = c.data as { id: string; name: string; code: string | null };
-    return {
-      id: classroom.id,
-      name: classroom.name,
-      code: classroom.code,
-      role: assignment.classroom_role,
-    };
+    }>) {
+      const classroom = roomById.get(a.classroom_id);
+      if (!classroom || classroom.ui_hidden) continue;
+      return {
+        id: classroom.id,
+        name: classroom.name,
+        code: classroom.code,
+        role: a.classroom_role ?? null,
+      };
+    }
+    return null;
   }
 );
 
@@ -136,11 +118,12 @@ export const listTeacherClassroomsForCurrentUser = cache(
 
     const { data: rooms } = await supabase
       .from("classrooms")
-      .select("id, name, code")
+      .select("id, name, code, ui_hidden")
       .in("id", ids);
     if (!rooms?.length) return [];
 
-    return (rooms as Array<{ id: string; name: string; code: string | null }>)
+    return (rooms as Array<{ id: string; name: string; code: string | null; ui_hidden?: boolean }>)
+      .filter((c) => !c.ui_hidden)
       .map((c) => ({
         id: c.id,
         name: c.name,
@@ -214,7 +197,7 @@ export async function teacherShouldSeeIepProgressTab(): Promise<boolean> {
 
   const { data: rows, error } = await supabase
     .from("classroom_teacher_assignments")
-    .select("classrooms ( program_types )")
+    .select("classrooms ( program_types, ui_hidden )")
     .eq("teacher_user_id", user.id)
     .is("end_date", null);
 
@@ -224,7 +207,10 @@ export async function teacherShouldSeeIepProgressTab(): Promise<boolean> {
   let anyIep = false;
 
   for (const row of rows) {
-    const c = (row as { classrooms: { program_types?: string[] | null } | null }).classrooms;
+    const c = (
+      row as { classrooms: { program_types?: string[] | null; ui_hidden?: boolean } | null }
+    ).classrooms;
+    if (!c || c.ui_hidden) continue;
     const raw = c?.program_types;
     const programs: Array<"montessori" | "iep"> =
       Array.isArray(raw) && raw.length > 0
@@ -248,14 +234,17 @@ export async function teacherShouldSeeSpeechProgressTab(): Promise<boolean> {
 
   const { data: rows, error } = await supabase
     .from("classroom_teacher_assignments")
-    .select("classrooms ( program_types )")
+    .select("classrooms ( program_types, ui_hidden )")
     .eq("teacher_user_id", user.id)
     .is("end_date", null);
 
   if (error || !rows?.length) return false;
 
   for (const row of rows) {
-    const c = (row as { classrooms: { program_types?: string[] | null } | null }).classrooms;
+    const c = (
+      row as { classrooms: { program_types?: string[] | null; ui_hidden?: boolean } | null }
+    ).classrooms;
+    if (!c || c.ui_hidden) continue;
     const raw = c?.program_types;
     const programs =
       Array.isArray(raw) && raw.length > 0

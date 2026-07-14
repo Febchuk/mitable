@@ -71,6 +71,7 @@ import {
   adminSplitRailScrollStyle,
   adminSplitRailStyle,
 } from "@/components/admin/split-pane-layout";
+import { adminFetch } from "@/lib/visibility/reveal-hidden";
 
 type AdminChild = {
   id: string;
@@ -100,9 +101,10 @@ type AdminClassroom = ClassroomOption & {
   programTypes: ProgressProgram[];
   teachers: ApiClassroomTeacher[];
   groups: AdminClassroomGroup[];
+  uiHidden: boolean;
 };
 
-type ApiTeacher = { id: string; name: string };
+type ApiTeacher = { id: string; name: string; uiHidden?: boolean };
 
 type ApiClassroomTeacher = {
   assignmentId: string;
@@ -128,6 +130,7 @@ type ApiClassroom = {
   programTypes: ProgressProgram[];
   teachers: ApiClassroomTeacher[];
   groups: ApiClassroomGroup[];
+  uiHidden?: boolean;
 };
 
 type ApiRosterStudent = {
@@ -217,7 +220,7 @@ function rosterToAdminChildren(roster: ApiRosterStudent[]): AdminChild[] {
 }
 
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const res = await adminFetch(url, {
     ...init,
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
   });
@@ -321,6 +324,7 @@ export default function AdminClassroomsPage() {
           color: normalizeGroupColor(g.color),
           sortOrder: g.sortOrder ?? 0,
         })),
+        uiHidden: Boolean(c.uiHidden),
       }));
       setClassrooms(mappedClassrooms);
       setTeacherPool(data.teachers);
@@ -339,6 +343,12 @@ export default function AdminClassroomsPage() {
 
   React.useEffect(() => {
     void reload();
+  }, [reload]);
+
+  React.useEffect(() => {
+    const onReveal = () => void reload();
+    window.addEventListener("mitable:reveal-hidden-changed", onReveal);
+    return () => window.removeEventListener("mitable:reveal-hidden-changed", onReveal);
   }, [reload]);
 
   const selectedClassroom = selectedClassroomId
@@ -529,6 +539,19 @@ export default function AdminClassroomsPage() {
       await reload();
     } catch (e) {
       setMutationError(e instanceof Error ? e.message : "Could not update curriculum");
+    }
+  };
+
+  const setClassroomUiHidden = async (classroomId: string, uiHidden: boolean) => {
+    setMutationError(null);
+    try {
+      await apiJson("/api/admin/classrooms", {
+        method: "PATCH",
+        body: JSON.stringify({ classroom_id: classroomId, ui_hidden: uiHidden }),
+      });
+      await reload();
+    } catch (e) {
+      setMutationError(e instanceof Error ? e.message : "Could not update visibility");
     }
   };
 
@@ -954,6 +977,7 @@ export default function AdminClassroomsPage() {
                 onRemoveTeacher={(assignmentId) => void removeTeacherFromRoom(assignmentId)}
                 onSavePrograms={(next) => setClassroomPrograms(selectedClassroom.id, next)}
                 onPickCurriculum={(next) => setClassroomCurriculum(selectedClassroom.id, next)}
+                onSetUiHidden={(next) => void setClassroomUiHidden(selectedClassroom.id, next)}
                 onCreateGroup={(name, color) => createGroup(selectedClassroom.id, name, color)}
                 onUpdateGroup={(groupId, fields) => updateGroup(groupId, fields)}
                 onDeleteGroup={(groupId) => deleteGroup(groupId)}
@@ -1348,6 +1372,7 @@ function ClassroomSettingsSection({
   onRemoveTeacher,
   onSavePrograms,
   onPickCurriculum,
+  onSetUiHidden,
   onCreateGroup,
   onUpdateGroup,
   onDeleteGroup,
@@ -1362,6 +1387,7 @@ function ClassroomSettingsSection({
   onRemoveTeacher: (assignmentId: string) => void;
   onSavePrograms: (next: ProgressProgram[]) => Promise<boolean>;
   onPickCurriculum: (curriculumId: string | null) => Promise<void>;
+  onSetUiHidden: (uiHidden: boolean) => void;
   onCreateGroup: (name: string, color: GroupColor) => Promise<boolean>;
   onUpdateGroup: (
     groupId: string,
@@ -1379,6 +1405,7 @@ function ClassroomSettingsSection({
     ...(groupsEnabled
       ? [`${classroom.groups.length} ${classroom.groups.length === 1 ? "group" : "groups"}`]
       : []),
+    ...(classroom.uiHidden ? ["Hidden in default view"] : []),
   ].join(" · ");
 
   return (
@@ -1444,6 +1471,33 @@ function ClassroomSettingsSection({
             gap: 14,
           }}
         >
+          <SettingsCard>
+            <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 4 }}>
+              Visibility
+            </div>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--color-ink-secondary)" }}>
+              When hidden, this classroom and its children are omitted from the default school view
+              until an admin chooses “Show hidden” in the account menu.
+            </p>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontSize: 13,
+                color: "var(--color-ink)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={classroom.uiHidden}
+                onChange={(e) => onSetUiHidden(e.target.checked)}
+              />
+              Hidden in default view
+            </label>
+          </SettingsCard>
+
           <SettingsCard>
             <ClassroomStaffPanel
               classroomId={classroom.id}

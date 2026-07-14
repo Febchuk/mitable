@@ -58,6 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 variant="row"
                 direction="up"
                 align="left"
+                showRevealHidden={isAdmin}
               />
             }
           />

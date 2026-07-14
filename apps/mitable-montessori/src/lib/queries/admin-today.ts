@@ -2,6 +2,11 @@ import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
 import { listCapturedToday, todayDateString, type CapturedTodayEntry } from "@/lib/queries/today";
+import {
+  loadUiHiddenSets,
+  revealHiddenFromCookies,
+  shouldFilterUiHidden,
+} from "@/lib/visibility/ui-hidden";
 
 export type AdminSchoolAttendance = {
   date: string;
@@ -58,16 +63,22 @@ export function formatSchoolDayLabel(isoDate: string): string {
 export async function getAdminTodayData(schoolId: string): Promise<AdminTodayData> {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
+  const filterHidden = shouldFilterUiHidden("admin", await revealHiddenFromCookies());
+  const hidden = filterHidden
+    ? await loadUiHiddenSets(supabase, schoolId)
+    : { classroomIds: new Set<string>(), teacherIds: new Set<string>() };
 
   const today = todayDateString();
 
   const { data: rooms } = await supabase
     .from("classrooms")
-    .select("id")
+    .select("id, ui_hidden")
     .eq("school_id", schoolId)
-    .returns<Array<{ id: string }>>();
+    .returns<Array<{ id: string; ui_hidden?: boolean }>>();
 
-  const roomIds = (rooms ?? []).map((r) => r.id);
+  const roomIds = (rooms ?? [])
+    .filter((r) => !filterHidden || !hidden.classroomIds.has(r.id))
+    .map((r) => r.id);
 
   const emptyAttendance: AdminSchoolAttendance = {
     date: today,
@@ -80,7 +91,10 @@ export async function getAdminTodayData(schoolId: string): Promise<AdminTodayDat
 
   if (roomIds.length === 0) {
     const captured = await listCapturedToday(16);
-    const pendingReports = await listAdminPendingReports(supabase);
+    const pendingReports = await listAdminPendingReports(supabase, {
+      filterHidden,
+      hiddenClassroomIds: hidden.classroomIds,
+    });
     return {
       dateLabel: formatSchoolDayLabel(today),
       attendance: emptyAttendance,
@@ -170,7 +184,10 @@ export async function getAdminTodayData(schoolId: string): Promise<AdminTodayDat
 
   const [captured, pendingReports] = await Promise.all([
     listCapturedToday(16),
-    listAdminPendingReports(supabase),
+    listAdminPendingReports(supabase, {
+      filterHidden,
+      hiddenClassroomIds: hidden.classroomIds,
+    }),
   ]);
 
   return {
@@ -181,7 +198,10 @@ export async function getAdminTodayData(schoolId: string): Promise<AdminTodayDat
   };
 }
 
-async function listAdminPendingReports(supabase: SupabaseClient): Promise<AdminPendingReport[]> {
+async function listAdminPendingReports(
+  supabase: SupabaseClient,
+  opts?: { filterHidden: boolean; hiddenClassroomIds: Set<string> }
+): Promise<AdminPendingReport[]> {
   const { data } = await supabase
     .from("reports")
     .select(
@@ -206,7 +226,28 @@ async function listAdminPendingReports(supabase: SupabaseClient): Promise<AdminP
       }>
     >();
 
-  return (data ?? []).map((r) => {
+  let rows = data ?? [];
+  if (opts?.filterHidden && opts.hiddenClassroomIds.size > 0 && rows.length > 0) {
+    const studentIds = [...new Set(rows.map((r) => r.student_id))];
+    const { data: enrollments } = await supabase
+      .from("student_classroom_enrollments")
+      .select("student_id, classroom_id")
+      .in("student_id", studentIds)
+      .is("end_date", null);
+    const visibleStudents = new Set<string>();
+    const enrolled = new Set<string>();
+    for (const e of enrollments ?? []) {
+      const row = e as { student_id: string; classroom_id: string };
+      enrolled.add(row.student_id);
+      if (!opts.hiddenClassroomIds.has(row.classroom_id)) {
+        visibleStudents.add(row.student_id);
+      }
+    }
+    // Keep reports for students with any visible room, or no enrollments.
+    rows = rows.filter((r) => visibleStudents.has(r.student_id) || !enrolled.has(r.student_id));
+  }
+
+  return rows.map((r) => {
     const display =
       r.students?.preferred_name ||
       (r.students ? `${r.students.first_name} ${r.students.last_name}`.trim() : "Unknown");

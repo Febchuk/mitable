@@ -13,25 +13,12 @@ import {
   X,
 } from "lucide-react";
 import { initialsFor, type Tone } from "@/components/montessori/data";
-import {
-  FilterChips,
-  PageHeader,
-  cardStyle,
-} from "@/components/montessori/page-header";
-import {
-  Avatar,
-  HandDivider,
-  HandUnderline,
-  ToastBus,
-} from "@/components/montessori/primitives";
+import { FilterChips, PageHeader, cardStyle } from "@/components/montessori/page-header";
+import { Avatar, HandDivider, HandUnderline, ToastBus } from "@/components/montessori/primitives";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { adminFetch } from "@/lib/visibility/reveal-hidden";
 
 type TeacherStatus = "Active" | "Invited" | "Expired";
 
@@ -52,6 +39,7 @@ type Teacher = {
   expiresAt?: string;
   /** ISO timestamp the teacher claimed and became Active. */
   joinedAt?: string;
+  uiHidden?: boolean;
 };
 
 const TONE_CYCLE: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
@@ -70,6 +58,7 @@ interface ApiTeacher {
   invitedAt?: string;
   expiresAt?: string;
   joinedAt?: string;
+  uiHidden?: boolean;
 }
 
 function toneFor(index: number): Tone {
@@ -89,6 +78,7 @@ function mapApiTeachers(rows: ApiTeacher[]): Teacher[] {
     invitedAt: row.invitedAt,
     expiresAt: row.expiresAt,
     joinedAt: row.joinedAt,
+    uiHidden: Boolean(row.uiHidden),
   }));
 }
 
@@ -101,7 +91,7 @@ export default function AdminTeachersPage() {
 
   const refresh = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/teachers", { cache: "no-store" });
+      const res = await adminFetch("/api/admin/teachers", { cache: "no-store" });
       if (!res.ok) {
         throw new Error(`Failed to load teachers (${res.status})`);
       }
@@ -120,6 +110,33 @@ export default function AdminTeachersPage() {
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  React.useEffect(() => {
+    const onReveal = () => void refresh();
+    window.addEventListener("mitable:reveal-hidden-changed", onReveal);
+    return () => window.removeEventListener("mitable:reveal-hidden-changed", onReveal);
+  }, [refresh]);
+
+  const setTeacherHidden = async (teacher: Teacher, uiHidden: boolean) => {
+    if (teacher.status !== "Active" || teacher.id.startsWith("invite:")) return;
+    try {
+      const res = await adminFetch("/api/admin/teachers", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_user_id: teacher.id, ui_hidden: uiHidden }),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(json.error ?? `Failed (${res.status})`);
+      }
+      await refresh();
+    } catch (err) {
+      ToastBus.push({
+        message: (err as Error).message,
+        icon: <MailWarning size={12} strokeWidth={1.6} color="var(--color-surface)" />,
+      });
+    }
+  };
 
   const counts = React.useMemo(() => {
     const c: Record<FilterValue, number> = {
@@ -163,9 +180,7 @@ export default function AdminTeachersPage() {
       if (sentCount > 0) {
         ToastBus.push({
           message:
-            sentCount === 1
-              ? `Invite sent to ${json.sent![0].email}`
-              : `${sentCount} invites sent`,
+            sentCount === 1 ? `Invite sent to ${json.sent![0].email}` : `${sentCount} invites sent`,
           icon: <Mail size={12} strokeWidth={1.6} color="var(--color-surface)" />,
         });
       }
@@ -175,9 +190,7 @@ export default function AdminTeachersPage() {
           .join(", ");
         ToastBus.push({
           message:
-            skippedCount === 1
-              ? `Skipped ${reasons}`
-              : `${skippedCount} skipped: ${reasons}`,
+            skippedCount === 1 ? `Skipped ${reasons}` : `${skippedCount} skipped: ${reasons}`,
           icon: <MailWarning size={12} strokeWidth={1.6} color="var(--color-surface)" />,
         });
       }
@@ -291,9 +304,7 @@ export default function AdminTeachersPage() {
               ...FILTERS.map((f) => `${labelFor(f)} · ${counts[f]}`),
             ]}
             value={
-              filter === "All"
-                ? `All · ${counts.All}`
-                : `${labelFor(filter)} · ${counts[filter]}`
+              filter === "All" ? `All · ${counts.All}` : `${labelFor(filter)} · ${counts[filter]}`
             }
             onChange={(v) => {
               const stripped = v.split(" · ")[0] as FilterValue;
@@ -326,14 +337,14 @@ export default function AdminTeachersPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1.6fr 1.6fr 1.4fr 1fr 96px",
+              gridTemplateColumns: "1.6fr 1.6fr 1.4fr 1fr 120px",
               padding: "12px 20px",
               borderBottom: "1px solid var(--color-border)",
             }}
           >
             {["Teacher", "Email", "Classrooms", "Status", ""].map((header) => (
               <div
-                key={header}
+                key={header || "actions"}
                 className="label-cap"
                 style={{ color: "var(--color-ink-muted)" }}
               >
@@ -347,6 +358,7 @@ export default function AdminTeachersPage() {
               teacher={teacher}
               onResend={() => resendInvite(teacher.id, teacher.invitationId)}
               onRevoke={() => revokeInvite(teacher.id, teacher.invitationId)}
+              onToggleHidden={(next) => void setTeacherHidden(teacher, next)}
             />
           ))}
           {filtered.length === 0 && (
@@ -363,6 +375,7 @@ export default function AdminTeachersPage() {
               index={index}
               onResend={() => resendInvite(teacher.id, teacher.invitationId)}
               onRevoke={() => revokeInvite(teacher.id, teacher.invitationId)}
+              onToggleHidden={(next) => void setTeacherHidden(teacher, next)}
             />
           ))}
           {filtered.length === 0 && (
@@ -389,10 +402,12 @@ function TeacherRow({
   teacher,
   onResend,
   onRevoke,
+  onToggleHidden,
 }: {
   teacher: Teacher;
   onResend: () => void;
   onRevoke: () => void;
+  onToggleHidden: (uiHidden: boolean) => void;
 }) {
   const [hover, setHover] = React.useState(false);
   const displayName =
@@ -407,7 +422,7 @@ function TeacherRow({
       onMouseLeave={() => setHover(false)}
       style={{
         display: "grid",
-        gridTemplateColumns: "1.6fr 1.6fr 1.4fr 1fr 96px",
+        gridTemplateColumns: "1.6fr 1.6fr 1.4fr 1fr 120px",
         alignItems: "center",
         padding: "14px 20px",
         borderTop: "1px solid var(--color-border)",
@@ -418,9 +433,7 @@ function TeacherRow({
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <Avatar
           initials={
-            displayName === "Awaiting sign-up"
-              ? glyphFor(teacher.email)
-              : initialsFor(displayName)
+            displayName === "Awaiting sign-up" ? glyphFor(teacher.email) : initialsFor(displayName)
           }
           tone={teacher.tone}
           size={36}
@@ -431,9 +444,7 @@ function TeacherRow({
               fontWeight: 600,
               fontSize: 14,
               color:
-                displayName === "Awaiting sign-up"
-                  ? "var(--color-ink-muted)"
-                  : "var(--color-ink)",
+                displayName === "Awaiting sign-up" ? "var(--color-ink-muted)" : "var(--color-ink)",
               fontStyle: displayName === "Awaiting sign-up" ? "italic" : "normal",
             }}
           >
@@ -466,17 +477,48 @@ function TeacherRow({
           display: "flex",
           justifyContent: "flex-end",
           gap: 4,
-          opacity: hover && teacher.status !== "Active" ? 1 : 0,
-          transition: "opacity 140ms ease",
-          pointerEvents: hover && teacher.status !== "Active" ? "auto" : "none",
+          alignItems: "center",
         }}
       >
-        <RowAction label="Resend invite" onClick={onResend}>
-          <RefreshCw size={14} strokeWidth={1.6} />
-        </RowAction>
-        <RowAction label="Revoke invite" onClick={onRevoke} tone="danger">
-          <Trash2 size={14} strokeWidth={1.6} />
-        </RowAction>
+        {teacher.status === "Active" ? (
+          <label
+            title="Hidden in default view"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              color: "var(--color-ink-muted)",
+              cursor: "pointer",
+              opacity: hover || teacher.uiHidden ? 1 : 0.55,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(teacher.uiHidden)}
+              onChange={(e) => onToggleHidden(e.target.checked)}
+            />
+            Hide
+          </label>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 4,
+              opacity: hover ? 1 : 0,
+              transition: "opacity 140ms ease",
+              pointerEvents: hover ? "auto" : "none",
+            }}
+          >
+            <RowAction label="Resend invite" onClick={onResend}>
+              <RefreshCw size={14} strokeWidth={1.6} />
+            </RowAction>
+            <RowAction label="Revoke invite" onClick={onRevoke} tone="danger">
+              <Trash2 size={14} strokeWidth={1.6} />
+            </RowAction>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -487,11 +529,13 @@ function TeacherMobileRow({
   index,
   onResend,
   onRevoke,
+  onToggleHidden,
 }: {
   teacher: Teacher;
   index: number;
   onResend: () => void;
   onRevoke: () => void;
+  onToggleHidden: (uiHidden: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const displayName =
@@ -512,9 +556,7 @@ function TeacherMobileRow({
     >
       <Avatar
         initials={
-          displayName === "Awaiting sign-up"
-            ? glyphFor(teacher.email)
-            : initialsFor(displayName)
+          displayName === "Awaiting sign-up" ? glyphFor(teacher.email) : initialsFor(displayName)
         }
         tone={teacher.tone}
         size={42}
@@ -525,9 +567,7 @@ function TeacherMobileRow({
             fontWeight: 600,
             fontSize: 15,
             color:
-              displayName === "Awaiting sign-up"
-                ? "var(--color-ink-muted)"
-                : "var(--color-ink)",
+              displayName === "Awaiting sign-up" ? "var(--color-ink-muted)" : "var(--color-ink)",
             fontStyle: displayName === "Awaiting sign-up" ? "italic" : "normal",
           }}
         >
@@ -559,7 +599,26 @@ function TeacherMobileRow({
           <span>· {subtitleFor(teacher)}</span>
         </div>
       </div>
-      {teacher.status !== "Active" && (
+      {teacher.status === "Active" ? (
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color: "var(--color-ink-muted)",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={Boolean(teacher.uiHidden)}
+            onChange={(e) => onToggleHidden(e.target.checked)}
+          />
+          Hide
+        </label>
+      ) : (
         <button
           type="button"
           aria-label="Invite actions"
@@ -641,8 +700,7 @@ function MenuItem({
         border: "none",
         textAlign: "left",
         fontSize: 13,
-        color:
-          tone === "danger" ? "var(--color-terracotta-deep)" : "var(--color-ink)",
+        color: tone === "danger" ? "var(--color-terracotta-deep)" : "var(--color-ink)",
         cursor: "pointer",
       }}
     >
@@ -678,8 +736,7 @@ function RowAction({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color:
-          tone === "danger" ? "var(--color-terracotta-deep)" : "var(--color-ink-secondary)",
+        color: tone === "danger" ? "var(--color-terracotta-deep)" : "var(--color-ink-secondary)",
         cursor: "pointer",
         transition: "background 120ms ease, border-color 120ms ease",
       }}
@@ -701,13 +758,7 @@ function RowAction({
 /*  Status pill                                                        */
 /* ------------------------------------------------------------------ */
 
-function StatusPill({
-  status,
-  compact = false,
-}: {
-  status: TeacherStatus;
-  compact?: boolean;
-}) {
+function StatusPill({ status, compact = false }: { status: TeacherStatus; compact?: boolean }) {
   const palette = STATUS_PALETTE[status];
   return (
     <span
@@ -732,9 +783,7 @@ function StatusPill({
           borderRadius: 999,
           background: palette.dot,
           boxShadow:
-            status === "Invited"
-              ? `0 0 0 3px ${palette.bg}, 0 0 0 4px ${palette.dot}33`
-              : "none",
+            status === "Invited" ? `0 0 0 3px ${palette.bg}, 0 0 0 4px ${palette.dot}33` : "none",
         }}
       />
       {labelFor(status)}
@@ -742,10 +791,7 @@ function StatusPill({
   );
 }
 
-const STATUS_PALETTE: Record<
-  TeacherStatus,
-  { bg: string; fg: string; dot: string }
-> = {
+const STATUS_PALETTE: Record<TeacherStatus, { bg: string; fg: string; dot: string }> = {
   Active: {
     bg: "var(--color-sage-soft)",
     fg: "var(--color-sage-deep)",
@@ -889,8 +935,7 @@ function InviteTeachersDialog({
     return true;
   };
 
-  const removeChip = (id: string) =>
-    setChips((prev) => prev.filter((c) => c.id !== id));
+  const removeChip = (id: string) => setChips((prev) => prev.filter((c) => c.id !== id));
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === "," || e.key === " " || e.key === "Tab") {
@@ -975,8 +1020,7 @@ function InviteTeachersDialog({
             }}
           >
             <p style={{ fontSize: 13, color: "var(--color-ink-secondary)", margin: 0 }}>
-              Add one or many email addresses. Each teacher gets a link to set up their
-              own account.
+              Add one or many email addresses. Each teacher gets a link to set up their own account.
             </p>
             <HandUnderline width={108} style={{ marginTop: 2 }} />
           </div>
@@ -1037,7 +1081,9 @@ function InviteTeachersDialog({
             >
               <MailWarning size={14} strokeWidth={1.7} style={{ marginTop: 2, flexShrink: 0 }} />
               <div>
-                {invalidChips.length === 1 ? "1 address needs attention:" : `${invalidChips.length} addresses need attention:`}{" "}
+                {invalidChips.length === 1
+                  ? "1 address needs attention:"
+                  : `${invalidChips.length} addresses need attention:`}{" "}
                 {summarizeInvalid(invalidChips)}
               </div>
             </div>
@@ -1343,6 +1389,7 @@ function glyphFor(email: string): string {
 
 function subtitleFor(t: Teacher): string {
   if (t.status === "Active") {
+    if (t.uiHidden) return "Hidden in default view";
     return t.joinedAt ? `Joined ${formatRelative(t.joinedAt)}` : "Joined";
   }
   if (t.status === "Invited") {

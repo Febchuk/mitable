@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { createClient } from "@/utils/supabase/server";
+import {
+  loadUiHiddenSets,
+  revealHiddenFromRequest,
+  shouldFilterUiHidden,
+  visibleClassroomIdsForStudent,
+} from "@/lib/visibility/ui-hidden";
 
 type EnrRow = {
   classroom_id: string;
@@ -31,13 +37,17 @@ function classroomNameFromEnrollment(e: EnrRow): string {
  * School-wide roster for admins: one row per student with active classroom
  * memberships and guardian counts.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const schoolId = auth.user.schoolId;
+  const filterHidden = shouldFilterUiHidden(auth.user.role, revealHiddenFromRequest(req));
+  const hidden = filterHidden
+    ? await loadUiHiddenSets(supabase, schoolId)
+    : { classroomIds: new Set<string>(), teacherIds: new Set<string>() };
 
   const { data, error } = await supabase
     .from("students")
@@ -57,33 +67,46 @@ export async function GET() {
 
   const students = (data ?? []) as unknown as StRow[];
 
-  const out = students.map((s) => {
+  const out = students.flatMap((s) => {
     const enrsRaw = s.student_classroom_enrollments;
     const enrs: EnrRow[] = Array.isArray(enrsRaw) ? enrsRaw : enrsRaw ? [enrsRaw] : [];
     const active = enrs.filter((e) => e.end_date === null);
-    const pairs = active
+    const activeIds = active.map((e) => e.classroom_id);
+    const visibleIds = visibleClassroomIdsForStudent(activeIds, hidden.classroomIds, filterHidden);
+    // Kids with only hidden-room enrollments (or no rooms) stay when not filtering;
+    // when filtering, drop kids with no visible room. Unassigned kids (no enrollments)
+    // remain visible — they aren't "in" a hidden classroom.
+    if (filterHidden && activeIds.length > 0 && visibleIds === null) {
+      return [];
+    }
+    const allowed = visibleIds ?? activeIds;
+    const allowedSet = new Set(allowed);
+    const visibleActive = active.filter((e) => allowedSet.has(e.classroom_id));
+    const pairs = visibleActive
       .map((e) => ({
         id: e.classroom_id,
         name: classroomNameFromEnrollment(e),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    const starts = active.map((e) => e.start_date).filter(Boolean);
+    const starts = visibleActive.map((e) => e.start_date).filter(Boolean);
     const earliest = starts.length ? [...starts].sort()[0] : null;
 
     const sgRaw = s.student_guardians;
     const sgList = Array.isArray(sgRaw) ? sgRaw : sgRaw ? [sgRaw] : [];
     const guardianCount = sgList.length;
 
-    return {
-      id: s.id,
-      firstName: s.first_name,
-      lastName: s.last_name,
-      preferredName: s.preferred_name,
-      birthDate: s.birth_date,
-      guardianCount,
-      enrolledEarliest: earliest,
-      classrooms: pairs,
-    };
+    return [
+      {
+        id: s.id,
+        firstName: s.first_name,
+        lastName: s.last_name,
+        preferredName: s.preferred_name,
+        birthDate: s.birth_date,
+        guardianCount,
+        enrolledEarliest: earliest,
+        classrooms: pairs,
+      },
+    ];
   });
 
   out.sort(

@@ -7,6 +7,8 @@ import {
   Book,
   Building2,
   CalendarRange,
+  Eye,
+  EyeOff,
   HelpCircle,
   LayoutTemplate,
   LogOut,
@@ -20,6 +22,7 @@ import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor
 import { ChatThread } from "@/components/chat/ChatThread";
 import { clearDb } from "@/lib/db/schema";
 import { clearSessionKeys } from "@/lib/crypto/session-key";
+import { getRevealHidden, setRevealHidden } from "@/lib/visibility/reveal-hidden";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
 import { adminReportTemplatesEnabled } from "@/lib/feature-flags";
@@ -360,6 +363,12 @@ function MobileDrawer({
     (localPart.length ? localPart[0].toUpperCase() + localPart.slice(1) : email);
   const roleLabel = variant === "admin" ? "Admin" : "Lead guide";
   const initial = (firstName?.[0] || email[0] || "?").toUpperCase();
+  const [revealHidden, setRevealHiddenState] = React.useState(false);
+
+  React.useEffect(() => {
+    if (variant !== "admin") return;
+    setRevealHiddenState(getRevealHidden());
+  }, [variant]);
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -376,6 +385,15 @@ function MobileDrawer({
     }
     router.push("/login");
     router.refresh();
+  }
+
+  function toggleRevealHidden() {
+    const next = !revealHidden;
+    setRevealHidden(next);
+    setRevealHiddenState(next);
+    onDismiss();
+    router.refresh();
+    window.dispatchEvent(new Event("mitable:reveal-hidden-changed"));
   }
 
   return (
@@ -584,6 +602,34 @@ function MobileDrawer({
           background: "var(--color-surface)",
         }}
       >
+        {variant === "admin" ? (
+          <button
+            type="button"
+            className="tap"
+            onClick={toggleRevealHidden}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "12px 14px",
+              width: "100%",
+              borderRadius: 12,
+              background: "transparent",
+              color: "var(--color-ink)",
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+              marginBottom: 4,
+            }}
+          >
+            {revealHidden ? (
+              <EyeOff size={18} strokeWidth={1.6} />
+            ) : (
+              <Eye size={18} strokeWidth={1.6} />
+            )}
+            {revealHidden ? "Hide soft-hidden items" : "Show hidden classrooms & teachers"}
+          </button>
+        ) : null}
         <button
           type="button"
           className="tap"

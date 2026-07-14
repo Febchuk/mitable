@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { listInvitationsForSchool } from "@/lib/teachers/invitations";
+import { adminWriteRoute } from "@/lib/admin/route-helper";
+import { setTeacherUiHidden } from "@/lib/admin/crud";
+import { SetTeacherUiHiddenSchema } from "@/lib/schemas/admin";
+import {
+  loadUiHiddenSets,
+  revealHiddenFromRequest,
+  shouldFilterUiHidden,
+} from "@/lib/visibility/ui-hidden";
 
 /**
  * Roster for /admin/teachers. Returns one entry per teacher: existing `users`
@@ -15,25 +23,34 @@ import { listInvitationsForSchool } from "@/lib/teachers/invitations";
  * If both a Pending invite AND an Active user exist for the same email
  * (rare race), Active wins.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
+
+  const filterHidden = shouldFilterUiHidden(auth.user.role, revealHiddenFromRequest(req));
 
   // Service-role read so we don't depend on the JWT-claim-based RLS path
   // (which requires the Custom Access Token Hook). All queries below are
   // explicitly scoped by auth.user.schoolId, so cross-school leakage isn't
   // possible.
   const supabase = createAdminClient();
+  const hidden = filterHidden
+    ? await loadUiHiddenSets(supabase, auth.user.schoolId)
+    : { classroomIds: new Set<string>(), teacherIds: new Set<string>() };
 
   // Active teachers — real users rows.
   const { data: users, error: usersErr } = await supabase
     .from("users")
-    .select("id, first_name, last_name, email, status, created_at")
+    .select("id, first_name, last_name, email, status, created_at, ui_hidden")
     .eq("school_id", auth.user.schoolId)
     .eq("role", "teacher");
   if (usersErr) {
     return NextResponse.json({ error: usersErr.message }, { status: 500 });
   }
+
+  const visibleUsers = (users ?? []).filter(
+    (u) => !filterHidden || !hidden.teacherIds.has((u as { id: string }).id)
+  );
 
   // All invitations for the school. We'll reduce to the most recent unclaimed
   // entry per email; claimed entries are dropped because the active user row
@@ -41,19 +58,21 @@ export async function GET() {
   const invitations = await listInvitationsForSchool(supabase, auth.user.schoolId);
 
   // Classroom assignments to enrich the response with classroom names.
-  const teacherIds = (users ?? []).map((u) => (u as { id: string }).id);
+  const teacherIds = visibleUsers.map((u) => (u as { id: string }).id);
   let assignmentsByTeacher: Record<string, string[]> = {};
   if (teacherIds.length > 0) {
     const { data: assignments } = await supabase
       .from("classroom_teacher_assignments")
-      .select("teacher_user_id, classrooms(name)")
+      .select("teacher_user_id, classroom_id, classrooms(name)")
       .in("teacher_user_id", teacherIds)
       .is("end_date", null);
     assignmentsByTeacher = (assignments ?? []).reduce<Record<string, string[]>>((acc, raw) => {
       const row = raw as {
         teacher_user_id: string;
+        classroom_id: string;
         classrooms: { name: string } | { name: string }[] | null;
       };
+      if (filterHidden && hidden.classroomIds.has(row.classroom_id)) return acc;
       const c = Array.isArray(row.classrooms) ? row.classrooms[0] : row.classrooms;
       if (!c) return acc;
       acc[row.teacher_user_id] = [...(acc[row.teacher_user_id] ?? []), c.name];
@@ -63,7 +82,7 @@ export async function GET() {
 
   const now = Date.now();
   const activeEmails = new Set(
-    (users ?? []).map((u) => (u as { email: string }).email.toLowerCase())
+    visibleUsers.map((u) => (u as { email: string }).email.toLowerCase())
   );
 
   type RosterEntry = {
@@ -77,9 +96,10 @@ export async function GET() {
     invitedAt?: string;
     expiresAt?: string;
     joinedAt?: string;
+    uiHidden?: boolean;
   };
 
-  const roster: RosterEntry[] = (users ?? []).map((u) => {
+  const roster: RosterEntry[] = visibleUsers.map((u) => {
     const row = u as {
       id: string;
       first_name: string | null;
@@ -87,6 +107,7 @@ export async function GET() {
       email: string;
       status: string;
       created_at: string;
+      ui_hidden?: boolean;
     };
     return {
       id: row.id,
@@ -96,6 +117,7 @@ export async function GET() {
       classrooms: assignmentsByTeacher[row.id] ?? [],
       status: "Active",
       joinedAt: row.created_at,
+      uiHidden: Boolean(row.ui_hidden),
     };
   });
 
@@ -123,4 +145,16 @@ export async function GET() {
   }
 
   return NextResponse.json({ teachers: roster });
+}
+
+export async function PATCH(req: Request) {
+  return adminWriteRoute(
+    req,
+    SetTeacherUiHiddenSchema,
+    "admin_set_teacher_ui_hidden",
+    async (input, ctx) => {
+      await setTeacherUiHidden(ctx, input.teacher_user_id, input.ui_hidden);
+      return { id: input.teacher_user_id, ui_hidden: input.ui_hidden };
+    }
+  );
 }

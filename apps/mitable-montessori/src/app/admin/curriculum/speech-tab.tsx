@@ -6,6 +6,7 @@ import { cardStyle } from "@/components/montessori/page-header";
 import { Avatar, ToastBus } from "@/components/montessori/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { adminFetch } from "@/lib/visibility/reveal-hidden";
 
 type Tone = "clay" | "sage" | "butter" | "blue" | "terracotta";
 
@@ -45,7 +46,7 @@ export function SpeechAdminTab() {
   }, [roster, onlyWithTargets]);
 
   const refreshRoster = React.useCallback(async () => {
-    const res = await fetch("/api/admin/speech/students", { cache: "no-store" });
+    const res = await adminFetch("/api/admin/speech/students", { cache: "no-store" });
     if (!res.ok) return;
     const data = (await res.json().catch(() => ({}))) as { students?: RosterRow[] };
     setRoster(data.students ?? []);
@@ -53,6 +54,12 @@ export function SpeechAdminTab() {
 
   React.useEffect(() => {
     void refreshRoster();
+  }, [refreshRoster]);
+
+  React.useEffect(() => {
+    const onReveal = () => void refreshRoster();
+    window.addEventListener("mitable:reveal-hidden-changed", onReveal);
+    return () => window.removeEventListener("mitable:reveal-hidden-changed", onReveal);
   }, [refreshRoster]);
 
   React.useEffect(() => {

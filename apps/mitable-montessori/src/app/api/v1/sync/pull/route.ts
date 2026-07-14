@@ -37,6 +37,8 @@ export async function GET() {
 
   // Pull all the read-only roster + curriculum tables. RLS confines results to
   // this school. We use the user-scoped client so policies apply.
+  // Soft-hidden classrooms (and kids only enrolled there) are omitted so the
+  // offline cache never surfaces them for teachers.
   const [
     students,
     enrollments,
@@ -63,7 +65,7 @@ export async function GET() {
       .select("id, student_id, classroom_id, start_date, end_date, is_primary"),
     supabase
       .from("classrooms")
-      .select("id, school_id, curriculum_id, name, code, status")
+      .select("id, school_id, curriculum_id, name, code, status, ui_hidden")
       .eq("status", "active"),
     supabase
       .from("classroom_teacher_assignments")
@@ -129,24 +131,86 @@ export async function GET() {
     }
   }
 
+  const allClassrooms = (classrooms.data ?? []) as Array<{
+    id: string;
+    ui_hidden?: boolean;
+    [key: string]: unknown;
+  }>;
+  const hiddenClassroomIds = new Set(allClassrooms.filter((c) => c.ui_hidden).map((c) => c.id));
+  const visibleClassrooms = allClassrooms
+    .filter((c) => !c.ui_hidden)
+    .map(({ ui_hidden: _omit, ...rest }) => rest);
+
+  const allEnrollments = (enrollments.data ?? []) as Array<{
+    student_id: string;
+    classroom_id: string;
+    end_date: string | null;
+    [key: string]: unknown;
+  }>;
+  const visibleEnrollments = allEnrollments.filter((e) => !hiddenClassroomIds.has(e.classroom_id));
+  const studentsWithVisibleRoom = new Set(
+    visibleEnrollments.filter((e) => e.end_date === null).map((e) => e.student_id)
+  );
+  // Kids only enrolled in hidden rooms are dropped. Unassigned kids stay.
+  const enrolledStudentIds = new Set(
+    allEnrollments.filter((e) => e.end_date === null).map((e) => e.student_id)
+  );
+  const visibleStudents = ((students.data ?? []) as Array<{ id: string }>).filter(
+    (s) => studentsWithVisibleRoom.has(s.id) || !enrolledStudentIds.has(s.id)
+  );
+  const visibleStudentIds = new Set(visibleStudents.map((s) => s.id));
+
+  const { data: hiddenTeachers } = await admin
+    .from("users")
+    .select("id")
+    .eq("school_id", schoolId)
+    .eq("role", "teacher")
+    .eq("ui_hidden", true);
+  const hiddenTeacherIds = new Set((hiddenTeachers ?? []).map((u) => (u as { id: string }).id));
+
+  const visibleClassroomTeachers = (
+    (classroomTeachers.data ?? []) as Array<{
+      classroom_id: string;
+      teacher_user_id: string;
+    }>
+  ).filter(
+    (a) => !hiddenClassroomIds.has(a.classroom_id) && !hiddenTeacherIds.has(a.teacher_user_id)
+  );
+
+  const visibleStudentGuardians = (
+    (studentGuardians.data ?? []) as Array<{ student_id: string }>
+  ).filter((sg) => visibleStudentIds.has(sg.student_id));
+
+  const visibleAxisAssessments = (
+    (axisAssessments.data ?? []) as Array<{ student_id: string }>
+  ).filter((r) => visibleStudentIds.has(r.student_id));
+
+  const visibleWholeChild = (
+    (wholeChildObservations.data ?? []) as Array<{ student_id: string }>
+  ).filter((r) => visibleStudentIds.has(r.student_id));
+
+  const visibleCurriculumEvents = (
+    (curriculumEvents.data ?? []) as Array<{ student_id: string }>
+  ).filter((r) => visibleStudentIds.has(r.student_id));
+
   return NextResponse.json({
     salt: saltRow.salt,
     schoolId,
     userId: profile.id,
     data: {
-      students: students.data ?? [],
-      enrollments: enrollments.data ?? [],
-      classrooms: classrooms.data ?? [],
-      classroom_teachers: classroomTeachers.data ?? [],
+      students: visibleStudents,
+      enrollments: visibleEnrollments,
+      classrooms: visibleClassrooms,
+      classroom_teachers: visibleClassroomTeachers,
       guardians: guardians.data ?? [],
-      student_guardians: studentGuardians.data ?? [],
+      student_guardians: visibleStudentGuardians,
       curricula: curricula.data ?? [],
       curriculum_topics: curriculumTopics.data ?? [],
       curriculum_subtopics: curriculumSubtopics.data ?? [],
       axes: axes.data ?? [],
-      axis_assessments: axisAssessments.data ?? [],
-      whole_child_observations: wholeChildObservations.data ?? [],
-      curriculum_events: curriculumEvents.data ?? [],
+      axis_assessments: visibleAxisAssessments,
+      whole_child_observations: visibleWholeChild,
+      curriculum_events: visibleCurriculumEvents,
     },
   });
 }

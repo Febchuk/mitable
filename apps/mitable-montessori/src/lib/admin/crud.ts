@@ -226,6 +226,33 @@ export async function updateClassroomName(
   if (error) throw new AdminError(error.message, "db_error");
 }
 
+export async function setClassroomUiHidden(
+  ctx: AdminContext,
+  classroomId: string,
+  uiHidden: boolean
+): Promise<void> {
+  const { error } = await ctx.supabase
+    .from("classrooms")
+    .update({ ui_hidden: uiHidden })
+    .eq("id", classroomId)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function setTeacherUiHidden(
+  ctx: AdminContext,
+  teacherUserId: string,
+  uiHidden: boolean
+): Promise<void> {
+  const { error } = await ctx.supabase
+    .from("users")
+    .update({ ui_hidden: uiHidden })
+    .eq("id", teacherUserId)
+    .eq("school_id", ctx.schoolId)
+    .eq("role", "teacher");
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
 export async function assignTeacherToClassroom(
   ctx: AdminContext,
   input: {
