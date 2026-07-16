@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import {
+  normalizeMarkingSchema,
+  type MarkingSchema,
+  type ProgressStatus,
+} from "@/lib/progress/marking-schemas";
 
-export type CurriculumStatus = "introduced" | "practicing" | "mastered" | "na";
+export type CurriculumStatus = ProgressStatus;
 
 export type SubtopicProgress = {
   subtopicId: string;
@@ -19,6 +24,7 @@ export type SubtopicProgress = {
 export type CurriculumByTopic = {
   topicId: string;
   topicName: string;
+  markingSchema: MarkingSchema;
   subtopics: SubtopicProgress[];
 };
 
@@ -33,7 +39,12 @@ type ProgressRow = {
     name: string;
     sort_order: number;
     topic_id: string;
-    curriculum_topics: { id: string; name: string; sort_order: number } | null;
+    curriculum_topics: {
+      id: string;
+      name: string;
+      sort_order: number;
+      marking_schema: string;
+    } | null;
   } | null;
 };
 
@@ -52,7 +63,7 @@ export async function listCurriculumProgress(studentId: string): Promise<Curricu
     supabase
       .from("student_progress")
       .select(
-        "id, curriculum_subtopic_id, status, comment, updated_at, curriculum_subtopics(id, name, sort_order, topic_id, curriculum_topics(id, name, sort_order))"
+        "id, curriculum_subtopic_id, status, comment, updated_at, curriculum_subtopics(id, name, sort_order, topic_id, curriculum_topics(id, name, sort_order, marking_schema))"
       )
       .eq("student_id", studentId)
       .returns<ProgressRow[]>(),
@@ -103,6 +114,7 @@ export async function listCurriculumProgress(studentId: string): Promise<Curricu
       byTopic.set(topic.id, {
         topicId: topic.id,
         topicName: topic.name,
+        markingSchema: normalizeMarkingSchema(topic.marking_schema),
         subtopics: [subProgress],
       });
     }

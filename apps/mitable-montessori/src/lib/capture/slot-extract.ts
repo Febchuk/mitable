@@ -1,17 +1,19 @@
 "use client";
 
+import type { ProgressStatus } from "@/lib/progress/marking-schemas";
+
 /**
  * Pure regex slot extractors used by the on-device resolver. No model load,
  * no async — operates on tokenized text where student/subtopic spans have
  * already been replaced by `[STUDENT_n]` / `[SUBTOPIC_n]` tokens.
  *
- * Status priority: MASTERED → INTRODUCED → PRESENT/ABSENT → PRACTICING.
+ * Status priority: explicit five-level ratings → MASTERED → INTRODUCED →
+ * PRESENT/ABSENT → PRACTICING.
  * Verbs that read like both "introduced" and "practicing" (e.g. "started")
  * should fall to introduced.
  */
 
-const ATTENDANCE_PRESENT =
-  /\b(here|present|in|showed up|checked in|made it|arrived)\b/i;
+const ATTENDANCE_PRESENT = /\b(here|present|in|showed up|checked in|made it|arrived)\b/i;
 const ATTENDANCE_ABSENT =
   /\b(out|absent|away|sick|home|missing|didn'?t come|didn'?t show|called (in )?(out|sick))\b/i;
 
@@ -21,6 +23,11 @@ const INTRODUCED =
   /\b(introduce[d]?|introducing|presented|first time|new to|started on|showed .* how)\b/i;
 const PRACTICING =
   /\b(practic(ed|ing)|tried|working on|worked on|attempted|used|chose|picked|built|did|made|set up|laid out|poured|spilling)\b/i;
+const EXCELLENT = /\b(excellent|excelling|exceptional)\b/i;
+const GOOD = /\b(good|doing well)\b/i;
+const SATISFACTORY = /\b(satisfactory|meets expectations)\b/i;
+const MINIMUM = /\b(minimum|minimally|below expectations)\b/i;
+const NONE = /\b(no evidence|none|not demonstrated|not yet demonstrated)\b/i;
 
 const STUDENT_TOKEN = /\[STUDENT_(\d+)\]/;
 const SUBTOPIC_TOKEN = /\[SUBTOPIC_(\d+)\]/;
@@ -35,9 +42,12 @@ export function extractAttendanceStatus(text: string): "present" | "absent" | nu
   return null;
 }
 
-export function extractMasteryStatus(
-  text: string
-): "introduced" | "practicing" | "mastered" | null {
+export function extractMasteryStatus(text: string): ProgressStatus | null {
+  if (EXCELLENT.test(text)) return "excellent";
+  if (GOOD.test(text)) return "good";
+  if (SATISFACTORY.test(text)) return "satisfactory";
+  if (MINIMUM.test(text)) return "minimum";
+  if (NONE.test(text)) return "none";
   if (MASTERED.test(text)) return "mastered";
   if (INTRODUCED.test(text)) return "introduced";
   if (PRACTICING.test(text)) return "practicing";
@@ -122,6 +132,14 @@ export function attendanceVerbSpan(text: string): string | null {
 }
 
 export function masteryVerbSpan(text: string): string | null {
-  const m = text.match(MASTERED) ?? text.match(INTRODUCED) ?? text.match(PRACTICING);
+  const m =
+    text.match(EXCELLENT) ??
+    text.match(GOOD) ??
+    text.match(SATISFACTORY) ??
+    text.match(MINIMUM) ??
+    text.match(NONE) ??
+    text.match(MASTERED) ??
+    text.match(INTRODUCED) ??
+    text.match(PRACTICING);
   return m ? m[0] : null;
 }

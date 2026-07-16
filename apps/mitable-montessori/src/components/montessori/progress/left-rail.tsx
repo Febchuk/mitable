@@ -10,9 +10,12 @@ import type {
   ClassroomProgressTopic,
 } from "@/lib/queries/classroom-progress";
 import { GROUP_COLOR_META } from "@/lib/classroom-groups";
+import {
+  ALL_PROGRESS_LEVELS,
+  marksForSchema,
+  type MarkingSchema,
+} from "@/lib/progress/marking-schemas";
 import styles from "./progress.module.css";
-
-const MASTERY_ORDER: ProgressMark[] = ["m", "p", "i", "-"];
 
 type LeftRailProps = {
   /** Every classroom the teacher can switch between. ≤1 hides the Class picker. */
@@ -37,7 +40,7 @@ type LeftRailProps = {
   students: ClassroomProgressStudent[];
   /** Every subtopic currently on screen, with its topic — drives the mastery
    *  tally across one or many topics. */
-  visibleSubtopics: Array<{ id: string; topicId: string }>;
+  visibleSubtopics: Array<{ id: string; topicId: string; markingSchema: MarkingSchema }>;
   progressByTopic: ProgressByTopic;
 };
 
@@ -59,8 +62,20 @@ export function LeftRail({
   visibleSubtopics,
   progressByTopic,
 }: LeftRailProps) {
+  const displayOrder = React.useMemo(() => {
+    const schemas = new Set(visibleSubtopics.map((subtopic) => subtopic.markingSchema));
+    const marks: ProgressMark[] = [];
+    if (schemas.has("ipm")) marks.push(...marksForSchema("ipm"));
+    if (schemas.has("five_level")) marks.push(...marksForSchema("five_level"));
+    marks.push("-");
+    return marks;
+  }, [visibleSubtopics]);
+
   const counts = React.useMemo(() => {
-    const o: Record<ProgressMark, number> = { m: 0, p: 0, i: 0, "-": 0 };
+    const o = Object.fromEntries(ALL_PROGRESS_LEVELS.map((level) => [level.mark, 0])) as Record<
+      ProgressMark,
+      number
+    >;
     let total = 0;
     for (const s of students) {
       for (const st of visibleSubtopics) {
@@ -239,10 +254,10 @@ export function LeftRail({
 
       <div>
         <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
-          {topicId === null ? "Mastery · all visible" : "Mastery · this topic"}
+          {topicId === null ? "Progress · all visible" : "Progress · this topic"}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {MASTERY_ORDER.map((s) => (
+          {displayOrder.map((s) => (
             <div
               key={s}
               style={{

@@ -4,9 +4,8 @@ import * as React from "react";
 import { STATUS_LABEL, type ProgressMark } from "@/components/montessori/data";
 import { Avatar } from "@/components/montessori/primitives";
 import type { ClassroomProgressStudent } from "@/lib/queries/classroom-progress";
+import { marksForSchema, type MarkingSchema } from "@/lib/progress/marking-schemas";
 import styles from "./progress.module.css";
-
-const STATUSES: ProgressMark[] = ["m", "p", "i", "-"];
 
 const initialsFor = (name: string) =>
   name
@@ -22,8 +21,9 @@ function toneFor(id: string): (typeof TONES)[number] {
 }
 
 type CellModeProps = {
-  /** Cell-selection mode: IPM swatches + note, applied to every selected cell. */
+  /** Cell-selection mode: schema swatches + note, applied to every selected cell. */
   mode: "cells";
+  markingSchema: MarkingSchema;
   count: number;
   draftStatus: ProgressMark | null;
   draftNote: string;
@@ -53,6 +53,7 @@ export function BulkBar(props: BulkBarProps) {
 }
 
 function CellBar({
+  markingSchema,
   count,
   draftStatus,
   draftNote,
@@ -62,6 +63,7 @@ function CellBar({
   onCancel,
 }: CellModeProps) {
   if (count === 0) return null;
+  const statuses = marksForSchema(markingSchema, true);
   return (
     <div className={styles.bulkBar} role="dialog" aria-label="Bulk apply progress">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -81,7 +83,7 @@ function CellBar({
           </span>
         </div>
         <div style={{ display: "flex", gap: 6, flex: 1 }}>
-          {STATUSES.map((s) => (
+          {statuses.map((s) => (
             <button
               key={s}
               type="button"

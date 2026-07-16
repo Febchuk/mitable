@@ -5,6 +5,11 @@ import type { ProgressMark, RecentUpdateEntry } from "@/components/montessori/da
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import type { ProgressProgram } from "@/lib/queries/progress-programs";
 import { normalizeGroupColor, type ClassroomGroup } from "@/lib/classroom-groups";
+import {
+  normalizeMarkingSchema,
+  statusToMark,
+  type MarkingSchema,
+} from "@/lib/progress/marking-schemas";
 
 export type { ProgressProgram };
 export type { ClassroomGroup };
@@ -20,6 +25,7 @@ export type ClassroomProgressTopic = {
   name: string;
   subjectId: string;
   sortOrder: number;
+  markingSchema: MarkingSchema;
 };
 
 export type ClassroomProgressSubtopic = {
@@ -74,6 +80,7 @@ type SubjectDbRow = {
     id: string;
     name: string;
     sort_order: number;
+    marking_schema: string;
     curriculum_subtopics: Array<{
       id: string;
       name: string;
@@ -109,10 +116,7 @@ type ProgressHistoryDbRow = {
 };
 
 function dbStatusToMark(status: string | null | undefined): ProgressMark {
-  if (status === "mastered") return "m";
-  if (status === "practicing") return "p";
-  if (status === "introduced") return "i";
-  return "-";
+  return statusToMark((status ?? "na") as CurriculumStatus);
 }
 
 function formatProgressWhen(iso: string): string {
@@ -420,7 +424,7 @@ export async function getClassroomProgress(
     .from("curriculum_subjects")
     .select(
       "id, name, sort_order, " +
-        "curriculum_topics(id, name, sort_order, " +
+        "curriculum_topics(id, name, sort_order, marking_schema, " +
         "curriculum_subtopics(id, name, sort_order))"
     )
     .eq("curriculum_id", curriculumId)
@@ -438,6 +442,7 @@ export async function getClassroomProgress(
         name: t.name,
         subjectId: subj.id,
         sortOrder: t.sort_order,
+        markingSchema: normalizeMarkingSchema(t.marking_schema),
       });
       for (const st of t.curriculum_subtopics) {
         subtopics.push({

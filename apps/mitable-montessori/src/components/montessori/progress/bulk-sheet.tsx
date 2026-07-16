@@ -9,9 +9,8 @@ import {
 } from "@/components/montessori/data";
 import { Avatar, HandDivider } from "@/components/montessori/primitives";
 import type { ClassroomProgressStudent } from "@/lib/queries/classroom-progress";
+import { marksForSchema, type MarkingSchema } from "@/lib/progress/marking-schemas";
 import styles from "./progress.module.css";
-
-const STATUSES: ProgressMark[] = ["m", "p", "i", "-"];
 
 const initialsFor = (name: string) =>
   name
@@ -29,6 +28,7 @@ function toneFor(id: string): (typeof TONES)[number] {
 type CellModeProps = {
   mode: "cells";
   topic: Topic;
+  markingSchema: MarkingSchema;
   count: number;
   draftStatus: ProgressMark | null;
   draftNote: string;
@@ -101,6 +101,7 @@ export function BulkSheet(props: BulkSheetProps) {
 
 function CellSheet({
   topic,
+  markingSchema,
   count,
   draftStatus,
   draftNote,
@@ -109,6 +110,7 @@ function CellSheet({
   onApply,
   onClose,
 }: CellModeProps) {
+  const statuses = marksForSchema(markingSchema, true);
   return (
     <>
       <div
@@ -131,7 +133,7 @@ function CellSheet({
       </div>
       <HandDivider />
       <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-        {STATUSES.map((s) => {
+        {statuses.map((s) => {
           const active = draftStatus === s;
           return (
             <button

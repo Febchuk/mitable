@@ -10,6 +10,7 @@ import {
   SCRIPTED_REPLIES,
   findChild,
   markToStatus,
+  statusToMark,
   type AttendanceMark,
   type CellNote,
   type ChatMessage,
@@ -157,14 +158,7 @@ function progressFromClassroom(initial: ClassroomProgress): ProgressByTopic {
       if (!topic) continue;
       const studentRow = topic[studentId];
       if (!studentRow) continue;
-      studentRow[subtopicId] =
-        status === "mastered"
-          ? "m"
-          : status === "practicing"
-            ? "p"
-            : status === "introduced"
-              ? "i"
-              : "-";
+      studentRow[subtopicId] = statusToMark(status);
     }
   }
   return out;

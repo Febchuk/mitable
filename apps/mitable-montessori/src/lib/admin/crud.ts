@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { MarkingSchema } from "@/lib/progress/marking-schemas";
 
 /**
  * Admin CRUD primitives. Pure functions over a Supabase client + the actor's
@@ -666,6 +667,68 @@ export async function createCurriculumTopic(
     sort_order: input.sort_order,
     is_active: true,
   });
+}
+
+export async function setTopicMarkingSchema(
+  ctx: AdminContext,
+  input: { topic_id: string; marking_schema: MarkingSchema }
+): Promise<void> {
+  const { data: topic, error: topicError } = await ctx.supabase
+    .from("curriculum_topics")
+    .select("id, curriculum_id, marking_schema")
+    .eq("id", input.topic_id)
+    .maybeSingle();
+  if (topicError) throw new AdminError(topicError.message, "db_error");
+  if (!topic) throw new AdminError("Topic not found", "not_found");
+
+  const { data: curriculum, error: curriculumError } = await ctx.supabase
+    .from("curricula")
+    .select("id")
+    .eq("id", topic.curriculum_id as string)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (curriculumError) throw new AdminError(curriculumError.message, "db_error");
+  if (!curriculum) throw new AdminError("Topic not found", "not_found");
+
+  if ((topic.marking_schema as string) === input.marking_schema) return;
+
+  const { data: subtopics, error: subtopicsError } = await ctx.supabase
+    .from("curriculum_subtopics")
+    .select("id")
+    .eq("topic_id", input.topic_id);
+  if (subtopicsError) throw new AdminError(subtopicsError.message, "db_error");
+
+  const subtopicIds = (subtopics ?? []).map((row) => row.id as string);
+  if (subtopicIds.length > 0) {
+    const [progressResult, historyResult] = await Promise.all([
+      ctx.supabase
+        .from("student_progress")
+        .select("id")
+        .in("curriculum_subtopic_id", subtopicIds)
+        .limit(1)
+        .maybeSingle(),
+      ctx.supabase
+        .from("student_progress_history")
+        .select("id")
+        .in("curriculum_subtopic_id", subtopicIds)
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (progressResult.error) throw new AdminError(progressResult.error.message, "db_error");
+    if (historyResult.error) throw new AdminError(historyResult.error.message, "db_error");
+    if (progressResult.data || historyResult.data) {
+      throw new AdminError(
+        "This marking scale is locked because student progress has already been recorded for this topic.",
+        "conflict"
+      );
+    }
+  }
+
+  const { error } = await ctx.supabase
+    .from("curriculum_topics")
+    .update({ marking_schema: input.marking_schema })
+    .eq("id", input.topic_id);
+  if (error) throw new AdminError(error.message, "db_error");
 }
 
 export async function createCurriculumSubtopic(

@@ -1,4 +1,5 @@
 import type { NameRef } from "@/lib/reports/token-preservation";
+import type { ProgressStatus } from "@/lib/progress/marking-schemas";
 
 /**
  * Tokenized records the agent loop reads from. The adapter pulls real data
@@ -20,7 +21,7 @@ export interface TokenizedCommandRecord {
 
 export interface TokenizedProgressRow {
   subtopic_token: string;
-  status: "introduced" | "practicing" | "mastered" | "na";
+  status: ProgressStatus;
   comment: string | null;
   updated_at: string;
 }

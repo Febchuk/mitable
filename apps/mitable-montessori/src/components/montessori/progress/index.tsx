@@ -15,6 +15,7 @@ import type {
 } from "@/lib/queries/classroom-progress";
 import { GROUP_COLOR_META } from "@/lib/classroom-groups";
 import { classroomGroupsEnabled } from "@/lib/feature-flags";
+import type { MarkingSchema } from "@/lib/progress/marking-schemas";
 import { BulkBar } from "./bulk-bar";
 import { BulkSheet } from "./bulk-sheet";
 import { LeftRail } from "./left-rail";
@@ -140,75 +141,119 @@ function ClassFilterChips({
   );
 }
 
-function useSelection(presentStudents: ClassroomProgressStudent[]) {
+function useSelection(
+  presentStudents: ClassroomProgressStudent[],
+  schemaForSubtopic: (subtopicId: string) => MarkingSchema
+) {
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set());
   const [draftStatus, setDraftStatus] = React.useState<ProgressMark | null>(null);
   const [draftNote, setDraftNote] = React.useState("");
+  const [markingSchema, setMarkingSchema] = React.useState<MarkingSchema>("ipm");
 
   const isSelected = React.useCallback(
     (studentId: string, subtopicId: string) => selected.has(`${studentId}:${subtopicId}`),
     [selected]
   );
 
-  const toggle = React.useCallback((studentId: string, subtopicId: string) => {
-    setSelected((prev) => {
-      const k = `${studentId}:${subtopicId}`;
-      const next = new Set(prev);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
-      return next;
-    });
-  }, []);
+  const toggle = React.useCallback(
+    (studentId: string, subtopicId: string) => {
+      const nextSchema = schemaForSubtopic(subtopicId);
+      setSelected((prev) => {
+        const k = `${studentId}:${subtopicId}`;
+        if (prev.has(k)) {
+          const next = new Set(prev);
+          next.delete(k);
+          return next;
+        }
+        if (prev.size > 0 && nextSchema !== markingSchema) {
+          setDraftStatus(null);
+          setDraftNote("");
+          setMarkingSchema(nextSchema);
+          return new Set([k]);
+        }
+        const next = new Set(prev);
+        next.add(k);
+        setMarkingSchema(nextSchema);
+        return next;
+      });
+    },
+    [markingSchema, schemaForSubtopic]
+  );
 
   const selectRow = React.useCallback(
     (subtopicId: string) => {
+      const nextSchema = schemaForSubtopic(subtopicId);
       setSelected((prev) => {
+        if (prev.size > 0 && nextSchema !== markingSchema) {
+          setDraftStatus(null);
+          setDraftNote("");
+          setMarkingSchema(nextSchema);
+          return new Set(presentStudents.map((s) => `${s.id}:${subtopicId}`));
+        }
         const next = new Set(prev);
         const allOn = presentStudents.every((s) => next.has(`${s.id}:${subtopicId}`));
         if (allOn) presentStudents.forEach((s) => next.delete(`${s.id}:${subtopicId}`));
         else presentStudents.forEach((s) => next.add(`${s.id}:${subtopicId}`));
+        setMarkingSchema(nextSchema);
         return next;
       });
     },
-    [presentStudents]
+    [presentStudents, markingSchema, schemaForSubtopic]
   );
 
-  const selectColumn = React.useCallback((studentId: string, subtopicIds: string[]) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      const allOn = subtopicIds.every((sid) => next.has(`${studentId}:${sid}`));
-      if (allOn) subtopicIds.forEach((sid) => next.delete(`${studentId}:${sid}`));
-      else subtopicIds.forEach((sid) => next.add(`${studentId}:${sid}`));
-      return next;
-    });
-  }, []);
+  const selectColumn = React.useCallback(
+    (studentId: string, subtopicIds: string[]) => {
+      const nextSchema =
+        selected.size > 0 ? markingSchema : schemaForSubtopic(subtopicIds[0] ?? "");
+      const eligibleIds = subtopicIds.filter((id) => schemaForSubtopic(id) === nextSchema);
+      setSelected((prev) => {
+        const next =
+          prev.size > 0 && nextSchema !== markingSchema ? new Set<string>() : new Set(prev);
+        const allOn = eligibleIds.every((sid) => next.has(`${studentId}:${sid}`));
+        if (allOn) eligibleIds.forEach((sid) => next.delete(`${studentId}:${sid}`));
+        else eligibleIds.forEach((sid) => next.add(`${studentId}:${sid}`));
+        setMarkingSchema(nextSchema);
+        return next;
+      });
+    },
+    [markingSchema, schemaForSubtopic, selected.size]
+  );
 
   // Toggle every present student across a set of subtopics (a whole topic
   // section in the grouped view).
   const selectSubtopics = React.useCallback(
     (subtopicIds: string[]) => {
+      const nextSchema = schemaForSubtopic(subtopicIds[0] ?? "");
+      const eligibleIds = subtopicIds.filter((id) => schemaForSubtopic(id) === nextSchema);
       setSelected((prev) => {
-        const next = new Set(prev);
-        const allOn = subtopicIds.every((sid) =>
+        if (prev.size > 0 && nextSchema !== markingSchema) {
+          setDraftStatus(null);
+          setDraftNote("");
+        }
+        const next =
+          prev.size > 0 && nextSchema !== markingSchema ? new Set<string>() : new Set(prev);
+        const allOn = eligibleIds.every((sid) =>
           presentStudents.every((s) => next.has(`${s.id}:${sid}`))
         );
-        for (const sid of subtopicIds) {
+        for (const sid of eligibleIds) {
           for (const s of presentStudents) {
             const k = `${s.id}:${sid}`;
             if (allOn) next.delete(k);
             else next.add(k);
           }
         }
+        setMarkingSchema(nextSchema);
         return next;
       });
     },
-    [presentStudents]
+    [presentStudents, markingSchema, schemaForSubtopic]
   );
 
   const clear = React.useCallback(() => {
     setSelected(new Set());
     setDraftStatus(null);
     setDraftNote("");
+    setMarkingSchema("ipm");
   }, []);
 
   return {
@@ -223,6 +268,7 @@ function useSelection(presentStudents: ClassroomProgressStudent[]) {
     setDraftStatus,
     draftNote,
     setDraftNote,
+    markingSchema,
     count: selected.size,
   };
 }
@@ -383,7 +429,25 @@ function ProgressFeatureLoaded({
     () => visibleStudents.filter((s) => s.present),
     [visibleStudents]
   );
-  const sel = useSelection(presentStudents);
+  const topicSchemaById = React.useMemo(
+    () => new Map(topics.map((topic) => [topic.id, topic.markingSchema] as const)),
+    [topics]
+  );
+  const subtopicSchemaById = React.useMemo(
+    () =>
+      new Map(
+        subtopics.map(
+          (subtopic) =>
+            [subtopic.id, topicSchemaById.get(subtopic.topicId) ?? ("ipm" as const)] as const
+        )
+      ),
+    [subtopics, topicSchemaById]
+  );
+  const schemaForSubtopic = React.useCallback(
+    (subtopicId: string) => subtopicSchemaById.get(subtopicId) ?? "ipm",
+    [subtopicSchemaById]
+  );
+  const sel = useSelection(presentStudents, schemaForSubtopic);
 
   // Subject filter. ALL_SUBJECTS sentinel = no filter.
   const [subjectId, setSubjectId] = React.useState<string>(ALL_SUBJECTS);
@@ -446,9 +510,10 @@ function ProgressFeatureLoaded({
           name: st.name,
           topicId: s.topicId,
           topicName: s.topicName,
+          markingSchema: topicSchemaById.get(s.topicId) ?? "ipm",
         }))
       ),
-    [sections]
+    [sections, topicSchemaById]
   );
 
   // ESC clears selection + closes any popover/sheet.
@@ -790,6 +855,7 @@ function ProgressFeatureLoaded({
         ) : (
           <BulkBar
             mode="cells"
+            markingSchema={sel.markingSchema}
             count={sel.count}
             draftStatus={sel.draftStatus}
             draftNote={sel.draftNote}
@@ -814,6 +880,7 @@ function ProgressFeatureLoaded({
           <BulkSheet
             mode="cells"
             topic={currentTopic?.name ?? "Selected cells"}
+            markingSchema={sel.markingSchema}
             count={sel.count}
             draftStatus={sel.draftStatus}
             draftNote={sel.draftNote}

@@ -22,6 +22,11 @@
   --color-dusty-blue-soft: #d2dce5;
   --color-clay: #b89880;
   --color-clay-soft: #e5d8c8;
+  --color-scale-none: #8b7aa8;
+  --color-scale-minimum: #d27d5f;
+  --color-scale-satisfactory: #4f91a8;
+  --color-scale-good: #4f8f72;
+  --color-scale-excellent: #8f5b86;
 
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-caveat), ui-serif, serif;

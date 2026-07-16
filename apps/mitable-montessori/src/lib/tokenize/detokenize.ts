@@ -2,6 +2,7 @@
 
 import type { ParsedToolCall } from "@/lib/schemas/parsed-tool-call";
 import type { TokenReference } from "@/lib/tokenize/types";
+import type { ProgressStatus } from "@/lib/progress/marking-schemas";
 
 export interface DetokenizedAttendance {
   kind: "attendance";
@@ -20,7 +21,7 @@ export interface DetokenizedProgress {
   subtopicId: string;
   subtopicDisplay: string;
   classroomId: string;
-  status: "introduced" | "practicing" | "mastered" | "na";
+  status: ProgressStatus;
   comment?: string;
 }
 

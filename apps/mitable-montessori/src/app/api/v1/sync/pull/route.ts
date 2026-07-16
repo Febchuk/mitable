@@ -83,7 +83,7 @@ export async function GET() {
       .eq("is_active", true),
     supabase
       .from("curriculum_topics")
-      .select("id, curriculum_id, name, sort_order, is_active")
+      .select("id, curriculum_id, name, sort_order, is_active, marking_schema")
       .eq("is_active", true),
     supabase
       .from("curriculum_subtopics")

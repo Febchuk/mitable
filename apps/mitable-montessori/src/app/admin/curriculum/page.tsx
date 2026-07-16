@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BookOpen, Plus, Trash2, X } from "lucide-react";
+import { BookOpen, ListTree, Plus, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ import {
 } from "@/components/admin/split-pane-layout";
 import type { CurriculumTree } from "@/lib/queries/curriculum-tree";
 import { classroomProgramsEnabled } from "@/lib/feature-flags";
+import type { MarkingSchema } from "@/lib/progress/marking-schemas";
 import { IepAdminTab } from "./iep-tab";
 import { SpeechAdminTab } from "./speech-tab";
 
@@ -29,6 +30,8 @@ type AdminSubtopic = { id: string; name: string };
 type AdminTopic = {
   id: string;
   name: string;
+  markingSchema: MarkingSchema;
+  persisted: boolean;
   subtopics: AdminSubtopic[];
 };
 
@@ -45,10 +48,6 @@ type AdminCurriculum = {
   subjects: AdminSubject[];
 };
 
-function uid(prefix: string): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
 function mapTreeToAdmin(tree: CurriculumTree): AdminCurriculum {
   return {
     id: tree.id,
@@ -60,6 +59,8 @@ function mapTreeToAdmin(tree: CurriculumTree): AdminCurriculum {
       topics: subject.topics.map((topic) => ({
         id: topic.id,
         name: topic.name,
+        markingSchema: topic.markingSchema,
+        persisted: true,
         subtopics: topic.subtopics.map((subtopic) => ({
           id: subtopic.id,
           name: subtopic.name,
@@ -108,7 +109,10 @@ export default function AdminCurriculumPage() {
   const [dbLoadError, setDbLoadError] = React.useState<string | null>(null);
   const [dbActionError, setDbActionError] = React.useState<string | null>(null);
   const [patchBusyId, setPatchBusyId] = React.useState<string | null>(null);
+  const [topicMarkingBusyId, setTopicMarkingBusyId] = React.useState<string | null>(null);
+  const [topicMarkingErrors, setTopicMarkingErrors] = React.useState<Record<string, string>>({});
   const [seedBusy, setSeedBusy] = React.useState(false);
+  const detailScrollRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (!programsEnabled && activeTab !== "curricula") {
@@ -149,6 +153,7 @@ export default function AdminCurriculumPage() {
     let cancelled = false;
     setTreeLoading(true);
     setTreeError(null);
+    setTopicMarkingErrors({});
     void fetch(`/api/admin/curricula/${selectedDbId}`, {
       cache: "no-store",
       credentials: "include",
@@ -247,6 +252,50 @@ export default function AdminCurriculumPage() {
     }));
   };
 
+  const setTopicMarkingSchema = async (
+    curriculumId: string,
+    subjectId: string,
+    topicId: string,
+    markingSchema: MarkingSchema
+  ) => {
+    setTopicMarkingBusyId(topicId);
+    setTopicMarkingErrors((prev) => {
+      const next = { ...prev };
+      delete next[topicId];
+      return next;
+    });
+    try {
+      const res = await fetch("/api/admin/curriculum-topics", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ topic_id: topicId, marking_schema: markingSchema }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
+      if (!res.ok) {
+        const message =
+          data.code === "conflict"
+            ? `${data.error ?? "This marking scale is locked."} Existing marks must keep the scale they were recorded with.`
+            : (data.error ?? "Could not update the marking scale.");
+        setTopicMarkingErrors((prev) => ({ ...prev, [topicId]: message }));
+        return;
+      }
+      updateTopic(curriculumId, subjectId, topicId, (topic) => ({
+        ...topic,
+        markingSchema,
+      }));
+    } catch {
+      setTopicMarkingErrors((prev) => ({
+        ...prev,
+        [topicId]: "Could not update the marking scale. Check your connection and try again.",
+      }));
+    } finally {
+      setTopicMarkingBusyId((current) => (current === topicId ? null : current));
+    }
+  };
+
   const addCurriculum = async (input: { name: string; ageRange?: string }) => {
     setDbActionError(null);
     try {
@@ -272,12 +321,44 @@ export default function AdminCurriculumPage() {
     setDbActionError("Removing curricula from the database is not supported here yet.");
   };
 
-  const addSubject = (curriculumId: string, name: string) => {
-    if (!name.trim()) return;
+  const createTreeRow = async (
+    path: string,
+    body: Record<string, unknown>,
+    fallbackError: string
+  ): Promise<string | null> => {
+    setDbActionError(null);
+    try {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; id?: string };
+      if (!res.ok || !data.id) throw new Error(data.error ?? fallbackError);
+      return data.id;
+    } catch (error) {
+      setDbActionError(error instanceof Error ? error.message : fallbackError);
+      return null;
+    }
+  };
+
+  const addSubject = async (curriculumId: string, name: string): Promise<boolean> => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const curriculum = selectedTree?.id === curriculumId ? selectedTree : null;
+    if (!curriculum) return false;
+    const sortOrder = curriculum.subjects.length;
+    const id = await createTreeRow(
+      "/api/admin/curriculum-subjects",
+      { curriculum_id: curriculumId, name: trimmed, sort_order: sortOrder },
+      "Could not create subject"
+    );
+    if (!id) return false;
     updateCurriculum(curriculumId, (curriculum) => ({
       ...curriculum,
-      subjects: [...curriculum.subjects, { id: uid("subject"), name: name.trim(), topics: [] }],
+      subjects: [...curriculum.subjects, { id, name: trimmed, topics: [] }],
     }));
+    return true;
   };
 
   const removeSubject = (curriculumId: string, subjectId: string) => {
@@ -294,12 +375,41 @@ export default function AdminCurriculumPage() {
     }));
   };
 
-  const addTopic = (curriculumId: string, subjectId: string, name: string) => {
-    if (!name.trim()) return;
+  const addTopic = async (
+    curriculumId: string,
+    subjectId: string,
+    name: string
+  ): Promise<boolean> => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const subject = selectedTree?.subjects.find((item) => item.id === subjectId);
+    if (!subject) return false;
+    const sortOrder = subject.topics.length;
+    const id = await createTreeRow(
+      "/api/admin/curriculum-topics",
+      {
+        curriculum_id: curriculumId,
+        subject_id: subjectId,
+        name: trimmed,
+        sort_order: sortOrder,
+      },
+      "Could not create topic"
+    );
+    if (!id) return false;
     updateSubject(curriculumId, subjectId, (subject) => ({
       ...subject,
-      topics: [...subject.topics, { id: uid("topic"), name: name.trim(), subtopics: [] }],
+      topics: [
+        ...subject.topics,
+        {
+          id,
+          name: trimmed,
+          markingSchema: "ipm",
+          persisted: true,
+          subtopics: [],
+        },
+      ],
     }));
+    return true;
   };
 
   const removeTopic = (curriculumId: string, subjectId: string, topicId: string) => {
@@ -316,12 +426,34 @@ export default function AdminCurriculumPage() {
     }));
   };
 
-  const addSubtopic = (curriculumId: string, subjectId: string, topicId: string, name: string) => {
-    if (!name.trim()) return;
+  const addSubtopic = async (
+    curriculumId: string,
+    subjectId: string,
+    topicId: string,
+    name: string
+  ): Promise<boolean> => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const topic = selectedTree?.subjects
+      .find((subject) => subject.id === subjectId)
+      ?.topics.find((item) => item.id === topicId);
+    if (!topic) return false;
+    const id = await createTreeRow(
+      "/api/admin/curriculum-subtopics",
+      {
+        topic_id: topicId,
+        name: trimmed,
+        sort_order: topic.subtopics.length,
+        aliases: [],
+      },
+      "Could not create lesson"
+    );
+    if (!id) return false;
     updateTopic(curriculumId, subjectId, topicId, (topic) => ({
       ...topic,
-      subtopics: [...topic.subtopics, { id: uid("sub"), name: name.trim() }],
+      subtopics: [...topic.subtopics, { id, name: trimmed }],
     }));
+    return true;
   };
 
   const removeSubtopic = (
@@ -547,7 +679,7 @@ export default function AdminCurriculumPage() {
           </aside>
 
           <section style={adminSplitDetailStyle}>
-            <div className="scroll-quiet" style={adminSplitDetailScrollStyle}>
+            <div ref={detailScrollRef} className="scroll-quiet" style={adminSplitDetailScrollStyle}>
               {treeLoading ? (
                 <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
                   Loading curriculum…
@@ -566,6 +698,7 @@ export default function AdminCurriculumPage() {
               ) : selected ? (
                 <CurriculumDetail
                   curriculum={selected}
+                  scrollRootRef={detailScrollRef}
                   showFramework={programsEnabled}
                   topicCount={topicCount(selected)}
                   subtopicCount={subtopicCount(selected)}
@@ -579,6 +712,11 @@ export default function AdminCurriculumPage() {
                   onRenameTopic={(subjectId, topicId, name) =>
                     renameTopic(selected.id, subjectId, topicId, name)
                   }
+                  onSetTopicMarkingSchema={(subjectId, topicId, markingSchema) =>
+                    setTopicMarkingSchema(selected.id, subjectId, topicId, markingSchema)
+                  }
+                  topicMarkingBusyId={topicMarkingBusyId}
+                  topicMarkingErrors={topicMarkingErrors}
                   onAddSubtopic={(subjectId, topicId, name) =>
                     addSubtopic(selected.id, subjectId, topicId, name)
                   }
@@ -611,6 +749,7 @@ export default function AdminCurriculumPage() {
 
 function CurriculumDetail({
   curriculum,
+  scrollRootRef,
   showFramework,
   topicCount,
   subtopicCount,
@@ -620,35 +759,88 @@ function CurriculumDetail({
   onAddTopic,
   onRemoveTopic,
   onRenameTopic,
+  onSetTopicMarkingSchema,
+  topicMarkingBusyId,
+  topicMarkingErrors,
   onAddSubtopic,
   onRemoveSubtopic,
   onRenameSubtopic,
   onRemoveCurriculum,
 }: {
   curriculum: AdminCurriculum;
+  scrollRootRef: React.RefObject<HTMLDivElement | null>;
   showFramework: boolean;
   topicCount: number;
   subtopicCount: number;
-  onAddSubject: (name: string) => void;
+  onAddSubject: (name: string) => Promise<boolean>;
   onRemoveSubject: (subjectId: string) => void;
   onRenameSubject: (subjectId: string, name: string) => void;
-  onAddTopic: (subjectId: string, name: string) => void;
+  onAddTopic: (subjectId: string, name: string) => Promise<boolean>;
   onRemoveTopic: (subjectId: string, topicId: string) => void;
   onRenameTopic: (subjectId: string, topicId: string, name: string) => void;
-  onAddSubtopic: (subjectId: string, topicId: string, name: string) => void;
+  onSetTopicMarkingSchema: (
+    subjectId: string,
+    topicId: string,
+    markingSchema: MarkingSchema
+  ) => void;
+  topicMarkingBusyId: string | null;
+  topicMarkingErrors: Record<string, string>;
+  onAddSubtopic: (subjectId: string, topicId: string, name: string) => Promise<boolean>;
   onRemoveSubtopic: (subjectId: string, topicId: string, subtopicId: string) => void;
   onRenameSubtopic: (subjectId: string, topicId: string, subtopicId: string, name: string) => void;
   onRemoveCurriculum: () => void;
 }) {
   const [showAddSubject, setShowAddSubject] = React.useState(false);
   const [newSubjectName, setNewSubjectName] = React.useState("");
+  const [subjectSaving, setSubjectSaving] = React.useState(false);
+  const firstSubjectId = curriculum.subjects[0]?.id ?? null;
+  const [activeSubjectId, setActiveSubjectId] = React.useState<string | null>(firstSubjectId);
+  const subjectRefs = React.useRef(new Map<string, HTMLDivElement>());
   const isEmpty = curriculum.subjects.length === 0;
 
-  const submitSubject = () => {
-    if (!newSubjectName.trim()) return;
-    onAddSubject(newSubjectName);
-    setNewSubjectName("");
-    setShowAddSubject(false);
+  React.useEffect(() => {
+    setActiveSubjectId(firstSubjectId);
+  }, [curriculum.id, firstSubjectId]);
+
+  React.useEffect(() => {
+    const root = scrollRootRef.current;
+    if (!root || curriculum.subjects.length === 0) return;
+    const updateActiveSubject = () => {
+      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 4) {
+        setActiveSubjectId(curriculum.subjects.at(-1)?.id ?? null);
+        return;
+      }
+      const rootTop = root.getBoundingClientRect().top;
+      let activeId = curriculum.subjects[0]?.id ?? null;
+      for (const subject of curriculum.subjects) {
+        const element = subjectRefs.current.get(subject.id);
+        if (element && element.getBoundingClientRect().top - rootTop <= 96) {
+          activeId = subject.id;
+        } else {
+          break;
+        }
+      }
+      setActiveSubjectId(activeId);
+    };
+    updateActiveSubject();
+    root.addEventListener("scroll", updateActiveSubject, { passive: true });
+    return () => root.removeEventListener("scroll", updateActiveSubject);
+  }, [curriculum.subjects, scrollRootRef]);
+
+  const jumpToSubject = (subjectId: string) => {
+    setActiveSubjectId(subjectId);
+    subjectRefs.current.get(subjectId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const submitSubject = async () => {
+    if (!newSubjectName.trim() || subjectSaving) return;
+    setSubjectSaving(true);
+    const saved = await onAddSubject(newSubjectName);
+    setSubjectSaving(false);
+    if (saved) {
+      setNewSubjectName("");
+      setShowAddSubject(false);
+    }
   };
 
   return (
@@ -673,73 +865,212 @@ function CurriculumDetail({
         </div>
       </div>
 
-      <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
-        {showAddSubject && (
-          <div
-            style={{
-              border: "1px dashed var(--color-border)",
-              borderRadius: 12,
-              padding: 12,
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              background: "var(--color-canvas, var(--color-muted))",
-            }}
-          >
-            <Input
-              autoFocus
-              value={newSubjectName}
-              onChange={(event) => setNewSubjectName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") submitSubject();
-                if (event.key === "Escape") {
-                  setShowAddSubject(false);
-                  setNewSubjectName("");
-                }
-              }}
-              placeholder="New subject name (e.g. Mathematics)"
-              className="h-10 bg-surface"
-            />
-            <Button type="button" onClick={submitSubject} disabled={!newSubjectName.trim()}>
-              Add
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setShowAddSubject(false);
-                setNewSubjectName("");
+      <div
+        style={{
+          padding: 18,
+          display: "grid",
+          gridTemplateColumns:
+            curriculum.subjects.length > 1 ? "minmax(0, 1fr) minmax(160px, 190px)" : "1fr",
+          gap: 18,
+          alignItems: "start",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          {showAddSubject && (
+            <div
+              style={{
+                border: "1px dashed var(--color-border)",
+                borderRadius: 12,
+                padding: 12,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                background: "var(--color-canvas, var(--color-muted))",
               }}
             >
-              Cancel
-            </Button>
-          </div>
-        )}
+              <Input
+                autoFocus
+                value={newSubjectName}
+                onChange={(event) => setNewSubjectName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void submitSubject();
+                  if (event.key === "Escape") {
+                    setShowAddSubject(false);
+                    setNewSubjectName("");
+                  }
+                }}
+                placeholder="New subject name (e.g. Mathematics)"
+                className="h-10 bg-surface"
+              />
+              <Button
+                type="button"
+                onClick={() => void submitSubject()}
+                disabled={!newSubjectName.trim() || subjectSaving}
+              >
+                {subjectSaving ? "Saving…" : "Add"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setShowAddSubject(false);
+                  setNewSubjectName("");
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
 
-        {isEmpty && !showAddSubject ? (
-          <EmptyCurriculumState onAddSubject={() => setShowAddSubject(true)} />
-        ) : (
-          curriculum.subjects.map((subject) => (
-            <SubjectCard
-              key={subject.id}
-              subject={subject}
-              onRename={(name) => onRenameSubject(subject.id, name)}
-              onRemove={() => onRemoveSubject(subject.id)}
-              onAddTopic={(name) => onAddTopic(subject.id, name)}
-              onRemoveTopic={(topicId) => onRemoveTopic(subject.id, topicId)}
-              onRenameTopic={(topicId, name) => onRenameTopic(subject.id, topicId, name)}
-              onAddSubtopic={(topicId, name) => onAddSubtopic(subject.id, topicId, name)}
-              onRemoveSubtopic={(topicId, subtopicId) =>
-                onRemoveSubtopic(subject.id, topicId, subtopicId)
-              }
-              onRenameSubtopic={(topicId, subtopicId, name) =>
-                onRenameSubtopic(subject.id, topicId, subtopicId, name)
-              }
-            />
-          ))
-        )}
+          {isEmpty && !showAddSubject ? (
+            <EmptyCurriculumState onAddSubject={() => setShowAddSubject(true)} />
+          ) : (
+            curriculum.subjects.map((subject) => (
+              <div
+                key={subject.id}
+                ref={(element) => {
+                  if (element) subjectRefs.current.set(subject.id, element);
+                  else subjectRefs.current.delete(subject.id);
+                }}
+                style={{ scrollMarginTop: 18 }}
+              >
+                <SubjectCard
+                  subject={subject}
+                  onRename={(name) => onRenameSubject(subject.id, name)}
+                  onRemove={() => onRemoveSubject(subject.id)}
+                  onAddTopic={(name) => onAddTopic(subject.id, name)}
+                  onRemoveTopic={(topicId) => onRemoveTopic(subject.id, topicId)}
+                  onRenameTopic={(topicId, name) => onRenameTopic(subject.id, topicId, name)}
+                  onSetTopicMarkingSchema={(topicId, markingSchema) =>
+                    onSetTopicMarkingSchema(subject.id, topicId, markingSchema)
+                  }
+                  topicMarkingBusyId={topicMarkingBusyId}
+                  topicMarkingErrors={topicMarkingErrors}
+                  onAddSubtopic={(topicId, name) => onAddSubtopic(subject.id, topicId, name)}
+                  onRemoveSubtopic={(topicId, subtopicId) =>
+                    onRemoveSubtopic(subject.id, topicId, subtopicId)
+                  }
+                  onRenameSubtopic={(topicId, subtopicId, name) =>
+                    onRenameSubtopic(subject.id, topicId, subtopicId, name)
+                  }
+                />
+              </div>
+            ))
+          )}
+        </div>
+        {curriculum.subjects.length > 1 ? (
+          <SubjectOutline
+            subjects={curriculum.subjects}
+            activeSubjectId={activeSubjectId}
+            onSubjectClick={jumpToSubject}
+          />
+        ) : null}
       </div>
     </>
+  );
+}
+
+function SubjectOutline({
+  subjects,
+  activeSubjectId,
+  onSubjectClick,
+}: {
+  subjects: AdminSubject[];
+  activeSubjectId: string | null;
+  onSubjectClick: (subjectId: string) => void;
+}) {
+  return (
+    <nav
+      aria-label="Curriculum subjects"
+      style={{
+        position: "sticky",
+        top: 16,
+        maxHeight: "calc(100dvh - 210px)",
+        overflowY: "auto",
+        padding: "12px 10px",
+        borderLeft: "1px solid var(--color-border)",
+      }}
+    >
+      <div
+        className="label-cap"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "0 8px 8px",
+          color: "var(--color-ink-muted)",
+        }}
+      >
+        <ListTree size={13} strokeWidth={1.7} />
+        On this curriculum
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {subjects.map((subject, index) => {
+          const active = subject.id === activeSubjectId;
+          return (
+            <button
+              key={subject.id}
+              type="button"
+              onClick={() => onSubjectClick(subject.id)}
+              aria-current={active ? "location" : undefined}
+              className="tap"
+              style={{
+                width: "100%",
+                minWidth: 0,
+                display: "grid",
+                gridTemplateColumns: "16px minmax(0, 1fr)",
+                gap: 7,
+                alignItems: "start",
+                padding: "7px 8px",
+                border: 0,
+                borderRadius: 7,
+                background: active ? "var(--color-muted)" : "transparent",
+                color: active ? "var(--color-ink)" : "var(--color-ink-secondary)",
+                textAlign: "left",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  fontSize: 10,
+                  lineHeight: "18px",
+                  color: active ? "var(--color-terracotta)" : "var(--color-ink-muted)",
+                  fontWeight: 700,
+                }}
+              >
+                {index + 1}
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span
+                  style={{
+                    display: "block",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    fontSize: 12.5,
+                    lineHeight: 1.35,
+                    fontWeight: active ? 650 : 500,
+                  }}
+                >
+                  {subject.name}
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    marginTop: 2,
+                    fontSize: 10.5,
+                    color: "var(--color-ink-muted)",
+                  }}
+                >
+                  {subject.topics.length} topic{subject.topics.length === 1 ? "" : "s"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -799,6 +1130,9 @@ function SubjectCard({
   onAddTopic,
   onRemoveTopic,
   onRenameTopic,
+  onSetTopicMarkingSchema,
+  topicMarkingBusyId,
+  topicMarkingErrors,
   onAddSubtopic,
   onRemoveSubtopic,
   onRenameSubtopic,
@@ -806,22 +1140,30 @@ function SubjectCard({
   subject: AdminSubject;
   onRename: (name: string) => void;
   onRemove: () => void;
-  onAddTopic: (name: string) => void;
+  onAddTopic: (name: string) => Promise<boolean>;
   onRemoveTopic: (topicId: string) => void;
   onRenameTopic: (topicId: string, name: string) => void;
-  onAddSubtopic: (topicId: string, name: string) => void;
+  onSetTopicMarkingSchema: (topicId: string, markingSchema: MarkingSchema) => void;
+  topicMarkingBusyId: string | null;
+  topicMarkingErrors: Record<string, string>;
+  onAddSubtopic: (topicId: string, name: string) => Promise<boolean>;
   onRemoveSubtopic: (topicId: string, subtopicId: string) => void;
   onRenameSubtopic: (topicId: string, subtopicId: string, name: string) => void;
 }) {
   const [showAddTopic, setShowAddTopic] = React.useState(false);
   const [draftTopic, setDraftTopic] = React.useState("");
+  const [topicSaving, setTopicSaving] = React.useState(false);
   const totalSubtopics = subject.topics.reduce((sum, topic) => sum + topic.subtopics.length, 0);
 
-  const submitTopic = () => {
-    if (!draftTopic.trim()) return;
-    onAddTopic(draftTopic);
-    setDraftTopic("");
-    setShowAddTopic(false);
+  const submitTopic = async () => {
+    if (!draftTopic.trim() || topicSaving) return;
+    setTopicSaving(true);
+    const saved = await onAddTopic(draftTopic);
+    setTopicSaving(false);
+    if (saved) {
+      setDraftTopic("");
+      setShowAddTopic(false);
+    }
   };
 
   return (
@@ -901,7 +1243,7 @@ function SubjectCard({
               value={draftTopic}
               onChange={(event) => setDraftTopic(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") submitTopic();
+                if (event.key === "Enter") void submitTopic();
                 if (event.key === "Escape") {
                   setShowAddTopic(false);
                   setDraftTopic("");
@@ -910,8 +1252,13 @@ function SubjectCard({
               placeholder="New topic name (e.g. Decimal System)"
               className="h-9 bg-canvas"
             />
-            <Button type="button" size="sm" onClick={submitTopic} disabled={!draftTopic.trim()}>
-              Add
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void submitTopic()}
+              disabled={!draftTopic.trim() || topicSaving}
+            >
+              {topicSaving ? "Saving…" : "Add"}
             </Button>
             <Button
               type="button"
@@ -945,6 +1292,11 @@ function SubjectCard({
               topic={topic}
               onRename={(name) => onRenameTopic(topic.id, name)}
               onRemove={() => onRemoveTopic(topic.id)}
+              onSetMarkingSchema={(markingSchema) =>
+                onSetTopicMarkingSchema(topic.id, markingSchema)
+              }
+              markingSchemaBusy={topicMarkingBusyId === topic.id}
+              markingSchemaError={topicMarkingErrors[topic.id]}
               onAddSubtopic={(name) => onAddSubtopic(topic.id, name)}
               onRemoveSubtopic={(subtopicId) => onRemoveSubtopic(topic.id, subtopicId)}
               onRenameSubtopic={(subtopicId, name) => onRenameSubtopic(topic.id, subtopicId, name)}
@@ -960,6 +1312,9 @@ function TopicCard({
   topic,
   onRename,
   onRemove,
+  onSetMarkingSchema,
+  markingSchemaBusy,
+  markingSchemaError,
   onAddSubtopic,
   onRemoveSubtopic,
   onRenameSubtopic,
@@ -967,16 +1322,22 @@ function TopicCard({
   topic: AdminTopic;
   onRename: (name: string) => void;
   onRemove: () => void;
-  onAddSubtopic: (name: string) => void;
+  onSetMarkingSchema: (markingSchema: MarkingSchema) => void;
+  markingSchemaBusy: boolean;
+  markingSchemaError?: string;
+  onAddSubtopic: (name: string) => Promise<boolean>;
   onRemoveSubtopic: (subtopicId: string) => void;
   onRenameSubtopic: (subtopicId: string, name: string) => void;
 }) {
   const [draftSubtopic, setDraftSubtopic] = React.useState("");
+  const [subtopicSaving, setSubtopicSaving] = React.useState(false);
 
-  const submitSubtopic = () => {
-    if (!draftSubtopic.trim()) return;
-    onAddSubtopic(draftSubtopic);
-    setDraftSubtopic("");
+  const submitSubtopic = async () => {
+    if (!draftSubtopic.trim() || subtopicSaving) return;
+    setSubtopicSaving(true);
+    const saved = await onAddSubtopic(draftSubtopic);
+    setSubtopicSaving(false);
+    if (saved) setDraftSubtopic("");
   };
 
   return (
@@ -1025,6 +1386,62 @@ function TopicCard({
           <Trash2 size={15} strokeWidth={1.6} />
         </button>
       </div>
+
+      {topic.persisted ? (
+        <div
+          style={{
+            padding: "10px 12px",
+            borderBottom: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <label
+              htmlFor={`marking-schema-${topic.id}`}
+              style={{ fontSize: 12, fontWeight: 600, color: "var(--color-ink-secondary)" }}
+            >
+              Progress marking
+            </label>
+            <select
+              id={`marking-schema-${topic.id}`}
+              value={topic.markingSchema}
+              disabled={markingSchemaBusy}
+              onChange={(event) => onSetMarkingSchema(event.target.value as MarkingSchema)}
+              style={{
+                height: 32,
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                background: "var(--color-canvas)",
+                color: "var(--color-ink)",
+                padding: "0 28px 0 10px",
+                fontFamily: "inherit",
+                fontSize: 12,
+                cursor: markingSchemaBusy ? "wait" : "pointer",
+                opacity: markingSchemaBusy ? 0.65 : 1,
+              }}
+            >
+              <option value="ipm">IPM — Introduced, Practicing, Mastered</option>
+              <option value="five_level">Five-level — None to Excellent</option>
+            </select>
+            {markingSchemaBusy ? (
+              <span style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>Saving…</span>
+            ) : null}
+          </div>
+          {markingSchemaError ? (
+            <div
+              role="alert"
+              style={{
+                marginTop: 7,
+                fontSize: 12,
+                lineHeight: 1.4,
+                color: "var(--color-status-error, #b42318)",
+              }}
+            >
+              {markingSchemaError}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {topic.subtopics.map((subtopic, index) => (
@@ -1079,13 +1496,18 @@ function TopicCard({
           value={draftSubtopic}
           onChange={(event) => setDraftSubtopic(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter") submitSubtopic();
+            if (event.key === "Enter") void submitSubtopic();
           }}
           placeholder="+ Add lesson"
           className="h-9 bg-canvas"
         />
-        <Button type="button" size="sm" onClick={submitSubtopic} disabled={!draftSubtopic.trim()}>
-          Add
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void submitSubtopic()}
+          disabled={!draftSubtopic.trim() || subtopicSaving}
+        >
+          {subtopicSaving ? "Saving…" : "Add"}
         </Button>
       </div>
     </section>

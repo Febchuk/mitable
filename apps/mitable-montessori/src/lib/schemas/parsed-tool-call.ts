@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ClassroomToken, StudentToken, SubtopicToken } from "@/lib/schemas/tokens";
+import { PROGRESS_STATUSES } from "@/lib/progress/marking-schemas";
 
 /**
  * Tool calls returned by the LLM. All entity references are token strings.
@@ -23,7 +24,7 @@ export const RecordProgressCall = z.object({
     student_token: StudentToken,
     subtopic_token: SubtopicToken,
     classroom_token: ClassroomToken,
-    status: z.enum(["introduced", "practicing", "mastered", "na"]),
+    status: z.enum(PROGRESS_STATUSES),
     comment: z.string().max(500).optional(),
   }),
 });

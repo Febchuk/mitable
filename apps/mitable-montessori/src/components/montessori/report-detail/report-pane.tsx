@@ -481,7 +481,7 @@ function ProgressStatusBadge({ row }: { row: ProgressTopicRow }) {
 }
 
 function ProgressTopicTableRow({ row }: { row: ProgressTopicRow }) {
-  const mark = row.status === "introduced" ? "i" : row.status === "practicing" ? "p" : "m";
+  const mark = statusToMark(row.status);
   return (
     <tr>
       <td>{row.name}</td>

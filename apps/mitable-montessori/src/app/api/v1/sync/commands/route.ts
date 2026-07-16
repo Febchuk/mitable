@@ -9,6 +9,7 @@ import {
   NotePayloadSchema,
   ProgressPayloadSchema,
 } from "@/lib/schemas/command";
+import { normalizeMarkingSchema, statusAllowedForSchema } from "@/lib/progress/marking-schemas";
 
 const OutboundCommandSchema = z.object({
   client_id: z.string().min(1).max(100),
@@ -57,6 +58,51 @@ export async function POST(req: Request) {
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
+
+  const progressCommands = parsed.data.commands.flatMap((command) => {
+    if (command.command_type !== "progress") return [];
+    const payload = ProgressPayloadSchema.parse(command.payload);
+    return [{ command, payload }];
+  });
+  if (progressCommands.length > 0) {
+    const subtopicIds = [...new Set(progressCommands.map(({ payload }) => payload.subtopic_id))];
+    const classroomIds = [...new Set(progressCommands.map(({ command }) => command.classroom_id))];
+    const [{ data: subtopics }, { data: classrooms }] = await Promise.all([
+      supabase
+        .from("curriculum_subtopics")
+        .select("id, curriculum_topics!inner(curriculum_id, marking_schema)")
+        .in("id", subtopicIds),
+      supabase.from("classrooms").select("id, curriculum_id").in("id", classroomIds),
+    ]);
+    const classroomCurriculum = new Map(
+      (classrooms ?? []).map((room) => [room.id as string, room.curriculum_id as string | null])
+    );
+    const topicBySubtopic = new Map(
+      (subtopics ?? []).map((subtopic) => {
+        const joined = subtopic.curriculum_topics as
+          | { curriculum_id: string; marking_schema: string }
+          | Array<{ curriculum_id: string; marking_schema: string }>;
+        return [subtopic.id as string, Array.isArray(joined) ? joined[0] : joined] as const;
+      })
+    );
+    const invalid = progressCommands.find(({ command, payload }) => {
+      const topic = topicBySubtopic.get(payload.subtopic_id);
+      return (
+        !topic ||
+        topic.curriculum_id !== classroomCurriculum.get(command.classroom_id) ||
+        !statusAllowedForSchema(payload.status, normalizeMarkingSchema(topic.marking_schema))
+      );
+    });
+    if (invalid) {
+      return NextResponse.json(
+        {
+          error: "Progress value does not match the topic marking schema",
+          clientId: invalid.command.client_id,
+        },
+        { status: 400 }
+      );
+    }
+  }
 
   // Insert via the user-scoped client so RLS enforces classroom assignment.
   const rows = parsed.data.commands.map((c) => ({

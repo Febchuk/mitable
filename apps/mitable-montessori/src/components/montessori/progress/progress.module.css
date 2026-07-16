@@ -305,6 +305,21 @@
 .cell[data-state="i"] {
   background: var(--color-clay);
 }
+.cell[data-state="n"] {
+  background: var(--color-scale-none);
+}
+.cell[data-state="min"] {
+  background: var(--color-scale-minimum);
+}
+.cell[data-state="sat"] {
+  background: var(--color-scale-satisfactory);
+}
+.cell[data-state="g"] {
+  background: var(--color-scale-good);
+}
+.cell[data-state="e"] {
+  background: var(--color-scale-excellent);
+}
 .cell[data-state="-"] {
   background: var(--color-surface);
 }
@@ -366,7 +381,7 @@
     0 24px 50px rgba(42, 39, 35, 0.28),
     0 8px 16px rgba(42, 39, 35, 0.12);
   animation: mp-bar-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  width: min(720px, calc(100% - 48px));
+  width: min(980px, calc(100% - 48px));
 }
 .bulkBar textarea {
   background: rgba(255, 251, 243, 0.08);
@@ -431,6 +446,21 @@
 }
 .statusBtn[data-state="i"] .swatch {
   background: var(--color-clay);
+}
+.statusBtn[data-state="n"] .swatch {
+  background: var(--color-scale-none);
+}
+.statusBtn[data-state="min"] .swatch {
+  background: var(--color-scale-minimum);
+}
+.statusBtn[data-state="sat"] .swatch {
+  background: var(--color-scale-satisfactory);
+}
+.statusBtn[data-state="g"] .swatch {
+  background: var(--color-scale-good);
+}
+.statusBtn[data-state="e"] .swatch {
+  background: var(--color-scale-excellent);
 }
 .statusBtn[data-state="-"] .swatch {
   background: transparent;

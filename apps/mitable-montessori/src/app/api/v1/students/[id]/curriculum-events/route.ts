@@ -3,13 +3,16 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
-
-const TRANSITIONS = ["introduced", "practicing", "mastered"] as const;
+import {
+  REPORTABLE_PROGRESS_STATUSES,
+  normalizeMarkingSchema,
+  statusAllowedForSchema,
+} from "@/lib/progress/marking-schemas";
 
 const Body = z.object({
   subtopicId: z.string().uuid(),
   comment: z.string().min(1).max(2000),
-  transitionToStatus: z.enum(TRANSITIONS).nullable(),
+  transitionToStatus: z.enum(REPORTABLE_PROGRESS_STATUSES).nullable(),
 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +35,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
   const input = parsed.data;
+
+  if (input.transitionToStatus) {
+    const { data: subtopic } = await supabase
+      .from("curriculum_subtopics")
+      .select("curriculum_topics!inner(marking_schema)")
+      .eq("id", input.subtopicId)
+      .maybeSingle();
+    const joined = subtopic?.curriculum_topics as
+      | { marking_schema: string }
+      | Array<{ marking_schema: string }>
+      | undefined;
+    const topic = Array.isArray(joined) ? joined[0] : joined;
+    if (
+      !topic ||
+      !statusAllowedForSchema(
+        input.transitionToStatus,
+        normalizeMarkingSchema(topic.marking_schema)
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Progress value does not match the topic marking schema" },
+        { status: 400 }
+      );
+    }
+  }
 
   // Insert the event row. RLS confines this to teacher-visible students;
   // anything else surfaces as a 403 from postgres.
