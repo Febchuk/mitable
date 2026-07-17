@@ -2,6 +2,8 @@
 // transparently encrypted at rest by the encryptedTable hooks — values arrive
 // here decrypted. The plaintext index seed (a name HMAC) is stored separately.
 
+import type { MarkingSchema, ProgressStatus } from "@/lib/progress/marking-schemas";
+
 export interface RosterRow {
   id: string;
   firstName: string;
@@ -89,6 +91,8 @@ export interface CurriculumTopicRow {
   name: string;
   sortOrder: number;
   isActive: boolean;
+  /** Missing only on offline rows created before topic marking schemas shipped. */
+  markingSchema?: MarkingSchema;
 }
 
 export interface CurriculumSubtopicRow {
@@ -114,7 +118,7 @@ export interface AttendancePayload {
 export interface ProgressPayload {
   student_id: string;
   subtopic_id: string;
-  status: "introduced" | "practicing" | "mastered" | "na";
+  status: ProgressStatus;
   comment?: string;
 }
 
@@ -156,7 +160,7 @@ export interface ProgressProjRow {
   studentId: string;
   subtopicId: string;
   classroomId: string;
-  status: "introduced" | "practicing" | "mastered" | "na";
+  status: ProgressStatus;
   comment: string | null;
   sourceCommandId: string;
   updatedAt: string;
@@ -243,7 +247,7 @@ export interface WholeChildObservationRow {
   createdAt: string;
 }
 
-export type CurriculumEventTransition = "introduced" | "practicing" | "mastered";
+export type CurriculumEventTransition = ProgressStatus;
 
 export interface CurriculumEventRow {
   id: string;

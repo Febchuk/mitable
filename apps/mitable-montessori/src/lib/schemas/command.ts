@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PROGRESS_STATUSES } from "@/lib/progress/marking-schemas";
 
 export const AttendancePayloadSchema = z.object({
   student_id: z.string().uuid(),
@@ -15,7 +16,7 @@ export const AttendancePayloadSchema = z.object({
 export const ProgressPayloadSchema = z.object({
   student_id: z.string().uuid(),
   subtopic_id: z.string().uuid(),
-  status: z.enum(["introduced", "practicing", "mastered", "na"]),
+  status: z.enum(PROGRESS_STATUSES),
   comment: z.string().max(500).optional(),
 });
 

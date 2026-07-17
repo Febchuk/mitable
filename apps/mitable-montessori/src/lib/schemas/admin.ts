@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MARKING_SCHEMAS } from "@/lib/progress/marking-schemas";
 
 /** Phase 4 Zod schemas for admin CRUD endpoints. Centralized here so the
  *  agent's tool definitions and the route handlers stay in lockstep. */
@@ -132,6 +133,11 @@ export const CreateCurriculumTopicSchema = z.object({
   subject_id: z.string().uuid(),
   name: z.string().min(1).max(200),
   sort_order: z.number().int().min(0).max(10000),
+});
+
+export const SetTopicMarkingSchemaSchema = z.object({
+  topic_id: z.string().uuid(),
+  marking_schema: z.enum(MARKING_SCHEMAS),
 });
 
 export const CreateCurriculumSubtopicSchema = z.object({

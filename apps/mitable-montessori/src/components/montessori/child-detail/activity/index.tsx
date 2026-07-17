@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { LEVEL_TONES, stateMeta, type Level, type SubtopicState } from "../mock-data";
+import { LEVEL_TONES, type Level } from "../mock-data";
 import { SectionHeading } from "../section-heading";
 import type { ActivityFeedEntry, ReportStatus } from "@/lib/queries/activity";
+import { ALL_PROGRESS_LEVELS } from "@/lib/progress/marking-schemas";
 
 const cardStyle: React.CSSProperties = {
   background: "var(--color-surface)",
@@ -36,18 +37,6 @@ const REPORT_STATUS_COLOR: Record<ReportStatus, { bg: string; fg: string }> = {
   approved: { bg: "var(--color-sage-soft, #eef6f1)", fg: "var(--color-sage-deep, #1f6b42)" },
   sent: { bg: "var(--color-sage-soft, #eef6f1)", fg: "var(--color-sage-deep, #1f6b42)" },
 };
-
-const TRANSITION_LABEL: Record<"introduced" | "practicing" | "mastered", string> = {
-  introduced: "Introduced",
-  practicing: "Practicing",
-  mastered: "Mastered",
-};
-
-function transitionState(s: "introduced" | "practicing" | "mastered"): SubtopicState {
-  if (s === "introduced") return "i";
-  if (s === "practicing") return "p";
-  return "m";
-}
 
 function formatRelative(iso: string): string {
   try {
@@ -108,7 +97,7 @@ function CurriculumEntry({
   mobile: boolean;
 }) {
   const transitionMeta = e.transitionToStatus
-    ? stateMeta[transitionState(e.transitionToStatus)]
+    ? ALL_PROGRESS_LEVELS.find((level) => level.status === e.transitionToStatus)
     : null;
   return (
     <div
@@ -172,12 +161,12 @@ function CurriculumEntry({
               textTransform: "uppercase",
               padding: "3px 8px",
               borderRadius: 999,
-              color: transitionMeta.deep,
-              background: transitionMeta.soft,
-              border: `1px solid ${transitionMeta.tone}`,
+              color: "var(--color-ink)",
+              background: `color-mix(in srgb, ${transitionMeta.color} 18%, transparent)`,
+              border: `1px solid ${transitionMeta.color}`,
             }}
           >
-            → {TRANSITION_LABEL[e.transitionToStatus]}
+            → {transitionMeta.label}
           </span>
         )}
         {e.authorName && (

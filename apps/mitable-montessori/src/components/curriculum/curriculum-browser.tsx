@@ -43,6 +43,7 @@ function toReaderShape(tree: CurriculumTree) {
       name: t.name,
       subjectId: s.id,
       sortOrder: t.sortOrder,
+      markingSchema: t.markingSchema,
     }))
   );
   const subtopics = tree.subjects.flatMap((s) =>

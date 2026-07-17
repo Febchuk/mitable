@@ -1,7 +1,16 @@
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import {
+  STATUS_COLOR,
+  STATUS_LABEL,
+  markToStatus,
+  statusToMark,
+  type ProgressMark,
+  type ProgressStatus,
+} from "@/lib/progress/marking-schemas";
+
+export { STATUS_COLOR, STATUS_LABEL, markToStatus, statusToMark, type ProgressMark };
 
 export type Tone = "clay" | "sage" | "butter" | "blue" | "terracotta";
-export type ProgressMark = "m" | "p" | "i" | "-";
 export type AttendanceMark = "p" | "a" | "t" | "-";
 export type ReportStatus = "draft" | "review" | "sent";
 export type ObservationStatus = "pending" | "approved";
@@ -443,31 +452,7 @@ export const SUBTOPIC_INFO: Record<string, string> = {
     "Similar pegboard. Child distributes beads evenly into the divisor's slots and reads the quotient.",
 };
 
-export const STATUS_LABEL: Record<ProgressMark, string> = {
-  m: "Mastered",
-  p: "Practicing",
-  i: "Introduced",
-  "-": "Not started",
-};
-
-export const STATUS_COLOR: Record<ProgressMark, string> = {
-  m: "var(--color-sage)",
-  p: "var(--color-butter)",
-  i: "var(--color-clay)",
-  "-": "var(--color-border)",
-};
-
-/** UI ↔ DB status converters. Source of truth for the DB enum lives in
- *  src/lib/queries/curriculum.ts (CurriculumStatus). */
-export type CurriculumStatusValue = "introduced" | "practicing" | "mastered" | "na";
-
-export function markToStatus(m: ProgressMark): CurriculumStatusValue {
-  return m === "m" ? "mastered" : m === "p" ? "practicing" : m === "i" ? "introduced" : "na";
-}
-
-export function statusToMark(s: CurriculumStatusValue): ProgressMark {
-  return s === "mastered" ? "m" : s === "practicing" ? "p" : s === "introduced" ? "i" : "-";
-}
+export type CurriculumStatusValue = ProgressStatus;
 
 // Per-topic seeded data. Sensorial mirrors the original 12-cell sensorial seed
 // for the 10 children that already had data; the other three topics use

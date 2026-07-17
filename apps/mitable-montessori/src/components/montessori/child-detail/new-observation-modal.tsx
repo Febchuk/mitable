@@ -8,6 +8,12 @@ import { ToastBus } from "../primitives";
 import type { PageView } from "./child-page-header";
 import type { CurriculumByTopic } from "@/lib/queries/curriculum";
 import type { AxisWithAssessment } from "@/lib/queries/whole-child";
+import {
+  ALL_PROGRESS_LEVELS,
+  levelsForSchema,
+  statusAllowedForSchema,
+  type ProgressStatus,
+} from "@/lib/progress/marking-schemas";
 
 type Props = {
   open: boolean;
@@ -26,12 +32,6 @@ const STUB_CONFIG: Record<"activity", { sub: string; fields: string[]; cta: stri
     cta: "Save observation",
   },
 };
-
-const TRANSITIONS = [
-  { value: "introduced", label: "Introduced" },
-  { value: "practicing", label: "Practicing" },
-  { value: "mastered", label: "Mastered" },
-] as const;
 
 export function NewObservationModal({
   open,
@@ -383,29 +383,30 @@ function CurriculumForm({
   const router = useRouter();
   const firstSubtopicId = curriculum[0]?.subtopics[0]?.subtopicId ?? "";
   const [subtopicId, setSubtopicId] = React.useState<string>(firstSubtopicId);
-  const [state, setState] = React.useState<(typeof TRANSITIONS)[number]["value"]>("introduced");
+  const [state, setState] = React.useState<ProgressStatus>("introduced");
   const [comment, setComment] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   // Look up the chosen subtopic's current status across the topic groups.
-  const currentStatus: "introduced" | "practicing" | "mastered" | "na" | null =
-    React.useMemo(() => {
-      for (const t of curriculum) {
-        const s = t.subtopics.find((sub) => sub.subtopicId === subtopicId);
-        if (s) return s.status;
-      }
-      return null;
-    }, [subtopicId, curriculum]);
+  const selectedTopic = React.useMemo(
+    () => curriculum.find((topic) => topic.subtopics.some((sub) => sub.subtopicId === subtopicId)),
+    [subtopicId, curriculum]
+  );
+  const currentStatus =
+    selectedTopic?.subtopics.find((sub) => sub.subtopicId === subtopicId)?.status ?? null;
+  const transitions = levelsForSchema(selectedTopic?.markingSchema ?? "ipm");
 
   // When the user picks a different subtopic, reset state to that subtopic's
   // current value so the form always reflects the chosen subtopic's status.
   React.useEffect(() => {
-    if (currentStatus === "introduced") setState("introduced");
-    else if (currentStatus === "practicing") setState("practicing");
-    else if (currentStatus === "mastered") setState("mastered");
-    else setState("introduced"); // never-recorded or "na"
-  }, [subtopicId, currentStatus]);
+    const schema = selectedTopic?.markingSchema ?? "ipm";
+    const nextState =
+      currentStatus && currentStatus !== "na" && statusAllowedForSchema(currentStatus, schema)
+        ? currentStatus
+        : (levelsForSchema(schema)[0]?.status ?? "introduced");
+    setState(nextState);
+  }, [subtopicId, currentStatus, selectedTopic?.markingSchema]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -484,7 +485,9 @@ function CurriculumForm({
             <optgroup key={t.topicId} label={t.topicName}>
               {t.subtopics.map((s) => (
                 <option key={s.subtopicId} value={s.subtopicId}>
-                  {s.name} · {s.status}
+                  {s.name} ·{" "}
+                  {ALL_PROGRESS_LEVELS.find((level) => level.status === s.status)?.label ??
+                    s.status}
                 </option>
               ))}
             </optgroup>
@@ -497,18 +500,21 @@ function CurriculumForm({
           State
           {currentStatus && currentStatus !== "na" && (
             <span style={{ marginLeft: 8, color: "var(--color-ink-muted)", letterSpacing: 0 }}>
-              (currently {currentStatus})
+              (currently{" "}
+              {ALL_PROGRESS_LEVELS.find((level) => level.status === currentStatus)?.label ??
+                currentStatus}
+              )
             </span>
           )}
         </span>
         <select
           value={state}
-          onChange={(e) => setState(e.target.value as (typeof TRANSITIONS)[number]["value"])}
+          onChange={(e) => setState(e.target.value as ProgressStatus)}
           style={inputStyle}
         >
-          {TRANSITIONS.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
+          {transitions.map((transition) => (
+            <option key={transition.status} value={transition.status}>
+              {transition.label}
             </option>
           ))}
         </select>

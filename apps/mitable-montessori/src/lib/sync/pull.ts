@@ -7,6 +7,7 @@ import {
   rosterNameHash,
 } from "@/lib/db/encrypted-fields";
 import { getDb } from "@/lib/db/schema";
+import type { ProgressStatus } from "@/lib/progress/marking-schemas";
 
 interface PullResponse {
   salt: string;
@@ -78,6 +79,7 @@ interface PullResponse {
       name: string;
       sort_order: number;
       is_active: boolean;
+      marking_schema: "ipm" | "five_level";
     }>;
     curriculum_subtopics: Array<{
       id: string;
@@ -122,7 +124,7 @@ interface PullResponse {
       student_id: string;
       subtopic_id: string;
       comment: string;
-      transition_to_status: "introduced" | "practicing" | "mastered" | null;
+      transition_to_status: ProgressStatus | null;
       author_user_id: string;
       created_at: string;
     }>;
@@ -263,6 +265,7 @@ export async function pullSync() {
           name: t.name,
           sortOrder: t.sort_order,
           isActive: t.is_active,
+          markingSchema: t.marking_schema,
         }))
       );
 

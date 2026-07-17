@@ -4,8 +4,9 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 import { getAxesForSchool } from "./axes";
 import type { AxisLevel } from "./whole-child";
+import type { ProgressStatus } from "@/lib/progress/marking-schemas";
 
-export type CurriculumTransition = "introduced" | "practicing" | "mastered";
+export type CurriculumTransition = ProgressStatus;
 
 /** A teacher entry in the activity feed — either a curriculum or whole-child event. */
 export type ReportStatus =

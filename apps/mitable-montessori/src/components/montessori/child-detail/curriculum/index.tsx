@@ -1,22 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { AREAS, stateMeta, type AreaName, type SubtopicState } from "../mock-data";
+import { AREAS, type AreaName } from "../mock-data";
 import { SectionHeading } from "../section-heading";
 import type {
   CurriculumByTopic,
   CurriculumStatus,
   SubtopicProgress,
 } from "@/lib/queries/curriculum";
+import {
+  STATUS_COLOR,
+  STATUS_LABEL,
+  levelsForSchema,
+  statusToMark,
+  type MarkingSchema,
+  type ProgressMark,
+} from "@/lib/progress/marking-schemas";
 
-type StepLabel = { key: SubtopicState; label: string; date: string | null };
-
-const STATUS_TO_STATE: Record<CurriculumStatus, SubtopicState | null> = {
-  introduced: "i",
-  practicing: "p",
-  mastered: "m",
-  na: null,
-};
+type StepLabel = { key: ProgressMark; label: string; color: string; date: string | null };
 
 const DEFAULT_AREA_TONE = { tone: "var(--color-clay)", soft: "var(--color-clay-soft)" };
 
@@ -53,7 +54,7 @@ function StepDiagramHorizontal({
                 <span
                   className="legend-dot"
                   style={{
-                    background: isFilled ? stateMeta[l.key].tone : "var(--color-border-strong)",
+                    background: isFilled ? l.color : "var(--color-border-strong)",
                     opacity: isFilled ? 1 : 0.5,
                   }}
                 />
@@ -109,7 +110,7 @@ function StepDiagramVertical({ labels, currentIdx }: { labels: StepLabel[]; curr
                 <span
                   className="legend-dot"
                   style={{
-                    background: isFilled ? stateMeta[l.key].tone : "var(--color-border-strong)",
+                    background: isFilled ? l.color : "var(--color-border-strong)",
                     opacity: isFilled ? 1 : 0.5,
                   }}
                 />
@@ -128,7 +129,7 @@ function StepDiagramVertical({ labels, currentIdx }: { labels: StepLabel[]; curr
                   marginLeft: 18,
                   height: 18,
                   width: 2,
-                  background: i < currentIdx ? stateMeta[l.key].tone : "var(--color-border)",
+                  background: i < currentIdx ? l.color : "var(--color-border)",
                   opacity: i < currentIdx ? 0.7 : 1,
                 }}
               />
@@ -203,7 +204,7 @@ function SubtopicPicker({
 }) {
   const inner = subtopics.map((s) => {
     const active = value === s.subtopicId;
-    const stateKey = STATUS_TO_STATE[s.status];
+    const stateKey = statusToMark(s.status);
     return (
       <button
         key={s.subtopicId}
@@ -212,10 +213,10 @@ function SubtopicPicker({
         data-active={active}
         onClick={() => onChange(s.subtopicId)}
       >
-        {stateKey && (
+        {stateKey !== "-" && (
           <span
             className="subtopic-chip-dot"
-            style={{ background: stateMeta[stateKey].tone }}
+            style={{ background: STATUS_COLOR[stateKey] }}
             aria-hidden
           />
         )}
@@ -233,17 +234,41 @@ function SubtopicPicker({
   return <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{inner}</div>;
 }
 
-function SubtopicDetail({ sub, mobile }: { sub: SubtopicProgress; mobile: boolean }) {
-  const stateKey = STATUS_TO_STATE[sub.status];
-  const meta = stateKey ? stateMeta[stateKey] : null;
+function SubtopicDetail({
+  sub,
+  markingSchema,
+  mobile,
+}: {
+  sub: SubtopicProgress;
+  markingSchema: MarkingSchema;
+  mobile: boolean;
+}) {
+  const stateKey = statusToMark(sub.status);
+  const meta =
+    stateKey === "-"
+      ? null
+      : {
+          label: STATUS_LABEL[stateKey],
+          tone: STATUS_COLOR[stateKey],
+          soft: `color-mix(in srgb, ${STATUS_COLOR[stateKey]} 18%, var(--color-surface))`,
+          deep: "var(--color-ink)",
+        };
   const tone = areaToneFor(sub.topicName);
-  const stateOrder: SubtopicState[] = ["i", "p", "m"];
-  const currentIdx = stateKey ? stateOrder.indexOf(stateKey) : -1;
-  const stepLabels: StepLabel[] = [
-    { key: "i", label: "Introduced", date: formatDate(sub.introducedAt) },
-    { key: "p", label: "Practicing", date: formatDate(sub.practicingAt) },
-    { key: "m", label: "Mastered", date: formatDate(sub.masteredAt) },
-  ];
+  const orderedLevels = [...levelsForSchema(markingSchema)].reverse();
+  const stateOrder = orderedLevels.map((level) => level.mark);
+  const currentIdx = stateKey === "-" ? -1 : stateOrder.indexOf(stateKey);
+  const dateForStatus = (status: CurriculumStatus): string | null => {
+    if (status === "introduced") return formatDate(sub.introducedAt);
+    if (status === "practicing") return formatDate(sub.practicingAt);
+    if (status === "mastered") return formatDate(sub.masteredAt);
+    return status === sub.status ? formatDate(sub.updatedAt) : null;
+  };
+  const stepLabels: StepLabel[] = orderedLevels.map((level) => ({
+    key: level.mark,
+    label: level.label,
+    color: level.color,
+    date: dateForStatus(level.status),
+  }));
 
   return (
     <div
@@ -427,7 +452,13 @@ export function CurriculumView({
             </div>
           )}
 
-          {activeSubtopic && <SubtopicDetail sub={activeSubtopic} mobile={mobile} />}
+          {activeSubtopic && (
+            <SubtopicDetail
+              sub={activeSubtopic}
+              markingSchema={activeTopic.markingSchema}
+              mobile={mobile}
+            />
+          )}
         </div>
       </div>
     </>

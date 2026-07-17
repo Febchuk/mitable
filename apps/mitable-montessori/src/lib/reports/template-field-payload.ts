@@ -5,7 +5,10 @@
  */
 
 import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
-import { progressTopicToReadableText } from "@/lib/reports/progress-topic-payload";
+import {
+  isProgressTopicPayload,
+  progressTopicToReadableText,
+} from "@/lib/reports/progress-topic-payload";
 
 const PREFIX = "__MITABLE_FIELD_V1__";
 
@@ -132,7 +135,7 @@ export function inferSingleSelect(proseHtml: string, options: string[]): string 
 
 /** Plain text for PDF, chat tokenization, and markdown `body` — never exposes raw JSON prefixes. */
 export function fieldPayloadToReadableText(html: string): string {
-  if (html.trim().startsWith("__MITABLE_PROGRESS_TOPIC_V1__")) {
+  if (isProgressTopicPayload(html)) {
     return progressTopicToReadableText(html);
   }
   const d = decodeFieldPayload(html);

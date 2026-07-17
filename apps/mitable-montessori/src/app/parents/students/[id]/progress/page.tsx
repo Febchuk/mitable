@@ -1,6 +1,17 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import {
+  PROGRESS_STATUSES,
+  STATUS_LABEL,
+  statusToMark,
+  type ProgressStatus,
+} from "@/lib/progress/marking-schemas";
+
+function progressLabel(status: string): string {
+  if (!PROGRESS_STATUSES.includes(status as ProgressStatus)) return status;
+  return STATUS_LABEL[statusToMark(status as ProgressStatus)];
+}
 
 export default async function ProgressPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -56,7 +67,9 @@ export default async function ProgressPage({ params }: { params: Promise<{ id: s
                   className="flex items-center justify-between gap-3 px-4 py-2 text-sm"
                 >
                   <span>{it.name}</span>
-                  <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs">{it.status}</span>
+                  <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs">
+                    {progressLabel(it.status)}
+                  </span>
                 </li>
               ))}
             </ul>

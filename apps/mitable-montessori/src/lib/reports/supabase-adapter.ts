@@ -5,6 +5,7 @@ import type {
   TokenizedCommandRecord,
   TokenizedProgressRow,
 } from "@/lib/reports/data-adapter";
+import type { ProgressStatus } from "@/lib/progress/marking-schemas";
 
 /**
  * Pulls commands + progress from Supabase (server-side, RLS in effect) and
@@ -224,7 +225,7 @@ export class SupabaseReportDataAdapter implements ReportDataAdapter {
     const rows: TokenizedProgressRow[] = (data ?? []).map((r) => {
       const row = r as {
         curriculum_subtopic_id: string;
-        status: "introduced" | "practicing" | "mastered" | "na";
+        status: ProgressStatus;
         comment: string | null;
         updated_at: string;
         curriculum_subtopics: { name: string } | { name: string }[] | null;

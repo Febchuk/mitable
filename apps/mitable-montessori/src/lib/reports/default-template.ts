@@ -3,6 +3,7 @@ import type { ReportTemplate, ReportKind } from "@/components/montessori/new-rep
 import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
 import { type ReportingPeriod } from "@/lib/report-templates/admin-dto";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
+import { REPORTABLE_PROGRESS_STATUSES } from "@/lib/progress/marking-schemas";
 import { encodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
 
 /** Legacy sentinel — still accepted when creating reports from old clients. */
@@ -189,7 +190,7 @@ type HistoryRow = {
   changed_at: string;
 };
 
-const ACTIVE_STATUSES = new Set(["introduced", "practicing", "mastered"]);
+const REPORTABLE_STATUSES = new Set<CurriculumStatus>(REPORTABLE_PROGRESS_STATUSES);
 
 function sectionSlug(heading: string, i: number): string {
   return (
@@ -238,7 +239,7 @@ async function loadClassroomSubjects(
     }));
 }
 
-/** Latest I/P/M mark per subtopic within the report window. */
+/** Latest reportable mark per subtopic within the report window. */
 async function loadPeriodProgressBySubtopic(
   supabase: SupabaseClient,
   studentId: string,
@@ -257,7 +258,7 @@ async function loadPeriodProgressBySubtopic(
   const out = new Map<string, { status: CurriculumStatus; comment: string | null }>();
   for (const row of (data ?? []) as HistoryRow[]) {
     const status = row.new_status;
-    if (!status || !ACTIVE_STATUSES.has(status)) continue;
+    if (!status || !REPORTABLE_STATUSES.has(status as CurriculumStatus)) continue;
     const comment = row.comment?.trim() || null;
     out.set(row.curriculum_subtopic_id, {
       status: status as CurriculumStatus,

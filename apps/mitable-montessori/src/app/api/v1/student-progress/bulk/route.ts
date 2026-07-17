@@ -4,6 +4,11 @@ import { z } from "zod";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { resolveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import {
+  PROGRESS_STATUSES,
+  normalizeMarkingSchema,
+  statusAllowedForSchema,
+} from "@/lib/progress/marking-schemas";
 import { createClient } from "@/utils/supabase/server";
 
 const BulkProgressSchema = z.object({
@@ -13,7 +18,7 @@ const BulkProgressSchema = z.object({
       z.object({
         studentId: z.string().uuid(),
         subtopicId: z.string().uuid(),
-        status: z.enum(["introduced", "practicing", "mastered", "na"]),
+        status: z.enum(PROGRESS_STATUSES),
         comment: z.string().max(500).optional(),
       })
     )
@@ -41,6 +46,41 @@ export async function POST(req: Request) {
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
+
+  const subtopicIds = Array.from(new Set(parsed.data.updates.map((u) => u.subtopicId)));
+  const [{ data: room }, { data: subtopicRows }] = await Promise.all([
+    supabase.from("classrooms").select("curriculum_id").eq("id", classroom.id).maybeSingle(),
+    supabase
+      .from("curriculum_subtopics")
+      .select("id, curriculum_topics!inner(curriculum_id, marking_schema)")
+      .in("id", subtopicIds),
+  ]);
+  const topicBySubtopic = new Map(
+    (subtopicRows ?? []).map((row) => {
+      const joined = row.curriculum_topics as
+        | { curriculum_id: string; marking_schema: string }
+        | Array<{ curriculum_id: string; marking_schema: string }>;
+      const topic = Array.isArray(joined) ? joined[0] : joined;
+      return [row.id as string, topic] as const;
+    })
+  );
+  const invalidUpdates = parsed.data.updates.filter((update) => {
+    const topic = topicBySubtopic.get(update.subtopicId);
+    return (
+      !topic ||
+      topic.curriculum_id !== (room?.curriculum_id as string | null) ||
+      !statusAllowedForSchema(update.status, normalizeMarkingSchema(topic.marking_schema))
+    );
+  });
+  if (invalidUpdates.length > 0) {
+    return NextResponse.json(
+      {
+        error: "Some progress values do not match the topic marking schema",
+        subtopicIds: [...new Set(invalidUpdates.map((update) => update.subtopicId))],
+      },
+      { status: 400 }
+    );
+  }
 
   // Validate every studentId is actively enrolled in the caller's classroom.
   // RLS would reject the command insert anyway (the trigger writes to

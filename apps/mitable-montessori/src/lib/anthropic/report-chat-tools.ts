@@ -343,7 +343,7 @@ Style:
 Stop after at most 4 tool turns total per request.`;
 
 export const REPORT_CHAT_DEFAULT_CLASSROOM_SUPPLEMENT = `Default classroom report (curriculum progress template):
-- read_report_sections may tag sections with sectionRole. progress_grid sections are I/P/M grids synced from progress history — LOCKED. Never call propose_rewrite or propose_ghost_edit on those paragraphs.
+- read_report_sections may tag sections with sectionRole. progress_grid sections contain the classroom's configured progress labels and are synced from progress history — LOCKED. Never call propose_rewrite or propose_ghost_edit on those paragraphs.
 - topic_comments sections (paired comment prose for a curriculum topic) are the editable areas for teacher voice and edits about that subject and its lessons/materials. Target them with propose_ghost_edit (additive) or propose_rewrite (replace existing comment text).
 - Map each voice-dictated observation to the Comments section for the matching topic when the speech mentions that subject area or specific materials within it.
 - If the teacher narrates content for a curriculum area with NO matching section yet, call propose_new_section to add the missing topic section(s), mirroring the existing pattern (topic progress section + "{Topic} — Comments" prose section when both are needed), then propose_ghost_edit on the new Comments paragraph with the narrated prose.

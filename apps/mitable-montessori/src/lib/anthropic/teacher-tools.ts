@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { PROGRESS_STATUSES } from "@/lib/progress/marking-schemas";
 
 /**
  * Tool definitions for Phase 1 teacher capture. Inputs and outputs are tokenized;
@@ -35,7 +36,7 @@ export const TEACHER_TOOLS: Anthropic.Tool[] = [
   {
     name: "record_progress",
     description:
-      "Record progress on a curriculum subtopic. Use when the teacher mentions a student practicing, mastering, or being introduced to a Montessori material/lesson.",
+      "Record progress on a curriculum subtopic. Supports IPM (introduced, practicing, mastered) and five-level (none, minimum, satisfactory, good, excellent) ratings.",
     input_schema: {
       type: "object",
       properties: {
@@ -44,7 +45,7 @@ export const TEACHER_TOOLS: Anthropic.Tool[] = [
         classroom_token: { type: "string" },
         status: {
           type: "string",
-          enum: ["introduced", "practicing", "mastered", "na"],
+          enum: [...PROGRESS_STATUSES],
         },
         comment: { type: "string" },
       },
@@ -100,5 +101,6 @@ Rules:
 - Always pass the classroom_token from the user message into mark_attendance and record_progress.
 - Default status for "X is here" / "X showed up" → 'present'. "X is out" / "X is sick" → 'absent'.
 - Default status for "X did Y" → 'practicing'. "X finished Y" / "X mastered Y" → 'mastered'. "X started Y" / "introduce X to Y" → 'introduced'.
+- Preserve explicit five-level ratings: 'none', 'minimum', 'satisfactory', 'good', or 'excellent'.
 - Use today's date (provided by the user) unless the teacher names another date.
 - Output tool calls only. No prose.`;

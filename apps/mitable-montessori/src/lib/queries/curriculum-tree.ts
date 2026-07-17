@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeMarkingSchema, type MarkingSchema } from "@/lib/progress/marking-schemas";
 
 export type CurriculumListItem = {
   id: string;
@@ -12,6 +13,7 @@ export type CurriculumTreeTopic = {
   id: string;
   name: string;
   sortOrder: number;
+  markingSchema: MarkingSchema;
   subtopics: CurriculumTreeSubtopic[];
 };
 export type CurriculumTreeSubject = {
@@ -33,6 +35,7 @@ type SubjectDbRow = {
     id: string;
     name: string;
     sort_order: number;
+    marking_schema: string;
     curriculum_subtopics: Array<{ id: string; name: string; sort_order: number }>;
   }>;
 };
@@ -143,7 +146,7 @@ export async function getCurriculumTree(
   const { data: subjectRows, error: treeErr } = await supabase
     .from("curriculum_subjects")
     .select(
-      "id, name, sort_order, curriculum_topics(id, name, sort_order, curriculum_subtopics(id, name, sort_order))"
+      "id, name, sort_order, curriculum_topics(id, name, sort_order, marking_schema, curriculum_subtopics(id, name, sort_order))"
     )
     .eq("curriculum_id", args.curriculumId)
     .returns<SubjectDbRow[]>();
@@ -161,6 +164,7 @@ export async function getCurriculumTree(
           id: topic.id,
           name: topic.name,
           sortOrder: topic.sort_order,
+          markingSchema: normalizeMarkingSchema(topic.marking_schema),
           subtopics: [...(topic.curriculum_subtopics ?? [])]
             .sort((a, b) => a.sort_order - b.sort_order)
             .map((st) => ({
