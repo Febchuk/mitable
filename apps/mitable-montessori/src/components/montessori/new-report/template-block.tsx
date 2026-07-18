@@ -4,7 +4,8 @@ import * as React from "react";
 import { LayoutTemplate } from "lucide-react";
 import { PdfPreviewPane } from "@/components/montessori/report-detail/pdf-preview-pane";
 import type { ReportPdfData } from "@/lib/pdf/report-template";
-import { progressTopicToReadableText } from "@/lib/reports/progress-topic-payload";
+import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
+import { encodeProgressTopic } from "@/lib/reports/progress-topic-payload";
 import {
   isDefaultReportTemplateId,
   withDefaultReportTemplates,
@@ -122,39 +123,43 @@ function TemplateRow({
  *  reads the same shape as the parent-facing PDF after the teacher fills
  *  it in. */
 function templateToPdfData(template: ReportTemplate, child: PickerChild | null): ReportPdfData {
+  // Reconstruct the raw section shape the real report stores, then run it
+  // through the shared block builder so the empty-template preview looks
+  // exactly like a filled report (same subject blocks, badges, controls).
+  const rawSections = template.sections.map((heading) => {
+    const meta = template.sectionMeta?.[heading];
+    let html = "";
+    if (meta?.type === "progress_topic" && isDefaultReportTemplateId(template.id)) {
+      // Illustrative sample so the default-template preview isn't empty.
+      html = encodeProgressTopic([
+        {
+          subtopicId: "preview-1",
+          name: "Pink Tower",
+          status: "introduced",
+          comment: null,
+          topicName: "Sensorial",
+        },
+        {
+          subtopicId: "preview-2",
+          name: "Brown Stair",
+          status: "practicing",
+          comment: null,
+          topicName: "Sensorial",
+        },
+      ]);
+    }
+    return { heading, paragraphs: [{ html }] };
+  });
+
   return {
     title: template.name,
     studentName: child?.name ?? "Student name",
     reportDate: null,
     classroom: "",
+    observedBy: "Teacher",
     reportType: template.kind.toLowerCase(),
     logoUrl: template.logoUrl,
-    sections: template.sections.map((heading) => {
-      const meta = template.sectionMeta?.[heading];
-      if (meta?.type === "progress_topic") {
-        const previewText = isDefaultReportTemplateId(template.id)
-          ? "Pink Tower (Introduced)\nBrown Stair (Practicing)"
-          : progressTopicToReadableText("");
-        return { heading, paragraphs: [{ text: previewText }] };
-      }
-      if (meta?.type === "checklist") {
-        return {
-          heading,
-          paragraphs: [
-            { text: "", field: { kind: "checklist", options: meta.options, selected: [] } },
-          ],
-        };
-      }
-      if (meta?.type === "single_select") {
-        return {
-          heading,
-          paragraphs: [
-            { text: "", field: { kind: "single_select", options: meta.options, value: null } },
-          ],
-        };
-      }
-      return { heading, paragraphs: [{ text: "" }] };
-    }),
+    blocks: buildReportPdfBlocks(rawSections, template.sectionMeta ?? {}),
     body: null,
   };
 }
