@@ -6,12 +6,29 @@ const appDir = import.meta.dirname;
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(appDir, "../../"),
-  // @react-pdf/renderer ships ESM-only. Without transpiling, Next's webpack
-  // build fails with "ESM packages need to be imported. Use 'import' to
-  // reference the package instead." when it's reached through the client
-  // graph via a static import (the <PDFViewer> itself is dynamic({ ssr: false })
-  // but ReportDocument is imported statically).
+  // @react-pdf/renderer ships ESM-only. Client preview needs transpiling.
   transpilePackages: ["@react-pdf/renderer"],
+  webpack: (config, { isServer }) => {
+    // App Router API routes bundle into Next's react-server layer. @react-pdf's
+    // reconciler reads React client internals (`…CLIENT_INTERNALS….S`). In that
+    // layer React 19 exposes server internals instead → renderToBuffer throws.
+    // Externalize on the server so Node resolves the normal client React build.
+    // (Turbopack dev ignores webpack() — use `npm run dev`, not `dev:turbo`.)
+    if (isServer) {
+      const existing = config.externals ?? [];
+      config.externals = [
+        ...(Array.isArray(existing) ? existing : [existing]),
+        "@react-pdf/renderer",
+        "@react-pdf/reconciler",
+        "@react-pdf/layout",
+        "@react-pdf/pdfkit",
+        "@react-pdf/render",
+        "@react-pdf/font",
+        "@react-pdf/primitives",
+      ];
+    }
+    return config;
+  },
   typescript: {
     ignoreBuildErrors: false,
   },
