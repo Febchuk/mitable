@@ -7,6 +7,11 @@ export type GuardianSummary = {
   relationship: string | null;
   primary: boolean;
   contact: string;
+  email?: string | null;
+  phone?: string | null;
+  preferredContactMethod?: "email" | "phone" | "either" | null;
+  receivesReports?: boolean;
+  accountActive?: boolean;
 };
 
 export type StudentProfile = {
@@ -51,6 +56,7 @@ type AssignmentRow = {
 type StudentGuardianRow = {
   relationship: string | null;
   is_primary_contact: boolean;
+  receives_reports: boolean;
   guardians: {
     id: string;
     first_name: string;
@@ -58,6 +64,7 @@ type StudentGuardianRow = {
     email: string | null;
     phone: string | null;
     preferred_contact_method: "email" | "phone" | "either" | null;
+    auth_user_id: string | null;
   } | null;
 };
 
@@ -99,7 +106,7 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
     supabase
       .from("student_guardians")
       .select(
-        "relationship, is_primary_contact, guardians(id, first_name, last_name, email, phone, preferred_contact_method)"
+        "relationship, is_primary_contact, receives_reports, guardians(id, first_name, last_name, email, phone, preferred_contact_method, auth_user_id)"
       )
       .eq("student_id", studentId)
       .order("is_primary_contact", { ascending: false })
@@ -143,6 +150,11 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
         relationship: sg.relationship,
         primary: sg.is_primary_contact,
         contact: preferredContact(g.email, g.phone, g.preferred_contact_method),
+        email: g.email,
+        phone: g.phone,
+        preferredContactMethod: g.preferred_contact_method,
+        receivesReports: sg.receives_reports,
+        accountActive: Boolean(g.auth_user_id),
       };
     });
 

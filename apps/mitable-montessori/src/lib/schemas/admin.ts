@@ -33,6 +33,20 @@ export const UpdateStudentSchema = z.object({
   fields: CreateStudentSchema.partial(),
 });
 
+/** Editable child fields used by the roster and child-detail editor. */
+export const PatchStudentSchema = z
+  .object({
+    first_name: z.string().min(1).max(100).optional(),
+    last_name: z.string().min(1).max(100).optional(),
+    preferred_name: z.string().max(100).nullable().optional(),
+    birth_date: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()]).optional(),
+    sex: z.string().max(50).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .refine((fields) => Object.values(fields).some((value) => value !== undefined), {
+    message: "Provide at least one field to update",
+  });
+
 /** Raw guardian fields (LLM extraction / JSON schema). Use `CreateGuardianSchema` on POST. */
 export const CreateGuardianBaseSchema = z.object({
   first_name: z.string().max(100).optional(),
@@ -69,6 +83,10 @@ export const CreateGuardianSchema = CreateGuardianBaseSchema.transform((v) => ({
   }
 });
 export type CreateGuardianInput = z.infer<typeof CreateGuardianSchema>;
+
+/** Guardian records must remain usable contact records after an edit. */
+export const UpdateGuardianSchema = CreateGuardianSchema;
+export type UpdateGuardianInput = z.infer<typeof UpdateGuardianSchema>;
 
 export const ProgressProgramSchema = z.enum(["montessori", "iep", "speech"]);
 
@@ -177,6 +195,8 @@ export const LinkGuardianSchema = z.object({
   is_primary_contact: z.boolean().default(false),
   receives_reports: z.boolean().default(true),
 });
+
+export const PatchStudentGuardianSchema = LinkGuardianSchema;
 
 export const UnlinkGuardianSchema = z.object({
   student_id: z.string().uuid(),

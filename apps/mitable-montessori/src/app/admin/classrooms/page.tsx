@@ -72,6 +72,7 @@ import {
   adminSplitRailStyle,
 } from "@/components/admin/split-pane-layout";
 import { adminFetch } from "@/lib/visibility/reveal-hidden";
+import { ChildEditorDialog } from "@/components/admin/child-editor-dialog";
 
 type AdminChild = {
   id: string;
@@ -270,6 +271,7 @@ export default function AdminClassroomsPage() {
   const [importOpen, setImportOpen] = React.useState(false);
   const [createClassroomOpen, setCreateClassroomOpen] = React.useState(false);
   const [addChildOpen, setAddChildOpen] = React.useState(false);
+  const [editingStudentId, setEditingStudentId] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [montessoriCurricula, setMontessoriCurricula] = React.useState<
     Array<{ id: string; name: string }>
@@ -995,8 +997,8 @@ export default function AdminClassroomsPage() {
                       style={{
                         display: "grid",
                         gridTemplateColumns: groupsEnabled
-                          ? "1.8fr 0.5fr 0.8fr 1.4fr 40px"
-                          : "1.8fr 0.5fr 0.8fr 40px",
+                          ? "1.8fr 0.5fr 0.8fr 1.4fr 72px"
+                          : "1.8fr 0.5fr 0.8fr 72px",
                         padding: "12px 20px",
                         borderBottom: "1px solid var(--color-border)",
                       }}
@@ -1024,6 +1026,7 @@ export default function AdminClassroomsPage() {
                           void assignChildGroup(selectedClassroom.id, child.id, groupId)
                         }
                         onRemove={() => setPendingArchiveChild(child)}
+                        onEdit={() => setEditingStudentId(child.id)}
                       />
                     ))}
                   </div>
@@ -1040,6 +1043,7 @@ export default function AdminClassroomsPage() {
                           void assignChildGroup(selectedClassroom.id, child.id, groupId)
                         }
                         onRemove={() => setPendingArchiveChild(child)}
+                        onEdit={() => setEditingStudentId(child.id)}
                       />
                     ))}
                   </div>
@@ -1121,6 +1125,15 @@ export default function AdminClassroomsPage() {
         onEnrollExistingWithGuardians={(studentId, guardianInput) =>
           enrollExistingChildWithGuardians(studentId, guardianInput)
         }
+      />
+
+      <ChildEditorDialog
+        open={editingStudentId !== null}
+        studentId={editingStudentId}
+        onOpenChange={(open) => {
+          if (!open) setEditingStudentId(null);
+        }}
+        onSaved={() => void reload()}
       />
 
       <Dialog
@@ -2840,20 +2853,22 @@ function RosterRow({
   groups,
   onAssignGroup,
   onRemove,
+  onEdit,
 }: {
   child: AdminChild;
   groupsEnabled: boolean;
   groups: AdminClassroomGroup[];
   onAssignGroup: (groupId: string | null) => void;
   onRemove: () => void;
+  onEdit: () => void;
 }) {
   return (
     <div
       style={{
         display: "grid",
         gridTemplateColumns: groupsEnabled
-          ? "1.8fr 0.5fr 0.8fr 1.4fr 40px"
-          : "1.8fr 0.5fr 0.8fr 40px",
+          ? "1.8fr 0.5fr 0.8fr 1.4fr 72px"
+          : "1.8fr 0.5fr 0.8fr 72px",
         alignItems: "center",
         padding: "12px 20px",
         width: "100%",
@@ -2885,7 +2900,16 @@ function RosterRow({
           <RosterGroupSelect groups={groups} value={child.groupId} onChange={onAssignGroup} />
         </div>
       ) : null}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
+        <button
+          type="button"
+          className="tap rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-ink"
+          title={`Edit ${child.name}`}
+          aria-label={`Edit ${child.name}`}
+          onClick={onEdit}
+        >
+          <Pencil size={16} strokeWidth={1.5} />
+        </button>
         <button
           type="button"
           className="tap rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"
@@ -3009,6 +3033,7 @@ function RosterMobileRow({
   groups,
   onAssignGroup,
   onRemove,
+  onEdit,
 }: {
   child: AdminChild;
   index: number;
@@ -3016,6 +3041,7 @@ function RosterMobileRow({
   groups: AdminClassroomGroup[];
   onAssignGroup: (groupId: string | null) => void;
   onRemove: () => void;
+  onEdit: () => void;
 }) {
   return (
     <div
@@ -3058,6 +3084,15 @@ function RosterMobileRow({
           <RosterGroupSelect groups={groups} value={child.groupId} onChange={onAssignGroup} />
         </div>
       ) : null}
+      <button
+        type="button"
+        className="tap shrink-0 rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-ink"
+        title={`Edit ${child.name}`}
+        aria-label={`Edit ${child.name}`}
+        onClick={onEdit}
+      >
+        <Pencil size={18} strokeWidth={1.5} />
+      </button>
       <button
         type="button"
         className="tap shrink-0 rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"

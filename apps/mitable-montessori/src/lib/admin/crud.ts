@@ -94,6 +94,49 @@ export async function updateStudent(
   if (error) throw new AdminError(error.message, "db_error");
 }
 
+export async function updateGuardian(
+  ctx: AdminContext,
+  guardianId: string,
+  input: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    preferred_contact_method?: "email" | "phone" | "either";
+  }
+): Promise<void> {
+  const { data: existing, error: readErr } = await ctx.supabase
+    .from("guardians")
+    .select("id, email, auth_user_id")
+    .eq("id", guardianId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (readErr) throw new AdminError(readErr.message, "db_error");
+  if (!existing) throw new AdminError("Guardian not found", "not_found");
+
+  const nextEmail = input.email?.trim() || null;
+  if (existing.auth_user_id && nextEmail !== existing.email) {
+    throw new AdminError(
+      "This guardian has an active parent account; their sign-in email cannot be changed here",
+      "invalid"
+    );
+  }
+
+  const { error } = await ctx.supabase
+    .from("guardians")
+    .update({
+      first_name: input.first_name?.trim(),
+      last_name: input.last_name?.trim(),
+      email: nextEmail,
+      phone: input.phone?.trim() || null,
+      preferred_contact_method: input.preferred_contact_method ?? "either",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", guardianId)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
 export async function archiveStudent(
   ctx: AdminContext,
   studentId: string,
@@ -174,6 +217,47 @@ export async function unlinkGuardianFromStudent(
     .eq("student_id", studentId)
     .eq("guardian_id", guardianId);
   if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function updateGuardianLink(
+  ctx: AdminContext,
+  input: {
+    student_id: string;
+    guardian_id: string;
+    relationship?: "mother" | "father" | "guardian" | "other";
+    is_primary_contact?: boolean;
+    receives_reports?: boolean;
+  }
+): Promise<void> {
+  const { data: existing, error: readErr } = await ctx.supabase
+    .from("student_guardians")
+    .select("id")
+    .eq("student_id", input.student_id)
+    .eq("guardian_id", input.guardian_id)
+    .maybeSingle();
+  if (readErr) throw new AdminError(readErr.message, "db_error");
+  if (!existing) throw new AdminError("Guardian link not found", "not_found");
+
+  // There can be only one primary contact for a child. Clear the old primary
+  // before setting the selected guardian, so the result is deterministic.
+  if (input.is_primary_contact) {
+    const { error } = await ctx.supabase
+      .from("student_guardians")
+      .update({ is_primary_contact: false })
+      .eq("student_id", input.student_id)
+      .neq("guardian_id", input.guardian_id);
+    if (error) throw new AdminError(error.message, "db_error");
+  }
+
+  const { error: updateErr } = await ctx.supabase
+    .from("student_guardians")
+    .update({
+      relationship: input.relationship ?? "guardian",
+      is_primary_contact: input.is_primary_contact ?? false,
+      receives_reports: input.receives_reports ?? true,
+    })
+    .eq("id", existing.id);
+  if (updateErr) throw new AdminError(updateErr.message, "db_error");
 }
 
 // === Classrooms + assignments ===

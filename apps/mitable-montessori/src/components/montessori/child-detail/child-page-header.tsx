@@ -208,9 +208,11 @@ function HeaderInfoTooltip({ profile, mobile }: { profile: StudentProfile; mobil
 function MobileKebabMenu({
   onNewObservation,
   onGenerateReport,
+  onEdit,
 }: {
   onNewObservation: () => void;
   onGenerateReport: () => void;
+  onEdit?: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const wrapRef = React.useRef<HTMLSpanElement | null>(null);
@@ -232,6 +234,18 @@ function MobileKebabMenu({
   }, [open]);
 
   const items = [
+    ...(onEdit
+      ? [
+          {
+            key: "edit",
+            label: "Edit child",
+            onClick: () => {
+              setOpen(false);
+              onEdit();
+            },
+          },
+        ]
+      : []),
     {
       key: "obs",
       label: "+ New observation",
@@ -356,6 +370,7 @@ export function ChildPageHeader({
   backLabel = "All children",
   onNewObservation,
   onGenerateReport,
+  onEdit,
 }: {
   profile: StudentProfile;
   mobile: boolean;
@@ -363,6 +378,7 @@ export function ChildPageHeader({
   backLabel?: string;
   onNewObservation: () => void;
   onGenerateReport: () => void;
+  onEdit?: () => void;
 }) {
   const displayName = profile.preferredName || profile.fullName;
   const tone = toneFor(profile.id);
@@ -401,6 +417,7 @@ export function ChildPageHeader({
           <MobileKebabMenu
             onNewObservation={onNewObservation}
             onGenerateReport={onGenerateReport}
+            onEdit={onEdit}
           />
         )}
       </div>
@@ -461,9 +478,11 @@ export function ChildPageHeader({
               <button type="button" className="ghost-btn tap" onClick={onNewObservation}>
                 + New observation
               </button>
-              <button type="button" className="ghost-btn tap">
-                Edit
-              </button>
+              {onEdit ? (
+                <button type="button" className="ghost-btn tap" onClick={onEdit}>
+                  Edit
+                </button>
+              ) : null}
               <button type="button" className="primary-btn tap" onClick={onGenerateReport}>
                 Generate report
               </button>

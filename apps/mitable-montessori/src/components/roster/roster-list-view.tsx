@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 import { initialsFor } from "@/components/montessori/data";
 import type { Tone } from "@/components/montessori/data";
 import { PageHeader, cardStyle } from "@/components/montessori/page-header";
@@ -61,6 +61,7 @@ export function RosterListView({
   emptyMessage,
   toolbar,
   scrollMode = "default",
+  onEditRow,
 }: {
   overline?: string;
   title: string;
@@ -72,6 +73,8 @@ export function RosterListView({
   toolbar?: React.ReactNode;
   /** When `stickyHeader`, title + toolbar stay fixed and only the roster body scrolls. */
   scrollMode?: "default" | "stickyHeader";
+  /** Admin roster action; omitted for teacher-facing rosters. */
+  onEditRow?: (row: RosterListViewRow) => void;
 }) {
   const header = (
     <PageHeader overline={overline} title={title} subtitle={subtitle} actions={actions} />
@@ -114,13 +117,19 @@ export function RosterListView({
             ))}
           </div>
           {rows.map((c) => (
-            <RosterDesktopRow key={c.id} c={c} showClassrooms={showClassrooms} />
+            <RosterDesktopRow key={c.id} c={c} showClassrooms={showClassrooms} onEdit={onEditRow} />
           ))}
         </div>
 
         <div className="lg:hidden" style={cardStyle}>
           {rows.map((c, i) => (
-            <RosterMobileRow key={c.id} c={c} firstRow={i === 0} showClassrooms={showClassrooms} />
+            <RosterMobileRow
+              key={c.id}
+              c={c}
+              firstRow={i === 0}
+              showClassrooms={showClassrooms}
+              onEdit={onEditRow}
+            />
           ))}
         </div>
       </>
@@ -161,13 +170,14 @@ export function RosterListView({
 function RosterDesktopRow({
   c,
   showClassrooms,
+  onEdit,
 }: {
   c: RosterListViewRow;
   showClassrooms: boolean;
+  onEdit?: (row: RosterListViewRow) => void;
 }) {
   return (
-    <Link
-      href={c.href}
+    <div
       className="tap"
       style={{
         display: "grid",
@@ -176,7 +186,6 @@ function RosterDesktopRow({
           : "1.4fr 0.6fr 0.8fr 0.8fr 24px",
         alignItems: "center",
         padding: "12px 20px",
-        cursor: "pointer",
         width: "100%",
         textAlign: "left",
         background: "transparent",
@@ -186,12 +195,21 @@ function RosterDesktopRow({
         textDecoration: "none",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <Link
+        href={c.href}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          color: "inherit",
+          textDecoration: "none",
+        }}
+      >
         <Avatar initials={initialsFor(c.initialsSource)} tone={toneFor(c.id)} size={34} />
         <div style={{ fontWeight: 600, fontSize: 14, color: "var(--color-ink)" }}>
           {c.displayName}
         </div>
-      </div>
+      </Link>
       <div className="font-numeric" style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
         {c.age ?? "—"}
       </div>
@@ -208,8 +226,27 @@ function RosterDesktopRow({
             ? "1 guardian"
             : `${c.guardianCount} guardians`}
       </div>
-      <ChevronRight size={14} strokeWidth={1.5} />
-    </Link>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 }}>
+        {onEdit ? (
+          <button
+            type="button"
+            className="tap rounded-md p-1.5 text-ink-muted hover:bg-ink/5 hover:text-ink"
+            aria-label={`Edit ${c.displayName}`}
+            title={`Edit ${c.displayName}`}
+            onClick={() => onEdit(c)}
+          >
+            <Pencil size={14} strokeWidth={1.6} />
+          </button>
+        ) : null}
+        <Link
+          href={c.href}
+          aria-label={`Open ${c.displayName}`}
+          className="tap rounded-md p-1 text-ink-muted hover:bg-ink/5"
+        >
+          <ChevronRight size={14} strokeWidth={1.5} />
+        </Link>
+      </div>
+    </div>
   );
 }
 
@@ -217,14 +254,15 @@ function RosterMobileRow({
   c,
   firstRow,
   showClassrooms,
+  onEdit,
 }: {
   c: RosterListViewRow;
   firstRow: boolean;
   showClassrooms: boolean;
+  onEdit?: (row: RosterListViewRow) => void;
 }) {
   return (
-    <Link
-      href={c.href}
+    <div
       className="tap"
       style={{
         width: "100%",
@@ -240,34 +278,64 @@ function RosterMobileRow({
         textDecoration: "none",
       }}
     >
-      <Avatar initials={initialsFor(c.initialsSource)} tone={toneFor(c.id)} size={40} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 15, color: "var(--color-ink)" }}>
-          {c.displayName}
+      <Link
+        href={c.href}
+        className="tap"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          color: "inherit",
+          textDecoration: "none",
+        }}
+      >
+        <Avatar initials={initialsFor(c.initialsSource)} tone={toneFor(c.id)} size={40} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: "var(--color-ink)" }}>
+            {c.displayName}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--color-ink-secondary)",
+              marginTop: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {c.enrolledAt ? `Enrolled ${c.enrolledAt}` : ""}
+            {showClassrooms && c.classroomsLine ? (
+              <span>
+                {c.enrolledAt ? " · " : ""}
+                {c.classroomsLine}
+              </span>
+            ) : null}
+          </div>
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--color-ink-secondary)",
-            marginTop: 2,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {c.enrolledAt ? `Enrolled ${c.enrolledAt}` : ""}
-          {showClassrooms && c.classroomsLine ? (
-            <span>
-              {c.enrolledAt ? " · " : ""}
-              {c.classroomsLine}
-            </span>
-          ) : null}
-        </div>
-      </div>
+      </Link>
       <div className="font-numeric" style={{ fontSize: 12, color: "var(--color-ink-muted)" }}>
         {c.age ?? ""}
       </div>
-      <ChevronRight size={16} strokeWidth={1.5} />
-    </Link>
+      {onEdit ? (
+        <button
+          type="button"
+          className="tap shrink-0 rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-ink"
+          aria-label={`Edit ${c.displayName}`}
+          onClick={() => onEdit(c)}
+        >
+          <Pencil size={16} strokeWidth={1.6} />
+        </button>
+      ) : null}
+      <Link
+        href={c.href}
+        aria-label={`Open ${c.displayName}`}
+        className="tap shrink-0 rounded-md p-1 text-ink-muted hover:bg-ink/5"
+      >
+        <ChevronRight size={16} strokeWidth={1.5} />
+      </Link>
+    </div>
   );
 }

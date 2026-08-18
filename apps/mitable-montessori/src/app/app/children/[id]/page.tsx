@@ -53,6 +53,7 @@ export default async function ChildDetailPage({
       activity={activity}
       reportsRailBasePath={reportsRailBasePath}
       rosterBackLink={rosterBackLink}
+      canManage={ctx?.role === "admin"}
     />
   );
 }
