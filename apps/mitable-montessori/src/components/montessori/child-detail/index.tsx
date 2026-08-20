@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ChildEditorDialog } from "@/components/admin/child-editor-dialog";
+import { Pencil, Plus } from "lucide-react";
+import {
+  ChildEditorDialog,
+  GuardianEditorDialog,
+  type GuardianEditorValue,
+} from "@/components/admin/child-editor-dialog";
 import { ToastBus } from "../primitives";
 import type { ActivityFeedEntry } from "@/lib/queries/activity";
 import type { CurriculumByTopic } from "@/lib/queries/curriculum";
@@ -57,7 +62,6 @@ export function ChildDetail({
         }
         onEdit={canManage ? () => setEditOpen(true) : undefined}
       />
-      <GuardianDetails profile={profile} canManage={canManage} onEdit={() => setEditOpen(true)} />
       <ViewToggle value={pageView} onChange={setPageView} mobile={mobile} />
       {pageView === "whole" && (
         <WholeChildView mobile={mobile} profile={profile} axes={axes} observations={observations} />
@@ -70,6 +74,7 @@ export function ChildDetail({
           reportsRailBasePath={reportsRailBasePath}
         />
       )}
+      {pageView === "guardians" && <GuardiansView profile={profile} canManage={canManage} />}
       <NewObservationModal
         open={newObsOpen}
         pageView={pageView}
@@ -91,39 +96,57 @@ export function ChildDetail({
   );
 }
 
-function GuardianDetails({
-  profile,
-  canManage,
-  onEdit,
-}: {
-  profile: StudentProfile;
-  canManage: boolean;
-  onEdit: () => void;
-}) {
+function GuardiansView({ profile, canManage }: { profile: StudentProfile; canManage: boolean }) {
+  const [editorOpen, setEditorOpen] = React.useState(false);
+  const [selectedGuardian, setSelectedGuardian] = React.useState<GuardianEditorValue | null>(null);
+
+  const openAdd = () => {
+    setSelectedGuardian(null);
+    setEditorOpen(true);
+  };
+
+  const openEdit = (guardian: StudentProfile["guardians"][number]) => {
+    const nameParts = guardian.name.trim().split(/\s+/);
+    setSelectedGuardian({
+      id: guardian.id,
+      firstName: guardian.firstName ?? nameParts[0] ?? "",
+      lastName: guardian.lastName ?? nameParts.slice(1).join(" "),
+      email: guardian.email ?? "",
+      phone: guardian.phone ?? "",
+      preferredContactMethod: guardian.preferredContactMethod ?? "either",
+      relationship: (guardian.relationship as GuardianEditorValue["relationship"]) ?? "guardian",
+      primary: guardian.primary,
+      receivesReports: guardian.receivesReports !== false,
+      accountActive: guardian.accountActive ?? false,
+    });
+    setEditorOpen(true);
+  };
+
   return (
-    <section
-      style={{
-        padding: "18px 28px",
-        borderBottom: "1px solid var(--color-border)",
-        background: "var(--color-canvas)",
-      }}
-    >
+    <section style={{ padding: "28px", maxWidth: 1120, margin: "0 auto", width: "100%" }}>
       <div
-        style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start" }}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 16,
+          alignItems: "start",
+          flexWrap: "wrap",
+        }}
       >
         <div>
-          <div className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginBottom: 8 }}>
             Guardians
           </div>
-          <p style={{ margin: "5px 0 0", fontSize: 13, color: "var(--color-ink-secondary)" }}>
+          <h2 style={{ margin: 0, fontSize: 22, color: "var(--color-ink)" }}>Family contacts</h2>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--color-ink-secondary)" }}>
             {profile.guardians.length === 0
-              ? "No guardian details have been added yet."
-              : `${profile.guardians.length} ${profile.guardians.length === 1 ? "guardian" : "guardians"} linked to this child.`}
+              ? "No guardians have been added for this child yet."
+              : "Contact details, relationship, and report preferences for this child."}
           </p>
         </div>
         {canManage ? (
-          <button type="button" className="ghost-btn tap" onClick={onEdit}>
-            Edit guardians
+          <button type="button" className="primary-btn tap" onClick={openAdd}>
+            <Plus size={16} strokeWidth={1.8} /> Add guardian
           </button>
         ) : null}
       </div>
@@ -146,12 +169,32 @@ function GuardianDetails({
                 background: "var(--color-surface)",
               }}
             >
-              <div style={{ display: "flex", gap: 7, alignItems: "baseline", flexWrap: "wrap" }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{guardian.name}</span>
-                <span style={{ color: "var(--color-ink-muted)", fontSize: 12 }}>
-                  {guardian.relationship ?? "Guardian"}
-                  {guardian.primary ? " · primary contact" : ""}
-                </span>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  alignItems: "start",
+                }}
+              >
+                <div style={{ display: "flex", gap: 7, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{guardian.name}</span>
+                  <span style={{ color: "var(--color-ink-muted)", fontSize: 12 }}>
+                    {guardian.relationship ?? "Guardian"}
+                    {guardian.primary ? " · primary contact" : ""}
+                  </span>
+                </div>
+                {canManage ? (
+                  <button
+                    type="button"
+                    className="tap rounded-md p-1.5 text-ink-muted hover:bg-ink/5 hover:text-ink"
+                    title={`Edit ${guardian.name}`}
+                    aria-label={`Edit ${guardian.name}`}
+                    onClick={() => openEdit(guardian)}
+                  >
+                    <Pencil size={15} strokeWidth={1.7} />
+                  </button>
+                ) : null}
               </div>
               {guardian.email ? (
                 <div style={{ marginTop: 6, fontSize: 12.5, color: "var(--color-ink-secondary)" }}>
@@ -173,6 +216,15 @@ function GuardianDetails({
             </div>
           ))}
         </div>
+      ) : null}
+      {canManage ? (
+        <GuardianEditorDialog
+          open={editorOpen}
+          studentId={profile.id}
+          guardian={selectedGuardian}
+          onOpenChange={setEditorOpen}
+          onSaved={() => window.location.reload()}
+        />
       ) : null}
     </section>
   );

@@ -3,6 +3,8 @@ import { createClient } from "@/utils/supabase/server";
 
 export type GuardianSummary = {
   id: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   relationship: string | null;
   primary: boolean;
@@ -146,6 +148,8 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
       const g = sg.guardians;
       return {
         id: g.id,
+        firstName: g.first_name,
+        lastName: g.last_name,
         name: `${g.first_name} ${g.last_name}`.trim(),
         relationship: sg.relationship,
         primary: sg.is_primary_contact,
