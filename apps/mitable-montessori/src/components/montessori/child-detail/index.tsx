@@ -145,7 +145,12 @@ function GuardiansView({ profile, canManage }: { profile: StudentProfile; canMan
           </p>
         </div>
         {canManage ? (
-          <button type="button" className="primary-btn tap" onClick={openAdd}>
+          <button
+            type="button"
+            className="primary-btn tap"
+            onClick={openAdd}
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap" }}
+          >
             <Plus size={16} strokeWidth={1.8} /> Add guardian
           </button>
         ) : null}
