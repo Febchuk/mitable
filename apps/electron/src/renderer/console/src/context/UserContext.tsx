@@ -169,12 +169,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     setIsAuthenticated(true);
 
-    // Share user context with main process for cross-window access (WatchingPill, etc.)
+    // Share user context with main process for cross-window access + local SQLite cache
     if (window.consoleAPI?.setCurrentUser) {
       window.consoleAPI.setCurrentUser({
         userId: response.profile.id,
         organizationId: response.profile.organizationId || "",
         role: dbRole,
+        email: response.profile.email || undefined,
+        firstName: response.profile.firstName || undefined,
+        lastName: response.profile.lastName || undefined,
+        avatarUrl: response.profile.avatarUrl || undefined,
+        organizationName: response.organization?.name,
       });
     }
   };
@@ -182,43 +187,85 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // Load user from token on mount
   useEffect(() => {
     const loadUser = async () => {
+      // ── Local account check (primary path) ──────────────────────────
+      if (window.consoleAPI?.localAuthGetUser) {
+        try {
+          const localUser = await window.consoleAPI.localAuthGetUser();
+          if (localUser) {
+            authService.clearTokens();
+
+            const fullName = `${localUser.firstName || ""} ${localUser.lastName || ""}`.trim();
+            const newUser: User = {
+              id: localUser.id,
+              name: fullName || localUser.email,
+              firstName: localUser.firstName || "",
+              email: localUser.email,
+              currentWeek: 1,
+              role: "employee",
+              organizationId: "local",
+              isLocalAccount: true,
+            };
+            setUser(newUser);
+            setIsAuthenticated(true);
+            setIsLoading(false);
+
+            if (window.consoleAPI?.setCurrentUser) {
+              window.consoleAPI.setCurrentUser({
+                userId: localUser.id,
+                organizationId: "local",
+                role: "employee",
+                email: localUser.email,
+                firstName: localUser.firstName,
+                lastName: localUser.lastName,
+              });
+            }
+
+            logger.info("Local account authenticated", { userId: localUser.id });
+            return;
+          }
+        } catch (err) {
+          logger.warn("Local account check failed:", err);
+        }
+      }
+
+      // ── Legacy token-based auth (@deprecated — backend auth) ────────
       const token = authService.getAccessToken();
 
+      const isElectron = !!window.consoleAPI;
+
       if (!token) {
-        // No token in localStorage — wait briefly for main process to push
-        // restored tokens from OS keychain before giving up
+        if (isElectron) {
+          logger.info("No local account or token — sending to login");
+          setIsLoading(false);
+          return;
+        }
         logger.info("No local token, waiting for keychain restore…");
         setTimeout(() => {
-          // If still not authenticated after delay, stop loading
           setIsLoading((prev) => {
-            // Only clear loading if we haven't been authenticated by the restore listener
-            if (!authService.getAccessToken()) {
-              return false;
-            }
+            if (!authService.getAccessToken()) return false;
             return prev;
           });
         }, 2500);
         return;
       }
 
+      // If running in Electron local-only, attempt hydration but don't
+      // retry/refresh on network errors — the offline listener handles it.
       try {
         await hydrateUser(token);
 
-        // Broadcast token to main process for cross-window sharing (Agent pill, etc.)
         const refreshToken = authService.getRefreshToken();
         if (refreshToken) {
           authService.saveTokens(token, refreshToken);
         }
       } catch (error) {
-        logger.error("Failed to load user:", error);
-
-        // Network error (backend not up yet) — keep tokens and wait for restore
         if (isNetworkError(error)) {
-          logger.info("Backend unreachable, preserving tokens for later restore");
+          logger.info("Backend unreachable, waiting for offline identity");
           return;
         }
 
-        // Token might be expired, try to refresh
+        logger.error("Failed to load user:", error);
+
         const refreshToken = authService.getRefreshToken();
         if (refreshToken) {
           try {
@@ -272,9 +319,46 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe?.();
   }, []);
 
-  // Background token refresh - keeps sessions alive for long-running usage
+  // Listen for offline user identity from main process (cached in local SQLite)
+  // This handles the case where the backend is unreachable but we have a cached user.
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!window.consoleAPI?.onOfflineUser) return;
+
+    const unsubscribe = window.consoleAPI.onOfflineUser((offlineUser) => {
+      logger.info("Received offline user identity from main process");
+
+      const fullName = `${offlineUser.firstName || ""} ${offlineUser.lastName || ""}`.trim();
+      const newUser: User = {
+        id: offlineUser.id,
+        name: fullName || offlineUser.email,
+        firstName: offlineUser.firstName || "",
+        email: offlineUser.email || undefined,
+        avatarUrl: offlineUser.avatarUrl || undefined,
+        currentWeek: 1,
+        role: (offlineUser.role as User["role"]) || "employee",
+        organizationId: offlineUser.organizationId || "",
+      };
+      setUser(newUser);
+      setIsAuthenticated(true);
+      setIsLoading(false);
+
+      if (offlineUser.organizationName) {
+        setOrganization({
+          id: offlineUser.organizationId,
+          name: offlineUser.organizationName,
+          settings: {},
+        });
+      }
+
+      logger.info("User hydrated from offline cache");
+    });
+
+    return () => unsubscribe?.();
+  }, []);
+
+  /** @deprecated Background token refresh — not needed for local accounts */
+  useEffect(() => {
+    if (!isAuthenticated || user?.isLocalAccount) return;
 
     const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
@@ -305,12 +389,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
     setIsAuthenticated(true);
 
-    // Share user context with main process (triggers keychain persist for refresh token)
+    // Share user context with main process (triggers keychain persist + local SQLite cache)
     if (window.consoleAPI?.setCurrentUser) {
       window.consoleAPI.setCurrentUser({
         userId: newUser.id,
         organizationId: newUser.organizationId || "",
         role: newUser.originalRole || newUser.role || "employee",
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.name?.split(" ").slice(1).join(" ") || undefined,
+        avatarUrl: newUser.avatarUrl,
+        organizationName: organization?.name,
       });
     }
   };
@@ -320,6 +409,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    if (user?.isLocalAccount) {
+      if (window.consoleAPI?.localAuthLogout) {
+        await window.consoleAPI.localAuthLogout();
+      }
+      setUser(null);
+      setOrganization(null);
+      setIsAuthenticated(false);
+      return;
+    }
+
+    /** @deprecated Backend token-based logout */
     const token = authService.getAccessToken();
     if (token) {
       try {

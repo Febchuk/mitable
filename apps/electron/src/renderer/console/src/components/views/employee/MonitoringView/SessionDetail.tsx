@@ -1,4 +1,6 @@
 /**
+ * @deprecated SessionDetail — replaced by CalendarView block detail. Set up for deletion.
+ *
  * SessionDetail
  *
  * Detailed view of a monitoring session.
@@ -1029,7 +1031,10 @@ export default function SessionDetail() {
         ) : (
           <div className="bg-canvas-overlay rounded-xl border border-stroke-subtle p-8 text-center">
             {uiStatus === "summarizing" ? (
-              <SummarizationProgress progress={session.summarizationProgress ?? null} />
+              <SummarizationProgress
+                sessionId={sessionId ?? undefined}
+                progress={session.summarizationProgress ?? null}
+              />
             ) : (
               <p className="text-sm text-ink-secondary">No summary available for this session.</p>
             )}

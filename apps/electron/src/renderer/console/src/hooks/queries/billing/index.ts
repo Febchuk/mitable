@@ -20,13 +20,14 @@ import { useUser } from "../../../context/UserContext";
  */
 export function useSubscription() {
   const { user } = useUser();
+  const isLocal = (user as any)?.isLocalAccount === true;
 
   return useQuery({
     queryKey: ["billing", "subscription"],
     queryFn: fetchSubscription,
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!user && !isLocal,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 }
 

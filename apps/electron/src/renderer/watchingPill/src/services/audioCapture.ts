@@ -66,9 +66,14 @@ class AudioCaptureService {
   }
 
   /**
-   * Start capturing audio and send chunks via IPC
+   * Start capturing audio and send chunks via IPC.
+   * @param sessionId  Active monitoring session ID
+   * @param micOnly    When true (on-device mode), skip getDisplayMedia entirely
    */
-  async startCapture(sessionId: string): Promise<{
+  async startCapture(
+    sessionId: string,
+    micOnly = false
+  ): Promise<{
     success: boolean;
     hasSystemAudio: boolean;
     error?: string;
@@ -81,7 +86,7 @@ class AudioCaptureService {
       };
     }
 
-    console.log(`[AudioCapture] Starting for session: ${sessionId}`);
+    console.log(`[AudioCapture] Starting for session: ${sessionId} (micOnly: ${micOnly})`);
 
     try {
       // Step 1: Capture microphone
@@ -99,19 +104,21 @@ class AudioCaptureService {
       const micTrack = micStream.getAudioTracks()[0];
       console.log("✅ Microphone captured:", micTrack.label);
 
-      // Step 2: Try system audio (may fail)
+      // Step 2: Try system audio (skip entirely for on-device to avoid getDisplayMedia issues)
       let systemStream: MediaStream | null = null;
-      try {
-        systemStream = await navigator.mediaDevices.getDisplayMedia({
-          audio: true,
-          video: true, // Required on some platforms
-        });
-        const systemTrack = systemStream.getAudioTracks()[0];
-        if (systemTrack) {
-          console.log("✅ System audio captured:", systemTrack.label);
+      if (!micOnly) {
+        try {
+          systemStream = await navigator.mediaDevices.getDisplayMedia({
+            audio: true,
+            video: true, // Required on some platforms
+          });
+          const systemTrack = systemStream.getAudioTracks()[0];
+          if (systemTrack) {
+            console.log("✅ System audio captured:", systemTrack.label);
+          }
+        } catch (error) {
+          console.warn("⚠️ System audio not available:", error);
         }
-      } catch (error) {
-        console.warn("⚠️ System audio not available:", error);
       }
 
       // Step 3: Create stereo audio context (L=mic, R=system)

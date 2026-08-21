@@ -89,6 +89,7 @@ export interface User {
   department?: string | null;
   directReportCount?: number;
   permissions?: string[];
+  isLocalAccount?: boolean;
 }
 
 // ============================================

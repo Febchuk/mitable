@@ -1,3 +1,7 @@
+/**
+ * @deprecated Admin/Team views no longer in use in the desktop app.
+ * Admin experience moves to the web app. Scheduled for migration.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, ChevronDown, ChevronRight, Users, AlertCircle, X } from "lucide-react";
 import { API_BASE_URL } from "@/console/src/lib/config";

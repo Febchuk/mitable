@@ -1,4 +1,6 @@
 /**
+ * @deprecated SessionCard — replaced by CalendarView ActivityBlock. Set up for deletion.
+ *
  * SessionCard
  *
  * Displays a summary card for a monitoring session.

@@ -1,3 +1,11 @@
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
 import type { Integration } from "../../../../../types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

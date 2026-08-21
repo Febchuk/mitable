@@ -1741,13 +1741,31 @@ router.get(
         return;
       }
 
+      const settings = (organization.settings as Record<string, unknown>) || {};
+
+      // Mask the inference API key — show only last 4 chars for admin display
+      const maskedSettings = { ...settings };
+      if (typeof settings.inferenceApiKey === "string" && settings.inferenceApiKey.length > 0) {
+        try {
+          const decrypted = encryptionService.decrypt(settings.inferenceApiKey as string);
+          maskedSettings.inferenceApiKeyMasked = `****${decrypted.slice(-4)}`;
+          maskedSettings.inferenceApiKeySet = true;
+        } catch {
+          maskedSettings.inferenceApiKeyMasked = "****";
+          maskedSettings.inferenceApiKeySet = true;
+        }
+        delete maskedSettings.inferenceApiKey;
+      } else {
+        maskedSettings.inferenceApiKeySet = false;
+      }
+
       res.json({
         success: true,
         organization: {
           id: organization.id,
           name: organization.name,
           domain: organization.domain,
-          settings: organization.settings || {},
+          settings: maskedSettings,
         },
       });
     } catch (error) {
@@ -1819,7 +1837,14 @@ router.patch(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.userId!;
-      const { variant, showCustomerBreakdown, showTopicBreakdown, knownCustomers } = req.body;
+      const {
+        variant,
+        showCustomerBreakdown,
+        showTopicBreakdown,
+        knownCustomers,
+        inferenceProvider,
+        inferenceApiKey,
+      } = req.body;
 
       // Verify user is admin
       const [currentUser] = await db
@@ -1889,12 +1914,71 @@ router.patch(
         }
       }
 
+      // Validate inference provider if provided (null clears the setting)
+      const validProviders = ["google", "openai", "anthropic"];
+      if (
+        inferenceProvider !== undefined &&
+        inferenceProvider !== null &&
+        !validProviders.includes(inferenceProvider)
+      ) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid inference provider. Must be one of: ${validProviders.join(", ")}`,
+          },
+        });
+        return;
+      }
+
+      // Validate key format matches provider
+      if (inferenceApiKey && typeof inferenceApiKey === "string" && inferenceProvider) {
+        const keyPrefixMap: Record<string, { prefix: string[]; label: string }> = {
+          google: { prefix: ["AIza"], label: "Google (AIza...)" },
+          openai: { prefix: ["sk-"], label: "OpenAI (sk-...)" },
+          anthropic: { prefix: ["sk-ant-"], label: "Anthropic (sk-ant-...)" },
+        };
+        const rule = keyPrefixMap[inferenceProvider];
+        if (rule) {
+          if (inferenceProvider === "openai" && inferenceApiKey.startsWith("sk-ant-")) {
+            res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: "This looks like an Anthropic key, not an OpenAI key.",
+              },
+            });
+            return;
+          }
+          if (!rule.prefix.some((p: string) => inferenceApiKey.startsWith(p))) {
+            res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: `API key doesn't match ${rule.label} format.`,
+              },
+            });
+            return;
+          }
+        }
+      }
+
+      // Encrypt the API key before storing (null clears it)
+      let encryptedKey: string | null | undefined;
+      if (inferenceApiKey === null) {
+        encryptedKey = null;
+      } else if (inferenceApiKey && typeof inferenceApiKey === "string") {
+        encryptedKey = encryptionService.encrypt(inferenceApiKey);
+      }
+
       const updatedSettings = {
         ...currentSettings,
         ...(variant !== undefined && { variant }),
         ...(showCustomerBreakdown !== undefined && { showCustomerBreakdown }),
         ...(showTopicBreakdown !== undefined && { showTopicBreakdown }),
         ...(knownCustomers !== undefined && { knownCustomers }),
+        ...(inferenceProvider !== undefined && { inferenceProvider }),
+        ...(encryptedKey !== undefined && { inferenceApiKey: encryptedKey }),
       };
 
       // Update organization settings

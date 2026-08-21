@@ -1,4 +1,6 @@
 /**
+ * @deprecated LinearUpdateDialog — no longer in use. Set up for deletion.
+ *
  * LinearUpdateDialog
  *
  * Dialog for sending session updates to a Linear ticket.

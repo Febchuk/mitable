@@ -1,4 +1,6 @@
 /**
+ * @deprecated EndSessionDialog — session end now handled via pill + CalendarView. Set up for deletion.
+ *
  * EndSessionDialog
  *
  * Modal that appears when stopping a session.

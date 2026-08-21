@@ -30,12 +30,18 @@ export interface InstalledApp {
   normalizedName: string; // Lowercase, no extension
   bundleId?: string; // macOS bundle identifier
   path?: string; // Install path
+  iconDataUrl?: string; // Base64 data URL of the app icon
 }
 
 interface CacheData {
   apps: InstalledApp[];
   lastUpdated: number;
   platform: string;
+}
+
+interface IconCacheData {
+  icons: Record<string, string>; // normalizedName → data URL
+  lastUpdated: number;
 }
 
 // Cache TTL: 24 hours in milliseconds
@@ -72,17 +78,21 @@ const SYSTEM_APP_PATTERNS = [
 ];
 
 class InstalledAppsService {
-  private store: Store<{ installedAppsCache: CacheData }>;
+  private store: Store<{ installedAppsCache: CacheData; iconCache: IconCacheData }>;
   private isScanning = false;
 
   constructor() {
-    this.store = new Store<{ installedAppsCache: CacheData }>({
+    this.store = new Store<{ installedAppsCache: CacheData; iconCache: IconCacheData }>({
       name: "installed-apps-cache",
       defaults: {
         installedAppsCache: {
           apps: [],
           lastUpdated: 0,
           platform: "",
+        },
+        iconCache: {
+          icons: {},
+          lastUpdated: 0,
         },
       },
     });
@@ -293,6 +303,64 @@ class InstalledAppsService {
       logger.error("Error scanning Windows apps:", error);
     }
 
+    // Scan Windows Store / MSIX / AppX packages (Teams, Calculator, etc.)
+    try {
+      const { stdout } = await execAsync(
+        `powershell -NoProfile -NonInteractive -Command "Get-AppxPackage | Where-Object { $_.IsFramework -eq $false -and $_.IsResourcePackage -eq $false } | Select-Object Name, InstallLocation | ConvertTo-Json -Compress"`,
+        { maxBuffer: 10 * 1024 * 1024 }
+      );
+
+      if (stdout.trim()) {
+        let entries = JSON.parse(stdout);
+        if (!Array.isArray(entries)) entries = [entries];
+
+        for (const entry of entries) {
+          if (entry.Name) {
+            const friendlyName = entry.Name.replace(/^.*\./, "").replace(
+              /([a-z])([A-Z])/g,
+              "$1 $2"
+            );
+
+            if (
+              friendlyName.length > 2 &&
+              !/^Windows\.|^Microsoft\.NET|^Microsoft\.VCLibs/i.test(entry.Name)
+            ) {
+              apps.push({
+                name: friendlyName,
+                normalizedName: this.normalizeAppName(friendlyName),
+                path: entry.InstallLocation || undefined,
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn("Error scanning AppX packages:", error);
+    }
+
+    // Scan per-user app directories (Electron/Squirrel apps: Slack, Discord, etc.)
+    const localAppData = process.env.LOCALAPPDATA;
+    if (localAppData) {
+      try {
+        const entries = fs.readdirSync(localAppData, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const updateExe = path.join(localAppData, entry.name, "Update.exe");
+          if (fs.existsSync(updateExe)) {
+            const dirName = entry.name;
+            const friendlyName = dirName.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/-/g, " ");
+            apps.push({
+              name: friendlyName,
+              normalizedName: this.normalizeAppName(friendlyName),
+              path: path.join(localAppData, entry.name),
+            });
+          }
+        }
+      } catch (error) {
+        logger.warn("Error scanning LocalAppData for Squirrel apps:", error);
+      }
+    }
+
     return apps;
   }
 
@@ -359,6 +427,100 @@ class InstalledAppsService {
   }
 
   /**
+   * Extract icons for a list of apps using Electron's app.getFileIcon().
+   * Returns apps with iconDataUrl populated where possible.
+   * Uses a separate icon cache to avoid re-extracting on every load.
+   */
+  async extractIcons(apps: InstalledApp[]): Promise<InstalledApp[]> {
+    const { app } = await import("electron");
+    const iconCache = this.store.get("iconCache");
+    const now = Date.now();
+    const cacheValid = now - iconCache.lastUpdated < CACHE_TTL_MS;
+    const cachedIcons = cacheValid ? iconCache.icons : {};
+    const newIcons: Record<string, string> = { ...cachedIcons };
+    let extracted = 0;
+
+    const results = await Promise.all(
+      apps.map(async (appEntry) => {
+        if (cachedIcons[appEntry.normalizedName]) {
+          return { ...appEntry, iconDataUrl: cachedIcons[appEntry.normalizedName] };
+        }
+
+        const exePath = this.findExePath(appEntry);
+        if (!exePath) return appEntry;
+
+        try {
+          const icon = await app.getFileIcon(path.normalize(exePath), { size: "normal" });
+          const dataUrl = icon.toDataURL();
+          if (dataUrl && dataUrl.length > 30) {
+            newIcons[appEntry.normalizedName] = dataUrl;
+            extracted++;
+            return { ...appEntry, iconDataUrl: dataUrl };
+          }
+        } catch {
+          // Silently skip — fallback to letter avatar in UI
+        }
+        return appEntry;
+      })
+    );
+
+    if (extracted > 0 || !cacheValid) {
+      this.store.set("iconCache", { icons: newIcons, lastUpdated: Date.now() });
+      logger.info(`Extracted ${extracted} new icons, ${Object.keys(newIcons).length} total cached`);
+    }
+
+    return results;
+  }
+
+  /**
+   * Find an actual .exe file for an app, handling Squirrel app layouts
+   * where the exe lives inside app-x.y.z/ subfolder.
+   */
+  private findExePath(appEntry: InstalledApp): string | null {
+    if (!appEntry.path) return null;
+
+    if (process.platform === "win32") {
+      // Direct .exe path (from registry — InstallLocation often has the folder)
+      const dirPath = appEntry.path;
+
+      // Check if the path itself is an exe
+      if (dirPath.endsWith(".exe") && fs.existsSync(dirPath)) {
+        return dirPath;
+      }
+
+      // Squirrel apps: look for app-x.y.z/*.exe inside the install dir
+      try {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+        // Find the latest app-* directory
+        const appDirs = entries
+          .filter((e) => e.isDirectory() && e.name.startsWith("app-"))
+          .map((e) => e.name)
+          .sort()
+          .reverse();
+
+        if (appDirs.length > 0) {
+          const latestAppDir = path.join(dirPath, appDirs[0]);
+          const exes = fs.readdirSync(latestAppDir).filter((f) => f.endsWith(".exe"));
+          if (exes.length > 0) {
+            return path.join(latestAppDir, exes[0]);
+          }
+        }
+
+        // Fallback: look for any .exe directly in the path
+        const directExes = entries.filter((e) => e.isFile() && e.name.endsWith(".exe"));
+        if (directExes.length > 0) {
+          return path.join(dirPath, directExes[0].name);
+        }
+      } catch {
+        // Directory not accessible
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Clear the cache
    */
   clearCache(): void {
@@ -367,6 +529,7 @@ class InstalledAppsService {
       lastUpdated: 0,
       platform: "",
     });
+    this.store.set("iconCache", { icons: {}, lastUpdated: 0 });
     logger.info("Cache cleared");
   }
 }

@@ -20,6 +20,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { createLogger } from "../lib/logger";
+import type { IntervalEvidence } from "./activityTracker";
 
 const logger = createLogger("LocalFrameStorage");
 
@@ -33,6 +34,12 @@ export interface FrameMetadata {
   windowTitle: string;
   trigger: "periodic" | "focus_change" | "manual";
   hash: string;
+
+  // Activity evidence captured at frame time
+  intervalEvidence?: IntervalEvidence;
+
+  // Browser context (if applicable)
+  browserContext?: { activeTabUrl: string; activeTabTitle: string; tabCount: number };
 
   // Analysis results (populated later)
   analysisStatus?: "pending" | "analyzed" | "skipped" | "duplicate";
@@ -629,6 +636,61 @@ class LocalFrameStorage {
 
     logger.info(` Cleaned up ${deletedCount} old sessions`);
     return deletedCount;
+  }
+
+  /**
+   * Purge heavy assets (frames, thumbnails, audio) for sessions older than
+   * hoursToKeep hours. Skips any session with status "active".
+   * Keeps manifest.json and timeline.json for metadata/diagnostics.
+   */
+  async cleanupSessionAssets(hoursToKeep: number = 24): Promise<void> {
+    const sessionIds = await this.getAllSessionIds();
+    const cutoffMs = Date.now() - hoursToKeep * 60 * 60 * 1000;
+    let cleaned = 0;
+
+    for (const sessionId of sessionIds) {
+      try {
+        const manifest = await this.loadManifest(sessionId);
+        if (!manifest) continue;
+        if (manifest.status === "active") continue;
+
+        const sessionDate = new Date(manifest.createdAt ?? manifest.startedAt);
+        if (sessionDate.getTime() > cutoffMs) continue;
+
+        const sessionPath = this.getSessionPath(sessionId);
+        const toDelete = [
+          path.join(sessionPath, "frames"),
+          path.join(sessionPath, "thumbnails"),
+          path.join(sessionPath, "audio_user.pcm"),
+          path.join(sessionPath, "audio_remote.pcm"),
+          path.join(sessionPath, "audio_user.wav"),
+          path.join(sessionPath, "audio_remote.wav"),
+        ];
+
+        for (const target of toDelete) {
+          try {
+            if (fs.existsSync(target)) {
+              const stat = fs.statSync(target);
+              if (stat.isDirectory()) {
+                await fs.promises.rm(target, { recursive: true, force: true });
+              } else {
+                await fs.promises.unlink(target);
+              }
+            }
+          } catch {
+            // Non-fatal — skip individual failures
+          }
+        }
+
+        cleaned++;
+      } catch {
+        // Non-fatal — skip individual session failures
+      }
+    }
+
+    if (cleaned > 0) {
+      logger.info(`[Cleanup] Purged assets for ${cleaned} session(s) older than ${hoursToKeep}h`);
+    }
   }
 }
 

@@ -724,8 +724,15 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.userId!;
     const { id } = req.params;
-    const { autoRecap } = req.body as {
+    const { autoRecap, onDeviceSummary, localMode } = req.body as {
       autoRecap?: boolean;
+      localMode?: boolean;
+      onDeviceSummary?: {
+        narrative: string;
+        taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
+        timeBreakdown: Record<string, number> | null;
+        modelUsed: string;
+      };
     };
 
     try {
@@ -863,7 +870,208 @@ router.post(
       // Proactively close audio WebSocket to stop orphaned audio chunks
       closeAudioConnection(id);
 
-      // Short-session guard: skip storyteller if not enough data
+      // ── On-device fast path ─────────────────────────────────────────────
+      // The Electron client ran the full AI pipeline locally (vision + classifier +
+      // storyteller). Only the final narrative + task breakdown are sent here — no
+      // raw captures or classifications leave the device. We persist the results
+      // directly and skip cloud-side summarization.
+      if (onDeviceSummary) {
+        log.info("On-device summary received, persisting directly", {
+          sessionId: id,
+          taskCount: onDeviceSummary.taskBreakdown?.length ?? 0,
+          modelUsed: onDeviceSummary.modelUsed,
+        });
+
+        const sessionTitle = onDeviceSummary.taskBreakdown?.[0]?.shortTitle || "Work session";
+
+        await db.insert(schema.sessionSummaries).values({
+          sessionId: id,
+          version: 1,
+          summaryType: "master_story",
+          narrativeSummary: onDeviceSummary.narrative,
+          modelUsed: onDeviceSummary.modelUsed || "on-device",
+          generationTimeMs: 0,
+        });
+
+        await db
+          .update(schema.monitoringSessions)
+          .set({
+            status: "ready",
+            summarizationProgress: null,
+            name: sessionTitle,
+            finalSummary: onDeviceSummary.narrative,
+            taskBreakdown: onDeviceSummary.taskBreakdown,
+            ...(onDeviceSummary.timeBreakdown
+              ? { timeBreakdown: onDeviceSummary.timeBreakdown }
+              : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.monitoringSessions.id, id));
+
+        // Auto-recap (reuses the same logic as the cloud path)
+        if (autoRecap !== false) {
+          try {
+            const sessionStart = new Date(session.startedAt);
+            const sessionEnd = endTime;
+            const activeMinutes = Math.max(1, Math.round(activeDurationMs / 60000));
+
+            const newBlock = {
+              id,
+              startTime: sessionStart.toISOString(),
+              endTime: sessionEnd.toISOString(),
+              duration: activeMinutes,
+              goal: session.sessionGoal || undefined,
+              sessionId: id,
+              title: sessionTitle,
+              durationMinutes: activeMinutes,
+            };
+
+            const sessionDay = new Date(session.startedAt);
+            const todayStart = new Date(sessionDay);
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date(sessionDay);
+            todayEnd.setHours(23, 59, 59, 999);
+
+            const [existingRecap] = await db
+              .select()
+              .from(schema.recaps)
+              .where(
+                and(
+                  eq(schema.recaps.userId, userId),
+                  sql`${schema.recaps.createdAt} >= ${todayStart.toISOString()}`,
+                  sql`${schema.recaps.createdAt} <= ${todayEnd.toISOString()}`
+                )
+              )
+              .orderBy(desc(schema.recaps.createdAt))
+              .limit(1);
+
+            if (existingRecap) {
+              const existingBlocks = (
+                Array.isArray(existingRecap.blocks) ? existingRecap.blocks : []
+              ) as Array<Record<string, unknown>>;
+              const alreadyAdded = existingBlocks.some((b) => (b.id || b.sessionId) === id);
+              if (!alreadyAdded) {
+                const allBlocks = [...existingBlocks, newBlock];
+                const totalDuration = allBlocks.reduce(
+                  (sum, b) => sum + (Number(b.duration) || Number(b.durationMinutes) || 0),
+                  0
+                );
+                const allSessionIds = allBlocks.map((b) => String(b.id || b.sessionId));
+                const recapContent = await recapRLMService.generateRecap(allSessionIds, userId);
+                const dateLabel = sessionDay.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                });
+                await db
+                  .update(schema.recaps)
+                  .set({
+                    title: `Daily Recap — ${dateLabel}`,
+                    content: recapContent,
+                    blocks: allBlocks,
+                    totalDuration,
+                    sessionId: id,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(schema.recaps.id, existingRecap.id));
+                log.info("Updated daily recap with on-device session", {
+                  recapId: existingRecap.id,
+                  sessionId: id,
+                });
+              }
+            } else {
+              const recapContent = await recapRLMService.generateRecap([id], userId);
+              await db.insert(schema.recaps).values({
+                userId,
+                organizationId: session.organizationId,
+                title: sessionTitle,
+                content: recapContent,
+                blocks: [newBlock],
+                totalDuration: activeMinutes,
+                sessionId: id,
+              });
+              log.info("Auto-created daily recap for on-device session", { sessionId: id });
+            }
+          } catch (recapError) {
+            log.error("On-device auto-recap failed (non-blocking)", {
+              sessionId: id,
+              error: recapError instanceof Error ? recapError.message : String(recapError),
+            });
+          }
+        }
+
+        res.json({
+          success: true,
+          session: {
+            id: updated.id,
+            status: "ready",
+            startedAt: updated.startedAt,
+            endedAt: updated.endedAt,
+            duration: {
+              totalMs: endTime.getTime() - startTime,
+              activeMs: activeDurationMs,
+              pausedMs: totalPausedMs,
+            },
+            captureCount,
+          },
+        });
+        return;
+      }
+
+      // ── Local-mode guard ─────────────────────────────────────────────────
+      // When the session ran in local mode, all classification happened on-device.
+      // There are no cloud-side captures/classifications, so the cloud storyteller
+      // has nothing to work with. If onDeviceSummary was already handled above,
+      // we never reach here. If it's missing (local pipeline failed), insert a
+      // fallback stub so the session still appears on the calendar.
+      if (localMode) {
+        log.info("Local-mode session without onDeviceSummary — inserting fallback stub", {
+          sessionId: id,
+          activeDurationMs,
+        });
+
+        const fallbackMessage =
+          "This session was processed on-device but the local AI pipeline did not produce a summary. " +
+          "The session data is stored locally on your machine.";
+
+        await db.insert(schema.sessionSummaries).values({
+          sessionId: id,
+          version: 1,
+          summaryType: "master_story",
+          narrativeSummary: fallbackMessage,
+          modelUsed: "on-device:fallback",
+          generationTimeMs: 0,
+        });
+
+        await db
+          .update(schema.monitoringSessions)
+          .set({
+            status: "ready",
+            summarizationProgress: null,
+            name: "On-device session",
+            finalSummary: fallbackMessage,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.monitoringSessions.id, id));
+
+        res.json({
+          success: true,
+          session: {
+            id: updated.id,
+            status: "ready",
+            startedAt: updated.startedAt,
+            endedAt: updated.endedAt,
+            duration: {
+              totalMs: endTime.getTime() - startTime,
+              activeMs: activeDurationMs,
+              pausedMs: totalPausedMs,
+            },
+            captureCount,
+          },
+        });
+        return;
+      }
+
+      // Short-session guard: skip storyteller if not enough data (cloud path only)
       const MIN_DURATION_MS = 3 * 60 * 1000; // 3 minutes
       const MIN_CLASSIFIED_CAPTURES = 5;
 
@@ -3051,6 +3259,100 @@ router.post(
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to mark session as delivered",
+      });
+    }
+  }
+);
+
+/**
+ * PUT /api/monitoring/sessions/:id/on-device-summary
+ * Re-sync an on-device summary for a session that already exists.
+ * Used after the reprocess script regenerates stories locally.
+ */
+router.put(
+  "/sessions/:id/on-device-summary",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const { id } = req.params;
+    const { onDeviceSummary } = req.body as {
+      onDeviceSummary: {
+        narrative: string;
+        taskBreakdown: Array<{ shortTitle: string; description: string; minutes: number }>;
+        timeBreakdown: Record<string, number> | null;
+        modelUsed: string;
+      };
+    };
+
+    if (!onDeviceSummary?.narrative) {
+      res.status(400).json({ error: "onDeviceSummary with narrative is required" });
+      return;
+    }
+
+    try {
+      const [session] = await db
+        .select()
+        .from(schema.monitoringSessions)
+        .where(eq(schema.monitoringSessions.id, id))
+        .limit(1);
+
+      if (!session || session.userId !== userId) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+
+      const sessionTitle =
+        onDeviceSummary.taskBreakdown?.[0]?.shortTitle || session.name || "Work session";
+
+      // Upsert session summary: delete any existing master_story, then insert
+      await db
+        .delete(schema.sessionSummaries)
+        .where(
+          and(
+            eq(schema.sessionSummaries.sessionId, id),
+            eq(schema.sessionSummaries.summaryType, "master_story")
+          )
+        );
+
+      await db.insert(schema.sessionSummaries).values({
+        sessionId: id,
+        version: 1,
+        summaryType: "master_story",
+        narrativeSummary: onDeviceSummary.narrative,
+        modelUsed: onDeviceSummary.modelUsed || "on-device:resync",
+        generationTimeMs: 0,
+      });
+
+      await db
+        .update(schema.monitoringSessions)
+        .set({
+          status: "ready",
+          summarizationProgress: null,
+          name: sessionTitle,
+          finalSummary: onDeviceSummary.narrative,
+          taskBreakdown: onDeviceSummary.taskBreakdown,
+          ...(onDeviceSummary.timeBreakdown
+            ? { timeBreakdown: onDeviceSummary.timeBreakdown }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.monitoringSessions.id, id));
+
+      logger.info(
+        { sessionId: id, taskCount: onDeviceSummary.taskBreakdown?.length ?? 0 },
+        "On-device summary re-synced"
+      );
+
+      res.json({
+        success: true,
+        sessionId: id,
+        taskCount: onDeviceSummary.taskBreakdown?.length ?? 0,
+      });
+    } catch (error) {
+      logger.error({ err: error }, "Error re-syncing on-device summary");
+      res.status(500).json({
+        error: "Failed to re-sync on-device summary",
+        message: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }

@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Check, Loader2, CircleHelp } from "lucide-react";
+import { Check, Loader2, CircleHelp, Settings } from "lucide-react";
 import { useUser } from "../../../context/UserContext";
-import { authService } from "../../../services/authService";
-import { API_BASE_URL } from "../../../lib/config";
 import { flushRendererLogsPending } from "../../../../../lib/feedback-log-buffer";
 
 export type FeedbackAnonymousSource = "login" | "register";
@@ -11,7 +10,6 @@ export type FeedbackAnonymousSource = "login" | "register";
 interface FeedbackDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** When set, email "From" uses this context instead of the signed-in user (login / register screens). */
   anonymousSource?: FeedbackAnonymousSource;
 }
 
@@ -26,8 +24,19 @@ export default function FeedbackDialog({
   anonymousSource,
 }: FeedbackDialogProps) {
   const { user } = useUser();
+  const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [hasResendKey, setHasResendKey] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      window.consoleAPI
+        ?.hasResendKey?.()
+        .then(setHasResendKey)
+        .catch(() => setHasResendKey(false));
+    }
+  }, [open]);
 
   const handleSubmit = async () => {
     if (!message.trim() || status === "sending") return;
@@ -51,33 +60,45 @@ export default function FeedbackDialog({
         mainLogs = `(client logs unavailable: ${String(e)})`;
       }
 
-      const token = authService.getAccessToken();
+      // Run log analysis locally via Ollama (best-effort)
+      let logAnalysis = "";
+      let ollamaDiagnostics = "";
+      try {
+        const analysisResult = await window.consoleAPI?.analyzeLogsLocally?.({
+          message: message.trim(),
+          mainLogs,
+          rendererLogs,
+        });
+        if (analysisResult?.success && analysisResult.analysis) {
+          logAnalysis = analysisResult.analysis;
+        }
+        if (analysisResult?.diagnostics) {
+          ollamaDiagnostics = analysisResult.diagnostics;
+        }
+      } catch {
+        ollamaDiagnostics = "analyzeLogsLocally IPC call threw";
+      }
+
       const fromLoginOrRegister = anonymousSource ? ANONYMOUS_SOURCE_LABEL[anonymousSource] : null;
       const resolvedUserName = fromLoginOrRegister
         ? fromLoginOrRegister
         : user?.name || user?.firstName || "Unknown";
       const resolvedUserEmail = fromLoginOrRegister ? "unauthenticated" : user?.email || "unknown";
-      const endpoint = anonymousSource
-        ? `${API_BASE_URL}/api/feedback/unauth`
-        : `${API_BASE_URL}/api/feedback`;
-      // Anonymous feedback must not send a stale Bearer token (optionalAuth would
-      // still attach a dead session to the request).
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(!anonymousSource && token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          message: message.trim(),
-          mainLogs,
-          rendererLogs,
-          userName: resolvedUserName,
-          userEmail: resolvedUserEmail,
-        }),
+
+      const result = await window.consoleAPI?.submitFeedback?.({
+        message: message.trim(),
+        logAnalysis,
+        ollamaDiagnostics,
+        mainLogs,
+        rendererLogs,
+        userName: resolvedUserName,
+        userEmail: resolvedUserEmail,
+        token: null,
+        apiBaseUrl: "",
+        isAnonymous: !!anonymousSource,
       });
 
-      if (!res.ok) throw new Error("Failed to send");
+      if (!result?.success) throw new Error(result?.error || "Failed to save");
       setStatus("sent");
       setTimeout(() => {
         onOpenChange(false);
@@ -121,7 +142,12 @@ export default function FeedbackDialog({
               fontFamily: "var(--font-sans)",
             }}
           >
-            {status === "sent" ? (
+            {hasResendKey === false ? (
+              <>
+                <Settings size={18} strokeWidth={1.6} />
+                Setup Required
+              </>
+            ) : status === "sent" ? (
               <>Thanks</>
             ) : (
               <>
@@ -132,7 +158,85 @@ export default function FeedbackDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {status === "sent" ? (
+        {hasResendKey === false ? (
+          <div style={{ padding: "24px 28px 28px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(var(--mi-accent-rgb), 0.12)",
+                }}
+              >
+                <Settings size={20} style={{ color: "var(--mi-accent)" }} />
+              </div>
+              <div>
+                <h3
+                  style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}
+                >
+                  Resend API Key Required
+                </h3>
+                <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
+                  Add your key to send feedback emails
+                </p>
+              </div>
+            </div>
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--text-secondary)",
+                lineHeight: 1.5,
+                margin: "0 0 20px",
+              }}
+            >
+              Feedback is sent via email using Resend. Go to{" "}
+              <strong style={{ color: "var(--text-primary)" }}>Settings &rarr; Setup</strong> and
+              add your Resend API key.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => handleClose(false)}
+                style={{
+                  flex: 1,
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  background: "var(--bg-overlay)",
+                  color: "var(--text-secondary)",
+                  border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                Later
+              </button>
+              <button
+                onClick={() => {
+                  handleClose(false);
+                  navigate("/profile");
+                }}
+                style={{
+                  flex: 1,
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  background: "var(--mi-accent)",
+                  color: "var(--bg-base)",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                Open Settings
+              </button>
+            </div>
+          </div>
+        ) : status === "sent" ? (
           <div
             style={{
               padding: "28px 32px 36px",

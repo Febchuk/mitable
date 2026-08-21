@@ -196,6 +196,7 @@ export interface WatchButtonState {
 export type MonitoringSessionStatus =
   | "active"
   | "paused"
+  | "ending"
   | "ended"
   | "summarizing"
   | "ready"

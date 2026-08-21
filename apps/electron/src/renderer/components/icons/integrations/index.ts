@@ -1,3 +1,11 @@
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
 import { SlackIcon } from "./SlackIcon";
 import { NotionIcon } from "./NotionIcon";
 import { GitHubIcon } from "./GitHubIcon";

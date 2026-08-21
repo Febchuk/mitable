@@ -1,3 +1,6 @@
+/**
+ * @deprecated MonitoringViewSkeleton — replaced by CalendarView. Set up for deletion.
+ */
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonBadge } from "@/console/src/components/skeletons";
 

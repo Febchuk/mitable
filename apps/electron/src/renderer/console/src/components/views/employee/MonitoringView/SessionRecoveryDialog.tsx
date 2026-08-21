@@ -1,4 +1,6 @@
 /**
+ * @deprecated SessionRecoveryDialog — replaced by CalendarView. Set up for deletion.
+ *
  * Session Recovery Dialog
  * Shown when incomplete monitoring sessions are detected on app startup
  */

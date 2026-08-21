@@ -11,7 +11,10 @@ export default function MenuDropdownApp() {
   // Derived state
   const isActive = sessionState?.status === "active";
   const isPaused = sessionState?.status === "paused";
-  const hasSession = isActive || isPaused;
+  const isEnding = sessionState?.status === "ending";
+  const isSummarizing = sessionState?.status === "summarizing";
+  const isBusy = isEnding || isSummarizing;
+  const hasSession = isActive || isPaused || isBusy;
 
   // Listen for data from main process
   useEffect(() => {
@@ -63,7 +66,7 @@ export default function MenuDropdownApp() {
       )}
 
       {/* Session controls based on state */}
-      {isActive && (
+      {isActive && !isBusy && (
         <button
           onClick={() => handleAction("pause-session")}
           className="block w-full text-left px-3 py-1.5 text-xs text-white/90 hover:bg-white/10 transition-colors whitespace-nowrap"
@@ -72,7 +75,7 @@ export default function MenuDropdownApp() {
         </button>
       )}
 
-      {isPaused && (
+      {isPaused && !isBusy && (
         <button
           onClick={() => handleAction("resume-session")}
           className="block w-full text-left px-3 py-1.5 text-xs text-white/90 hover:bg-white/10 transition-colors whitespace-nowrap"
@@ -83,10 +86,13 @@ export default function MenuDropdownApp() {
 
       {hasSession && (
         <button
-          onClick={() => handleAction("end-session")}
-          className="block w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-white/10 transition-colors whitespace-nowrap"
+          onClick={() => !isBusy && handleAction("end-session")}
+          disabled={isBusy}
+          className={`block w-full text-left px-3 py-1.5 text-xs transition-colors whitespace-nowrap ${
+            isBusy ? "text-white/40 cursor-not-allowed" : "text-red-400 hover:bg-white/10"
+          }`}
         >
-          End Session
+          {isEnding ? "Ending…" : isSummarizing ? "Summarizing…" : "End Session"}
         </button>
       )}
 

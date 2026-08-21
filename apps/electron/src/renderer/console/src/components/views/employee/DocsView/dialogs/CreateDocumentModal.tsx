@@ -5,15 +5,22 @@
  * No title, no blank doc option. Blocks dropdown shows recent sessions.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, ChevronDown, Loader2, Check, ArrowUp, Layers } from "lucide-react";
+import { X, ChevronDown, Loader2, Check, ArrowUp, Layers, Paperclip, Settings } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { useGenerateDocumentStream } from "@/console/src/hooks/queries/documents/useGenerateDocumentStream";
-import { useSessions } from "@/console/src/hooks/queries/monitoring";
-import type { SessionListItem } from "@/console/src/services/monitoringService";
 import type { DocType } from "@mitable/shared";
+
+interface LocalSession {
+  id: string;
+  name: string | null;
+  status: string;
+  startedAt: number;
+  endedAt: number | null;
+  captureCount: number;
+  duration: number;
+}
 
 interface CreateDocumentModalProps {
   open: boolean;
@@ -32,8 +39,8 @@ function formatDuration(ms: number): string {
   return `${minutes}m`;
 }
 
-function formatRelativeDate(dateString: string): string {
-  const date = new Date(dateString);
+function formatRelativeDate(timestamp: number | string): string {
+  const date = new Date(timestamp);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
@@ -59,8 +66,8 @@ export default function CreateDocumentModal({
   routeBase = "/docs",
   entityLabel = "document",
   promptPlaceholder,
-  defaultTags = [],
-  docType = "knowledge-article",
+  defaultTags: _defaultTags = [],
+  docType: _docType = "knowledge-article",
 }: CreateDocumentModalProps) {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -68,14 +75,35 @@ export default function CreateDocumentModal({
   const [input, setInput] = useState("");
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [blocksOpen, setBlocksOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ phase: string; message: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
 
-  const { generate, isGenerating, documentId, progress, error, reset } =
-    useGenerateDocumentStream();
+  const reset = useCallback(() => {
+    setIsGenerating(false);
+    setDocumentId(null);
+    setProgress(null);
+    setError(null);
+  }, []);
 
-  const { data: sessionsData } = useSessions();
-  const sessions = sessionsData?.sessions ?? [];
+  // Fetch local sessions via IPC instead of backend
+  const [sessions, setSessions] = useState<LocalSession[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const result = await window.consoleAPI?.getRecentSessions?.();
+        setSessions(result ?? []);
+      } catch {
+        setSessions([]);
+      }
+    })();
+  }, [open]);
+
   const completedSessions = sessions.filter(
-    (s: SessionListItem) => ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
+    (s) => ["ended", "ready", "delivered"].includes(s.status) && s.captureCount > 0
   );
 
   const entityLabelTitle = entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1);
@@ -97,6 +125,7 @@ export default function CreateDocumentModal({
       setInput("");
       setSelectedSessionIds(new Set());
       setBlocksOpen(false);
+      setShowProviderModal(false);
     }
   }, [open]);
 
@@ -113,8 +142,39 @@ export default function CreateDocumentModal({
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
-    const sessionIds = selectedSessionIds.size > 0 ? Array.from(selectedSessionIds) : undefined;
-    await generate(input, docType, { sessionIds, tags: defaultTags });
+
+    // Check if AI provider is configured
+    try {
+      const config = await window.consoleAPI?.loadInferenceConfig?.();
+      if (!config) {
+        setShowProviderModal(true);
+        return;
+      }
+    } catch {
+      // Allow to proceed if check fails
+    }
+
+    setIsGenerating(true);
+    setError(null);
+    setProgress({ phase: "drafting", message: "Generating with AI..." });
+
+    try {
+      const sessionIds = selectedSessionIds.size > 0 ? Array.from(selectedSessionIds) : undefined;
+      const result = await window.consoleAPI.localDocsGenerate?.(input.trim(), sessionIds);
+
+      if (result?.error) {
+        setError(result.error);
+        setIsGenerating(false);
+        return;
+      }
+
+      setDocumentId(result?.documentId ?? null);
+      setProgress({ phase: "complete", message: "Document ready!" });
+      setIsGenerating(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Generation failed");
+      setIsGenerating(false);
+    }
   };
 
   const handleClose = () => {
@@ -139,7 +199,7 @@ export default function CreateDocumentModal({
     });
   };
 
-  const showForm = !isGenerating && !isComplete && !error;
+  const showForm = !isGenerating && !isComplete && !error && !showProviderModal;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -395,7 +455,7 @@ export default function CreateDocumentModal({
                             <span
                               style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}
                             >
-                              {formatDuration(session.duration.totalMs)}
+                              {formatDuration(session.duration)}
                             </span>
                             <span
                               style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}
@@ -409,6 +469,39 @@ export default function CreateDocumentModal({
                   </div>
                 )}
               </div>
+
+              {/* Upload file */}
+              <button
+                onClick={async () => {
+                  const result = await window.consoleAPI.localDocsPickFile?.();
+                  if (result && !result.canceled && !result.error) {
+                    handleClose();
+                  }
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "5px 10px",
+                  borderRadius: 6,
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--text-tertiary)",
+                  fontSize: 12,
+                  fontFamily: "var(--font-sans)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "var(--text-tertiary)";
+                }}
+              >
+                <Paperclip size={13} />
+                Upload
+              </button>
 
               {/* Spacer */}
               <div style={{ flex: 1 }} />
@@ -537,6 +630,104 @@ export default function CreateDocumentModal({
               >
                 Try again
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── AI Provider Required Modal ────────────────────────── */}
+        {showProviderModal && (
+          <div
+            style={{
+              padding: "24px 20px",
+            }}
+          >
+            <div
+              style={{
+                padding: "20px",
+                borderRadius: 12,
+                background: "var(--bg-raised)",
+                border: "0.5px solid rgba(var(--ui-rgb), 0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(var(--mi-accent-rgb), 0.12)",
+                  }}
+                >
+                  <Settings size={20} style={{ color: "var(--mi-accent)" }} />
+                </div>
+                <div>
+                  <h3
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      margin: 0,
+                    }}
+                  >
+                    AI Provider Required
+                  </h3>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "2px 0 0" }}>
+                    Add your API key to get started
+                  </p>
+                </div>
+              </div>
+              <p
+                style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}
+              >
+                Document generation needs an AI provider to work. Go to{" "}
+                <strong style={{ color: "var(--text-primary)" }}>Settings</strong> and add your API
+                key for Google, OpenAI, or Anthropic.
+              </p>
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <button
+                  onClick={() => setShowProviderModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 16px",
+                    fontSize: 13,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    color: "var(--text-secondary)",
+                    border: "0.5px solid rgba(var(--ui-rgb), 0.10)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProviderModal(false);
+                    handleClose();
+                    navigate("/profile");
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "8px 16px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    borderRadius: 8,
+                    background: "var(--mi-accent)",
+                    color: "var(--bg-base)",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Open Settings
+                </button>
+              </div>
             </div>
           </div>
         )}

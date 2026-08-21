@@ -1,29 +1,16 @@
-import { Settings, LogOut, Building2, CircleHelp } from "lucide-react";
+import { Settings, LogOut, CircleHelp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "../../context/SidebarContext";
 import { useUser } from "../../context/UserContext";
 import Nav from "../navigation/Nav";
 import FeedbackDialog from "../views/shared/FeedbackDialog";
 import { useState, useRef, useEffect } from "react";
-import type { ViewMode } from "../../types";
-
 const isMac = navigator.platform.toLowerCase().includes("mac");
-
-const VIEW_MODE_LABELS: Record<ViewMode, string> = {
-  employee: "Me",
-  manager: "Team",
-};
 
 export default function Sidebar() {
   const { open } = useSidebar();
-  const { user, logout, organization, viewMode, availableViewModes, setViewMode } = useUser();
+  const { user, logout } = useUser();
   const navigate = useNavigate();
-
-  const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    if (mode === "employee") navigate("/calendar");
-    else navigate("/dashboard");
-  };
 
   const firstInitial = user?.name?.charAt(0)?.toUpperCase() || "U";
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -67,45 +54,9 @@ export default function Sidebar() {
         }}
       />
 
-      {/* View Mode Switcher */}
-      {availableViewModes.length > 1 && (
-        <div style={{ padding: "0 8px", marginBottom: 8 }}>
-          <div
-            style={{
-              display: "flex",
-              gap: 1,
-              background: "rgba(var(--ui-rgb), 0.05)",
-              borderRadius: 6,
-              padding: 2,
-            }}
-          >
-            {availableViewModes.map((mode) => (
-              <button
-                key={mode}
-                onClick={() => handleViewModeChange(mode)}
-                style={{
-                  flex: 1,
-                  padding: "3px 6px",
-                  borderRadius: 4,
-                  fontSize: 10,
-                  fontWeight: 500,
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "background 0.1s, color 0.1s",
-                  background: viewMode === mode ? "rgba(var(--ui-rgb), 0.12)" : "transparent",
-                  color: viewMode === mode ? "var(--text-primary)" : "var(--text-secondary)",
-                }}
-              >
-                {VIEW_MODE_LABELS[mode]}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Navigation */}
       <nav style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
-        <Nav viewMode={viewMode} />
+        <Nav />
       </nav>
 
       {/* Bottom section */}
@@ -213,7 +164,7 @@ export default function Sidebar() {
                   lineHeight: 1,
                 }}
               >
-                {viewMode !== "employee" && organization?.name ? organization.name : "Free plan"}
+                Free plan
               </div>
             </div>
           </div>
@@ -267,40 +218,7 @@ export default function Sidebar() {
                 Settings
               </button>
 
-              {(user?.role === "admin" || user?.originalRole === "admin") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    navigate("/org-setup");
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    width: "100%",
-                    padding: "9px 12px",
-                    borderRadius: 6,
-                    border: "none",
-                    background: "none",
-                    color: "var(--text-secondary)",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
-                    e.currentTarget.style.color = "var(--text-primary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "none";
-                    e.currentTarget.style.color = "var(--text-secondary)";
-                  }}
-                >
-                  <Building2 size={14} strokeWidth={1.5} />
-                  Org Setup
-                </button>
-              )}
+              {/* DEPRECATED: Org Setup hidden — admin experience moves to web app */}
 
               <div
                 style={{

@@ -1,0 +1,786 @@
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
+
+import React from "react";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type IntegrationsTabProps = any;
+
+function IntegrationsTab(props: IntegrationsTabProps) {
+  // This component is never rendered — kept for web migration reference
+
+  const {
+    slackUserStatus,
+    isSlackUserLoading,
+    isSlackUserConnecting,
+    isSlackUserDisconnecting,
+    handleConnectSlackUser,
+    handleDisconnectSlackUser,
+    linearStatus,
+    isLinearLoading,
+    isConnecting,
+    isDisconnecting,
+    handleConnectLinear,
+    handleDisconnectLinear,
+    notionStatus,
+    isNotionLoading,
+    isNotionConnecting,
+    isNotionDisconnecting,
+    handleConnectNotion,
+    handleDisconnectNotion,
+    gmailStatus,
+    isGmailLoading,
+    isGmailConnecting,
+    isGmailDisconnecting,
+    handleConnectGmail,
+    handleDisconnectGmail,
+    granolaStatus,
+    isGranolaLoading,
+    isGranolaConnecting,
+    isGranolaDisconnecting,
+    handleConnectGranola,
+    handleDisconnectGranola,
+    firefliesStatus,
+    isFirefliesLoading,
+    isFirefliesConnecting,
+    isFirefliesDisconnecting,
+    handleConnectFireflies,
+    handleDisconnectFireflies,
+    showFirefliesModal,
+    setShowFirefliesModal,
+    firefliesApiKey,
+    setFirefliesApiKey,
+    newKeyName,
+    setNewKeyName,
+    handleCreateApiKey,
+    isCreatingKey,
+    newlyCreatedKey,
+    setNewlyCreatedKey,
+    toast,
+    apiKeys,
+    isApiKeysLoading,
+    handleRevokeApiKey,
+    revokingKeyId,
+    SiSlack,
+    SiLinear,
+    SiNotion,
+    SiGmail,
+    Loader2,
+    Check,
+    Unlink,
+    Plus,
+    Copy,
+    X,
+    Trash2,
+    ExternalLink,
+    FirefliesIcon,
+    ShadcnButton,
+  } = props;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div
+        style={{
+          paddingBottom: 16,
+          borderBottom: "var(--border-hairline)",
+        }}
+      >
+        <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+          Integrations
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
+          Connect apps and services for richer context
+        </p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {/* Integration rows */}
+        {(
+          [
+            {
+              key: "slack",
+              name: "Slack",
+              description:
+                slackUserStatus?.connected && slackUserStatus.teamName
+                  ? `Connected to ${slackUserStatus.teamName}`
+                  : "Capture DMs and @mentions",
+              icon: (
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    border: "var(--border-subtle)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <SiSlack style={{ width: 18, height: 18, color: "#E01E5A" }} />
+                </div>
+              ),
+              loading: isSlackUserLoading,
+              connected: slackUserStatus?.connected ?? false,
+              expired: slackUserStatus?.expired ?? false,
+              connecting: isSlackUserConnecting,
+              disconnecting: isSlackUserDisconnecting,
+              onConnect: handleConnectSlackUser,
+              onDisconnect: handleDisconnectSlackUser,
+            },
+            {
+              key: "linear",
+              name: "Linear",
+              description: "Session updates to tickets",
+              icon: (
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    border: "var(--border-subtle)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <SiLinear style={{ width: 18, height: 18, color: "#5E6AD2" }} />
+                </div>
+              ),
+              loading: isLinearLoading,
+              connected: linearStatus?.connected ?? false,
+              expired: linearStatus?.expired ?? false,
+              connecting: isConnecting,
+              disconnecting: isDisconnecting,
+              onConnect: handleConnectLinear,
+              onDisconnect: handleDisconnectLinear,
+            },
+            {
+              key: "notion",
+              name: "Notion",
+              description: "Export documents",
+              icon: (
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    border: "var(--border-subtle)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <SiNotion style={{ width: 18, height: 18, color: "var(--text-primary)" }} />
+                </div>
+              ),
+              loading: isNotionLoading,
+              connected: notionStatus?.connected ?? false,
+              expired: notionStatus?.expired ?? false,
+              connecting: isNotionConnecting,
+              disconnecting: isNotionDisconnecting,
+              onConnect: handleConnectNotion,
+              onDisconnect: handleDisconnectNotion,
+            },
+            {
+              key: "gmail",
+              name: "Gmail",
+              description:
+                gmailStatus?.connected && gmailStatus.email
+                  ? gmailStatus.email
+                  : "Send summaries via email",
+              icon: (
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    border: "var(--border-subtle)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <SiGmail style={{ width: 18, height: 18, color: "#EA4335" }} />
+                </div>
+              ),
+              loading: isGmailLoading,
+              connected: gmailStatus?.connected ?? false,
+              expired: gmailStatus?.expired ?? false,
+              connecting: isGmailConnecting,
+              disconnecting: isGmailDisconnecting,
+              onConnect: handleConnectGmail,
+              onDisconnect: handleDisconnectGmail,
+            },
+            {
+              key: "granola",
+              name: "Granola",
+              description:
+                granolaStatus?.connected && granolaStatus.email
+                  ? granolaStatus.email
+                  : "Sync meeting notes",
+              icon: (
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    border: "var(--border-subtle)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 1308 1350"
+                    style={{ width: 18, height: 18 }}
+                    fill="#C8E64A"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M1033.77,1021.55c-21.6,24.24-40.11,38.92-50.31,45.93c-4.8,3.19-7.8,7.65-11.99,11.48 c-22.2,19.14-46.26,24.83-63.06,38.23c-22.8,17.86-107.98,39.1-132.18,46.54c-40.96,9.31-87.03,12.67-137.43,10.75 c-10.91,0-20.99,0-30.26-0.73c-3.76-0.29-7.54,0.68-11.31,0.72c-0.15,0-0.29,0-0.42,0c-0.4,0-1.07-0.29-2.01-0.86 c-1.06-0.65-2.26-1.06-3.51-1.06c-0.33,0-0.65-0.03-0.97-0.07c-5.08-0.7-7.78,1.09-9.73,2.08c-1.48,0.75-3.09,0.12-4.49-0.77 c-4.43-2.81-14.32-9.14-17.68-10.16c-3.32-1.01-3.64,0.37-5.41,0.68c-1.18,0.21-2.41-0.21-3.3-1.01 c-0.99-0.9-2.06-2.2-4.5-3.5c-4.49-2.39-6.88,3.04-13.55-3.03c-0.97-0.88-1.54-2.61-2.85-2.7c-0.33-0.02-0.56-0.04-0.89-0.1 c-6.72-1.3-18.92-3.8-27.12-6.29c-9.6-2.55-6.61-4.46-10.81-6.37c-56.4-21.05-136.79-62.52-166.19-91.86 c-10.8-10.84-23.4-35.72-31.2-42.1c-6-5.1-18-15.31-21-20.41c-2.4-4.47-0-12.75-4.2-18.49 c-5.4-7.02-16.2-10.85-26.4-26.79c-11.4-17.86-18-41.46-29.4-65.7C202,854.91,175,786.02,175,660.36 c0-84.2,39-200.93,55.8-216.88c10.8-10.21,9.6-32.53,17.39-43.37c89.01-123.75,244.8-214.79,430.2-224.35 c7.53-0.39,15.07-0.63,22.62-0.72c45.74-0.53,91.58,4.47,136.04,15.31c44.41,10.83,86.87,27.73,128.26,46.95 c0,0,4.91,0.39,6.21,1.03c2.16,1.06,3.07,2.99,5.23,4.06c2.16,1.06,5.28,0.16,7.64,0.64c7.77,1.59,9.17,6.21,10.6,8.05 c1.74,2.23,3.83,3.09,7.78,4.22c10.31,2.96,11.67,6.37,13.07,7.94c1.12,1.25,1.61,2.88,2.17,4.34 c0.57,1.48,1.7,2.84,3.28,3.21c3.42,0.8,8.06,4.98,9.02,10.69c0.63,3.72,4.65,5.32,3.55,12.3 c-0.36,2.26,2.05,5.6-10.6,18.07s-39.18,20.33-55.34,14.14c-55.85-21.41-64.13-25.53-86.57-31.65 c-40.96-11.17-75.85-18.76-118.36-17.96c-67.8,1.28-121.21,7.66-185.41,29.98c-28.14,9.97-81.27,37.11-107.93,58.24 c-26.66,21.13-65.26,50.32-81.19,77.33c-5.58,9.46-11.86,18.5-25.06,33.17c-19.2,21.05-41.42,81.93-48.62,111.28 c-1.8,6.38,2.99,13.4,0.59,19.78c-2.4,7.02-13.8,10.21-15,15.95c-4.8,20.41-3.6,46.56-3.6,68.88 c0,12.12,3.6,28.7,7.8,38.27c3,6.38,12.6,10.85,13.8,17.22c0.6,4.46-5.39,9.56-5.4,13.39c0,3.19,5.39,46.57,8.39,52.95 c4.2,7.65,17.4,17.22,21,26.15c2.4,6.38-4.21,12.76,0.59,19.14c3,3.83,12.61,3.82,16.21,8.92 c4.8,6.38,15,24.87,19.8,30.62c3.6,4.47,10.2,6.39,13.2,8.3c9,6.38,1.2,12.11,9.6,21.68 c26.4,29.98,67.2,66.98,106.2,83.57c6.02,2.56,67.75,26.13,71.39,26.15c87,12.83,184.84,11.63,269.44-35.58 c19.8-10.85,131.97-88.81,150.57-181.3c4.2-18.5,9.6-63.16,7.2-81.02c-9.6-66.34-50.48-161.76-125.41-197.09 c-39.91-18.82-70.2-18.5-78-17.22c-22.8,4.46-30.6-8.93-51.6-7.02c-64.2,5.1-127.2,22.97-176.4,74.63 c-45,47.84-54.01,109.08-31.21,147.99c2.4,5.1,1.2,11.48-3.6,14.67c-2.1,1.28-4.05,2.87-4.95,4.55 c-1.79,3.33,3.39,5.11,6.95,6.36c24.96,8.73,33.96,50.84,67,49.06h7.2c0,0,13.8,0,19.2-6.38c4.44-5.24,4.42-11.35,1.27-14.06 c-1.4-1.21-3.18-1.93-3.59-3.74c-0.45-1.99-0.68-4.61-0.68-5.79c0-1.28,1.8-1.92,1.8-3.2c0-3.83-4.2-7.01-3.6-10.84 c0.38-2.04,3.21-4.85,5.21-6.96c1.52-1.6,1.54-3.63,0.55-5.6c-0.04-0.07-0.07-0.14-0.11-0.21c-0.96-1.97-1.14-4.32-0.49-6.41 c0.38-1.2,0.83-2.49,0.83-3.78c0.6-5.74-1.79-8.29-2.39-12.76c0-1.58,8.54-5.32,11.56-7.66c0.89-0.69,0.98-1.84,0.69-2.93 c-0.62-2.32-1.45-3.03-1.45-7.27c0-1.02,0.86-2.44,1.89-3.79c2.08-2.71,4-5.6,4.94-8.88l1.66-5.79 c0.69-2.42,2.53-4.34,4.92-5.15c4.13-1.39,2.22-8.13,6.16-10.01c1.15-0.55,4.02,0.15,8.63-0.83 c9.59-1.91,3-5.1,4.8-10.21c0.84-3.12,3.44-2.81,5.96-2.56c2.02,0.2,3.98-0.46,5.43-1.88c1.43-1.39,2.87-3.02,4.81-3.85 c2.43-1.03,8.81-1.23,13.38-1.27c1.88-0.02,3.74-0.29,5.61-0.51c5.1-0.6,12.33-0.24,15.82-0.77 c4.2-0.64,6.6-4.47,10.19-4.47c3,0,7.21,5.1,10.21,5.1c3,0,6-2.55,9-2.55c1.8,0,2.4,3.19,5.4,3.19h1.2 c0,0,27.6,0.64,56.4,18.49c19.8,12.12,34.2,41.47,34.2,41.47c13.8,23.6-1.51,47.86-1.51,69.55c0,8.93,3,16.58,1.2,24.88 c-1.2,6.38-6,11.49-7.8,16.59c-1.8,4.46-1.79,10.21-7.79,18.49c-4.8,7.02-7.21,7.01-8.41,8.29 c-1.8,1.91-17.34,25.41-27.54,34.34c-27,24.24-51.96,31.34-88.56,31.97c-16.2,0.64-18,3.83-20.4,3.83 c-8.4,0.64-46.79-1.27-58.8-3.19c0,0-53.4-10.21-74.4-20.41c-11.4-5.1-86.41-60.6-103.21-91.86 c-52.2-98.23-40.2-202.84,13.8-273.01c39-51.03,103.2-117.37,255.59-130.13c77.4-6.38,146.41,3.83,200.41,29.35 c76.2,35.72,132,98.87,166.8,173.5C1154.8,743.28,1151.37,887.6,1033.77,1021.55z" />
+                  </svg>
+                </div>
+              ),
+              loading: isGranolaLoading,
+              connected: granolaStatus?.connected ?? false,
+              expired: granolaStatus?.expired ?? false,
+              connecting: isGranolaConnecting,
+              disconnecting: isGranolaDisconnecting,
+              onConnect: handleConnectGranola,
+              onDisconnect: handleDisconnectGranola,
+            },
+            {
+              key: "fireflies",
+              name: "Fireflies",
+              description: firefliesStatus?.connected
+                ? "Meeting transcripts synced"
+                : "Sync meeting transcripts",
+              icon: (
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "var(--bg-overlay)",
+                    border: "var(--border-subtle)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 56 56"
+                    style={{ width: 18, height: 18 }}
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <defs>
+                      <linearGradient id="ff-icon-grad" x1="1" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#E82A73" />
+                        <stop offset="30%" stopColor="#C5388F" />
+                        <stop offset="54%" stopColor="#9B4AB0" />
+                        <stop offset="82%" stopColor="#6262DE" />
+                        <stop offset="100%" stopColor="#3B73FF" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M18.4,0H0v18.3h18.4V0z" fill="url(#ff-icon-grad)" />
+                    <path
+                      d="M40.2,0H21.8v18.3H56v-2.6c0-4.2-1.7-8.1-4.6-11.1C48.4,1.7,44.4,0,40.2,0z"
+                      fill="url(#ff-icon-grad)"
+                    />
+                    <path
+                      d="M0,22.1v18.3c0,4.2,1.7,8.1,4.6,11.1c3,2.9,7,4.6,11.2,4.6h2.6V22.1H0z"
+                      fill="url(#ff-icon-grad)"
+                    />
+                    <path d="M40.2,22.1H21.8v18.3h18.4V22.1z" fill="url(#ff-icon-grad)" />
+                  </svg>
+                </div>
+              ),
+              loading: isFirefliesLoading,
+              connected: firefliesStatus?.connected ?? false,
+              expired: false,
+              connecting: isFirefliesConnecting,
+              disconnecting: isFirefliesDisconnecting,
+              onConnect: () => setShowFirefliesModal(true),
+              onDisconnect: handleDisconnectFireflies,
+            },
+          ] as const
+        ).map((integration, idx, arr) => (
+          <div key={integration.key}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                padding: "14px 0",
+              }}
+            >
+              {integration.icon}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    lineHeight: 1,
+                  }}
+                >
+                  {integration.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-tertiary)",
+                    marginTop: 4,
+                    lineHeight: 1,
+                  }}
+                >
+                  {integration.expired ? (
+                    <span style={{ color: "#E8B474" }}>Connection expired</span>
+                  ) : (
+                    integration.description
+                  )}
+                </div>
+              </div>
+
+              {/* Action area */}
+              {integration.loading ? (
+                <Loader2 size={16} style={{ color: "#4B4740" }} className="animate-spin" />
+              ) : integration.connected ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#4ADE80",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Check size={13} />
+                    Connected
+                  </span>
+                  <button
+                    onClick={integration.onDisconnect}
+                    disabled={integration.disconnecting}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#4B4740",
+                      cursor: "pointer",
+                      padding: 4,
+                      borderRadius: 4,
+                      display: "flex",
+                      alignItems: "center",
+                      transition: "color 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#E5534B";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#4B4740";
+                    }}
+                  >
+                    {integration.disconnecting ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Unlink size={14} />
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={integration.onConnect}
+                  disabled={integration.connecting}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    background: "rgba(var(--ui-rgb), 0.06)",
+                    border: "var(--border-subtle)",
+                    cursor: integration.connecting ? "not-allowed" : "pointer",
+                    opacity: integration.connecting ? 0.6 : 1,
+                    transition: "background 0.15s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(var(--ui-rgb), 0.06)";
+                  }}
+                >
+                  {integration.connecting ? <Loader2 size={12} className="animate-spin" /> : null}
+                  Connect
+                </button>
+              )}
+            </div>
+            {idx < arr.length - 1 && (
+              <div
+                style={{
+                  height: 0.5,
+                  background: "var(--divider)",
+                }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── API Keys Section ── */}
+      <div
+        style={{
+          paddingTop: 8,
+          borderTop: "var(--border-hairline)",
+        }}
+      >
+        <div
+          style={{
+            paddingBottom: 16,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 16,
+              fontWeight: 500,
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
+            API Keys
+          </h2>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "6px 0 0" }}>
+            Create API keys to connect AI agents like Claude Desktop to your Mitable data via MCP
+          </p>
+        </div>
+
+        {/* Create key form */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginBottom: 16,
+          }}
+        >
+          <input
+            type="text"
+            value={newKeyName}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewKeyName(e.target.value)}
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === "Enter" && newKeyName.trim()) handleCreateApiKey();
+            }}
+            placeholder="Key name (e.g. Claude Desktop)"
+            style={{
+              flex: 1,
+              padding: "7px 12px",
+              borderRadius: 6,
+              fontSize: 13,
+              color: "var(--text-primary)",
+              background: "var(--bg-primary)",
+              border: "var(--border-subtle)",
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={handleCreateApiKey}
+            disabled={!newKeyName.trim() || isCreatingKey}
+            style={{
+              padding: "7px 16px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#fff",
+              background:
+                isCreatingKey || !newKeyName.trim() ? "#555" : "var(--mi-accent-dark, #3A7A87)",
+              border: "none",
+              cursor: isCreatingKey || !newKeyName.trim() ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              transition: "background 0.15s ease",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {isCreatingKey ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+            Create Key
+          </button>
+        </div>
+
+        {/* Newly created key banner */}
+        {newlyCreatedKey && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "12px 14px",
+              borderRadius: 8,
+              background: "rgba(130, 192, 204, 0.08)",
+              border: "1px solid rgba(130, 192, 204, 0.25)",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#E8B474",
+                  marginBottom: 4,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Copy your key — it won't be shown again
+              </div>
+              <code
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-primary)",
+                  wordBreak: "break-all",
+                  fontFamily: "monospace",
+                }}
+              >
+                {newlyCreatedKey}
+              </code>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(newlyCreatedKey);
+                toast({ title: "Copied to clipboard" });
+              }}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+                background: "rgba(var(--ui-rgb), 0.08)",
+                border: "var(--border-subtle)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                flexShrink: 0,
+              }}
+            >
+              <Copy size={12} />
+              Copy
+            </button>
+            <button
+              onClick={() => setNewlyCreatedKey(null)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-tertiary)",
+                cursor: "pointer",
+                padding: 4,
+                display: "flex",
+                flexShrink: 0,
+              }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Keys list */}
+        {isApiKeysLoading ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
+            }}
+          >
+            <Loader2 size={16} className="animate-spin" style={{ color: "#4B4740" }} />
+          </div>
+        ) : apiKeys.length === 0 ? (
+          <div
+            style={{
+              padding: "20px 0",
+              textAlign: "center",
+              fontSize: 13,
+              color: "var(--text-tertiary)",
+            }}
+          >
+            No API keys yet
+          </div>
+        ) : (
+          <div
+            style={{
+              borderRadius: 8,
+              border: "var(--border-subtle)",
+              overflow: "hidden",
+            }}
+          >
+            {apiKeys.map((key: any, idx: number) => (
+              <div
+                key={key.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "10px 14px",
+                  borderBottom: idx < apiKeys.length - 1 ? "var(--border-subtle)" : "none",
+                  background: "rgba(var(--ui-rgb), 0.02)",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {key.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-tertiary)",
+                      marginTop: 3,
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {key.keyPrefix}...
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-tertiary)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {new Date(key.createdAt).toLocaleDateString()}
+                </div>
+                <button
+                  onClick={() => handleRevokeApiKey(key.id)}
+                  disabled={revokingKeyId === key.id}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#4B4740",
+                    cursor: "pointer",
+                    padding: 4,
+                    borderRadius: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    transition: "color 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#E5534B";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "#4B4740";
+                  }}
+                  title="Revoke key"
+                >
+                  {revokingKeyId === key.id ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Fireflies API Key Modal */}
+      {showFirefliesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-background-elevated border border-border-subtle rounded-xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <FirefliesIcon size="md" />
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Connect Fireflies.ai</h3>
+                <p className="text-sm text-text-tertiary">Enter your API key to sync meetings</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-text-secondary">API Key</label>
+                <input
+                  type="password"
+                  value={firefliesApiKey}
+                  onChange={(e) => setFirefliesApiKey(e.target.value)}
+                  placeholder="Enter your Fireflies API key"
+                  className="flex h-10 w-full rounded-md border border-border-subtle bg-background-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/50"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && firefliesApiKey.trim()) {
+                      handleConnectFireflies();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="p-3 rounded-lg bg-background-primary border border-border-subtle">
+                <p className="text-xs text-text-tertiary">
+                  <strong className="text-text-secondary">Where to find your key:</strong> Go to{" "}
+                  <a
+                    href="https://app.fireflies.ai/integrations/custom/fireflies"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#7C3AED] hover:underline inline-flex items-center gap-0.5"
+                  >
+                    Fireflies Integrations
+                    <ExternalLink className="w-3 h-3" />
+                  </a>{" "}
+                  &rarr; API Key section &rarr; Copy your key.
+                </p>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <ShadcnButton
+                  variant="ghost"
+                  onClick={() => {
+                    setShowFirefliesModal(false);
+                    setFirefliesApiKey("");
+                  }}
+                >
+                  Cancel
+                </ShadcnButton>
+                <ShadcnButton
+                  onClick={handleConnectFireflies}
+                  disabled={!firefliesApiKey.trim() || isFirefliesConnecting}
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white gap-2"
+                >
+                  {isFirefliesConnecting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  Connect
+                </ShadcnButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default IntegrationsTab;

@@ -11,7 +11,7 @@ import { useUser } from "@/console/src/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { monitoringKeys } from "@/console/src/hooks/queries/monitoring";
-import { createSession, startMonitoringSession } from "@/console/src/services/monitoringService";
+import { startMonitoringSession } from "@/console/src/services/monitoringService";
 import { authService } from "@/console/src/services/authService";
 import { SESSION_DEFAULTS } from "@mitable/shared";
 import { createLogger } from "../../../../lib/logger";
@@ -33,6 +33,10 @@ interface UseStartSessionReturn {
   isStarting: boolean;
   /** Error message if start failed */
   error: string | null;
+  /** True when the user tried to start without a BYOK provider configured */
+  showProviderModal: boolean;
+  /** Dismiss the provider modal */
+  dismissProviderModal: () => void;
 }
 
 /**
@@ -60,8 +64,22 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
 
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
+
+  const dismissProviderModal = useCallback(() => setShowProviderModal(false), []);
 
   const startSession = useCallback(async (): Promise<string | null> => {
+    // Check if a BYOK AI provider is configured before starting
+    try {
+      const config = await window.consoleAPI?.loadInferenceConfig?.();
+      if (!config) {
+        setShowProviderModal(true);
+        return null;
+      }
+    } catch {
+      // If the check itself fails, allow session to proceed
+    }
+
     // Validate user is logged in
     if (!user?.id || !user?.organizationId) {
       const errorMsg = "Please log in to start a session";
@@ -96,15 +114,9 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
         logger.warn("No access token available for main process sync");
       }
 
-      // 1. Create backend session
-      const backendResult = await createSession({
-        selectedWindows: [], // Focus tracker adds windows dynamically
-        captureIntervalMs: SESSION_DEFAULTS.CAPTURE_INTERVAL_MS,
-        name: SESSION_DEFAULTS.DEFAULT_NAME,
-      });
-
-      const sessionId = backendResult.session.id;
-      logger.info("Backend session created:", sessionId);
+      // Local-first: generate session UUID locally, no backend call
+      const sessionId = crypto.randomUUID();
+      logger.info("Local session created:", sessionId);
 
       // 2. Start Electron capture loop (focus tracker starts automatically)
       const electronResult = await startMonitoringSession({
@@ -163,5 +175,7 @@ export function useStartSession(options: UseStartSessionOptions = {}): UseStartS
     startSession,
     isStarting,
     error,
+    showProviderModal,
+    dismissProviderModal,
   };
 }

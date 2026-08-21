@@ -1,7 +1,8 @@
 /**
- * SettingsView
+ * @deprecated Old SettingsView — not routed, not in use. Replaced by UserProfilePage.
+ * Scheduled for deletion.
  *
- * User settings page with Linear integration connection.
+ * Original: User settings page with Linear integration connection.
  */
 
 import { useState, useEffect } from "react";

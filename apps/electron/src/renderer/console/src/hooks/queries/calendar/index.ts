@@ -271,7 +271,8 @@ function sessionToWorkBlock(
 /**
  * Group sessions by date into ActivityDays
  */
-function groupSessionsByDay(
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _groupSessionsByDay(
   sessions: SessionListItem[],
   sessionsWithCaptures: Map<string, SessionCapture[]>
 ): ActivityDay[] {
@@ -404,7 +405,8 @@ function parseIntegrationBlocks(
   });
 }
 
-async function fetchGranolaBlocks(): Promise<WorkBlock[]> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function _fetchGranolaBlocks(): Promise<WorkBlock[]> {
   try {
     const data = await apiRequest<{ blocks: IntegrationBlockResponse[] }>(
       "/integrations/granola/blocks"
@@ -415,7 +417,8 @@ async function fetchGranolaBlocks(): Promise<WorkBlock[]> {
   }
 }
 
-async function fetchFirefliesBlocks(): Promise<WorkBlock[]> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function _fetchFirefliesBlocks(): Promise<WorkBlock[]> {
   try {
     const data = await apiRequest<{ blocks: IntegrationBlockResponse[] }>(
       "/integrations/fireflies/blocks"
@@ -430,7 +433,8 @@ function isMeetingSource(source?: string): boolean {
   return source === "granola" || source === "fireflies";
 }
 
-function mergeIntegrationBlocksIntoDays(
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _mergeIntegrationBlocksIntoDays(
   days: ActivityDay[],
   integrationBlocks: WorkBlock[]
 ): ActivityDay[] {
@@ -488,27 +492,34 @@ export function useCalendarDays(dateRange?: CalendarDateRange) {
 
   return useQuery({
     queryKey: calendarKeys.days(dateRange?.start, dateRange?.end),
-    queryFn: async () => {
-      const [sessions, granolaBlocks, firefliesBlocks] = await Promise.all([
-        dateRange
-          ? monitoringService.fetchSessionsByDateRange(dateRange.start, dateRange.end)
-          : monitoringService.fetchAllSessions(),
-        fetchGranolaBlocks(),
-        fetchFirefliesBlocks(),
-      ]);
+    queryFn: async (): Promise<ActivityDay[]> => {
+      // Local-first: read session data from local SQLite via IPC
+      const startMs = dateRange
+        ? new Date(dateRange.start).getTime()
+        : Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const endMs = dateRange
+        ? new Date(dateRange.end).getTime()
+        : Date.now() + 24 * 60 * 60 * 1000;
 
-      const emptyCaptures = new Map<string, SessionCapture[]>();
-      const days = sessions.length ? groupSessionsByDay(sessions, emptyCaptures) : [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw: any[] = (await window.consoleAPI?.getLocalCalendarDays?.(startMs, endMs)) ?? [];
 
-      const allIntegrationBlocks = [...granolaBlocks, ...firefliesBlocks];
-      return mergeIntegrationBlocksIntoDays(days, allIntegrationBlocks);
+      return raw.map((day) => ({
+        ...day,
+        date: new Date(day.date),
+        workBlocks: (day.workBlocks ?? []).map((b: Record<string, unknown>) => ({
+          ...b,
+          startTime: new Date(b.startTime as string),
+          endTime: b.endTime ? new Date(b.endTime as string) : null,
+          captures: b.captures ?? [],
+          appBreakdown: b.appBreakdown ?? [],
+          taskBreakdown: b.taskBreakdown ?? [],
+          deliveredAt: b.deliveredAt ? new Date(b.deliveredAt as string) : undefined,
+        })),
+      }));
     },
     enabled: !!user,
     staleTime: 5000,
-    // Poll frequency based on block status:
-    //   active/paused   → 5s  (detect session changes)
-    //   summarizing     → 2s  (catch summary completion + show spinner)
-    //   ready/other     → 60s (idle)
     refetchInterval: (query) => {
       const days = query.state.data;
       if (!days) return 60000;

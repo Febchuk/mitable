@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
   AUTH_CLEAR: "auth-clear",
   AUTH_TOKEN_UPDATED: "auth-token-updated",
   AUTH_SESSION_RESTORED: "auth-session-restored", // Main → Renderer: push tokens restored from keychain on startup
+  AUTH_OFFLINE_USER: "auth-offline-user", // Main → Renderer: push cached user profile for offline mode
 
   // User context (cross-window user info sharing)
   USER_CONTEXT_SET: "user-context-set",
@@ -55,6 +56,8 @@ export const IPC_CHANNELS = {
   MONITORING_SESSION_STATUS: "monitoring-session-status", // Get current session status
   MONITORING_SESSION_UPDATE: "monitoring-session-update", // Broadcast session state changes
   MONITORING_SESSION_RESET: "monitoring-session-reset", // Reset/clear session state (after external delete)
+  MONITORING_SESSION_DELETE: "monitoring-session-delete", // Delete a session and all its data locally
+  MONITORING_RESYNC_LOCAL: "monitoring-resync-local", // Re-upload local stories to cloud backend
   MONITORING_CAPTURE_TAKEN: "monitoring-capture-taken", // Notify when capture is taken
   MONITORING_CAPTURE_PROGRESS: "monitoring-capture-progress", // Capture count update
   MONITORING_AUDIO_START: "monitoring-audio-start", // Start audio recording for session
@@ -160,6 +163,78 @@ export const IPC_CHANNELS = {
   FEEDBACK_GET_LOGS: "feedback:get-logs",
   /** Renderer console lines batched to main for persistence (renderer.log on disk). */
   FEEDBACK_APPEND_RENDERER_LOG: "feedback:append-renderer-log",
+
+  // On-Device AI
+  ON_DEVICE_GET_STATUS: "on-device:get-status",
+  ON_DEVICE_GET_PLATFORM: "on-device:get-platform",
+  ON_DEVICE_GET_DOWNLOAD_SUMMARY: "on-device:get-download-summary",
+  ON_DEVICE_DOWNLOAD_ASSET: "on-device:download-asset",
+  ON_DEVICE_DOWNLOAD_ALL: "on-device:download-all",
+  ON_DEVICE_REMOVE_ALL: "on-device:remove-all",
+  ON_DEVICE_REMOVE_ASSET: "on-device:remove-asset",
+  ON_DEVICE_START_SERVER: "on-device:start-server",
+  ON_DEVICE_STOP_SERVER: "on-device:stop-server",
+  ON_DEVICE_SERVER_STATUS: "on-device:server-status",
+  ON_DEVICE_DOWNLOAD_PROGRESS: "on-device:download-progress",
+  ON_DEVICE_GET_SYSTEM_INFO: "on-device:get-system-info",
+  ON_DEVICE_SET_GPU_PREFERENCE: "on-device:set-gpu-preference",
+  ON_DEVICE_GET_GPU_PREFERENCE: "on-device:get-gpu-preference",
+  ON_DEVICE_PIPELINE_PROGRESS: "on-device:pipeline-progress",
+  ON_DEVICE_READINESS_UPDATE: "on-device:readiness-update",
+  ON_DEVICE_NOT_READY: "on-device:not-ready",
+
+  // Inference mode preference (hybrid pipeline testing) — @deprecated Phase 2
+  INFERENCE_MODE_GET: "inference-mode:get",
+  INFERENCE_MODE_SET: "inference-mode:set",
+  INFERENCE_TEST_PROVIDER: "inference:test-provider",
+  /** @deprecated Use INFERENCE_SAVE_CONFIG / INFERENCE_LOAD_CONFIG / INFERENCE_CLEAR_CONFIG instead */
+  INFERENCE_REFRESH_CONFIG: "inference:refresh-config",
+  REPROCESS_SESSION: "session:reprocess",
+
+  // BYOK — direct keyVault operations (no backend)
+  INFERENCE_SAVE_CONFIG: "inference:save-config",
+  INFERENCE_LOAD_CONFIG: "inference:load-config",
+  INFERENCE_CLEAR_CONFIG: "inference:clear-config",
+
+  // Resend (feedback email key)
+  RESEND_SAVE_KEY: "resend:save-key",
+  RESEND_HAS_KEY: "resend:has-key",
+  RESEND_CLEAR_KEY: "resend:clear-key",
+
+  // Local docs (on-device document RAG)
+  LOCAL_DOCS_PICK_FILE: "local-docs:pick-file",
+  LOCAL_DOCS_LIST: "local-docs:list",
+  LOCAL_DOCS_DELETE: "local-docs:delete",
+  LOCAL_DOCS_QUERY: "local-docs:query",
+  LOCAL_DOCS_GET_CHUNKS: "local-docs:get-chunks",
+  LOCAL_DOCS_GENERATE: "local-docs:generate",
+  LOCAL_DOCS_GET: "local-docs:get",
+  LOCAL_DOCS_UPDATE: "local-docs:update",
+  LOCAL_DOCS_REVISE: "local-docs:revise",
+
+  // Local agent (on-device RLM chat)
+  LOCAL_AGENT_ASK: "local-agent:ask",
+  LOCAL_AGENT_LIST_CHATS: "local-agent:list-chats",
+  LOCAL_AGENT_GET_CHAT: "local-agent:get-chat",
+  LOCAL_AGENT_CREATE_CHAT: "local-agent:create-chat",
+  LOCAL_AGENT_RENAME_CHAT: "local-agent:rename-chat",
+  LOCAL_AGENT_DELETE_CHAT: "local-agent:delete-chat",
+  LOCAL_AGENT_ADD_MESSAGE: "local-agent:add-message",
+  LOCAL_AGENT_PROGRESS: "local-agent:progress",
+
+  // Whisper setup
+  WHISPER_STATUS: "whisper:status",
+  WHISPER_RUN_SETUP: "whisper:run-setup",
+  WHISPER_SETUP_PROGRESS: "whisper:setup-progress",
+
+  // Local auth (on-device accounts)
+  LOCAL_AUTH_LIST_ACCOUNTS: "local-auth:list-accounts",
+  LOCAL_AUTH_CREATE: "local-auth:create",
+  LOCAL_AUTH_LOGIN: "local-auth:login",
+  LOCAL_AUTH_LOGOUT: "local-auth:logout",
+  LOCAL_AUTH_GET_USER: "local-auth:get-user",
+  LOCAL_AUTH_HAS_ACCOUNT: "local-auth:has-account",
+  LOCAL_AUTH_RESET_PASSWORD: "local-auth:reset-password",
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

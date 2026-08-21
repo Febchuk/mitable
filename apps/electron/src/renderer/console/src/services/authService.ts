@@ -211,16 +211,12 @@ class AuthService {
   }
 
   /**
-   * Clear tokens from localStorage AND main process
+   * Clear backend tokens from localStorage only.
+   * Does NOT touch the OS keychain — BYOK API keys live there.
    */
   clearTokens(): void {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
-
-    // Clear tokens in main process
-    if (window.consoleAPI?.clearAuthTokens) {
-      window.consoleAPI.clearAuthTokens();
-    }
   }
 
   /**

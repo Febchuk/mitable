@@ -3,6 +3,32 @@
  *
  * Manages user preferences using electron-store for persistent storage.
  * Preferences are stored locally on the user's machine.
+ *
+ * ⚠️  MIGRATION NOTE (May 2026)
+ * We are progressively moving user-scoped preferences from electron-store
+ * to the local PGlite database (pgDb.ts → user_preferences table).
+ *
+ * Already migrated:
+ *   - pillDisplayMode → pgDb.getUserPreference / setUserPreference
+ *
+ * Deprecated (features disabled, call sites still reference these):
+ *   - getUserPassiveMonitoringEnabled / setUserPassiveMonitoringEnabled
+ *   - getUserAutoRecap / setUserAutoRecap
+ *   - getUserNotificationFrequency / setUserNotificationFrequency
+ *   - getUserNotificationPreferences
+ *   - getUserPillDisplayMode / setUserPillDisplayMode (superseded by PGlite)
+ *
+ * Still actively needed here:
+ *   - Theme (getTheme / setTheme)
+ *   - Audio preferences (getAudioPreferences / setAudioPreferences)
+ *   - Blocked apps (getUserBlockedApps / add / remove)
+ *   - Summary config (getSummaryPreferences / setSummaryDefaults / alwaysAskOnSessionEnd)
+ *   - Agent enabled (getUserAgentEnabled / setUserAgentEnabled)
+ *   - Generic prefs (getPreference / setPreference / getAllPreferences)
+ *   - showPillOnSessionStart (read-only, effectively always true now)
+ *
+ * Long-term goal: migrate all user-scoped prefs to SQLite, then retire
+ * this service entirely and remove the electron-store dependency.
  */
 
 import { app } from "electron";
@@ -76,7 +102,7 @@ const defaults: PreferencesSchema = {
   users: {},
 };
 
-const DEFAULT_BLOCKED_APPS = ["electron", "messages", "whatsapp", "spotify", "imessage"];
+const DEFAULT_BLOCKED_APPS = ["whatsapp", "spotify", "imessage"];
 
 class PreferencesService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

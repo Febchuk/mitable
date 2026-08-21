@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Loader2, Terminal, FileText, Globe, AlertCircle, Copy, Check } from "lucide-react";
+import {
+  Loader2,
+  Terminal,
+  FileText,
+  Globe,
+  AlertCircle,
+  Copy,
+  Check,
+  Search,
+  CalendarDays,
+} from "lucide-react";
 import { Response } from "../../../../../../components/ui/ai-response";
 
 interface AgentMessageProps {
@@ -172,41 +182,66 @@ export default function AgentMessage({ role, content, toolName, isPlan }: AgentM
   );
 }
 
-function formatToolLabel(name: string): string {
-  const labels: Record<string, string> = {
-    Glob: "Searching files...",
-    Grep: "Searching code...",
-    Read: "Reading file...",
-    Write: "Writing file...",
-    Edit: "Writing file...",
-    Bash: "Running command...",
-    WebSearch: "Searching the web...",
-    WebFetch: "Fetching page...",
-    mcp__mitable__get_my_sessions: "Loading sessions...",
-    mcp__mitable__get_daily_summary: "Loading daily summary...",
-    mcp__mitable__slack_send_message: "Sending Slack message...",
-    mcp__mitable__slack_list_channels: "Loading Slack channels...",
-  };
-  return labels[name] || "Working...";
+const TOOL_PHRASES: Record<string, string[]> = {
+  get_my_activity: [
+    "Pulling up your recent sessions...",
+    "Scanning your work timeline...",
+    "Checking what you've been up to...",
+  ],
+  get_activity_detail: [
+    "Reading the full session transcript...",
+    "Diving into the details of that block...",
+    "Loading screen captures and audio notes...",
+  ],
+  search_documents: [
+    "Searching through your documents...",
+    "Scanning your docs for relevant info...",
+    "Digging through your files...",
+  ],
+  list_documents: [
+    "Checking what documents you have...",
+    "Loading your document library...",
+    "Pulling up your files...",
+  ],
+};
+
+const THINKING_PHRASES = [
+  "Thinking about this...",
+  "Working through your question...",
+  "Let me figure this out...",
+  "Processing...",
+];
+
+const COMPOSING_PHRASES = [
+  "Putting it all together...",
+  "Crafting your answer...",
+  "Almost there...",
+  "Wrapping things up...",
+];
+
+function pickRandom(arr: string[]): string {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function AgentThinking({
-  toolName,
-  toolDetail,
-}: {
-  toolName?: string | null;
-  toolDetail?: string | null;
-}) {
-  const isLayer1 = toolName === "layer1_progress";
-  const label =
-    isLayer1 && toolDetail ? toolDetail : toolName ? formatToolLabel(toolName) : "Thinking...";
-  const icon = toolName && !isLayer1 ? <ToolIcon name={toolName} /> : null;
-  const detail =
-    !isLayer1 && toolDetail
-      ? toolDetail.length > 50
-        ? toolDetail.slice(0, 50) + "..."
-        : toolDetail
-      : null;
+function getProgressLabel(phase: string, tool?: string): string {
+  if (phase === "tool_call" && tool && TOOL_PHRASES[tool]) {
+    return pickRandom(TOOL_PHRASES[tool]);
+  }
+  if (phase === "tool_result" && tool && TOOL_PHRASES[tool]) {
+    const resultPhrases: Record<string, string> = {
+      get_my_activity: "Found your sessions, analyzing...",
+      get_activity_detail: "Got the full transcript, reading through it...",
+      search_documents: "Found some matches, reviewing...",
+      list_documents: "Got your docs, checking relevance...",
+    };
+    return resultPhrases[tool] || "Processing results...";
+  }
+  if (phase === "composing") return pickRandom(COMPOSING_PHRASES);
+  return pickRandom(THINKING_PHRASES);
+}
+
+export function AgentThinking({ phase, tool }: { phase?: string; tool?: string }) {
+  const label = getProgressLabel(phase || "thinking", tool);
 
   return (
     <div style={{ padding: "10px 0" }}>
@@ -223,26 +258,9 @@ export function AgentThinking({
           size={13}
           style={{ color: "var(--mi-accent)", animation: "spin 1s linear infinite", flexShrink: 0 }}
         />
-        {icon && <span>{icon}</span>}
+        {tool && <ToolIcon name={tool} />}
         <span>{label}</span>
       </div>
-      {detail && (
-        <span
-          style={{
-            display: "block",
-            marginTop: 3,
-            marginLeft: 21,
-            fontSize: 11,
-            color: "rgba(107, 102, 92, 0.6)",
-            fontFamily: "var(--font-mono, monospace)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {detail}
-        </span>
-      )}
     </div>
   );
 }
@@ -250,21 +268,11 @@ export function AgentThinking({
 function ToolIcon({ name }: { name?: string }) {
   const style = { color: "var(--text-tertiary)" };
   if (!name) return <Terminal size={12} style={style} />;
-  const lower = name.toLowerCase();
-  if (
-    lower.includes("file") ||
-    lower.includes("read") ||
-    lower.includes("write") ||
-    lower.includes("edit") ||
-    lower === "glob"
-  )
-    return <FileText size={12} style={style} />;
-  if (
-    lower.includes("web") ||
-    lower.includes("search") ||
-    lower.includes("fetch") ||
-    lower === "grep"
-  )
+  if (name === "get_my_activity") return <CalendarDays size={12} style={style} />;
+  if (name === "get_activity_detail") return <FileText size={12} style={style} />;
+  if (name === "search_documents") return <Search size={12} style={style} />;
+  if (name === "list_documents") return <FileText size={12} style={style} />;
+  if (name.includes("web") || name.includes("search") || name.includes("fetch"))
     return <Globe size={12} style={style} />;
   return <Terminal size={12} style={style} />;
 }

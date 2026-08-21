@@ -19,6 +19,7 @@ export default function App() {
   const [audioRecordingActive, setAudioRecordingActive] = useState(false);
   // Ref mirrors audioRecordingActive so closures always see the current value
   const audioRecordingActiveRef = useRef(false);
+  const audioToggleBusyRef = useRef(false);
 
   // Track which dropdown is open (for UI state only)
   const [eyeDropdownOpen, setEyeDropdownOpen] = useState(false);
@@ -74,8 +75,14 @@ export default function App() {
         (!state || (state.status !== "active" && state.status !== "paused"))
       ) {
         logger.info("🔇 Session ended, stopping audio capture");
-        const { audioCaptureService } = await import("./services/audioCapture");
-        await audioCaptureService.stopCapture();
+        try {
+          const { audioCaptureService } = await import("./services/audioCapture");
+          if (audioCaptureService.isCapturing()) {
+            await audioCaptureService.stopCapture();
+          }
+        } catch {
+          /* on-device path: no renderer capture to stop */
+        }
         await window.watchingPillAPI?.stopAudioRecording();
         setAudioRecordingEnabled(false);
         setAudioRecordingActive(false);
@@ -100,8 +107,14 @@ export default function App() {
     // Main process forces audio stop when session ends or pauses
     const unsubForceStopAudio = window.watchingPillAPI.onForceStopAudio(async () => {
       logger.info("\uD83D\uDD07 Force-stop audio received from main process");
-      const { audioCaptureService } = await import("./services/audioCapture");
-      await audioCaptureService.stopCapture();
+      try {
+        const { audioCaptureService } = await import("./services/audioCapture");
+        if (audioCaptureService.isCapturing()) {
+          await audioCaptureService.stopCapture();
+        }
+      } catch {
+        /* renderer capture may not be active (on-device path) */
+      }
       setAudioRecordingEnabled(false);
       setAudioRecordingActive(false);
       audioRecordingActiveRef.current = false;
@@ -117,14 +130,19 @@ export default function App() {
         return;
       }
 
-      const state = await window.watchingPillAPI?.getSessionState();
-      const { audioCaptureService } = await import("./services/audioCapture");
-      const captureResult = await audioCaptureService.startCapture(state?.id || "");
+      const isOnDevice = !!(result as any).onDevice;
 
-      if (!captureResult.success) {
-        logger.error("❌ Failed to restart audio capture after resume:", captureResult.error);
-        await window.watchingPillAPI?.stopAudioRecording();
-        return;
+      if (!isOnDevice) {
+        // Cloud mode: restart renderer-side capture
+        const state = await window.watchingPillAPI?.getSessionState();
+        const { audioCaptureService } = await import("./services/audioCapture");
+        const captureResult = await audioCaptureService.startCapture(state?.id || "");
+
+        if (!captureResult.success) {
+          logger.error("❌ Failed to restart audio capture after resume:", captureResult.error);
+          await window.watchingPillAPI?.stopAudioRecording();
+          return;
+        }
       }
 
       logger.info("✅ Audio recording restarted after resume");
@@ -138,6 +156,7 @@ export default function App() {
       logger.info(" Pill display mode changed:", mode);
       setPillMode(mode);
       if (mode === "expanded") setIsExpanded(true);
+      else setIsExpanded(false);
     });
 
     return () => {
@@ -203,48 +222,78 @@ export default function App() {
 
   // Microphone button toggles audio recording
   const handleMicClick = async () => {
+    if (audioToggleBusyRef.current) return;
+    audioToggleBusyRef.current = true;
+
     const newState = !audioRecordingEnabled;
+
+    // Optimistic update — both flags flip immediately so UI is instant
     setAudioRecordingEnabled(newState);
+    setAudioRecordingActive(newState);
+    audioRecordingActiveRef.current = newState;
 
-    if (newState) {
-      // Start audio recording
-      logger.info("🎤 Enabling audio recording");
+    try {
+      if (newState) {
+        logger.info("🎤 Enabling audio recording");
 
-      // Step 1: Connect WebSocket in main process
-      const result = await window.watchingPillAPI?.startAudioRecording();
+        const result = await window.watchingPillAPI?.startAudioRecording();
 
-      if (!result?.success) {
-        logger.error("❌ Failed to start audio recording:", result?.error);
-        setAudioRecordingEnabled(false);
-        return;
-      }
+        if (!result?.success) {
+          logger.error("❌ Failed to start audio recording:", result?.error);
+          setAudioRecordingEnabled(false);
+          setAudioRecordingActive(false);
+          audioRecordingActiveRef.current = false;
+          return;
+        }
 
-      // Step 2: Start audio capture in renderer
-      const { audioCaptureService } = await import("./services/audioCapture");
-      const captureResult = await audioCaptureService.startCapture(sessionState?.id || "");
+        // On-device mode: native capture runs in main process, no renderer work needed
+        const isOnDevice = !!(result as any).onDevice;
 
-      if (!captureResult.success) {
-        logger.error("❌ Failed to start audio capture:", captureResult.error);
+        if (!isOnDevice) {
+          // Cloud mode: start renderer-side AudioWorklet capture -> IPC -> WebSocket
+          const { audioCaptureService } = await import("./services/audioCapture");
+          const captureResult = await audioCaptureService.startCapture(sessionState?.id || "");
+
+          if (!captureResult.success) {
+            logger.error("❌ Failed to start audio capture:", captureResult.error);
+            await window.watchingPillAPI?.stopAudioRecording();
+            setAudioRecordingEnabled(false);
+            setAudioRecordingActive(false);
+            audioRecordingActiveRef.current = false;
+            return;
+          }
+
+          logger.info("✅ Audio recording started (cloud)", {
+            hasSystemAudio: captureResult.hasSystemAudio,
+          });
+        } else {
+          logger.info("✅ Audio recording started (on-device native)", {
+            hasSystemAudio: result.hasSystemAudio,
+          });
+        }
+      } else {
+        logger.info("🔇 Disabling audio recording");
+
+        // Stop renderer capture if running (cloud path)
+        try {
+          const { audioCaptureService } = await import("./services/audioCapture");
+          if (audioCaptureService.isCapturing()) {
+            await audioCaptureService.stopCapture();
+          }
+        } catch {
+          /* on-device path: no renderer capture to stop */
+        }
+
         await window.watchingPillAPI?.stopAudioRecording();
-        setAudioRecordingEnabled(false);
-        return;
       }
-
-      logger.info("✅ Audio recording started", { hasSystemAudio: captureResult.hasSystemAudio });
-      setAudioRecordingActive(true);
-      audioRecordingActiveRef.current = true;
-    } else {
-      // Stop audio recording
-      logger.info("🔇 Disabling audio recording");
-
-      // Stop renderer capture
-      const { audioCaptureService } = await import("./services/audioCapture");
-      await audioCaptureService.stopCapture();
-
-      // Stop main WebSocket
-      await window.watchingPillAPI?.stopAudioRecording();
-      setAudioRecordingActive(false);
-      audioRecordingActiveRef.current = false;
+    } catch (err) {
+      // Revert optimistic update on unexpected error
+      logger.error("❌ Audio toggle error:", String(err));
+      setAudioRecordingEnabled(!newState);
+      setAudioRecordingActive(!newState);
+      audioRecordingActiveRef.current = !newState;
+    } finally {
+      audioToggleBusyRef.current = false;
     }
   };
 
@@ -267,6 +316,7 @@ export default function App() {
             <img
               src={LogoIcon}
               alt="Mitable"
+              draggable={false}
               className={`h-5 w-auto transition-all duration-150 group-hover:scale-110 group-hover:brightness-125 ${isPaused ? "opacity-40" : "opacity-100"}`}
             />
 
@@ -278,6 +328,11 @@ export default function App() {
             {/* Paused indicator - amber dot */}
             {isPaused && (
               <div className="absolute top-0 right-0 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+            )}
+
+            {/* Ending/summarizing indicator - blue dot */}
+            {(sessionState?.status === "ending" || sessionState?.status === "summarizing") && (
+              <div className="absolute top-0 right-0 w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
             )}
           </button>
 

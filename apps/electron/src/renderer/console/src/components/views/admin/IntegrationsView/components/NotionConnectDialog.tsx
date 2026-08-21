@@ -1,3 +1,7 @@
+/**
+ * @deprecated Integrations tab no longer in use. Local-first app does not use
+ * cloud integrations. This file is scheduled for deletion.
+ */
 import { useState } from "react";
 import { createLogger } from "../../../../../../../lib/logger";
 

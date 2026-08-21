@@ -1,11 +1,16 @@
-import { apiRequest } from "./api";
+/**
+ * Agent Chat Service (Local)
+ *
+ * All operations go through local IPC → SQLite + BYOK provider.
+ * @deprecated Backend HTTP routes removed — everything is local now.
+ */
 
 export interface AgentConversationSummary {
   id: string;
   title: string | null;
-  sessionId: string | null;
-  createdAt: string;
-  updatedAt: string;
+  sessionId?: string | null;
+  createdAt: string | number;
+  updatedAt: string | number;
 }
 
 export interface AgentMessageRecord {
@@ -13,53 +18,52 @@ export interface AgentMessageRecord {
   conversationId: string;
   role: string;
   content: string;
-  toolCalls: Array<{ name: string; input?: unknown; detail?: string }>;
-  createdAt: string;
+  toolCalls: Array<{ name: string; input?: unknown; detail?: string }> | string;
+  createdAt: string | number;
 }
 
 export async function fetchAgentChats(): Promise<{ conversations: AgentConversationSummary[] }> {
-  return apiRequest("/agent/chats");
+  const result = await window.consoleAPI.localAgentListChats?.();
+  return { conversations: result?.conversations ?? [] };
 }
 
 export async function createAgentChat(
   id?: string,
   title?: string
 ): Promise<{ conversation: AgentConversationSummary }> {
-  return apiRequest("/agent/chats", {
-    method: "POST",
-    body: JSON.stringify({ id, title }),
-  });
+  const result = await window.consoleAPI.localAgentCreateChat?.({ id, title });
+  if (result?.error) throw new Error(result.error);
+  return { conversation: result!.conversation! };
 }
 
 export async function fetchAgentChat(id: string): Promise<{
   conversation: AgentConversationSummary;
   messages: AgentMessageRecord[];
 }> {
-  return apiRequest(`/agent/chats/${id}`);
+  const result = await window.consoleAPI.localAgentGetChat?.(id);
+  if (!result) throw new Error("Conversation not found");
+  return result;
 }
 
 export async function renameAgentChat(
   id: string,
   title: string
 ): Promise<{ conversation: AgentConversationSummary }> {
-  return apiRequest(`/agent/chats/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({ title }),
-  });
+  await window.consoleAPI.localAgentRenameChat?.(id, title);
+  const data = await window.consoleAPI.localAgentGetChat?.(id);
+  return { conversation: data?.conversation ?? { id, title, createdAt: 0, updatedAt: 0 } };
 }
 
 export async function updateAgentChatSession(
-  id: string,
-  sessionId: string
+  _id: string,
+  _sessionId: string
 ): Promise<{ conversation: AgentConversationSummary }> {
-  return apiRequest(`/agent/chats/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({ sessionId }),
-  });
+  return { conversation: { id: _id, title: "", createdAt: 0, updatedAt: 0 } };
 }
 
 export async function deleteAgentChat(id: string): Promise<{ success: boolean }> {
-  return apiRequest(`/agent/chats/${id}`, { method: "DELETE" });
+  const result = await window.consoleAPI.localAgentDeleteChat?.(id);
+  return { success: result?.success ?? false };
 }
 
 export async function addAgentMessage(
@@ -68,29 +72,34 @@ export async function addAgentMessage(
   content: string,
   toolCalls?: Array<{ name: string; input?: unknown; detail?: string }>
 ): Promise<{ message: AgentMessageRecord }> {
-  return apiRequest(`/agent/chats/${conversationId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ role, content, toolCalls }),
+  const result = await window.consoleAPI.localAgentAddMessage?.({
+    conversationId,
+    role,
+    content,
+    toolCalls,
   });
+  if (result?.error) throw new Error(result.error);
+  return { message: result!.message as AgentMessageRecord };
 }
 
-// ── Agent Query Layer (Layer 1) ─────────────────────────────────────
-// Lightweight RLM for conversational queries — no SDK subprocess needed.
+// ── Agent Query Layer (Local RLM) ────────────────────────────────────
 
 export interface AgentQueryResult {
   response?: string;
-  escalate?: boolean;
+  error?: string;
 }
 
 export async function askAgentQuery(
   message: string,
   conversationId?: string,
-  signal?: AbortSignal
+  _signal?: AbortSignal
 ): Promise<AgentQueryResult> {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return apiRequest("/agent/ask", {
-    method: "POST",
-    body: JSON.stringify({ message, conversationId, timezone }),
-    signal,
+  const result = await window.consoleAPI.localAgentAsk?.({
+    message,
+    conversationId,
+    timezone,
   });
+  if (result?.error) throw new Error(result.error);
+  return { response: result?.response };
 }
