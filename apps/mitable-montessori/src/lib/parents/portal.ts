@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { createClient } from "@/utils/supabase/server";
 
@@ -20,44 +20,57 @@ export const getParentPortalContext = cache(
   async function getParentPortalContext(): Promise<ParentPortalContext | null> {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.email) return null;
+    const requestHeaders = await headers();
+    let userId = requestHeaders.get("x-mitable-auth-user-id");
+    let email = requestHeaders.get("x-mitable-auth-user-email");
+
+    // Middleware normally provides the verified account here. Keep this
+    // fallback for direct server rendering outside of middleware.
+    if (!userId || !email) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userId = user?.id ?? null;
+      email = user?.email ?? null;
+    }
+    if (!userId || !email) return null;
 
     const { data: guardian } = await supabase
       .from("guardians")
-      .select("id, first_name, onboarding_completed_at")
-      .eq("auth_user_id", user.id)
+      .select(
+        "first_name, onboarding_completed_at, student_guardians(receives_reports, students(id, first_name, last_name, preferred_name, archived_at))"
+      )
+      .eq("auth_user_id", userId)
       .maybeSingle();
     if (!guardian) return null;
 
-    const { data: links } = await supabase
-      .from("student_guardians")
-      .select("receives_reports, students(id, first_name, last_name, preferred_name, archived_at)")
-      .eq("guardian_id", guardian.id);
+    const children =
+      (
+        guardian as {
+          student_guardians: Array<{
+            receives_reports: boolean;
+            students:
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  preferred_name: string | null;
+                  archived_at: string | null;
+                }
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  preferred_name: string | null;
+                  archived_at: string | null;
+                }[]
+              | null;
+          }> | null;
+        }
+      ).student_guardians ?? [];
 
-    const children = (links ?? [])
-      .map((row) => {
-        const link = row as {
-          receives_reports: boolean;
-          students:
-            | {
-                id: string;
-                first_name: string;
-                last_name: string;
-                preferred_name: string | null;
-                archived_at: string | null;
-              }
-            | {
-                id: string;
-                first_name: string;
-                last_name: string;
-                preferred_name: string | null;
-                archived_at: string | null;
-              }[]
-            | null;
-        };
+    const linkedChildren = children
+      .map((link) => {
         const student = Array.isArray(link.students) ? link.students[0] : link.students;
         if (!student || student.archived_at) return null;
         return {
@@ -69,10 +82,12 @@ export const getParentPortalContext = cache(
       .filter((child): child is ParentChild => child !== null);
 
     return {
-      firstName: guardian.first_name,
-      email: user.email,
-      onboardingComplete: Boolean(guardian.onboarding_completed_at),
-      children,
+      firstName: (guardian as { first_name: string }).first_name,
+      email,
+      onboardingComplete: Boolean(
+        (guardian as { onboarding_completed_at: string | null }).onboarding_completed_at
+      ),
+      children: linkedChildren,
     };
   }
 );

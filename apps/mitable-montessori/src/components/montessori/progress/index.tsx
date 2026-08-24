@@ -336,6 +336,18 @@ export function ProgressFeature() {
   const cp = store.classroomProgress;
   const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = store;
 
+  if (!cp && classroomBusy) {
+    return (
+      <div className="progress-root">
+        <PageHeader
+          title="Progress"
+          subtitle="Record children's progress through the curriculum."
+        />
+        <EmptyState title="Loading your classroom" body="Your class progress is on its way." />
+      </div>
+    );
+  }
+
   // No active classroom at all (admin or unseated teacher).
   if (!cp) {
     return (

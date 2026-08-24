@@ -3,6 +3,17 @@ import { cookies } from "next/headers";
 import { getParentPortalContext, selectedParentChild } from "@/lib/parents/portal";
 import { createClient } from "@/utils/supabase/server";
 
+function formatAttendanceDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 export default async function ParentAttendancePage({
   searchParams,
 }: {
@@ -40,7 +51,9 @@ export default async function ParentAttendancePage({
               className="flex items-center justify-between gap-4 px-5 py-4"
             >
               <div>
-                <p className="text-sm font-medium text-ink">{row.attendance_date}</p>
+                <p className="text-sm font-medium text-ink">
+                  {formatAttendanceDate(row.attendance_date)}
+                </p>
                 {row.comment ? (
                   <p className="mt-1 text-sm text-ink-secondary">{row.comment}</p>
                 ) : null}

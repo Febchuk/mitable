@@ -14,7 +14,6 @@ import {
   listTeacherClassroomsForCurrentUser,
   teacherShouldSeeSpeechProgressTab,
 } from "@/lib/app/active-classroom";
-import { getClassroomProgress } from "@/lib/queries/classroom-progress";
 import {
   addTodayProgressAndAgent,
   adminTodayEnabled,
@@ -26,21 +25,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!ctx) redirect("/login");
   if (!ctx.privacyAcknowledgedAt) redirect("/onboarding/privacy");
   const isAdmin = ctx.role === "admin";
-  const classroom = await getActiveClassroomForCurrentUser();
+  const [classroom, teacherClassrooms, showSpeechProgressTab] = isAdmin
+    ? [null, [], false]
+    : await Promise.all([
+        getActiveClassroomForCurrentUser(),
+        listTeacherClassroomsForCurrentUser(),
+        teacherShouldSeeSpeechProgressTab(),
+      ]);
   const classroomName = classroom?.name ?? "Primrose Room";
-  // Teachers' Progress tab needs the curriculum tree + roster + progress
-  // hydrated server-side. Skipped for admins (their /app shell shows admin
-  // pages, not the teacher Progress tab).
-  const initialClassroomProgress = isAdmin ? null : await getClassroomProgress();
-  // All rooms the teacher can switch between (Progress class picker).
-  const teacherClassrooms = isAdmin ? [] : await listTeacherClassroomsForCurrentUser();
-  const showSpeechProgressTab = !isAdmin && (await teacherShouldSeeSpeechProgressTab());
   const showTodayAndAgent = isAdmin ? adminTodayEnabled() : addTodayProgressAndAgent();
   const showReportFirstNav = !isAdmin && reportFirstExperience();
 
   return (
     <MontessoriProvider
-      initialClassroomProgress={initialClassroomProgress}
       initialClassrooms={teacherClassrooms.map((c) => ({ id: c.id, name: c.name }))}
       showSpeechProgressTab={showSpeechProgressTab}
     >
