@@ -6,6 +6,8 @@ const PUBLIC_PATHS = [
   "/login",
   "/signup",
   "/auth/callback",
+  "/parents/claim",
+  "/parents/login",
   "/api/health",
   "/api/v1/auth",
   "/api/schools/register",
@@ -26,7 +28,7 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = pathname.startsWith("/parents/") ? "/parents/login" : "/login";
     url.searchParams.set("redirect", pathname);
     return NextResponse.redirect(url);
   }
