@@ -6,12 +6,7 @@ import { ParentPortalShell } from "@/components/parents/parent-portal-shell";
 import { getParentPortalContext } from "@/lib/parents/portal";
 
 export default async function ParentsLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const portal = user ? await getParentPortalContext() : null;
+  const portal = await getParentPortalContext();
 
   if (portal?.onboardingComplete) {
     return (
@@ -25,6 +20,11 @@ export default async function ParentsLayout({ children }: { children: React.Reac
     );
   }
 
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ink/10 bg-canvas/80 px-4 py-3 backdrop-blur">

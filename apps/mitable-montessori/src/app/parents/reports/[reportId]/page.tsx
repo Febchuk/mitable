@@ -3,6 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getParentPortalContext, selectedParentChild } from "@/lib/parents/portal";
 import { createClient } from "@/utils/supabase/server";
+import { ParentReportView } from "@/components/parents/parent-report-view";
+import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
+import type { SectionMeta } from "@/lib/report-templates/sections";
 
 export default async function ParentReportDetailPage({
   params,
@@ -20,34 +23,48 @@ export default async function ParentReportDetailPage({
   const supabase = createClient(await cookies());
   const { data: report } = await supabase
     .from("reports")
-    .select("id, report_type, period_start, period_end, title, body, sent_at")
+    .select(
+      "id, report_type, period_start, period_end, title, body, sent_at, sections, section_meta"
+    )
     .eq("id", reportId)
     .eq("student_id", child.id)
     .eq("status", "sent")
     .maybeSingle();
   if (!report) notFound();
 
+  const sections = Array.isArray(report.sections)
+    ? (report.sections as Array<{ heading: string; paragraphs: Array<{ html: string }> }>)
+    : [];
+  const blocks = buildReportPdfBlocks(
+    sections,
+    (report.section_meta as SectionMeta | null) ?? null
+  );
+  const periodLabel =
+    report.period_start && report.period_end
+      ? `${report.period_start} – ${report.period_end}`
+      : report.sent_at
+        ? `Shared ${new Date(report.sent_at).toLocaleDateString(undefined, {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })}`
+        : "Shared with your family";
+
   return (
-    <article className="mx-auto max-w-3xl">
+    <div>
       <Link href={`/parents/reports?child=${child.id}`} className="text-sm text-ink-secondary">
         ← All reports
       </Link>
-      <header className="mt-6 border-b border-border pb-6">
-        <p className="label-cap text-ink-muted">
-          {report.report_type} report · {child.name}
-        </p>
-        <h1 className="mt-2 font-display text-4xl text-ink">{report.title || "Report"}</h1>
-        <p className="mt-3 text-sm text-ink-secondary">
-          {report.period_start && report.period_end
-            ? `${report.period_start} – ${report.period_end}`
-            : report.sent_at
-              ? `Shared ${new Date(report.sent_at).toLocaleDateString()}`
-              : "Shared with your family"}
-        </p>
-      </header>
-      <div className="mt-8 whitespace-pre-wrap text-[15px] leading-7 text-ink-secondary">
-        {report.body || "This report does not include written notes."}
+      <div className="mt-5">
+        <ParentReportView
+          title={report.title || "Report"}
+          studentName={child.name}
+          reportType={report.report_type}
+          periodLabel={periodLabel}
+          blocks={blocks}
+          fallbackBody={report.body || "This report does not include written notes."}
+        />
       </div>
-    </article>
+    </div>
   );
 }
