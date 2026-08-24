@@ -474,12 +474,14 @@ export function GuardianEditorDialog({
   onSaved: () => void;
 }) {
   const [draft, setDraft] = React.useState<GuardianDraft>(emptyGuardian());
+  const [inviteGuardian, setInviteGuardian] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     setDraft(guardian ? { ...guardian } : emptyGuardian());
+    setInviteGuardian(false);
     setError(null);
   }, [open, guardian]);
 
@@ -488,6 +490,10 @@ export function GuardianEditorDialog({
     const validationError = guardianError(clean);
     if (validationError) {
       setError(validationError);
+      return;
+    }
+    if (inviteGuardian && !clean.email) {
+      setError("Add an email address before inviting this guardian.");
       return;
     }
     setSaving(true);
@@ -537,6 +543,9 @@ export function GuardianEditorDialog({
             receives_reports: clean.receivesReports,
           }),
         });
+      }
+      if (inviteGuardian && guardianId) {
+        await apiJson(`/api/admin/guardians/${guardianId}/invite`, { method: "POST" });
       }
       onOpenChange(false);
       onSaved();
@@ -629,6 +638,24 @@ export function GuardianEditorDialog({
               This guardian has an active parent account, so their sign-in email cannot be changed
               here.
             </p>
+          ) : null}
+          {!draft.accountActive ? (
+            <div className="sm:col-span-2 rounded-lg bg-canvas px-3 py-3 text-sm text-ink-secondary">
+              <label className="flex items-center gap-2 font-medium text-ink">
+                <input
+                  type="checkbox"
+                  checked={inviteGuardian}
+                  disabled={!draft.email.trim()}
+                  onChange={(e) => setInviteGuardian(e.target.checked)}
+                />
+                Invite guardian
+              </label>
+              <p className="mt-1 text-xs">
+                {draft.email.trim()
+                  ? `Send an account setup link to ${draft.email.trim()}.`
+                  : "Add an email address to send an account setup link."}
+              </p>
+            </div>
           ) : null}
           <div className="sm:col-span-2 flex flex-wrap gap-4 text-sm text-ink-secondary">
             <label className="flex items-center gap-2">

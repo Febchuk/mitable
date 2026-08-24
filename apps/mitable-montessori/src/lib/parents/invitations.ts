@@ -54,6 +54,19 @@ export async function issueInvitation(input: IssueInvitationInput): Promise<Issu
   return { token, invitationId: (data as { id: string }).id, expiresAt };
 }
 
+/** A fresh invite replaces any earlier unclaimed link for this guardian. */
+export async function invalidateActiveInvitations(input: {
+  supabase: SupabaseClient;
+  guardianId: string;
+}): Promise<void> {
+  const { error } = await input.supabase
+    .from("guardian_invitations")
+    .update({ claimed_at: new Date().toISOString() })
+    .eq("guardian_id", input.guardianId)
+    .is("claimed_at", null);
+  if (error) throw new InvitationError(error.message, "db_error");
+}
+
 export interface ClaimInvitationInput {
   supabase: SupabaseClient;
   token: string;

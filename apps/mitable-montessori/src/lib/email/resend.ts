@@ -24,12 +24,34 @@ export interface SendResult {
 }
 
 export async function sendTeacherInviteEmail(input: SendInviteInput): Promise<SendResult> {
+  return sendInviteEmail({
+    ...input,
+    subject: `${input.inviterName} invited you to ${input.schoolName} on Mitable`,
+    eyebrow: "An invitation to teach",
+    heading: `${input.inviterName} invited you to ${input.schoolName}`,
+    body: "Mitable is a calm place to keep notes, track each child's progress, and turn it into thoughtful reports for parents. Set up your account to join the classroom.",
+  });
+}
+
+/** Send a parent-facing invitation to create a Mitable account. */
+export async function sendGuardianInviteEmail(input: SendInviteInput): Promise<SendResult> {
+  return sendInviteEmail({
+    ...input,
+    subject: `${input.inviterName} invited you to follow your child's learning on Mitable`,
+    eyebrow: "An invitation for your family",
+    heading: `${input.inviterName} invited you to ${input.schoolName}`,
+    body: "Mitable gives you a simple place to follow your child's learning, see progress, and receive reports from the classroom. Set up your parent account to get started.",
+  });
+}
+
+async function sendInviteEmail(
+  input: SendInviteInput & { subject: string; eyebrow: string; heading: string; body: string }
+): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     throw new Error("RESEND_API_KEY is not set; cannot dispatch invite email");
   }
 
-  const subject = `${input.inviterName} invited you to ${input.schoolName} on Mitable`;
   const html = renderInviteHtml(input);
   const text = renderInviteText(input);
 
@@ -42,7 +64,7 @@ export async function sendTeacherInviteEmail(input: SendInviteInput): Promise<Se
     body: JSON.stringify({
       from: FROM,
       to: [input.to],
-      subject,
+      subject: input.subject,
       html,
       text,
     }),
@@ -57,11 +79,15 @@ export async function sendTeacherInviteEmail(input: SendInviteInput): Promise<Se
   return { id: json.id };
 }
 
-function renderInviteText({ inviteUrl, schoolName, inviterName }: SendInviteInput): string {
+function renderInviteText({
+  inviteUrl,
+  inviterName,
+  body,
+}: SendInviteInput & { body: string }): string {
   return [
     `Hi,`,
     ``,
-    `${inviterName} invited you to join ${schoolName} on Mitable — a calmer way to keep notes, track progress, and write reports for your students.`,
+    `${inviterName} invited you to Mitable. ${body}`,
     ``,
     `Set up your account here:`,
     inviteUrl,
@@ -72,10 +98,22 @@ function renderInviteText({ inviteUrl, schoolName, inviterName }: SendInviteInpu
   ].join("\n");
 }
 
-function renderInviteHtml({ inviteUrl, schoolName, inviterName }: SendInviteInput): string {
+function renderInviteHtml({
+  inviteUrl,
+  inviterName,
+  eyebrow,
+  heading,
+  body,
+}: SendInviteInput & {
+  eyebrow: string;
+  heading: string;
+  body: string;
+}): string {
   // Plain HTML, no template engine. Inline styles only — most email clients
   // strip <style> blocks. Warm cream background to match the app.
-  const safeSchool = escapeHtml(schoolName);
+  const safeEyebrow = escapeHtml(eyebrow);
+  const safeHeading = escapeHtml(heading);
+  const safeBody = escapeHtml(body);
   const safeInviter = escapeHtml(inviterName);
   const safeUrl = escapeHtml(inviteUrl);
 
@@ -87,13 +125,12 @@ function renderInviteHtml({ inviteUrl, schoolName, inviterName }: SendInviteInpu
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E8DFD0;border-radius:18px;padding:36px 32px;">
             <tr><td>
-              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8A8275;margin-bottom:14px;">An invitation to teach</div>
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8A8275;margin-bottom:14px;">${safeEyebrow}</div>
               <h1 style="font-size:22px;font-weight:600;line-height:1.25;margin:0 0 14px;color:#2A2723;letter-spacing:-0.005em;">
-                ${safeInviter} invited you to ${safeSchool}
+                ${safeHeading}
               </h1>
               <p style="font-size:15px;line-height:1.55;color:#4A453E;margin:0 0 22px;">
-                Mitable is a calm place to keep notes, track each child's progress, and turn it into thoughtful reports for parents.
-                Set up your account to join the classroom.
+                ${safeBody}
               </p>
               <p style="margin:0 0 26px;">
                 <a href="${safeUrl}"
