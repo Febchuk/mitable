@@ -67,20 +67,21 @@ export function NavigationFeedback() {
   if (!isNavigating) return null;
 
   return (
-    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-0 z-[100]">
-      <div className="navigation-progress h-1 w-full bg-terracotta" />
+    <>
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[100]">
+        <div className="navigation-progress h-1 w-full bg-terracotta" />
+      </div>
       {showMessage ? (
         <div
-          className="absolute right-4 top-4 flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-xs font-medium text-ink-secondary shadow-sm"
+          aria-live="polite"
+          className="fixed inset-0 z-[99] flex items-center justify-center bg-canvas/35 px-5 backdrop-blur-sm"
           role="status"
         >
-          <span
-            className="h-3 w-3 rounded-full border-2 border-clay-soft border-t-terracotta"
-            style={{ animation: "spin 0.8s linear infinite" }}
-          />
-          Loading page…
+          <div className="rounded-full border border-border-strong bg-surface px-8 py-4 text-base font-semibold text-ink shadow-lg sm:px-10 sm:text-lg">
+            Page loading…
+          </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }
