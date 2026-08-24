@@ -13,7 +13,7 @@ export default async function ParentsHome() {
 
   const { data: link } = await supabase
     .from("guardians")
-    .select("id, first_name, last_name")
+    .select("id, first_name, last_name, onboarding_completed_at")
     .eq("auth_user_id", user.id)
     .maybeSingle();
   if (!link) {
@@ -26,6 +26,9 @@ export default async function ParentsHome() {
         </p>
       </div>
     );
+  }
+  if (!(link as { onboarding_completed_at: string | null }).onboarding_completed_at) {
+    redirect("/parents/onboarding");
   }
 
   const { data: students } = await supabase

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { z } from "zod";
 import { auditLog } from "@/lib/audit/log";
-import { createClient } from "@/utils/supabase/server";
-import { claimInvitation, InvitationError } from "@/lib/parents/invitations";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { claimInvitation, InvitationError, lookupInvitation } from "@/lib/parents/invitations";
 
 const ClaimSchema = z.object({
   token: z.string().min(20).max(200),
@@ -17,7 +16,7 @@ const ClaimSchema = z.object({
  *   2. Look up the canonical guardians.email so the auth account uses the
  *      address the admin invited (not whatever the user types — defense
  *      against an attacker swapping in their own email)
- *   3. supabase.auth.signUp creates the Supabase Auth user
+ *   3. Create the Supabase Auth user with its email already confirmed
  *   4. claimInvitation links auth_user_id → guardians.id and stamps claimed_at
  *
  * The JWT claim `guardian_id` is set by a Supabase auth hook reading
@@ -31,60 +30,49 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  // We need the canonical email for the invitation BEFORE creating the auth
-  // user, so we resolve the invitation first. claimInvitation re-validates +
-  // marks claimed at the end, after auth signup succeeds.
-  const tokenHash = await sha256Hex(parsed.data.token);
-  const { data: invitation } = await supabase
-    .from("guardian_invitations")
-    .select("id, guardian_id, expires_at, claimed_at, guardians(email)")
-    .eq("token_hash", tokenHash)
-    .maybeSingle();
-  if (!invitation) {
-    return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
-  }
-  const inv = invitation as {
-    id: string;
-    guardian_id: string;
-    expires_at: string;
-    claimed_at: string | null;
-    guardians: { email: string | null } | { email: string | null }[] | null;
-  };
-  if (inv.claimed_at) {
-    return NextResponse.json({ error: "Invitation already claimed" }, { status: 409 });
-  }
-  if (new Date(inv.expires_at).getTime() < Date.now()) {
-    return NextResponse.json({ error: "Invitation expired" }, { status: 410 });
-  }
-  const g = Array.isArray(inv.guardians) ? inv.guardians[0] : inv.guardians;
-  const email = g?.email;
-  if (!email) {
-    return NextResponse.json({ error: "Guardian email missing" }, { status: 400 });
+  const admin = createAdminClient();
+  let invitation;
+  try {
+    invitation = await lookupInvitation(admin, parsed.data.token);
+  } catch (err) {
+    if (err instanceof InvitationError) {
+      const status = err.code === "not_found" ? 404 : err.code === "expired" ? 410 : 409;
+      return NextResponse.json({ error: err.message, code: err.code }, { status });
+    }
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 
-  // Create the Supabase Auth user with the canonical email.
-  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-    email,
+  const created = await admin.auth.admin.createUser({
+    email: invitation.email,
     password: parsed.data.password,
+    email_confirm: true,
   });
-  if (signUpErr || !signUpData.user) {
-    return NextResponse.json(
-      { error: signUpErr?.message ?? "Auth signup failed" },
-      { status: 500 }
-    );
+  let authUserId: string;
+  if (created.error) {
+    const message = created.error.message ?? "";
+    const alreadyExists = /already|exists|registered/i.test(message);
+    const existingId = alreadyExists ? await findAuthUserByEmail(admin, invitation.email) : null;
+    if (!existingId) {
+      return NextResponse.json(
+        { error: message || "Could not create the account" },
+        { status: 500 }
+      );
+    }
+    authUserId = existingId;
+  } else if (!created.data.user) {
+    return NextResponse.json({ error: "Could not create the account" }, { status: 500 });
+  } else {
+    authUserId = created.data.user.id;
   }
 
   try {
     const result = await claimInvitation({
-      supabase,
+      supabase: admin,
       token: parsed.data.token,
-      authUserId: signUpData.user.id,
+      authUserId,
     });
     await auditLog({
-      actor_id: signUpData.user.id,
+      actor_id: authUserId,
       actor_role: "guardian",
       action: "guardian_claim_invitation",
       target_table: "guardians",
@@ -100,9 +88,12 @@ export async function POST(req: Request) {
   }
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const arr = Array.from(new Uint8Array(digest));
-  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
+async function findAuthUserByEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string
+): Promise<string | null> {
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  if (error) return null;
+  const match = data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
+  return match?.id ?? null;
 }

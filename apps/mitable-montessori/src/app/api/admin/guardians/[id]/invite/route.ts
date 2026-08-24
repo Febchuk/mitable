@@ -21,7 +21,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // cross-school writes regardless, but we want a clean 404 over a 403.
   const { data: guardian } = await supabase
     .from("guardians")
-    .select("id, email, school_id, first_name, last_name")
+    .select("id, email, school_id, auth_user_id, first_name, last_name")
     .eq("id", id)
     .maybeSingle();
   if (!guardian || (guardian as { school_id: string }).school_id !== auth.user.schoolId) {
@@ -32,6 +32,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       { error: "Guardian has no email on file; add one before inviting" },
       { status: 400 }
     );
+  }
+  if ((guardian as { auth_user_id: string | null }).auth_user_id) {
+    return NextResponse.json({ error: "This guardian already has an account" }, { status: 409 });
   }
 
   try {
