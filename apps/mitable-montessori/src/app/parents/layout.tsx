@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { UserMenu } from "@/components/app/UserMenu";
+import { ParentPortalShell } from "@/components/parents/parent-portal-shell";
+import { getParentPortalContext } from "@/lib/parents/portal";
 
 export default async function ParentsLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
@@ -9,6 +11,19 @@ export default async function ParentsLayout({ children }: { children: React.Reac
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const portal = user ? await getParentPortalContext() : null;
+
+  if (portal?.onboardingComplete) {
+    return (
+      <ParentPortalShell
+        firstName={portal.firstName}
+        email={portal.email}
+        linkedChildren={portal.children}
+      >
+        {children}
+      </ParentPortalShell>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -17,7 +32,7 @@ export default async function ParentsLayout({ children }: { children: React.Reac
           Mitable
           <span className="ml-2 text-xs uppercase tracking-wide text-ink/40">parents</span>
         </Link>
-        {user?.email ? <UserMenu email={user.email} /> : null}
+        {user?.email ? <UserMenu email={user.email} signOutHref="/parents/login" /> : null}
       </header>
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">{children}</main>
     </div>

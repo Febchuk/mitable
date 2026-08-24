@@ -25,6 +25,8 @@ export interface UserMenuProps {
   align?: "left" | "right";
   /** When true, show the admin-only “Show hidden” toggle. */
   showRevealHidden?: boolean;
+  /** Destination after sign-out. Parents return to their dedicated sign-in page. */
+  signOutHref?: string;
 }
 
 /**
@@ -47,6 +49,7 @@ export function UserMenu({
   direction = "down",
   align = "right",
   showRevealHidden = false,
+  signOutHref = "/login",
 }: UserMenuProps) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -90,7 +93,7 @@ export function UserMenu({
     } catch {
       // Best-effort.
     }
-    router.push("/login");
+    router.push(signOutHref);
     router.refresh();
   }
 
