@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 
@@ -31,7 +32,12 @@ export default async function ReportsPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-4 py-4">
-      <h2 className="font-display text-xl">Reports</h2>
+      <header className="space-y-1">
+        <Link href={`/parents/students/${id}`} className="text-xs text-ink/40">
+          ← Back to child
+        </Link>
+        <h2 className="font-display text-xl">Reports</h2>
+      </header>
       {list.length === 0 ? (
         <p className="text-sm text-ink/50">
           No reports sent to you yet. They&apos;ll appear here once approved by the school.

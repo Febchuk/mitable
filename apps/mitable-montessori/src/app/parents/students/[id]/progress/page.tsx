@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import {
@@ -53,7 +54,12 @@ export default async function ProgressPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-6 py-4">
-      <h2 className="font-display text-xl">Progress</h2>
+      <header className="space-y-1">
+        <Link href={`/parents/students/${id}`} className="text-xs text-ink/40">
+          ← Back to child
+        </Link>
+        <h2 className="font-display text-xl">Progress</h2>
+      </header>
       {sections.length === 0 ? (
         <p className="text-sm text-ink/50">No progress logged yet.</p>
       ) : (
