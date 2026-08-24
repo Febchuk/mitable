@@ -15,6 +15,7 @@ import {
   readStoredDraftCapture,
 } from "@/lib/capture/draft-capture-storage";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
+import { startNavigationFeedback } from "@/lib/navigation-feedback";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 import {
   fieldPayloadToReadableText,
@@ -763,6 +764,7 @@ export function ReportDetail({
         pendingNavRef.current = href;
         setLeaveDialogOpen(true);
       } else {
+        startNavigationFeedback();
         router.push(href);
       }
     },

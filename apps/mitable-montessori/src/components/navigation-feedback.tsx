@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { NAVIGATION_START_EVENT } from "@/lib/navigation-feedback";
 
 function isInternalNavigation(event: MouseEvent) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -31,14 +32,19 @@ export function NavigationFeedback() {
   const previousRouteRef = useRef(route);
 
   useEffect(() => {
+    const startNavigation = () => setIsNavigating(true);
     const handleClick = (event: MouseEvent) => {
       if (!isInternalNavigation(event)) return;
 
-      setIsNavigating(true);
+      startNavigation();
     };
 
     document.addEventListener("click", handleClick, true);
-    return () => document.removeEventListener("click", handleClick, true);
+    window.addEventListener(NAVIGATION_START_EVENT, startNavigation);
+    return () => {
+      document.removeEventListener("click", handleClick, true);
+      window.removeEventListener(NAVIGATION_START_EVENT, startNavigation);
+    };
   }, []);
 
   useEffect(() => {
