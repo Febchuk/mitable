@@ -177,6 +177,164 @@ function CurriculumEntry({
   );
 }
 
+function ProgressEntry({
+  e,
+  mobile,
+}: {
+  e: Extract<ActivityFeedEntry, { kind: "progress" }>;
+  mobile: boolean;
+}) {
+  const transitionMeta = ALL_PROGRESS_LEVELS.find((level) => level.status === e.transitionToStatus);
+  return (
+    <div
+      style={{
+        background: mobile ? "var(--color-canvas)" : "transparent",
+        border: mobile ? "1px solid var(--color-border)" : "0",
+        borderRadius: mobile ? 12 : 0,
+        padding: mobile ? "12px 14px" : "12px 0",
+        borderBottom: mobile ? undefined : "1px solid var(--color-border)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+          marginBottom: 6,
+          flexWrap: "wrap",
+        }}
+      >
+        <span className="label-cap" style={{ color: "var(--color-ink-secondary)" }}>
+          Progress · {e.topicName}
+        </span>
+        <span
+          className="font-numeric"
+          style={{ fontSize: 11, color: "var(--color-ink-muted)" }}
+          title={e.createdAt}
+        >
+          {formatRelative(e.createdAt)}
+        </span>
+      </div>
+      <div style={{ fontSize: 14, color: "var(--color-ink)", lineHeight: 1.45 }}>
+        Marked <strong style={{ fontWeight: 600 }}>{e.subtopicName}</strong>
+      </div>
+      {e.comment && (
+        <div
+          style={{
+            fontSize: 13,
+            color: "var(--color-ink-secondary)",
+            marginTop: 4,
+            lineHeight: 1.45,
+          }}
+        >
+          {e.comment}
+        </div>
+      )}
+      <div
+        style={{
+          marginTop: 8,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        {transitionMeta && (
+          <span
+            style={{
+              display: "inline-block",
+              fontSize: 10.5,
+              fontWeight: 500,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              padding: "3px 8px",
+              borderRadius: 999,
+              color: "var(--color-ink)",
+              background: `color-mix(in srgb, ${transitionMeta.color} 18%, transparent)`,
+              border: `1px solid ${transitionMeta.color}`,
+            }}
+          >
+            {transitionMeta.label}
+          </span>
+        )}
+        {e.authorName && (
+          <span style={{ fontSize: 11, color: "var(--color-ink-muted)" }}>{e.authorName}</span>
+        )}
+      </div>
+      {e.media.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: mobile ? "1fr" : "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 10,
+            marginTop: 12,
+          }}
+        >
+          {e.media.map((media) => (
+            <figure
+              key={media.id}
+              style={{
+                margin: 0,
+                overflow: "hidden",
+                border: "1px solid var(--color-border)",
+                borderRadius: 10,
+                background: "var(--color-surface)",
+              }}
+            >
+              {media.url ? (
+                media.kind === "video" ? (
+                  <video
+                    controls
+                    preload="metadata"
+                    src={media.url}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      maxHeight: 280,
+                      background: "#1d1c1a",
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={media.url}
+                    alt={media.caption || `A classroom moment from ${e.subtopicName}`}
+                    style={{ display: "block", width: "100%", maxHeight: 280, objectFit: "cover" }}
+                  />
+                )
+              ) : (
+                <div
+                  style={{
+                    minHeight: 120,
+                    display: "grid",
+                    placeItems: "center",
+                    padding: 12,
+                    color: "var(--color-ink-muted)",
+                    fontSize: 12,
+                  }}
+                >
+                  Preview unavailable
+                </div>
+              )}
+              {media.caption && (
+                <figcaption
+                  style={{
+                    padding: "8px 10px",
+                    color: "var(--color-ink-secondary)",
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {media.caption}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WholeChildEntry({
   e,
   mobile,
@@ -394,7 +552,7 @@ export function ActivityView({
               Activity feed
             </div>
             <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-ink)" }}>
-              Curriculum, whole-child &amp; reports
+              Progress, curriculum, whole-child &amp; reports
             </div>
             <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 2 }}>
               {entries.length} {entries.length === 1 ? "entry" : "entries"} total
@@ -403,7 +561,9 @@ export function ActivityView({
 
           <div style={{ display: "flex", flexDirection: "column", gap: mobile ? 10 : 0 }}>
             {visible.map((e) =>
-              e.kind === "curriculum" ? (
+              e.kind === "progress" ? (
+                <ProgressEntry key={`p-${e.id}`} e={e} mobile={mobile} />
+              ) : e.kind === "curriculum" ? (
                 <CurriculumEntry key={`c-${e.id}`} e={e} mobile={mobile} />
               ) : e.kind === "whole-child" ? (
                 <WholeChildEntry key={`w-${e.id}`} e={e} mobile={mobile} />
