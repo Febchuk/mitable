@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Smartphone } from "lucide-react";
+import { ChevronDown, Smartphone } from "lucide-react";
 import { type ProgressMark } from "@/components/montessori/data";
 import { StudentMediaCapture } from "@/components/montessori/child-detail/student-media";
-import { FilterChips, PageHeader } from "@/components/montessori/page-header";
+import { PageHeader } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
 import type {
@@ -15,7 +15,6 @@ import type {
   ClassroomProgressTopic,
   ClassroomProgressSubject,
 } from "@/lib/queries/classroom-progress";
-import { GROUP_COLOR_META } from "@/lib/classroom-groups";
 import { classroomGroupsEnabled } from "@/lib/feature-flags";
 import type { MarkingSchema } from "@/lib/progress/marking-schemas";
 import { BulkBar } from "./bulk-bar";
@@ -29,68 +28,6 @@ import { SelectionCapsule } from "./selection-capsule";
 import { SubtopicPopover } from "./subtopic-popover";
 
 const ALL_SUBJECTS = "__all__";
-
-/** Horizontal group ("team") filter pills. Used in the mobile Progress layout;
- *  the desktop layout shows the same filter inside the LeftRail. */
-function GroupFilterChips({
-  groups,
-  groupId,
-  onChange,
-}: {
-  groups: ClassroomGroup[];
-  groupId: string | null;
-  onChange: (id: string | null) => void;
-}) {
-  const chip = (active: boolean): React.CSSProperties => ({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 12,
-    fontWeight: 500,
-    padding: "6px 12px",
-    borderRadius: 999,
-    whiteSpace: "nowrap",
-    background: active ? "var(--color-ink)" : "var(--color-surface)",
-    color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
-    border: active ? "1px solid var(--color-ink)" : "1px solid var(--color-border)",
-  });
-  return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-      <button
-        type="button"
-        className="tap"
-        onClick={() => onChange(null)}
-        style={chip(groupId === null)}
-      >
-        All
-      </button>
-      {groups.map((g) => {
-        const active = groupId === g.id;
-        return (
-          <button
-            key={g.id}
-            type="button"
-            className="tap"
-            onClick={() => onChange(g.id)}
-            style={chip(active)}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                flexShrink: 0,
-                background: GROUP_COLOR_META[g.color].cssVar,
-              }}
-            />
-            {g.name}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 /** Horizontal class switcher pills. Used in the mobile Progress layout and the
  *  curriculum-less empty state; the desktop layout shows the same picker inside
@@ -140,6 +77,208 @@ function ClassFilterChips({
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * A compact mobile filter drawer. The previous chip wall made it hard to tell
+ * which classroom or part of the curriculum was actually being viewed.
+ */
+function MobileProgressFilters({
+  classrooms,
+  selectedClassroomId,
+  onClassroomChange,
+  classroomBusy,
+  groups,
+  groupsEnabled,
+  groupId,
+  onGroupChange,
+  subjects,
+  subjectId,
+  onSubjectChange,
+  topics,
+  topicId,
+  onTopicChange,
+}: {
+  classrooms: Array<{ id: string; name: string }>;
+  selectedClassroomId: string | null;
+  onClassroomChange: (id: string) => void;
+  classroomBusy: boolean;
+  groups: ClassroomGroup[];
+  groupsEnabled: boolean;
+  groupId: string | null;
+  onGroupChange: (id: string | null) => void;
+  subjects: ClassroomProgressSubject[];
+  subjectId: string;
+  onSubjectChange: (id: string) => void;
+  topics: ClassroomProgressTopic[];
+  topicId: string | null;
+  onTopicChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const classroomName =
+    classrooms.find((classroom) => classroom.id === selectedClassroomId)?.name ?? "Classroom";
+  const groupName = groups.find((group) => group.id === groupId)?.name ?? "Whole class";
+  const subjectName =
+    subjectId === ALL_SUBJECTS
+      ? "All subjects"
+      : (subjects.find((subject) => subject.id === subjectId)?.name ?? "All subjects");
+  const topicName = topics.find((topic) => topic.id === topicId)?.name ?? "All topics";
+  const selectStyle: React.CSSProperties = {
+    width: "100%",
+    minHeight: 42,
+    border: "1px solid var(--color-border)",
+    borderRadius: 10,
+    background: "var(--color-canvas)",
+    color: "var(--color-ink)",
+    padding: "0 10px",
+    fontSize: 14,
+  };
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    marginBottom: 5,
+    color: "var(--color-ink-muted)",
+    fontSize: 10,
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+  };
+
+  return (
+    <section
+      style={{
+        margin: "12px 16px 8px",
+        border: "1px solid var(--color-border)",
+        borderRadius: 14,
+        background: "var(--color-surface)",
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        className="tap"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "12px 14px",
+          textAlign: "left",
+          color: "var(--color-ink)",
+        }}
+      >
+        <span style={{ minWidth: 0 }}>
+          <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+            Viewing
+          </span>
+          <span
+            style={{
+              display: "block",
+              overflow: "hidden",
+              marginTop: 3,
+              color: "var(--color-ink-secondary)",
+              fontSize: 13,
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {classroomName} · {subjectName} · {topicName}
+            {groupsEnabled && groupId ? ` · ${groupName}` : ""}
+          </span>
+        </span>
+        <ChevronDown
+          size={18}
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            color: "var(--color-ink-muted)",
+            transform: open ? "rotate(180deg)" : undefined,
+            transition: "transform 160ms ease",
+          }}
+        />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 12,
+            padding: "0 14px 14px",
+            borderTop: "1px solid var(--color-border)",
+            paddingTop: 14,
+          }}
+        >
+          {classrooms.length > 1 && (
+            <label style={{ gridColumn: "1 / -1" }}>
+              <span style={labelStyle}>Classroom</span>
+              <select
+                value={selectedClassroomId ?? ""}
+                onChange={(event) => onClassroomChange(event.target.value)}
+                disabled={classroomBusy}
+                style={selectStyle}
+              >
+                {classrooms.map((classroom) => (
+                  <option key={classroom.id} value={classroom.id}>
+                    {classroom.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {groupsEnabled && groups.length > 0 && (
+            <label style={{ gridColumn: "1 / -1" }}>
+              <span style={labelStyle}>Group</span>
+              <select
+                value={groupId ?? ""}
+                onChange={(event) => onGroupChange(event.target.value || null)}
+                style={selectStyle}
+              >
+                <option value="">Whole class</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            <span style={labelStyle}>Subject</span>
+            <select
+              value={subjectId}
+              onChange={(event) => onSubjectChange(event.target.value)}
+              style={selectStyle}
+            >
+              <option value={ALL_SUBJECTS}>All subjects</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span style={labelStyle}>Topic</span>
+            <select
+              value={topicId ?? ""}
+              onChange={(event) => onTopicChange(event.target.value || null)}
+              style={selectStyle}
+            >
+              <option value="">All topics</option>
+              {topics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -735,29 +874,6 @@ function ProgressFeatureLoaded({
 
   const subtopicAtInfo = info ? (subtopics.find((s) => s.id === info.subtopicId) ?? null) : null;
 
-  const subjectChipOptions = ["All", ...subjects.map((s) => s.name)];
-  const subjectChipValue =
-    subjectId === ALL_SUBJECTS ? "All" : (subjects.find((s) => s.id === subjectId)?.name ?? "All");
-  const onSubjectChipChange = (label: string) => {
-    if (label === "All") switchSubject(ALL_SUBJECTS);
-    else {
-      const found = subjects.find((s) => s.name === label);
-      if (found) switchSubject(found.id);
-    }
-  };
-
-  const ALL_TOPICS_LABEL = "All topics";
-  const topicChipOptions = [ALL_TOPICS_LABEL, ...visibleTopics.map((t) => t.name)];
-  const topicChipValue = currentTopic?.name ?? ALL_TOPICS_LABEL;
-  const onTopicChipChange = (label: string) => {
-    if (label === ALL_TOPICS_LABEL) {
-      switchTopic(null);
-      return;
-    }
-    const found = visibleTopics.find((t) => t.name === label);
-    if (found) switchTopic(found.id);
-  };
-
   return (
     <div className="progress-root">
       <PageHeader title="Progress" subtitle="Record children's progress through the curriculum." />
@@ -819,65 +935,22 @@ function ProgressFeatureLoaded({
 
           {/* Mobile layout */}
           <div className={`lg:hidden ${styles.mobileColumn}`}>
-            {classrooms.length > 1 && (
-              <div
-                style={{
-                  padding: "4px 16px 4px",
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                }}
-              >
-                <ClassFilterChips
-                  classrooms={classrooms}
-                  selectedClassroomId={selectedClassroomId}
-                  onChange={selectClassroom}
-                  busy={classroomBusy}
-                />
-              </div>
-            )}
-            {groupsEnabled && groups.length > 0 && (
-              <div
-                style={{
-                  padding: "4px 16px 4px",
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                }}
-              >
-                <GroupFilterChips groups={groups} groupId={groupId} onChange={switchGroup} />
-              </div>
-            )}
-            {subjects.length > 1 && (
-              <div
-                style={{
-                  padding: "4px 16px 4px",
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                }}
-              >
-                <FilterChips
-                  options={subjectChipOptions}
-                  value={subjectChipValue}
-                  onChange={onSubjectChipChange}
-                />
-              </div>
-            )}
-            <div
-              style={{
-                padding: "4px 16px 8px",
-                display: "flex",
-                gap: 6,
-                overflowX: "auto",
-              }}
-            >
-              <FilterChips
-                options={topicChipOptions}
-                value={topicChipValue}
-                onChange={onTopicChipChange}
-              />
-            </div>
+            <MobileProgressFilters
+              classrooms={classrooms}
+              selectedClassroomId={selectedClassroomId}
+              onClassroomChange={selectClassroom}
+              classroomBusy={classroomBusy}
+              groups={groups}
+              groupsEnabled={groupsEnabled}
+              groupId={groupId}
+              onGroupChange={switchGroup}
+              subjects={subjects}
+              subjectId={subjectId}
+              onSubjectChange={switchSubject}
+              topics={visibleTopics}
+              topicId={topicId}
+              onTopicChange={switchTopic}
+            />
             <div
               style={{
                 padding: "4px 16px 12px",
