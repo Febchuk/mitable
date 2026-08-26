@@ -17,6 +17,7 @@ const StartUploadBody = z.object({
   kind: z.enum(["photo", "video"]),
   mimeType: z.enum(STUDENT_MEDIA_MIME_TYPES),
   byteSize: z.number().int().positive(),
+  progressCommandId: z.string().uuid().optional(),
 });
 
 type MediaRow = {
@@ -29,6 +30,7 @@ type MediaRow = {
   shared_at: string | null;
   created_at: string;
   storage_path: string;
+  progress_command_id: string | null;
   users:
     | { first_name: string | null; last_name: string | null }
     | { first_name: string | null; last_name: string | null }[]
@@ -59,6 +61,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const admin = createAdminClient();
+  if (input.progressCommandId) {
+    const { data: command } = await admin
+      .from("commands")
+      .select("id, school_id, user_id, command_type, payload")
+      .eq("id", input.progressCommandId)
+      .maybeSingle();
+    const commandPayload = command?.payload as { student_id?: string } | null;
+    if (
+      !command ||
+      command.school_id !== access.access.student.school_id ||
+      command.user_id !== access.access.user.userId ||
+      command.command_type !== "progress" ||
+      commandPayload?.student_id !== studentId
+    ) {
+      return NextResponse.json(
+        { error: "That progress update is not available for media" },
+        { status: 403 }
+      );
+    }
+  }
   const mediaId = crypto.randomUUID();
   const storagePath = `${access.access.student.school_id}/${studentId}/${mediaId}.${mediaExtension(input.mimeType)}`;
   const { error: insertError } = await admin.from("student_media").insert({
@@ -70,6 +92,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     mime_type: input.mimeType,
     byte_size: input.byteSize,
     storage_path: storagePath,
+    progress_command_id: input.progressCommandId ?? null,
   });
   if (insertError) {
     return NextResponse.json({ error: "Couldn't prepare the media upload" }, { status: 500 });
@@ -94,6 +117,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       kind: input.kind,
       mime_type: input.mimeType,
       byte_size: input.byteSize,
+      progress_command_id: input.progressCommandId ?? null,
     },
   });
 
@@ -114,7 +138,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data, error } = await admin
     .from("student_media")
     .select(
-      "id, kind, mime_type, byte_size, caption, status, shared_at, created_at, storage_path, users:uploaded_by_user_id(first_name, last_name)"
+      "id, kind, mime_type, byte_size, caption, status, shared_at, created_at, storage_path, progress_command_id, users:uploaded_by_user_id(first_name, last_name)"
     )
     .eq("student_id", studentId)
     .neq("status", "deleted")
@@ -140,6 +164,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         sharedAt: item.shared_at,
         createdAt: item.created_at,
         uploadedBy,
+        progressCommandId: item.progress_command_id,
         url: signed?.signedUrl ?? null,
       };
     })

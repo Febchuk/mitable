@@ -31,6 +31,10 @@ export type ChatMode = "open" | "pill";
  *  silently misalign cells. */
 export type ProgressByTopic = Record<string, Record<string, Record<string, ProgressMark>>>;
 
+export type ProgressSaveResult = {
+  updates: Array<{ studentId: string; subtopicId: string; commandId: string }>;
+};
+
 /** Minimal classroom shape for the Progress class switcher. */
 export type ProgressClassroom = { id: string; name: string };
 
@@ -109,7 +113,7 @@ export type MontessoriStore = {
     cells: Array<{ studentId: string; subtopicId: string; subtopicName: string }>;
     status: ProgressMark;
     note?: string;
-  }) => Promise<void>;
+  }) => Promise<ProgressSaveResult | null>;
 
   /** Persist a free-form comment about a child that isn't tied to any subtopic
    *  or status. Optimistically prepends it to `recentUpdates`, then POSTs to
@@ -307,7 +311,7 @@ export function MontessoriProvider({
       status: ProgressMark;
       note?: string;
     }) => {
-      if (cells.length === 0) return;
+      if (cells.length === 0) return null;
       const trimmedNote = note?.trim() || "";
       const when = "just now";
 
@@ -372,7 +376,7 @@ export function MontessoriProvider({
         setNotesByTopic(prevNotes);
         setRecentUpdates(prevRecent);
         ToastBus.push({ message: "Couldn't save — try again" });
-        return;
+        return null;
       }
 
       try {
@@ -389,7 +393,9 @@ export function MontessoriProvider({
             })),
           }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = (await res.json().catch(() => null)) as ProgressSaveResult | null;
+        if (!res.ok || !result?.updates) throw new Error(`HTTP ${res.status}`);
+        return result;
       } catch {
         // Roll back on any failure.
         setProgressByTopic(prevProgressByTopic);
@@ -397,6 +403,7 @@ export function MontessoriProvider({
         setNotesByTopic(prevNotes);
         setRecentUpdates(prevRecent);
         ToastBus.push({ message: "Couldn't save — try again" });
+        return null;
       }
     },
     [progressByTopic, classroomProgress, notesByTopic, recentUpdates, selectedClassroomId]

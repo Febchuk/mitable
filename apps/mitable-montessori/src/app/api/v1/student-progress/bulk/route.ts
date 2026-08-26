@@ -106,8 +106,12 @@ export async function POST(req: Request) {
   // upserts student_progress and inserts student_progress_history atomically
   // — see supabase/migrations/0003_triggers.sql.
   const now = new Date().toISOString();
-  const rows = parsed.data.updates.map((u, i) => ({
-    client_id: `bulk-${auth.user.userId}-${Date.now()}-${i}`,
+  const requestedRows = parsed.data.updates.map((update, index) => ({
+    update,
+    clientId: `bulk-${auth.user.userId}-${Date.now()}-${index}`,
+  }));
+  const rows = requestedRows.map(({ update: u, clientId }) => ({
+    client_id: clientId,
     school_id: auth.user.schoolId,
     user_id: auth.user.userId,
     classroom_id: classroom.id,
@@ -124,7 +128,7 @@ export async function POST(req: Request) {
     approved_at: now,
   }));
 
-  const { data, error } = await supabase.from("commands").insert(rows).select("id");
+  const { data, error } = await supabase.from("commands").insert(rows).select("id, client_id");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -140,5 +144,17 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true, applied: data?.length ?? 0 });
+  const commandIdByClientId = new Map(
+    (data ?? []).map((row) => [row.client_id as string, row.id as string] as const)
+  );
+  return NextResponse.json({
+    ok: true,
+    applied: data?.length ?? 0,
+    updates: requestedRows.flatMap(({ update, clientId }) => {
+      const commandId = commandIdByClientId.get(clientId);
+      return commandId
+        ? [{ studentId: update.studentId, subtopicId: update.subtopicId, commandId }]
+        : [];
+    }),
+  });
 }
