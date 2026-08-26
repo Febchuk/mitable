@@ -5,6 +5,7 @@ import { listAxesWithAssessment, listWholeChildObservations } from "@/lib/querie
 import type { StudentProfile } from "@/lib/queries/student-profile";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { listParentMedia } from "@/lib/media/parent-media";
 
 export default async function ParentOverviewPage({
   searchParams,
@@ -19,7 +20,7 @@ export default async function ParentOverviewPage({
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  const [studentResp, axes, observations, curriculumResp, reportsResp] = await Promise.all([
+  const [studentResp, axes, observations, curriculumResp, reportsResp, media] = await Promise.all([
     supabase
       .from("students")
       .select("id, first_name, last_name, preferred_name, birth_date, sex, notes")
@@ -40,6 +41,7 @@ export default async function ParentOverviewPage({
       .eq("status", "sent")
       .order("sent_at", { ascending: false })
       .limit(50),
+    listParentMedia(child.id),
   ]);
   const student = studentResp.data;
   if (!student) notFound();
@@ -83,6 +85,12 @@ export default async function ParentOverviewPage({
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
-    <ParentOverview profile={profile} axes={axes} observations={observations} activity={activity} />
+    <ParentOverview
+      profile={profile}
+      axes={axes}
+      observations={observations}
+      activity={activity}
+      media={media}
+    />
   );
 }
