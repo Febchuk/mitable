@@ -13,6 +13,7 @@ export type ParentMediaItem = {
   mimeType: StudentMediaMimeType;
   caption: string;
   sharedAt: string;
+  progressCommandId: string | null;
   url: string | null;
 };
 
@@ -25,7 +26,7 @@ export async function listParentMedia(studentId: string): Promise<ParentMediaIte
   const supabase = createClient(await cookies());
   const { data, error } = await supabase
     .from("student_media")
-    .select("id, kind, mime_type, caption, shared_at, storage_path")
+    .select("id, kind, mime_type, caption, shared_at, storage_path, progress_command_id")
     .eq("student_id", studentId)
     .eq("status", "shared")
     .order("shared_at", { ascending: false })
@@ -44,6 +45,7 @@ export async function listParentMedia(studentId: string): Promise<ParentMediaIte
           caption: string;
           shared_at: string;
           storage_path: string;
+          progress_command_id: string | null;
         };
         const { data: signed } = await admin.storage
           .from(STUDENT_MEDIA_BUCKET)
@@ -54,6 +56,7 @@ export async function listParentMedia(studentId: string): Promise<ParentMediaIte
           mimeType: item.mime_type,
           caption: item.caption,
           sharedAt: item.shared_at,
+          progressCommandId: item.progress_command_id,
           url: signed?.signedUrl ?? null,
         };
       })
