@@ -206,10 +206,12 @@ function HeaderInfoTooltip({ profile, mobile }: { profile: StudentProfile; mobil
 }
 
 function MobileKebabMenu({
+  onAddMedia,
   onNewObservation,
   onGenerateReport,
   onEdit,
 }: {
+  onAddMedia: () => void;
   onNewObservation: () => void;
   onGenerateReport: () => void;
   onEdit?: () => void;
@@ -234,6 +236,14 @@ function MobileKebabMenu({
   }, [open]);
 
   const items = [
+    {
+      key: "media",
+      label: "Add photo or video",
+      onClick: () => {
+        setOpen(false);
+        onAddMedia();
+      },
+    },
     ...(onEdit
       ? [
           {
@@ -336,6 +346,7 @@ export function ChildPageHeader({
   mobile,
   backHref = "/app/roster",
   backLabel = "All children",
+  onAddMedia,
   onNewObservation,
   onGenerateReport,
   onEdit,
@@ -344,6 +355,7 @@ export function ChildPageHeader({
   mobile: boolean;
   backHref?: string;
   backLabel?: string;
+  onAddMedia: () => void;
   onNewObservation: () => void;
   onGenerateReport: () => void;
   onEdit?: () => void;
@@ -383,6 +395,7 @@ export function ChildPageHeader({
         </Link>
         {mobile && (
           <MobileKebabMenu
+            onAddMedia={onAddMedia}
             onNewObservation={onNewObservation}
             onGenerateReport={onGenerateReport}
             onEdit={onEdit}
@@ -434,6 +447,9 @@ export function ChildPageHeader({
 
         {!mobile && (
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button type="button" className="ghost-btn tap" onClick={onAddMedia}>
+              + Add photo/video
+            </button>
             <button type="button" className="ghost-btn tap" onClick={onNewObservation}>
               + New observation
             </button>
