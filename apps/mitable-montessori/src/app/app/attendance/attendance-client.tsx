@@ -184,11 +184,6 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
     [data.date, router, classroomParam]
   );
 
-  const goToday = React.useCallback(() => {
-    const today = localDateString();
-    if (today !== data.date) router.push(`/app/attendance?date=${today}${classroomParam}`);
-  }, [data.date, router, classroomParam]);
-
   const isToday = data.date === localDateString();
 
   const saveRow = React.useCallback(
@@ -350,23 +345,21 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             </div>
             <DayArrow direction="next" onClick={() => goDay(1)} large />
           </div>
-          {!isToday && (
-            <button
-              type="button"
-              onClick={goToday}
-              className="tap label-cap"
+          {isToday && (
+            <span
+              className="label-cap"
               style={{
+                display: "inline-flex",
                 padding: "5px 12px",
                 borderRadius: 999,
                 background: "var(--color-surface)",
                 border: "1px solid var(--color-border)",
                 color: "var(--color-ink-secondary)",
-                cursor: "pointer",
                 letterSpacing: "0.06em",
               }}
             >
               Today
-            </button>
+            </span>
           )}
         </div>
 

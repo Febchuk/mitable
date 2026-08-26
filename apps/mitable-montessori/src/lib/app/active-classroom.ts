@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 
 export interface ActiveClassroom {
@@ -11,6 +11,96 @@ export interface ActiveClassroom {
 
 /** Same shape as ActiveClassroom — one entry per active teacher assignment. */
 export type TeacherClassroom = ActiveClassroom;
+
+type ClassroomProgram = "montessori" | "iep" | "speech";
+
+type AssignedTeacherClassroom = ActiveClassroom & {
+  startDate: string;
+  programs: ClassroomProgram[];
+};
+
+type AuthenticatedUser = { id: string; email: string | null };
+
+/** One verified account lookup per request, shared by the app shell's queries. */
+const getAuthenticatedUser = cache(async (): Promise<AuthenticatedUser | null> => {
+  const requestHeaders = await headers();
+  const id = requestHeaders.get("x-mitable-auth-user-id");
+  const email = requestHeaders.get("x-mitable-auth-user-email");
+  if (id) return { id, email };
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ? { id: user.id, email: user.email ?? null } : null;
+});
+
+/**
+ * Loads the active classroom assignments once, then lets the shell derive the
+ * current classroom, switcher list, and program flags from the same result.
+ */
+const listAssignedTeacherClassrooms = cache(async (): Promise<AssignedTeacherClassroom[]> => {
+  const user = await getAuthenticatedUser();
+  if (!user) return [];
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const { data: assignments } = await supabase
+    .from("classroom_teacher_assignments")
+    .select("classroom_role, start_date, classrooms(id, name, code, ui_hidden, program_types)")
+    .eq("teacher_user_id", user.id)
+    .is("end_date", null)
+    .order("start_date", { ascending: false });
+  if (!assignments?.length) return [];
+
+  const classrooms: AssignedTeacherClassroom[] = [];
+  const seenClassroomIds = new Set<string>();
+  for (const assignment of assignments as Array<{
+    classroom_role: ActiveClassroom["role"];
+    start_date: string;
+    classrooms:
+      | {
+          id: string;
+          name: string;
+          code: string | null;
+          ui_hidden?: boolean;
+          program_types?: string[] | null;
+        }
+      | {
+          id: string;
+          name: string;
+          code: string | null;
+          ui_hidden?: boolean;
+          program_types?: string[] | null;
+        }[]
+      | null;
+  }>) {
+    const classroom = Array.isArray(assignment.classrooms)
+      ? assignment.classrooms[0]
+      : assignment.classrooms;
+    if (!classroom || classroom.ui_hidden || seenClassroomIds.has(classroom.id)) continue;
+    seenClassroomIds.add(classroom.id);
+    classrooms.push({
+      id: classroom.id,
+      name: classroom.name,
+      code: classroom.code,
+      role: assignment.classroom_role ?? null,
+      startDate: assignment.start_date,
+      programs: normalizePrograms(classroom.program_types),
+    });
+  }
+
+  return classrooms;
+});
+
+function normalizePrograms(programTypes: string[] | null | undefined): ClassroomProgram[] {
+  if (!Array.isArray(programTypes) || programTypes.length === 0) return ["montessori"];
+  return programTypes.filter(
+    (program): program is ClassroomProgram =>
+      program === "montessori" || program === "iep" || program === "speech"
+  );
+}
 
 /**
  * Resolves which classroom a teacher is acting in. When `classroomId` is
@@ -31,54 +121,14 @@ export const resolveClassroomForCurrentUser = cache(async function resolveClassr
 
 export const getActiveClassroomForCurrentUser = cache(
   async function getActiveClassroomForCurrentUser(): Promise<ActiveClassroom | null> {
-    const cookieStore = await cookies();
-    const supabase = createClient(cookieStore);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const { data: assignments } = await supabase
-      .from("classroom_teacher_assignments")
-      .select("classroom_id, classroom_role, start_date")
-      .eq("teacher_user_id", user.id)
-      .is("end_date", null)
-      .order("start_date", { ascending: false });
-    if (!assignments?.length) return null;
-
-    const ids = [
-      ...new Set((assignments as Array<{ classroom_id: string }>).map((a) => a.classroom_id)),
-    ];
-    const { data: rooms } = await supabase
-      .from("classrooms")
-      .select("id, name, code, ui_hidden")
-      .in("id", ids);
-    const roomById = new Map(
-      (rooms ?? []).map((r) => {
-        const row = r as {
-          id: string;
-          name: string;
-          code: string | null;
-          ui_hidden?: boolean;
-        };
-        return [row.id, row] as const;
-      })
-    );
-
-    for (const a of assignments as Array<{
-      classroom_id: string;
-      classroom_role: ActiveClassroom["role"];
-    }>) {
-      const classroom = roomById.get(a.classroom_id);
-      if (!classroom || classroom.ui_hidden) continue;
-      return {
-        id: classroom.id,
-        name: classroom.name,
-        code: classroom.code,
-        role: a.classroom_role ?? null,
-      };
-    }
-    return null;
+    const classroom = (await listAssignedTeacherClassrooms())[0];
+    if (!classroom) return null;
+    return {
+      id: classroom.id,
+      name: classroom.name,
+      code: classroom.code,
+      role: classroom.role,
+    };
   }
 );
 
@@ -90,45 +140,12 @@ export const getActiveClassroomForCurrentUser = cache(
  */
 export const listTeacherClassroomsForCurrentUser = cache(
   async function listTeacherClassroomsForCurrentUser(): Promise<TeacherClassroom[]> {
-    const cookieStore = await cookies();
-    const supabase = createClient(cookieStore);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return [];
-
-    const { data: assignments } = await supabase
-      .from("classroom_teacher_assignments")
-      .select("classroom_id, classroom_role, start_date")
-      .eq("teacher_user_id", user.id)
-      .is("end_date", null)
-      .order("start_date", { ascending: false });
-    if (!assignments?.length) return [];
-
-    // Dedupe by classroom, keeping the most recent assignment's role.
-    const roleById = new Map<string, ActiveClassroom["role"]>();
-    for (const a of assignments as Array<{
-      classroom_id: string;
-      classroom_role: ActiveClassroom["role"];
-    }>) {
-      if (!roleById.has(a.classroom_id)) roleById.set(a.classroom_id, a.classroom_role ?? null);
-    }
-    const ids = [...roleById.keys()];
-    if (ids.length === 0) return [];
-
-    const { data: rooms } = await supabase
-      .from("classrooms")
-      .select("id, name, code, ui_hidden")
-      .in("id", ids);
-    if (!rooms?.length) return [];
-
-    return (rooms as Array<{ id: string; name: string; code: string | null; ui_hidden?: boolean }>)
-      .filter((c) => !c.ui_hidden)
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        code: c.code,
-        role: roleById.get(c.id) ?? null,
+    return (await listAssignedTeacherClassrooms())
+      .map((classroom) => ({
+        id: classroom.id,
+        name: classroom.name,
+        code: classroom.code,
+        role: classroom.role,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -146,38 +163,31 @@ export interface CurrentUserContext {
 
 export const getCurrentUserContext = cache(
   async function getCurrentUserContext(): Promise<CurrentUserContext | null> {
+    const user = await getAuthenticatedUser();
+    if (!user) return null;
+
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
     const { data } = await supabase
       .from("users")
-      .select("id, school_id, role, email, first_name, privacy_acknowledged_at")
+      .select("id, school_id, role, email, first_name, privacy_acknowledged_at, schools(name)")
       .eq("id", user.id)
       .maybeSingle();
     if (!data) return null;
 
-    // Best-effort school name lookup — failure should not block the page.
-    let schoolName: string | null = null;
-    if (data.school_id) {
-      const { data: school } = await supabase
-        .from("schools")
-        .select("name")
-        .eq("id", data.school_id as string)
-        .maybeSingle();
-      schoolName = (school?.name as string | null) ?? null;
-    }
+    const row = data as typeof data & {
+      schools: { name: string | null } | { name: string | null }[] | null;
+    };
+    const school = Array.isArray(row.schools) ? row.schools[0] : row.schools;
 
     return {
-      userId: data.id as string,
-      schoolId: data.school_id as string,
-      schoolName,
-      role: data.role as "admin" | "teacher",
-      email: (data.email as string) ?? user.email ?? "",
-      firstName: (data.first_name as string | null) ?? null,
-      privacyAcknowledgedAt: (data.privacy_acknowledged_at as string | null) ?? null,
+      userId: row.id as string,
+      schoolId: row.school_id as string,
+      schoolName: school?.name ?? null,
+      role: row.role as "admin" | "teacher",
+      email: (row.email as string) ?? user.email ?? "",
+      firstName: (row.first_name as string | null) ?? null,
+      privacyAcknowledgedAt: (row.privacy_acknowledged_at as string | null) ?? null,
     };
   }
 );
@@ -188,73 +198,16 @@ export const getCurrentUserContext = cache(
  * IEP program and at least one that includes Montessori (often the same room).
  */
 export async function teacherShouldSeeIepProgressTab(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { data: rows, error } = await supabase
-    .from("classroom_teacher_assignments")
-    .select("classrooms ( program_types, ui_hidden )")
-    .eq("teacher_user_id", user.id)
-    .is("end_date", null);
-
-  if (error || !rows?.length) return false;
-
-  let anyMontessori = false;
-  let anyIep = false;
-
-  for (const row of rows) {
-    const c = (
-      row as { classrooms: { program_types?: string[] | null; ui_hidden?: boolean } | null }
-    ).classrooms;
-    if (!c || c.ui_hidden) continue;
-    const raw = c?.program_types;
-    const programs: Array<"montessori" | "iep"> =
-      Array.isArray(raw) && raw.length > 0
-        ? raw.filter((p): p is "montessori" | "iep" => p === "montessori" || p === "iep")
-        : ["montessori"];
-    if (programs.includes("montessori")) anyMontessori = true;
-    if (programs.includes("iep")) anyIep = true;
-  }
-
-  return anyMontessori && anyIep;
+  const classrooms = await listAssignedTeacherClassrooms();
+  return (
+    classrooms.some((classroom) => classroom.programs.includes("montessori")) &&
+    classrooms.some((classroom) => classroom.programs.includes("iep"))
+  );
 }
 
 /** True when the teacher has any active assignment to a classroom that includes Speech. */
 export async function teacherShouldSeeSpeechProgressTab(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { data: rows, error } = await supabase
-    .from("classroom_teacher_assignments")
-    .select("classrooms ( program_types, ui_hidden )")
-    .eq("teacher_user_id", user.id)
-    .is("end_date", null);
-
-  if (error || !rows?.length) return false;
-
-  for (const row of rows) {
-    const c = (
-      row as { classrooms: { program_types?: string[] | null; ui_hidden?: boolean } | null }
-    ).classrooms;
-    if (!c || c.ui_hidden) continue;
-    const raw = c?.program_types;
-    const programs =
-      Array.isArray(raw) && raw.length > 0
-        ? raw.filter(
-            (p): p is "montessori" | "iep" | "speech" =>
-              p === "montessori" || p === "iep" || p === "speech"
-          )
-        : ["montessori"];
-    if (programs.includes("speech")) return true;
-  }
-
-  return false;
+  return (await listAssignedTeacherClassrooms()).some((classroom) =>
+    classroom.programs.includes("speech")
+  );
 }

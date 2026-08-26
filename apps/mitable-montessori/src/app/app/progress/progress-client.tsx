@@ -8,8 +8,13 @@ import * as React from "react";
 type ProgressMode = "class" | "speech";
 
 export default function ProgressClient() {
-  const { showSpeechProgressTab } = useMontessori();
+  const { classroomProgress, selectedClassroomId, selectClassroom, showSpeechProgressTab } =
+    useMontessori();
   const [mode, setMode] = React.useState<ProgressMode>("class");
+
+  React.useEffect(() => {
+    if (!classroomProgress && selectedClassroomId) void selectClassroom(selectedClassroomId);
+  }, [classroomProgress, selectedClassroomId, selectClassroom]);
 
   React.useEffect(() => {
     if (!showSpeechProgressTab && mode === "speech") setMode("class");

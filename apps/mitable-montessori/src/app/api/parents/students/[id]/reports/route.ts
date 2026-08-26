@@ -4,10 +4,9 @@ import { requireGuardian } from "@/lib/api/guardian-auth";
 import { createClient } from "@/utils/supabase/server";
 
 /**
- * Sent reports for one of the guardian's linked students. RLS enforces both
- * (a) the link exists, (b) `receives_reports = true` on the link, (c) report
- * status = 'sent'. We re-state status='sent' here as defense-in-depth in case
- * an RLS policy change ever loosens the table-level rule.
+ * Reports explicitly sent to the guardian for one of their linked students.
+ * RLS enforces the recipient relationship and sent status. We re-state
+ * status='sent' here as defense-in-depth.
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireGuardian();

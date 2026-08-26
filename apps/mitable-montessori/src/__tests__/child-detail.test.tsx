@@ -56,7 +56,7 @@ const curriculum: CurriculumByTopic[] = [];
 const activity: ActivityFeedEntry[] = [];
 
 describe("ChildDetail", () => {
-  it("renders the child name and the three view tabs", () => {
+  it("renders the child name and the four view tabs", () => {
     render(
       <ChildDetail
         profile={profile}
@@ -72,6 +72,7 @@ describe("ChildDetail", () => {
     expect(screen.getByRole("tab", { name: "Whole child" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Curriculum" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Activity" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Guardians" })).toBeTruthy();
   });
 
   it("defaults to Activity and switches when another tab is selected", () => {
@@ -93,5 +94,24 @@ describe("ChildDetail", () => {
     fireEvent.click(wholeTab);
     expect(wholeTab.getAttribute("aria-selected")).toBe("true");
     expect(activityTab.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("shows guardian details only after selecting the Guardians tab", () => {
+    render(
+      <ChildDetail
+        profile={profile}
+        axes={axes}
+        observations={observations}
+        curriculum={curriculum}
+        activity={activity}
+        reportsRailBasePath="/app/reports"
+      />
+    );
+
+    expect(screen.queryByText("Family contacts")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Guardians" }));
+
+    expect(screen.getByRole("heading", { level: 2, name: "Family contacts" })).toBeTruthy();
+    expect(screen.getByText("Jane Chen")).toBeTruthy();
   });
 });

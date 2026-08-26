@@ -195,13 +195,13 @@ export function MontessoriProvider({
 
   const [classrooms] = React.useState<ProgressClassroom[]>(initialClassrooms);
   const [selectedClassroomId, setSelectedClassroomId] = React.useState<string | null>(
-    initialClassroomProgress?.classroomId ?? null
+    initialClassroomProgress?.classroomId ?? initialClassrooms[0]?.id ?? null
   );
   const [classroomBusy, setClassroomBusy] = React.useState(false);
 
   const selectClassroom = React.useCallback(
     async (id: string) => {
-      if (!id || id === selectedClassroomId || classroomBusy) return;
+      if (!id || (id === selectedClassroomId && classroomProgress) || classroomBusy) return;
       setClassroomBusy(true);
       try {
         const res = await fetch(
@@ -225,7 +225,7 @@ export function MontessoriProvider({
         setClassroomBusy(false);
       }
     },
-    [selectedClassroomId, classroomBusy]
+    [selectedClassroomId, classroomBusy, classroomProgress]
   );
 
   // Restore the teacher's last-picked class on mount. The layout server-renders

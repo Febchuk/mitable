@@ -1,0 +1,98 @@
+import { cookies, headers } from "next/headers";
+import { cache } from "react";
+import { createClient } from "@/utils/supabase/server";
+
+export type ParentChild = {
+  id: string;
+  name: string;
+  receivesReports: boolean;
+};
+
+export type ParentPortalContext = {
+  firstName: string;
+  email: string;
+  onboardingComplete: boolean;
+  children: ParentChild[];
+};
+
+/** Resolves the signed-in guardian and their active children for the parent portal. */
+export const getParentPortalContext = cache(
+  async function getParentPortalContext(): Promise<ParentPortalContext | null> {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const requestHeaders = await headers();
+    let userId = requestHeaders.get("x-mitable-auth-user-id");
+    let email = requestHeaders.get("x-mitable-auth-user-email");
+
+    // Middleware normally provides the verified account here. Keep this
+    // fallback for direct server rendering outside of middleware.
+    if (!userId || !email) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userId = user?.id ?? null;
+      email = user?.email ?? null;
+    }
+    if (!userId || !email) return null;
+
+    const { data: guardian } = await supabase
+      .from("guardians")
+      .select(
+        "first_name, onboarding_completed_at, student_guardians(receives_reports, students(id, first_name, last_name, preferred_name, archived_at))"
+      )
+      .eq("auth_user_id", userId)
+      .maybeSingle();
+    if (!guardian) return null;
+
+    const children =
+      (
+        guardian as {
+          student_guardians: Array<{
+            receives_reports: boolean;
+            students:
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  preferred_name: string | null;
+                  archived_at: string | null;
+                }
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  preferred_name: string | null;
+                  archived_at: string | null;
+                }[]
+              | null;
+          }> | null;
+        }
+      ).student_guardians ?? [];
+
+    const linkedChildren = children
+      .map((link) => {
+        const student = Array.isArray(link.students) ? link.students[0] : link.students;
+        if (!student || student.archived_at) return null;
+        return {
+          id: student.id,
+          name: student.preferred_name || `${student.first_name} ${student.last_name}`,
+          receivesReports: link.receives_reports,
+        };
+      })
+      .filter((child): child is ParentChild => child !== null);
+
+    return {
+      firstName: (guardian as { first_name: string }).first_name,
+      email,
+      onboardingComplete: Boolean(
+        (guardian as { onboarding_completed_at: string | null }).onboarding_completed_at
+      ),
+      children: linkedChildren,
+    };
+  }
+);
+
+export function selectedParentChild(children: ParentChild[], childId: string | undefined) {
+  if (childId) return children.find((child) => child.id === childId) ?? null;
+  return children[0] ?? null;
+}

@@ -8,7 +8,7 @@ import type { Tone } from "../data";
 import type { StudentProfile } from "@/lib/queries/student-profile";
 import { ChevLeft, InfoIcon, Kebab } from "./icons";
 
-export type PageView = "whole" | "curriculum" | "activity";
+export type PageView = "whole" | "curriculum" | "activity" | "guardians";
 
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
 
@@ -208,9 +208,11 @@ function HeaderInfoTooltip({ profile, mobile }: { profile: StudentProfile; mobil
 function MobileKebabMenu({
   onNewObservation,
   onGenerateReport,
+  onEdit,
 }: {
   onNewObservation: () => void;
   onGenerateReport: () => void;
+  onEdit?: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const wrapRef = React.useRef<HTMLSpanElement | null>(null);
@@ -232,6 +234,18 @@ function MobileKebabMenu({
   }, [open]);
 
   const items = [
+    ...(onEdit
+      ? [
+          {
+            key: "edit",
+            label: "Edit child",
+            onClick: () => {
+              setOpen(false);
+              onEdit();
+            },
+          },
+        ]
+      : []),
     {
       key: "obs",
       label: "+ New observation",
@@ -317,38 +331,6 @@ function MobileKebabMenu({
   );
 }
 
-function GuardianChip({ profile }: { profile: StudentProfile }) {
-  const gs = profile.guardians;
-  if (gs.length === 0) return null;
-  const lasts = gs.map((g) => g.name.split(" ").slice(-1)[0]);
-  const sameLast = lasts.every((l) => l === lasts[0]);
-  const names = sameLast
-    ? gs.map((g) => g.name.split(" ")[0]).join(" & ") + " " + lasts[0]
-    : gs.map((g) => g.name).join(" & ");
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "2px 9px",
-        borderRadius: 999,
-        background: "transparent",
-        border: "1px solid var(--color-border)",
-        fontSize: 11,
-        color: "var(--color-ink-secondary)",
-        whiteSpace: "nowrap",
-      }}
-    >
-      <span className="label-cap" style={{ color: "var(--color-ink-muted)", fontSize: 9.5 }}>
-        Guardians
-      </span>
-      <span style={{ color: "var(--color-ink-muted)", opacity: 0.5 }}>·</span>
-      <span style={{ fontWeight: 500 }}>{names}</span>
-    </span>
-  );
-}
-
 export function ChildPageHeader({
   profile,
   mobile,
@@ -356,6 +338,7 @@ export function ChildPageHeader({
   backLabel = "All children",
   onNewObservation,
   onGenerateReport,
+  onEdit,
 }: {
   profile: StudentProfile;
   mobile: boolean;
@@ -363,6 +346,7 @@ export function ChildPageHeader({
   backLabel?: string;
   onNewObservation: () => void;
   onGenerateReport: () => void;
+  onEdit?: () => void;
 }) {
   const displayName = profile.preferredName || profile.fullName;
   const tone = toneFor(profile.id);
@@ -401,6 +385,7 @@ export function ChildPageHeader({
           <MobileKebabMenu
             onNewObservation={onNewObservation}
             onGenerateReport={onGenerateReport}
+            onEdit={onEdit}
           />
         )}
       </div>
@@ -448,27 +433,18 @@ export function ChildPageHeader({
         </div>
 
         {!mobile && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 12,
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="ghost-btn tap" onClick={onNewObservation}>
-                + New observation
-              </button>
-              <button type="button" className="ghost-btn tap">
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button type="button" className="ghost-btn tap" onClick={onNewObservation}>
+              + New observation
+            </button>
+            {onEdit ? (
+              <button type="button" className="ghost-btn tap" onClick={onEdit}>
                 Edit
               </button>
-              <button type="button" className="primary-btn tap" onClick={onGenerateReport}>
-                Generate report
-              </button>
-            </div>
-            <GuardianChip profile={profile} />
+            ) : null}
+            <button type="button" className="primary-btn tap" onClick={onGenerateReport}>
+              Generate report
+            </button>
           </div>
         )}
       </div>
@@ -489,6 +465,7 @@ export function ViewToggle({
     { key: "whole", label: "Whole child" },
     { key: "curriculum", label: "Curriculum" },
     { key: "activity", label: "Activity" },
+    { key: "guardians", label: "Guardians" },
   ];
   return (
     <div

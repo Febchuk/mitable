@@ -52,8 +52,15 @@ export function NewObservationModal({
   }, [open, onClose]);
 
   if (!open) return null;
+  // Guardian records are not observations. Keep capture useful when it is
+  // opened from that tab by defaulting to an activity note.
+  const captureView = pageView === "guardians" ? "activity" : pageView;
   const tabLabel =
-    pageView === "whole" ? "Whole child" : pageView === "curriculum" ? "Curriculum" : "Activity";
+    captureView === "whole"
+      ? "Whole child"
+      : captureView === "curriculum"
+        ? "Curriculum"
+        : "Activity";
 
   return (
     <div
@@ -87,11 +94,11 @@ export function NewObservationModal({
           flexDirection: "column",
         }}
       >
-        <ModalHeader tabLabel={tabLabel} pageView={pageView} onClose={onClose} />
-        {pageView === "whole" && (
+        <ModalHeader tabLabel={tabLabel} pageView={captureView} onClose={onClose} />
+        {captureView === "whole" && (
           <WholeChildForm studentId={studentId} axes={axes} onClose={onClose} onSaved={onClose} />
         )}
-        {pageView === "curriculum" && (
+        {captureView === "curriculum" && (
           <CurriculumForm
             studentId={studentId}
             curriculum={curriculum}
@@ -99,13 +106,13 @@ export function NewObservationModal({
             onSaved={onClose}
           />
         )}
-        {pageView === "activity" && <StubFields onClose={onClose} />}
+        {captureView === "activity" && <StubFields onClose={onClose} />}
       </div>
     </div>
   );
 }
 
-const SUB_FOR: Record<PageView, string> = {
+const SUB_FOR: Record<Exclude<PageView, "guardians">, string> = {
   whole: "Capture what you observed and which dimension it shifted.",
   curriculum: "Tag a subtopic and the level the child is working at.",
   activity: STUB_CONFIG.activity.sub,
@@ -117,7 +124,7 @@ function ModalHeader({
   onClose,
 }: {
   tabLabel: string;
-  pageView: PageView;
+  pageView: Exclude<PageView, "guardians">;
   onClose: () => void;
 }) {
   const sub = SUB_FOR[pageView];

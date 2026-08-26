@@ -81,3 +81,4 @@ apps/electron/electron.vite.config.*.mjs
 
 # User specific files
 *cursor-rules.mdc.claude-flow/
+AGENTS.md

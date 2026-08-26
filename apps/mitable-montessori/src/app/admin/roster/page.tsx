@@ -14,6 +14,7 @@ import {
   formatEnrolled,
   type RosterListViewRow,
 } from "@/components/roster/roster-list-view";
+import { ChildEditorDialog } from "@/components/admin/child-editor-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { executeStudentImportPlan } from "@/lib/admin/execute-student-import-plan";
@@ -83,6 +84,7 @@ export default function AdminSchoolRosterPage() {
   const [mutationError, setMutationError] = React.useState<string | null>(null);
   const [importOpen, setImportOpen] = React.useState(false);
   const [addChildOpen, setAddChildOpen] = React.useState(false);
+  const [editingStudentId, setEditingStudentId] = React.useState<string | null>(null);
 
   const schoolStudentsForImport = React.useMemo(
     () =>
@@ -307,6 +309,7 @@ export default function AdminSchoolRosterPage() {
         rows={visibleRows}
         emptyMessage={emptyMessage}
         scrollMode="stickyHeader"
+        onEditRow={(row) => setEditingStudentId(row.id)}
         toolbar={
           <div style={{ padding: "0 24px 16px" }}>
             <div style={{ position: "relative", maxWidth: 400 }}>
@@ -356,6 +359,14 @@ export default function AdminSchoolRosterPage() {
         schoolStudentsForImport={schoolStudentsForImport}
         onAdd={addChildToSchool}
         onAttachGuardiansOnly={(studentId, input) => attachGuardiansToExisting(studentId, input)}
+      />
+      <ChildEditorDialog
+        open={editingStudentId !== null}
+        studentId={editingStudentId}
+        onOpenChange={(open) => {
+          if (!open) setEditingStudentId(null);
+        }}
+        onSaved={() => void reload()}
       />
     </div>
   );

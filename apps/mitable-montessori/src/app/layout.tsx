@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Suspense } from "react";
+import { NavigationFeedback } from "@/components/navigation-feedback";
 import "@/styles/globals.css";
 import "@/styles/tokens.css";
 import { cn } from "@/lib/utils";
@@ -51,7 +53,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn(dmSans.variable, caveat.variable)} suppressHydrationWarning>
-      <body className="min-h-screen bg-canvas font-sans text-ink antialiased">{children}</body>
+      <body className="min-h-screen bg-canvas font-sans text-ink antialiased">
+        <Suspense fallback={null}>
+          <NavigationFeedback />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

@@ -24,6 +24,14 @@ export interface IssueInvitationResult {
   expiresAt: string;
 }
 
+export interface InvitationPreview {
+  invitationId: string;
+  guardianId: string;
+  email: string;
+  schoolId: string;
+  expiresAt: string;
+}
+
 export class InvitationError extends Error {
   constructor(
     message: string,
@@ -52,6 +60,60 @@ export async function issueInvitation(input: IssueInvitationInput): Promise<Issu
   if (error || !data) throw new InvitationError(error?.message ?? "Insert failed", "db_error");
 
   return { token, invitationId: (data as { id: string }).id, expiresAt };
+}
+
+/** A fresh invite replaces any earlier unclaimed link for this guardian. */
+export async function invalidateActiveInvitations(input: {
+  supabase: SupabaseClient;
+  guardianId: string;
+}): Promise<void> {
+  const { error } = await input.supabase
+    .from("guardian_invitations")
+    .update({ claimed_at: new Date().toISOString() })
+    .eq("guardian_id", input.guardianId)
+    .is("claimed_at", null);
+  if (error) throw new InvitationError(error.message, "db_error");
+}
+
+/** Read an active invite without claiming it, for the account-setup page. */
+export async function lookupInvitation(
+  supabase: SupabaseClient,
+  token: string
+): Promise<InvitationPreview> {
+  const tokenHash = await sha256Hex(token);
+  const { data, error } = await supabase
+    .from("guardian_invitations")
+    .select("id, guardian_id, expires_at, claimed_at, guardians(email, school_id)")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+  if (error) throw new InvitationError(error.message, "db_error");
+  if (!data) throw new InvitationError("Invitation not found", "not_found");
+  const invitation = data as {
+    id: string;
+    guardian_id: string;
+    expires_at: string;
+    claimed_at: string | null;
+    guardians:
+      | { email: string | null; school_id: string }
+      | { email: string | null; school_id: string }[]
+      | null;
+  };
+  if (invitation.claimed_at)
+    throw new InvitationError("Invitation already claimed", "already_claimed");
+  if (new Date(invitation.expires_at).getTime() < Date.now()) {
+    throw new InvitationError("Invitation expired", "expired");
+  }
+  const guardian = Array.isArray(invitation.guardians)
+    ? invitation.guardians[0]
+    : invitation.guardians;
+  if (!guardian?.email) throw new InvitationError("Guardian email missing", "db_error");
+  return {
+    invitationId: invitation.id,
+    guardianId: invitation.guardian_id,
+    email: guardian.email,
+    schoolId: guardian.school_id,
+    expiresAt: invitation.expires_at,
+  };
 }
 
 export interface ClaimInvitationInput {
