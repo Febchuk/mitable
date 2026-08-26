@@ -16,7 +16,7 @@ import { ActivityView } from "./activity";
 import { ChildPageHeader, ViewToggle, type PageView } from "./child-page-header";
 import { CurriculumView } from "./curriculum";
 import { NewObservationModal } from "./new-observation-modal";
-import { StudentMediaCapture, StudentMediaLibrary } from "./student-media";
+import { StudentMediaLibrary } from "./student-media";
 import { useIsMobile } from "./use-is-mobile";
 import { WholeChildView } from "./whole-child";
 import "./child-detail.css";
@@ -48,8 +48,6 @@ export function ChildDetail({
   const mobile = useIsMobile();
   const [pageView, setPageView] = React.useState<PageView>("activity");
   const [newObsOpen, setNewObsOpen] = React.useState(false);
-  const [mediaCaptureOpen, setMediaCaptureOpen] = React.useState(false);
-  const [mediaRefreshKey, setMediaRefreshKey] = React.useState(0);
   const [editOpen, setEditOpen] = React.useState(false);
 
   return (
@@ -59,7 +57,6 @@ export function ChildDetail({
         mobile={mobile}
         backHref={rosterBackLink.href}
         backLabel={rosterBackLink.label}
-        onAddMedia={() => setMediaCaptureOpen(true)}
         onNewObservation={() => setNewObsOpen(true)}
         onGenerateReport={() =>
           ToastBus.push({ message: "Report drafting from this view is coming soon" })
@@ -72,20 +69,19 @@ export function ChildDetail({
       )}
       {pageView === "curriculum" && <CurriculumView mobile={mobile} topics={curriculum} />}
       {pageView === "activity" && (
-        <>
-          <StudentMediaLibrary
-            studentId={profile.id}
-            studentName={profile.preferredName || profile.fullName}
-            refreshKey={mediaRefreshKey}
-            mobile={mobile}
-            onAddMedia={() => setMediaCaptureOpen(true)}
-          />
-          <ActivityView
-            mobile={mobile}
-            entries={activity}
-            reportsRailBasePath={reportsRailBasePath}
-          />
-        </>
+        <ActivityView
+          mobile={mobile}
+          entries={activity}
+          reportsRailBasePath={reportsRailBasePath}
+        />
+      )}
+      {pageView === "media" && (
+        <StudentMediaLibrary
+          studentId={profile.id}
+          studentName={profile.preferredName || profile.fullName}
+          refreshKey={0}
+          mobile={mobile}
+        />
       )}
       {pageView === "guardians" && <GuardiansView profile={profile} canManage={canManage} />}
       <NewObservationModal
@@ -96,13 +92,6 @@ export function ChildDetail({
         studentId={profile.id}
         axes={axes}
         curriculum={curriculum}
-      />
-      <StudentMediaCapture
-        open={mediaCaptureOpen}
-        studentId={profile.id}
-        studentName={profile.preferredName || profile.fullName}
-        onClose={() => setMediaCaptureOpen(false)}
-        onShared={() => setMediaRefreshKey((key) => key + 1)}
       />
       {canManage ? (
         <ChildEditorDialog

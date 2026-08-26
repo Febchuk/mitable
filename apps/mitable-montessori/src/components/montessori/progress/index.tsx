@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { Smartphone } from "lucide-react";
 import { type ProgressMark } from "@/components/montessori/data";
+import { StudentMediaCapture } from "@/components/montessori/child-detail/student-media";
 import { FilterChips, PageHeader } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
@@ -331,6 +333,42 @@ function EmptyState({
   );
 }
 
+function DesktopMediaNotice({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[80] grid place-items-center bg-ink/20 p-5 backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={onClose}
+    >
+      <section
+        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 text-center shadow-[0_24px_60px_rgba(42,39,35,0.2)]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile capture only"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-terracotta-soft text-terracotta-deep">
+          <Smartphone size={23} strokeWidth={1.7} />
+        </span>
+        <h2 className="mt-4 text-xl font-semibold text-ink">
+          Open Mitable on your mobile to complete that.
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">
+          Photos and videos are captured live in the app, rather than selected from a personal
+          camera roll.
+        </p>
+        <button
+          type="button"
+          className="primary-btn tap mt-5 w-full justify-center"
+          onClick={onClose}
+        >
+          Got it
+        </button>
+      </section>
+    </div>
+  );
+}
+
 export function ProgressFeature() {
   const store = useMontessori();
   const cp = store.classroomProgress;
@@ -482,6 +520,12 @@ function ProgressFeatureLoaded({
 
   const [info, setInfo] = React.useState<{ subtopicId: string; rect: DOMRect } | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [desktopMediaNoticeOpen, setDesktopMediaNoticeOpen] = React.useState(false);
+  const [pendingProgressMedia, setPendingProgressMedia] = React.useState<{
+    studentId: string;
+    studentName: string;
+    commandId: string;
+  } | null>(null);
 
   const currentTopic = topicId ? (visibleTopics.find((t) => t.id === topicId) ?? null) : null;
 
@@ -657,6 +701,36 @@ function ProgressFeatureLoaded({
       }`,
     });
     sel.clear();
+  };
+
+  const onApplyAndIncludeMedia = async () => {
+    if (!sel.draftStatus || sel.count !== 1) return;
+    const selectedKey = Array.from(sel.selected)[0];
+    if (!selectedKey) return;
+    const [studentId, subtopicId] = selectedKey.split(":");
+    const subtopic = visibleSubtopics.find((entry) => entry.id === subtopicId);
+    const student = students.find((entry) => entry.id === studentId);
+    if (!subtopic || !student) return;
+
+    const result = await store.applyBulkProgress({
+      topicId: subtopic.topicId,
+      topicName: subtopic.topicName,
+      cells: [{ studentId, subtopicId, subtopicName: subtopic.name }],
+      status: sel.draftStatus,
+      note: sel.draftNote.trim() || undefined,
+    });
+    const commandId = result?.updates.find(
+      (entry) => entry.studentId === studentId && entry.subtopicId === subtopicId
+    )?.commandId;
+    if (!commandId) return;
+
+    sel.clear();
+    setSheetOpen(false);
+    setPendingProgressMedia({
+      studentId,
+      studentName: student.preferredName || student.fullName,
+      commandId,
+    });
   };
 
   const subtopicAtInfo = info ? (subtopics.find((s) => s.id === info.subtopicId) ?? null) : null;
@@ -874,6 +948,7 @@ function ProgressFeatureLoaded({
             onDraftStatus={sel.setDraftStatus}
             onDraftNote={sel.setDraftNote}
             onApply={onApply}
+            onRequestMedia={() => setDesktopMediaNoticeOpen(true)}
             onCancel={sel.clear}
           />
         )}
@@ -902,6 +977,7 @@ function ProgressFeatureLoaded({
               onApply();
               setSheetOpen(false);
             }}
+            onIncludeMedia={() => void onApplyAndIncludeMedia()}
             onClose={() => setSheetOpen(false)}
           />
         )}
@@ -926,6 +1002,17 @@ function ProgressFeatureLoaded({
           onClose={() => setInfo(null)}
         />
       )}
+      {desktopMediaNoticeOpen ? (
+        <DesktopMediaNotice onClose={() => setDesktopMediaNoticeOpen(false)} />
+      ) : null}
+      <StudentMediaCapture
+        open={pendingProgressMedia !== null}
+        studentId={pendingProgressMedia?.studentId ?? ""}
+        studentName={pendingProgressMedia?.studentName ?? "this child"}
+        progressCommandId={pendingProgressMedia?.commandId}
+        onClose={() => setPendingProgressMedia(null)}
+        onShared={() => ToastBus.push({ message: "Progress update and family moment shared" })}
+      />
     </div>
   );
 }

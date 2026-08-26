@@ -52,9 +52,9 @@ export function NewObservationModal({
   }, [open, onClose]);
 
   if (!open) return null;
-  // Guardian records are not observations. Keep capture useful when it is
-  // opened from that tab by defaulting to an activity note.
-  const captureView = pageView === "guardians" ? "activity" : pageView;
+  // Guardian records and the media library are not observation forms. Keep
+  // capture useful when opened from either tab by defaulting to an activity note.
+  const captureView = pageView === "guardians" || pageView === "media" ? "activity" : pageView;
   const tabLabel =
     captureView === "whole"
       ? "Whole child"
@@ -112,7 +112,7 @@ export function NewObservationModal({
   );
 }
 
-const SUB_FOR: Record<Exclude<PageView, "guardians">, string> = {
+const SUB_FOR: Record<Exclude<PageView, "guardians" | "media">, string> = {
   whole: "Capture what you observed and which dimension it shifted.",
   curriculum: "Tag a subtopic and the level the child is working at.",
   activity: STUB_CONFIG.activity.sub,
@@ -124,7 +124,7 @@ function ModalHeader({
   onClose,
 }: {
   tabLabel: string;
-  pageView: Exclude<PageView, "guardians">;
+  pageView: Exclude<PageView, "guardians" | "media">;
   onClose: () => void;
 }) {
   const sub = SUB_FOR[pageView];

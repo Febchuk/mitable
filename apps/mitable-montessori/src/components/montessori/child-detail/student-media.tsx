@@ -79,12 +79,15 @@ export function StudentMediaCapture({
   open,
   studentId,
   studentName,
+  progressCommandId,
   onClose,
   onShared,
 }: {
   open: boolean;
   studentId: string;
   studentName: string;
+  /** The single progress action this camera capture documents. */
+  progressCommandId?: string;
   onClose: () => void;
   onShared: () => void;
 }) {
@@ -311,6 +314,7 @@ export function StudentMediaCapture({
           kind: captured.kind,
           mimeType: captured.mimeType,
           byteSize: captured.blob.size,
+          progressCommandId,
         }),
       });
       if (!start.ok)
@@ -639,7 +643,8 @@ export function StudentMediaLibrary({
   studentName: string;
   refreshKey: number;
   mobile: boolean;
-  onAddMedia: () => void;
+  /** The library is browse-only when capture belongs in another workflow. */
+  onAddMedia?: () => void;
 }) {
   const [items, setItems] = React.useState<StudentMediaItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -700,12 +705,14 @@ export function StudentMediaLibrary({
             <p className="label-cap m-0 text-ink-muted">Family moments</p>
             <h2 className="mt-1 text-base font-semibold text-ink">Photos &amp; videos</h2>
             <p className="mt-1 text-xs leading-5 text-ink-secondary">
-              Captured directly in Mitable and shared with {studentName}&apos;s family.
+              Captured alongside classroom progress and shared with {studentName}&apos;s family.
             </p>
           </div>
-          <button type="button" className="primary-btn tap shrink-0" onClick={onAddMedia}>
-            <Camera size={15} /> Add
-          </button>
+          {onAddMedia ? (
+            <button type="button" className="primary-btn tap shrink-0" onClick={onAddMedia}>
+              <Camera size={15} /> Add
+            </button>
+          ) : null}
         </div>
 
         {loading ? (
@@ -715,7 +722,7 @@ export function StudentMediaLibrary({
             <ImageIcon className="mx-auto h-5 w-5 text-ink-muted" strokeWidth={1.5} />
             <p className="mt-2 text-sm font-medium text-ink">No shared moments yet</p>
             <p className="mt-1 text-xs leading-5 text-ink-secondary">
-              Capture a photo or a short video on mobile to share a glimpse of the classroom.
+              Photos and videos captured with a progress update will appear here.
             </p>
           </div>
         ) : (

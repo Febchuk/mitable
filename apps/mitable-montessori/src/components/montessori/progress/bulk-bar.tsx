@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Camera } from "lucide-react";
 import { STATUS_LABEL, type ProgressMark } from "@/components/montessori/data";
 import { Avatar } from "@/components/montessori/primitives";
 import type { ClassroomProgressStudent } from "@/lib/queries/classroom-progress";
@@ -30,6 +31,7 @@ type CellModeProps = {
   onDraftStatus: (s: ProgressMark) => void;
   onDraftNote: (s: string) => void;
   onApply: () => void;
+  onRequestMedia: () => void;
   onCancel: () => void;
 };
 
@@ -60,6 +62,7 @@ function CellBar({
   onDraftStatus,
   onDraftNote,
   onApply,
+  onRequestMedia,
   onCancel,
 }: CellModeProps) {
   if (count === 0) return null;
@@ -98,6 +101,16 @@ function CellBar({
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto" }}>
+          {count === 1 ? (
+            <button
+              type="button"
+              className={`${styles.ghostBtn} tap`}
+              onClick={onRequestMedia}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Camera size={14} /> Include media
+            </button>
+          ) : null}
           <button type="button" className={`${styles.ghostBtn} tap`} onClick={onCancel}>
             Cancel
           </button>
