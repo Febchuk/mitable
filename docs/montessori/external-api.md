@@ -1,10 +1,12 @@
 # Montessori external API reference
 
 The Montessori app exposes a school-scoped, server-to-server API at
-`https://mitable.ng/api/public/v1` in production. For local development, use
-`http://localhost:3100/api/public/v1`. It is designed for trusted workflow
-integrations such as Lorikeet. Every key is limited to the school where it was
-created.
+`https://www.mitable.ng/api/public/v1` in production. For local development,
+use `http://localhost:3100/api/public/v1`. Always use the `www` production
+host: `https://mitable.ng` redirects to it and may return HTML rather than the
+API response in clients that do not follow redirects. It is designed for
+trusted workflow integrations such as Lorikeet. Every key is limited to the
+school where it was created.
 
 This API intentionally uses a **school-wide integration key**, not a separate
 key for each admin, teacher, or guardian. A workflow should first resolve the
@@ -32,13 +34,18 @@ administrator can then use **Admin → API Keys** to create/revoke keys, or use:
 Send the returned secret with every external request:
 
 ```bash
-curl https://mitable.ng/api/public/v1/classrooms \
+curl https://www.mitable.ng/api/public/v1/classrooms \
   -H "Authorization: Bearer mitable_KEY_ID.SECRET"
 ```
 
 `X-API-Key: mitable_KEY_ID.SECRET` is also accepted. Read keys can call only
 GET endpoints; write keys can call GET plus POST, PATCH, and DELETE endpoints.
 Revoked/expired keys return `401`; records from a different school return `404`.
+
+This is an application API, not direct Supabase table access. A valid key
+returns JSON only from the endpoints documented below, using each endpoint's
+intentional response shape. It does not expose arbitrary database tables or
+every column in a table.
 
 ## Identity and people
 
