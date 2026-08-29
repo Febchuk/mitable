@@ -10,6 +10,10 @@ const PUBLIC_PATHS = [
   "/parents/login",
   "/api/health",
   "/api/v1/auth",
+  // External integrations authenticate in their route handler with an API key,
+  // rather than a browser session. Let them reach that handler so failures are
+  // JSON 401/403 responses instead of browser-login redirects.
+  "/api/public/v1",
   "/api/schools/register",
 ];
 

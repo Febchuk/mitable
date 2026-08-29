@@ -3,11 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, CalendarRange, LayoutTemplate, Users } from "lucide-react";
+import { Book, Building2, CalendarRange, KeyRound, LayoutTemplate, Users } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
-import { adminReportTemplatesEnabled } from "@/lib/feature-flags";
+import { adminExternalApiEnabled, adminReportTemplatesEnabled } from "@/lib/feature-flags";
 
 type NavItem = {
   href: string;
@@ -72,6 +72,15 @@ const ADMIN_NAV_CORE: NavItem[] = [
           href: "/admin/report-templates",
           label: "Templates",
           renderIcon: () => <LayoutTemplate {...lucide} />,
+        },
+      ]
+    : []),
+  ...(adminExternalApiEnabled()
+    ? [
+        {
+          href: "/admin/api-keys",
+          label: "API Keys",
+          renderIcon: () => <KeyRound {...lucide} />,
         },
       ]
     : []),

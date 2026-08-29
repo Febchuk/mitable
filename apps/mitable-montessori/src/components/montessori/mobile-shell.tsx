@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   HelpCircle,
+  KeyRound,
   LayoutTemplate,
   LogOut,
   MessageSquare,
@@ -25,7 +26,7 @@ import { clearSessionKeys } from "@/lib/crypto/session-key";
 import { getRevealHidden, setRevealHidden } from "@/lib/visibility/reveal-hidden";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
-import { adminReportTemplatesEnabled } from "@/lib/feature-flags";
+import { adminExternalApiEnabled, adminReportTemplatesEnabled } from "@/lib/feature-flags";
 
 /**
  * Mobile shell for Mitable Montessori.
@@ -95,6 +96,9 @@ const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/terms", label: "Terms", icon: <CalendarRange {...lu} /> },
   ...(adminReportTemplatesEnabled()
     ? [{ href: "/admin/report-templates", label: "Templates", icon: <LayoutTemplate {...lu} /> }]
+    : []),
+  ...(adminExternalApiEnabled()
+    ? [{ href: "/admin/api-keys", label: "API Keys", icon: <KeyRound {...lu} /> }]
     : []),
   { href: "/admin/teachers", label: "Teachers", icon: <Users {...lu} /> },
   {
