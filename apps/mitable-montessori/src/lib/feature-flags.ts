@@ -81,6 +81,15 @@ export function adminReportTemplatesEnabled(): boolean {
 }
 
 /**
+ * When true, exposes the Admin → API Keys page for creating and revoking
+ * school-scoped external-integration credentials. Off by default because most
+ * school administrators do not need to manage developer integrations.
+ */
+export function adminExternalApiEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_ADMIN_EXTERNAL_API");
+}
+
+/**
  * When true, reports are AI-scored on submit and edit (confidence score, flags,
  * completeness bar in the list). Off by default.
  */
