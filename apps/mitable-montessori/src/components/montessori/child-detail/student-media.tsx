@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import type { StudentMediaKind, StudentMediaMimeType } from "@/lib/media/constants";
+import "./child-detail.css";
 
 const MAX_VIDEO_SECONDS = 90;
 
@@ -553,7 +554,7 @@ export function StudentMediaCapture({
 
 function CaptureSheet({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="cd-sheet-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="cd-root cd-sheet-backdrop" role="presentation" onMouseDown={onClose}>
       <section
         className="cd-sheet"
         role="dialog"
