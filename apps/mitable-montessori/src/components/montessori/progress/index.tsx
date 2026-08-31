@@ -2,8 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { ChevronDown, Smartphone } from "lucide-react";
 import { type ProgressMark } from "@/components/montessori/data";
-import { FilterChips, PageHeader } from "@/components/montessori/page-header";
+import { StudentMediaCapture } from "@/components/montessori/child-detail/student-media";
+import { PageHeader } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
 import type {
@@ -13,7 +15,6 @@ import type {
   ClassroomProgressTopic,
   ClassroomProgressSubject,
 } from "@/lib/queries/classroom-progress";
-import { GROUP_COLOR_META } from "@/lib/classroom-groups";
 import { classroomGroupsEnabled } from "@/lib/feature-flags";
 import type { MarkingSchema } from "@/lib/progress/marking-schemas";
 import { BulkBar } from "./bulk-bar";
@@ -27,68 +28,6 @@ import { SelectionCapsule } from "./selection-capsule";
 import { SubtopicPopover } from "./subtopic-popover";
 
 const ALL_SUBJECTS = "__all__";
-
-/** Horizontal group ("team") filter pills. Used in the mobile Progress layout;
- *  the desktop layout shows the same filter inside the LeftRail. */
-function GroupFilterChips({
-  groups,
-  groupId,
-  onChange,
-}: {
-  groups: ClassroomGroup[];
-  groupId: string | null;
-  onChange: (id: string | null) => void;
-}) {
-  const chip = (active: boolean): React.CSSProperties => ({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 12,
-    fontWeight: 500,
-    padding: "6px 12px",
-    borderRadius: 999,
-    whiteSpace: "nowrap",
-    background: active ? "var(--color-ink)" : "var(--color-surface)",
-    color: active ? "var(--color-surface)" : "var(--color-ink-secondary)",
-    border: active ? "1px solid var(--color-ink)" : "1px solid var(--color-border)",
-  });
-  return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-      <button
-        type="button"
-        className="tap"
-        onClick={() => onChange(null)}
-        style={chip(groupId === null)}
-      >
-        All
-      </button>
-      {groups.map((g) => {
-        const active = groupId === g.id;
-        return (
-          <button
-            key={g.id}
-            type="button"
-            className="tap"
-            onClick={() => onChange(g.id)}
-            style={chip(active)}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                flexShrink: 0,
-                background: GROUP_COLOR_META[g.color].cssVar,
-              }}
-            />
-            {g.name}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 /** Horizontal class switcher pills. Used in the mobile Progress layout and the
  *  curriculum-less empty state; the desktop layout shows the same picker inside
@@ -138,6 +77,208 @@ function ClassFilterChips({
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * A compact mobile filter drawer. The previous chip wall made it hard to tell
+ * which classroom or part of the curriculum was actually being viewed.
+ */
+function MobileProgressFilters({
+  classrooms,
+  selectedClassroomId,
+  onClassroomChange,
+  classroomBusy,
+  groups,
+  groupsEnabled,
+  groupId,
+  onGroupChange,
+  subjects,
+  subjectId,
+  onSubjectChange,
+  topics,
+  topicId,
+  onTopicChange,
+}: {
+  classrooms: Array<{ id: string; name: string }>;
+  selectedClassroomId: string | null;
+  onClassroomChange: (id: string) => void;
+  classroomBusy: boolean;
+  groups: ClassroomGroup[];
+  groupsEnabled: boolean;
+  groupId: string | null;
+  onGroupChange: (id: string | null) => void;
+  subjects: ClassroomProgressSubject[];
+  subjectId: string;
+  onSubjectChange: (id: string) => void;
+  topics: ClassroomProgressTopic[];
+  topicId: string | null;
+  onTopicChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const classroomName =
+    classrooms.find((classroom) => classroom.id === selectedClassroomId)?.name ?? "Classroom";
+  const groupName = groups.find((group) => group.id === groupId)?.name ?? "Whole class";
+  const subjectName =
+    subjectId === ALL_SUBJECTS
+      ? "All subjects"
+      : (subjects.find((subject) => subject.id === subjectId)?.name ?? "All subjects");
+  const topicName = topics.find((topic) => topic.id === topicId)?.name ?? "All topics";
+  const selectStyle: React.CSSProperties = {
+    width: "100%",
+    minHeight: 42,
+    border: "1px solid var(--color-border)",
+    borderRadius: 10,
+    background: "var(--color-canvas)",
+    color: "var(--color-ink)",
+    padding: "0 10px",
+    fontSize: 14,
+  };
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    marginBottom: 5,
+    color: "var(--color-ink-muted)",
+    fontSize: 10,
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+  };
+
+  return (
+    <section
+      style={{
+        margin: "12px 16px 8px",
+        border: "1px solid var(--color-border)",
+        borderRadius: 14,
+        background: "var(--color-surface)",
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        className="tap"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "12px 14px",
+          textAlign: "left",
+          color: "var(--color-ink)",
+        }}
+      >
+        <span style={{ minWidth: 0 }}>
+          <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
+            Viewing
+          </span>
+          <span
+            style={{
+              display: "block",
+              overflow: "hidden",
+              marginTop: 3,
+              color: "var(--color-ink-secondary)",
+              fontSize: 13,
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {classroomName} · {subjectName} · {topicName}
+            {groupsEnabled && groupId ? ` · ${groupName}` : ""}
+          </span>
+        </span>
+        <ChevronDown
+          size={18}
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            color: "var(--color-ink-muted)",
+            transform: open ? "rotate(180deg)" : undefined,
+            transition: "transform 160ms ease",
+          }}
+        />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 12,
+            padding: "0 14px 14px",
+            borderTop: "1px solid var(--color-border)",
+            paddingTop: 14,
+          }}
+        >
+          {classrooms.length > 1 && (
+            <label style={{ gridColumn: "1 / -1" }}>
+              <span style={labelStyle}>Classroom</span>
+              <select
+                value={selectedClassroomId ?? ""}
+                onChange={(event) => onClassroomChange(event.target.value)}
+                disabled={classroomBusy}
+                style={selectStyle}
+              >
+                {classrooms.map((classroom) => (
+                  <option key={classroom.id} value={classroom.id}>
+                    {classroom.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {groupsEnabled && groups.length > 0 && (
+            <label style={{ gridColumn: "1 / -1" }}>
+              <span style={labelStyle}>Group</span>
+              <select
+                value={groupId ?? ""}
+                onChange={(event) => onGroupChange(event.target.value || null)}
+                style={selectStyle}
+              >
+                <option value="">Whole class</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            <span style={labelStyle}>Subject</span>
+            <select
+              value={subjectId}
+              onChange={(event) => onSubjectChange(event.target.value)}
+              style={selectStyle}
+            >
+              <option value={ALL_SUBJECTS}>All subjects</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span style={labelStyle}>Topic</span>
+            <select
+              value={topicId ?? ""}
+              onChange={(event) => onTopicChange(event.target.value || null)}
+              style={selectStyle}
+            >
+              <option value="">All topics</option>
+              {topics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -331,6 +472,42 @@ function EmptyState({
   );
 }
 
+function DesktopMediaNotice({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[80] grid place-items-center bg-ink/20 p-5 backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={onClose}
+    >
+      <section
+        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 text-center shadow-[0_24px_60px_rgba(42,39,35,0.2)]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile capture only"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-terracotta-soft text-terracotta-deep">
+          <Smartphone size={23} strokeWidth={1.7} />
+        </span>
+        <h2 className="mt-4 text-xl font-semibold text-ink">
+          Open Mitable on your mobile to complete that.
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">
+          Photos and videos are captured live in the app, rather than selected from a personal
+          camera roll.
+        </p>
+        <button
+          type="button"
+          className="primary-btn tap mt-5 w-full justify-center"
+          onClick={onClose}
+        >
+          Got it
+        </button>
+      </section>
+    </div>
+  );
+}
+
 export function ProgressFeature() {
   const store = useMontessori();
   const cp = store.classroomProgress;
@@ -482,6 +659,12 @@ function ProgressFeatureLoaded({
 
   const [info, setInfo] = React.useState<{ subtopicId: string; rect: DOMRect } | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [desktopMediaNoticeOpen, setDesktopMediaNoticeOpen] = React.useState(false);
+  const [pendingProgressMedia, setPendingProgressMedia] = React.useState<{
+    studentId: string;
+    studentName: string;
+    commandId?: string;
+  } | null>(null);
 
   const currentTopic = topicId ? (visibleTopics.find((t) => t.id === topicId) ?? null) : null;
 
@@ -659,30 +842,60 @@ function ProgressFeatureLoaded({
     sel.clear();
   };
 
-  const subtopicAtInfo = info ? (subtopics.find((s) => s.id === info.subtopicId) ?? null) : null;
+  const onApplyAndIncludeMedia = async () => {
+    if (sel.count !== 1) return;
+    const selectedKey = Array.from(sel.selected)[0];
+    if (!selectedKey) return;
+    const [studentId, subtopicId] = selectedKey.split(":");
+    const subtopic = visibleSubtopics.find((entry) => entry.id === subtopicId);
+    const student = students.find((entry) => entry.id === studentId);
+    if (!subtopic || !student) return;
 
-  const subjectChipOptions = ["All", ...subjects.map((s) => s.name)];
-  const subjectChipValue =
-    subjectId === ALL_SUBJECTS ? "All" : (subjects.find((s) => s.id === subjectId)?.name ?? "All");
-  const onSubjectChipChange = (label: string) => {
-    if (label === "All") switchSubject(ALL_SUBJECTS);
-    else {
-      const found = subjects.find((s) => s.name === label);
-      if (found) switchSubject(found.id);
-    }
-  };
+    // A teacher can document a classroom moment before deciding whether it is
+    // an introduction, practice, or mastery update. In that case we open the
+    // live camera without writing a progress command at all.
+    const openMediaCapture = (commandId?: string) => {
+      // Let the progress tray finish closing before mounting the capture sheet.
+      // On mobile, mounting both sheets during the same tap can cause the new
+      // sheet to receive that tap as a dismissal.
+      sel.clear();
+      setSheetOpen(false);
+      window.requestAnimationFrame(() => {
+        setPendingProgressMedia({
+          studentId,
+          studentName: student.preferredName || student.fullName,
+          commandId,
+        });
+      });
+    };
 
-  const ALL_TOPICS_LABEL = "All topics";
-  const topicChipOptions = [ALL_TOPICS_LABEL, ...visibleTopics.map((t) => t.name)];
-  const topicChipValue = currentTopic?.name ?? ALL_TOPICS_LABEL;
-  const onTopicChipChange = (label: string) => {
-    if (label === ALL_TOPICS_LABEL) {
-      switchTopic(null);
+    if (!sel.draftStatus) {
+      openMediaCapture();
       return;
     }
-    const found = visibleTopics.find((t) => t.name === label);
-    if (found) switchTopic(found.id);
+
+    const result = await store.applyBulkProgress({
+      topicId: subtopic.topicId,
+      topicName: subtopic.topicName,
+      cells: [{ studentId, subtopicId, subtopicName: subtopic.name }],
+      status: sel.draftStatus,
+      note: sel.draftNote.trim() || undefined,
+    });
+    const commandId = result?.updates.find(
+      (entry) => entry.studentId === studentId && entry.subtopicId === subtopicId
+    )?.commandId;
+    if (!commandId) {
+      ToastBus.push({
+        message:
+          "Progress saved, but the camera couldn't open. Please try Include photo/video again.",
+      });
+      return;
+    }
+
+    openMediaCapture(commandId);
   };
+
+  const subtopicAtInfo = info ? (subtopics.find((s) => s.id === info.subtopicId) ?? null) : null;
 
   return (
     <div className="progress-root">
@@ -745,65 +958,22 @@ function ProgressFeatureLoaded({
 
           {/* Mobile layout */}
           <div className={`lg:hidden ${styles.mobileColumn}`}>
-            {classrooms.length > 1 && (
-              <div
-                style={{
-                  padding: "4px 16px 4px",
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                }}
-              >
-                <ClassFilterChips
-                  classrooms={classrooms}
-                  selectedClassroomId={selectedClassroomId}
-                  onChange={selectClassroom}
-                  busy={classroomBusy}
-                />
-              </div>
-            )}
-            {groupsEnabled && groups.length > 0 && (
-              <div
-                style={{
-                  padding: "4px 16px 4px",
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                }}
-              >
-                <GroupFilterChips groups={groups} groupId={groupId} onChange={switchGroup} />
-              </div>
-            )}
-            {subjects.length > 1 && (
-              <div
-                style={{
-                  padding: "4px 16px 4px",
-                  display: "flex",
-                  gap: 6,
-                  overflowX: "auto",
-                }}
-              >
-                <FilterChips
-                  options={subjectChipOptions}
-                  value={subjectChipValue}
-                  onChange={onSubjectChipChange}
-                />
-              </div>
-            )}
-            <div
-              style={{
-                padding: "4px 16px 8px",
-                display: "flex",
-                gap: 6,
-                overflowX: "auto",
-              }}
-            >
-              <FilterChips
-                options={topicChipOptions}
-                value={topicChipValue}
-                onChange={onTopicChipChange}
-              />
-            </div>
+            <MobileProgressFilters
+              classrooms={classrooms}
+              selectedClassroomId={selectedClassroomId}
+              onClassroomChange={selectClassroom}
+              classroomBusy={classroomBusy}
+              groups={groups}
+              groupsEnabled={groupsEnabled}
+              groupId={groupId}
+              onGroupChange={switchGroup}
+              subjects={subjects}
+              subjectId={subjectId}
+              onSubjectChange={switchSubject}
+              topics={visibleTopics}
+              topicId={topicId}
+              onTopicChange={switchTopic}
+            />
             <div
               style={{
                 padding: "4px 16px 12px",
@@ -874,6 +1044,7 @@ function ProgressFeatureLoaded({
             onDraftStatus={sel.setDraftStatus}
             onDraftNote={sel.setDraftNote}
             onApply={onApply}
+            onRequestMedia={() => setDesktopMediaNoticeOpen(true)}
             onCancel={sel.clear}
           />
         )}
@@ -902,6 +1073,7 @@ function ProgressFeatureLoaded({
               onApply();
               setSheetOpen(false);
             }}
+            onIncludeMedia={() => void onApplyAndIncludeMedia()}
             onClose={() => setSheetOpen(false)}
           />
         )}
@@ -926,6 +1098,21 @@ function ProgressFeatureLoaded({
           onClose={() => setInfo(null)}
         />
       )}
+      {desktopMediaNoticeOpen ? (
+        <DesktopMediaNotice onClose={() => setDesktopMediaNoticeOpen(false)} />
+      ) : null}
+      {pendingProgressMedia ? (
+        <StudentMediaCapture
+          key={`${pendingProgressMedia.studentId}:${pendingProgressMedia.commandId ?? "moment"}`}
+          open
+          studentId={pendingProgressMedia.studentId}
+          studentName={pendingProgressMedia.studentName}
+          progressCommandId={pendingProgressMedia.commandId}
+          forceMobileCapture
+          onClose={() => setPendingProgressMedia(null)}
+          onShared={() => ToastBus.push({ message: "Progress update and family moment shared" })}
+        />
+      ) : null}
     </div>
   );
 }

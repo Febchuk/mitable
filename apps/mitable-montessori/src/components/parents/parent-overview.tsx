@@ -3,14 +3,18 @@
 import * as React from "react";
 import { WholeChildView } from "@/components/montessori/child-detail/whole-child";
 import { useIsMobile } from "@/components/montessori/child-detail/use-is-mobile";
+import type { ParentMediaItem } from "@/lib/media/parent-media";
 import type { StudentProfile } from "@/lib/queries/student-profile";
 import type { AxisWithAssessment, WholeChildObservation } from "@/lib/queries/whole-child";
 
 export type ParentActivity = {
   id: string;
-  kind: "learning" | "whole-child" | "report";
+  kind: "learning" | "whole-child" | "report" | "progress" | "moment";
   title: string;
   detail: string | null;
+  note?: string | null;
+  status?: string;
+  media?: ParentMediaItem[];
   createdAt: string;
 };
 
@@ -65,7 +69,9 @@ export function ParentOverview({
           <p className="label-cap text-ink-muted">Activity over time</p>
           <h2 className="mt-1 text-xl font-semibold text-ink">Learning and shared updates</h2>
           {activity.length === 0 ? (
-            <p className="mt-6 text-sm text-ink-secondary">No activity has been shared yet.</p>
+            <p className="mt-6 text-sm text-ink-secondary">
+              No learning activity has been shared yet.
+            </p>
           ) : (
             <ol className="mt-5 divide-y divide-border">
               {activity.map((entry) => (
@@ -84,6 +90,52 @@ export function ParentOverview({
                     <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">
                       {entry.detail}
                     </p>
+                  ) : null}
+                  {entry.status ? (
+                    <span className="mt-2 inline-flex rounded-full border border-sage-deep bg-sage-soft px-2.5 py-1 text-xs font-medium text-sage-deep">
+                      {entry.status}
+                    </span>
+                  ) : null}
+                  {entry.note ? (
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">
+                      {entry.note}
+                    </p>
+                  ) : null}
+                  {entry.media && entry.media.length > 0 ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {entry.media.map((item) => (
+                        <figure
+                          key={item.id}
+                          className="overflow-hidden rounded-xl border border-border bg-canvas"
+                        >
+                          {item.url ? (
+                            item.kind === "video" ? (
+                              <video
+                                controls
+                                preload="metadata"
+                                src={item.url}
+                                className="block max-h-80 w-full bg-ink"
+                              />
+                            ) : (
+                              <img
+                                src={item.url}
+                                alt={item.caption || `A classroom moment for ${name}`}
+                                className="block max-h-80 w-full object-cover"
+                              />
+                            )
+                          ) : (
+                            <div className="grid min-h-32 place-items-center p-3 text-xs text-ink-muted">
+                              Preview unavailable
+                            </div>
+                          )}
+                          {item.caption ? (
+                            <figcaption className="px-3 py-2 text-xs leading-5 text-ink-secondary">
+                              {item.caption}
+                            </figcaption>
+                          ) : null}
+                        </figure>
+                      ))}
+                    </div>
                   ) : null}
                 </li>
               ))}

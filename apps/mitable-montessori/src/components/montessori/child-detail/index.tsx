@@ -16,6 +16,7 @@ import { ActivityView } from "./activity";
 import { ChildPageHeader, ViewToggle, type PageView } from "./child-page-header";
 import { CurriculumView } from "./curriculum";
 import { NewObservationModal } from "./new-observation-modal";
+import { StudentMediaLibrary } from "./student-media";
 import { useIsMobile } from "./use-is-mobile";
 import { WholeChildView } from "./whole-child";
 import "./child-detail.css";
@@ -72,6 +73,14 @@ export function ChildDetail({
           mobile={mobile}
           entries={activity}
           reportsRailBasePath={reportsRailBasePath}
+        />
+      )}
+      {pageView === "media" && (
+        <StudentMediaLibrary
+          studentId={profile.id}
+          studentName={profile.preferredName || profile.fullName}
+          refreshKey={0}
+          mobile={mobile}
         />
       )}
       {pageView === "guardians" && <GuardiansView profile={profile} canManage={canManage} />}

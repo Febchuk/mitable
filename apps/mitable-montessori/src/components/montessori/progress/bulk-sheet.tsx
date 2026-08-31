@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Camera } from "lucide-react";
 import {
   STATUS_COLOR,
   STATUS_LABEL,
@@ -35,6 +36,7 @@ type CellModeProps = {
   onDraftStatus: (s: ProgressMark) => void;
   onDraftNote: (s: string) => void;
   onApply: () => void;
+  onIncludeMedia: () => void;
   onClose: () => void;
 };
 
@@ -108,6 +110,7 @@ function CellSheet({
   onDraftStatus,
   onDraftNote,
   onApply,
+  onIncludeMedia,
   onClose,
 }: CellModeProps) {
   const statuses = marksForSchema(markingSchema, true);
@@ -183,6 +186,40 @@ function CellSheet({
           style={noteTextareaStyle}
         />
       </div>
+      {count === 1 ? (
+        <button
+          type="button"
+          className="tap"
+          onClick={onIncludeMedia}
+          style={{
+            marginTop: 10,
+            width: "100%",
+            padding: "11px 12px",
+            borderRadius: 12,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
+            color: "var(--color-ink)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            fontSize: 13.5,
+            fontWeight: 600,
+          }}
+        >
+          <Camera size={16} strokeWidth={1.8} /> Include photo/video
+        </button>
+      ) : (
+        <p style={{ margin: "12px 2px 0", fontSize: 12, color: "var(--color-ink-muted)" }}>
+          To include media, select one child and one activity.
+        </p>
+      )}
+      {count === 1 ? (
+        <p style={{ margin: "7px 2px 0", fontSize: 12, color: "var(--color-ink-muted)" }}>
+          You can capture without changing the progress level. If you choose a level first, the
+          moment will be attached to that update.
+        </p>
+      ) : null}
       <button
         type="button"
         className="tap"

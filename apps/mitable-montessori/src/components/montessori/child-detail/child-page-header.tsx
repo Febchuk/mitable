@@ -8,7 +8,7 @@ import type { Tone } from "../data";
 import type { StudentProfile } from "@/lib/queries/student-profile";
 import { ChevLeft, InfoIcon, Kebab } from "./icons";
 
-export type PageView = "whole" | "curriculum" | "activity" | "guardians";
+export type PageView = "whole" | "curriculum" | "activity" | "media" | "guardians";
 
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
 
@@ -465,6 +465,7 @@ export function ViewToggle({
     { key: "whole", label: "Whole child" },
     { key: "curriculum", label: "Curriculum" },
     { key: "activity", label: "Activity" },
+    { key: "media", label: "Media" },
     { key: "guardians", label: "Guardians" },
   ];
   return (
