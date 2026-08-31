@@ -1102,6 +1102,7 @@ function ProgressFeatureLoaded({
         studentId={pendingProgressMedia?.studentId ?? ""}
         studentName={pendingProgressMedia?.studentName ?? "this child"}
         progressCommandId={pendingProgressMedia?.commandId}
+        forceMobileCapture
         onClose={() => setPendingProgressMedia(null)}
         onShared={() => ToastBus.push({ message: "Progress update and family moment shared" })}
       />

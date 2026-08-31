@@ -80,6 +80,7 @@ export function StudentMediaCapture({
   studentId,
   studentName,
   progressCommandId,
+  forceMobileCapture = false,
   onClose,
   onShared,
 }: {
@@ -88,6 +89,8 @@ export function StudentMediaCapture({
   studentName: string;
   /** The single progress action this camera capture documents. */
   progressCommandId?: string;
+  /** The progress tray is rendered only on mobile; do not rely on user-agent detection there. */
+  forceMobileCapture?: boolean;
   onClose: () => void;
   onShared: () => void;
 }) {
@@ -154,8 +157,8 @@ export function StudentMediaCapture({
       setScreen("closed");
       return;
     }
-    setScreen(isMobileDevice() ? "chooser" : "desktop");
-  }, [open, reset]);
+    setScreen(forceMobileCapture || isMobileDevice() ? "chooser" : "desktop");
+  }, [open, reset, forceMobileCapture]);
 
   React.useEffect(() => {
     if (screen !== "camera" || !streamRef.current || !videoRef.current) return;
