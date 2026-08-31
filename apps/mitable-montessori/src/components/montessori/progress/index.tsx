@@ -854,13 +854,23 @@ function ProgressFeatureLoaded({
     // A teacher can document a classroom moment before deciding whether it is
     // an introduction, practice, or mastery update. In that case we open the
     // live camera without writing a progress command at all.
-    if (!sel.draftStatus) {
+    const openMediaCapture = (commandId?: string) => {
+      // Let the progress tray finish closing before mounting the capture sheet.
+      // On mobile, mounting both sheets during the same tap can cause the new
+      // sheet to receive that tap as a dismissal.
       sel.clear();
       setSheetOpen(false);
-      setPendingProgressMedia({
-        studentId,
-        studentName: student.preferredName || student.fullName,
+      window.requestAnimationFrame(() => {
+        setPendingProgressMedia({
+          studentId,
+          studentName: student.preferredName || student.fullName,
+          commandId,
+        });
       });
+    };
+
+    if (!sel.draftStatus) {
+      openMediaCapture();
       return;
     }
 
@@ -882,13 +892,7 @@ function ProgressFeatureLoaded({
       return;
     }
 
-    sel.clear();
-    setSheetOpen(false);
-    setPendingProgressMedia({
-      studentId,
-      studentName: student.preferredName || student.fullName,
-      commandId,
-    });
+    openMediaCapture(commandId);
   };
 
   const subtopicAtInfo = info ? (subtopics.find((s) => s.id === info.subtopicId) ?? null) : null;
@@ -1097,15 +1101,18 @@ function ProgressFeatureLoaded({
       {desktopMediaNoticeOpen ? (
         <DesktopMediaNotice onClose={() => setDesktopMediaNoticeOpen(false)} />
       ) : null}
-      <StudentMediaCapture
-        open={pendingProgressMedia !== null}
-        studentId={pendingProgressMedia?.studentId ?? ""}
-        studentName={pendingProgressMedia?.studentName ?? "this child"}
-        progressCommandId={pendingProgressMedia?.commandId}
-        forceMobileCapture
-        onClose={() => setPendingProgressMedia(null)}
-        onShared={() => ToastBus.push({ message: "Progress update and family moment shared" })}
-      />
+      {pendingProgressMedia ? (
+        <StudentMediaCapture
+          key={`${pendingProgressMedia.studentId}:${pendingProgressMedia.commandId ?? "moment"}`}
+          open
+          studentId={pendingProgressMedia.studentId}
+          studentName={pendingProgressMedia.studentName}
+          progressCommandId={pendingProgressMedia.commandId}
+          forceMobileCapture
+          onClose={() => setPendingProgressMedia(null)}
+          onShared={() => ToastBus.push({ message: "Progress update and family moment shared" })}
+        />
+      ) : null}
     </div>
   );
 }
