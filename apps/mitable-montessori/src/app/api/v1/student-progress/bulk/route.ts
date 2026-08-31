@@ -109,8 +109,14 @@ export async function POST(req: Request) {
   const requestedRows = parsed.data.updates.map((update, index) => ({
     update,
     clientId: `bulk-${auth.user.userId}-${Date.now()}-${index}`,
+    // The caller needs this identifier immediately to attach a live camera
+    // capture to this exact update. Generating it here avoids depending on a
+    // post-insert SELECT response, which can be empty under a stricter RLS
+    // configuration even though the progress command was successfully saved.
+    commandId: crypto.randomUUID(),
   }));
-  const rows = requestedRows.map(({ update: u, clientId }) => ({
+  const rows = requestedRows.map(({ update: u, clientId, commandId }) => ({
+    id: commandId,
     client_id: clientId,
     school_id: auth.user.schoolId,
     user_id: auth.user.userId,
@@ -128,7 +134,7 @@ export async function POST(req: Request) {
     approved_at: now,
   }));
 
-  const { data, error } = await supabase.from("commands").insert(rows).select("id, client_id");
+  const { error } = await supabase.from("commands").insert(rows);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -144,17 +150,13 @@ export async function POST(req: Request) {
     },
   });
 
-  const commandIdByClientId = new Map(
-    (data ?? []).map((row) => [row.client_id as string, row.id as string] as const)
-  );
   return NextResponse.json({
     ok: true,
-    applied: data?.length ?? 0,
-    updates: requestedRows.flatMap(({ update, clientId }) => {
-      const commandId = commandIdByClientId.get(clientId);
-      return commandId
-        ? [{ studentId: update.studentId, subtopicId: update.subtopicId, commandId }]
-        : [];
-    }),
+    applied: rows.length,
+    updates: requestedRows.map(({ update, commandId }) => ({
+      studentId: update.studentId,
+      subtopicId: update.subtopicId,
+      commandId,
+    })),
   });
 }

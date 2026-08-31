@@ -663,7 +663,7 @@ function ProgressFeatureLoaded({
   const [pendingProgressMedia, setPendingProgressMedia] = React.useState<{
     studentId: string;
     studentName: string;
-    commandId: string;
+    commandId?: string;
   } | null>(null);
 
   const currentTopic = topicId ? (visibleTopics.find((t) => t.id === topicId) ?? null) : null;
@@ -843,13 +843,26 @@ function ProgressFeatureLoaded({
   };
 
   const onApplyAndIncludeMedia = async () => {
-    if (!sel.draftStatus || sel.count !== 1) return;
+    if (sel.count !== 1) return;
     const selectedKey = Array.from(sel.selected)[0];
     if (!selectedKey) return;
     const [studentId, subtopicId] = selectedKey.split(":");
     const subtopic = visibleSubtopics.find((entry) => entry.id === subtopicId);
     const student = students.find((entry) => entry.id === studentId);
     if (!subtopic || !student) return;
+
+    // A teacher can document a classroom moment before deciding whether it is
+    // an introduction, practice, or mastery update. In that case we open the
+    // live camera without writing a progress command at all.
+    if (!sel.draftStatus) {
+      sel.clear();
+      setSheetOpen(false);
+      setPendingProgressMedia({
+        studentId,
+        studentName: student.preferredName || student.fullName,
+      });
+      return;
+    }
 
     const result = await store.applyBulkProgress({
       topicId: subtopic.topicId,
@@ -861,7 +874,13 @@ function ProgressFeatureLoaded({
     const commandId = result?.updates.find(
       (entry) => entry.studentId === studentId && entry.subtopicId === subtopicId
     )?.commandId;
-    if (!commandId) return;
+    if (!commandId) {
+      ToastBus.push({
+        message:
+          "Progress saved, but the camera couldn't open. Please try Include photo/video again.",
+      });
+      return;
+    }
 
     sel.clear();
     setSheetOpen(false);

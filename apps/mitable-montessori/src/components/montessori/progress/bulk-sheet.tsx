@@ -191,7 +191,6 @@ function CellSheet({
           type="button"
           className="tap"
           onClick={onIncludeMedia}
-          disabled={!draftStatus}
           style={{
             marginTop: 10,
             width: "100%",
@@ -199,7 +198,7 @@ function CellSheet({
             borderRadius: 12,
             border: "1px solid var(--color-border)",
             background: "var(--color-surface)",
-            color: draftStatus ? "var(--color-ink)" : "var(--color-ink-muted)",
+            color: "var(--color-ink)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -217,7 +216,8 @@ function CellSheet({
       )}
       {count === 1 ? (
         <p style={{ margin: "7px 2px 0", fontSize: 12, color: "var(--color-ink-muted)" }}>
-          This saves the progress update, then opens the camera.
+          You can capture without changing the progress level. If you choose a level first, the
+          moment will be attached to that update.
         </p>
       ) : null}
       <button
