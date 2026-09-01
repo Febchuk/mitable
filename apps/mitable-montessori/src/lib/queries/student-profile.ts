@@ -20,6 +20,7 @@ export type StudentProfile = {
   id: string;
   fullName: string;
   preferredName: string | null;
+  admissionNumber?: string | null;
   birthDate: string | null;
   sex: string | null;
   notes: string | null;
@@ -34,6 +35,7 @@ type StudentRow = {
   first_name: string;
   last_name: string;
   preferred_name: string | null;
+  admission_number: string | null;
   birth_date: string | null;
   sex: string | null;
   notes: string | null;
@@ -90,7 +92,9 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
 
   const { data: student } = await supabase
     .from("students")
-    .select("id, first_name, last_name, preferred_name, birth_date, sex, notes, archived_at")
+    .select(
+      "id, first_name, last_name, preferred_name, admission_number, birth_date, sex, notes, archived_at"
+    )
     .eq("id", studentId)
     .maybeSingle<StudentRow>();
   if (!student || student.archived_at) return null;
@@ -166,6 +170,7 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
     id: student.id,
     fullName: `${student.first_name} ${student.last_name}`.trim(),
     preferredName: student.preferred_name,
+    admissionNumber: student.admission_number,
     birthDate: student.birth_date,
     sex: student.sex,
     notes: student.notes,

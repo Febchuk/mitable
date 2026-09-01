@@ -42,7 +42,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const supabase = createClient(cookieStore);
   const { data: student, error } = await supabase
     .from("students")
-    .select("id, first_name, last_name, preferred_name, birth_date, sex, notes")
+    .select("id, first_name, last_name, preferred_name, admission_number, birth_date, sex, notes")
     .eq("id", id)
     .eq("school_id", auth.user.schoolId)
     .is("archived_at", null)
@@ -84,6 +84,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       firstName: student.first_name,
       lastName: student.last_name,
       preferredName: student.preferred_name,
+      admissionNumber: student.admission_number ?? "",
       birthDate: student.birth_date,
       sex: student.sex,
       notes: student.notes,

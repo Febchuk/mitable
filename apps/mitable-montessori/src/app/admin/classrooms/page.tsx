@@ -594,6 +594,7 @@ export default function AdminClassroomsPage() {
   const addChildManually = async (input: {
     firstName: string;
     lastName: string;
+    admissionNumber?: string;
     birthDate?: string;
     guardianFirstName?: string;
     guardianLastName?: string;
@@ -604,11 +605,13 @@ export default function AdminClassroomsPage() {
     setMutationError(null);
     try {
       const bd = input.birthDate?.trim();
+      const admissionNumber = input.admissionNumber?.trim();
       const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
         method: "POST",
         body: JSON.stringify({
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
+          ...(admissionNumber ? { admission_number: admissionNumber } : {}),
           ...(bd ? { birth_date: bd } : {}),
           classroom_id: selectedClassroomId,
         }),
@@ -2014,6 +2017,7 @@ export function AddChildDialog({
   onAdd: (input: {
     firstName: string;
     lastName: string;
+    admissionNumber?: string;
     birthDate?: string;
     guardianFirstName?: string;
     guardianLastName?: string;
@@ -2043,6 +2047,7 @@ export function AddChildDialog({
   const [mode, setMode] = React.useState<"new" | "roster">("new");
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
+  const [admissionNumber, setAdmissionNumber] = React.useState("");
   const [birthDate, setBirthDate] = React.useState("");
   const [guardianFirstName, setGuardianFirstName] = React.useState("");
   const [guardianLastName, setGuardianLastName] = React.useState("");
@@ -2059,6 +2064,7 @@ export function AddChildDialog({
       setMode("new");
       setFirstName("");
       setLastName("");
+      setAdmissionNumber("");
       setBirthDate("");
       setGuardianFirstName("");
       setGuardianLastName("");
@@ -2181,6 +2187,14 @@ export function AddChildDialog({
                 </FieldLabel>
               </div>
 
+              <FieldLabel label="Admission number (optional)">
+                <Input
+                  value={admissionNumber}
+                  onChange={(event) => setAdmissionNumber(event.target.value)}
+                  className="h-10 bg-canvas"
+                />
+              </FieldLabel>
+
               <FieldLabel label="Birthday (optional)">
                 <Input
                   type="date"
@@ -2300,6 +2314,7 @@ export function AddChildDialog({
                           onAdd({
                             firstName,
                             lastName,
+                            admissionNumber: admissionNumber.trim() || undefined,
                             birthDate: birthDate.trim() || undefined,
                             guardianFirstName: gf || undefined,
                             guardianLastName: gl || undefined,
@@ -2373,6 +2388,7 @@ export function AddChildDialog({
                           onAdd({
                             firstName,
                             lastName,
+                            admissionNumber: admissionNumber.trim() || undefined,
                             birthDate: birthDate.trim() || undefined,
                             guardianFirstName: gf || undefined,
                             guardianLastName: gl || undefined,
@@ -2411,6 +2427,7 @@ export function AddChildDialog({
                   void onAdd({
                     firstName,
                     lastName,
+                    admissionNumber: admissionNumber.trim() || undefined,
                     birthDate: birthDate.trim() || undefined,
                     guardianFirstName: gf || undefined,
                     guardianLastName: gl || undefined,

@@ -65,6 +65,7 @@ export async function createStudent(
     first_name: string;
     last_name: string;
     preferred_name?: string;
+    admission_number?: string;
     birth_date?: string;
     nicknames?: string[];
     notes?: string;
@@ -75,6 +76,7 @@ export async function createStudent(
     first_name: input.first_name,
     last_name: input.last_name,
     preferred_name: input.preferred_name ?? null,
+    admission_number: input.admission_number?.trim() || null,
     birth_date: input.birth_date ?? null,
     nicknames: input.nicknames ?? [],
     notes: input.notes ?? null,

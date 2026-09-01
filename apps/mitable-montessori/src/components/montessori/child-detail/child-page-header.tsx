@@ -113,6 +113,12 @@ function HeaderInfoTooltip({ profile, mobile }: { profile: StudentProfile; mobil
               fontSize: 12.5,
             }}
           >
+            {profile.admissionNumber && (
+              <>
+                <span style={{ color: "var(--color-ink-muted)" }}>Admission no.</span>
+                <span className="font-numeric">{profile.admissionNumber}</span>
+              </>
+            )}
             {profile.birthDate && (
               <>
                 <span style={{ color: "var(--color-ink-muted)" }}>Born</span>
