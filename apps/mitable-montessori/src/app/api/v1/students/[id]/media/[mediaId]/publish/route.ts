@@ -37,7 +37,7 @@ export async function POST(
     .from(STUDENT_MEDIA_BUCKET)
     .list(pathParts.join("/"), { limit: 1, search: fileName });
   if (filesError || !files?.some((file) => file.name === fileName)) {
-    return NextResponse.json({ error: "The camera upload has not finished yet" }, { status: 409 });
+    return NextResponse.json({ error: "The media upload has not finished yet" }, { status: 409 });
   }
 
   const now = new Date().toISOString();

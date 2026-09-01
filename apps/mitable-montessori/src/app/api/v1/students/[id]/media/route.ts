@@ -37,7 +37,7 @@ type MediaRow = {
     | null;
 };
 
-/** Starts a one-use private Storage upload for a live camera capture. */
+/** Starts a one-use private Storage upload for a live capture or selected device file. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: studentId } = await params;
   const access = await requireStudentMediaAccess(studentId);
@@ -48,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const input = parsed.data;
   if (!isAllowedMediaMimeType(input.kind, input.mimeType)) {
     return NextResponse.json(
-      { error: "That file type does not match the requested capture" },
+      { error: "That file type does not match the requested media kind" },
       { status: 400 }
     );
   }
