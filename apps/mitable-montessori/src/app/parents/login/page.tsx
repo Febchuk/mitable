@@ -24,6 +24,7 @@ function ParentLoginInner() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const justJoined = params.get("welcome") === "parent";
+  const passwordUpdated = params.get("password") === "updated";
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -65,7 +66,15 @@ function ParentLoginInner() {
           />
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
-          Password
+          <span className="flex items-baseline justify-between gap-3">
+            Password
+            <Link
+              href="/forgot-password?audience=parent"
+              className="text-xs font-normal text-terracotta underline underline-offset-2"
+            >
+              Forgot password?
+            </Link>
+          </span>
           <Input
             type="password"
             autoComplete="current-password"
@@ -74,6 +83,9 @@ function ParentLoginInner() {
             required
           />
         </label>
+        {passwordUpdated ? (
+          <p className="text-sm text-sage">Password updated. Sign in with your new password.</p>
+        ) : null}
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
         <Button type="submit" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}

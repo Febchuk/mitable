@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { appHomePathForRole, teacherAppHomePath } from "@/lib/feature-flags";
+import { safeAuthRedirect } from "@/lib/auth/password-reset";
 
 /**
  * OAuth callback. Supabase Auth redirects here with `?code=...` after Google
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code");
   const defaultHome = "/";
   const requested = searchParams.get("redirect") ?? defaultHome;
-  const safeRedirect = requested.startsWith("/") ? requested : defaultHome;
+  const safeRedirect = safeAuthRedirect(requested, defaultHome);
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=no_code", origin));
