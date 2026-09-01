@@ -162,6 +162,24 @@ export async function createGuardian(
   }
 ) {
   const email = input.email?.trim() || undefined;
+
+  if (email) {
+    const normalizedEmail = email.toLowerCase();
+    const { data: matches, error } = await ctx.supabase
+      .from("guardians")
+      .select("id, email, auth_user_id")
+      .eq("school_id", ctx.schoolId)
+      .ilike("email", email);
+    if (error) throw new AdminError(error.message, "db_error");
+
+    const exactMatches = (matches ?? []).filter(
+      (guardian) => guardian.email?.trim().toLowerCase() === normalizedEmail
+    );
+    const existing =
+      exactMatches.find((guardian) => guardian.auth_user_id !== null) ?? exactMatches[0];
+    if (existing) return existing.id;
+  }
+
   let first = (input.first_name ?? "").trim();
   let last = (input.last_name ?? "").trim();
   if (email && (!first || !last)) {
@@ -197,6 +215,15 @@ export async function linkGuardianToStudent(
     receives_reports?: boolean;
   }
 ) {
+  const { data: existing, error: readErr } = await ctx.supabase
+    .from("student_guardians")
+    .select("id")
+    .eq("student_id", input.student_id)
+    .eq("guardian_id", input.guardian_id)
+    .maybeSingle();
+  if (readErr) throw new AdminError(readErr.message, "db_error");
+  if (existing) return existing.id;
+
   return insertReturningId(ctx, "student_guardians", {
     student_id: input.student_id,
     guardian_id: input.guardian_id,
