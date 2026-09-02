@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -468,6 +468,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export type GuardianEditorValue = GuardianDraft;
 
+type GuardianSearchMatch = Pick<
+  GuardianDraft,
+  "id" | "firstName" | "lastName" | "email" | "phone" | "preferredContactMethod" | "accountActive"
+>;
+
 export function GuardianEditorDialog({
   open,
   studentId,
@@ -483,6 +488,10 @@ export function GuardianEditorDialog({
 }) {
   const [draft, setDraft] = React.useState<GuardianDraft>(emptyGuardian());
   const [inviteGuardian, setInviteGuardian] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchMatches, setSearchMatches] = React.useState<GuardianSearchMatch[]>([]);
+  const [searching, setSearching] = React.useState(false);
+  const [linkingExisting, setLinkingExisting] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -490,8 +499,62 @@ export function GuardianEditorDialog({
     if (!open) return;
     setDraft(guardian ? { ...guardian } : emptyGuardian());
     setInviteGuardian(false);
+    setSearchQuery("");
+    setSearchMatches([]);
+    setSearching(false);
+    setLinkingExisting(false);
     setError(null);
   }, [open, guardian]);
+
+  React.useEffect(() => {
+    if (!open || guardian?.id || linkingExisting || searchQuery.trim().length < 2) {
+      setSearchMatches([]);
+      setSearching(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      const params = new URLSearchParams({ q: searchQuery.trim(), student_id: studentId });
+      void fetch(`/api/admin/guardians/search?${params}`, {
+        credentials: "include",
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          const body = (await response.json()) as {
+            guardians?: GuardianSearchMatch[];
+            error?: string;
+          };
+          if (!response.ok) throw new Error(body.error ?? "Could not search guardians");
+          setSearchMatches(body.guardians ?? []);
+        })
+        .catch((searchError) => {
+          if (!controller.signal.aborted) {
+            setError(
+              searchError instanceof Error ? searchError.message : "Could not search guardians"
+            );
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSearching(false);
+        });
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [guardian?.id, linkingExisting, open, searchQuery, studentId]);
+
+  const selectExistingGuardian = (match: GuardianSearchMatch) => {
+    setDraft({
+      ...emptyGuardian(),
+      ...match,
+    });
+    setLinkingExisting(true);
+    setSearchMatches([]);
+    setInviteGuardian(false);
+    setError(null);
+  };
 
   const save = async () => {
     const clean = cleanGuardian(draft);
@@ -508,7 +571,18 @@ export function GuardianEditorDialog({
     setError(null);
     try {
       let guardianId = clean.id;
-      if (guardianId) {
+      if (guardianId && linkingExisting) {
+        await apiJson("/api/admin/student-guardians", {
+          method: "POST",
+          body: JSON.stringify({
+            student_id: studentId,
+            guardian_id: guardianId,
+            relationship: clean.relationship,
+            is_primary_contact: clean.primary,
+            receives_reports: clean.receivesReports,
+          }),
+        });
+      } else if (guardianId) {
         await apiJson(`/api/admin/guardians/${guardianId}`, {
           method: "PATCH",
           body: JSON.stringify({
@@ -580,16 +654,96 @@ export function GuardianEditorDialog({
         {error ? (
           <p className="mx-6 mt-5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : null}
+        {!guardian?.id ? (
+          <div className="border-b border-border px-6 py-4">
+            {linkingExisting ? (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-sage/30 bg-sage/10 px-3 py-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-sage" />
+                  <div className="min-w-0 text-sm">
+                    <p className="truncate font-medium text-ink">
+                      {draft.firstName} {draft.lastName}
+                    </p>
+                    <p className="truncate text-xs text-ink-secondary">
+                      {draft.email || draft.phone || "Existing guardian"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setDraft(emptyGuardian());
+                    setLinkingExisting(false);
+                    setSearchQuery("");
+                  }}
+                >
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label htmlFor="guardian-search" className="text-sm font-medium text-ink">
+                  Search existing guardians
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+                  <Input
+                    id="guardian-search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Name or email"
+                    className="pl-9 pr-9"
+                  />
+                  {searching ? (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-ink-muted" />
+                  ) : null}
+                </div>
+                {searchQuery.trim().length >= 2 && !searching ? (
+                  <div className="overflow-hidden rounded-xl border border-border">
+                    {searchMatches.length > 0 ? (
+                      searchMatches.map((match) => (
+                        <button
+                          key={match.id}
+                          type="button"
+                          onClick={() => selectExistingGuardian(match)}
+                          className="flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-canvas"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-ink">
+                              {match.firstName} {match.lastName}
+                            </span>
+                            <span className="block truncate text-xs text-ink-secondary">
+                              {match.email || match.phone || "No contact details"}
+                            </span>
+                          </span>
+                          <span className="text-xs font-medium text-terracotta">Select</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="px-3 py-3 text-sm text-ink-secondary">
+                        No unlinked guardians found. Enter details below to create a new one.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
         <div className="grid gap-3 px-6 py-5 sm:grid-cols-2">
           <Field label="First name">
             <Input
               value={draft.firstName}
+              disabled={linkingExisting}
               onChange={(e) => setDraft({ ...draft, firstName: e.target.value })}
             />
           </Field>
           <Field label="Last name">
             <Input
               value={draft.lastName}
+              disabled={linkingExisting}
               onChange={(e) => setDraft({ ...draft, lastName: e.target.value })}
             />
           </Field>
@@ -597,7 +751,7 @@ export function GuardianEditorDialog({
             <Input
               type="email"
               value={draft.email}
-              disabled={draft.accountActive}
+              disabled={draft.accountActive || linkingExisting}
               onChange={(e) => setDraft({ ...draft, email: e.target.value })}
             />
           </Field>
@@ -605,6 +759,7 @@ export function GuardianEditorDialog({
             <Input
               type="tel"
               value={draft.phone}
+              disabled={linkingExisting}
               onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
             />
           </Field>
@@ -629,6 +784,7 @@ export function GuardianEditorDialog({
             <select
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={draft.preferredContactMethod}
+              disabled={linkingExisting}
               onChange={(e) =>
                 setDraft({
                   ...draft,
@@ -694,7 +850,7 @@ export function GuardianEditorDialog({
             Cancel
           </Button>
           <Button type="button" disabled={saving} onClick={() => void save()}>
-            {saving ? "Saving…" : "Save guardian"}
+            {saving ? "Saving…" : linkingExisting ? "Link guardian" : "Save guardian"}
           </Button>
         </div>
       </DialogContent>
