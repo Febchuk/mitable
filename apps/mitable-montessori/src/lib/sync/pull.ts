@@ -131,6 +131,63 @@ interface PullResponse {
   };
 }
 
+/** Full roster/curriculum pulls are expensive: they fetch, encrypt, and replace
+ * the entire offline cache. Keep it fresh without repeating that work every
+ * time a teacher briefly switches back to the tab. */
+export const FULL_SYNC_STALE_AFTER_MS = 5 * 60 * 1000;
+
+type SyncIdentity = {
+  schoolId: string;
+  userId: string;
+};
+
+type PullResult = {
+  schoolId: string;
+  userId: string;
+};
+
+let inFlightFullSync: { identity: string; promise: Promise<PullResult | null> } | null = null;
+
+function syncMetaKey({ schoolId, userId }: SyncIdentity) {
+  return `last_pulled_at:${schoolId}:${userId}`;
+}
+
+function isFreshTimestamp(value: string | undefined, maxAgeMs: number) {
+  if (!value) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && Date.now() - timestamp < maxAgeMs;
+}
+
+/**
+ * Pull only when this signed-in user's offline cache is missing or stale.
+ * A shared promise also prevents the initial load, visibility, and online
+ * events from starting duplicate full syncs at the same time.
+ */
+export function pullSyncIfStale(
+  identity: SyncIdentity,
+  maxAgeMs = FULL_SYNC_STALE_AFTER_MS
+): Promise<PullResult | null> {
+  const key = syncMetaKey(identity);
+  if (inFlightFullSync?.identity === key) return inFlightFullSync.promise;
+
+  const promise = (async () => {
+    const lastPulled = await getDb().syncMeta.get(key);
+    if (isFreshTimestamp(lastPulled?.value, maxAgeMs)) return null;
+    return pullSync();
+  })();
+
+  inFlightFullSync = { identity: key, promise };
+  void promise.then(
+    () => {
+      if (inFlightFullSync?.promise === promise) inFlightFullSync = null;
+    },
+    () => {
+      if (inFlightFullSync?.promise === promise) inFlightFullSync = null;
+    }
+  );
+  return promise;
+}
+
 export async function pullSync() {
   const res = await fetch("/api/v1/sync/pull", { method: "GET", credentials: "include" });
   if (!res.ok) throw new Error(`Sync pull failed: ${res.status} ${await res.text()}`);
@@ -339,7 +396,10 @@ export async function pullSync() {
         }))
       );
 
-      await db.syncMeta.put({ key: "last_pulled_at", value: new Date().toISOString() });
+      await db.syncMeta.put({
+        key: syncMetaKey({ schoolId: body.schoolId, userId: body.userId }),
+        value: new Date().toISOString(),
+      });
     }
   );
 

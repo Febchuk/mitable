@@ -123,7 +123,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
         <ToastHost />
         <InstallBanner />
-        <AppBootstrap />
+        <AppBootstrap schoolId={ctx.schoolId} userId={ctx.userId} />
       </ActiveReportProvider>
     </MontessoriProvider>
   );
