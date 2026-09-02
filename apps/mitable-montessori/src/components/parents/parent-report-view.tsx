@@ -43,6 +43,8 @@ export function ParentReportView({
           blocks.map((block) =>
             block.kind === "subject" ? (
               <SubjectBlock key={`${block.index}-${block.heading}`} block={block} />
+            ) : block.kind === "exam_grades" ? (
+              <ExamGradesBlock key={block.heading} block={block} />
             ) : (
               <SectionBlock key={block.heading} block={block} />
             )
@@ -55,6 +57,44 @@ export function ParentReportView({
         Prepared with Mitable
       </footer>
     </article>
+  );
+}
+
+function ExamGradesBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "exam_grades" }> }) {
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-ink">{block.heading}</h2>
+      {block.rows.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-secondary">
+          No exam grades were recorded for this term.
+        </p>
+      ) : (
+        <div className="mt-3 overflow-x-auto rounded-xl border border-border">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-muted text-xs uppercase tracking-wide text-ink-muted">
+              <tr>
+                <th className="px-3 py-2">Subject</th>
+                <th className="px-3 py-2">Exam</th>
+                <th className="px-3 py-2">Result</th>
+                <th className="px-3 py-2">Grade</th>
+                <th className="px-3 py-2">Comments</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {block.rows.map((row, index) => (
+                <tr key={`${row.subject}-${row.assessmentName}-${index}`}>
+                  <td className="px-3 py-3 font-medium text-ink">{row.subject}</td>
+                  <td className="px-3 py-3 text-ink-secondary">{row.assessmentName}</td>
+                  <td className="px-3 py-3 font-semibold text-ink">{row.percentage}%</td>
+                  <td className="px-3 py-3 text-ink">{row.gradeLabel}</td>
+                  <td className="px-3 py-3 text-ink-secondary">{row.comments?.trim() || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -12,6 +12,18 @@ export interface ActiveClassroom {
 /** Same shape as ActiveClassroom — one entry per active teacher assignment. */
 export type TeacherClassroom = ActiveClassroom;
 
+const ELEMENTARY_CLASSROOM_CODES = new Set(["Lower Elementary", "Upper Elementary"]);
+
+export function isElementaryClassroomCode(code: string | null | undefined): boolean {
+  return !!code && ELEMENTARY_CLASSROOM_CODES.has(code);
+}
+
+export async function teacherShouldSeeGrades(): Promise<boolean> {
+  return (await listTeacherClassroomsForCurrentUser()).some((classroom) =>
+    isElementaryClassroomCode(classroom.code)
+  );
+}
+
 type ClassroomProgram = "montessori" | "iep" | "speech";
 
 type AssignedTeacherClassroom = ActiveClassroom & {

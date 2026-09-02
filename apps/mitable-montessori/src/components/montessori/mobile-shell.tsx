@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   HelpCircle,
+  GraduationCap,
   KeyRound,
   LayoutTemplate,
   LogOut,
@@ -77,10 +78,17 @@ const TEACHER_PROGRESS: NavItem = {
   icon: <SquaresFour {...ph} />,
 };
 
-function teacherNavItems(options: { showToday: boolean; reportFirst: boolean }): NavItem[] {
-  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+function teacherNavItems(options: {
+  showToday: boolean;
+  reportFirst: boolean;
+  showGrades: boolean;
+}): NavItem[] {
+  const grades: NavItem[] = options.showGrades
+    ? [{ href: "/app/grades", label: "Grades", icon: <GraduationCap {...lu} /> }]
+    : [];
+  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE, ...grades];
   const head = options.showToday ? TEACHER_NAV_LEGACY : [TEACHER_PROGRESS];
-  return [...head, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
+  return [...head, ...TEACHER_NAV_CORE, ...grades, TEACHER_REPORTS];
 }
 
 const ADMIN_TODAY: NavItem = {
@@ -117,6 +125,7 @@ export interface MontessoriMobileShellProps {
   variant: Variant;
   showTodayNav?: boolean;
   reportFirstNav?: boolean;
+  showGradesNav?: boolean;
   showLegacyChat?: boolean;
   /** First name for the drawer profile block. Falls back to email local part. */
   firstName?: string | null;
@@ -206,6 +215,7 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
         variant={props.variant}
         showTodayNav={props.showTodayNav ?? false}
         reportFirstNav={props.reportFirstNav ?? false}
+        showGradesNav={props.showGradesNav ?? false}
         firstName={props.firstName}
         email={props.email}
         schoolName={props.schoolName}
@@ -332,6 +342,7 @@ function MobileDrawer({
   variant,
   showTodayNav,
   reportFirstNav,
+  showGradesNav,
   firstName,
   email,
   schoolName,
@@ -342,6 +353,7 @@ function MobileDrawer({
   variant: Variant;
   showTodayNav: boolean;
   reportFirstNav: boolean;
+  showGradesNav: boolean;
   firstName?: string | null;
   email: string;
   schoolName: string;
@@ -359,7 +371,11 @@ function MobileDrawer({
   const items =
     variant === "admin"
       ? adminNavItems({ showToday: showTodayNav })
-      : teacherNavItems({ showToday: showTodayNav, reportFirst: reportFirstNav });
+      : teacherNavItems({
+          showToday: showTodayNav,
+          reportFirst: reportFirstNav,
+          showGrades: showGradesNav,
+        });
 
   const localPart = email.split("@")[0] ?? email;
   const displayName =

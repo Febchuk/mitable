@@ -5,6 +5,7 @@ import { auditLog } from "@/lib/audit/log";
 import { listReports } from "@/lib/queries/reports";
 import {
   getActiveClassroomForCurrentUser,
+  isElementaryClassroomCode,
   listTeacherClassroomsForCurrentUser,
 } from "@/lib/app/active-classroom";
 import { CreateReportRequestSchema, type ReportKind } from "@/lib/schemas/report";
@@ -24,6 +25,8 @@ import {
   resolveStudentClassroomId,
 } from "@/lib/reports/create-report-sections";
 import { endOfTermPeriodBounds } from "@/lib/reports/term-period";
+import { listStudentExamGradesForTerm } from "@/lib/queries/elementary-grades";
+import { encodeExamGrades } from "@/lib/reports/exam-grades-payload";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
   Daily: "daily",
@@ -36,16 +39,16 @@ async function resolvePeriodBounds(
   schoolId: string,
   reportingPeriod: ReportingPeriod,
   today: Date
-): Promise<{ periodStart: string; periodEnd: string }> {
+): Promise<{ periodStart: string; periodEnd: string; termId: string | null }> {
   const periodEnd = today.toISOString().slice(0, 10);
   if (reportingPeriod === "end_of_term") {
     const term = await endOfTermPeriodBounds(supabase, schoolId, today);
-    return { periodStart: term.periodStart, periodEnd: term.periodEnd };
+    return { periodStart: term.periodStart, periodEnd: term.periodEnd, termId: term.termId };
   }
   const periodDays = REPORTING_PERIOD_DAYS[reportingPeriod];
   const periodStartDate = new Date(today);
   periodStartDate.setDate(periodStartDate.getDate() - (periodDays - 1));
-  return { periodStart: periodStartDate.toISOString().slice(0, 10), periodEnd };
+  return { periodStart: periodStartDate.toISOString().slice(0, 10), periodEnd, termId: null };
 }
 
 export async function GET() {
@@ -180,6 +183,8 @@ export async function POST(req: Request) {
       reportingPeriod = (tpl.reporting_period as ReportingPeriod | null) ?? null;
       const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
       const meta = (tpl.section_meta as SectionMeta | null) ?? {};
+      sectionGuidance = guidance;
+      sectionMeta = meta;
       const headings = tpl.sections as string[];
       const needsSpeech = headings.some(
         (h) => meta[h]?.type === "curriculum" && meta[h]?.program === "speech"
@@ -211,9 +216,38 @@ export async function POST(req: Request) {
   });
   const reportDate = today.toISOString().slice(0, 10);
 
-  const { periodStart, periodEnd } = reportingPeriod
+  const { periodStart, periodEnd, termId } = reportingPeriod
     ? await resolvePeriodBounds(supabase, auth.user.schoolId, reportingPeriod, today)
-    : { periodStart: reportDate, periodEnd: reportDate };
+    : { periodStart: reportDate, periodEnd: reportDate, termId: null };
+
+  const reportClassroom = teacherClassrooms.find((classroom) => classroom.id === reportClassroomId);
+  if (
+    reportingPeriod === "end_of_term" &&
+    termId &&
+    isElementaryClassroomCode(reportClassroom?.code)
+  ) {
+    const gradeRows = await listStudentExamGradesForTerm({
+      schoolId: auth.user.schoolId,
+      classroomId: reportClassroomId,
+      studentId: input.childId,
+      termId,
+    });
+    const heading = "Exam grades";
+    sections = [
+      ...(sections ?? []).filter((section) => section.heading !== heading),
+      {
+        id: `s-exam-grades-${termId}`,
+        heading,
+        paragraphs: [
+          {
+            id: `p-exam-grades-${termId}`,
+            html: encodeExamGrades(gradeRows),
+          },
+        ],
+      },
+    ];
+    sectionMeta = { ...sectionMeta, [heading]: { type: "exam_grades", termId } };
+  }
 
   const { data: inserted, error } = await supabase
     .from("reports")
@@ -224,6 +258,8 @@ export async function POST(req: Request) {
       report_date: reportDate,
       period_start: periodStart,
       period_end: periodEnd,
+      reporting_period: reportingPeriod,
+      term_id: termId,
       status: "draft",
       title: `${firstName} — ${dayLabel}`,
       body: null,
@@ -233,8 +269,8 @@ export async function POST(req: Request) {
           ? resolvedTemplateId
           : null
         : (input.templateId ?? null),
-      section_meta: useDefaultTemplate ? sectionMeta : {},
-      section_guidance: useDefaultTemplate ? sectionGuidance : {},
+      section_meta: sectionMeta,
+      section_guidance: sectionGuidance,
       created_by_user_id: auth.user.userId,
     })
     .select("id")

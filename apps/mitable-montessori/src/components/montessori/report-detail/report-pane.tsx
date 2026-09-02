@@ -13,6 +13,7 @@ import {
 } from "@/lib/reports/template-field-payload";
 import { firstOpenParagraphIndex } from "@/lib/reports/section-paragraph-slots";
 import { decodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
+import { decodeExamGrades } from "@/lib/reports/exam-grades-payload";
 import { isTopicCommentsHeading } from "@/lib/reports/default-classroom-report";
 import { STATUS_COLOR, STATUS_LABEL, statusToMark } from "@/components/montessori/data";
 import { ToastBus } from "../primitives";
@@ -501,6 +502,45 @@ function ProgressTopicTableRow({ row }: { row: ProgressTopicRow }) {
   );
 }
 
+function ExamGradesTable({ html }: { html: string }) {
+  const rows = decodeExamGrades(html) ?? [];
+  return (
+    <div className="rd-template-field rd-progress-topic" aria-readonly>
+      {rows.length ? (
+        <table className="rd-progress-topic-table">
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>Exam</th>
+              <th>Result</th>
+              <th>Grade</th>
+              <th>Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.subject}-${row.assessmentName}-${index}`}>
+                <td>{row.subject}</td>
+                <td>{row.assessmentName}</td>
+                <td>
+                  <strong>{row.percentage}%</strong>
+                </td>
+                <td>{row.gradeLabel}</td>
+                <td>{row.comments?.trim() || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p style={{ margin: 0, color: "var(--color-ink-muted)", fontStyle: "italic" }}>
+          No exam grades were recorded for this term.
+        </p>
+      )}
+      <p className="rd-template-field-hint">Snapshot from Grades for this end-of-term report.</p>
+    </div>
+  );
+}
+
 type SectionGroup =
   | {
       type: "subject";
@@ -666,49 +706,52 @@ function SectionBlock({
     ? firstOpenParagraphIndex(section.paragraphs, fieldMeta)
     : null;
   const radioGroupName = React.useId();
+  const lockedSection = fieldMeta?.type === "exam_grades";
 
   return (
     <div className="rd-section">
       <div className="rd-section-heading-row">
         <div className="rd-section-heading">{section.heading}</div>
-        <div className="rd-section-actions">
-          {confirmingDelete ? (
-            <span className="rd-section-confirm" role="group" aria-label="Confirm delete section">
-              <span className="rd-section-confirm-label">Delete this section?</span>
+        {!lockedSection ? (
+          <div className="rd-section-actions">
+            {confirmingDelete ? (
+              <span className="rd-section-confirm" role="group" aria-label="Confirm delete section">
+                <span className="rd-section-confirm-label">Delete this section?</span>
+                <button
+                  type="button"
+                  className="rd-section-confirm-btn rd-section-confirm-yes"
+                  onClick={() => {
+                    onDelete();
+                    ToastBus.push({ message: `Deleted "${section.heading}" section` });
+                  }}
+                  aria-label="Confirm delete"
+                >
+                  <Check size={12} strokeWidth={2.5} />
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  className="rd-section-confirm-btn"
+                  onClick={() => setConfirmingDelete(false)}
+                  aria-label="Cancel delete"
+                >
+                  <X size={12} strokeWidth={2.5} />
+                  Cancel
+                </button>
+              </span>
+            ) : (
               <button
                 type="button"
-                className="rd-section-confirm-btn rd-section-confirm-yes"
-                onClick={() => {
-                  onDelete();
-                  ToastBus.push({ message: `Deleted "${section.heading}" section` });
-                }}
-                aria-label="Confirm delete"
+                className="rd-section-delete"
+                onClick={() => setConfirmingDelete(true)}
+                aria-label={`Delete ${section.heading} section`}
+                title="Delete section"
               >
-                <Check size={12} strokeWidth={2.5} />
-                Delete
+                <Trash2 size={12} strokeWidth={2} />
               </button>
-              <button
-                type="button"
-                className="rd-section-confirm-btn"
-                onClick={() => setConfirmingDelete(false)}
-                aria-label="Cancel delete"
-              >
-                <X size={12} strokeWidth={2.5} />
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button
-              type="button"
-              className="rd-section-delete"
-              onClick={() => setConfirmingDelete(true)}
-              aria-label={`Delete ${section.heading} section`}
-              title="Delete section"
-            >
-              <Trash2 size={12} strokeWidth={2} />
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {section.paragraphs.map((p, paraIndex) => {
@@ -731,7 +774,8 @@ function SectionBlock({
           paraIndex === 0 &&
           (fieldMeta?.type === "hardcoded" ||
             fieldMeta?.type === "curriculum" ||
-            fieldMeta?.type === "progress_topic");
+            fieldMeta?.type === "progress_topic" ||
+            fieldMeta?.type === "exam_grades");
         const hideParagraphDelete = structuredFirst || serverFilledFirst;
 
         return (
@@ -817,6 +861,8 @@ function SectionBlock({
               />
             ) : serverFilledFirst && fieldMeta?.type === "progress_topic" ? (
               <ProgressTopicGrid heading={section.heading} html={p.html} />
+            ) : serverFilledFirst && fieldMeta?.type === "exam_grades" ? (
+              <ExamGradesTable html={p.html} />
             ) : serverFilledFirst ? (
               <TemplateHardcodedField
                 heading={section.heading}

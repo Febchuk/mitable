@@ -20,7 +20,12 @@ export async function endOfTermPeriodBounds(
   supabase: SupabaseClient,
   schoolId: string,
   asOf: Date = new Date()
-): Promise<{ periodStart: string; periodEnd: string; termName: string | null }> {
+): Promise<{
+  periodStart: string;
+  periodEnd: string;
+  termName: string | null;
+  termId: string | null;
+}> {
   const periodEnd = asOf.toISOString().slice(0, 10);
   const resolved = await resolveEndOfTermPeriod(supabase, schoolId, asOf);
   if (resolved) {
@@ -28,11 +33,13 @@ export async function endOfTermPeriodBounds(
       periodStart: resolved.periodStart,
       periodEnd: resolved.periodEnd,
       termName: resolved.termName,
+      termId: resolved.termId,
     };
   }
   return {
     periodStart: currentTermStartDate(asOf),
     periodEnd,
     termName: null,
+    termId: null,
   };
 }

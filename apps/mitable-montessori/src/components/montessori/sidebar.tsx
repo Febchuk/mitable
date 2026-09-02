@@ -3,7 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Book, Building2, CalendarRange, KeyRound, LayoutTemplate, Users } from "lucide-react";
+import {
+  Book,
+  Building2,
+  CalendarRange,
+  GraduationCap,
+  KeyRound,
+  LayoutTemplate,
+  Users,
+} from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
@@ -49,10 +57,17 @@ const TEACHER_PROGRESS: NavItem = {
 };
 
 /** Default: Progress first. Report-first puts Reports at the top (no Progress link). */
-function teacherNavItems(options: { showToday: boolean; reportFirst: boolean }): NavItem[] {
-  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE];
+function teacherNavItems(options: {
+  showToday: boolean;
+  reportFirst: boolean;
+  showGrades: boolean;
+}): NavItem[] {
+  const grades: NavItem[] = options.showGrades
+    ? [{ href: "/app/grades", label: "Grades", renderIcon: () => <GraduationCap {...lucide} /> }]
+    : [];
+  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE, ...grades];
   const head = options.showToday ? TEACHER_NAV_LEGACY : [TEACHER_PROGRESS];
-  return [...head, ...TEACHER_NAV_CORE, TEACHER_REPORTS];
+  return [...head, ...TEACHER_NAV_CORE, ...grades, TEACHER_REPORTS];
 }
 
 const ADMIN_TODAY: NavItem = {
@@ -101,6 +116,7 @@ export function MontessoriSidebar({
   variant = "teacher",
   showTodayNav = false,
   reportFirstNav = false,
+  showGradesNav = false,
   userMenuSlot,
 }: {
   variant?: "teacher" | "admin";
@@ -108,6 +124,8 @@ export function MontessoriSidebar({
   showTodayNav?: boolean;
   /** When true, Reports-first nav (hides Progress link). */
   reportFirstNav?: boolean;
+  /** Elementary teachers can record traditional exam results. */
+  showGradesNav?: boolean;
   /**
    * Footer slot — renders directly above the bottom of the sidebar. Layouts
    * pass a `<UserMenu variant="row" … />` here; the menu is responsible for
@@ -123,7 +141,11 @@ export function MontessoriSidebar({
   const navItems =
     variant === "admin"
       ? adminNavItems({ showToday: showTodayNav })
-      : teacherNavItems({ showToday: showTodayNav, reportFirst: reportFirstNav });
+      : teacherNavItems({
+          showToday: showTodayNav,
+          reportFirst: reportFirstNav,
+          showGrades: showGradesNav,
+        });
   return (
     <aside
       className="hidden lg:flex"

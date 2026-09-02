@@ -182,8 +182,10 @@ export async function drainPendingReports(
       classroomName: classroom?.name ?? null,
       messageBody: row.message_body,
       templateLogoUrl: template?.logo_url ?? null,
-      templateSectionMeta:
-        template?.section_meta ?? (report.section_meta as SectionMeta | null) ?? null,
+      templateSectionMeta: {
+        ...((template?.section_meta as SectionMeta | null) ?? {}),
+        ...((report.section_meta as SectionMeta | null) ?? {}),
+      },
     });
 
     if (sendResult.ok) {
