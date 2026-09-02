@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronDown, Smartphone } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { type ProgressMark } from "@/components/montessori/data";
 import { StudentMediaCapture } from "@/components/montessori/child-detail/student-media";
 import { PageHeader } from "@/components/montessori/page-header";
@@ -472,42 +472,6 @@ function EmptyState({
   );
 }
 
-function DesktopMediaNotice({ onClose }: { onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-[80] grid place-items-center bg-ink/20 p-5 backdrop-blur-sm"
-      role="presentation"
-      onMouseDown={onClose}
-    >
-      <section
-        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 text-center shadow-[0_24px_60px_rgba(42,39,35,0.2)]"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Mobile capture only"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-terracotta-soft text-terracotta-deep">
-          <Smartphone size={23} strokeWidth={1.7} />
-        </span>
-        <h2 className="mt-4 text-xl font-semibold text-ink">
-          Open Mitable on your mobile to complete that.
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">
-          Photos and videos are captured live in the app, rather than selected from a personal
-          camera roll.
-        </p>
-        <button
-          type="button"
-          className="primary-btn tap mt-5 w-full justify-center"
-          onClick={onClose}
-        >
-          Got it
-        </button>
-      </section>
-    </div>
-  );
-}
-
 export function ProgressFeature() {
   const store = useMontessori();
   const cp = store.classroomProgress;
@@ -659,7 +623,6 @@ function ProgressFeatureLoaded({
 
   const [info, setInfo] = React.useState<{ subtopicId: string; rect: DOMRect } | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
-  const [desktopMediaNoticeOpen, setDesktopMediaNoticeOpen] = React.useState(false);
   const [pendingProgressMedia, setPendingProgressMedia] = React.useState<{
     studentId: string;
     studentName: string;
@@ -856,8 +819,6 @@ function ProgressFeatureLoaded({
     // live camera without writing a progress command at all.
     const openMediaCapture = (commandId?: string) => {
       // Let the progress tray finish closing before mounting the capture sheet.
-      // On mobile, mounting both sheets during the same tap can cause the new
-      // sheet to receive that tap as a dismissal.
       sel.clear();
       setSheetOpen(false);
       window.requestAnimationFrame(() => {
@@ -1044,7 +1005,7 @@ function ProgressFeatureLoaded({
             onDraftStatus={sel.setDraftStatus}
             onDraftNote={sel.setDraftNote}
             onApply={onApply}
-            onRequestMedia={() => setDesktopMediaNoticeOpen(true)}
+            onRequestMedia={() => void onApplyAndIncludeMedia()}
             onCancel={sel.clear}
           />
         )}
@@ -1098,9 +1059,6 @@ function ProgressFeatureLoaded({
           onClose={() => setInfo(null)}
         />
       )}
-      {desktopMediaNoticeOpen ? (
-        <DesktopMediaNotice onClose={() => setDesktopMediaNoticeOpen(false)} />
-      ) : null}
       {pendingProgressMedia ? (
         <StudentMediaCapture
           key={`${pendingProgressMedia.studentId}:${pendingProgressMedia.commandId ?? "moment"}`}
@@ -1108,7 +1066,6 @@ function ProgressFeatureLoaded({
           studentId={pendingProgressMedia.studentId}
           studentName={pendingProgressMedia.studentName}
           progressCommandId={pendingProgressMedia.commandId}
-          forceMobileCapture
           onClose={() => setPendingProgressMedia(null)}
           onShared={() => ToastBus.push({ message: "Progress update and family moment shared" })}
         />

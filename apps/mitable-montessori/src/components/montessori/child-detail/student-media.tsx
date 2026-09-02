@@ -8,7 +8,6 @@ import {
   Loader2,
   RotateCcw,
   ShieldCheck,
-  Smartphone,
   Trash2,
   Upload,
   Video,
@@ -26,7 +25,7 @@ import "./child-detail.css";
 
 const MAX_VIDEO_SECONDS = 90;
 
-type CaptureScreen = "closed" | "desktop" | "chooser" | "camera" | "preview";
+type CaptureScreen = "closed" | "chooser" | "camera" | "preview";
 
 type CapturedMedia = {
   blob: Blob;
@@ -48,11 +47,6 @@ export type StudentMediaItem = {
   uploadedBy: string | null;
   url: string | null;
 };
-
-function isMobileDevice() {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-}
 
 function durationLabel(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -89,7 +83,6 @@ export function StudentMediaCapture({
   studentId,
   studentName,
   progressCommandId,
-  forceMobileCapture = false,
   onClose,
   onShared,
 }: {
@@ -98,8 +91,6 @@ export function StudentMediaCapture({
   studentName: string;
   /** The single progress action this media documents. */
   progressCommandId?: string;
-  /** The progress tray is rendered only on mobile; do not rely on user-agent detection there. */
-  forceMobileCapture?: boolean;
   onClose: () => void;
   onShared: () => void;
 }) {
@@ -167,8 +158,8 @@ export function StudentMediaCapture({
       setScreen("closed");
       return;
     }
-    setScreen(forceMobileCapture || isMobileDevice() ? "chooser" : "desktop");
-  }, [open, reset, forceMobileCapture]);
+    setScreen("chooser");
+  }, [open, reset]);
 
   React.useEffect(() => {
     if (screen !== "camera" || !streamRef.current || !videoRef.current) return;
@@ -385,39 +376,14 @@ export function StudentMediaCapture({
 
   if (screen === "closed") return null;
 
-  if (screen === "desktop") {
-    return (
-      <CaptureSheet onClose={close}>
-        <div style={{ textAlign: "center", padding: "10px 4px 8px" }}>
-          <div style={iconCircleStyle}>
-            <Smartphone size={24} strokeWidth={1.6} />
-          </div>
-          <p
-            className="label-cap"
-            style={{ color: "var(--color-ink-muted)", margin: "16px 0 6px" }}
-          >
-            School device required
-          </p>
-          <h2 style={sheetTitleStyle}>Use Mitable on your phone</h2>
-          <p style={sheetBodyStyle}>
-            Open {studentName}&apos;s page on a school phone to take a new photo or choose one
-            already saved on that device.
-          </p>
-        </div>
-      </CaptureSheet>
-    );
-  }
-
   if (screen === "chooser") {
     return (
       <CaptureSheet onClose={close}>
         <p className="label-cap" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
-          Share a family moment
+          Share a classroom moment
         </p>
         <h2 style={sheetTitleStyle}>Share {studentName} at work</h2>
-        <p style={sheetBodyStyle}>
-          Take a new photo or video now, or choose one saved on this school device.
-        </p>
+        <p style={sheetBodyStyle}>Take a new photo or video now, or choose one from this device.</p>
         <div style={{ display: "grid", gap: 10, marginTop: 20 }}>
           <input
             ref={fileInputRef}
@@ -434,7 +400,7 @@ export function StudentMediaCapture({
           <CaptureChoice
             icon={<Upload size={21} strokeWidth={1.7} />}
             title="Choose from device"
-            body="Select a photo or video already saved on this school phone."
+            body="Select a photo or video already saved on this device."
             onClick={() => fileInputRef.current?.click()}
           />
           <CaptureChoice

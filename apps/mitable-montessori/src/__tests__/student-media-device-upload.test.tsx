@@ -15,7 +15,7 @@ describe("student media device uploads", () => {
     expect(mediaKindForMimeType("image/png")).toBeNull();
   });
 
-  it("opens a selected school-device photo in the existing review flow", async () => {
+  it("opens a selected computer photo in the existing review flow", async () => {
     vi.stubGlobal("URL", {
       ...URL,
       createObjectURL: vi.fn(() => "blob:school-photo"),
@@ -27,7 +27,6 @@ describe("student media device uploads", () => {
         open
         studentId="student-1"
         studentName="Avery"
-        forceMobileCapture
         onClose={vi.fn()}
         onShared={vi.fn()}
       />
