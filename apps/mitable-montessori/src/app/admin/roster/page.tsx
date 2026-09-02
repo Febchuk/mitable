@@ -153,6 +153,7 @@ export default function AdminSchoolRosterPage() {
   const addChildToSchool = async (input: {
     firstName: string;
     lastName: string;
+    admissionNumber?: string;
     birthDate?: string;
     guardianFirstName?: string;
     guardianLastName?: string;
@@ -162,11 +163,13 @@ export default function AdminSchoolRosterPage() {
     setMutationError(null);
     try {
       const bd = input.birthDate?.trim();
+      const admissionNumber = input.admissionNumber?.trim();
       const created = await apiJson<{ ok: boolean; id: string }>("/api/admin/students", {
         method: "POST",
         body: JSON.stringify({
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
+          ...(admissionNumber ? { admission_number: admissionNumber } : {}),
           ...(bd ? { birth_date: bd } : {}),
         }),
       });

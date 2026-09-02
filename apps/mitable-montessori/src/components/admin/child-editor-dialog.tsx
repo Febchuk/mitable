@@ -25,6 +25,7 @@ type ChildDraft = {
   firstName: string;
   lastName: string;
   preferredName: string;
+  admissionNumber: string;
   birthDate: string;
   sex: string;
   notes: string;
@@ -172,6 +173,7 @@ export function ChildEditorDialog({
           first_name: firstName,
           last_name: lastName,
           preferred_name: draft.preferredName.trim() || null,
+          admission_number: draft.admissionNumber.trim() || null,
           birth_date: draft.birthDate || null,
           sex: draft.sex.trim() || null,
           notes: draft.notes.trim() || null,
@@ -278,6 +280,12 @@ export function ChildEditorDialog({
                   <Input
                     value={draft.preferredName}
                     onChange={(e) => setDraft({ ...draft, preferredName: e.target.value })}
+                  />
+                </Field>
+                <Field label="Admission number">
+                  <Input
+                    value={draft.admissionNumber}
+                    onChange={(e) => setDraft({ ...draft, admissionNumber: e.target.value })}
                   />
                 </Field>
                 <Field label="Birthday">
