@@ -10,6 +10,12 @@ export const STUDENT_MEDIA_MIME_TYPES = [...PHOTO_MIME_TYPES, ...VIDEO_MIME_TYPE
 export type StudentMediaKind = "photo" | "video";
 export type StudentMediaMimeType = (typeof STUDENT_MEDIA_MIME_TYPES)[number];
 
+export function mediaKindForMimeType(mimeType: string): StudentMediaKind | null {
+  if (PHOTO_MIME_TYPES.includes(mimeType as (typeof PHOTO_MIME_TYPES)[number])) return "photo";
+  if (VIDEO_MIME_TYPES.includes(mimeType as (typeof VIDEO_MIME_TYPES)[number])) return "video";
+  return null;
+}
+
 export function mediaExtension(mimeType: StudentMediaMimeType) {
   switch (mimeType) {
     case "image/jpeg":

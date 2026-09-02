@@ -8,24 +8,31 @@ import {
   Loader2,
   RotateCcw,
   ShieldCheck,
-  Smartphone,
   Trash2,
+  Upload,
   Video,
   X,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import type { StudentMediaKind, StudentMediaMimeType } from "@/lib/media/constants";
+import {
+  maxMediaBytes,
+  mediaKindForMimeType,
+  STUDENT_MEDIA_MIME_TYPES,
+  type StudentMediaKind,
+  type StudentMediaMimeType,
+} from "@/lib/media/constants";
 import "./child-detail.css";
 
 const MAX_VIDEO_SECONDS = 90;
 
-type CaptureScreen = "closed" | "desktop" | "chooser" | "camera" | "preview";
+type CaptureScreen = "closed" | "chooser" | "camera" | "preview";
 
 type CapturedMedia = {
   blob: Blob;
   url: string;
   kind: StudentMediaKind;
   mimeType: StudentMediaMimeType;
+  source: "camera" | "device";
 };
 
 export type StudentMediaItem = {
@@ -40,11 +47,6 @@ export type StudentMediaItem = {
   uploadedBy: string | null;
   url: string | null;
 };
-
-function isMobileDevice() {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-}
 
 function durationLabel(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -81,17 +83,14 @@ export function StudentMediaCapture({
   studentId,
   studentName,
   progressCommandId,
-  forceMobileCapture = false,
   onClose,
   onShared,
 }: {
   open: boolean;
   studentId: string;
   studentName: string;
-  /** The single progress action this camera capture documents. */
+  /** The single progress action this media documents. */
   progressCommandId?: string;
-  /** The progress tray is rendered only on mobile; do not rely on user-agent detection there. */
-  forceMobileCapture?: boolean;
   onClose: () => void;
   onShared: () => void;
 }) {
@@ -111,6 +110,7 @@ export function StudentMediaCapture({
   const autoStopRef = React.useRef<number | null>(null);
   const recordingStartedRef = React.useRef(0);
   const capturedRef = React.useRef<CapturedMedia | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const stopTimer = React.useCallback(() => {
     if (timerRef.current !== null) {
@@ -158,8 +158,8 @@ export function StudentMediaCapture({
       setScreen("closed");
       return;
     }
-    setScreen(forceMobileCapture || isMobileDevice() ? "chooser" : "desktop");
-  }, [open, reset, forceMobileCapture]);
+    setScreen("chooser");
+  }, [open, reset]);
 
   React.useEffect(() => {
     if (screen !== "camera" || !streamRef.current || !videoRef.current) return;
@@ -212,12 +212,35 @@ export function StudentMediaCapture({
     }
   };
 
-  const saveCaptured = (blob: Blob, nextKind: StudentMediaKind, mimeType: StudentMediaMimeType) => {
-    const nextCaptured = { blob, kind: nextKind, mimeType, url: URL.createObjectURL(blob) };
+  const saveCaptured = (
+    blob: Blob,
+    nextKind: StudentMediaKind,
+    mimeType: StudentMediaMimeType,
+    source: CapturedMedia["source"] = "camera"
+  ) => {
+    const nextCaptured = { blob, kind: nextKind, mimeType, source, url: URL.createObjectURL(blob) };
     capturedRef.current = nextCaptured;
     setCaptured(nextCaptured);
+    setKind(nextKind);
     stopCamera();
     setScreen("preview");
+  };
+
+  const selectDeviceFile = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    const nextKind = mediaKindForMimeType(file.type);
+    if (!nextKind) {
+      setError("Choose a JPEG or WebP photo, or an MP4 or WebM video.");
+      return;
+    }
+    if (file.size > maxMediaBytes(nextKind)) {
+      setError(
+        `${nextKind === "photo" ? "Photo" : "Video"} exceeds the ${nextKind === "photo" ? "12 MB" : "100 MB"} limit.`
+      );
+      return;
+    }
+    saveCaptured(file, nextKind, file.type as StudentMediaMimeType, "device");
   };
 
   const takePhoto = async () => {
@@ -301,8 +324,13 @@ export function StudentMediaCapture({
   };
 
   const retake = () => {
+    const source = capturedRef.current?.source;
     discardCaptured();
     setCaption("");
+    if (source === "device") {
+      setScreen("chooser");
+      return;
+    }
     void openCamera(kind);
   };
 
@@ -348,40 +376,33 @@ export function StudentMediaCapture({
 
   if (screen === "closed") return null;
 
-  if (screen === "desktop") {
-    return (
-      <CaptureSheet onClose={close}>
-        <div style={{ textAlign: "center", padding: "10px 4px 8px" }}>
-          <div style={iconCircleStyle}>
-            <Smartphone size={24} strokeWidth={1.6} />
-          </div>
-          <p
-            className="label-cap"
-            style={{ color: "var(--color-ink-muted)", margin: "16px 0 6px" }}
-          >
-            Mobile capture only
-          </p>
-          <h2 style={sheetTitleStyle}>Use Mitable on your phone</h2>
-          <p style={sheetBodyStyle}>
-            Photos and videos are captured directly in Mitable, not selected from a personal camera
-            roll. Open {studentName}&apos;s page on your mobile device to add a moment.
-          </p>
-        </div>
-      </CaptureSheet>
-    );
-  }
-
   if (screen === "chooser") {
     return (
       <CaptureSheet onClose={close}>
         <p className="label-cap" style={{ color: "var(--color-ink-muted)", margin: 0 }}>
-          Share a family moment
+          Share a classroom moment
         </p>
-        <h2 style={sheetTitleStyle}>Capture {studentName} at work</h2>
-        <p style={sheetBodyStyle}>
-          Use the live camera only. Mitable won&apos;t open your personal photo or video library.
-        </p>
+        <h2 style={sheetTitleStyle}>Share {studentName} at work</h2>
+        <p style={sheetBodyStyle}>Take a new photo or video now, or choose one from this device.</p>
         <div style={{ display: "grid", gap: 10, marginTop: 20 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={STUDENT_MEDIA_MIME_TYPES.join(",")}
+            className="sr-only"
+            aria-label="Choose photo or video from device"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              void selectDeviceFile(file);
+            }}
+          />
+          <CaptureChoice
+            icon={<Upload size={21} strokeWidth={1.7} />}
+            title="Choose from device"
+            body="Select a photo or video already saved on this device."
+            onClick={() => fileInputRef.current?.click()}
+          />
           <CaptureChoice
             icon={<Camera size={21} strokeWidth={1.7} />}
             title="Take a photo"
@@ -536,7 +557,7 @@ export function StudentMediaCapture({
           onClick={retake}
           disabled={uploading}
         >
-          <RotateCcw size={16} /> Retake
+          <RotateCcw size={16} /> {captured?.source === "device" ? "Choose another" : "Retake"}
         </button>
         <button
           type="button"
