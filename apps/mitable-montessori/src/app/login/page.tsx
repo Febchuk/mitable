@@ -96,8 +96,12 @@ function LoginInner() {
                 <label htmlFor="password" className="text-[0.8125rem] font-medium text-ink">
                   Password
                 </label>
-                {/* Forgot-password flow not yet implemented — link is a placeholder. */}
-                <span className="text-xs text-ink/40">Forgot?</span>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-terracotta underline decoration-terracotta/40 underline-offset-2 hover:decoration-terracotta"
+                >
+                  Forgot password?
+                </Link>
               </div>
               <div className="relative">
                 <Input
@@ -153,6 +157,9 @@ function LoginInner() {
               </div>
             </div>
 
+            {params.get("password") === "updated" ? (
+              <p className="text-sm text-sage">Password updated. Sign in with your new password.</p>
+            ) : null}
             {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
             <Button type="submit" size="lg" disabled={busy || googleBusy}>
