@@ -1,7 +1,7 @@
 .illustration {
   display: inline-block;
   width: 76px;
-  height: 96px;
+  height: 108px;
   flex: 0 0 auto;
   background-image: url("/toddler/daily-log-sprite.webp");
   background-repeat: no-repeat;
@@ -14,7 +14,7 @@
 
 .small {
   width: 62px;
-  height: 80px;
+  height: 90px;
 }
 
 .mood {
@@ -43,7 +43,7 @@
 .activities,
 .materials,
 .notes {
-  background-position-y: 88%;
+  background-position-y: 85%;
 }
 
 .feeding {
