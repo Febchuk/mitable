@@ -198,6 +198,42 @@ export function ReportPane({
             )
           )}
 
+          {detail.media?.length ? (
+            <section className="mt-8">
+              <h2 className="text-lg font-semibold text-ink">Media</h2>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                {detail.media.map((item) => (
+                  <figure
+                    key={item.id}
+                    className="overflow-hidden rounded-xl border border-border bg-canvas"
+                  >
+                    <div className="aspect-[4/3] bg-muted">
+                      {item.url && item.kind === "photo" ? (
+                        <img
+                          src={item.url}
+                          alt={item.caption || "Daily log media"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : item.url ? (
+                        <video
+                          src={item.url}
+                          controls
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                      ) : null}
+                    </div>
+                    {item.caption ? (
+                      <figcaption className="px-3 py-2 text-sm text-ink-secondary">
+                        {item.caption}
+                      </figcaption>
+                    ) : null}
+                  </figure>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {addingSection ? (
             <NewSectionPrompt onCreate={onCreateSection} onCancel={() => setAddingSection(false)} />
           ) : (
@@ -505,32 +541,24 @@ function ProgressTopicTableRow({ row }: { row: ProgressTopicRow }) {
 }
 
 function ExamGradesTable({ html }: { html: string }) {
-  const rows = decodeExamGrades(html) ?? [];
+  const summary = decodeExamGrades(html);
   return (
     <div className="rd-template-field rd-progress-topic" aria-readonly>
-      {rows.length ? (
+      {summary ? (
         <table className="rd-progress-topic-table">
           <thead>
             <tr>
-              <th>Subject</th>
-              <th>Exam</th>
-              <th>Result</th>
-              <th>Grade</th>
+              <th>Overall average</th>
               <th>Comments</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${row.subject}-${row.assessmentName}-${index}`}>
-                <td>{row.subject}</td>
-                <td>{row.assessmentName}</td>
-                <td>
-                  <strong>{row.percentage}%</strong>
-                </td>
-                <td>{row.gradeLabel}</td>
-                <td>{row.comments?.trim() || "—"}</td>
-              </tr>
-            ))}
+            <tr>
+              <td>
+                <strong>{summary.averagePercentage}%</strong>
+              </td>
+              <td>{summary.comment?.trim() || "—"}</td>
+            </tr>
           </tbody>
         </table>
       ) : (

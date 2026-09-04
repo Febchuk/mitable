@@ -1,6 +1,7 @@
 import React from "react";
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
+import type { ReportMediaItem } from "@/lib/media/report-media";
 
 /* ------------------------------------------------------------------ */
 /*  Palette — mirrors src/styles/globals.css theme tokens. react-pdf   */
@@ -58,12 +59,9 @@ export interface ReportPdfProgressGroup {
   rows: ReportPdfProgressRow[];
 }
 
-export interface ReportPdfExamGradeRow {
-  subject: string;
-  assessmentName: string;
-  percentage: number;
-  gradeLabel: string;
-  comments: string | null;
+export interface ReportPdfExamGradeSummary {
+  averagePercentage: number;
+  comment: string | null;
 }
 
 /**
@@ -88,7 +86,7 @@ export type ReportPdfBlock =
   | {
       kind: "exam_grades";
       heading: string;
-      rows: ReportPdfExamGradeRow[];
+      summary: ReportPdfExamGradeSummary | null;
     };
 
 export interface ReportPdfData {
@@ -102,6 +100,7 @@ export interface ReportPdfData {
   /** Public Supabase storage URL for the template logo. Optional. */
   logoUrl: string | null;
   blocks: ReportPdfBlock[];
+  media: ReportMediaItem[];
   /** Legacy fallback: raw "# heading\n\nprose" body used only when no blocks. */
   body: string | null;
 }
@@ -255,6 +254,10 @@ const s = StyleSheet.create({
   examResult: { width: "12%" },
   examGrade: { width: "14%" },
   examComments: { width: "30%" },
+  mediaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 5 },
+  mediaCard: { width: "48%", marginBottom: 8 },
+  mediaImage: { width: "100%", height: 150, objectFit: "cover" },
+  mediaCaption: { marginTop: 4, fontSize: 8.5, color: INK_MUTED },
 
   /* Checklist / single-select controls */
   choiceRow: {
@@ -442,38 +445,44 @@ function PlainSection({ block }: { block: Extract<ReportPdfBlock, { kind: "secti
 }
 
 function ExamGradesBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "exam_grades" }> }) {
-  const columns = [
-    ["Subject", s.examSubject],
-    ["Exam", s.examAssessment],
-    ["Result", s.examResult],
-    ["Grade", s.examGrade],
-    ["Comments", s.examComments],
-  ] as const;
   return (
     <View style={s.section}>
       <Text style={s.sectionHeading}>{block.heading}</Text>
-      {block.rows.length === 0 ? (
+      {!block.summary ? (
         <Text style={s.emptyProgress}>No exam grades were recorded for this term.</Text>
       ) : (
         <View style={s.examTable}>
           <View style={[s.examRow, s.examHeader]} wrap={false}>
-            {columns.map(([label, width]) => (
-              <Text key={label} style={[s.examCell, width, { fontWeight: "bold" }]}>
-                {label}
-              </Text>
-            ))}
+            <Text style={[s.examCell, { fontWeight: "bold" }]}>Overall average</Text>
+            <Text style={[s.examCell, { fontWeight: "bold" }]}>Comments</Text>
           </View>
-          {block.rows.map((row, index) => (
-            <View key={`${row.subject}-${index}`} style={s.examRow} wrap={false}>
-              <Text style={[s.examCell, s.examSubject]}>{row.subject}</Text>
-              <Text style={[s.examCell, s.examAssessment]}>{row.assessmentName}</Text>
-              <Text style={[s.examCell, s.examResult]}>{row.percentage}%</Text>
-              <Text style={[s.examCell, s.examGrade]}>{row.gradeLabel}</Text>
-              <Text style={[s.examCell, s.examComments]}>{row.comments?.trim() || "—"}</Text>
-            </View>
-          ))}
+          <View style={s.examRow} wrap={false}>
+            <Text style={s.examCell}>{block.summary.averagePercentage}%</Text>
+            <Text style={s.examCell}>{block.summary.comment?.trim() || "—"}</Text>
+          </View>
         </View>
       )}
+    </View>
+  );
+}
+
+function MediaSection({ media }: { media: ReportMediaItem[] }) {
+  if (media.length === 0) return null;
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionHeading}>Media</Text>
+      <View style={s.mediaGrid}>
+        {media.map((item) => (
+          <View key={item.id} style={s.mediaCard} wrap={false}>
+            {item.kind === "photo" && item.url ? (
+              <Image src={item.url} style={s.mediaImage} />
+            ) : (
+              <Text style={s.paragraph}>Video included in the online report</Text>
+            )}
+            {item.caption ? <Text style={s.mediaCaption}>{item.caption}</Text> : null}
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -554,6 +563,8 @@ export function ReportDocument({ data }: { data: ReportPdfData }) {
                 );
               })
             : null}
+
+        <MediaSection media={data.media} />
 
         <View style={s.footer} fixed>
           <Text style={s.footerText}>Prepared with Mitable</Text>

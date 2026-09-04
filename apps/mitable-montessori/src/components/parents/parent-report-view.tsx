@@ -1,6 +1,7 @@
 import type { ReportPdfBlock } from "@/lib/pdf/report-template";
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
 import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
+import type { ReportMediaItem } from "@/lib/media/report-media";
 
 const MARK_CLASS: Record<ProgressMark, string> = {
   m: "bg-sage-soft text-sage-deep",
@@ -21,6 +22,7 @@ export function ParentReportView({
   periodLabel,
   blocks,
   fallbackBody,
+  media,
 }: {
   title: string;
   studentName: string;
@@ -28,6 +30,7 @@ export function ParentReportView({
   periodLabel: string;
   blocks: ReportPdfBlock[];
   fallbackBody: string;
+  media: ReportMediaItem[];
 }) {
   return (
     <article className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
@@ -53,6 +56,7 @@ export function ParentReportView({
         ) : (
           <LegacyBody body={fallbackBody} />
         )}
+        {media.length > 0 ? <ReportMediaGallery media={media} studentName={studentName} /> : null}
       </div>
       <footer className="border-t border-border px-6 py-4 text-center text-xs text-ink-muted sm:px-10">
         Prepared with Mitable
@@ -61,38 +65,73 @@ export function ParentReportView({
   );
 }
 
+function ReportMediaGallery({
+  media,
+  studentName,
+}: {
+  media: ReportMediaItem[];
+  studentName: string;
+}) {
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-ink">Media</h2>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        {media.map((item) => (
+          <figure
+            key={item.id}
+            className="overflow-hidden rounded-xl border border-border bg-canvas"
+          >
+            <div className="aspect-[4/3] bg-muted">
+              {item.url && item.kind === "photo" ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.url}
+                  alt={item.caption || `Daily log moment for ${studentName}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : item.url ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video src={item.url} controls playsInline className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full place-items-center text-sm text-ink-muted">
+                  Preview unavailable
+                </div>
+              )}
+            </div>
+            {item.caption ? (
+              <figcaption className="px-3 py-2 text-sm text-ink-secondary">
+                {item.caption}
+              </figcaption>
+            ) : null}
+          </figure>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ExamGradesBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "exam_grades" }> }) {
   return (
     <section>
       <h2 className="text-lg font-semibold text-ink">{block.heading}</h2>
-      {block.rows.length === 0 ? (
+      {!block.summary ? (
         <p className="mt-3 text-sm text-ink-secondary">
           No exam grades were recorded for this term.
         </p>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-border">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-muted text-xs uppercase tracking-wide text-ink-muted">
-              <tr>
-                <th className="px-3 py-2">Subject</th>
-                <th className="px-3 py-2">Exam</th>
-                <th className="px-3 py-2">Result</th>
-                <th className="px-3 py-2">Grade</th>
-                <th className="px-3 py-2">Comments</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {block.rows.map((row, index) => (
-                <tr key={`${row.subject}-${row.assessmentName}-${index}`}>
-                  <td className="px-3 py-3 font-medium text-ink">{row.subject}</td>
-                  <td className="px-3 py-3 text-ink-secondary">{row.assessmentName}</td>
-                  <td className="px-3 py-3 font-semibold text-ink">{row.percentage}%</td>
-                  <td className="px-3 py-3 text-ink">{row.gradeLabel}</td>
-                  <td className="px-3 py-3 text-ink-secondary">{row.comments?.trim() || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-3 rounded-xl border border-border text-sm">
+          <div className="grid gap-1 border-b border-border bg-muted px-3 py-2 sm:grid-cols-[180px_1fr]">
+            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Overall average
+            </span>
+            <span className="font-semibold text-ink">{block.summary.averagePercentage}%</span>
+          </div>
+          <div className="grid gap-1 px-3 py-3 sm:grid-cols-[180px_1fr]">
+            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Comments
+            </span>
+            <span className="text-ink-secondary">{block.summary.comment?.trim() || "—"}</span>
+          </div>
         </div>
       )}
     </section>

@@ -14,7 +14,6 @@ const UpsertGradeSchema = z.object({
   assessmentName: z.string().trim().min(1).max(160),
   percentage: z.number().min(0).max(100),
   gradeLabel: z.string().trim().min(1).max(80),
-  comments: z.string().trim().max(4000).nullable().optional(),
 });
 
 async function validateScope(args: {
@@ -108,7 +107,7 @@ export async function POST(req: Request) {
     assessment_name: input.assessmentName,
     percentage: input.percentage,
     grade_label: input.gradeLabel,
-    comments: input.comments || null,
+    comments: null,
     recorded_by_user_id: auth.user.userId,
   };
   const mutation = input.id

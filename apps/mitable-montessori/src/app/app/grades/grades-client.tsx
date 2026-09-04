@@ -27,7 +27,6 @@ type FormState = {
   assessmentName: string;
   percentage: string;
   gradeLabel: string;
-  comments: string;
 };
 
 function emptyForm(studentId: string): FormState {
@@ -37,12 +36,12 @@ function emptyForm(studentId: string): FormState {
     assessmentName: "End-of-term exam",
     percentage: "",
     gradeLabel: "",
-    comments: "",
   };
 }
 
 export default function GradesClient({ initialData }: { initialData: ElementaryGradesPageData }) {
   const [grades, setGrades] = React.useState(initialData.grades);
+  const [termComments, setTermComments] = React.useState(initialData.termComments);
   const [classroomId, setClassroomId] = React.useState(initialData.classrooms[0]?.id ?? "");
   const [termId, setTermId] = React.useState(initialData.terms[0]?.id ?? "");
   const classroomStudents = initialData.students.filter((s) => s.classroomId === classroomId);
@@ -50,16 +49,30 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
     emptyForm(classroomStudents[0]?.id ?? "")
   );
   const [saving, setSaving] = React.useState(false);
+  const [commentStudentId, setCommentStudentId] = React.useState(classroomStudents[0]?.id ?? "");
+  const [termComment, setTermComment] = React.useState("");
+  const [savingTermComment, setSavingTermComment] = React.useState(false);
 
   React.useEffect(() => {
     const firstStudent = initialData.students.find((s) => s.classroomId === classroomId);
     setForm(emptyForm(firstStudent?.id ?? ""));
+    setCommentStudentId(firstStudent?.id ?? "");
   }, [classroomId, initialData.students]);
 
   const visibleGrades = grades.filter(
     (grade) => grade.classroomId === classroomId && grade.termId === termId
   );
   const studentName = new Map(initialData.students.map((student) => [student.id, student.name]));
+  const selectedTermComment = termComments.find(
+    (item) =>
+      item.classroomId === classroomId &&
+      item.termId === termId &&
+      item.studentId === commentStudentId
+  );
+
+  React.useEffect(() => {
+    setTermComment(selectedTermComment?.comment ?? "");
+  }, [selectedTermComment?.comment]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -83,7 +96,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
           assessmentName: form.assessmentName,
           percentage,
           gradeLabel: form.gradeLabel,
-          comments: form.comments || null,
         }),
       });
       const payload = (await response.json()) as { grade?: ElementaryExamGrade; error?: string };
@@ -109,7 +121,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
       assessmentName: grade.assessmentName,
       percentage: String(grade.percentage),
       gradeLabel: grade.gradeLabel,
-      comments: grade.comments ?? "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -125,12 +136,53 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
     ToastBus.push({ message: "Grade deleted" });
   }
 
+  async function saveTermComment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!classroomId || !termId || !commentStudentId) return;
+    setSavingTermComment(true);
+    try {
+      const response = await fetch("/api/v1/elementary-grade-comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classroomId,
+          studentId: commentStudentId,
+          termId,
+          comment: termComment.trim() || null,
+        }),
+      });
+      const payload = (await response.json()) as { comment?: string | null; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Could not save the comment");
+      setTermComments((current) => {
+        const remaining = current.filter(
+          (item) =>
+            item.classroomId !== classroomId ||
+            item.termId !== termId ||
+            item.studentId !== commentStudentId
+        );
+        return payload.comment
+          ? [
+              ...remaining,
+              { classroomId, termId, studentId: commentStudentId, comment: payload.comment },
+            ]
+          : remaining;
+      });
+      ToastBus.push({ message: payload.comment ? "End-of-term comment saved" : "Comment cleared" });
+    } catch (error) {
+      ToastBus.push({
+        message: error instanceof Error ? error.message : "Could not save the comment",
+      });
+    } finally {
+      setSavingTermComment(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         overline="Elementary"
         title="Grades"
-        subtitle="Record traditional exam results. These appear only in end-of-term reports."
+        subtitle="Record subject results, then add one end-of-term comment for each student. Reports show the overall average."
       />
       <div style={{ padding: 24, maxWidth: 1120, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
@@ -223,15 +275,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                   />
                 </Field>
               </div>
-              <Field label="Comments">
-                <textarea
-                  style={{ ...inputStyle, minHeight: 92, resize: "vertical" }}
-                  value={form.comments}
-                  onChange={(e) => update("comments", e.target.value)}
-                  placeholder="Optional context about the result"
-                  maxLength={4000}
-                />
-              </Field>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="submit"
@@ -306,9 +349,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                         {grade.assessmentName} · <strong>{grade.percentage}%</strong> ·{" "}
                         {grade.gradeLabel}
                       </div>
-                      {grade.comments ? (
-                        <p style={{ margin: "8px 0 0", fontSize: 13 }}>{grade.comments}</p>
-                      ) : null}
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
                       <button
@@ -332,6 +372,58 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                 ))
               )}
             </div>
+            <form
+              onSubmit={saveTermComment}
+              style={{ ...cardStyle, padding: 18, gridColumn: "1 / -1" }}
+            >
+              <h2 style={{ fontSize: 17, margin: "0 0 6px" }}>End-of-term comment</h2>
+              <p style={{ margin: "0 0 16px", color: "var(--color-ink-secondary)", fontSize: 14 }}>
+                This is the one comment that appears beside the student&apos;s overall grade
+                average.
+              </p>
+              <Field label="Student">
+                <select
+                  style={inputStyle}
+                  value={commentStudentId}
+                  onChange={(event) => setCommentStudentId(event.target.value)}
+                  required
+                >
+                  {classroomStudents.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Comments">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 110, resize: "vertical" }}
+                  value={termComment}
+                  onChange={(event) => setTermComment(event.target.value)}
+                  placeholder="Overall feedback for this term"
+                  maxLength={4000}
+                />
+              </Field>
+              <button
+                type="submit"
+                disabled={savingTermComment || !classroomStudents.length}
+                style={{
+                  border: 0,
+                  borderRadius: 9,
+                  padding: "10px 14px",
+                  background: "var(--color-terracotta)",
+                  color: "white",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {savingTermComment
+                  ? "Saving…"
+                  : termComment.trim()
+                    ? "Save comment"
+                    : "Clear comment"}
+              </button>
+            </form>
           </div>
         )}
       </div>

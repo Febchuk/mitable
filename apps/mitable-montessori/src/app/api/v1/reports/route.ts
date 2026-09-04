@@ -26,8 +26,11 @@ import {
   resolveStudentClassroomId,
 } from "@/lib/reports/create-report-sections";
 import { endOfTermPeriodBounds } from "@/lib/reports/term-period";
-import { listStudentExamGradesForTerm } from "@/lib/queries/elementary-grades";
-import { encodeExamGrades } from "@/lib/reports/exam-grades-payload";
+import {
+  getStudentTermGradeComment,
+  listStudentExamGradesForTerm,
+} from "@/lib/queries/elementary-grades";
+import { encodeExamGrades, summarizeExamGrades } from "@/lib/reports/exam-grades-payload";
 import { dbToddlerDailyLogToDto, toddlerDailyLogReportHtml } from "@/lib/toddler-routines";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
@@ -120,6 +123,7 @@ export async function POST(req: Request) {
   // this child's profile data (progress, comments, observations, etc.).
   let reportingPeriod: ReportingPeriod | null = null;
   let reportClassroomId = activeClassroom.id;
+  let toddlerDailyLogId: string | null = null;
   let resolvedTemplateId: string | null = input.templateId ?? null;
   const useDefaultTemplate = isDefaultReportTemplateId(input.templateId ?? null);
   const teacherClassrooms = await listTeacherClassroomsForCurrentUser();
@@ -232,12 +236,16 @@ export async function POST(req: Request) {
     termId &&
     isElementaryClassroomCode(reportClassroom?.code)
   ) {
-    const gradeRows = await listStudentExamGradesForTerm({
+    const gradeScope = {
       schoolId: auth.user.schoolId,
       classroomId: reportClassroomId,
       studentId: input.childId,
       termId,
-    });
+    };
+    const [gradeRows, termComment] = await Promise.all([
+      listStudentExamGradesForTerm(gradeScope),
+      getStudentTermGradeComment(gradeScope),
+    ]);
     const heading = "Exam grades";
     sections = [
       ...(sections ?? []).filter((section) => section.heading !== heading),
@@ -247,7 +255,7 @@ export async function POST(req: Request) {
         paragraphs: [
           {
             id: `p-exam-grades-${termId}`,
-            html: encodeExamGrades(gradeRows),
+            html: encodeExamGrades(summarizeExamGrades(gradeRows, termComment)),
           },
         ],
       },
@@ -273,34 +281,40 @@ export async function POST(req: Request) {
         .eq("attendance_date", reportDate)
         .maybeSingle(),
     ]);
-    if (logRow) {
-      const attendance = attendanceRow?.status
-        ? `${attendanceRow.status}${attendanceRow.arrival_time ? ` · arrived ${String(attendanceRow.arrival_time).slice(0, 5)}` : ""}`
-        : null;
-      const heading = "Daily log";
-      sections = [
-        ...(sections ?? []).filter(
-          (section) => section.heading.toLowerCase() !== heading.toLowerCase()
-        ),
-        {
-          id: `s-toddler-daily-log-${reportDate}`,
-          heading,
-          paragraphs: [
-            {
-              id: `p-toddler-daily-log-${reportDate}`,
-              html: toddlerDailyLogReportHtml(dbToddlerDailyLogToDto(logRow), attendance),
-            },
-          ],
-        },
-      ];
+    if (!logRow) {
+      return NextResponse.json(
+        { error: "Save this child's Daily Log before creating the report" },
+        { status: 400 }
+      );
     }
+    toddlerDailyLogId = logRow.id as string;
+    const attendance = attendanceRow?.status
+      ? `${attendanceRow.status}${attendanceRow.arrival_time ? ` · arrived ${String(attendanceRow.arrival_time).slice(0, 5)}` : ""}`
+      : null;
+    const heading = "Daily log";
+    // Toddler reports come entirely from the Daily Log. Do not retain the
+    // regular curriculum/progress-grid sections built by the default template.
+    sections = [
+      {
+        id: `s-toddler-daily-log-${reportDate}`,
+        heading,
+        paragraphs: [
+          {
+            id: `p-toddler-daily-log-${reportDate}`,
+            html: toddlerDailyLogReportHtml(dbToddlerDailyLogToDto(logRow), attendance),
+          },
+        ],
+      },
+    ];
+    sectionMeta = {};
+    sectionGuidance = {};
   }
 
   const { data: reusable } =
     input.kind === "Daily"
       ? await supabase
           .from("reports")
-          .select("id, sections")
+          .select("id")
           .eq("student_id", input.childId)
           .eq("classroom_id", reportClassroomId)
           .eq("report_type", "daily")
@@ -312,17 +326,15 @@ export async function POST(req: Request) {
       : { data: null };
 
   if (reusable) {
-    const dailyLogSection = sections?.find(
-      (section) => section.heading.toLowerCase() === "daily log"
-    );
-    if (dailyLogSection) {
-      const existingSections =
-        (reusable.sections as typeof sections | null)?.filter(
-          (section) => section.heading.toLowerCase() !== "daily log"
-        ) ?? [];
+    if (toddlerDailyLogId) {
       const { error: updateError } = await supabase
         .from("reports")
-        .update({ sections: [...existingSections, dailyLogSection] })
+        .update({
+          sections,
+          section_meta: sectionMeta,
+          section_guidance: sectionGuidance,
+          toddler_daily_log_id: toddlerDailyLogId,
+        })
         .eq("id", reusable.id);
       if (updateError) {
         return NextResponse.json(
@@ -345,6 +357,7 @@ export async function POST(req: Request) {
       period_end: periodEnd,
       reporting_period: reportingPeriod,
       term_id: termId,
+      toddler_daily_log_id: toddlerDailyLogId,
       status: "draft",
       title: `${firstName} — ${dayLabel}`,
       body: null,

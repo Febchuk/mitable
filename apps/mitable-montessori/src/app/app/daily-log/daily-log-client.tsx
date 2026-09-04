@@ -2,7 +2,11 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, FileText, Plus, Save, Trash2 } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, FileText, Plus, Save, Trash2 } from "lucide-react";
+import {
+  StudentMediaCapture,
+  StudentMediaLibrary,
+} from "@/components/montessori/child-detail/student-media";
 import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { Button } from "@/components/ui/button";
@@ -72,6 +76,8 @@ export default function DailyLogClient({
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [reporting, setReporting] = React.useState(false);
+  const [mediaOpen, setMediaOpen] = React.useState(false);
+  const [mediaRefreshKey, setMediaRefreshKey] = React.useState(0);
 
   const load = React.useCallback(async (nextDate: string, nextClassroomId: string) => {
     setLoading(true);
@@ -200,6 +206,12 @@ export default function DailyLogClient({
     }
   }
 
+  async function includeMedia() {
+    const saved = draft?.id ? draft : await save(false);
+    if (!saved?.id) return;
+    setMediaOpen(true);
+  }
+
   const currentStudent = data?.students.find((student) => student.id === studentId);
   const attendance = data?.attendance[studentId];
 
@@ -316,6 +328,17 @@ export default function DailyLogClient({
               </div>
             </section>
 
+            {draft.id ? (
+              <StudentMediaLibrary
+                studentId={draft.studentId}
+                studentName={currentStudent.name}
+                refreshKey={mediaRefreshKey}
+                mobile={false}
+                toddlerDailyLogId={draft.id}
+                onAddMedia={() => void includeMedia()}
+              />
+            ) : null}
+
             <TimedSection
               title="Potty time / diapering"
               illustration="toileting"
@@ -389,6 +412,15 @@ export default function DailyLogClient({
                 type="button"
                 variant="outline"
                 disabled={saving || reporting}
+                onClick={() => void includeMedia()}
+              >
+                <Camera size={15} />
+                Include media
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving || reporting}
                 onClick={() => void save()}
               >
                 <Save size={15} />
@@ -403,6 +435,19 @@ export default function DailyLogClient({
                 {reporting ? "Opening…" : "Review daily report"}
               </Button>
             </div>
+            {mediaOpen && draft.id ? (
+              <StudentMediaCapture
+                open
+                studentId={draft.studentId}
+                studentName={currentStudent.name}
+                toddlerDailyLogId={draft.id}
+                onClose={() => setMediaOpen(false)}
+                onShared={() => {
+                  setMediaRefreshKey((value) => value + 1);
+                  ToastBus.push({ message: "Daily log media shared with family" });
+                }}
+              />
+            ) : null}
           </>
         )}
       </div>

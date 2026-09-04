@@ -115,7 +115,7 @@ export function buildReportPdfBlocks(
       blocks.push({
         kind: "exam_grades",
         heading: section.heading,
-        rows: decodeExamGrades(section.paragraphs[0]?.html ?? "") ?? [],
+        summary: decodeExamGrades(section.paragraphs[0]?.html ?? ""),
       });
       continue;
     }

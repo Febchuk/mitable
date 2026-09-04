@@ -16,6 +16,7 @@ import {
   teacherShouldSeeDailyLog,
   teacherShouldSeeProgress,
   teacherShouldSeeSpeechProgressTab,
+  isToddlerClassroomCode,
 } from "@/lib/app/active-classroom";
 import {
   addTodayProgressAndAgent,
@@ -51,7 +52,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <MontessoriProvider
-      initialClassrooms={teacherClassrooms.map((c) => ({ id: c.id, name: c.name }))}
+      initialClassrooms={teacherClassrooms.map((c) => ({
+        id: c.id,
+        name: c.name,
+        supportsProgress: !isToddlerClassroomCode(c.code),
+      }))}
       showSpeechProgressTab={showSpeechProgressTab}
     >
       <ActiveReportProvider>

@@ -25,12 +25,27 @@ export type ElementaryExamGrade = {
   updatedAt: string;
 };
 
+export type ElementaryTermGradeComment = {
+  classroomId: string;
+  studentId: string;
+  termId: string;
+  comment: string;
+};
+
 export type ElementaryGradesPageData = {
   classrooms: Array<{ id: string; name: string }>;
   terms: SchoolTerm[];
   students: ElementaryGradeStudent[];
   grades: ElementaryExamGrade[];
+  termComments: ElementaryTermGradeComment[];
 };
+
+function isMissingTermCommentsTable(error: { code?: string; message?: string } | null): boolean {
+  return (
+    error?.code === "PGRST205" ||
+    error?.message?.includes("public.elementary_term_grade_comments") === true
+  );
+}
 
 export async function getElementaryGradesPageData(): Promise<ElementaryGradesPageData | null> {
   const ctx = await getCurrentUserContext();
@@ -43,7 +58,7 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
 
   const admin = createAdminClient();
   const classroomIds = classrooms.map((classroom) => classroom.id);
-  const [terms, enrollmentResp, gradesResp] = await Promise.all([
+  const [terms, enrollmentResp, gradesResp, termCommentsResp] = await Promise.all([
     listSchoolTerms(admin, ctx.schoolId),
     admin
       .from("student_classroom_enrollments")
@@ -59,10 +74,18 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
       .eq("school_id", ctx.schoolId)
       .in("classroom_id", classroomIds)
       .order("subject"),
+    admin
+      .from("elementary_term_grade_comments")
+      .select("classroom_id, student_id, term_id, comment")
+      .eq("school_id", ctx.schoolId)
+      .in("classroom_id", classroomIds),
   ]);
 
   if (enrollmentResp.error) throw new Error(enrollmentResp.error.message);
   if (gradesResp.error) throw new Error(gradesResp.error.message);
+  if (termCommentsResp.error && !isMissingTermCommentsTable(termCommentsResp.error)) {
+    throw new Error(termCommentsResp.error.message);
+  }
 
   const students = (enrollmentResp.data ?? []).flatMap((raw) => {
     const row = raw as unknown as {
@@ -112,6 +135,15 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
         updatedAt: row.updated_at as string,
       };
     }),
+    termComments: (termCommentsResp.data ?? []).map((raw) => {
+      const row = raw as Record<string, unknown>;
+      return {
+        classroomId: row.classroom_id as string,
+        studentId: row.student_id as string,
+        termId: row.term_id as string,
+        comment: row.comment as string,
+      };
+    }),
   };
 }
 
@@ -149,4 +181,24 @@ export async function listStudentExamGradesForTerm(args: {
       updatedAt: row.updated_at as string,
     };
   });
+}
+
+export async function getStudentTermGradeComment(args: {
+  schoolId: string;
+  classroomId: string;
+  studentId: string;
+  termId: string;
+}): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("elementary_term_grade_comments")
+    .select("comment")
+    .eq("school_id", args.schoolId)
+    .eq("classroom_id", args.classroomId)
+    .eq("student_id", args.studentId)
+    .eq("term_id", args.termId)
+    .maybeSingle();
+  if (error && !isMissingTermCommentsTable(error)) throw new Error(error.message);
+  if (isMissingTermCommentsTable(error)) return null;
+  return (data?.comment as string | null | undefined) ?? null;
 }

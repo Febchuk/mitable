@@ -475,7 +475,8 @@ function EmptyState({
 export function ProgressFeature() {
   const store = useMontessori();
   const cp = store.classroomProgress;
-  const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = store;
+  const { selectedClassroomId, selectClassroom, classroomBusy } = store;
+  const classrooms = store.classrooms.filter((classroom) => classroom.supportsProgress !== false);
 
   if (!cp && classroomBusy) {
     return (
@@ -560,7 +561,8 @@ function ProgressFeatureLoaded({
   students: ClassroomProgressStudent[];
 }) {
   const store = useMontessori();
-  const { classrooms, selectedClassroomId, selectClassroom, classroomBusy } = store;
+  const { selectedClassroomId, selectClassroom, classroomBusy } = store;
+  const classrooms = store.classrooms.filter((classroom) => classroom.supportsProgress !== false);
 
   // Group ("team") filtering is gated by a feature flag; the Class picker owns
   // this slot by default and the Group filter only appears when enabled.
