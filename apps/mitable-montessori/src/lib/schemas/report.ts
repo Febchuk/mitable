@@ -36,6 +36,11 @@ export const CreateReportRequestSchema = z.object({
   notes: z.array(z.string().min(1)).max(20).optional().default([]),
   /** Fuzzy-matched tokens. */
   tokenMap: z.array(TokenMapEntrySchema).max(50).optional().default([]),
+  /** Used by date-based experiences such as Toddler Daily Log. */
+  reportDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 export type CreateReportRequest = z.infer<typeof CreateReportRequestSchema>;
 

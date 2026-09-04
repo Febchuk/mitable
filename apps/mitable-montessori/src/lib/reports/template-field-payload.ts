@@ -9,6 +9,7 @@ import {
   isProgressTopicPayload,
   progressTopicToReadableText,
 } from "@/lib/reports/progress-topic-payload";
+import { decodeExamGrades, examGradesToReadableText } from "@/lib/reports/exam-grades-payload";
 
 const PREFIX = "__MITABLE_FIELD_V1__";
 
@@ -135,6 +136,7 @@ export function inferSingleSelect(proseHtml: string, options: string[]): string 
 
 /** Plain text for PDF, chat tokenization, and markdown `body` — never exposes raw JSON prefixes. */
 export function fieldPayloadToReadableText(html: string): string {
+  if (decodeExamGrades(html)) return examGradesToReadableText(html);
   if (isProgressTopicPayload(html)) {
     return progressTopicToReadableText(html);
   }
@@ -173,7 +175,8 @@ export function paragraphCountsTowardDraftReadiness(
   if (
     fieldMeta?.type === "hardcoded" ||
     fieldMeta?.type === "curriculum" ||
-    fieldMeta?.type === "progress_topic"
+    fieldMeta?.type === "progress_topic" ||
+    fieldMeta?.type === "exam_grades"
   ) {
     return false;
   }
@@ -192,7 +195,8 @@ export function normalizeSectionHtmlForTemplate(
     entry.type === "text" ||
     entry.type === "hardcoded" ||
     entry.type === "curriculum" ||
-    entry.type === "progress_topic"
+    entry.type === "progress_topic" ||
+    entry.type === "exam_grades"
   ) {
     return html;
   }

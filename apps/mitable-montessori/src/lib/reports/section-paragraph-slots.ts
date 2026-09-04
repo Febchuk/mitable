@@ -12,6 +12,7 @@ export function firstOpenParagraphIndex(
         fieldMeta.type === "hardcoded" ||
         fieldMeta.type === "curriculum" ||
         fieldMeta.type === "progress_topic" ||
+        fieldMeta.type === "exam_grades" ||
         fieldMeta.type === "checklist" ||
         fieldMeta.type === "single_select";
       if (structured) continue;

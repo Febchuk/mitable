@@ -18,6 +18,7 @@ const StartUploadBody = z.object({
   mimeType: z.enum(STUDENT_MEDIA_MIME_TYPES),
   byteSize: z.number().int().positive(),
   progressCommandId: z.string().uuid().optional(),
+  toddlerDailyLogId: z.string().uuid().optional(),
 });
 
 type MediaRow = {
@@ -31,6 +32,7 @@ type MediaRow = {
   created_at: string;
   storage_path: string;
   progress_command_id: string | null;
+  toddler_daily_log_id: string | null;
   users:
     | { first_name: string | null; last_name: string | null }
     | { first_name: string | null; last_name: string | null }[]
@@ -81,6 +83,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       );
     }
   }
+  if (input.toddlerDailyLogId) {
+    const { data: log } = await admin
+      .from("toddler_daily_logs")
+      .select("id, school_id, student_id, classroom_id")
+      .eq("id", input.toddlerDailyLogId)
+      .maybeSingle();
+    if (!log || log.school_id !== access.access.student.school_id || log.student_id !== studentId) {
+      return NextResponse.json(
+        { error: "That daily log is not available for media" },
+        { status: 403 }
+      );
+    }
+    if (access.access.user.role !== "admin") {
+      const { data: assignment } = await admin
+        .from("classroom_teacher_assignments")
+        .select("classroom_id")
+        .eq("teacher_user_id", access.access.user.userId)
+        .eq("classroom_id", log.classroom_id)
+        .is("end_date", null)
+        .maybeSingle();
+      if (!assignment) {
+        return NextResponse.json(
+          { error: "That daily log is not available for media" },
+          { status: 403 }
+        );
+      }
+    }
+  }
   const mediaId = crypto.randomUUID();
   const storagePath = `${access.access.student.school_id}/${studentId}/${mediaId}.${mediaExtension(input.mimeType)}`;
   const { error: insertError } = await admin.from("student_media").insert({
@@ -93,6 +123,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     byte_size: input.byteSize,
     storage_path: storagePath,
     progress_command_id: input.progressCommandId ?? null,
+    toddler_daily_log_id: input.toddlerDailyLogId ?? null,
   });
   if (insertError) {
     return NextResponse.json({ error: "Couldn't prepare the media upload" }, { status: 500 });
@@ -118,6 +149,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       mime_type: input.mimeType,
       byte_size: input.byteSize,
       progress_command_id: input.progressCommandId ?? null,
+      toddler_daily_log_id: input.toddlerDailyLogId ?? null,
     },
   });
 
@@ -129,20 +161,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 /** Returns the teacher/admin library for one child with short-lived viewing links. */
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: studentId } = await params;
   const access = await requireStudentMediaAccess(studentId);
   if (!access.ok) return access.response;
 
   const admin = createAdminClient();
-  const { data, error } = await admin
+  const toddlerDailyLogId = new URL(req.url).searchParams.get("toddlerDailyLogId");
+  if (toddlerDailyLogId && !z.string().uuid().safeParse(toddlerDailyLogId).success) {
+    return NextResponse.json({ error: "Invalid daily log" }, { status: 400 });
+  }
+  let query = admin
     .from("student_media")
     .select(
-      "id, kind, mime_type, byte_size, caption, status, shared_at, created_at, storage_path, progress_command_id, users:uploaded_by_user_id(first_name, last_name)"
+      "id, kind, mime_type, byte_size, caption, status, shared_at, created_at, storage_path, progress_command_id, toddler_daily_log_id, users:uploaded_by_user_id(first_name, last_name)"
     )
     .eq("student_id", studentId)
     .neq("status", "deleted")
     .order("created_at", { ascending: false });
+  if (toddlerDailyLogId) query = query.eq("toddler_daily_log_id", toddlerDailyLogId);
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Couldn't load media" }, { status: 500 });
 
   const items = await Promise.all(
@@ -165,6 +203,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         createdAt: item.created_at,
         uploadedBy,
         progressCommandId: item.progress_command_id,
+        toddlerDailyLogId: item.toddler_daily_log_id,
         url: signed?.signedUrl ?? null,
       };
     })

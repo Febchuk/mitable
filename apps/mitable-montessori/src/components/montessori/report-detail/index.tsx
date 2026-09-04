@@ -33,6 +33,7 @@ import { SendToParentsDialog } from "@/app/app/reports/report-modals";
 import { usePublishActiveReport } from "../active-report-context";
 import { ChatPane, type ChatPaneHandle, type ChatPaneSection } from "./chat-pane";
 import { ReportChatLauncher } from "./report-chat-drawer";
+import type { ReportMediaItem } from "@/lib/media/report-media";
 
 const DIRTY_LABEL = "Unsaved changes";
 const SAVING_LABEL = "Saving…";
@@ -58,6 +59,7 @@ type LocalDetail = {
   sections: LocalSection[];
   templateLogoUrl?: string | null;
   templateSectionMeta: SectionMeta;
+  media?: ReportMediaItem[];
 };
 
 /** Calendar line for the report — uses `locale` via `useUiLocale` for hydration-safe Intl. */
@@ -162,6 +164,7 @@ function buildLocalDetail(report: ReportDetailRow, locale: string): LocalDetail 
     sections,
     templateLogoUrl: report.templateLogoUrl ?? null,
     templateSectionMeta: report.templateSectionMeta ?? {},
+    media: report.media ?? [],
   };
 }
 

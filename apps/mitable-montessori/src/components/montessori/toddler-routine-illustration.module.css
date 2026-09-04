@@ -1,0 +1,157 @@
+.illustration {
+  display: inline-block;
+  width: 76px;
+  height: 108px;
+  flex: 0 0 auto;
+  background-image: url("/toddler/daily-log-sprite.webp");
+  background-repeat: no-repeat;
+  background-size: 400% auto;
+  background-position-y: 16%;
+  transform-origin: 50% 82%;
+  animation: gentle-float 3.8s ease-in-out infinite;
+  filter: drop-shadow(0 5px 7px rgb(82 53 36 / 9%));
+}
+
+.small {
+  width: 62px;
+  height: 90px;
+}
+
+.mood {
+  background-position-x: 0;
+  animation-name: happy-bounce;
+}
+
+.nap {
+  background-position-x: 33.333%;
+  animation-name: sleepy-breathe;
+  animation-duration: 4.8s;
+}
+
+.participation {
+  background-position-x: 66.667%;
+  animation-name: curious-wave;
+}
+
+.toileting {
+  background-position-x: 100%;
+  animation-name: gentle-float;
+}
+
+.feeding,
+.outdoor,
+.activities,
+.materials,
+.notes {
+  background-position-y: 85%;
+}
+
+.feeding {
+  background-position-x: 0;
+  animation-name: spoon-bob;
+}
+
+.outdoor {
+  background-position-x: 33.333%;
+  animation-name: playful-step;
+}
+
+.activities {
+  background-position-x: 66.667%;
+  animation-name: creative-sway;
+}
+
+.materials,
+.notes {
+  background-position-x: 100%;
+  animation-name: focused-breathe;
+}
+
+@keyframes gentle-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.5deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(0.5deg);
+  }
+}
+
+@keyframes happy-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-5px) scale(1.015);
+  }
+  58% {
+    transform: translateY(-2px) scale(0.995);
+  }
+}
+
+@keyframes sleepy-breathe {
+  0%,
+  100% {
+    transform: scale(0.985) translateY(1px);
+  }
+  50% {
+    transform: scale(1.015) translateY(-1px);
+  }
+}
+
+@keyframes curious-wave {
+  0%,
+  100% {
+    transform: rotate(-0.7deg) translateY(0);
+  }
+  50% {
+    transform: rotate(0.8deg) translateY(-3px);
+  }
+}
+
+@keyframes spoon-bob {
+  0%,
+  100% {
+    transform: rotate(0) translateY(0);
+  }
+  50% {
+    transform: rotate(-1deg) translateY(-3px);
+  }
+}
+
+@keyframes playful-step {
+  0%,
+  100% {
+    transform: translateX(0) translateY(0) rotate(-0.5deg);
+  }
+  50% {
+    transform: translateX(2px) translateY(-4px) rotate(0.8deg);
+  }
+}
+
+@keyframes creative-sway {
+  0%,
+  100% {
+    transform: rotate(-0.8deg);
+  }
+  50% {
+    transform: rotate(0.8deg) translateY(-2px);
+  }
+}
+
+@keyframes focused-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(0.99);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.01);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illustration {
+    animation: none;
+  }
+}

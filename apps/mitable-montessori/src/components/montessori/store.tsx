@@ -36,7 +36,7 @@ export type ProgressSaveResult = {
 };
 
 /** Minimal classroom shape for the Progress class switcher. */
-export type ProgressClassroom = { id: string; name: string };
+export type ProgressClassroom = { id: string; name: string; supportsProgress?: boolean };
 
 const SELECTED_CLASSROOM_KEY = "mitable.selectedClassroom";
 
@@ -199,13 +199,21 @@ export function MontessoriProvider({
 
   const [classrooms] = React.useState<ProgressClassroom[]>(initialClassrooms);
   const [selectedClassroomId, setSelectedClassroomId] = React.useState<string | null>(
-    initialClassroomProgress?.classroomId ?? initialClassrooms[0]?.id ?? null
+    initialClassroomProgress?.classroomId ??
+      initialClassrooms.find((classroom) => classroom.supportsProgress !== false)?.id ??
+      null
   );
   const [classroomBusy, setClassroomBusy] = React.useState(false);
 
   const selectClassroom = React.useCallback(
     async (id: string) => {
-      if (!id || (id === selectedClassroomId && classroomProgress) || classroomBusy) return;
+      if (
+        !id ||
+        initialClassrooms.find((classroom) => classroom.id === id)?.supportsProgress === false ||
+        (id === selectedClassroomId && classroomProgress) ||
+        classroomBusy
+      )
+        return;
       setClassroomBusy(true);
       try {
         const res = await fetch(
@@ -229,7 +237,7 @@ export function MontessoriProvider({
         setClassroomBusy(false);
       }
     },
-    [selectedClassroomId, classroomBusy, classroomProgress]
+    [selectedClassroomId, classroomBusy, classroomProgress, initialClassrooms]
   );
 
   // Restore the teacher's last-picked class on mount. The layout server-renders
@@ -237,7 +245,11 @@ export function MontessoriProvider({
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(SELECTED_CLASSROOM_KEY);
-    if (stored && stored !== selectedClassroomId && classrooms.some((c) => c.id === stored)) {
+    if (
+      stored &&
+      stored !== selectedClassroomId &&
+      classrooms.some((c) => c.id === stored && c.supportsProgress !== false)
+    ) {
       void selectClassroom(stored);
     }
     // Run once on mount; selectClassroom guards against redundant swaps.

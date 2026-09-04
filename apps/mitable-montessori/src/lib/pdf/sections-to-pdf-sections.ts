@@ -21,6 +21,7 @@ import {
   inferSingleSelect,
 } from "@/lib/reports/template-field-payload";
 import { decodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
+import { decodeExamGrades } from "@/lib/reports/exam-grades-payload";
 import { isTopicCommentsHeading } from "@/lib/reports/default-classroom-report";
 import { statusToMark } from "@/lib/progress/marking-schemas";
 
@@ -106,6 +107,15 @@ export function buildReportPdfBlocks(
         heading: section.heading,
         groups: groupRowsByTopic(rows),
         comment,
+      });
+      continue;
+    }
+
+    if (entry?.type === "exam_grades") {
+      blocks.push({
+        kind: "exam_grades",
+        heading: section.heading,
+        summary: decodeExamGrades(section.paragraphs[0]?.html ?? ""),
       });
       continue;
     }

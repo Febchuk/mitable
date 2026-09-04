@@ -1,6 +1,7 @@
 import React from "react";
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
+import type { ReportMediaItem } from "@/lib/media/report-media";
 
 /* ------------------------------------------------------------------ */
 /*  Palette — mirrors src/styles/globals.css theme tokens. react-pdf   */
@@ -58,6 +59,11 @@ export interface ReportPdfProgressGroup {
   rows: ReportPdfProgressRow[];
 }
 
+export interface ReportPdfExamGradeSummary {
+  averagePercentage: number;
+  comment: string | null;
+}
+
 /**
  * A rendered report is a list of blocks. `subject` blocks mirror the
  * Greenhouse-style progress layout in report detail (numbered heading +
@@ -76,6 +82,11 @@ export type ReportPdfBlock =
       kind: "section";
       heading: string;
       paragraphs: ReportPdfParagraph[];
+    }
+  | {
+      kind: "exam_grades";
+      heading: string;
+      summary: ReportPdfExamGradeSummary | null;
     };
 
 export interface ReportPdfData {
@@ -89,6 +100,7 @@ export interface ReportPdfData {
   /** Public Supabase storage URL for the template logo. Optional. */
   logoUrl: string | null;
   blocks: ReportPdfBlock[];
+  media: ReportMediaItem[];
   /** Legacy fallback: raw "# heading\n\nprose" body used only when no blocks. */
   body: string | null;
 }
@@ -233,6 +245,19 @@ const s = StyleSheet.create({
     marginBottom: 7,
     lineHeight: 1.55,
   },
+  examTable: { marginTop: 4, borderWidth: 1, borderColor: BORDER },
+  examRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: BORDER },
+  examHeader: { backgroundColor: "#f2ebdf" },
+  examCell: { padding: 6, fontSize: 8.5, color: INK },
+  examSubject: { width: "20%" },
+  examAssessment: { width: "24%" },
+  examResult: { width: "12%" },
+  examGrade: { width: "14%" },
+  examComments: { width: "30%" },
+  mediaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 5 },
+  mediaCard: { width: "48%", marginBottom: 8 },
+  mediaImage: { width: "100%", height: 150, objectFit: "cover" },
+  mediaCaption: { marginTop: 4, fontSize: 8.5, color: INK_MUTED },
 
   /* Checklist / single-select controls */
   choiceRow: {
@@ -419,12 +444,56 @@ function PlainSection({ block }: { block: Extract<ReportPdfBlock, { kind: "secti
   );
 }
 
+function ExamGradesBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "exam_grades" }> }) {
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionHeading}>{block.heading}</Text>
+      {!block.summary ? (
+        <Text style={s.emptyProgress}>No exam grades were recorded for this term.</Text>
+      ) : (
+        <View style={s.examTable}>
+          <View style={[s.examRow, s.examHeader]} wrap={false}>
+            <Text style={[s.examCell, { fontWeight: "bold" }]}>Overall average</Text>
+            <Text style={[s.examCell, { fontWeight: "bold" }]}>Comments</Text>
+          </View>
+          <View style={s.examRow} wrap={false}>
+            <Text style={s.examCell}>{block.summary.averagePercentage}%</Text>
+            <Text style={s.examCell}>{block.summary.comment?.trim() || "—"}</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function MediaSection({ media }: { media: ReportMediaItem[] }) {
+  if (media.length === 0) return null;
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionHeading}>Media</Text>
+      <View style={s.mediaGrid}>
+        {media.map((item) => (
+          <View key={item.id} style={s.mediaCard} wrap={false}>
+            {item.kind === "photo" && item.url ? (
+              <Image src={item.url} style={s.mediaImage} />
+            ) : (
+              <Text style={s.paragraph}>Video included in the online report</Text>
+            )}
+            {item.caption ? <Text style={s.mediaCaption}>{item.caption}</Text> : null}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function ReportDocument({ data }: { data: ReportPdfData }) {
   const hasBlocks =
     data.blocks.length > 0 &&
     data.blocks.some(
       (b) =>
         b.kind === "subject" ||
+        b.kind === "exam_grades" ||
         b.paragraphs.some((p) => p.field || p.text.length > 0) ||
         b.heading.length > 0
     );
@@ -470,6 +539,8 @@ export function ReportDocument({ data }: { data: ReportPdfData }) {
           ? data.blocks.map((block, bi) =>
               block.kind === "subject" ? (
                 <SubjectBlock key={bi} block={block} />
+              ) : block.kind === "exam_grades" ? (
+                <ExamGradesBlock key={bi} block={block} />
               ) : (
                 <PlainSection key={bi} block={block} />
               )
@@ -492,6 +563,8 @@ export function ReportDocument({ data }: { data: ReportPdfData }) {
                 );
               })
             : null}
+
+        <MediaSection media={data.media} />
 
         <View style={s.footer} fixed>
           <Text style={s.footerText}>Prepared with Mitable</Text>

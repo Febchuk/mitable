@@ -2,6 +2,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 import { reportAiScoringEnabled } from "@/lib/feature-flags";
+import { listToddlerReportMedia, type ReportMediaItem } from "@/lib/media/report-media";
 
 type MontessoriSupabase = ReturnType<typeof createAdminClient>;
 
@@ -81,6 +82,10 @@ export type ReportDetail = ReportListRow & {
   body: string | null;
   sections: ReportSection[] | null;
   templateId: string | null;
+  reportingPeriod?: string | null;
+  termId?: string | null;
+  toddlerDailyLogId?: string | null;
+  media?: ReportMediaItem[];
   /** Per-heading field types + options from `report_templates.section_meta`. */
   templateSectionMeta: SectionMeta;
   /** Header logo from the report's template — not sent to the LLM. */
@@ -113,6 +118,9 @@ type ReportsRow = {
   body: string | null;
   sections: ReportSection[] | null;
   template_id: string | null;
+  reporting_period: string | null;
+  term_id: string | null;
+  toddler_daily_log_id: string | null;
   section_meta: SectionMeta | null;
   created_by_user_id: string | null;
   approved_by_user_id: string | null;
@@ -458,7 +466,7 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, section_meta, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id, section_meta), users:created_by_user_id(first_name, last_name)"
+      "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, reporting_period, term_id, toddler_daily_log_id, section_meta, created_by_user_id, approved_by_user_id, approved_at, sent_at, ai_score, ai_flags, ai_reasoning, ai_scored_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), classrooms(id, name), report_templates(logo_url, school_id, section_meta), users:created_by_user_id(first_name, last_name)"
     )
     .eq("id", id)
     .eq("students.school_id", ctx.schoolId)
@@ -475,19 +483,19 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   }
   const tplJoin = row.report_templates;
   const reportSectionMeta = (row.section_meta as SectionMeta | null) ?? {};
-  const templateSectionMeta: SectionMeta =
+  const joinedTemplateMeta: SectionMeta =
     tplJoin && (tplJoin.school_id as string) === ctx.schoolId
       ? ((tplJoin.section_meta as SectionMeta | null) ?? {})
-      : Object.keys(reportSectionMeta).length > 0
-        ? reportSectionMeta
-        : {};
-  const [templateLogoUrl, { count: priorSubmissionCount }] = await Promise.all([
+      : {};
+  const templateSectionMeta: SectionMeta = { ...joinedTemplateMeta, ...reportSectionMeta };
+  const [templateLogoUrl, { count: priorSubmissionCount }, media] = await Promise.all([
     fetchTemplateLogoUrl(supabase, row.template_id, ctx.schoolId),
     supabase
       .from("report_review_actions")
       .select("id", { count: "exact", head: true })
       .eq("report_id", id)
       .eq("action_type", "submitted"),
+    listToddlerReportMedia(supabase, row.toddler_daily_log_id),
   ]);
   return {
     id: row.id,
@@ -504,6 +512,10 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     body: row.body,
     sections: row.sections,
     templateId: row.template_id,
+    reportingPeriod: row.reporting_period,
+    termId: row.term_id,
+    toddlerDailyLogId: row.toddler_daily_log_id,
+    media,
     templateSectionMeta,
     templateLogoUrl,
     authorName: teacherDisplayName(row.users),

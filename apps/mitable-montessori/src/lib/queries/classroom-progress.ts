@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { resolveClassroomForCurrentUser } from "@/lib/app/active-classroom";
+import { isToddlerClassroomCode, resolveClassroomForCurrentUser } from "@/lib/app/active-classroom";
 import type { ProgressMark, RecentUpdateEntry } from "@/components/montessori/data";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import type { ProgressProgram } from "@/lib/queries/progress-programs";
@@ -293,6 +293,7 @@ export async function getClassroomProgress(
 ): Promise<ClassroomProgress | null> {
   const classroom = await resolveClassroomForCurrentUser(classroomId);
   if (!classroom) return null;
+  if (isToddlerClassroomCode(classroom.code)) return null;
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);

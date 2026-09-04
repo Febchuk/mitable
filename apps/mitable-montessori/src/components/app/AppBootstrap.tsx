@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { pullSync } from "@/lib/sync/pull";
+import { useCallback, useEffect } from "react";
+import { pullSyncIfStale } from "@/lib/sync/pull";
 import { startSyncWorker } from "@/lib/sync/worker";
 import { invalidateRosterIndex } from "@/lib/tokenize/roster-index";
 import { registerServiceWorker } from "@/lib/pwa/register";
@@ -35,16 +35,31 @@ async function ensureFreshSchema() {
   }
 }
 
-export function AppBootstrap() {
+interface AppBootstrapProps {
+  schoolId: string;
+  userId: string;
+}
+
+export function AppBootstrap({ schoolId, userId }: AppBootstrapProps) {
+  const refreshSchoolDataIfNeeded = useCallback(async () => {
+    const result = await pullSyncIfStale({ schoolId, userId });
+    if (result) invalidateRosterIndex();
+  }, [schoolId, userId]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         await ensureFreshSchema();
         if (cancelled) return;
-        await pullSync();
+        try {
+          await refreshSchoolDataIfNeeded();
+        } catch (err) {
+          // Offline access still works from Dexie, so do not prevent the
+          // command worker and service worker from starting after a failed pull.
+          console.error("Initial school sync failed", err);
+        }
         if (cancelled) return;
-        invalidateRosterIndex();
         startSyncWorker();
         registerServiceWorker();
       } catch (err) {
@@ -54,26 +69,31 @@ export function AppBootstrap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshSchoolDataIfNeeded]);
 
-  // Re-pull when the tab becomes visible after being hidden — keeps Dexie
-  // reads fresh after the user switches tabs without forcing a hard reload.
+  // A short tab switch should be free. Once the local cache is five minutes
+  // old (or the browser comes back online), refresh it in the background.
   useEffect(() => {
     let inFlight = false;
-    function onVisible() {
-      if (document.visibilityState !== "visible") return;
+    function refreshIfNeeded() {
       if (inFlight) return;
       inFlight = true;
-      pullSync()
-        .then(() => invalidateRosterIndex())
-        .catch((err) => console.error("Visibility re-sync failed", err))
+      refreshSchoolDataIfNeeded()
+        .catch((err) => console.error("Background school sync failed", err))
         .finally(() => {
           inFlight = false;
         });
     }
+    function onVisible() {
+      if (document.visibilityState === "visible") refreshIfNeeded();
+    }
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+    window.addEventListener("online", refreshIfNeeded);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", refreshIfNeeded);
+    };
+  }, [refreshSchoolDataIfNeeded]);
 
   return null;
 }

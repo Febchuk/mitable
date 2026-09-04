@@ -160,6 +160,7 @@ function templateToPdfData(template: ReportTemplate, child: PickerChild | null):
     reportType: template.kind.toLowerCase(),
     logoUrl: template.logoUrl,
     blocks: buildReportPdfBlocks(rawSections, template.sectionMeta ?? {}),
+    media: [],
     body: null,
   };
 }

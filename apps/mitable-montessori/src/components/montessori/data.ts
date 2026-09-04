@@ -1,4 +1,5 @@
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import type { ReportMediaItem } from "@/lib/media/report-media";
 import {
   STATUS_COLOR,
   STATUS_LABEL,
@@ -63,6 +64,7 @@ export type ReportDetail = {
   templateLogoUrl?: string | null;
   /** When the report uses a template: per-heading checklist / single-select config. */
   templateSectionMeta: SectionMeta;
+  media?: ReportMediaItem[];
 };
 
 export type Report = {

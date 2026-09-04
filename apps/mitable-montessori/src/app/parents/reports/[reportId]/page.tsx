@@ -6,6 +6,8 @@ import { createClient } from "@/utils/supabase/server";
 import { ParentReportView } from "@/components/parents/parent-report-view";
 import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { listToddlerReportMedia } from "@/lib/media/report-media";
 
 export default async function ParentReportDetailPage({
   params,
@@ -24,13 +26,17 @@ export default async function ParentReportDetailPage({
   const { data: report } = await supabase
     .from("reports")
     .select(
-      "id, report_type, period_start, period_end, title, body, sent_at, sections, section_meta"
+      "id, report_type, period_start, period_end, title, body, sent_at, sections, section_meta, toddler_daily_log_id"
     )
     .eq("id", reportId)
     .eq("student_id", child.id)
     .eq("status", "sent")
     .maybeSingle();
   if (!report) notFound();
+  const media = await listToddlerReportMedia(
+    createAdminClient(),
+    report.toddler_daily_log_id as string | null
+  );
 
   const sections = Array.isArray(report.sections)
     ? (report.sections as Array<{ heading: string; paragraphs: Array<{ html: string }> }>)
@@ -63,6 +69,7 @@ export default async function ParentReportDetailPage({
           periodLabel={periodLabel}
           blocks={blocks}
           fallbackBody={report.body || "This report does not include written notes."}
+          media={media}
         />
       </div>
     </div>

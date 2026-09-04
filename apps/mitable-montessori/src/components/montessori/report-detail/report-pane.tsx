@@ -8,15 +8,18 @@ import {
   decodeFieldPayload,
   encodeChecklist,
   encodeSingleSelect,
+  fieldPayloadToReadableText,
   inferChecklistSelections,
   inferSingleSelect,
 } from "@/lib/reports/template-field-payload";
 import { firstOpenParagraphIndex } from "@/lib/reports/section-paragraph-slots";
 import { decodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
+import { decodeExamGrades } from "@/lib/reports/exam-grades-payload";
 import { isTopicCommentsHeading } from "@/lib/reports/default-classroom-report";
 import { STATUS_COLOR, STATUS_LABEL, statusToMark } from "@/components/montessori/data";
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
+import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
 
 const COMING_SOON = "Editing this section is coming soon — chat assistant will land first.";
 const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
@@ -194,6 +197,42 @@ export function ReportPane({
               />
             )
           )}
+
+          {detail.media?.length ? (
+            <section className="mt-8">
+              <h2 className="text-lg font-semibold text-ink">Media</h2>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                {detail.media.map((item) => (
+                  <figure
+                    key={item.id}
+                    className="overflow-hidden rounded-xl border border-border bg-canvas"
+                  >
+                    <div className="aspect-[4/3] bg-muted">
+                      {item.url && item.kind === "photo" ? (
+                        <img
+                          src={item.url}
+                          alt={item.caption || "Daily log media"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : item.url ? (
+                        <video
+                          src={item.url}
+                          controls
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                      ) : null}
+                    </div>
+                    {item.caption ? (
+                      <figcaption className="px-3 py-2 text-sm text-ink-secondary">
+                        {item.caption}
+                      </figcaption>
+                    ) : null}
+                  </figure>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {addingSection ? (
             <NewSectionPrompt onCreate={onCreateSection} onCancel={() => setAddingSection(false)} />
@@ -501,6 +540,37 @@ function ProgressTopicTableRow({ row }: { row: ProgressTopicRow }) {
   );
 }
 
+function ExamGradesTable({ html }: { html: string }) {
+  const summary = decodeExamGrades(html);
+  return (
+    <div className="rd-template-field rd-progress-topic" aria-readonly>
+      {summary ? (
+        <table className="rd-progress-topic-table">
+          <thead>
+            <tr>
+              <th>Overall average</th>
+              <th>Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>{summary.averagePercentage}%</strong>
+              </td>
+              <td>{summary.comment?.trim() || "—"}</td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <p style={{ margin: 0, color: "var(--color-ink-muted)", fontStyle: "italic" }}>
+          No exam grades were recorded for this term.
+        </p>
+      )}
+      <p className="rd-template-field-hint">Snapshot from Grades for this end-of-term report.</p>
+    </div>
+  );
+}
+
 type SectionGroup =
   | {
       type: "subject";
@@ -666,49 +736,53 @@ function SectionBlock({
     ? firstOpenParagraphIndex(section.paragraphs, fieldMeta)
     : null;
   const radioGroupName = React.useId();
+  const dailyLogSection = section.heading.trim().toLowerCase() === "daily log";
+  const lockedSection = fieldMeta?.type === "exam_grades" || dailyLogSection;
 
   return (
     <div className="rd-section">
       <div className="rd-section-heading-row">
         <div className="rd-section-heading">{section.heading}</div>
-        <div className="rd-section-actions">
-          {confirmingDelete ? (
-            <span className="rd-section-confirm" role="group" aria-label="Confirm delete section">
-              <span className="rd-section-confirm-label">Delete this section?</span>
+        {!lockedSection ? (
+          <div className="rd-section-actions">
+            {confirmingDelete ? (
+              <span className="rd-section-confirm" role="group" aria-label="Confirm delete section">
+                <span className="rd-section-confirm-label">Delete this section?</span>
+                <button
+                  type="button"
+                  className="rd-section-confirm-btn rd-section-confirm-yes"
+                  onClick={() => {
+                    onDelete();
+                    ToastBus.push({ message: `Deleted "${section.heading}" section` });
+                  }}
+                  aria-label="Confirm delete"
+                >
+                  <Check size={12} strokeWidth={2.5} />
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  className="rd-section-confirm-btn"
+                  onClick={() => setConfirmingDelete(false)}
+                  aria-label="Cancel delete"
+                >
+                  <X size={12} strokeWidth={2.5} />
+                  Cancel
+                </button>
+              </span>
+            ) : (
               <button
                 type="button"
-                className="rd-section-confirm-btn rd-section-confirm-yes"
-                onClick={() => {
-                  onDelete();
-                  ToastBus.push({ message: `Deleted "${section.heading}" section` });
-                }}
-                aria-label="Confirm delete"
+                className="rd-section-delete"
+                onClick={() => setConfirmingDelete(true)}
+                aria-label={`Delete ${section.heading} section`}
+                title="Delete section"
               >
-                <Check size={12} strokeWidth={2.5} />
-                Delete
+                <Trash2 size={12} strokeWidth={2} />
               </button>
-              <button
-                type="button"
-                className="rd-section-confirm-btn"
-                onClick={() => setConfirmingDelete(false)}
-                aria-label="Cancel delete"
-              >
-                <X size={12} strokeWidth={2.5} />
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button
-              type="button"
-              className="rd-section-delete"
-              onClick={() => setConfirmingDelete(true)}
-              aria-label={`Delete ${section.heading} section`}
-              title="Delete section"
-            >
-              <Trash2 size={12} strokeWidth={2} />
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {section.paragraphs.map((p, paraIndex) => {
@@ -729,9 +803,11 @@ function SectionBlock({
           (fieldMeta.type === "checklist" || fieldMeta.type === "single_select");
         const serverFilledFirst =
           paraIndex === 0 &&
-          (fieldMeta?.type === "hardcoded" ||
+          (dailyLogSection ||
+            fieldMeta?.type === "hardcoded" ||
             fieldMeta?.type === "curriculum" ||
-            fieldMeta?.type === "progress_topic");
+            fieldMeta?.type === "progress_topic" ||
+            fieldMeta?.type === "exam_grades");
         const hideParagraphDelete = structuredFirst || serverFilledFirst;
 
         return (
@@ -817,6 +893,10 @@ function SectionBlock({
               />
             ) : serverFilledFirst && fieldMeta?.type === "progress_topic" ? (
               <ProgressTopicGrid heading={section.heading} html={p.html} />
+            ) : serverFilledFirst && fieldMeta?.type === "exam_grades" ? (
+              <ExamGradesTable html={p.html} />
+            ) : serverFilledFirst && dailyLogSection ? (
+              <ToddlerDailyLogSummary text={fieldPayloadToReadableText(p.html)} />
             ) : serverFilledFirst ? (
               <TemplateHardcodedField
                 heading={section.heading}

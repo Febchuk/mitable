@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
@@ -10,23 +10,45 @@ export interface AuthedUser {
 }
 
 /**
+ * Middleware removes any browser-supplied version of these headers and only
+ * adds them after Supabase verifies the session. Reusing that result avoids a
+ * second /auth/v1/user request in every protected API handler. The cookie
+ * lookup remains as a safe fallback for direct invocation and tests.
+ */
+async function getVerifiedRequestUser(): Promise<{ id: string; email: string | null } | null> {
+  const requestHeaders = await headers();
+  const middlewareUserId = requestHeaders.get("x-mitable-auth-user-id");
+  if (middlewareUserId) {
+    return {
+      id: middlewareUserId,
+      email: requestHeaders.get("x-mitable-auth-user-email"),
+    };
+  }
+
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ? { id: user.id, email: user.email ?? null } : null;
+}
+
+/**
  * Loads the authenticated user + their `users` profile. Returns either an
  * AuthedUser or an early NextResponse to short-circuit the route.
  */
 export async function requireUser(): Promise<
   { ok: true; user: AuthedUser } | { ok: false; response: NextResponse }
 > {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getVerifiedRequestUser();
   if (!user) {
     return {
       ok: false,
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     };
   }
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
   const { data: profile, error } = await supabase
     .from("users")
     .select("id, school_id, role, email")
@@ -44,7 +66,7 @@ export async function requireUser(): Promise<
       userId: profile.id as string,
       schoolId: profile.school_id as string,
       role: profile.role as "admin" | "teacher",
-      email: profile.email as string,
+      email: (profile.email as string | null) ?? user.email ?? "",
     },
   };
 }
@@ -54,12 +76,10 @@ export async function requireUser(): Promise<
  * classroom. Use before any teacher-only write.
  */
 export async function requireTeacherForClassroom(classroomId: string) {
+  const user = await getVerifiedRequestUser();
+  if (!user) return false;
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return false;
   const { data, error } = await supabase
     .from("classroom_teacher_assignments")
     .select("id")

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SectionMeta } from "@/lib/report-templates/sections";
+import { listToddlerReportMedia, type ReportMediaItem } from "@/lib/media/report-media";
 
 /**
  * Email delivery worker. Drains report_recipients rows in 'pending' →
@@ -32,6 +33,7 @@ export interface EmailJob {
   templateLogoUrl: string | null;
   /** Per-heading template field types + options. Drives checklist rendering. */
   templateSectionMeta: SectionMeta | null;
+  media?: ReportMediaItem[];
 }
 
 export interface EmailSender {
@@ -64,7 +66,7 @@ export async function drainPendingReports(
   let query = supabase
     .from("report_recipients")
     .select(
-      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, section_meta, status, report_date, report_type, students(first_name, last_name), classrooms(name), report_templates(logo_url, section_meta), users:created_by_user_id(first_name, last_name))"
+      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, section_meta, status, report_date, report_type, toddler_daily_log_id, students(first_name, last_name), classrooms(name), report_templates(logo_url, section_meta), users:created_by_user_id(first_name, last_name))"
     )
     .eq("delivery_status", "pending")
     .limit(limit);
@@ -94,6 +96,7 @@ export async function drainPendingReports(
             status: string;
             report_date: string | null;
             report_type: string | null;
+            toddler_daily_log_id: string | null;
             students:
               | { first_name: string; last_name: string }
               | { first_name: string; last_name: string }[]
@@ -113,6 +116,7 @@ export async function drainPendingReports(
             status: string;
             report_date: string | null;
             report_type: string | null;
+            toddler_daily_log_id: string | null;
             students:
               | { first_name: string; last_name: string }
               | { first_name: string; last_name: string }[]
@@ -167,6 +171,7 @@ export async function drainPendingReports(
         : report.report_templates
       : null;
 
+    const media = await listToddlerReportMedia(supabase, report.toddler_daily_log_id);
     const sendResult = await sender.send({
       recipientId: row.id,
       reportId: row.report_id,
@@ -182,8 +187,11 @@ export async function drainPendingReports(
       classroomName: classroom?.name ?? null,
       messageBody: row.message_body,
       templateLogoUrl: template?.logo_url ?? null,
-      templateSectionMeta:
-        template?.section_meta ?? (report.section_meta as SectionMeta | null) ?? null,
+      templateSectionMeta: {
+        ...((template?.section_meta as SectionMeta | null) ?? {}),
+        ...((report.section_meta as SectionMeta | null) ?? {}),
+      },
+      media,
     });
 
     if (sendResult.ok) {

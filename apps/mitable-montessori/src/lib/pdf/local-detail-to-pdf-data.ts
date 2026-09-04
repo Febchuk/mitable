@@ -43,6 +43,7 @@ export function localDetailToPdfData(
     reportType: report.reportType,
     logoUrl: report.templateLogoUrl ?? null,
     blocks: buildReportPdfBlocks(detail.sections, report.templateSectionMeta ?? {}),
+    media: report.media ?? [],
     body: sectionsToBody(detail.sections),
   };
 }

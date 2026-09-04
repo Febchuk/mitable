@@ -45,6 +45,7 @@ export type StudentMediaItem = {
   sharedAt: string | null;
   createdAt: string;
   uploadedBy: string | null;
+  toddlerDailyLogId: string | null;
   url: string | null;
 };
 
@@ -83,6 +84,7 @@ export function StudentMediaCapture({
   studentId,
   studentName,
   progressCommandId,
+  toddlerDailyLogId,
   onClose,
   onShared,
 }: {
@@ -91,6 +93,8 @@ export function StudentMediaCapture({
   studentName: string;
   /** The single progress action this media documents. */
   progressCommandId?: string;
+  /** The toddler daily log this media documents. */
+  toddlerDailyLogId?: string;
   onClose: () => void;
   onShared: () => void;
 }) {
@@ -347,6 +351,7 @@ export function StudentMediaCapture({
           mimeType: captured.mimeType,
           byteSize: captured.blob.size,
           progressCommandId,
+          toddlerDailyLogId,
         }),
       });
       if (!start.ok)
@@ -663,6 +668,7 @@ export function StudentMediaLibrary({
   refreshKey,
   mobile,
   onAddMedia,
+  toddlerDailyLogId,
 }: {
   studentId: string;
   studentName: string;
@@ -670,6 +676,8 @@ export function StudentMediaLibrary({
   mobile: boolean;
   /** The library is browse-only when capture belongs in another workflow. */
   onAddMedia?: () => void;
+  /** When set, show only media attached to this toddler daily log. */
+  toddlerDailyLogId?: string;
 }) {
   const [items, setItems] = React.useState<StudentMediaItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -680,7 +688,12 @@ export function StudentMediaLibrary({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/v1/students/${studentId}/media`, { cache: "no-store" });
+      const query = toddlerDailyLogId
+        ? `?toddlerDailyLogId=${encodeURIComponent(toddlerDailyLogId)}`
+        : "";
+      const response = await fetch(`/api/v1/students/${studentId}/media${query}`, {
+        cache: "no-store",
+      });
       if (!response.ok)
         throw new Error(await responseError(response, "Couldn't load family moments."));
       const payload = (await response.json()) as { items: StudentMediaItem[] };
@@ -690,7 +703,7 @@ export function StudentMediaLibrary({
     } finally {
       setLoading(false);
     }
-  }, [studentId]);
+  }, [studentId, toddlerDailyLogId]);
 
   React.useEffect(() => {
     void load();
@@ -727,10 +740,14 @@ export function StudentMediaLibrary({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="label-cap m-0 text-ink-muted">Family moments</p>
+            <p className="label-cap m-0 text-ink-muted">
+              {toddlerDailyLogId ? "Daily log media" : "Family moments"}
+            </p>
             <h2 className="mt-1 text-base font-semibold text-ink">Photos &amp; videos</h2>
             <p className="mt-1 text-xs leading-5 text-ink-secondary">
-              Captured alongside classroom progress and shared with {studentName}&apos;s family.
+              {toddlerDailyLogId
+                ? `Included with this daily log and shared with ${studentName}'s family.`
+                : `Captured alongside classroom progress and shared with ${studentName}'s family.`}
             </p>
           </div>
           {onAddMedia ? (
@@ -747,7 +764,9 @@ export function StudentMediaLibrary({
             <ImageIcon className="mx-auto h-5 w-5 text-ink-muted" strokeWidth={1.5} />
             <p className="mt-2 text-sm font-medium text-ink">No shared moments yet</p>
             <p className="mt-1 text-xs leading-5 text-ink-secondary">
-              Photos and videos captured with a progress update will appear here.
+              {toddlerDailyLogId
+                ? "Photos and videos included with this daily log will appear here."
+                : "Photos and videos captured with a progress update will appear here."}
             </p>
           </div>
         ) : (

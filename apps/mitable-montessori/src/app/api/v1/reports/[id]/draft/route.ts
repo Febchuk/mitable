@@ -132,10 +132,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (tpl && (tpl.school_id as string) === auth.user.schoolId) {
       const headings = (tpl.sections as string[] | null) ?? [];
       const guidance = (tpl.section_guidance as Record<string, string> | null) ?? {};
-      templateSectionMeta = (tpl.section_meta as SectionMeta | null) ?? {};
-      templateHeadings = headings;
-      sectionGuidance = guidance;
-      templateSections = headings
+      templateSectionMeta = {
+        ...((tpl.section_meta as SectionMeta | null) ?? {}),
+        ...storedSectionMeta,
+      };
+      templateHeadings = [
+        ...headings,
+        ...storedSections
+          .map((section) => section.heading)
+          .filter((heading) => !headings.includes(heading)),
+      ];
+      sectionGuidance = { ...guidance, ...storedSectionGuidance };
+      templateSections = templateHeadings
         .filter((heading) => !sectionExcludedFromAgent(templateSectionMeta[heading]))
         .map((heading) => ({
           heading,
@@ -351,6 +359,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
               paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
           }
+          if (meta?.type === "exam_grades") {
+            return {
+              id: `s-${i}-${slug}`,
+              heading,
+              paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
+            };
+          }
           return {
             id: `s-${i}-${slug}`,
             heading,
@@ -372,7 +387,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           const { data: freshSkip, error: freshSkipErr } = await supabase
             .from("reports")
             .select(
-              "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), report_templates(section_meta, school_id)"
+              "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, section_meta, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), report_templates(section_meta, school_id)"
             )
             .eq("id", id)
             .maybeSingle();
@@ -387,10 +402,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
                 report_templates: { section_meta: unknown; school_id: string } | null;
               }
             ).report_templates;
-            const responseTemplateMeta: SectionMeta =
-              freshTplSkip && freshTplSkip.school_id === auth.user.schoolId
+            const responseTemplateMeta: SectionMeta = {
+              ...(freshTplSkip && freshTplSkip.school_id === auth.user.schoolId
                 ? ((freshTplSkip.section_meta as SectionMeta | null) ?? {})
-                : templateSectionMeta;
+                : templateSectionMeta),
+              ...((freshSkip.section_meta as SectionMeta | null) ?? {}),
+            };
             skipReportPayload = {
               id: freshSkip.id,
               studentId: freshSkip.student_id,
@@ -529,6 +546,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
+        if (meta?.type === "exam_grades") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
+          };
+        }
         return {
           id: `s-${i}-${slug}`,
           heading,
@@ -591,6 +615,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
+        if (cur?.type === "exam_grades") {
+          return {
+            id: `s-${i}-${slug}`,
+            heading,
+            paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
+          };
+        }
         const s = agentResult!.draft.sections[agentIdx++];
         if (!s) {
           throw new Error("Draft sections misaligned with template (missing agent block)");
@@ -642,7 +673,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const { data: fresh, error: freshErr } = await supabase
       .from("reports")
       .select(
-        "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), report_templates(section_meta, school_id)"
+        "id, student_id, classroom_id, report_type, report_date, period_start, period_end, status, title, body, sections, template_id, section_meta, created_by_user_id, approved_by_user_id, approved_at, sent_at, created_at, updated_at, students!inner(id, first_name, last_name, preferred_name, school_id), report_templates(section_meta, school_id)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -662,10 +693,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         report_templates: { section_meta: unknown; school_id: string } | null;
       }
     ).report_templates;
-    const responseTemplateMeta: SectionMeta =
-      freshTpl && freshTpl.school_id === auth.user.schoolId
+    const responseTemplateMeta: SectionMeta = {
+      ...(freshTpl && freshTpl.school_id === auth.user.schoolId
         ? ((freshTpl.section_meta as SectionMeta | null) ?? {})
-        : templateSectionMeta;
+        : templateSectionMeta),
+      ...((fresh.section_meta as SectionMeta | null) ?? {}),
+    };
     const reportPayload = {
       id: fresh.id,
       studentId: fresh.student_id,

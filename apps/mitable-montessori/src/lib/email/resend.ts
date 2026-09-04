@@ -195,6 +195,7 @@ export class ResendEmailSender implements EmailSender {
         reportType: job.reportType ?? "daily",
         logoUrl: job.templateLogoUrl,
         blocks: buildReportPdfBlocks(job.reportSections, job.templateSectionMeta),
+        media: job.media ?? [],
         body: job.reportBody,
       });
       pdfAttachment = {
