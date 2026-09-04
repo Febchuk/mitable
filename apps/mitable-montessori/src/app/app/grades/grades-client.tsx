@@ -22,16 +22,14 @@ const inputStyle: React.CSSProperties = {
 
 type FormState = {
   id?: string;
-  studentId: string;
   subject: string;
   assessmentName: string;
   percentage: string;
   gradeLabel: string;
 };
 
-function emptyForm(studentId: string): FormState {
+function emptyForm(): FormState {
   return {
-    studentId,
     subject: "",
     assessmentName: "End-of-term exam",
     percentage: "",
@@ -45,29 +43,30 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
   const [classroomId, setClassroomId] = React.useState(initialData.classrooms[0]?.id ?? "");
   const [termId, setTermId] = React.useState(initialData.terms[0]?.id ?? "");
   const classroomStudents = initialData.students.filter((s) => s.classroomId === classroomId);
-  const [form, setForm] = React.useState<FormState>(() =>
-    emptyForm(classroomStudents[0]?.id ?? "")
-  );
+  const [selectedStudentId, setSelectedStudentId] = React.useState(classroomStudents[0]?.id ?? "");
+  const [form, setForm] = React.useState<FormState>(emptyForm);
   const [saving, setSaving] = React.useState(false);
-  const [commentStudentId, setCommentStudentId] = React.useState(classroomStudents[0]?.id ?? "");
   const [termComment, setTermComment] = React.useState("");
   const [savingTermComment, setSavingTermComment] = React.useState(false);
 
   React.useEffect(() => {
     const firstStudent = initialData.students.find((s) => s.classroomId === classroomId);
-    setForm(emptyForm(firstStudent?.id ?? ""));
-    setCommentStudentId(firstStudent?.id ?? "");
+    setSelectedStudentId(firstStudent?.id ?? "");
+    setForm(emptyForm());
   }, [classroomId, initialData.students]);
 
   const visibleGrades = grades.filter(
-    (grade) => grade.classroomId === classroomId && grade.termId === termId
+    (grade) =>
+      grade.classroomId === classroomId &&
+      grade.termId === termId &&
+      grade.studentId === selectedStudentId
   );
-  const studentName = new Map(initialData.students.map((student) => [student.id, student.name]));
+  const selectedStudent = classroomStudents.find((student) => student.id === selectedStudentId);
   const selectedTermComment = termComments.find(
     (item) =>
       item.classroomId === classroomId &&
       item.termId === termId &&
-      item.studentId === commentStudentId
+      item.studentId === selectedStudentId
   );
 
   React.useEffect(() => {
@@ -78,10 +77,25 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function selectClassroom(nextClassroomId: string) {
+    setClassroomId(nextClassroomId);
+    setForm(emptyForm());
+  }
+
+  function selectTerm(nextTermId: string) {
+    setTermId(nextTermId);
+    setForm(emptyForm());
+  }
+
+  function selectStudent(nextStudentId: string) {
+    setSelectedStudentId(nextStudentId);
+    setForm(emptyForm());
+  }
+
   async function save(event: React.FormEvent) {
     event.preventDefault();
     const percentage = Number(form.percentage);
-    if (!form.studentId || !termId || Number.isNaN(percentage)) return;
+    if (!selectedStudentId || !termId || Number.isNaN(percentage)) return;
     setSaving(true);
     try {
       const response = await fetch("/api/v1/elementary-grades", {
@@ -90,7 +104,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
         body: JSON.stringify({
           id: form.id,
           classroomId,
-          studentId: form.studentId,
+          studentId: selectedStudentId,
           termId,
           subject: form.subject,
           assessmentName: form.assessmentName,
@@ -104,7 +118,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
         ...current.filter((grade) => grade.id !== payload.grade!.id),
         payload.grade!,
       ]);
-      setForm(emptyForm(form.studentId));
+      setForm(emptyForm());
       ToastBus.push({ message: "Grade saved" });
     } catch (error) {
       ToastBus.push({ message: error instanceof Error ? error.message : "Could not save grade" });
@@ -116,12 +130,12 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
   function edit(grade: ElementaryExamGrade) {
     setForm({
       id: grade.id,
-      studentId: grade.studentId,
       subject: grade.subject,
       assessmentName: grade.assessmentName,
       percentage: String(grade.percentage),
       gradeLabel: grade.gradeLabel,
     });
+    setSelectedStudentId(grade.studentId);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -138,7 +152,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
 
   async function saveTermComment(event: React.FormEvent) {
     event.preventDefault();
-    if (!classroomId || !termId || !commentStudentId) return;
+    if (!classroomId || !termId || !selectedStudentId) return;
     setSavingTermComment(true);
     try {
       const response = await fetch("/api/v1/elementary-grade-comments", {
@@ -146,7 +160,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           classroomId,
-          studentId: commentStudentId,
+          studentId: selectedStudentId,
           termId,
           comment: termComment.trim() || null,
         }),
@@ -158,12 +172,12 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
           (item) =>
             item.classroomId !== classroomId ||
             item.termId !== termId ||
-            item.studentId !== commentStudentId
+            item.studentId !== selectedStudentId
         );
         return payload.comment
           ? [
               ...remaining,
-              { classroomId, termId, studentId: commentStudentId, comment: payload.comment },
+              { classroomId, termId, studentId: selectedStudentId, comment: payload.comment },
             ]
           : remaining;
       });
@@ -189,14 +203,23 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
           <FilterSelect
             label="Classroom"
             value={classroomId}
-            onChange={setClassroomId}
+            onChange={selectClassroom}
             options={initialData.classrooms.map((room) => ({ value: room.id, label: room.name }))}
           />
           <FilterSelect
             label="Term"
             value={termId}
-            onChange={setTermId}
+            onChange={selectTerm}
             options={initialData.terms.map((term) => ({ value: term.id, label: term.name }))}
+          />
+          <FilterSelect
+            label="Student"
+            value={selectedStudentId}
+            onChange={selectStudent}
+            options={classroomStudents.map((student) => ({
+              value: student.id,
+              label: student.name,
+            }))}
           />
         </div>
 
@@ -217,20 +240,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
               <h2 style={{ fontSize: 17, margin: "0 0 16px" }}>
                 {form.id ? "Edit grade" : "Add grade"}
               </h2>
-              <Field label="Student">
-                <select
-                  style={inputStyle}
-                  value={form.studentId}
-                  onChange={(e) => update("studentId", e.target.value)}
-                  required
-                >
-                  {classroomStudents.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
               <Field label="Subject">
                 <input
                   style={inputStyle}
@@ -298,7 +307,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                 {form.id ? (
                   <button
                     type="button"
-                    onClick={() => setForm(emptyForm(form.studentId))}
+                    onClick={() => setForm(emptyForm())}
                     style={{
                       border: "1px solid var(--color-border)",
                       borderRadius: 9,
@@ -321,7 +330,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                   fontWeight: 600,
                 }}
               >
-                Saved results
+                Saved results{selectedStudent ? ` for ${selectedStudent.name}` : ""}
               </div>
               {visibleGrades.length === 0 ? (
                 <p style={{ padding: 18, margin: 0, color: "var(--color-ink-muted)" }}>
@@ -340,9 +349,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 650 }}>
-                        {studentName.get(grade.studentId)} · {grade.subject}
-                      </div>
+                      <div style={{ fontWeight: 650 }}>{grade.subject}</div>
                       <div
                         style={{ marginTop: 4, color: "var(--color-ink-secondary)", fontSize: 13 }}
                       >
@@ -381,20 +388,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                 This is the one comment that appears beside the student&apos;s overall grade
                 average.
               </p>
-              <Field label="Student">
-                <select
-                  style={inputStyle}
-                  value={commentStudentId}
-                  onChange={(event) => setCommentStudentId(event.target.value)}
-                  required
-                >
-                  {classroomStudents.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
               <Field label="Comments">
                 <textarea
                   style={{ ...inputStyle, minHeight: 110, resize: "vertical" }}

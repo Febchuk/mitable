@@ -189,7 +189,7 @@ export default function DailyLogClient({
         body: JSON.stringify({
           childId: saved.studentId,
           kind: "Daily",
-          templateId: "__builtin:daily",
+          templateId: `__default:daily:${saved.classroomId}`,
           reportDate: saved.logDate,
           transcripts: [],
           notes: [],
@@ -232,54 +232,64 @@ export default function DailyLogClient({
             alignItems: "center",
           }}
         >
-          <select
-            aria-label="Classroom"
-            value={classroomId}
-            onChange={(event) => setClassroomId(event.target.value)}
-            style={selectStyle}
-          >
-            {classrooms.map((classroom) => (
-              <option key={classroom.id} value={classroom.id}>
-                {classroom.name}
-              </option>
-            ))}
-          </select>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Previous day"
-              onClick={() => setDate(dateOffset(date, -1))}
+          <label style={toolbarFieldStyle}>
+            <span>Class</span>
+            <select
+              aria-label="Class"
+              value={classroomId}
+              onChange={(event) => setClassroomId(event.target.value)}
+              style={selectStyle}
             >
-              <ChevronLeft size={16} />
-            </Button>
-            <Input
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              style={{ width: 165 }}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Next day"
-              onClick={() => setDate(dateOffset(date, 1))}
+              {classrooms.map((classroom) => (
+                <option key={classroom.id} value={classroom.id}>
+                  {classroom.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={toolbarFieldStyle}>
+            <span>Date</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Previous day"
+                onClick={() => setDate(dateOffset(date, -1))}
+              >
+                <ChevronLeft size={16} />
+              </Button>
+              <Input
+                aria-label="Daily log date"
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                style={{ width: 165 }}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Next day"
+                onClick={() => setDate(dateOffset(date, 1))}
+              >
+                <ChevronRight size={16} />
+              </Button>
+            </div>
+          </label>
+          <label style={{ ...toolbarFieldStyle, marginLeft: "auto" }}>
+            <span>Student this log is for</span>
+            <select
+              aria-label="Student this daily log is for"
+              value={studentId}
+              onChange={(event) => setStudentId(event.target.value)}
+              style={selectStyle}
             >
-              <ChevronRight size={16} />
-            </Button>
-          </div>
-          <select
-            aria-label="Child"
-            value={studentId}
-            onChange={(event) => setStudentId(event.target.value)}
-            style={{ ...selectStyle, marginLeft: "auto" }}
-          >
-            {(data?.students ?? []).map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.name}
-              </option>
-            ))}
-          </select>
+              {(data?.students ?? []).map((student) => (
+                <option key={student.id} value={student.id}>
+                  {student.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </section>
 
         {loading ? (
@@ -706,6 +716,14 @@ const fieldLabelStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   color: "var(--color-ink-secondary)",
+};
+const toolbarFieldStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 5,
+  color: "var(--color-ink-secondary)",
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.04em",
 };
 const sectionTitle: React.CSSProperties = { margin: 0, fontSize: 17, color: "var(--color-ink)" };
 const mutedStyle: React.CSSProperties = {

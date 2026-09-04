@@ -43,21 +43,25 @@ export function ParentPortalShell({
 
   const selector =
     linkedChildren.length > 0 ? (
-      <label className="flex items-center gap-2 text-sm font-medium text-ink-secondary">
-        <BookOpen className="h-4 w-4 text-ink-muted" aria-hidden />
-        <span className="sr-only">Select child</span>
-        <select
-          aria-label="Select child"
-          value={selectedId}
-          onChange={(event) => switchChild(event.target.value)}
-          className="max-w-48 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink outline-none focus:border-terracotta"
-        >
-          {linkedChildren.map((child) => (
-            <option key={child.id} value={child.id}>
-              {child.name}
-            </option>
-          ))}
-        </select>
+      <label className="flex items-start gap-2 text-sm font-medium text-ink-secondary">
+        <BookOpen className="mt-5 h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
+        <span className="grid gap-1">
+          <span className="whitespace-nowrap text-xs font-semibold text-ink-secondary">
+            Viewing data for
+          </span>
+          <select
+            aria-label="Child whose data you are viewing"
+            value={selectedId}
+            onChange={(event) => switchChild(event.target.value)}
+            className="max-w-48 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink outline-none focus:border-terracotta"
+          >
+            {linkedChildren.map((child) => (
+              <option key={child.id} value={child.id}>
+                {child.name}
+              </option>
+            ))}
+          </select>
+        </span>
       </label>
     ) : null;
 
