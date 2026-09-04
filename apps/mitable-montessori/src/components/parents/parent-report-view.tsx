@@ -1,5 +1,6 @@
 import type { ReportPdfBlock } from "@/lib/pdf/report-template";
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
+import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
 
 const MARK_CLASS: Record<ProgressMark, string> = {
   m: "bg-sage-soft text-sage-deep",
@@ -143,6 +144,18 @@ function SubjectBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "subje
 }
 
 function SectionBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "section" }> }) {
+  if (block.heading.trim().toLowerCase() === "daily log") {
+    const text = block.paragraphs
+      .map((paragraph) => paragraph.text)
+      .filter(Boolean)
+      .join("\n");
+    return (
+      <section>
+        <h2 className="text-lg font-semibold text-ink">{block.heading}</h2>
+        <ToddlerDailyLogSummary text={text} />
+      </section>
+    );
+  }
   return (
     <section>
       {block.heading ? <h2 className="text-lg font-semibold text-ink">{block.heading}</h2> : null}

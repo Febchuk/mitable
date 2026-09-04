@@ -7,6 +7,10 @@ import { PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  ToddlerRoutineIllustration,
+  type ToddlerRoutineIllustrationKind,
+} from "@/components/montessori/toddler-routine-illustration";
 import type {
   ToddlerDailyLog,
   ToddlerRoutineCategory,
@@ -275,28 +279,36 @@ export default function DailyLogClient({
         ) : (
           <>
             <section style={{ ...cardStyle, padding: 18 }}>
-              <h2 style={sectionTitle}>{currentStudent.name}</h2>
-              <p style={{ ...mutedStyle, margin: "4px 0 16px" }}>
-                Attendance:{" "}
-                {attendance?.status
-                  ? `${attendance.status}${attendance.arrivalTime ? ` · arrived ${String(attendance.arrivalTime).slice(0, 5)}` : ""}`
-                  : "Not recorded"}
-              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <ToddlerRoutineIllustration kind="participation" small />
+                <div>
+                  <h2 style={sectionTitle}>{currentStudent.name}</h2>
+                  <p style={{ ...mutedStyle, margin: "4px 0 0" }}>
+                    Attendance:{" "}
+                    {attendance?.status
+                      ? `${attendance.status}${attendance.arrivalTime ? ` · arrived ${String(attendance.arrivalTime).slice(0, 5)}` : ""}`
+                      : "Not recorded"}
+                  </p>
+                </div>
+              </div>
               <div style={threeColumnStyle}>
                 <SelectField
                   label="Mood"
+                  illustration="mood"
                   value={draft.mood}
                   onChange={(mood) => update({ mood })}
                   options={options("mood")}
                 />
                 <SelectField
                   label="Nap"
+                  illustration="nap"
                   value={draft.nap}
                   onChange={(nap) => update({ nap })}
                   options={options("nap")}
                 />
                 <SelectField
                   label="Class participation"
+                  illustration="participation"
                   value={draft.participation}
                   onChange={(participation) => update({ participation })}
                   options={options("participation")}
@@ -306,6 +318,7 @@ export default function DailyLogClient({
 
             <TimedSection
               title="Potty time / diapering"
+              illustration="toileting"
               addLabel="Add entry"
               entries={draft.toiletingEntries}
               choices={options("toileting")}
@@ -314,6 +327,7 @@ export default function DailyLogClient({
             />
             <TimedSection
               title="Feeding"
+              illustration="feeding"
               addLabel="Add feeding"
               entries={draft.feedingEntries}
               choices={options("meal_response")}
@@ -323,6 +337,7 @@ export default function DailyLogClient({
             />
             <TimedSection
               title="Outdoor play"
+              illustration="outdoor"
               addLabel="Add outdoor play"
               entries={draft.outdoorPlayEntries}
               choices={options("outdoor_response")}
@@ -332,12 +347,14 @@ export default function DailyLogClient({
 
             <ChoiceSection
               title="Activities"
+              illustration="activities"
               options={options("activity")}
               selected={draft.activityOptionIds}
               onChange={(activityOptionIds) => update({ activityOptionIds })}
             />
             <ChoiceSection
               title="Montessori materials"
+              illustration="materials"
               options={options("material")}
               selected={draft.materialOptionIds}
               onChange={(materialOptionIds) => update({ materialOptionIds })}
@@ -346,12 +363,14 @@ export default function DailyLogClient({
             <section style={{ ...cardStyle, padding: 18 }}>
               <TextAreaField
                 label="Other notes"
+                illustration="notes"
                 value={draft.otherNotes}
                 onChange={(otherNotes) => update({ otherNotes })}
               />
               <div style={{ height: 14 }} />
               <TextAreaField
                 label="Teacher comments"
+                illustration="participation"
                 value={draft.teacherComments}
                 onChange={(teacherComments) => update({ teacherComments })}
               />
@@ -393,18 +412,23 @@ export default function DailyLogClient({
 
 function SelectField({
   label,
+  illustration,
   value,
   options,
   onChange,
 }: {
   label: string;
+  illustration: ToddlerRoutineIllustrationKind;
   value: string;
   options: ToddlerRoutineOption[];
   onChange: (value: string) => void;
 }) {
   return (
-    <label style={fieldLabelStyle}>
-      <span>{label}</span>
+    <label style={{ ...fieldLabelStyle, ...illustratedFieldStyle }}>
+      <span style={illustratedFieldHeadingStyle}>
+        <span>{label}</span>
+        <ToddlerRoutineIllustration kind={illustration} small />
+      </span>
       <select value={value} onChange={(event) => onChange(event.target.value)} style={selectStyle}>
         <option value="">Not recorded</option>
         {options.map((option) => (
@@ -419,6 +443,7 @@ function SelectField({
 
 function TimedSection({
   title,
+  illustration,
   addLabel,
   entries,
   choices,
@@ -427,6 +452,7 @@ function TimedSection({
   onChange,
 }: {
   title: string;
+  illustration: ToddlerRoutineIllustrationKind;
   addLabel: string;
   entries: ToddlerTimedEntry[];
   choices: ToddlerRoutineOption[];
@@ -446,7 +472,7 @@ function TimedSection({
           marginBottom: 12,
         }}
       >
-        <h2 style={sectionTitle}>{title}</h2>
+        <IllustratedHeading title={title} illustration={illustration} />
         <Button size="sm" variant="outline" onClick={onAdd}>
           <Plus size={14} />
           {addLabel}
@@ -518,18 +544,22 @@ function TimedSection({
 
 function ChoiceSection({
   title,
+  illustration,
   options,
   selected,
   onChange,
 }: {
   title: string;
+  illustration: ToddlerRoutineIllustrationKind;
   options: ToddlerRoutineOption[];
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
   return (
     <section style={{ ...cardStyle, padding: 18 }}>
-      <h2 style={{ ...sectionTitle, marginBottom: 12 }}>{title}</h2>
+      <div style={{ marginBottom: 12 }}>
+        <IllustratedHeading title={title} illustration={illustration} />
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {options.map((option) => {
           const checked = selected.includes(option.id);
@@ -568,16 +598,21 @@ function ChoiceSection({
 
 function TextAreaField({
   label,
+  illustration,
   value,
   onChange,
 }: {
   label: string;
+  illustration: ToddlerRoutineIllustrationKind;
   value: string;
   onChange: (value: string) => void;
 }) {
   return (
     <label style={fieldLabelStyle}>
-      <span>{label}</span>
+      <span style={illustratedTextAreaHeadingStyle}>
+        <span>{label}</span>
+        <ToddlerRoutineIllustration kind={illustration} small />
+      </span>
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -593,6 +628,21 @@ function TextAreaField({
         }}
       />
     </label>
+  );
+}
+
+function IllustratedHeading({
+  title,
+  illustration,
+}: {
+  title: string;
+  illustration: ToddlerRoutineIllustrationKind;
+}) {
+  return (
+    <div style={illustratedSectionHeadingStyle}>
+      <ToddlerRoutineIllustration kind={illustration} />
+      <h2 style={sectionTitle}>{title}</h2>
+    </div>
   );
 }
 
@@ -622,4 +672,34 @@ const threeColumnStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: 12,
+};
+const illustratedFieldStyle: React.CSSProperties = {
+  border: "1px solid var(--color-border)",
+  borderRadius: 12,
+  padding: "10px 12px 12px",
+  background: "color-mix(in srgb, var(--color-surface) 88%, var(--color-clay-soft))",
+};
+const illustratedFieldHeadingStyle: React.CSSProperties = {
+  minHeight: 68,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  color: "var(--color-ink)",
+  fontSize: 14,
+};
+const illustratedSectionHeadingStyle: React.CSSProperties = {
+  minHeight: 78,
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+};
+const illustratedTextAreaHeadingStyle: React.CSSProperties = {
+  minHeight: 66,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  color: "var(--color-ink)",
+  fontSize: 15,
 };
