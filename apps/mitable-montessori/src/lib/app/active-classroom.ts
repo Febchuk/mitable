@@ -24,6 +24,22 @@ export async function teacherShouldSeeGrades(): Promise<boolean> {
   );
 }
 
+export function isToddlerClassroomCode(code: string | null | undefined): boolean {
+  return code?.trim().toLowerCase() === "toddler";
+}
+
+export async function teacherShouldSeeDailyLog(): Promise<boolean> {
+  return (await listTeacherClassroomsForCurrentUser()).some((classroom) =>
+    isToddlerClassroomCode(classroom.code)
+  );
+}
+
+export async function teacherShouldSeeProgress(): Promise<boolean> {
+  return (await listTeacherClassroomsForCurrentUser()).some(
+    (classroom) => !isToddlerClassroomCode(classroom.code)
+  );
+}
+
 type ClassroomProgram = "montessori" | "iep" | "speech";
 
 type AssignedTeacherClassroom = ActiveClassroom & {

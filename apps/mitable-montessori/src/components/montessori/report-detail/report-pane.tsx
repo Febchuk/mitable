@@ -8,6 +8,7 @@ import {
   decodeFieldPayload,
   encodeChecklist,
   encodeSingleSelect,
+  fieldPayloadToReadableText,
   inferChecklistSelections,
   inferSingleSelect,
 } from "@/lib/reports/template-field-payload";
@@ -18,6 +19,7 @@ import { isTopicCommentsHeading } from "@/lib/reports/default-classroom-report";
 import { STATUS_COLOR, STATUS_LABEL, statusToMark } from "@/components/montessori/data";
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
+import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
 
 const COMING_SOON = "Editing this section is coming soon — chat assistant will land first.";
 const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
@@ -706,7 +708,8 @@ function SectionBlock({
     ? firstOpenParagraphIndex(section.paragraphs, fieldMeta)
     : null;
   const radioGroupName = React.useId();
-  const lockedSection = fieldMeta?.type === "exam_grades";
+  const dailyLogSection = section.heading.trim().toLowerCase() === "daily log";
+  const lockedSection = fieldMeta?.type === "exam_grades" || dailyLogSection;
 
   return (
     <div className="rd-section">
@@ -772,7 +775,8 @@ function SectionBlock({
           (fieldMeta.type === "checklist" || fieldMeta.type === "single_select");
         const serverFilledFirst =
           paraIndex === 0 &&
-          (fieldMeta?.type === "hardcoded" ||
+          (dailyLogSection ||
+            fieldMeta?.type === "hardcoded" ||
             fieldMeta?.type === "curriculum" ||
             fieldMeta?.type === "progress_topic" ||
             fieldMeta?.type === "exam_grades");
@@ -863,6 +867,8 @@ function SectionBlock({
               <ProgressTopicGrid heading={section.heading} html={p.html} />
             ) : serverFilledFirst && fieldMeta?.type === "exam_grades" ? (
               <ExamGradesTable html={p.html} />
+            ) : serverFilledFirst && dailyLogSection ? (
+              <ToddlerDailyLogSummary text={fieldPayloadToReadableText(p.html)} />
             ) : serverFilledFirst ? (
               <TemplateHardcodedField
                 heading={section.heading}

@@ -13,6 +13,8 @@ import {
   getCurrentUserContext,
   listTeacherClassroomsForCurrentUser,
   teacherShouldSeeGrades,
+  teacherShouldSeeDailyLog,
+  teacherShouldSeeProgress,
   teacherShouldSeeSpeechProgressTab,
 } from "@/lib/app/active-classroom";
 import {
@@ -26,13 +28,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!ctx) redirect("/login");
   if (!ctx.privacyAcknowledgedAt) redirect("/onboarding/privacy");
   const isAdmin = ctx.role === "admin";
-  const [classroom, teacherClassrooms, showSpeechProgressTab, showGradesNav] = isAdmin
-    ? [null, [], false, false]
+  const [
+    classroom,
+    teacherClassrooms,
+    showSpeechProgressTab,
+    showGradesNav,
+    showDailyLogNav,
+    showProgressNav,
+  ] = isAdmin
+    ? [null, [], false, false, false, true]
     : await Promise.all([
         getActiveClassroomForCurrentUser(),
         listTeacherClassroomsForCurrentUser(),
         teacherShouldSeeSpeechProgressTab(),
         teacherShouldSeeGrades(),
+        teacherShouldSeeDailyLog(),
+        teacherShouldSeeProgress(),
       ]);
   const classroomName = classroom?.name ?? "Primrose Room";
   const showTodayAndAgent = isAdmin ? adminTodayEnabled() : addTodayProgressAndAgent();
@@ -50,6 +61,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             showTodayNav={showTodayAndAgent}
             reportFirstNav={showReportFirstNav}
             showGradesNav={showGradesNav}
+            showDailyLogNav={showDailyLogNav}
+            showProgressNav={showProgressNav}
             userMenuSlot={
               <UserMenu
                 email={ctx.email}
@@ -76,6 +89,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               showTodayNav={showTodayAndAgent}
               reportFirstNav={showReportFirstNav}
               showGradesNav={showGradesNav}
+              showDailyLogNav={showDailyLogNav}
+              showProgressNav={showProgressNav}
               showLegacyChat={showTodayAndAgent}
               firstName={ctx.firstName}
               email={ctx.email}
@@ -108,7 +123,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
         <ToastHost />
         <InstallBanner />
-        <AppBootstrap />
+        <AppBootstrap schoolId={ctx.schoolId} userId={ctx.userId} />
       </ActiveReportProvider>
     </MontessoriProvider>
   );

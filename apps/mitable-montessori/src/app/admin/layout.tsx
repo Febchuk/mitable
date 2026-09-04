@@ -66,7 +66,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </div>
       <ToastHost />
       <InstallBanner />
-      <AppBootstrap />
+      <AppBootstrap schoolId={ctx.schoolId} userId={ctx.userId} />
     </MontessoriProvider>
   );
 }

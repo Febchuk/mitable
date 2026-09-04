@@ -7,12 +7,14 @@ import {
   Book,
   Building2,
   CalendarRange,
+  ClipboardList,
   Eye,
   EyeOff,
   HelpCircle,
   GraduationCap,
   KeyRound,
   LayoutTemplate,
+  ListChecks,
   LogOut,
   MessageSquare,
   Settings,
@@ -78,17 +80,28 @@ const TEACHER_PROGRESS: NavItem = {
   icon: <SquaresFour {...ph} />,
 };
 
+const TEACHER_DAILY_LOG: NavItem = {
+  href: "/app/daily-log",
+  label: "Daily Log",
+  icon: <ClipboardList {...lu} />,
+};
+
 function teacherNavItems(options: {
   showToday: boolean;
   reportFirst: boolean;
   showGrades: boolean;
+  showDailyLog: boolean;
+  showProgress: boolean;
 }): NavItem[] {
   const grades: NavItem[] = options.showGrades
     ? [{ href: "/app/grades", label: "Grades", icon: <GraduationCap {...lu} /> }]
     : [];
-  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE, ...grades];
-  const head = options.showToday ? TEACHER_NAV_LEGACY : [TEACHER_PROGRESS];
-  return [...head, ...TEACHER_NAV_CORE, ...grades, TEACHER_REPORTS];
+  const dailyLog = options.showDailyLog ? [TEACHER_DAILY_LOG] : [];
+  const progress = options.showProgress ? [TEACHER_PROGRESS] : [];
+  if (options.reportFirst)
+    return [TEACHER_REPORTS, ...progress, ...dailyLog, ...TEACHER_NAV_CORE, ...grades];
+  const head = options.showToday ? [TEACHER_NAV_LEGACY[0], ...progress] : progress;
+  return [...head, ...dailyLog, ...TEACHER_NAV_CORE, ...grades, TEACHER_REPORTS];
 }
 
 const ADMIN_TODAY: NavItem = {
@@ -101,6 +114,7 @@ const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/classrooms", label: "Classrooms", icon: <Building2 {...lu} /> },
   { href: "/admin/roster", label: "Roster", icon: <Users {...lu} /> },
   { href: "/admin/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
+  { href: "/admin/routines", label: "Routines", icon: <ListChecks {...lu} /> },
   { href: "/admin/terms", label: "Terms", icon: <CalendarRange {...lu} /> },
   ...(adminReportTemplatesEnabled()
     ? [{ href: "/admin/report-templates", label: "Templates", icon: <LayoutTemplate {...lu} /> }]
@@ -126,6 +140,8 @@ export interface MontessoriMobileShellProps {
   showTodayNav?: boolean;
   reportFirstNav?: boolean;
   showGradesNav?: boolean;
+  showDailyLogNav?: boolean;
+  showProgressNav?: boolean;
   showLegacyChat?: boolean;
   /** First name for the drawer profile block. Falls back to email local part. */
   firstName?: string | null;
@@ -216,6 +232,8 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
         showTodayNav={props.showTodayNav ?? false}
         reportFirstNav={props.reportFirstNav ?? false}
         showGradesNav={props.showGradesNav ?? false}
+        showDailyLogNav={props.showDailyLogNav ?? false}
+        showProgressNav={props.showProgressNav ?? true}
         firstName={props.firstName}
         email={props.email}
         schoolName={props.schoolName}
@@ -343,6 +361,8 @@ function MobileDrawer({
   showTodayNav,
   reportFirstNav,
   showGradesNav,
+  showDailyLogNav,
+  showProgressNav,
   firstName,
   email,
   schoolName,
@@ -354,6 +374,8 @@ function MobileDrawer({
   showTodayNav: boolean;
   reportFirstNav: boolean;
   showGradesNav: boolean;
+  showDailyLogNav: boolean;
+  showProgressNav: boolean;
   firstName?: string | null;
   email: string;
   schoolName: string;
@@ -375,6 +397,8 @@ function MobileDrawer({
           showToday: showTodayNav,
           reportFirst: reportFirstNav,
           showGrades: showGradesNav,
+          showDailyLog: showDailyLogNav,
+          showProgress: showProgressNav,
         });
 
   const localPart = email.split("@")[0] ?? email;

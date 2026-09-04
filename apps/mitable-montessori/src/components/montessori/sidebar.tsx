@@ -7,9 +7,11 @@ import {
   Book,
   Building2,
   CalendarRange,
+  ClipboardList,
   GraduationCap,
   KeyRound,
   LayoutTemplate,
+  ListChecks,
   Users,
 } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
@@ -56,18 +58,29 @@ const TEACHER_PROGRESS: NavItem = {
   renderIcon: () => <SquaresFour {...phosphor} />,
 };
 
+const TEACHER_DAILY_LOG: NavItem = {
+  href: "/app/daily-log",
+  label: "Daily Log",
+  renderIcon: () => <ClipboardList {...lucide} />,
+};
+
 /** Default: Progress first. Report-first puts Reports at the top (no Progress link). */
 function teacherNavItems(options: {
   showToday: boolean;
   reportFirst: boolean;
   showGrades: boolean;
+  showDailyLog: boolean;
+  showProgress: boolean;
 }): NavItem[] {
   const grades: NavItem[] = options.showGrades
     ? [{ href: "/app/grades", label: "Grades", renderIcon: () => <GraduationCap {...lucide} /> }]
     : [];
-  if (options.reportFirst) return [TEACHER_REPORTS, ...TEACHER_NAV_CORE, ...grades];
-  const head = options.showToday ? TEACHER_NAV_LEGACY : [TEACHER_PROGRESS];
-  return [...head, ...TEACHER_NAV_CORE, ...grades, TEACHER_REPORTS];
+  const dailyLog = options.showDailyLog ? [TEACHER_DAILY_LOG] : [];
+  const progress = options.showProgress ? [TEACHER_PROGRESS] : [];
+  if (options.reportFirst)
+    return [TEACHER_REPORTS, ...progress, ...dailyLog, ...TEACHER_NAV_CORE, ...grades];
+  const head = options.showToday ? [TEACHER_NAV_LEGACY[0], ...progress] : progress;
+  return [...head, ...dailyLog, ...TEACHER_NAV_CORE, ...grades, TEACHER_REPORTS];
 }
 
 const ADMIN_TODAY: NavItem = {
@@ -80,6 +93,7 @@ const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/classrooms", label: "Classrooms", renderIcon: () => <Building2 {...lucide} /> },
   { href: "/admin/roster", label: "Roster", renderIcon: () => <Users {...lucide} /> },
   { href: "/admin/curriculum", label: "Curriculum", renderIcon: () => <Book {...lucide} /> },
+  { href: "/admin/routines", label: "Routines", renderIcon: () => <ListChecks {...lucide} /> },
   { href: "/admin/terms", label: "Terms", renderIcon: () => <CalendarRange {...lucide} /> },
   ...(adminReportTemplatesEnabled()
     ? [
@@ -117,6 +131,8 @@ export function MontessoriSidebar({
   showTodayNav = false,
   reportFirstNav = false,
   showGradesNav = false,
+  showDailyLogNav = false,
+  showProgressNav = true,
   userMenuSlot,
 }: {
   variant?: "teacher" | "admin";
@@ -126,6 +142,10 @@ export function MontessoriSidebar({
   reportFirstNav?: boolean;
   /** Elementary teachers can record traditional exam results. */
   showGradesNav?: boolean;
+  /** Toddler teachers record care and routine details here. */
+  showDailyLogNav?: boolean;
+  /** Hidden when every active assignment is a Toddler classroom. */
+  showProgressNav?: boolean;
   /**
    * Footer slot — renders directly above the bottom of the sidebar. Layouts
    * pass a `<UserMenu variant="row" … />` here; the menu is responsible for
@@ -145,6 +165,8 @@ export function MontessoriSidebar({
           showToday: showTodayNav,
           reportFirst: reportFirstNav,
           showGrades: showGradesNav,
+          showDailyLog: showDailyLogNav,
+          showProgress: showProgressNav,
         });
   return (
     <aside
