@@ -28,6 +28,23 @@ const getPort = (): number => {
 
 const PORT = getPort();
 
+const PRODUCTION_BACKEND_URL = "https://mitablebackend-production.up.railway.app";
+
+/**
+ * URLs included in emails must be publicly reachable. In particular, Railway's
+ * runtime PORT is internal to its container, so deriving a public URL from it
+ * produces links such as http://localhost:8080.
+ */
+const getBackendUrl = (): string => {
+  const configuredUrl = process.env.BACKEND_URL?.trim();
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  const isRailway = Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID);
+  if (process.env.NODE_ENV === "production" || isRailway) return PRODUCTION_BACKEND_URL;
+
+  return `http://localhost:${PORT}`;
+};
+
 export const config = {
   port: PORT,
   nodeEnv: process.env.NODE_ENV || "development",
@@ -244,8 +261,8 @@ export const config = {
     backendServiceId: (process.env.RAILWAY_BACKEND_SERVICE_ID || "").trim(),
   },
 
-  // Backend URL (used for password reset redirects, etc.)
-  backendUrl: (process.env.BACKEND_URL || `http://localhost:${PORT}`).trim(),
+  // Public backend URL (used for password reset redirects, etc.)
+  backendUrl: getBackendUrl(),
 
   // Security
   jwtSecret: process.env.JWT_SECRET || "",
