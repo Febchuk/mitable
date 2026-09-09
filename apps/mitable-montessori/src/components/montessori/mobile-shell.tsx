@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor-icons/react";
-import { ChatThread } from "@/components/chat/ChatThread";
+import { AgentChat } from "@/components/chat/agent/AgentChat";
 import { clearDb } from "@/lib/db/schema";
 import { clearSessionKeys } from "@/lib/crypto/session-key";
 import { getRevealHidden, setRevealHidden } from "@/lib/visibility/reveal-hidden";
@@ -36,7 +36,7 @@ import { adminExternalApiEnabled, adminReportTemplatesEnabled } from "@/lib/feat
  *
  *   1. Top bar with a left-side avatar that opens a left sliding drawer.
  *   2. Persistent terracotta chat FAB at bottom-right that opens a bottom
- *      sheet hosting the existing ChatThread.
+ *      sheet hosting the Ask Mitable agent chat.
  *
  * Replaces the previous mobile bottom-tab navigation. Visible on `<lg`
  * screens only — desktop continues to use MontessoriSidebar.
@@ -249,8 +249,6 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
             open={sheetOpen}
             classroomId={props.classroomId ?? null}
             classroomName={props.classroomName ?? props.schoolName}
-            schoolId={props.schoolId}
-            userId={props.userId}
             onClose={() => setSheetOpen(false)}
           />
           <MobileChatFab hidden={sheetOpen} onClick={() => setSheetOpen(true)} />
@@ -820,19 +818,13 @@ function MobileChatSheet({
   open,
   classroomId,
   classroomName,
-  schoolId,
-  userId,
   onClose,
 }: {
   open: boolean;
   classroomId: string | null;
   classroomName: string;
-  schoolId: string;
-  userId: string;
   onClose: () => void;
 }) {
-  const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
-
   return (
     <div
       className="flex lg:hidden"
@@ -930,12 +922,7 @@ function MobileChatSheet({
           // Only mount the live thread once it's been opened — avoids paying the
           // network/render cost on every page load when the sheet is closed.
           open ? (
-            <ChatThread
-              threadId={threadId}
-              classroomId={classroomId}
-              schoolId={schoolId}
-              userId={userId}
-            />
+            <AgentChat classroomId={classroomId} classroomName={classroomName} />
           ) : null
         ) : (
           <div

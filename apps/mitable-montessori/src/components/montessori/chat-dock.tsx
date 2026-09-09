@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { MessageSquare, Sparkles, X } from "lucide-react";
-import { ChatThread } from "@/components/chat/ChatThread";
+import { AgentChat } from "@/components/chat/agent/AgentChat";
 import { ChatPane } from "./report-detail/chat-pane";
 import { useActiveReport } from "./active-report-context";
 import { useMontessori } from "./store";
@@ -23,7 +23,6 @@ export interface ChatDockProps {
 export function ChatDock(props: ChatDockProps) {
   const store = useMontessori();
   const isOpen = store.webChatMode === "open";
-  const [threadId] = React.useState(() => `thread-${crypto.randomUUID()}`);
   const activeReport = useActiveReport();
   const editorMode = Boolean(activeReport?.reportId);
 
@@ -133,12 +132,7 @@ export function ChatDock(props: ChatDockProps) {
                 layout="dock"
               />
             ) : props.classroomId ? (
-              <ChatThread
-                threadId={threadId}
-                classroomId={props.classroomId}
-                schoolId={props.schoolId}
-                userId={props.userId}
-              />
+              <AgentChat classroomId={props.classroomId} classroomName={props.classroomName} />
             ) : (
               <div
                 style={{

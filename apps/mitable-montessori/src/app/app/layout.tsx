@@ -22,6 +22,7 @@ import {
   addTodayProgressAndAgent,
   adminTodayEnabled,
   reportFirstExperience,
+  teacherChatAgentEnabled,
 } from "@/lib/feature-flags";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const classroomName = classroom?.name ?? "Primrose Room";
   const showTodayAndAgent = isAdmin ? adminTodayEnabled() : addTodayProgressAndAgent();
   const showReportFirstNav = !isAdmin && reportFirstExperience();
+  // The teacher chat agent can be enabled on its own flag, or comes along with
+  // the legacy Today/agent bundle. Teacher-only — admins have their own agent.
+  const showChatAgent = !isAdmin && (addTodayProgressAndAgent() || teacherChatAgentEnabled());
 
   return (
     <MontessoriProvider
@@ -96,7 +100,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               showGradesNav={showGradesNav}
               showDailyLogNav={showDailyLogNav}
               showProgressNav={showProgressNav}
-              showLegacyChat={showTodayAndAgent}
+              showLegacyChat={showChatAgent}
               firstName={ctx.firstName}
               email={ctx.email}
               schoolName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
@@ -123,7 +127,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             classroomName={classroomName}
             schoolId={ctx.schoolId}
             userId={ctx.userId}
-            captureEnabled={showTodayAndAgent}
+            captureEnabled={showChatAgent}
           />
         )}
         <ToastHost />

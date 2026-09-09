@@ -46,6 +46,17 @@ export function addTodayProgressAndAgent(): boolean {
   return readPublicFlag("NEXT_PUBLIC_ADD_TODAY_PROGRESS_AND_AGENT");
 }
 
+/**
+ * When true, teachers get the Gemini-powered "Ask Mitable" chat agent (mark
+ * attendance, record progress/grades, log observations, create/edit reports)
+ * on both the mobile FAB and the desktop dock. Kept separate from
+ * `addTodayProgressAndAgent` so the agent can be enabled without also restoring
+ * the Today route. Requires GEMINI_API_KEY on the server.
+ */
+export function teacherChatAgentEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_TEACHER_CHAT_AGENT");
+}
+
 export function enableCaptureWorker(): boolean {
   return readPublicFlag("NEXT_PUBLIC_ENABLE_CAPTURE_WORKER");
 }
