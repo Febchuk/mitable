@@ -210,7 +210,9 @@ function GuardiansView({ profile, canManage }: { profile: StudentProfile; canMan
                   </button>
                 ) : null}
               </div>
-              {guardian.email ? (
+              {/* Email is only shown to admins, who manage guardian records.
+                  Teachers (canManage=false) don't see guardian email addresses. */}
+              {canManage && guardian.email ? (
                 <div style={{ marginTop: 6, fontSize: 12.5, color: "var(--color-ink-secondary)" }}>
                   {guardian.email}
                 </div>
