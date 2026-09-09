@@ -12,6 +12,7 @@ const MARK_CLASS: Record<ProgressMark, string> = {
   sat: "bg-scale-satisfactory/15 text-scale-satisfactory",
   min: "bg-scale-minimum/15 text-scale-minimum",
   n: "bg-scale-none/15 text-scale-none",
+  na: "bg-muted text-ink-secondary", // N/A — excluded from reports; present for type completeness
   "-": "bg-muted text-ink-muted",
 };
 

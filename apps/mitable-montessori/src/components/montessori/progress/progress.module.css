@@ -320,6 +320,9 @@
 .cell[data-state="e"] {
   background: var(--color-scale-excellent);
 }
+.cell[data-state="na"] {
+  background: var(--color-scale-na);
+}
 .cell[data-state="-"] {
   background: var(--color-surface);
 }
@@ -461,6 +464,9 @@
 }
 .statusBtn[data-state="e"] .swatch {
   background: var(--color-scale-excellent);
+}
+.statusBtn[data-state="na"] .swatch {
+  background: var(--color-scale-na);
 }
 .statusBtn[data-state="-"] .swatch {
   background: transparent;
