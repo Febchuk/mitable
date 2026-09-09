@@ -34,4 +34,14 @@ describe("topic marking schemas", () => {
     expect(statusAllowedForSchema("mastered", "five_level")).toBe(false);
     expect(statusAllowedForSchema("na", "five_level")).toBe(true);
   });
+
+  it("adds N/A as a fourth IPM action, distinct from clear and absent on grades", () => {
+    expect(marksForSchema("ipm", true)).toEqual(["m", "p", "i", "na", "-"]);
+    expect(markToStatus("na")).toBe("not_applicable");
+    expect(statusToMark("not_applicable")).toBe("na");
+    // Five-level grades are unchanged — no N/A action.
+    expect(marksForSchema("five_level", true)).toEqual(["e", "g", "sat", "min", "n", "-"]);
+    expect(statusAllowedForSchema("not_applicable", "ipm")).toBe(true);
+    expect(statusAllowedForSchema("not_applicable", "five_level")).toBe(false);
+  });
 });

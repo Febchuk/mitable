@@ -11,6 +11,7 @@ export const PROGRESS_STATUSES = [
   "good",
   "excellent",
   "na",
+  "not_applicable",
 ] as const;
 export type ProgressStatus = (typeof PROGRESS_STATUSES)[number];
 export const REPORTABLE_PROGRESS_STATUSES = [
@@ -25,7 +26,7 @@ export const REPORTABLE_PROGRESS_STATUSES = [
 ] as const;
 export type ReportableProgressStatus = (typeof REPORTABLE_PROGRESS_STATUSES)[number];
 
-export type ProgressMark = "i" | "p" | "m" | "n" | "min" | "sat" | "g" | "e" | "-";
+export type ProgressMark = "i" | "p" | "m" | "n" | "min" | "sat" | "g" | "e" | "-" | "na";
 
 export type ProgressLevel = {
   mark: ProgressMark;
@@ -39,6 +40,16 @@ const CLEAR_LEVEL: ProgressLevel = {
   status: "na",
   label: "Not started",
   color: "var(--color-border)",
+};
+
+// Distinct from CLEAR_LEVEL ("Not started"): a subtopic a teacher has
+// deliberately marked as not applicable, so it no longer reads as "missed".
+// Universal (offered for every schema), like clearing.
+const NOT_APPLICABLE_LEVEL: ProgressLevel = {
+  mark: "na",
+  status: "not_applicable",
+  label: "N/A",
+  color: "var(--color-scale-na)",
 };
 
 export const PROGRESS_LEVELS: Record<MarkingSchema, readonly ProgressLevel[]> = {
@@ -64,6 +75,7 @@ export const PROGRESS_LEVELS: Record<MarkingSchema, readonly ProgressLevel[]> = 
 export const ALL_PROGRESS_LEVELS = [
   ...PROGRESS_LEVELS.ipm,
   ...PROGRESS_LEVELS.five_level,
+  NOT_APPLICABLE_LEVEL,
   CLEAR_LEVEL,
 ] as const;
 
@@ -82,7 +94,11 @@ export function levelsForSchema(
   schema: MarkingSchema,
   includeClear = false
 ): readonly ProgressLevel[] {
-  return includeClear ? [...PROGRESS_LEVELS[schema], CLEAR_LEVEL] : PROGRESS_LEVELS[schema];
+  if (!includeClear) return PROGRESS_LEVELS[schema];
+  // N/A is offered only on the IPM scheme (the school's request). Five-level
+  // grades keep their existing ratings plus the clear action.
+  const clearActions = schema === "ipm" ? [NOT_APPLICABLE_LEVEL, CLEAR_LEVEL] : [CLEAR_LEVEL];
+  return [...PROGRESS_LEVELS[schema], ...clearActions];
 }
 
 export function marksForSchema(schema: MarkingSchema, includeClear = false): ProgressMark[] {
@@ -104,7 +120,11 @@ export function schemaForStatus(status: ProgressStatus): MarkingSchema | null {
 }
 
 export function statusAllowedForSchema(status: ProgressStatus, schema: MarkingSchema): boolean {
-  return status === "na" || PROGRESS_LEVELS[schema].some((level) => level.status === status);
+  return (
+    status === "na" ||
+    (status === "not_applicable" && schema === "ipm") ||
+    PROGRESS_LEVELS[schema].some((level) => level.status === status)
+  );
 }
 
 export function normalizeMarkingSchema(value: unknown): MarkingSchema {

@@ -23,6 +23,7 @@ const MARK_BG: Record<ProgressMark, string> = {
   sat: "#4f91a8", // scale-satisfactory
   min: "#d27d5f", // scale-minimum
   n: "#8b7aa8", // scale-none
+  na: "#8b8680", // N/A — excluded from reports; present for type completeness
   "-": BORDER, // Not started
 };
 
