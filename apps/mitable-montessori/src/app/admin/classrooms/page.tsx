@@ -36,6 +36,7 @@ import {
   STUDENT_IMPORT_TEMPLATE,
   analyzeImportDraft,
   ageLabelFromBirthDate,
+  buildDraftsFromStudentCandidates,
   buildImportDrafts,
   buildStudentImportPlan,
   detectImportMapping,
@@ -50,6 +51,7 @@ import {
   type StudentImportDraft,
   type StudentImportPlan,
 } from "@/lib/admin/student-import";
+import type { StudentImportCandidate } from "@/lib/admin/student-import-candidates";
 import { executeStudentImportPlan } from "@/lib/admin/execute-student-import-plan";
 import {
   PROGRAM_LABEL,
@@ -3150,6 +3152,8 @@ export function StudentImportDialog({
   const [drafts, setDrafts] = React.useState<StudentImportDraft[]>([]);
   const [pasteText, setPasteText] = React.useState("");
   const [fileName, setFileName] = React.useState<string | null>(null);
+  const [analysisBusy, setAnalysisBusy] = React.useState(false);
+  const [analysisError, setAnalysisError] = React.useState<string | null>(null);
   const [importBusy, setImportBusy] = React.useState(false);
   const [nameMatchPicks, setNameMatchPicks] = React.useState<Record<string, "new" | string>>({});
 
@@ -3160,6 +3164,8 @@ export function StudentImportDialog({
       setDrafts([]);
       setPasteText("");
       setFileName(null);
+      setAnalysisBusy(false);
+      setAnalysisError(null);
       setImportBusy(false);
       setNameMatchPicks({});
     }
@@ -3177,6 +3183,40 @@ export function StudentImportDialog({
     setRawData(parsed);
     setMapping(nextMapping);
     setDrafts(buildImportDrafts(parsed.rows, nextMapping));
+  };
+
+  const loadAiFile = async (file: File) => {
+    setAnalysisBusy(true);
+    setAnalysisError(null);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const comma = dataUrl.indexOf(",");
+      if (comma < 0) throw new Error("The uploaded file could not be read.");
+      const fileBase64 = dataUrl.slice(comma + 1);
+      const mimeType = file.type || mimeTypeFromName(file.name);
+      const result = await apiJson<{ students: StudentImportCandidate[] }>(
+        "/api/admin/extract-student-import",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            file_name: file.name,
+            mime_type: mimeType,
+            file_base64: fileBase64,
+          }),
+        }
+      );
+      const nextDrafts = buildDraftsFromStudentCandidates(result.students);
+      if (nextDrafts.length === 0) {
+        throw new Error("We could not find any named children in that file.");
+      }
+      setRawData(null);
+      setMapping({});
+      setDrafts(nextDrafts);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "Could not analyze that file.");
+    } finally {
+      setAnalysisBusy(false);
+    }
   };
 
   const analyses = React.useMemo(
@@ -3268,13 +3308,13 @@ export function StudentImportDialog({
           <DialogTitle className="text-xl">Import children</DialogTitle>
           <p className="text-sm text-ink-secondary">
             {importTarget === "school"
-              ? "Paste rows from a spreadsheet or upload a CSV. Classroom is optional — leave it blank to add children to the school roster only; assign classes later under Classrooms."
-              : "Paste rows from a spreadsheet or upload a CSV. We will show every issue before anything is added."}
+              ? "Paste spreadsheet rows, or upload a Word document, CSV, PDF, or image. Classroom is optional — leave it blank to add children to the school roster only; assign classes later under Classrooms."
+              : "Paste spreadsheet rows, or upload a Word document, CSV, PDF, or image. We will show every extracted value and issue before anything is added."}
           </p>
         </DialogHeader>
 
         <div className="scroll-quiet max-h-[calc(86vh-148px)] overflow-y-auto px-6 py-5">
-          {!rawData ? (
+          {!rawData && drafts.length === 0 ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-border bg-canvas p-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -3282,17 +3322,19 @@ export function StudentImportDialog({
                     Upload
                     <input
                       type="file"
-                      accept=".csv,text/csv,text/tab-separated-values"
+                      accept=".docx,.csv,.tsv,.txt,.pdf,.jpg,.jpeg,.png,.webp,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,text/tab-separated-values,text/plain,application/pdf,image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={(event) => {
                         const file = event.target.files?.[0];
                         if (!file) return;
                         setFileName(file.name);
-                        void file.text().then(loadText);
+                        void loadAiFile(file);
                       }}
                     />
                   </label>
-                  {fileName && <span className="text-sm text-ink-muted">{fileName}</span>}
+                  {analysisBusy && (
+                    <span className="text-sm text-ink-muted">Reading {fileName}…</span>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
@@ -3311,6 +3353,11 @@ export function StudentImportDialog({
                   </Button>
                 </div>
               </div>
+              {analysisError ? (
+                <p className="rounded-xl border border-terracotta/30 bg-terracotta/10 px-3 py-2 text-sm text-ink">
+                  {analysisError}
+                </p>
+              ) : null}
               <Textarea
                 value={pasteText}
                 onChange={(event) => setPasteText(event.target.value)}
@@ -3332,36 +3379,53 @@ export function StudentImportDialog({
               <section className="rounded-2xl border border-border bg-canvas p-4">
                 <div className="mb-3 flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-ink">Check the columns</h3>
+                    <h3 className="text-sm font-semibold text-ink">
+                      {rawData ? "Check the columns" : "Review the extracted roster"}
+                    </h3>
                     <p className="text-xs text-ink-secondary">
-                      We guessed what each column means. Change anything that looks wrong.
+                      {rawData
+                        ? "We guessed what each column means. Change anything that looks wrong."
+                        : "Gemini made this draft from the uploaded file. Check every value before importing."}
                     </p>
                   </div>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setRawData(null)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setRawData(null);
+                      setMapping({});
+                      setDrafts([]);
+                      setFileName(null);
+                      setAnalysisError(null);
+                    }}
+                  >
                     Use a different file
                   </Button>
                 </div>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {rawData.headers.map((header, index) => (
-                    <label key={`${header}-${index}`} className="flex items-center gap-2 text-xs">
-                      <span className="w-32 truncate text-ink-secondary" title={header}>
-                        {header || `Column ${index + 1}`}
-                      </span>
-                      <span className="text-ink-muted">is</span>
-                      <select
-                        value={mapping[index] ?? "ignore"}
-                        onChange={(event) => remap(index, event.target.value as ImportField)}
-                        className="h-8 flex-1 rounded-md border border-ink/15 bg-surface px-2 text-xs text-ink"
-                      >
-                        {FIELD_OPTIONS.map((field) => (
-                          <option key={field} value={field}>
-                            {FIELD_LABELS[field]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ))}
-                </div>
+                {rawData ? (
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {rawData.headers.map((header, index) => (
+                      <label key={`${header}-${index}`} className="flex items-center gap-2 text-xs">
+                        <span className="w-32 truncate text-ink-secondary" title={header}>
+                          {header || `Column ${index + 1}`}
+                        </span>
+                        <span className="text-ink-muted">is</span>
+                        <select
+                          value={mapping[index] ?? "ignore"}
+                          onChange={(event) => remap(index, event.target.value as ImportField)}
+                          className="h-8 flex-1 rounded-md border border-ink/15 bg-surface px-2 text-xs text-ink"
+                        >
+                          {FIELD_OPTIONS.map((field) => (
+                            <option key={field} value={field}>
+                              {FIELD_LABELS[field]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
               </section>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -3546,6 +3610,29 @@ function ImportDraftCard({
         />
       </div>
 
+      <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1.3fr_auto]">
+        <MiniInput
+          label="Alternate phone"
+          value={draft.guardianAlternativePhone}
+          onChange={(value) => onUpdate(draft.id, { guardianAlternativePhone: value })}
+        />
+        <MiniInput
+          label="Contact address"
+          value={draft.guardianContactAddress}
+          onChange={(value) => onUpdate(draft.id, { guardianContactAddress: value })}
+        />
+        <label className="mt-6 flex items-center gap-2 text-sm text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={draft.guardianPrimary}
+            onChange={(event) => onUpdate(draft.id, { guardianPrimary: event.target.checked })}
+          />
+          Primary contact
+        </label>
+      </div>
+
+      <ImportedSupportingInfo draft={draft} onUpdate={onUpdate} />
+
       {nameMatchCandidates.length > 0 && onNameMatchPick ? (
         <div
           className={`mt-3 space-y-2 rounded-xl border px-3 py-3 text-sm ${
@@ -3627,6 +3714,91 @@ function ImportDraftCard({
   );
 }
 
+const PROFILE_FIELDS: Array<{ key: keyof StudentImportDraft["profile"]; label: string }> = [
+  { key: "middleName", label: "Middle name" },
+  { key: "preferredName", label: "Preferred name" },
+  { key: "admissionNumber", label: "Admission number" },
+  { key: "sex", label: "Sex" },
+  { key: "academicTerm", label: "Term" },
+  { key: "academicYear", label: "Year" },
+  { key: "studentStatus", label: "Student status" },
+  { key: "state", label: "State" },
+  { key: "country", label: "Country" },
+  { key: "schoolAttended", label: "School attended" },
+  { key: "healthInfo", label: "Health info" },
+  { key: "religion", label: "Religion" },
+  { key: "parentMaritalStatus", label: "Parent marital status" },
+  { key: "hospital", label: "Hospital" },
+  { key: "placeOfWorship", label: "Place of worship" },
+  { key: "house", label: "House" },
+  { key: "termStatusChanged", label: "Term status changed" },
+  { key: "yearStatusChanged", label: "Year status changed" },
+];
+
+function ImportedSupportingInfo({
+  draft,
+  onUpdate,
+}: {
+  draft: StudentImportDraft;
+  onUpdate: (id: string, update: Partial<StudentImportDraft>) => void;
+}) {
+  const fields = PROFILE_FIELDS.filter((field) => draft.profile[field.key].trim());
+  const additional = draft.additionalGuardians;
+  if (fields.length === 0 && additional.length === 0) return null;
+
+  return (
+    <details className="mt-3 rounded-xl border border-border bg-surface px-3 py-2">
+      <summary className="cursor-pointer text-sm font-medium text-ink">
+        Supporting information ({fields.length + additional.length})
+      </summary>
+      {fields.length > 0 ? (
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          {fields.map((field) => (
+            <MiniInput
+              key={field.key}
+              label={field.label}
+              value={draft.profile[field.key]}
+              onChange={(value) =>
+                onUpdate(draft.id, { profile: { ...draft.profile, [field.key]: value } })
+              }
+            />
+          ))}
+        </div>
+      ) : null}
+      {additional.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          <p className="label-cap text-ink-muted">Additional guardians</p>
+          {additional.map((guardian, index) => (
+            <div
+              key={`${guardian.name}-${index}`}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-canvas px-2 py-2 text-xs text-ink-secondary"
+            >
+              <span className="font-medium text-ink">
+                {guardian.relationship}: {guardian.name || guardian.email}
+              </span>
+              {guardian.email ? <span>{guardian.email}</span> : null}
+              {guardian.phone ? <span>{guardian.phone}</span> : null}
+              <button
+                type="button"
+                className="ml-auto text-ink-muted underline"
+                onClick={() =>
+                  onUpdate(draft.id, {
+                    additionalGuardians: additional.filter(
+                      (_, guardianIndex) => guardianIndex !== index
+                    ),
+                  })
+                }
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </details>
+  );
+}
+
 function MiniInput({
   label,
   value,
@@ -3646,6 +3818,46 @@ function MiniInput({
       />
     </label>
   );
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The uploaded file could not be read."));
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("The uploaded file could not be read."));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function mimeTypeFromName(name: string): string {
+  const extension = name.trim().split(".").pop()?.toLowerCase();
+  switch (extension) {
+    case "csv":
+      return "text/csv";
+    case "tsv":
+      return "text/tab-separated-values";
+    case "txt":
+      return "text/plain";
+    case "pdf":
+      return "application/pdf";
+    case "docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "webp":
+      return "image/webp";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 function IssueMessage({

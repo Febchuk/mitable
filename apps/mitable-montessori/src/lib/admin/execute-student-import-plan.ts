@@ -18,6 +18,30 @@ export function mapGuardianRelationship(raw: string): "mother" | "father" | "gua
 
 type ApiJson = <T>(url: string, init?: RequestInit) => Promise<T>;
 
+function profilePayload(profile: StudentImportPlan["newStudents"][number]["profile"]) {
+  const value = (text: string) => text.trim() || undefined;
+  return {
+    middle_name: value(profile.middleName),
+    preferred_name: value(profile.preferredName),
+    admission_number: value(profile.admissionNumber),
+    sex: value(profile.sex),
+    academic_term: value(profile.academicTerm),
+    academic_year: value(profile.academicYear),
+    state: value(profile.state),
+    country: value(profile.country),
+    school_attended: value(profile.schoolAttended),
+    health_info: value(profile.healthInfo),
+    religion: value(profile.religion),
+    parent_marital_status: value(profile.parentMaritalStatus),
+    hospital: value(profile.hospital),
+    place_of_worship: value(profile.placeOfWorship),
+    house: value(profile.house),
+    term_status_changed: value(profile.termStatusChanged),
+    student_status: value(profile.studentStatus),
+    year_status_changed: value(profile.yearStatusChanged),
+  };
+}
+
 /** Runs import plan: creates students (optional classroom), links guardians, enrolls when classroomId is set. */
 export async function executeStudentImportPlan(
   apiJson: ApiJson,
@@ -55,6 +79,7 @@ export async function executeStudentImportPlan(
           body: JSON.stringify({
             first_name: s.firstName,
             last_name: s.lastName,
+            ...profilePayload(s.profile),
             ...(s.birthDate ? { birth_date: s.birthDate } : {}),
             ...(s.classroomId ? { classroom_id: s.classroomId } : {}),
           }),
@@ -67,6 +92,7 @@ export async function executeStudentImportPlan(
         body: JSON.stringify({
           first_name: s.firstName,
           last_name: s.lastName,
+          ...profilePayload(s.profile),
           ...(s.birthDate ? { birth_date: s.birthDate } : {}),
           ...(s.classroomId ? { classroom_id: s.classroomId } : {}),
         }),
@@ -86,6 +112,8 @@ export async function executeStudentImportPlan(
           last_name: gn.last_name.trim() || undefined,
           email: email || undefined,
           phone: (g.phone ?? "").trim() || undefined,
+          alternative_phone: (g.alternativePhone ?? "").trim() || undefined,
+          contact_address: (g.contactAddress ?? "").trim() || undefined,
           preferred_contact_method: "either",
         }),
       });
@@ -95,7 +123,7 @@ export async function executeStudentImportPlan(
           student_id: studentId,
           guardian_id: guardianRow.id,
           relationship: mapGuardianRelationship(g.relationship || "guardian"),
-          is_primary_contact: false,
+          is_primary_contact: g.primary,
           receives_reports: true,
         }),
       });
@@ -112,6 +140,8 @@ export async function executeStudentImportPlan(
         last_name: gn.last_name.trim() || undefined,
         email: email || undefined,
         phone: (item.guardian.phone ?? "").trim() || undefined,
+        alternative_phone: (item.guardian.alternativePhone ?? "").trim() || undefined,
+        contact_address: (item.guardian.contactAddress ?? "").trim() || undefined,
         preferred_contact_method: "either",
       }),
     });
@@ -121,7 +151,7 @@ export async function executeStudentImportPlan(
         student_id: item.studentId,
         guardian_id: guardianRow.id,
         relationship: mapGuardianRelationship(item.guardian.relationship || "guardian"),
-        is_primary_contact: false,
+        is_primary_contact: item.guardian.primary,
         receives_reports: true,
       }),
     });

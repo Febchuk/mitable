@@ -1,4 +1,8 @@
 import { z } from "zod";
+import type {
+  StudentImportCandidate,
+  StudentImportGuardianCandidate,
+} from "@/lib/admin/student-import-candidates";
 
 export type ImportField =
   | "first_name"
@@ -44,13 +48,74 @@ export interface StudentImportDraft {
   guardianEmail: string;
   guardianPhone: string;
   guardianRelationship: string;
+  guardianPrimary: boolean;
+  guardianAlternativePhone: string;
+  guardianContactAddress: string;
+  additionalGuardians: StudentImportGuardianDraft[];
+  profile: StudentImportProfile;
 }
+
+/** Child-owned details from school information systems. */
+export interface StudentImportProfile {
+  middleName: string;
+  preferredName: string;
+  admissionNumber: string;
+  sex: string;
+  academicTerm: string;
+  academicYear: string;
+  state: string;
+  country: string;
+  schoolAttended: string;
+  healthInfo: string;
+  religion: string;
+  parentMaritalStatus: string;
+  hospital: string;
+  placeOfWorship: string;
+  house: string;
+  termStatusChanged: string;
+  studentStatus: string;
+  yearStatusChanged: string;
+}
+
+export interface StudentImportGuardianDraft {
+  name: string;
+  email: string;
+  phone: string;
+  alternativePhone: string;
+  contactAddress: string;
+  relationship: string;
+  primary: boolean;
+}
+
+export const EMPTY_STUDENT_IMPORT_PROFILE: StudentImportProfile = {
+  middleName: "",
+  preferredName: "",
+  admissionNumber: "",
+  sex: "",
+  academicTerm: "",
+  academicYear: "",
+  state: "",
+  country: "",
+  schoolAttended: "",
+  healthInfo: "",
+  religion: "",
+  parentMaritalStatus: "",
+  hospital: "",
+  placeOfWorship: "",
+  house: "",
+  termStatusChanged: "",
+  studentStatus: "",
+  yearStatusChanged: "",
+};
 
 export interface GuardianImport {
   name: string;
   email: string;
   phone?: string;
+  alternativePhone?: string;
+  contactAddress?: string;
   relationship: string;
+  primary: boolean;
 }
 
 export type ImportIssue =
@@ -73,7 +138,8 @@ export interface DraftAnalysis {
     classroomId: string | null;
     classroomName: string;
     studentKey: string;
-    guardian: GuardianImport | null;
+    guardians: GuardianImport[];
+    profile: StudentImportProfile;
   } | null;
 }
 
@@ -87,6 +153,7 @@ export interface StudentImportPlan {
     fullName: string;
     birthDate: string | null;
     classroomId: string | null;
+    profile: StudentImportProfile;
     guardians: GuardianImport[];
   }>;
   guardiansForExisting: Array<{
@@ -261,8 +328,87 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
       guardianEmail,
       guardianPhone,
       guardianRelationship,
+      guardianPrimary: false,
+      guardianAlternativePhone: "",
+      guardianContactAddress: "",
+      additionalGuardians: [],
+      profile: { ...EMPTY_STUDENT_IMPORT_PROFILE },
     };
   });
+}
+
+/** Converts an AI-extracted document into the same editable drafts as a CSV import. */
+export function buildDraftsFromStudentCandidates(
+  candidates: StudentImportCandidate[]
+): StudentImportDraft[] {
+  return candidates.map((candidate, index) => {
+    const guardians = candidate.guardians
+      .map(candidateGuardianToDraft)
+      .filter((guardian) => guardian.name || guardian.email);
+    const primary = guardians[0] ?? emptyGuardianDraft();
+    return {
+      id: `ai_${index + 1}_${Math.random().toString(36).slice(2, 8)}`,
+      sourceRow: index + 1,
+      firstName: candidate.first_name,
+      lastName: candidate.last_name,
+      birthDate: candidate.birth_date,
+      classroomName: candidate.classroom,
+      guardianName: primary.name,
+      guardianEmail: primary.email,
+      guardianPhone: primary.phone,
+      guardianRelationship: primary.relationship,
+      guardianPrimary: primary.primary,
+      guardianAlternativePhone: primary.alternativePhone,
+      guardianContactAddress: primary.contactAddress,
+      additionalGuardians: guardians.slice(1),
+      profile: {
+        middleName: candidate.middle_name,
+        preferredName: candidate.preferred_name,
+        admissionNumber: candidate.admission_number,
+        sex: candidate.sex,
+        academicTerm: candidate.academic_term,
+        academicYear: candidate.academic_year,
+        state: candidate.state,
+        country: candidate.country,
+        schoolAttended: candidate.school_attended,
+        healthInfo: candidate.health_info,
+        religion: candidate.religion,
+        parentMaritalStatus: candidate.parent_marital_status,
+        hospital: candidate.hospital,
+        placeOfWorship: candidate.place_of_worship,
+        house: candidate.house,
+        termStatusChanged: candidate.term_status_changed,
+        studentStatus: candidate.student_status,
+        yearStatusChanged: candidate.year_status_changed,
+      },
+    };
+  });
+}
+
+function candidateGuardianToDraft(
+  guardian: StudentImportGuardianCandidate
+): StudentImportGuardianDraft {
+  return {
+    name: `${guardian.first_name} ${guardian.last_name}`.trim(),
+    email: guardian.email,
+    phone: guardian.phone,
+    alternativePhone: guardian.alternative_phone,
+    contactAddress: guardian.contact_address,
+    relationship: guardian.relationship,
+    primary: guardian.is_primary_contact,
+  };
+}
+
+function emptyGuardianDraft(): StudentImportGuardianDraft {
+  return {
+    name: "",
+    email: "",
+    phone: "",
+    alternativePhone: "",
+    contactAddress: "",
+    relationship: "guardian",
+    primary: false,
+  };
 }
 
 export function analyzeImportDraft(
@@ -297,31 +443,32 @@ export function analyzeImportDraft(
     issues.push({ kind: "missing_classroom" });
   }
 
-  const guardianName = draft.guardianName.trim();
-  const guardianEmail = draft.guardianEmail.trim();
-  const guardianPhone = draft.guardianPhone.trim();
-  const hasValidEmail = guardianEmail ? z.string().email().safeParse(guardianEmail).success : false;
-
-  if (guardianEmail && !hasValidEmail) {
-    issues.push({ kind: "invalid_guardian_email", value: guardianEmail });
-  } else if (guardianName && !hasValidEmail) {
-    issues.push({ kind: "guardian_incomplete" });
-  } else if (
-    !hasValidEmail &&
-    !guardianName &&
-    (guardianPhone || draft.guardianRelationship.trim())
-  ) {
-    issues.push({ kind: "guardian_incomplete" });
+  const guardianDrafts: StudentImportGuardianDraft[] = [
+    {
+      name: draft.guardianName,
+      email: draft.guardianEmail,
+      phone: draft.guardianPhone,
+      alternativePhone: draft.guardianAlternativePhone,
+      contactAddress: draft.guardianContactAddress,
+      relationship: draft.guardianRelationship,
+      primary: draft.guardianPrimary,
+    },
+    ...draft.additionalGuardians,
+  ];
+  const guardians: GuardianImport[] = [];
+  let hasPrimaryGuardian = false;
+  for (const guardianDraft of guardianDrafts) {
+    const result = validateGuardianDraft(guardianDraft);
+    if (result.issue) issues.push(result.issue);
+    if (result.guardian) {
+      // An imported spreadsheet can flag more than one contact as primary.
+      // Keep the first reviewed contact primary; the database must have a
+      // deterministic single primary contact for each child.
+      const primary = result.guardian.primary && !hasPrimaryGuardian;
+      if (primary) hasPrimaryGuardian = true;
+      guardians.push({ ...result.guardian, primary });
+    }
   }
-
-  const guardian: GuardianImport | null = hasValidEmail
-    ? {
-        name: guardianName,
-        email: guardianEmail,
-        phone: guardianPhone || undefined,
-        relationship: draft.guardianRelationship.trim() || "Guardian",
-      }
-    : null;
 
   const classroomResolved = trimmedClassroom ? Boolean(classroomMatch.exact) : allowUnassigned;
 
@@ -336,7 +483,8 @@ export function analyzeImportDraft(
           studentKey: parsedDate
             ? `${fullName.toLowerCase()}|${parsedDate.iso}`
             : `${fullName.toLowerCase()}|__nodob__|${exact ? exact.id : "__school__"}`,
-          guardian,
+          guardians,
+          profile: draft.profile,
         }
       : null;
 
@@ -378,25 +526,27 @@ export function buildStudentImportPlan(
     const existing = existingByKey.get(ready.studentKey);
 
     if (existing) {
-      if (!ready.guardian) {
+      if (ready.guardians.length === 0) {
         duplicateIssues.set(analysis.draft.id, [
           { kind: "duplicate_without_guardian", name: existing.name },
         ]);
         return;
       }
-      guardiansForExisting.push({ studentId: existing.id, guardian: ready.guardian });
+      for (const guardian of ready.guardians) {
+        guardiansForExisting.push({ studentId: existing.id, guardian });
+      }
       return;
     }
 
     const alreadyInBatch = newStudentsByKey.get(ready.studentKey);
     if (alreadyInBatch) {
-      if (!ready.guardian) {
+      if (ready.guardians.length === 0) {
         duplicateIssues.set(analysis.draft.id, [
           { kind: "duplicate_without_guardian", name: ready.fullName },
         ]);
         return;
       }
-      alreadyInBatch.guardians.push(ready.guardian);
+      alreadyInBatch.guardians.push(...ready.guardians);
       return;
     }
 
@@ -408,7 +558,8 @@ export function buildStudentImportPlan(
       fullName: ready.fullName,
       birthDate: ready.birthDate,
       classroomId: ready.classroomId,
-      guardians: ready.guardian ? [ready.guardian] : [],
+      profile: ready.profile,
+      guardians: ready.guardians,
     });
   });
 
@@ -419,6 +570,40 @@ export function buildStudentImportPlan(
       guardiansForExisting,
     },
     duplicateIssues,
+  };
+}
+
+function validateGuardianDraft(draft: StudentImportGuardianDraft): {
+  guardian: GuardianImport | null;
+  issue: ImportIssue | null;
+} {
+  const name = draft.name.trim();
+  const email = draft.email.trim();
+  const phone = draft.phone.trim();
+  const alternativePhone = draft.alternativePhone.trim();
+  const contactAddress = draft.contactAddress.trim();
+  const hasAnyData = Boolean(name || email || phone || alternativePhone || contactAddress);
+  if (!hasAnyData) return { guardian: null, issue: null };
+
+  const emailOk = email ? z.string().email().safeParse(email).success : false;
+  if (email && !emailOk) {
+    return { guardian: null, issue: { kind: "invalid_guardian_email", value: email } };
+  }
+  const nameParts = name.split(/\s+/).filter(Boolean);
+  if (!emailOk && nameParts.length < 2) {
+    return { guardian: null, issue: { kind: "guardian_incomplete" } };
+  }
+  return {
+    guardian: {
+      name,
+      email,
+      phone: phone || undefined,
+      alternativePhone: alternativePhone || undefined,
+      contactAddress: contactAddress || undefined,
+      relationship: draft.relationship.trim() || "Guardian",
+      primary: draft.primary,
+    },
+    issue: null,
   };
 }
 

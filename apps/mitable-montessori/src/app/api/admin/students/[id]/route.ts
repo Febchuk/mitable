@@ -19,6 +19,8 @@ type GuardianJoin = {
         last_name: string;
         email: string | null;
         phone: string | null;
+        alternative_phone: string | null;
+        contact_address: string | null;
         preferred_contact_method: "email" | "phone" | "either" | null;
         auth_user_id: string | null;
       }
@@ -28,10 +30,38 @@ type GuardianJoin = {
         last_name: string;
         email: string | null;
         phone: string | null;
+        alternative_phone: string | null;
+        contact_address: string | null;
         preferred_contact_method: "email" | "phone" | "either" | null;
         auth_user_id: string | null;
       }[]
     | null;
+};
+
+type StudentRecord = {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  preferred_name: string | null;
+  admission_number: string | null;
+  birth_date: string | null;
+  sex: string | null;
+  notes: string | null;
+  state: string | null;
+  country: string | null;
+  school_attended: string | null;
+  health_info: string | null;
+  religion: string | null;
+  parent_marital_status: string | null;
+  hospital: string | null;
+  place_of_worship: string | null;
+  house: string | null;
+  academic_term: string | null;
+  academic_year: string | null;
+  term_status_changed: string | null;
+  student_status: string | null;
+  year_status_changed: string | null;
 };
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -42,18 +72,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const supabase = createClient(cookieStore);
   const { data: student, error } = await supabase
     .from("students")
-    .select("id, first_name, last_name, preferred_name, admission_number, birth_date, sex, notes")
+    .select(
+      "id, first_name, middle_name, last_name, preferred_name, admission_number, birth_date, sex, notes, " +
+        "state, country, school_attended, health_info, religion, parent_marital_status, hospital, " +
+        "place_of_worship, house, academic_term, academic_year, term_status_changed, student_status, year_status_changed"
+    )
     .eq("id", id)
     .eq("school_id", auth.user.schoolId)
     .is("archived_at", null)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!student) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const studentRecord = student as unknown as StudentRecord;
 
   const { data: links, error: linksError } = await supabase
     .from("student_guardians")
     .select(
-      "guardian_id, relationship, is_primary_contact, receives_reports, guardians(id, first_name, last_name, email, phone, preferred_contact_method, auth_user_id)"
+      "guardian_id, relationship, is_primary_contact, receives_reports, guardians(id, first_name, last_name, email, phone, alternative_phone, contact_address, preferred_contact_method, auth_user_id)"
     )
     .eq("student_id", id)
     .order("is_primary_contact", { ascending: false });
@@ -69,6 +104,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         lastName: raw.last_name,
         email: raw.email,
         phone: raw.phone,
+        alternativePhone: raw.alternative_phone ?? "",
+        contactAddress: raw.contact_address ?? "",
         preferredContactMethod: raw.preferred_contact_method ?? "either",
         relationship: link.relationship ?? "guardian",
         primary: link.is_primary_contact,
@@ -80,14 +117,29 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   return NextResponse.json({
     student: {
-      id: student.id,
-      firstName: student.first_name,
-      lastName: student.last_name,
-      preferredName: student.preferred_name,
-      admissionNumber: student.admission_number ?? "",
-      birthDate: student.birth_date,
-      sex: student.sex,
-      notes: student.notes,
+      id: studentRecord.id,
+      firstName: studentRecord.first_name,
+      middleName: studentRecord.middle_name ?? "",
+      lastName: studentRecord.last_name,
+      preferredName: studentRecord.preferred_name,
+      admissionNumber: studentRecord.admission_number ?? "",
+      birthDate: studentRecord.birth_date,
+      sex: studentRecord.sex,
+      notes: studentRecord.notes,
+      state: studentRecord.state ?? "",
+      country: studentRecord.country ?? "",
+      schoolAttended: studentRecord.school_attended ?? "",
+      healthInfo: studentRecord.health_info ?? "",
+      religion: studentRecord.religion ?? "",
+      parentMaritalStatus: studentRecord.parent_marital_status ?? "",
+      hospital: studentRecord.hospital ?? "",
+      placeOfWorship: studentRecord.place_of_worship ?? "",
+      house: studentRecord.house ?? "",
+      academicTerm: studentRecord.academic_term ?? "",
+      academicYear: studentRecord.academic_year ?? "",
+      termStatusChanged: studentRecord.term_status_changed ?? "",
+      studentStatus: studentRecord.student_status ?? "",
+      yearStatusChanged: studentRecord.year_status_changed ?? "",
       guardians,
     },
   });

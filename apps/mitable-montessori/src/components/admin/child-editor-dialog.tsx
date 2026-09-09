@@ -13,6 +13,8 @@ type GuardianDraft = {
   lastName: string;
   email: string;
   phone: string;
+  alternativePhone?: string;
+  contactAddress?: string;
   preferredContactMethod: "email" | "phone" | "either";
   relationship: "mother" | "father" | "guardian" | "other";
   primary: boolean;
@@ -23,12 +25,27 @@ type GuardianDraft = {
 type ChildDraft = {
   id: string;
   firstName: string;
+  middleName: string;
   lastName: string;
   preferredName: string;
   admissionNumber: string;
   birthDate: string;
   sex: string;
   notes: string;
+  state: string;
+  country: string;
+  schoolAttended: string;
+  healthInfo: string;
+  religion: string;
+  parentMaritalStatus: string;
+  hospital: string;
+  placeOfWorship: string;
+  house: string;
+  academicTerm: string;
+  academicYear: string;
+  termStatusChanged: string;
+  studentStatus: string;
+  yearStatusChanged: string;
   guardians: GuardianDraft[];
 };
 
@@ -37,6 +54,8 @@ const emptyGuardian = (): GuardianDraft => ({
   lastName: "",
   email: "",
   phone: "",
+  alternativePhone: "",
+  contactAddress: "",
   preferredContactMethod: "either",
   relationship: "guardian",
   primary: false,
@@ -62,6 +81,8 @@ function cleanGuardian(g: GuardianDraft): GuardianDraft {
     lastName: g.lastName.trim(),
     email: g.email.trim(),
     phone: g.phone.trim(),
+    alternativePhone: (g.alternativePhone ?? "").trim(),
+    contactAddress: (g.contactAddress ?? "").trim(),
   };
 }
 
@@ -171,12 +192,27 @@ export function ChildEditorDialog({
         method: "PATCH",
         body: JSON.stringify({
           first_name: firstName,
+          middle_name: draft.middleName.trim() || null,
           last_name: lastName,
           preferred_name: draft.preferredName.trim() || null,
           admission_number: draft.admissionNumber.trim() || null,
           birth_date: draft.birthDate || null,
           sex: draft.sex.trim() || null,
           notes: draft.notes.trim() || null,
+          state: draft.state.trim() || null,
+          country: draft.country.trim() || null,
+          school_attended: draft.schoolAttended.trim() || null,
+          health_info: draft.healthInfo.trim() || null,
+          religion: draft.religion.trim() || null,
+          parent_marital_status: draft.parentMaritalStatus.trim() || null,
+          hospital: draft.hospital.trim() || null,
+          place_of_worship: draft.placeOfWorship.trim() || null,
+          house: draft.house.trim() || null,
+          academic_term: draft.academicTerm.trim() || null,
+          academic_year: draft.academicYear.trim() || null,
+          term_status_changed: draft.termStatusChanged.trim() || null,
+          student_status: draft.studentStatus.trim() || null,
+          year_status_changed: draft.yearStatusChanged.trim() || null,
         }),
       });
 
@@ -198,6 +234,8 @@ export function ChildEditorDialog({
                 last_name: clean.lastName,
                 email: clean.email || undefined,
                 phone: clean.phone || undefined,
+                alternative_phone: clean.alternativePhone || undefined,
+                contact_address: clean.contactAddress || undefined,
                 preferred_contact_method: clean.preferredContactMethod,
               }),
             });
@@ -209,6 +247,8 @@ export function ChildEditorDialog({
                 last_name: clean.lastName,
                 email: clean.email || undefined,
                 phone: clean.phone || undefined,
+                alternative_phone: clean.alternativePhone || undefined,
+                contact_address: clean.contactAddress || undefined,
                 preferred_contact_method: clean.preferredContactMethod,
               }),
             });
@@ -276,6 +316,12 @@ export function ChildEditorDialog({
                     onChange={(e) => setDraft({ ...draft, lastName: e.target.value })}
                   />
                 </Field>
+                <Field label="Middle name">
+                  <Input
+                    value={draft.middleName}
+                    onChange={(e) => setDraft({ ...draft, middleName: e.target.value })}
+                  />
+                </Field>
                 <Field label="Preferred name">
                   <Input
                     value={draft.preferredName}
@@ -300,6 +346,107 @@ export function ChildEditorDialog({
                 <Textarea
                   value={draft.notes}
                   onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+                />
+              </Field>
+            </section>
+
+            <section className="space-y-3 border-t border-border pt-5">
+              <div>
+                <p className="label-cap text-ink-muted">School record</p>
+                <p className="mt-1 text-sm text-ink-secondary">
+                  These fields support a migration from the school&apos;s existing roster system.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Sex">
+                  <Input
+                    value={draft.sex}
+                    onChange={(e) => setDraft({ ...draft, sex: e.target.value })}
+                  />
+                </Field>
+                <Field label="Student status">
+                  <Input
+                    value={draft.studentStatus}
+                    onChange={(e) => setDraft({ ...draft, studentStatus: e.target.value })}
+                  />
+                </Field>
+                <Field label="Term">
+                  <Input
+                    value={draft.academicTerm}
+                    onChange={(e) => setDraft({ ...draft, academicTerm: e.target.value })}
+                  />
+                </Field>
+                <Field label="Year">
+                  <Input
+                    value={draft.academicYear}
+                    onChange={(e) => setDraft({ ...draft, academicYear: e.target.value })}
+                  />
+                </Field>
+                <Field label="State">
+                  <Input
+                    value={draft.state}
+                    onChange={(e) => setDraft({ ...draft, state: e.target.value })}
+                  />
+                </Field>
+                <Field label="Country">
+                  <Input
+                    value={draft.country}
+                    onChange={(e) => setDraft({ ...draft, country: e.target.value })}
+                  />
+                </Field>
+                <Field label="School attended">
+                  <Input
+                    value={draft.schoolAttended}
+                    onChange={(e) => setDraft({ ...draft, schoolAttended: e.target.value })}
+                  />
+                </Field>
+                <Field label="Hospital">
+                  <Input
+                    value={draft.hospital}
+                    onChange={(e) => setDraft({ ...draft, hospital: e.target.value })}
+                  />
+                </Field>
+                <Field label="Religion">
+                  <Input
+                    value={draft.religion}
+                    onChange={(e) => setDraft({ ...draft, religion: e.target.value })}
+                  />
+                </Field>
+                <Field label="Place of worship">
+                  <Input
+                    value={draft.placeOfWorship}
+                    onChange={(e) => setDraft({ ...draft, placeOfWorship: e.target.value })}
+                  />
+                </Field>
+                <Field label="House">
+                  <Input
+                    value={draft.house}
+                    onChange={(e) => setDraft({ ...draft, house: e.target.value })}
+                  />
+                </Field>
+                <Field label="Parent marital status">
+                  <Input
+                    value={draft.parentMaritalStatus}
+                    onChange={(e) => setDraft({ ...draft, parentMaritalStatus: e.target.value })}
+                  />
+                </Field>
+                <Field label="Term status changed">
+                  <Input
+                    value={draft.termStatusChanged}
+                    onChange={(e) => setDraft({ ...draft, termStatusChanged: e.target.value })}
+                  />
+                </Field>
+                <Field label="Year status changed">
+                  <Input
+                    value={draft.yearStatusChanged}
+                    onChange={(e) => setDraft({ ...draft, yearStatusChanged: e.target.value })}
+                  />
+                </Field>
+              </div>
+              <Field label="Health information">
+                <Textarea
+                  value={draft.healthInfo}
+                  onChange={(e) => setDraft({ ...draft, healthInfo: e.target.value })}
                 />
               </Field>
             </section>
@@ -371,6 +518,23 @@ export function ChildEditorDialog({
                           type="tel"
                           value={guardian.phone}
                           onChange={(e) => updateGuardian(index, { phone: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Alternate phone">
+                        <Input
+                          type="tel"
+                          value={guardian.alternativePhone}
+                          onChange={(e) =>
+                            updateGuardian(index, { alternativePhone: e.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="Contact address">
+                        <Input
+                          value={guardian.contactAddress}
+                          onChange={(e) =>
+                            updateGuardian(index, { contactAddress: e.target.value })
+                          }
                         />
                       </Field>
                       <Field label="Relationship">
@@ -470,7 +634,15 @@ export type GuardianEditorValue = GuardianDraft;
 
 type GuardianSearchMatch = Pick<
   GuardianDraft,
-  "id" | "firstName" | "lastName" | "email" | "phone" | "preferredContactMethod" | "accountActive"
+  | "id"
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "alternativePhone"
+  | "contactAddress"
+  | "preferredContactMethod"
+  | "accountActive"
 >;
 
 export function GuardianEditorDialog({
@@ -590,6 +762,8 @@ export function GuardianEditorDialog({
             last_name: clean.lastName,
             email: clean.email || undefined,
             phone: clean.phone || undefined,
+            alternative_phone: clean.alternativePhone || undefined,
+            contact_address: clean.contactAddress || undefined,
             preferred_contact_method: clean.preferredContactMethod,
           }),
         });
@@ -611,6 +785,8 @@ export function GuardianEditorDialog({
             last_name: clean.lastName,
             email: clean.email || undefined,
             phone: clean.phone || undefined,
+            alternative_phone: clean.alternativePhone || undefined,
+            contact_address: clean.contactAddress || undefined,
             preferred_contact_method: clean.preferredContactMethod,
           }),
         });
@@ -761,6 +937,21 @@ export function GuardianEditorDialog({
               value={draft.phone}
               disabled={linkingExisting}
               onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+            />
+          </Field>
+          <Field label="Alternate phone">
+            <Input
+              type="tel"
+              value={draft.alternativePhone}
+              disabled={linkingExisting}
+              onChange={(e) => setDraft({ ...draft, alternativePhone: e.target.value })}
+            />
+          </Field>
+          <Field label="Contact address">
+            <Input
+              value={draft.contactAddress}
+              disabled={linkingExisting}
+              onChange={(e) => setDraft({ ...draft, contactAddress: e.target.value })}
             />
           </Field>
           <Field label="Relationship">
