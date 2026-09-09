@@ -23,3 +23,11 @@ export function getGemini(): GoogleGenAI {
  * proposes one or two record edits per turn.
  */
 export const GEMINI_MODEL = "gemini-3.5-flash";
+
+/**
+ * Roster extraction is deliberately separate from the teacher agent: a file
+ * can contain many children and scanned pages, so it uses a stronger model and
+ * always returns a draft for an administrator to review before any records are
+ * written.
+ */
+export const GEMINI_STUDENT_IMPORT_MODEL = "gemini-3.1-pro-preview";

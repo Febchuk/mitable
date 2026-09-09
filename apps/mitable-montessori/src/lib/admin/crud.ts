@@ -64,22 +64,54 @@ export async function createStudent(
   input: {
     first_name: string;
     last_name: string;
+    middle_name?: string;
     preferred_name?: string;
     admission_number?: string;
     birth_date?: string;
     nicknames?: string[];
     notes?: string;
+    sex?: string;
+    state?: string;
+    country?: string;
+    school_attended?: string;
+    health_info?: string;
+    religion?: string;
+    parent_marital_status?: string;
+    hospital?: string;
+    place_of_worship?: string;
+    house?: string;
+    academic_term?: string;
+    academic_year?: string;
+    term_status_changed?: string;
+    student_status?: string;
+    year_status_changed?: string;
   }
 ) {
   return insertReturningId(ctx, "students", {
     school_id: ctx.schoolId,
     first_name: input.first_name,
     last_name: input.last_name,
+    middle_name: input.middle_name?.trim() || null,
     preferred_name: input.preferred_name ?? null,
     admission_number: input.admission_number?.trim() || null,
     birth_date: input.birth_date ?? null,
     nicknames: input.nicknames ?? [],
     notes: input.notes ?? null,
+    sex: input.sex?.trim() || null,
+    state: input.state?.trim() || null,
+    country: input.country?.trim() || null,
+    school_attended: input.school_attended?.trim() || null,
+    health_info: input.health_info?.trim() || null,
+    religion: input.religion?.trim() || null,
+    parent_marital_status: input.parent_marital_status?.trim() || null,
+    hospital: input.hospital?.trim() || null,
+    place_of_worship: input.place_of_worship?.trim() || null,
+    house: input.house?.trim() || null,
+    academic_term: input.academic_term?.trim() || null,
+    academic_year: input.academic_year?.trim() || null,
+    term_status_changed: input.term_status_changed?.trim() || null,
+    student_status: input.student_status?.trim() || null,
+    year_status_changed: input.year_status_changed?.trim() || null,
   });
 }
 
@@ -104,6 +136,8 @@ export async function updateGuardian(
     last_name?: string;
     email?: string;
     phone?: string;
+    alternative_phone?: string;
+    contact_address?: string;
     preferred_contact_method?: "email" | "phone" | "either";
   }
 ): Promise<void> {
@@ -131,6 +165,8 @@ export async function updateGuardian(
       last_name: input.last_name?.trim(),
       email: nextEmail,
       phone: input.phone?.trim() || null,
+      alternative_phone: input.alternative_phone?.trim() || null,
+      contact_address: input.contact_address?.trim() || null,
       preferred_contact_method: input.preferred_contact_method ?? "either",
       updated_at: new Date().toISOString(),
     })
@@ -160,6 +196,8 @@ export async function createGuardian(
     last_name?: string;
     email?: string;
     phone?: string;
+    alternative_phone?: string;
+    contact_address?: string;
     preferred_contact_method?: "email" | "phone" | "either";
   }
 ) {
@@ -203,6 +241,8 @@ export async function createGuardian(
     last_name: last,
     email: email ?? null,
     phone: input.phone?.trim() || null,
+    alternative_phone: input.alternative_phone?.trim() || null,
+    contact_address: input.contact_address?.trim() || null,
     preferred_contact_method: input.preferred_contact_method ?? "either",
   });
 }

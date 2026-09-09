@@ -16,6 +16,7 @@ export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 export const CreateStudentSchema = z.object({
   first_name: z.string().min(1).max(100),
   last_name: z.string().min(1).max(100),
+  middle_name: z.string().max(100).optional(),
   preferred_name: z.string().max(100).optional(),
   admission_number: z.string().max(100).optional(),
   birth_date: z
@@ -24,6 +25,21 @@ export const CreateStudentSchema = z.object({
     .optional(),
   nicknames: z.array(z.string().max(100)).max(10).default([]),
   notes: z.string().max(2000).optional(),
+  sex: z.string().max(50).optional(),
+  state: z.string().max(100).optional(),
+  country: z.string().max(100).optional(),
+  school_attended: z.string().max(300).optional(),
+  health_info: z.string().max(4000).optional(),
+  religion: z.string().max(100).optional(),
+  parent_marital_status: z.string().max(100).optional(),
+  hospital: z.string().max(300).optional(),
+  place_of_worship: z.string().max(300).optional(),
+  house: z.string().max(100).optional(),
+  academic_term: z.string().max(100).optional(),
+  academic_year: z.string().max(100).optional(),
+  term_status_changed: z.string().max(100).optional(),
+  student_status: z.string().max(100).optional(),
+  year_status_changed: z.string().max(100).optional(),
   /** When set, creates an active primary enrollment in this classroom. */
   classroom_id: z.string().uuid().optional(),
 });
@@ -39,11 +55,26 @@ export const PatchStudentSchema = z
   .object({
     first_name: z.string().min(1).max(100).optional(),
     last_name: z.string().min(1).max(100).optional(),
+    middle_name: z.string().max(100).nullable().optional(),
     preferred_name: z.string().max(100).nullable().optional(),
     admission_number: z.string().max(100).nullable().optional(),
     birth_date: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()]).optional(),
     sex: z.string().max(50).nullable().optional(),
     notes: z.string().max(2000).nullable().optional(),
+    state: z.string().max(100).nullable().optional(),
+    country: z.string().max(100).nullable().optional(),
+    school_attended: z.string().max(300).nullable().optional(),
+    health_info: z.string().max(4000).nullable().optional(),
+    religion: z.string().max(100).nullable().optional(),
+    parent_marital_status: z.string().max(100).nullable().optional(),
+    hospital: z.string().max(300).nullable().optional(),
+    place_of_worship: z.string().max(300).nullable().optional(),
+    house: z.string().max(100).nullable().optional(),
+    academic_term: z.string().max(100).nullable().optional(),
+    academic_year: z.string().max(100).nullable().optional(),
+    term_status_changed: z.string().max(100).nullable().optional(),
+    student_status: z.string().max(100).nullable().optional(),
+    year_status_changed: z.string().max(100).nullable().optional(),
   })
   .refine((fields) => Object.values(fields).some((value) => value !== undefined), {
     message: "Provide at least one field to update",
@@ -55,6 +86,8 @@ export const CreateGuardianBaseSchema = z.object({
   last_name: z.string().max(100).optional(),
   email: z.string().max(254).optional(),
   phone: z.string().max(50).optional(),
+  alternative_phone: z.string().max(50).optional(),
+  contact_address: z.string().max(500).optional(),
   preferred_contact_method: z.enum(["email", "phone", "either"]).default("either"),
 });
 
@@ -63,6 +96,8 @@ export const CreateGuardianSchema = CreateGuardianBaseSchema.transform((v) => ({
   last_name: (v.last_name ?? "").trim(),
   email: (v.email ?? "").trim() || undefined,
   phone: (v.phone ?? "").trim() || undefined,
+  alternative_phone: (v.alternative_phone ?? "").trim() || undefined,
+  contact_address: (v.contact_address ?? "").trim() || undefined,
   preferred_contact_method: v.preferred_contact_method,
 })).superRefine((v, ctx) => {
   const hasEmail = Boolean(v.email);

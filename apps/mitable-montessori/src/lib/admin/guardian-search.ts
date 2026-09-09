@@ -6,6 +6,8 @@ type GuardianRow = {
   last_name: string;
   email: string | null;
   phone: string | null;
+  alternative_phone?: string | null;
+  contact_address?: string | null;
   preferred_contact_method: "email" | "phone" | "either" | null;
   auth_user_id: string | null;
 };
@@ -16,6 +18,8 @@ export type GuardianSearchResult = {
   lastName: string;
   email: string;
   phone: string;
+  alternativePhone: string;
+  contactAddress: string;
   preferredContactMethod: "email" | "phone" | "either";
   accountActive: boolean;
 };
@@ -42,6 +46,8 @@ export function mergeGuardianSearchResults(
       lastName: guardian.last_name,
       email: guardian.email ?? "",
       phone: guardian.phone ?? "",
+      alternativePhone: guardian.alternative_phone ?? "",
+      contactAddress: guardian.contact_address ?? "",
       preferredContactMethod: guardian.preferred_contact_method ?? "either",
       accountActive: Boolean(guardian.auth_user_id),
     }));
@@ -54,7 +60,8 @@ export async function searchGuardiansForSchool(
   studentId?: string
 ): Promise<GuardianSearchResult[]> {
   const pattern = `%${query.trim()}%`;
-  const columns = "id, first_name, last_name, email, phone, preferred_contact_method, auth_user_id";
+  const columns =
+    "id, first_name, last_name, email, phone, alternative_phone, contact_address, preferred_contact_method, auth_user_id";
   const searches = ["first_name", "last_name", "email"].map((column) =>
     supabase
       .from("guardians")
