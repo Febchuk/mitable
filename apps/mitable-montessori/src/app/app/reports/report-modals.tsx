@@ -917,10 +917,10 @@ export function SendToParentsDialog({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink">{g.name}</div>
-                      <div className="truncate text-xs text-ink-secondary">
-                        {g.email}
-                        {g.relationship && ` · ${g.relationship}`}
-                      </div>
+                      {/* Guardian email is intentionally not shown to teachers. */}
+                      {g.relationship && (
+                        <div className="truncate text-xs text-ink-secondary">{g.relationship}</div>
+                      )}
                     </div>
                   </label>
                 ))}
