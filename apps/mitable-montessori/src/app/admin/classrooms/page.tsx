@@ -42,6 +42,7 @@ import {
   detectImportMapping,
   listSchoolStudentsMatchingName,
   parseImportText,
+  shouldParseStudentImportFileLocally,
   type ClassroomOption,
   type DraftAnalysis,
   type ImportField,
@@ -234,27 +235,83 @@ async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 const FIELD_LABELS: Record<ImportField, string> = {
   first_name: "First name",
+  middle_name: "Middle name",
   last_name: "Last name",
   full_name: "Full name",
+  preferred_name: "Preferred name",
+  admission_number: "Admission number",
   birth_date: "Birthday",
+  sex: "Sex",
   classroom: "Classroom",
+  academic_term: "Term",
+  academic_year: "Academic year",
+  state: "State",
+  country: "Country",
+  school_attended: "School attended",
+  health_info: "Health information",
+  religion: "Religion",
+  parent_marital_status: "Parent marital status",
+  hospital: "Hospital",
+  place_of_worship: "Place of worship",
+  house: "House",
+  term_status_changed: "Term status changed",
+  student_status: "Student status",
+  year_status_changed: "Year status changed",
   guardian_name: "Guardian name",
   guardian_email: "Guardian email",
   guardian_phone: "Guardian phone",
+  guardian_alternative_phone: "Guardian alternate phone",
+  guardian_contact_address: "Guardian address",
   guardian_relationship: "Guardian relation",
+  father_name: "Father name",
+  father_email: "Father email",
+  father_phone: "Father phone",
+  father_alternative_phone: "Father alternate phone",
+  mother_name: "Mother name",
+  mother_email: "Mother email",
+  mother_phone: "Mother phone",
+  mother_alternative_phone: "Mother alternate phone",
   ignore: "Ignore",
 };
 
 const FIELD_OPTIONS: ImportField[] = [
   "first_name",
+  "middle_name",
   "last_name",
   "full_name",
+  "preferred_name",
+  "admission_number",
   "birth_date",
+  "sex",
   "classroom",
+  "academic_term",
+  "academic_year",
+  "state",
+  "country",
+  "school_attended",
+  "health_info",
+  "religion",
+  "parent_marital_status",
+  "hospital",
+  "place_of_worship",
+  "house",
+  "term_status_changed",
+  "student_status",
+  "year_status_changed",
   "guardian_name",
   "guardian_email",
   "guardian_phone",
+  "guardian_alternative_phone",
+  "guardian_contact_address",
   "guardian_relationship",
+  "father_name",
+  "father_email",
+  "father_phone",
+  "father_alternative_phone",
+  "mother_name",
+  "mother_email",
+  "mother_phone",
+  "mother_alternative_phone",
   "ignore",
 ];
 
@@ -3176,13 +3233,31 @@ export function StudentImportDialog({
     setNameMatchPicks({});
   }, [draftIdsKey]);
 
-  const loadText = (text: string) => {
+  const loadText = (text: string): boolean => {
     const parsed = parseImportText(text);
-    if (!parsed) return;
+    if (!parsed || parsed.rows.length === 0) {
+      setAnalysisError("That spreadsheet does not contain any student rows.");
+      return false;
+    }
     const nextMapping = detectImportMapping(parsed.headers);
+    setAnalysisError(null);
     setRawData(parsed);
     setMapping(nextMapping);
     setDrafts(buildImportDrafts(parsed.rows, nextMapping));
+    return true;
+  };
+
+  const loadTextFile = async (file: File) => {
+    setAnalysisBusy(true);
+    setAnalysisError(null);
+    try {
+      const loaded = loadText(await file.text());
+      if (!loaded) return;
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "Could not read that spreadsheet.");
+    } finally {
+      setAnalysisBusy(false);
+    }
   };
 
   const loadAiFile = async (file: File) => {
@@ -3303,8 +3378,8 @@ export function StudentImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[940px] max-h-[86vh] overflow-hidden rounded-[22px] border border-border bg-surface p-0 shadow-2xl">
-        <DialogHeader className="border-b border-border px-6 py-5">
+      <DialogContent className="flex max-h-[86vh] max-w-[940px] flex-col overflow-hidden rounded-[22px] border border-border bg-surface p-0 shadow-2xl">
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
           <DialogTitle className="text-xl">Import children</DialogTitle>
           <p className="text-sm text-ink-secondary">
             {importTarget === "school"
@@ -3313,7 +3388,7 @@ export function StudentImportDialog({
           </p>
         </DialogHeader>
 
-        <div className="scroll-quiet max-h-[calc(86vh-148px)] overflow-y-auto px-6 py-5">
+        <div className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {!rawData && drafts.length === 0 ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-border bg-canvas p-4">
@@ -3328,7 +3403,9 @@ export function StudentImportDialog({
                         const file = event.target.files?.[0];
                         if (!file) return;
                         setFileName(file.name);
-                        void loadAiFile(file);
+                        void (shouldParseStudentImportFileLocally(file)
+                          ? loadTextFile(file)
+                          : loadAiFile(file));
                       }}
                     />
                   </label>
@@ -3478,7 +3555,7 @@ export function StudentImportDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
