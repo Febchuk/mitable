@@ -6,14 +6,42 @@ import type {
 
 export type ImportField =
   | "first_name"
+  | "middle_name"
   | "last_name"
   | "full_name"
+  | "preferred_name"
+  | "admission_number"
   | "birth_date"
+  | "sex"
   | "classroom"
+  | "academic_term"
+  | "academic_year"
+  | "state"
+  | "country"
+  | "school_attended"
+  | "health_info"
+  | "religion"
+  | "parent_marital_status"
+  | "hospital"
+  | "place_of_worship"
+  | "house"
+  | "term_status_changed"
+  | "student_status"
+  | "year_status_changed"
   | "guardian_name"
   | "guardian_email"
   | "guardian_phone"
+  | "guardian_alternative_phone"
+  | "guardian_contact_address"
   | "guardian_relationship"
+  | "father_name"
+  | "father_email"
+  | "father_phone"
+  | "father_alternative_phone"
+  | "mother_name"
+  | "mother_email"
+  | "mother_phone"
+  | "mother_alternative_phone"
   | "ignore";
 
 export type ImportMapping = Record<number, ImportField>;
@@ -163,14 +191,26 @@ export interface StudentImportPlan {
 }
 
 export const STUDENT_IMPORT_TEMPLATE =
-  "first_name,last_name,birth_date,classroom,guardian_name,guardian_email,guardian_phone,guardian_relationship\n" +
-  "Maya,Patel,2019-04-15,Primary East,Asha Patel,asha.patel@example.com,,Mother\n" +
-  "Maya,Patel,2019-04-15,Primary East,Rohan Patel,rohan.patel@example.com,,Father\n" +
-  "Eli,Johansson,15 April 2018,Elementary West,Linnea Johansson,linnea@example.com,,Mother\n" +
-  "Sam,Taylor,,Primary East,,parent@example.com,555-0100,Guardian\n";
+  "admission_number,first_name,middle_name,last_name,birth_date,sex,classroom,guardian_name,guardian_email,guardian_phone,guardian_relationship\n" +
+  "ADM-101,Maya,,Patel,2019-04-15,Female,Primary East,Asha Patel,asha.patel@example.com,,Mother\n" +
+  "ADM-102,Eli,,Johansson,15 April 2018,Male,Elementary West,Linnea Johansson,linnea@example.com,,Mother\n" +
+  "ADM-103,Sam,,Taylor,,Non-binary,Primary East,,parent@example.com,555-0100,Guardian\n";
+
+export function shouldParseStudentImportFileLocally(input: {
+  name: string;
+  type?: string;
+}): boolean {
+  const type = input.type?.trim().toLowerCase();
+  if (type === "text/csv" || type === "text/tab-separated-values" || type === "text/plain") {
+    return true;
+  }
+  const extension = input.name.trim().split(".").pop()?.toLowerCase();
+  return extension === "csv" || extension === "tsv" || extension === "txt";
+}
 
 const FIELD_PATTERNS: Record<Exclude<ImportField, "ignore">, RegExp[]> = {
   first_name: [/^first[\s_-]*name$/i, /^first$/i, /^fname$/i, /^given[\s_-]*name$/i],
+  middle_name: [/^middle[\s_-]*name$/i, /^middle$/i, /^mname$/i],
   last_name: [/^last[\s_-]*name$/i, /^last$/i, /^lname$/i, /^surname$/i, /^family[\s_-]*name$/i],
   full_name: [
     /^name$/i,
@@ -178,12 +218,39 @@ const FIELD_PATTERNS: Record<Exclude<ImportField, "ignore">, RegExp[]> = {
     /^child([\s_-]*name)?$/i,
     /^student([\s_-]*name)?$/i,
   ],
+  preferred_name: [/^preferred[\s_-]*name$/i, /^known[\s_-]*as$/i],
+  admission_number: [
+    /^admission[\s_-]*(number|no\.?|#)$/i,
+    /^student[\s_-]*(number|no\.?|#)$/i,
+    /^admission$/i,
+  ],
   birth_date: [/^birth[\s_-]*date$/i, /^birthday$/i, /^dob$/i, /^date[\s_-]*of[\s_-]*birth$/i],
+  sex: [/^sex$/i, /^gender$/i],
   classroom: [/^classroom$/i, /^class$/i, /^room$/i, /^classroom[\s_-]*name$/i],
-  guardian_name: [/^guardian([\s_-]*name)?$/i, /^parent([\s_-]*name)?$/i, /^carer([\s_-]*name)?$/i],
+  academic_term: [/^academic[\s_-]*term$/i, /^term$/i],
+  academic_year: [/^academic[\s_-]*year$/i, /^school[\s_-]*year$/i, /^year$/i],
+  state: [/^state$/i, /^state[\s_-]*of[\s_-]*origin$/i],
+  country: [/^country$/i, /^nationality$/i],
+  school_attended: [/^(previous[\s_-]*)?school[\s_-]*attended$/i, /^previous[\s_-]*school$/i],
+  health_info: [/^health[\s_-]*(info|information)$/i, /^medical[\s_-]*(info|information)$/i],
+  religion: [/^religion$/i],
+  parent_marital_status: [/^parent[\s_-]*marital[\s_-]*status$/i, /^marital[\s_-]*status$/i],
+  hospital: [/^hospital$/i],
+  place_of_worship: [/^place[\s_-]*of[\s_-]*worship$/i],
+  house: [/^house$/i],
+  term_status_changed: [/^term[\s_-]*status[\s_-]*changed$/i],
+  student_status: [/^student[\s_-]*status$/i],
+  year_status_changed: [/^year[\s_-]*status[\s_-]*changed$/i],
+  guardian_name: [
+    /^guardian([\s_-]*name)?$/i,
+    /^parent([\s_-]*name)?$/i,
+    /^parent[\s_-]*or[\s_-]*guardian$/i,
+    /^carer([\s_-]*name)?$/i,
+  ],
   guardian_email: [
     /^guardian[\s_-]*e?-?mail$/i,
     /^parent[\s_-]*e?-?mail$/i,
+    /^parent[\s_-]*primary[\s_-]*e?-?mail$/i,
     /^contact[\s_-]*e?-?mail$/i,
     /^email$/i,
   ],
@@ -191,7 +258,17 @@ const FIELD_PATTERNS: Record<Exclude<ImportField, "ignore">, RegExp[]> = {
     /^guardian[\s_-]*phone$/i,
     /^parent[\s_-]*phone$/i,
     /^contact[\s_-]*phone$/i,
+    /^primary[\s_-]*phone([\s_-]*(number|no\.?))?$/i,
     /^phone$/i,
+  ],
+  guardian_alternative_phone: [
+    /^(guardian|parent|contact)[\s_-]*(alternative|alternate|secondary)[\s_-]*phone$/i,
+    /^(alternative|alternate|secondary)[\s_-]*phone([\s_-]*(number|no\.?))?$/i,
+  ],
+  guardian_contact_address: [
+    /^(guardian|parent|contact)[\s_-]*address$/i,
+    /^contact[\s_-]*address$/i,
+    /^address$/i,
   ],
   guardian_relationship: [
     /^guardian[\s_-]*relationship$/i,
@@ -199,6 +276,14 @@ const FIELD_PATTERNS: Record<Exclude<ImportField, "ignore">, RegExp[]> = {
     /^relation$/i,
     /^parent[\s_-]*relationship$/i,
   ],
+  father_name: [/^father[\s_-]*name$/i],
+  father_email: [/^father[\s_-]*e?-?mail$/i],
+  father_phone: [/^father[\s_-]*phone$/i],
+  father_alternative_phone: [/^father[\s_-]*contact$/i],
+  mother_name: [/^mother[\s_-]*name$/i],
+  mother_email: [/^mother[\s_-]*e?-?mail$/i],
+  mother_phone: [/^mother[\s_-]*phone$/i],
+  mother_alternative_phone: [/^mother[\s_-]*contact$/i],
 };
 
 const MONTHS: Record<string, number> = {
@@ -276,11 +361,19 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
     let guardianEmail = "";
     let guardianPhone = "";
     let guardianRelationship = "";
+    let guardianAlternativePhone = "";
+    let guardianContactAddress = "";
+    const profile = { ...EMPTY_STUDENT_IMPORT_PROFILE };
+    const father = { ...emptyGuardianDraft(), relationship: "father" };
+    const mother = { ...emptyGuardianDraft(), relationship: "mother" };
 
     cells.forEach((value, index) => {
       switch (mapping[index]) {
         case "first_name":
           firstName = value;
+          break;
+        case "middle_name":
+          profile.middleName = value;
           break;
         case "last_name":
           lastName = value;
@@ -291,8 +384,59 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
         case "birth_date":
           birthDate = value;
           break;
+        case "preferred_name":
+          profile.preferredName = value;
+          break;
+        case "admission_number":
+          profile.admissionNumber = value;
+          break;
+        case "sex":
+          profile.sex = value;
+          break;
         case "classroom":
           classroomName = value;
+          break;
+        case "academic_term":
+          profile.academicTerm = value;
+          break;
+        case "academic_year":
+          profile.academicYear = value;
+          break;
+        case "state":
+          profile.state = value;
+          break;
+        case "country":
+          profile.country = value;
+          break;
+        case "school_attended":
+          profile.schoolAttended = value;
+          break;
+        case "health_info":
+          profile.healthInfo = value;
+          break;
+        case "religion":
+          profile.religion = value;
+          break;
+        case "parent_marital_status":
+          profile.parentMaritalStatus = value;
+          break;
+        case "hospital":
+          profile.hospital = value;
+          break;
+        case "place_of_worship":
+          profile.placeOfWorship = value;
+          break;
+        case "house":
+          profile.house = value;
+          break;
+        case "term_status_changed":
+          profile.termStatusChanged = value;
+          break;
+        case "student_status":
+          profile.studentStatus = value;
+          break;
+        case "year_status_changed":
+          profile.yearStatusChanged = value;
           break;
         case "guardian_name":
           guardianName = value;
@@ -303,8 +447,38 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
         case "guardian_phone":
           guardianPhone = value;
           break;
+        case "guardian_alternative_phone":
+          guardianAlternativePhone = value;
+          break;
+        case "guardian_contact_address":
+          guardianContactAddress = value;
+          break;
         case "guardian_relationship":
           guardianRelationship = value;
+          break;
+        case "father_name":
+          father.name = value;
+          break;
+        case "father_email":
+          father.email = value;
+          break;
+        case "father_phone":
+          father.phone = value;
+          break;
+        case "father_alternative_phone":
+          father.alternativePhone = value;
+          break;
+        case "mother_name":
+          mother.name = value;
+          break;
+        case "mother_email":
+          mother.email = value;
+          break;
+        case "mother_phone":
+          mother.phone = value;
+          break;
+        case "mother_alternative_phone":
+          mother.alternativePhone = value;
           break;
         default:
           break;
@@ -317,6 +491,16 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
       lastName = parts.slice(1).join(" ");
     }
 
+    const guardianEmails = guardianEmail
+      .split(/[;,\n]+/)
+      .map((email) => email.trim())
+      .filter(Boolean);
+    guardianEmail = guardianEmails.shift() ?? "";
+    const additionalEmailGuardians = guardianEmails.map((email) => ({
+      ...emptyGuardianDraft(),
+      email,
+    }));
+
     return {
       id: `row_${rowIndex + 2}_${Math.random().toString(36).slice(2, 8)}`,
       sourceRow: rowIndex + 2,
@@ -328,11 +512,15 @@ export function buildImportDrafts(rows: string[][], mapping: ImportMapping): Stu
       guardianEmail,
       guardianPhone,
       guardianRelationship,
-      guardianPrimary: false,
-      guardianAlternativePhone: "",
-      guardianContactAddress: "",
-      additionalGuardians: [],
-      profile: { ...EMPTY_STUDENT_IMPORT_PROFILE },
+      guardianPrimary: Boolean(
+        guardianName || guardianEmail || guardianPhone || guardianAlternativePhone
+      ),
+      guardianAlternativePhone,
+      guardianContactAddress,
+      additionalGuardians: [...additionalEmailGuardians, father, mother].filter(
+        hasGuardianDraftData
+      ),
+      profile,
     };
   });
 }
@@ -411,6 +599,16 @@ function emptyGuardianDraft(): StudentImportGuardianDraft {
   };
 }
 
+function hasGuardianDraftData(guardian: StudentImportGuardianDraft): boolean {
+  return Boolean(
+    guardian.name.trim() ||
+    guardian.email.trim() ||
+    guardian.phone.trim() ||
+    guardian.alternativePhone.trim() ||
+    guardian.contactAddress.trim()
+  );
+}
+
 export function analyzeImportDraft(
   draft: StudentImportDraft,
   classrooms: ClassroomOption[],
@@ -455,20 +653,33 @@ export function analyzeImportDraft(
     },
     ...draft.additionalGuardians,
   ];
-  const guardians: GuardianImport[] = [];
-  let hasPrimaryGuardian = false;
+  let guardians: GuardianImport[] = [];
   for (const guardianDraft of guardianDrafts) {
     const result = validateGuardianDraft(guardianDraft);
     if (result.issue) issues.push(result.issue);
     if (result.guardian) {
-      // An imported spreadsheet can flag more than one contact as primary.
-      // Keep the first reviewed contact primary; the database must have a
-      // deterministic single primary contact for each child.
-      const primary = result.guardian.primary && !hasPrimaryGuardian;
-      if (primary) hasPrimaryGuardian = true;
-      guardians.push({ ...result.guardian, primary });
+      const duplicateIndex = guardians.findIndex((guardian) =>
+        sameGuardianContact(guardian, result.guardian!)
+      );
+      if (duplicateIndex >= 0) {
+        guardians[duplicateIndex] = mergeGuardianContacts(
+          guardians[duplicateIndex]!,
+          result.guardian
+        );
+      } else {
+        guardians.push(result.guardian);
+      }
     }
   }
+  // An imported spreadsheet can flag more than one contact as primary.
+  // Keep the first reviewed contact primary; the database must have a
+  // deterministic single primary contact for each child.
+  let hasPrimaryGuardian = false;
+  guardians = guardians.map((guardian) => {
+    const primary = guardian.primary && !hasPrimaryGuardian;
+    if (primary) hasPrimaryGuardian = true;
+    return { ...guardian, primary };
+  });
 
   const classroomResolved = trimmedClassroom ? Boolean(classroomMatch.exact) : allowUnassigned;
 
@@ -604,6 +815,35 @@ function validateGuardianDraft(draft: StudentImportGuardianDraft): {
       primary: draft.primary,
     },
     issue: null,
+  };
+}
+
+function sameGuardianContact(a: GuardianImport, b: GuardianImport): boolean {
+  const aEmail = a.email.trim().toLowerCase();
+  const bEmail = b.email.trim().toLowerCase();
+  if (aEmail && bEmail) return aEmail === bEmail;
+
+  const aName = a.name.trim().toLowerCase();
+  const bName = b.name.trim().toLowerCase();
+  return Boolean(aName && bName && aName === bName);
+}
+
+function mergeGuardianContacts(a: GuardianImport, b: GuardianImport): GuardianImport {
+  const aRelationship = a.relationship.trim();
+  const bRelationship = b.relationship.trim();
+  const relationship =
+    (!aRelationship || aRelationship.toLowerCase() === "guardian") && bRelationship
+      ? bRelationship
+      : aRelationship || bRelationship || "Guardian";
+
+  return {
+    name: a.name.trim() || b.name.trim(),
+    email: a.email.trim() || b.email.trim(),
+    phone: a.phone?.trim() || b.phone?.trim() || undefined,
+    alternativePhone: a.alternativePhone?.trim() || b.alternativePhone?.trim() || undefined,
+    contactAddress: a.contactAddress?.trim() || b.contactAddress?.trim() || undefined,
+    relationship,
+    primary: a.primary || b.primary,
   };
 }
 

@@ -3,12 +3,107 @@ import { StudentImportCandidateSchema } from "@/lib/admin/student-import-candida
 import {
   analyzeImportDraft,
   buildDraftsFromStudentCandidates,
+  buildImportDrafts,
   buildStudentImportPlan,
+  detectImportMapping,
+  parseImportText,
+  shouldParseStudentImportFileLocally,
 } from "@/lib/admin/student-import";
 import { DOCX_MIME_TYPE, validateStudentImportFile } from "@/lib/admin/student-import-ai";
 import { docxBufferToImportText, wordDocumentXmlToImportText } from "@/lib/admin/docx-import-text";
 
 describe("AI-assisted student import drafts", () => {
+  it("parses legacy CSV profile and guardian headers without AI", () => {
+    const csv = [
+      "ADMISSION NUMBER,SURNAME,MIDDLE NAME,FIRST NAME,CLASS,TERM,YEAR,DATE OF BIRTH,SEX,STATE,PARENT OR GUARDIAN,CONTACT ADDRESS,PRIMARY PHONE NUMBER,ALTERNATIVE PHONE NUMBER,PARENT PRIMARY EMAIL,FATHER NAME,FATHER CONTACT,FATHER EMAIL,FATHER PHONE,MOTHER NAME,MOTHER CONTACT,MOTHER EMAIL,MOTHER PHONE",
+      "ADM-105,Okafor,Nneka,Amara,Africa Red Team,Term 1,2026/2027,15/11/2024,Female,Lagos,Ada Okafor,1 Main Street,555-0101,555-0102,ada@example.com,Chidi Okafor,555-0202,chidi@example.com,555-0201,Ifeoma Okafor,555-0302,ifeoma@example.com,555-0301",
+    ].join("\n");
+
+    const parsed = parseImportText(csv);
+    expect(parsed).not.toBeNull();
+    const mapping = detectImportMapping(parsed!.headers);
+    const [draft] = buildImportDrafts(parsed!.rows, mapping);
+
+    expect(draft).toMatchObject({
+      firstName: "Amara",
+      lastName: "Okafor",
+      birthDate: "15/11/2024",
+      classroomName: "Africa Red Team",
+      guardianName: "Ada Okafor",
+      guardianEmail: "ada@example.com",
+      guardianPhone: "555-0101",
+      guardianAlternativePhone: "555-0102",
+      guardianContactAddress: "1 Main Street",
+      guardianPrimary: true,
+      profile: {
+        middleName: "Nneka",
+        admissionNumber: "ADM-105",
+        sex: "Female",
+        academicTerm: "Term 1",
+        academicYear: "2026/2027",
+        state: "Lagos",
+      },
+    });
+    expect(draft.additionalGuardians).toEqual([
+      expect.objectContaining({
+        name: "Chidi Okafor",
+        email: "chidi@example.com",
+        phone: "555-0201",
+        alternativePhone: "555-0202",
+        relationship: "father",
+      }),
+      expect.objectContaining({
+        name: "Ifeoma Okafor",
+        email: "ifeoma@example.com",
+        phone: "555-0301",
+        alternativePhone: "555-0302",
+        relationship: "mother",
+      }),
+    ]);
+  });
+
+  it("routes uploaded text rosters to the deterministic parser", () => {
+    expect(shouldParseStudentImportFileLocally({ name: "roster.csv", type: "text/csv" })).toBe(
+      true
+    );
+    expect(shouldParseStudentImportFileLocally({ name: "roster.CSV" })).toBe(true);
+    expect(shouldParseStudentImportFileLocally({ name: "roster.tsv" })).toBe(true);
+    expect(
+      shouldParseStudentImportFileLocally({ name: "roster.pdf", type: "application/pdf" })
+    ).toBe(false);
+  });
+
+  it("splits multiple parent emails into separate guardian contacts", () => {
+    const parsed = parseImportText(
+      "FIRST NAME,SURNAME,CLASS,PARENT PRIMARY EMAIL\nAmara,Okafor,Africa Red Team,ada@example.com;chidi@example.com"
+    );
+    expect(parsed).not.toBeNull();
+    const [draft] = buildImportDrafts(parsed!.rows, detectImportMapping(parsed!.headers));
+
+    expect(draft.guardianEmail).toBe("ada@example.com");
+    expect(draft.additionalGuardians).toEqual([
+      expect.objectContaining({ email: "chidi@example.com", relationship: "guardian" }),
+    ]);
+  });
+
+  it("deduplicates a primary guardian repeated in a parent-specific column", () => {
+    const parsed = parseImportText(
+      "FIRST NAME,SURNAME,CLASS,PARENT PRIMARY EMAIL,MOTHER NAME,MOTHER EMAIL\nAmara,Okafor,Africa Red Team,ada@example.com,Ada Okafor,ada@example.com"
+    );
+    expect(parsed).not.toBeNull();
+    const [draft] = buildImportDrafts(parsed!.rows, detectImportMapping(parsed!.headers));
+    const analysis = analyzeImportDraft(draft, [{ id: "room-1", name: "Africa Red Team" }]);
+
+    expect(analysis.ready?.guardians).toEqual([
+      expect.objectContaining({
+        name: "Ada Okafor",
+        email: "ada@example.com",
+        relationship: "mother",
+        primary: true,
+      }),
+    ]);
+  });
+
   it("keeps child profile fields and creates a linked mother and father", () => {
     const candidate = StudentImportCandidateSchema.parse({
       first_name: "Amara",
