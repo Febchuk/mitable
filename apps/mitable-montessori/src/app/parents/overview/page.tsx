@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getParentPortalContext, selectedParentChild } from "@/lib/parents/portal";
 import { ParentOverview, type ParentActivity } from "@/components/parents/parent-overview";
-import { listAxesWithAssessment, listWholeChildObservations } from "@/lib/queries/whole-child";
+import { listWholeChildObservations } from "@/lib/queries/whole-child";
 import type { StudentProfile } from "@/lib/queries/student-profile";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
@@ -36,14 +36,13 @@ export default async function ParentOverviewPage({
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  const [studentResp, axes, observations, curriculumResp, reportsResp, progressResp, media] =
+  const [studentResp, observations, curriculumResp, reportsResp, progressResp, media] =
     await Promise.all([
       supabase
         .from("students")
         .select("id, first_name, last_name, preferred_name, birth_date, sex, notes")
         .eq("id", child.id)
         .maybeSingle(),
-      listAxesWithAssessment(child.id),
       listWholeChildObservations(child.id),
       supabase
         .from("curriculum_events")
@@ -141,7 +140,5 @@ export default async function ParentOverviewPage({
     .filter((entry) => entry.createdAt)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-  return (
-    <ParentOverview profile={profile} axes={axes} observations={observations} activity={activity} />
-  );
+  return <ParentOverview profile={profile} activity={activity} />;
 }
