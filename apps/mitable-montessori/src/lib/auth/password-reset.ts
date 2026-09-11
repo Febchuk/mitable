@@ -1,6 +1,6 @@
 export type PasswordResetAudience = "staff" | "parent";
 
-const PRODUCTION_APP_ORIGIN = "https://www.mitable.ng";
+export const PRODUCTION_APP_ORIGIN = "https://www.mitable.ng";
 
 export function passwordResetAudience(value: string | null): PasswordResetAudience {
   return value === "parent" ? "parent" : "staff";

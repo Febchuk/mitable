@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { appHomePathForRole, teacherAppHomePath } from "@/lib/feature-flags";
 import { safeAuthRedirect } from "@/lib/auth/password-reset";
+import { getAppUrl } from "@/lib/utils/app-url";
 
 /**
  * OAuth callback. Supabase Auth redirects here with `?code=...` after Google
@@ -16,7 +17,12 @@ import { safeAuthRedirect } from "@/lib/auth/password-reset";
  * encoded. We sanitize it to ensure it's same-origin.
  */
 export async function GET(req: NextRequest) {
-  const { searchParams, origin } = req.nextUrl;
+  const { searchParams } = req.nextUrl;
+  // Build redirects against the canonical public origin — NOT req.nextUrl.origin.
+  // Behind Railway's proxy this server handler sees the container-internal host
+  // (http://localhost:8080, the runtime $PORT), which would otherwise be baked
+  // into the redirect and strand users on a dead localhost link.
+  const origin = getAppUrl(req);
   const code = searchParams.get("code");
   const defaultHome = "/";
   const requested = searchParams.get("redirect") ?? defaultHome;
