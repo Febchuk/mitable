@@ -35,7 +35,7 @@ export async function loadParentPortalContext(
   // portal for guardians with multiple children.
   const { data: links } = await supabase
     .from("student_guardians")
-    .select("receives_reports, students(id, first_name, last_name, preferred_name, archived_at)")
+    .select("receives_reports, students(id, first_name, last_name, preferred_name)")
     .eq("guardian_id", guardian.id);
 
   const children = (links ?? [])
@@ -48,19 +48,19 @@ export async function loadParentPortalContext(
               first_name: string;
               last_name: string;
               preferred_name: string | null;
-              archived_at: string | null;
             }
           | {
               id: string;
               first_name: string;
               last_name: string;
               preferred_name: string | null;
-              archived_at: string | null;
             }[]
           | null;
       };
       const student = Array.isArray(link.students) ? link.students[0] : link.students;
-      if (!student || student.archived_at) return null;
+      // Archiving removes a student from staff workflows, but it must not
+      // revoke a parent's access to reports and history already shared.
+      if (!student) return null;
       return {
         id: student.id,
         name: student.preferred_name || `${student.first_name} ${student.last_name}`,

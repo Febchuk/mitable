@@ -38,6 +38,55 @@ describe("guardian identity and links", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("connects an unclaimed guardian to an existing school login with the same email", async () => {
+    const guardianLookup = {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          ilike: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: "guardian-existing",
+                email: "parent@example.com",
+                auth_user_id: null,
+              },
+            ],
+            error: null,
+          }),
+        }),
+      }),
+    };
+    const staffLookup = {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          ilike: vi.fn().mockResolvedValue({
+            data: [{ id: "auth-parent", email: "Parent@Example.com" }],
+            error: null,
+          }),
+        }),
+      }),
+    };
+    const finalEq = vi.fn().mockResolvedValue({ error: null });
+    const firstEq = vi.fn().mockReturnValue({ eq: finalEq });
+    const update = vi.fn().mockReturnValue({ eq: firstEq });
+    let guardianCalls = 0;
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "users") return staffLookup;
+        guardianCalls++;
+        return guardianCalls === 1 ? guardianLookup : { update };
+      }),
+    } as unknown as SupabaseClient;
+
+    const id = await createGuardian(context(supabase), {
+      email: " parent@example.com ",
+    });
+
+    expect(id).toBe("guardian-existing");
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ auth_user_id: "auth-parent" }));
+    expect(firstEq).toHaveBeenCalledWith("id", "guardian-existing");
+    expect(finalEq).toHaveBeenCalledWith("school_id", "school-1");
+  });
+
   it("does not create a duplicate link for the same parent and child", async () => {
     const maybeSingle = vi.fn().mockResolvedValue({
       data: { id: "link-existing" },

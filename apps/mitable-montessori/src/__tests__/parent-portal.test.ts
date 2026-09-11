@@ -3,7 +3,7 @@ import { loadParentPortalContext, selectedParentChild } from "@/lib/parents/port
 import { createClient } from "@/utils/supabase/server";
 
 describe("parent portal children", () => {
-  it("loads every active child linked to the guardian", async () => {
+  it("loads every linked child, including archived children with report history", async () => {
     const maybeSingle = vi.fn().mockResolvedValue({
       data: {
         id: "guardian-1",
@@ -36,6 +36,16 @@ describe("parent portal children", () => {
             archived_at: null,
           },
         },
+        {
+          receives_reports: true,
+          students: {
+            id: "student-3",
+            first_name: "Casey",
+            last_name: "Stone",
+            preferred_name: null,
+            archived_at: "2026-09-10T12:00:00Z",
+          },
+        },
       ],
     });
     const linksSelect = vi.fn().mockReturnValue({ eq: linksEq });
@@ -55,6 +65,7 @@ describe("parent portal children", () => {
     expect(portal?.children).toEqual([
       { id: "student-1", name: "Avery Stone", receivesReports: true },
       { id: "student-2", name: "Ben", receivesReports: false },
+      { id: "student-3", name: "Casey Stone", receivesReports: true },
     ]);
   });
 
