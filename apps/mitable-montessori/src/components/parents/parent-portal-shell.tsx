@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, CalendarDays, ChartNoAxesCombined, FileText, Home } from "lucide-react";
@@ -35,9 +36,14 @@ export function ParentPortalShell({
   const switchChild = (childId: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("child", childId);
-    const section = NAV_ITEMS.some((item) => pathname.startsWith(item.href))
-      ? pathname
-      : "/parents/overview";
+    // An individual report belongs to one child. When the parent changes
+    // children from that view, return to the new child's report list rather
+    // than carrying the old child's report id into the new selection.
+    const section = pathname.startsWith("/parents/reports/")
+      ? "/parents/reports"
+      : NAV_ITEMS.some((item) => pathname.startsWith(item.href))
+        ? pathname
+        : "/parents/overview";
     router.push(`${section}?${params.toString()}`);
   };
 

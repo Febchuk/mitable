@@ -2,7 +2,6 @@
  * Adapter that turns raw report sections (as stored on `reports.sections` or
  * carried in an EmailJob) into the block model the PDF template renders. Used by:
  *   - the in-editor preview pipeline (via local-detail-to-pdf-data.ts)
- *   - the parent-facing email sender (ResendEmailSender)
  *
  * Blocks mirror what report detail shows on screen:
  *   - progress_topic sections become numbered `subject` blocks with rows
