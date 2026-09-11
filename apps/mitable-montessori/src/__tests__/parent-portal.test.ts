@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { loadParentPortalContext } from "@/lib/parents/portal";
+import { loadParentPortalContext, selectedParentChild } from "@/lib/parents/portal";
 import { createClient } from "@/utils/supabase/server";
 
 describe("parent portal children", () => {
@@ -56,5 +56,15 @@ describe("parent portal children", () => {
       { id: "student-1", name: "Avery Stone", receivesReports: true },
       { id: "student-2", name: "Ben", receivesReports: false },
     ]);
+  });
+
+  it("selects the requested child instead of keeping the first linked child", () => {
+    const children = [
+      { id: "student-1", name: "Avery Stone", receivesReports: true },
+      { id: "student-2", name: "Ben Stone", receivesReports: true },
+    ];
+
+    expect(selectedParentChild(children, "student-2")).toEqual(children[1]);
+    expect(selectedParentChild(children, "not-linked")).toBeNull();
   });
 });
