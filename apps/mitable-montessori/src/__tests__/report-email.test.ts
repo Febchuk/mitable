@@ -6,6 +6,7 @@ function reportJob(overrides: Partial<EmailJob> = {}): EmailJob {
   return {
     recipientId: "recipient-1",
     reportId: "report-1",
+    studentId: "student-1",
     guardianId: "guardian-1",
     email: "parent@example.com",
     reportDate: "2026-09-10",
@@ -40,7 +41,9 @@ describe("parent report notification email", () => {
     const payload = JSON.parse(String(request.body)) as Record<string, unknown>;
     expect(payload.subject).toBe("Your child's report is ready — Harbour Learning Place");
     expect(payload).not.toHaveProperty("attachments");
-    expect(payload.text).toContain("https://school.mitable.app/parents/reports");
+    expect(payload.text).toContain(
+      "https://school.mitable.app/parents/reports/report-1?child=student-1"
+    );
     expect(payload.html).toContain("View report in Mitable");
     expect(payload.html).not.toContain("attached");
     expect(payload.text).not.toContain("attached");

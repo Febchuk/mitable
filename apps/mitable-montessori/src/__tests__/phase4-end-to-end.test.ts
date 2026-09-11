@@ -79,7 +79,7 @@ function buildFakeSupabase(initial?: {
     status: string;
     title?: string;
     body?: string;
-    student?: { firstName: string; lastName: string; schoolName: string };
+    student?: { id: string; firstName: string; lastName: string; schoolName: string };
   }>;
   recipients?: Array<{
     id: string;
@@ -119,6 +119,7 @@ function buildFakeSupabase(initial?: {
                               status: rep.status,
                               students: rep.student
                                 ? {
+                                    id: rep.student.id,
                                     first_name: rep.student.firstName,
                                     last_name: rep.student.lastName,
                                     schools: { name: rep.student.schoolName },
@@ -408,6 +409,7 @@ describe("Phase 4 — email worker", () => {
           id: "r-ok",
           status: "sent",
           student: {
+            id: STUDENT_ID,
             firstName: "Maya",
             lastName: "Singh",
             schoolName: "Harbour Learning Place",
@@ -447,6 +449,7 @@ describe("Phase 4 — email worker", () => {
     expect(result.failed).toBe(2);
     expect(sender.sentJobs).toHaveLength(1);
     expect(sender.sentJobs[0].guardianId).toBe("g-1");
+    expect(sender.sentJobs[0].studentId).toBe(STUDENT_ID);
     expect(sender.sentJobs[0].schoolName).toBe("Harbour Learning Place");
     const reasons = result.failures.map((f) => f.error).sort();
     expect(reasons).toEqual(["missing guardian email", "parent report not in 'sent' state"]);

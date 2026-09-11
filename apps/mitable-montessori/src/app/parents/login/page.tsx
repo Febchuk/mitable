@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
+import { safeParentRedirect } from "@/lib/parents/redirect";
 
 export default function ParentLoginPage() {
   return (
@@ -39,7 +40,7 @@ function ParentLoginInner() {
       setError(signInError.message);
       return;
     }
-    router.push("/parents/onboarding");
+    router.push(safeParentRedirect(params.get("redirect")) ?? "/parents/onboarding");
     router.refresh();
   };
 

@@ -183,7 +183,7 @@ export class ResendEmailSender implements EmailSender {
       : new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
     const schoolName = job.schoolName?.trim() || "Your school";
     const subject = `Your child's report is ready — ${schoolName}`;
-    const reportUrl = `${getAppUrl()}/parents/reports`;
+    const reportUrl = `${getAppUrl()}/parents/reports/${encodeURIComponent(job.reportId)}?child=${encodeURIComponent(job.studentId)}`;
 
     const html = renderReportEmailHtml({
       studentName,
