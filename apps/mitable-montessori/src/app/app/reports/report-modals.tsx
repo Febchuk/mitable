@@ -865,7 +865,7 @@ export function SendToParentsDialog({
       }
       const sentCount = sendData.drain?.sent ?? selected.size;
       ToastBus.push({
-        message: `Report emailed to ${sentCount} guardian${sentCount === 1 ? "" : "s"}.`,
+        message: `Report notification sent to ${sentCount} guardian${sentCount === 1 ? "" : "s"}.`,
       });
       onSent();
     } catch {
@@ -950,8 +950,8 @@ export function SendToParentsDialog({
             <DialogHeader>
               <DialogTitle>Add a note for parents</DialogTitle>
               <DialogDescription>
-                This message will appear in the email body alongside the report PDF attachment.
-                Leave blank to send without a personal note.
+                This message will appear in the notification email. Parents will sign in to Mitable
+                to view the report. Leave blank to send without a personal note.
               </DialogDescription>
             </DialogHeader>
 
@@ -966,7 +966,7 @@ export function SendToParentsDialog({
                 className="w-full resize-none rounded-lg border border-ink/10 bg-transparent px-3 py-2.5 text-sm text-ink placeholder:text-ink-tertiary focus:border-accent focus:outline-none"
               />
               <p className="mt-1.5 text-xs text-ink-tertiary">
-                Sending to {selected.size} guardian(s). The report will be attached as a PDF.
+                Sending to {selected.size} guardian(s). The email will link to the parent portal.
               </p>
             </div>
 

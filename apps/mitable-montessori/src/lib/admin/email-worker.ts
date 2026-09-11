@@ -25,6 +25,7 @@ export interface EmailJob {
   reportSections: ReportSection[] | null;
   reportDate: string | null;
   studentName: string | null;
+  schoolName: string | null;
   reportType: string | null;
   observedBy: string | null;
   classroomName: string | null;
@@ -66,7 +67,7 @@ export async function drainPendingReports(
   let query = supabase
     .from("report_recipients")
     .select(
-      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, section_meta, status, report_date, report_type, toddler_daily_log_id, students(first_name, last_name), classrooms(name), report_templates(logo_url, section_meta), users:created_by_user_id(first_name, last_name))"
+      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, section_meta, status, report_date, report_type, toddler_daily_log_id, students(first_name, last_name, schools(name)), classrooms(name), report_templates(logo_url, section_meta), users:created_by_user_id(first_name, last_name))"
     )
     .eq("delivery_status", "pending")
     .limit(limit);
@@ -98,8 +99,16 @@ export async function drainPendingReports(
             report_type: string | null;
             toddler_daily_log_id: string | null;
             students:
-              | { first_name: string; last_name: string }
-              | { first_name: string; last_name: string }[]
+              | {
+                  first_name: string;
+                  last_name: string;
+                  schools: { name: string | null } | { name: string | null }[] | null;
+                }
+              | {
+                  first_name: string;
+                  last_name: string;
+                  schools: { name: string | null } | { name: string | null }[] | null;
+                }[]
               | null;
             classrooms: { name: string | null } | { name: string | null }[] | null;
             report_templates:
@@ -118,8 +127,16 @@ export async function drainPendingReports(
             report_type: string | null;
             toddler_daily_log_id: string | null;
             students:
-              | { first_name: string; last_name: string }
-              | { first_name: string; last_name: string }[]
+              | {
+                  first_name: string;
+                  last_name: string;
+                  schools: { name: string | null } | { name: string | null }[] | null;
+                }
+              | {
+                  first_name: string;
+                  last_name: string;
+                  schools: { name: string | null } | { name: string | null }[] | null;
+                }[]
               | null;
             classrooms: { name: string | null } | { name: string | null }[] | null;
             report_templates:
@@ -165,6 +182,12 @@ export async function drainPendingReports(
         : report.classrooms
       : null;
 
+    const school = student?.schools
+      ? Array.isArray(student.schools)
+        ? student.schools[0]
+        : student.schools
+      : null;
+
     const template = report.report_templates
       ? Array.isArray(report.report_templates)
         ? report.report_templates[0]
@@ -182,6 +205,7 @@ export async function drainPendingReports(
       reportSections: report.sections,
       reportDate: report.report_date,
       studentName: student ? `${student.first_name} ${student.last_name}` : null,
+      schoolName: school?.name ?? null,
       reportType: report.report_type,
       observedBy: authorDisplayName(report.users),
       classroomName: classroom?.name ?? null,

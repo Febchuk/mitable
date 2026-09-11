@@ -74,7 +74,13 @@ function buildStubAnthropic(turns: StubTurn[]) {
 }
 
 function buildFakeSupabase(initial?: {
-  reports?: Array<{ id: string; status: string; title?: string; body?: string }>;
+  reports?: Array<{
+    id: string;
+    status: string;
+    title?: string;
+    body?: string;
+    student?: { firstName: string; lastName: string; schoolName: string };
+  }>;
   recipients?: Array<{
     id: string;
     report_id: string;
@@ -107,7 +113,18 @@ function buildFakeSupabase(initial?: {
                         guardian_id: r.guardian_id,
                         email_snapshot: r.email_snapshot,
                         reports: rep
-                          ? { title: rep.title, body: rep.body, status: rep.status }
+                          ? {
+                              title: rep.title,
+                              body: rep.body,
+                              status: rep.status,
+                              students: rep.student
+                                ? {
+                                    first_name: rep.student.firstName,
+                                    last_name: rep.student.lastName,
+                                    schools: { name: rep.student.schoolName },
+                                  }
+                                : null,
+                            }
                           : null,
                       };
                     });
@@ -387,7 +404,15 @@ describe("Phase 4 — email worker", () => {
   it("drains 'pending' for 'sent' reports and skips wrong-state reports", async () => {
     const { fake } = buildFakeSupabase({
       reports: [
-        { id: "r-ok", status: "sent" },
+        {
+          id: "r-ok",
+          status: "sent",
+          student: {
+            firstName: "Maya",
+            lastName: "Singh",
+            schoolName: "Harbour Learning Place",
+          },
+        },
         { id: "r-not-ready", status: "approved" },
       ],
       recipients: [
@@ -422,6 +447,7 @@ describe("Phase 4 — email worker", () => {
     expect(result.failed).toBe(2);
     expect(sender.sentJobs).toHaveLength(1);
     expect(sender.sentJobs[0].guardianId).toBe("g-1");
+    expect(sender.sentJobs[0].schoolName).toBe("Harbour Learning Place");
     const reasons = result.failures.map((f) => f.error).sort();
     expect(reasons).toEqual(["missing guardian email", "parent report not in 'sent' state"]);
   });

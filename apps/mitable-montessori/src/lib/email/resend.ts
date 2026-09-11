@@ -164,8 +164,7 @@ function renderInviteHtml({
 /* ------------------------------------------------------------------ */
 
 import type { EmailJob, EmailSender } from "@/lib/admin/email-worker";
-import { generateReportPdf } from "@/lib/pdf/generate-report-pdf";
-import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
+import { getAppUrl } from "@/lib/utils/app-url";
 
 export class ResendEmailSender implements EmailSender {
   async send(job: EmailJob): Promise<{ ok: boolean; messageId?: string; error?: string }> {
@@ -182,41 +181,23 @@ export class ResendEmailSender implements EmailSender {
     const dateLabel = job.reportDate
       ? formatEmailDate(job.reportDate)
       : new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-    const subject = `${reportType} Report for ${studentName} — ${dateLabel}`;
-
-    let pdfAttachment: { content: string; filename: string } | undefined;
-    try {
-      const { buffer, filename } = await generateReportPdf({
-        title: job.reportTitle ?? `${reportType} Report`,
-        studentName,
-        reportDate: job.reportDate,
-        classroom: job.classroomName ?? "",
-        observedBy: job.observedBy,
-        reportType: job.reportType ?? "daily",
-        logoUrl: job.templateLogoUrl,
-        blocks: buildReportPdfBlocks(job.reportSections, job.templateSectionMeta),
-        media: job.media ?? [],
-        body: job.reportBody,
-      });
-      pdfAttachment = {
-        content: buffer.toString("base64"),
-        filename,
-      };
-    } catch (err) {
-      console.warn("[ResendEmailSender] PDF generation failed, sending without attachment:", err);
-    }
+    const schoolName = job.schoolName?.trim() || "Your school";
+    const subject = `Your child's report is ready — ${schoolName}`;
+    const reportUrl = `${getAppUrl()}/parents/reports`;
 
     const html = renderReportEmailHtml({
       studentName,
       reportType,
       dateLabel,
       messageBody: job.messageBody,
+      reportUrl,
     });
     const text = renderReportEmailText({
       studentName,
       reportType,
       dateLabel,
       messageBody: job.messageBody,
+      reportUrl,
     });
 
     try {
@@ -227,10 +208,6 @@ export class ResendEmailSender implements EmailSender {
         html,
         text,
       };
-      if (pdfAttachment) {
-        payload.attachments = [pdfAttachment];
-      }
-
       const res = await fetch(RESEND_ENDPOINT, {
         method: "POST",
         headers: {
@@ -271,16 +248,18 @@ interface EmailRenderInput {
   reportType: string;
   dateLabel: string;
   messageBody: string | null;
+  reportUrl: string;
 }
 
 function renderReportEmailText(input: EmailRenderInput): string {
-  const { studentName, reportType, dateLabel, messageBody } = input;
+  const { studentName, reportType, dateLabel, messageBody, reportUrl } = input;
   const lines = [`${reportType} Report for ${studentName}`, dateLabel, ""];
   if (messageBody?.trim()) {
     lines.push(messageBody.trim(), "");
   }
   lines.push(
-    "The full report is attached to this email as a PDF.",
+    "Sign in to Mitable to view the full report:",
+    reportUrl,
     "",
     "—",
     "Sent by your child's school via Mitable.",
@@ -290,10 +269,11 @@ function renderReportEmailText(input: EmailRenderInput): string {
 }
 
 function renderReportEmailHtml(input: EmailRenderInput): string {
-  const { studentName, reportType, dateLabel, messageBody } = input;
+  const { studentName, reportType, dateLabel, messageBody, reportUrl } = input;
   const safeName = escapeHtml(studentName);
   const safeType = escapeHtml(reportType);
   const safeDate = escapeHtml(dateLabel);
+  const safeReportUrl = escapeHtml(reportUrl);
 
   const hasMessage = !!messageBody?.trim();
   const messageHtml = hasMessage
@@ -342,15 +322,21 @@ function renderReportEmailHtml(input: EmailRenderInput): string {
               ? `
           ${messageHtml}
           <p style="font-size:14px;line-height:1.6;color:#6B665C;margin:16px 0 0;font-style:italic;">
-            The full report is attached as a PDF.
+            Sign in to Mitable to view the full report.
           </p>
           `
               : `
           <p style="font-size:15px;line-height:1.65;color:#4A453E;margin:0;">
-            A new report for ${safeName} is ready for you. Please find it attached to this email as a PDF.
+            A new report for ${safeName} is ready for you. Sign in to Mitable to view it.
           </p>
           `
           }
+          <p style="margin:20px 0 0;">
+            <a href="${safeReportUrl}"
+               style="display:inline-block;background:#2A2723;color:#FFFBF3;text-decoration:none;font-weight:600;font-size:14px;padding:12px 22px;border-radius:10px;letter-spacing:0.01em;">
+              View report in Mitable
+            </a>
+          </p>
         </td></tr>
 
         <!-- Footer divider -->
