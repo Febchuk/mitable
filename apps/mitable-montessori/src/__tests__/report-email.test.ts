@@ -8,18 +8,11 @@ function reportJob(overrides: Partial<EmailJob> = {}): EmailJob {
     reportId: "report-1",
     guardianId: "guardian-1",
     email: "parent@example.com",
-    reportTitle: "Autumn progress report",
-    reportBody: "A thoughtful report.",
-    reportSections: null,
     reportDate: "2026-09-10",
     studentName: "Avery Stone",
     schoolName: "Harbour Learning Place",
     reportType: "major",
-    observedBy: "Sam Teacher",
-    classroomName: "Willow",
     messageBody: null,
-    templateLogoUrl: null,
-    templateSectionMeta: null,
     ...overrides,
   };
 }

@@ -1,6 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SectionMeta } from "@/lib/report-templates/sections";
-import { listToddlerReportMedia, type ReportMediaItem } from "@/lib/media/report-media";
 
 /**
  * Email delivery worker. Drains report_recipients rows in 'pending' →
@@ -10,31 +8,16 @@ import { listToddlerReportMedia, type ReportMediaItem } from "@/lib/media/report
  * deterministic stub that never hits the network.
  */
 
-export interface ReportSection {
-  heading: string;
-  paragraphs: { html: string }[];
-}
-
 export interface EmailJob {
   recipientId: string;
   reportId: string;
   guardianId: string;
   email: string | null;
-  reportTitle: string | null;
-  reportBody: string | null;
-  reportSections: ReportSection[] | null;
   reportDate: string | null;
   studentName: string | null;
   schoolName: string | null;
   reportType: string | null;
-  observedBy: string | null;
-  classroomName: string | null;
   messageBody: string | null;
-  /** Template logo URL (public Supabase storage URL). Embedded in PDF header. */
-  templateLogoUrl: string | null;
-  /** Per-heading template field types + options. Drives checklist rendering. */
-  templateSectionMeta: SectionMeta | null;
-  media?: ReportMediaItem[];
 }
 
 export interface EmailSender {
@@ -48,15 +31,6 @@ export interface DrainResult {
   failures: Array<{ recipientId: string; error: string }>;
 }
 
-type ReportAuthor = { first_name: string | null; last_name: string | null };
-
-function authorDisplayName(users: ReportAuthor | ReportAuthor[] | null | undefined): string | null {
-  const user = Array.isArray(users) ? users[0] : users;
-  if (!user) return null;
-  const full = `${user.first_name?.trim() ?? ""} ${user.last_name?.trim() ?? ""}`.trim();
-  return full || null;
-}
-
 export async function drainPendingReports(
   supabase: SupabaseClient,
   sender: EmailSender,
@@ -67,7 +41,7 @@ export async function drainPendingReports(
   let query = supabase
     .from("report_recipients")
     .select(
-      "id, report_id, guardian_id, email_snapshot, message_body, reports(title, body, sections, section_meta, status, report_date, report_type, toddler_daily_log_id, students(first_name, last_name, schools(name)), classrooms(name), report_templates(logo_url, section_meta), users:created_by_user_id(first_name, last_name))"
+      "id, report_id, guardian_id, email_snapshot, message_body, reports(status, report_date, report_type, students(first_name, last_name, schools(name)))"
     )
     .eq("delivery_status", "pending")
     .limit(limit);
@@ -90,14 +64,9 @@ export async function drainPendingReports(
       message_body: string | null;
       reports:
         | {
-            title: string | null;
-            body: string | null;
-            sections: ReportSection[] | null;
-            section_meta: SectionMeta | null;
             status: string;
             report_date: string | null;
             report_type: string | null;
-            toddler_daily_log_id: string | null;
             students:
               | {
                   first_name: string;
@@ -110,22 +79,11 @@ export async function drainPendingReports(
                   schools: { name: string | null } | { name: string | null }[] | null;
                 }[]
               | null;
-            classrooms: { name: string | null } | { name: string | null }[] | null;
-            report_templates:
-              | { logo_url: string | null; section_meta: SectionMeta | null }
-              | { logo_url: string | null; section_meta: SectionMeta | null }[]
-              | null;
-            users: ReportAuthor | ReportAuthor[] | null;
           }
         | {
-            title: string | null;
-            body: string | null;
-            sections: ReportSection[] | null;
-            section_meta: SectionMeta | null;
             status: string;
             report_date: string | null;
             report_type: string | null;
-            toddler_daily_log_id: string | null;
             students:
               | {
                   first_name: string;
@@ -138,12 +96,6 @@ export async function drainPendingReports(
                   schools: { name: string | null } | { name: string | null }[] | null;
                 }[]
               | null;
-            classrooms: { name: string | null } | { name: string | null }[] | null;
-            report_templates:
-              | { logo_url: string | null; section_meta: SectionMeta | null }
-              | { logo_url: string | null; section_meta: SectionMeta | null }[]
-              | null;
-            users: ReportAuthor | ReportAuthor[] | null;
           }[]
         | null;
     };
@@ -176,46 +128,22 @@ export async function drainPendingReports(
         : report.students
       : null;
 
-    const classroom = report.classrooms
-      ? Array.isArray(report.classrooms)
-        ? report.classrooms[0]
-        : report.classrooms
-      : null;
-
     const school = student?.schools
       ? Array.isArray(student.schools)
         ? student.schools[0]
         : student.schools
       : null;
 
-    const template = report.report_templates
-      ? Array.isArray(report.report_templates)
-        ? report.report_templates[0]
-        : report.report_templates
-      : null;
-
-    const media = await listToddlerReportMedia(supabase, report.toddler_daily_log_id);
     const sendResult = await sender.send({
       recipientId: row.id,
       reportId: row.report_id,
       guardianId: row.guardian_id,
       email: row.email_snapshot,
-      reportTitle: report.title,
-      reportBody: report.body,
-      reportSections: report.sections,
       reportDate: report.report_date,
       studentName: student ? `${student.first_name} ${student.last_name}` : null,
       schoolName: school?.name ?? null,
       reportType: report.report_type,
-      observedBy: authorDisplayName(report.users),
-      classroomName: classroom?.name ?? null,
       messageBody: row.message_body,
-      templateLogoUrl: template?.logo_url ?? null,
-      templateSectionMeta: {
-        ...((template?.section_meta as SectionMeta | null) ?? {}),
-        ...((report.section_meta as SectionMeta | null) ?? {}),
-      },
-      media,
     });
 
     if (sendResult.ok) {
