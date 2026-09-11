@@ -202,6 +202,7 @@ export async function createGuardian(
   }
 ) {
   const email = input.email?.trim() || undefined;
+  let matchingStaffAuthUserId: string | null = null;
 
   if (email) {
     const normalizedEmail = email.toLowerCase();
@@ -217,7 +218,36 @@ export async function createGuardian(
     );
     const existing =
       exactMatches.find((guardian) => guardian.auth_user_id !== null) ?? exactMatches[0];
-    if (existing) return existing.id;
+    if (existing?.auth_user_id) return existing.id;
+
+    // A teacher or administrator can also be a parent. If their existing
+    // school login uses this email, connect the guardian profile to that same
+    // auth identity so their children appear in the parent portal immediately.
+    const { data: staffMatches, error: staffError } = await ctx.supabase
+      .from("users")
+      .select("id, email")
+      .eq("school_id", ctx.schoolId)
+      .ilike("email", email);
+    if (staffError) throw new AdminError(staffError.message, "db_error");
+
+    matchingStaffAuthUserId =
+      (staffMatches ?? []).find((user) => user.email?.trim().toLowerCase() === normalizedEmail)
+        ?.id ?? null;
+
+    if (existing) {
+      if (matchingStaffAuthUserId) {
+        const { error: linkError } = await ctx.supabase
+          .from("guardians")
+          .update({
+            auth_user_id: matchingStaffAuthUserId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+          .eq("school_id", ctx.schoolId);
+        if (linkError) throw new AdminError(linkError.message, "db_error");
+      }
+      return existing.id;
+    }
   }
 
   let first = (input.first_name ?? "").trim();
@@ -237,6 +267,7 @@ export async function createGuardian(
   }
   return insertReturningId(ctx, "guardians", {
     school_id: ctx.schoolId,
+    auth_user_id: matchingStaffAuthUserId,
     first_name: first,
     last_name: last,
     email: email ?? null,

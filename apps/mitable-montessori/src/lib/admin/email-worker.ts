@@ -11,6 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export interface EmailJob {
   recipientId: string;
   reportId: string;
+  studentId: string;
   guardianId: string;
   email: string | null;
   reportDate: string | null;
@@ -41,7 +42,7 @@ export async function drainPendingReports(
   let query = supabase
     .from("report_recipients")
     .select(
-      "id, report_id, guardian_id, email_snapshot, message_body, reports(status, report_date, report_type, students(first_name, last_name, schools(name)))"
+      "id, report_id, guardian_id, email_snapshot, message_body, reports(status, report_date, report_type, students(id, first_name, last_name, schools(name)))"
     )
     .eq("delivery_status", "pending")
     .limit(limit);
@@ -69,11 +70,13 @@ export async function drainPendingReports(
             report_type: string | null;
             students:
               | {
+                  id: string;
                   first_name: string;
                   last_name: string;
                   schools: { name: string | null } | { name: string | null }[] | null;
                 }
               | {
+                  id: string;
                   first_name: string;
                   last_name: string;
                   schools: { name: string | null } | { name: string | null }[] | null;
@@ -86,11 +89,13 @@ export async function drainPendingReports(
             report_type: string | null;
             students:
               | {
+                  id: string;
                   first_name: string;
                   last_name: string;
                   schools: { name: string | null } | { name: string | null }[] | null;
                 }
               | {
+                  id: string;
                   first_name: string;
                   last_name: string;
                   schools: { name: string | null } | { name: string | null }[] | null;
@@ -137,6 +142,7 @@ export async function drainPendingReports(
     const sendResult = await sender.send({
       recipientId: row.id,
       reportId: row.report_id,
+      studentId: student?.id ?? "",
       guardianId: row.guardian_id,
       email: row.email_snapshot,
       reportDate: report.report_date,

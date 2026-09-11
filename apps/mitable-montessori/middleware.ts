@@ -49,8 +49,10 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
+    const requestedDestination = `${pathname}${request.nextUrl.search}`;
     url.pathname = pathname.startsWith("/parents/") ? "/parents/login" : "/login";
-    url.searchParams.set("redirect", pathname);
+    url.search = "";
+    url.searchParams.set("redirect", requestedDestination);
     return withSessionCookies(NextResponse.redirect(url));
   }
 
