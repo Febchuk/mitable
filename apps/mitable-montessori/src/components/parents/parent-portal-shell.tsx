@@ -49,17 +49,19 @@ export function ParentPortalShell({
 
   const selector =
     linkedChildren.length > 0 ? (
-      <label className="flex items-start gap-2 text-sm font-medium text-ink-secondary">
-        <BookOpen className="mt-5 h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
-        <span className="grid gap-1">
-          <span className="whitespace-nowrap text-xs font-semibold text-ink-secondary">
+      <label className="flex min-w-0 items-center gap-3 rounded-xl border border-border/80 bg-surface px-3 py-2 shadow-sm sm:px-4">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-terracotta-deep">
+          <BookOpen className="h-[18px] w-[18px]" strokeWidth={1.7} aria-hidden />
+        </span>
+        <span className="grid min-w-0 gap-0.5">
+          <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
             Viewing data for
           </span>
           <select
             aria-label="Child whose data you are viewing"
             value={selectedId}
             onChange={(event) => switchChild(event.target.value)}
-            className="max-w-48 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink outline-none focus:border-terracotta"
+            className="min-w-0 max-w-52 appearance-none border-0 bg-transparent p-0 pr-5 text-sm font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-terracotta/40"
           >
             {linkedChildren.map((child) => (
               <option key={child.id} value={child.id}>
@@ -114,7 +116,7 @@ export function ParentPortalShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex min-h-[65px] items-center justify-between border-b border-border bg-canvas/85 px-4 backdrop-blur lg:justify-end lg:px-8">
+        <header className="sticky top-0 z-20 flex min-h-[84px] items-center justify-between border-b border-border/70 bg-canvas/90 px-4 py-3 backdrop-blur lg:justify-end lg:px-8">
           <Link
             href={hrefFor("/parents/overview")}
             className="font-display text-xl text-ink no-underline lg:hidden"
