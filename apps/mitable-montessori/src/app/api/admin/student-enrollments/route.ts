@@ -1,6 +1,6 @@
 import { adminWriteRoute } from "@/lib/admin/route-helper";
-import { EnrollStudentSchema } from "@/lib/schemas/admin";
-import { enrollStudentInClassroom } from "@/lib/admin/crud";
+import { EndStudentEnrollmentSchema, EnrollStudentSchema } from "@/lib/schemas/admin";
+import { endStudentEnrollment, enrollStudentInClassroom } from "@/lib/admin/crud";
 
 export async function POST(req: Request) {
   return adminWriteRoute(req, EnrollStudentSchema, "admin_enroll_student", async (input, ctx) => {
@@ -15,4 +15,19 @@ export async function POST(req: Request) {
       meta: { student_id: input.student_id, classroom_id: input.classroom_id },
     };
   });
+}
+
+export async function DELETE(req: Request) {
+  return adminWriteRoute(
+    req,
+    EndStudentEnrollmentSchema,
+    "admin_end_student_enrollment",
+    async (input, ctx) => {
+      const id = await endStudentEnrollment(ctx, input);
+      return {
+        id,
+        meta: { student_id: input.student_id, classroom_id: input.classroom_id },
+      };
+    }
+  );
 }

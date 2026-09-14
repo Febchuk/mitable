@@ -516,10 +516,10 @@ export async function unassignTeacherFromClassroom(
   if (error) throw new AdminError(error.message, "db_error");
 }
 
-/** Adds an active enrollment for a student in a classroom. If the student
- *  already has a primary active enrollment elsewhere, the new row is marked
- *  non-primary so the partial unique index on (student_id) is_primary=true is
- *  satisfied. */
+/**
+ * Moves a student into a classroom. A student may have historical enrollment
+ * rows, but can be active in only one classroom at a time.
+ */
 export async function enrollStudentInClassroom(
   ctx: AdminContext,
   input: { student_id: string; classroom_id: string; start_date: string }
@@ -549,22 +549,47 @@ export async function enrollStudentInClassroom(
     .maybeSingle();
   if (dup) throw new AdminError("Already enrolled in this classroom", "conflict");
 
-  const { data: primary } = await ctx.supabase
-    .from("student_classroom_enrollments")
-    .select("id")
-    .eq("student_id", input.student_id)
-    .is("end_date", null)
-    .eq("is_primary", true)
-    .maybeSingle();
-  const isPrimary = !primary;
-
-  return insertReturningId(ctx, "student_classroom_enrollments", {
+  return transferStudent(ctx, {
     student_id: input.student_id,
-    classroom_id: input.classroom_id,
+    new_classroom_id: input.classroom_id,
     start_date: input.start_date,
-    end_date: null,
-    is_primary: isPrimary,
   });
+}
+
+/** Ends the active enrollment in one classroom, leaving the child in the school roster. */
+export async function endStudentEnrollment(
+  ctx: AdminContext,
+  input: { student_id: string; classroom_id: string; end_date: string }
+): Promise<string> {
+  const { data: student } = await ctx.supabase
+    .from("students")
+    .select("id")
+    .eq("id", input.student_id)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (!student) throw new AdminError("Student not found", "not_found");
+
+  const { data: classroom } = await ctx.supabase
+    .from("classrooms")
+    .select("id")
+    .eq("id", input.classroom_id)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (!classroom) throw new AdminError("Classroom not found", "not_found");
+
+  const { data, error } = await ctx.supabase
+    .from("student_classroom_enrollments")
+    .update({ end_date: input.end_date })
+    .eq("student_id", input.student_id)
+    .eq("classroom_id", input.classroom_id)
+    .is("end_date", null)
+    .select("id");
+  if (error) throw new AdminError(error.message, "db_error");
+
+  const enrollment = (data as Array<{ id: string }> | null)?.[0];
+  if (!enrollment) throw new AdminError("Active classroom enrollment not found", "not_found");
+
+  return enrollment.id;
 }
 
 export async function transferStudent(
