@@ -166,9 +166,10 @@ export const SetTeacherUiHiddenSchema = z.object({
 export type SetTeacherUiHiddenInput = z.infer<typeof SetTeacherUiHiddenSchema>;
 
 export const CreateCurriculumSchema = z.object({
-  name: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(200),
   framework: z.string().max(100).default("montessori"),
   description: z.string().max(2000).optional(),
+  term_id: z.string().uuid().nullable().optional(),
 });
 
 /** Toggle whether a curriculum is available (classroom pickers, teacher sync). */
@@ -177,16 +178,28 @@ export const SetCurriculumActiveSchema = z.object({
   is_active: z.boolean(),
 });
 
+/** Rename a curriculum. Names are unique per school. */
+export const SetCurriculumNameSchema = z.object({
+  curriculum_id: z.string().uuid(),
+  name: z.string().trim().min(1).max(200),
+});
+
+/** Assign a curriculum to a term in the same school, or remove its assignment. */
+export const SetCurriculumTermSchema = z.object({
+  curriculum_id: z.string().uuid(),
+  term_id: z.string().uuid().nullable(),
+});
+
 export const CreateCurriculumSubjectSchema = z.object({
   curriculum_id: z.string().uuid(),
-  name: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(200),
   sort_order: z.number().int().min(0).max(10000),
 });
 
 export const CreateCurriculumTopicSchema = z.object({
   curriculum_id: z.string().uuid(),
   subject_id: z.string().uuid(),
-  name: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(200),
   sort_order: z.number().int().min(0).max(10000),
 });
 
@@ -197,9 +210,64 @@ export const SetTopicMarkingSchemaSchema = z.object({
 
 export const CreateCurriculumSubtopicSchema = z.object({
   topic_id: z.string().uuid(),
-  name: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(200),
   sort_order: z.number().int().min(0).max(10000),
   aliases: z.array(z.string().max(200)).max(20).default([]),
+});
+
+const CurriculumItemNameSchema = z.string().trim().min(1).max(200);
+const CurriculumItemIdsSchema = z
+  .array(z.string().uuid())
+  .min(1)
+  .max(10000)
+  .superRefine((ids, ctx) => {
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Items must be unique" });
+    }
+  });
+
+export const UpdateCurriculumSubjectSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("rename"),
+    subject_id: z.string().uuid(),
+    name: CurriculumItemNameSchema,
+  }),
+  z.object({
+    action: z.literal("reorder"),
+    curriculum_id: z.string().uuid(),
+    subject_ids: CurriculumItemIdsSchema,
+  }),
+]);
+
+export const UpdateCurriculumTopicSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("rename"),
+    topic_id: z.string().uuid(),
+    name: CurriculumItemNameSchema,
+  }),
+  z.object({
+    action: z.literal("reorder"),
+    subject_id: z.string().uuid(),
+    topic_ids: CurriculumItemIdsSchema,
+  }),
+]);
+
+export const UpdateCurriculumSubtopicSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("rename"),
+    subtopic_id: z.string().uuid(),
+    name: CurriculumItemNameSchema,
+  }),
+  z.object({
+    action: z.literal("reorder"),
+    topic_id: z.string().uuid(),
+    subtopic_ids: CurriculumItemIdsSchema,
+  }),
+]);
+
+export const DuplicateCurriculumSchema = z.object({
+  curriculum_id: z.string().uuid(),
+  name: CurriculumItemNameSchema,
 });
 
 export const AssignTeacherSchema = z.object({

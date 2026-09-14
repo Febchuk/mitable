@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminWriteRoute } from "@/lib/admin/route-helper";
-import { CreateCurriculumSchema, SetCurriculumActiveSchema } from "@/lib/schemas/admin";
-import { createCurriculum, setCurriculumActive } from "@/lib/admin/crud";
+import {
+  CreateCurriculumSchema,
+  SetCurriculumActiveSchema,
+  SetCurriculumNameSchema,
+  SetCurriculumTermSchema,
+} from "@/lib/schemas/admin";
+import {
+  createCurriculum,
+  renameCurriculum,
+  setCurriculumActive,
+  setCurriculumTerm,
+} from "@/lib/admin/crud";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { createClient } from "@/utils/supabase/server";
 import { normalizeCurriculumFramework } from "@/lib/queries/curriculum-tree";
@@ -15,7 +25,7 @@ export async function GET() {
   const supabase = createClient(cookieStore);
   const { data, error } = await supabase
     .from("curricula")
-    .select("id, name, framework, is_active")
+    .select("id, name, framework, is_active, term_id")
     .eq("school_id", auth.user.schoolId)
     .order("name");
 
@@ -45,9 +55,17 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   return adminWriteRoute(
     req,
-    SetCurriculumActiveSchema,
-    "admin_set_curriculum_active",
+    SetCurriculumActiveSchema.or(SetCurriculumNameSchema).or(SetCurriculumTermSchema),
+    "admin_update_curriculum",
     async (input, ctx) => {
+      if ("name" in input) {
+        await renameCurriculum(ctx, input.curriculum_id, input.name);
+        return { id: input.curriculum_id, meta: { name: input.name } };
+      }
+      if ("term_id" in input) {
+        await setCurriculumTerm(ctx, input.curriculum_id, input.term_id);
+        return { id: input.curriculum_id, meta: { term_id: input.term_id } };
+      }
       await setCurriculumActive(ctx, input.curriculum_id, input.is_active);
       return { id: input.curriculum_id, meta: { is_active: input.is_active } };
     }
