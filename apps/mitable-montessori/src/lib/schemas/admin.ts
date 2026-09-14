@@ -268,6 +268,13 @@ export const EnrollStudentSchema = z.object({
     .optional(),
 });
 
+/** Ends a child's active enrollment in one classroom without archiving the child. */
+export const EndStudentEnrollmentSchema = z.object({
+  student_id: z.string().uuid(),
+  classroom_id: z.string().uuid(),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
 export const GroupColorSchema = z.enum(["terracotta", "sage", "butter", "blue", "clay"]);
 
 export const CreateClassroomGroupSchema = z.object({

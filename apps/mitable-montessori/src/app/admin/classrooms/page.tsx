@@ -325,8 +325,10 @@ export default function AdminClassroomsPage() {
   const [loadState, setLoadState] = React.useState<"idle" | "loading" | "error">("loading");
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [mutationError, setMutationError] = React.useState<string | null>(null);
-  const [pendingArchiveChild, setPendingArchiveChild] = React.useState<AdminChild | null>(null);
-  const [archiveBusy, setArchiveBusy] = React.useState(false);
+  const [pendingClassroomRemoval, setPendingClassroomRemoval] = React.useState<AdminChild | null>(
+    null
+  );
+  const [removalBusy, setRemovalBusy] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [createClassroomOpen, setCreateClassroomOpen] = React.useState(false);
   const [addChildOpen, setAddChildOpen] = React.useState(false);
@@ -633,22 +635,27 @@ export default function AdminClassroomsPage() {
     }
   };
 
-  const confirmArchiveChild = React.useCallback(async () => {
-    if (!pendingArchiveChild) return;
-    setArchiveBusy(true);
+  const confirmClassroomRemoval = React.useCallback(async () => {
+    if (!pendingClassroomRemoval) return;
+    setRemovalBusy(true);
     setMutationError(null);
     try {
-      await apiJson<{ ok: boolean }>(`/api/admin/students/${pendingArchiveChild.id}`, {
+      await apiJson<{ ok: boolean }>("/api/admin/student-enrollments", {
         method: "DELETE",
+        body: JSON.stringify({
+          student_id: pendingClassroomRemoval.id,
+          classroom_id: pendingClassroomRemoval.classroomId,
+          end_date: new Date().toISOString().slice(0, 10),
+        }),
       });
-      setPendingArchiveChild(null);
+      setPendingClassroomRemoval(null);
       await reload();
     } catch (e) {
-      setMutationError(e instanceof Error ? e.message : "Could not remove child");
+      setMutationError(e instanceof Error ? e.message : "Could not remove child from classroom");
     } finally {
-      setArchiveBusy(false);
+      setRemovalBusy(false);
     }
-  }, [pendingArchiveChild, reload]);
+  }, [pendingClassroomRemoval, reload]);
 
   const addChildManually = async (input: {
     firstName: string;
@@ -1087,7 +1094,7 @@ export default function AdminClassroomsPage() {
                         onAssignGroup={(groupId) =>
                           void assignChildGroup(selectedClassroom.id, child.id, groupId)
                         }
-                        onRemove={() => setPendingArchiveChild(child)}
+                        onRemove={() => setPendingClassroomRemoval(child)}
                         onEdit={() => setEditingStudentId(child.id)}
                       />
                     ))}
@@ -1104,7 +1111,7 @@ export default function AdminClassroomsPage() {
                         onAssignGroup={(groupId) =>
                           void assignChildGroup(selectedClassroom.id, child.id, groupId)
                         }
-                        onRemove={() => setPendingArchiveChild(child)}
+                        onRemove={() => setPendingClassroomRemoval(child)}
                         onEdit={() => setEditingStudentId(child.id)}
                       />
                     ))}
@@ -1199,19 +1206,18 @@ export default function AdminClassroomsPage() {
       />
 
       <Dialog
-        open={!!pendingArchiveChild}
-        onOpenChange={(open) => !open && setPendingArchiveChild(null)}
+        open={!!pendingClassroomRemoval}
+        onOpenChange={(open) => !open && setPendingClassroomRemoval(null)}
       >
         <DialogContent className="border-ink/10 bg-canvas">
           <DialogHeader>
-            <DialogTitle>Remove this child from the roster?</DialogTitle>
+            <DialogTitle>Remove this child from the classroom?</DialogTitle>
             <DialogDescription>
-              {pendingArchiveChild ? (
+              {pendingClassroomRemoval ? (
                 <>
                   This removes{" "}
-                  <span className="font-medium text-ink">{pendingArchiveChild.name}</span> from
-                  class lists for teachers. The record stays in the database (soft archive) and can
-                  be restored by support if needed.
+                  <span className="font-medium text-ink">{pendingClassroomRemoval.name}</span> from
+                  this classroom. Their school roster and family details will remain available.
                 </>
               ) : null}
             </DialogDescription>
@@ -1220,8 +1226,8 @@ export default function AdminClassroomsPage() {
             <button
               type="button"
               className="rounded-lg border border-ink/15 bg-canvas px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas-muted"
-              disabled={archiveBusy}
-              onClick={() => setPendingArchiveChild(null)}
+              disabled={removalBusy}
+              onClick={() => setPendingClassroomRemoval(null)}
             >
               Cancel
             </button>
@@ -1232,10 +1238,10 @@ export default function AdminClassroomsPage() {
                 borderColor: "rgba(232, 116, 116, 0.45)",
                 color: "var(--status-error, #e87474)",
               }}
-              disabled={archiveBusy}
-              onClick={() => void confirmArchiveChild()}
+              disabled={removalBusy}
+              onClick={() => void confirmClassroomRemoval()}
             >
-              {archiveBusy ? "Removing…" : "Remove from roster"}
+              {removalBusy ? "Removing…" : "Remove from classroom"}
             </button>
           </div>
         </DialogContent>
@@ -2324,7 +2330,7 @@ export function AddChildDialog({
                         A child with this first and last name is already on the school roster.
                       </p>
                       <p className="mt-1 text-xs text-ink-secondary">
-                        Add that student to this classroom (same person), or create a second record
+                        Move that student to this classroom (same person), or create a second record
                         only if this is a different child.
                       </p>
                     </div>
@@ -2360,7 +2366,7 @@ export function AddChildDialog({
                           .finally(() => setDuplicateBusy(false));
                       }}
                     >
-                      {duplicateBusy ? "Adding…" : "Add existing child to this class"}
+                      {duplicateBusy ? "Moving…" : "Move existing child to this class"}
                     </Button>
                     <Button
                       type="button"
@@ -2504,8 +2510,8 @@ export function AddChildDialog({
           <>
             <div className="space-y-3 px-6 py-5">
               <p className="text-xs text-ink-secondary">
-                Tap to select one or more students already on the school roster. They stay one
-                person across classrooms; this only adds them to {classroomName}.
+                Select one or more students from the school roster. Each selected child will move to{" "}
+                {classroomName}; a child can be active in only one classroom at a time.
               </p>
               <Input
                 value={rosterSearch}
@@ -2589,12 +2595,12 @@ export function AddChildDialog({
                 }}
               >
                 {enrollBusy
-                  ? "Adding…"
+                  ? "Moving…"
                   : selectedRosterCount === 0
                     ? "Select students"
                     : selectedRosterCount === 1
-                      ? "Add 1 to this classroom"
-                      : `Add ${selectedRosterCount} to this classroom`}
+                      ? "Move 1 to this classroom"
+                      : `Move ${selectedRosterCount} to this classroom`}
               </Button>
             </div>
           </>
@@ -2989,8 +2995,8 @@ function RosterRow({
         <button
           type="button"
           className="tap rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"
-          title="Remove child from roster"
-          aria-label={`Remove ${child.name} from roster`}
+          title="Remove child from classroom"
+          aria-label={`Remove ${child.name} from classroom`}
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
@@ -3172,8 +3178,8 @@ function RosterMobileRow({
       <button
         type="button"
         className="tap shrink-0 rounded-md p-2 text-ink-muted hover:bg-ink/5 hover:text-status-error"
-        title="Remove child from roster"
-        aria-label={`Remove ${child.name} from roster`}
+        title="Remove child from classroom"
+        aria-label={`Remove ${child.name} from classroom`}
         onClick={() => onRemove()}
       >
         <Trash2 size={18} strokeWidth={1.5} />
