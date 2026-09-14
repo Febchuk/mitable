@@ -819,17 +819,143 @@ export async function setStudentGroup(
 }
 
 // === Curriculum ===
+function isUniqueViolation(error: { code?: string } | null | undefined): boolean {
+  return error?.code === "23505";
+}
+
+async function getCurriculumInSchool(ctx: AdminContext, curriculumId: string) {
+  const { data, error } = await ctx.supabase
+    .from("curricula")
+    .select("id, term_id")
+    .eq("id", curriculumId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (error) throw new AdminError(error.message, "db_error");
+  if (!data) throw new AdminError("Curriculum not found", "not_found");
+  return data as { id: string; term_id: string | null };
+}
+
+async function getSchoolTermInSchool(ctx: AdminContext, termId: string) {
+  const { data, error } = await ctx.supabase
+    .from("school_terms")
+    .select("id")
+    .eq("id", termId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (error) throw new AdminError(error.message, "db_error");
+  if (!data) throw new AdminError("Term not found", "not_found");
+  return data as { id: string };
+}
+
+async function getSubjectInSchool(ctx: AdminContext, subjectId: string) {
+  const { data, error } = await ctx.supabase
+    .from("curriculum_subjects")
+    .select("id, curriculum_id")
+    .eq("id", subjectId)
+    .maybeSingle();
+  if (error) throw new AdminError(error.message, "db_error");
+  if (!data) throw new AdminError("Subject not found", "not_found");
+  await getCurriculumInSchool(ctx, data.curriculum_id as string);
+  return data as { id: string; curriculum_id: string };
+}
+
+async function getTopicInSchool(ctx: AdminContext, topicId: string) {
+  const { data, error } = await ctx.supabase
+    .from("curriculum_topics")
+    .select("id, curriculum_id, subject_id")
+    .eq("id", topicId)
+    .maybeSingle();
+  if (error) throw new AdminError(error.message, "db_error");
+  if (!data) throw new AdminError("Topic not found", "not_found");
+  await getCurriculumInSchool(ctx, data.curriculum_id as string);
+  return data as { id: string; curriculum_id: string; subject_id: string };
+}
+
+async function getSubtopicInSchool(ctx: AdminContext, subtopicId: string) {
+  const { data, error } = await ctx.supabase
+    .from("curriculum_subtopics")
+    .select("id, topic_id")
+    .eq("id", subtopicId)
+    .maybeSingle();
+  if (error) throw new AdminError(error.message, "db_error");
+  if (!data) throw new AdminError("Lesson not found", "not_found");
+  await getTopicInSchool(ctx, data.topic_id as string);
+  return data as { id: string; topic_id: string };
+}
+
+function assertExactSiblingIds(
+  requestedIds: string[],
+  siblingIds: string[],
+  itemLabel: string
+): void {
+  const requested = new Set(requestedIds);
+  if (
+    requestedIds.length !== siblingIds.length ||
+    requested.size !== requestedIds.length ||
+    siblingIds.some((id) => !requested.has(id))
+  ) {
+    throw new AdminError(
+      `The ${itemLabel} list has changed. Refresh the curriculum and try again.`,
+      "conflict"
+    );
+  }
+}
+
 export async function createCurriculum(
   ctx: AdminContext,
-  input: { name: string; framework?: string; description?: string }
+  input: { name: string; framework?: string; description?: string; term_id?: string | null }
 ) {
-  return insertReturningId(ctx, "curricula", {
-    school_id: ctx.schoolId,
-    name: input.name,
-    framework: (input.framework ?? "montessori").trim().toLowerCase() || "montessori",
-    is_active: true,
-    created_by_user_id: ctx.actorUserId,
+  if (input.term_id) await getSchoolTermInSchool(ctx, input.term_id);
+  const { data, error } = await ctx.supabase
+    .from("curricula")
+    .insert({
+      school_id: ctx.schoolId,
+      name: input.name.trim(),
+      framework: (input.framework ?? "montessori").trim().toLowerCase() || "montessori",
+      description: input.description?.trim() || null,
+      term_id: input.term_id ?? null,
+      is_active: true,
+      created_by_user_id: ctx.actorUserId,
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    throw new AdminError(
+      isUniqueViolation(error)
+        ? "A curriculum with this name already exists."
+        : (error?.message ?? "Insert failed"),
+      isUniqueViolation(error) ? "conflict" : "db_error"
+    );
+  }
+  return (data as { id: string }).id;
+}
+
+export async function duplicateCurriculum(
+  ctx: AdminContext,
+  input: { curriculum_id: string; name: string }
+): Promise<string> {
+  const source = await getCurriculumInSchool(ctx, input.curriculum_id);
+  const { data, error } = await ctx.supabase.rpc("duplicate_curriculum", {
+    source_curriculum_id: input.curriculum_id,
+    new_curriculum_name: input.name.trim(),
   });
+  if (error || typeof data !== "string") {
+    throw new AdminError(
+      isUniqueViolation(error)
+        ? "A curriculum with this name already exists."
+        : (error?.message ?? "Could not duplicate curriculum"),
+      isUniqueViolation(error) ? "conflict" : "db_error"
+    );
+  }
+  if (source.term_id) {
+    const { error: termError } = await ctx.supabase
+      .from("curricula")
+      .update({ term_id: source.term_id, updated_at: new Date().toISOString() })
+      .eq("id", data)
+      .eq("school_id", ctx.schoolId);
+    if (termError) throw new AdminError(termError.message, "db_error");
+  }
+  return data;
 }
 
 export async function setCurriculumActive(
@@ -848,6 +974,41 @@ export async function setCurriculumActive(
   const { error } = await ctx.supabase
     .from("curricula")
     .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq("id", curriculumId)
+    .eq("school_id", ctx.schoolId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function renameCurriculum(
+  ctx: AdminContext,
+  curriculumId: string,
+  name: string
+): Promise<void> {
+  await getCurriculumInSchool(ctx, curriculumId);
+  const { error } = await ctx.supabase
+    .from("curricula")
+    .update({ name: name.trim(), updated_at: new Date().toISOString() })
+    .eq("id", curriculumId)
+    .eq("school_id", ctx.schoolId);
+  if (error) {
+    throw new AdminError(
+      isUniqueViolation(error) ? "A curriculum with this name already exists." : error.message,
+      isUniqueViolation(error) ? "conflict" : "db_error"
+    );
+  }
+}
+
+export async function setCurriculumTerm(
+  ctx: AdminContext,
+  curriculumId: string,
+  termId: string | null
+): Promise<void> {
+  await getCurriculumInSchool(ctx, curriculumId);
+  if (termId) await getSchoolTermInSchool(ctx, termId);
+
+  const { error } = await ctx.supabase
+    .from("curricula")
+    .update({ term_id: termId, updated_at: new Date().toISOString() })
     .eq("id", curriculumId)
     .eq("school_id", ctx.schoolId);
   if (error) throw new AdminError(error.message, "db_error");
@@ -951,6 +1112,135 @@ export async function createCurriculumSubtopic(
     is_active: true,
     aliases: input.aliases ?? [],
   });
+}
+
+export async function renameCurriculumSubject(
+  ctx: AdminContext,
+  subjectId: string,
+  name: string
+): Promise<void> {
+  await getSubjectInSchool(ctx, subjectId);
+  const { error } = await ctx.supabase
+    .from("curriculum_subjects")
+    .update({ name: name.trim(), updated_at: new Date().toISOString() })
+    .eq("id", subjectId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function reorderCurriculumSubjects(
+  ctx: AdminContext,
+  curriculumId: string,
+  subjectIds: string[]
+): Promise<void> {
+  await getCurriculumInSchool(ctx, curriculumId);
+  const { data: subjects, error: readError } = await ctx.supabase
+    .from("curriculum_subjects")
+    .select("id")
+    .eq("curriculum_id", curriculumId);
+  if (readError) throw new AdminError(readError.message, "db_error");
+  assertExactSiblingIds(
+    subjectIds,
+    (subjects ?? []).map((row) => row.id as string),
+    "subject"
+  );
+
+  const results = await Promise.all(
+    subjectIds.map((id, sortOrder) =>
+      ctx.supabase
+        .from("curriculum_subjects")
+        .update({ sort_order: sortOrder, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("curriculum_id", curriculumId)
+    )
+  );
+  const failure = results.find((result) => result.error);
+  if (failure?.error) throw new AdminError(failure.error.message, "db_error");
+}
+
+export async function renameCurriculumTopic(
+  ctx: AdminContext,
+  topicId: string,
+  name: string
+): Promise<void> {
+  await getTopicInSchool(ctx, topicId);
+  const { error } = await ctx.supabase
+    .from("curriculum_topics")
+    .update({ name: name.trim() })
+    .eq("id", topicId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function reorderCurriculumTopics(
+  ctx: AdminContext,
+  subjectId: string,
+  topicIds: string[]
+): Promise<void> {
+  await getSubjectInSchool(ctx, subjectId);
+  const { data: topics, error: readError } = await ctx.supabase
+    .from("curriculum_topics")
+    .select("id")
+    .eq("subject_id", subjectId);
+  if (readError) throw new AdminError(readError.message, "db_error");
+  assertExactSiblingIds(
+    topicIds,
+    (topics ?? []).map((row) => row.id as string),
+    "topic"
+  );
+
+  const results = await Promise.all(
+    topicIds.map((id, sortOrder) =>
+      ctx.supabase
+        .from("curriculum_topics")
+        .update({ sort_order: sortOrder })
+        .eq("id", id)
+        .eq("subject_id", subjectId)
+    )
+  );
+  const failure = results.find((result) => result.error);
+  if (failure?.error) throw new AdminError(failure.error.message, "db_error");
+}
+
+export async function renameCurriculumSubtopic(
+  ctx: AdminContext,
+  subtopicId: string,
+  name: string
+): Promise<void> {
+  await getSubtopicInSchool(ctx, subtopicId);
+  const { error } = await ctx.supabase
+    .from("curriculum_subtopics")
+    .update({ name: name.trim() })
+    .eq("id", subtopicId);
+  if (error) throw new AdminError(error.message, "db_error");
+}
+
+export async function reorderCurriculumSubtopics(
+  ctx: AdminContext,
+  topicId: string,
+  subtopicIds: string[]
+): Promise<void> {
+  await getTopicInSchool(ctx, topicId);
+  const { data: subtopics, error: readError } = await ctx.supabase
+    .from("curriculum_subtopics")
+    .select("id")
+    .eq("topic_id", topicId);
+  if (readError) throw new AdminError(readError.message, "db_error");
+  assertExactSiblingIds(
+    subtopicIds,
+    (subtopics ?? []).map((row) => row.id as string),
+    "lesson"
+  );
+
+  const results = await Promise.all(
+    subtopicIds.map((id, sortOrder) =>
+      ctx.supabase
+        .from("curriculum_subtopics")
+        .update({ sort_order: sortOrder })
+        .eq("id", id)
+        .eq("topic_id", topicId)
+    )
+  );
+  const failure = results.find((result) => result.error);
+  if (failure?.error) throw new AdminError(failure.error.message, "db_error");
 }
 
 export async function renameSubtopic(
