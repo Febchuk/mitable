@@ -19,6 +19,7 @@ import { classroomGroupsEnabled } from "@/lib/feature-flags";
 import type { MarkingSchema } from "@/lib/progress/marking-schemas";
 import { BulkBar } from "./bulk-bar";
 import { BulkSheet } from "./bulk-sheet";
+import { DailyReportsPanel } from "./daily-reports-panel";
 import { LeftRail } from "./left-rail";
 import { ProgressMatrix, type MatrixSection, type SelectionApi } from "./progress-matrix";
 import "./progress.css";
@@ -862,7 +863,11 @@ function ProgressFeatureLoaded({
 
   return (
     <div className="progress-root">
-      <PageHeader title="Progress" subtitle="Record children's progress through the curriculum." />
+      <PageHeader
+        title="Progress"
+        subtitle="Record children's progress through the curriculum."
+        actions={<DailyReportsPanel refreshKey={store.recentUpdates.length} />}
+      />
 
       {visibleTopics.length === 0 ? (
         <EmptyState
