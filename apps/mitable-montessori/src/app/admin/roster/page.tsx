@@ -15,9 +15,13 @@ import {
   type RosterListViewRow,
 } from "@/components/roster/roster-list-view";
 import { ChildEditorDialog } from "@/components/admin/child-editor-dialog";
+import { ToastBus } from "@/components/montessori/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { executeStudentImportPlan } from "@/lib/admin/execute-student-import-plan";
+import {
+  executeStudentImportPlan,
+  guardianInviteImportResultMessages,
+} from "@/lib/admin/execute-student-import-plan";
 import type { ClassroomOption, StudentImportPlan } from "@/lib/admin/student-import";
 import { adminFetch } from "@/lib/visibility/reveal-hidden";
 
@@ -137,12 +141,22 @@ export default function AdminSchoolRosterPage() {
 
   const applyImportPlan = async (
     plan: StudentImportPlan,
-    nameMatchPicks: Record<string, "new" | string> = {}
+    nameMatchPicks: Record<string, "new" | string> = {},
+    sendGuardianInvites = false
   ) => {
     setMutationError(null);
     try {
-      await executeStudentImportPlan(apiJson, plan, nameMatchPicks, schoolStudentsForImport);
+      const result = await executeStudentImportPlan(
+        apiJson,
+        plan,
+        nameMatchPicks,
+        schoolStudentsForImport,
+        sendGuardianInvites
+      );
       await reload();
+      guardianInviteImportResultMessages(result.guardianInvites).forEach((message) =>
+        ToastBus.push({ message })
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Import failed";
       setMutationError(msg);

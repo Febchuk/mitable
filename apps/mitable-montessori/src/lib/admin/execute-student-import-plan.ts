@@ -18,6 +18,41 @@ export function mapGuardianRelationship(raw: string): "mother" | "father" | "gua
 
 type ApiJson = <T>(url: string, init?: RequestInit) => Promise<T>;
 
+export interface GuardianBulkInviteResponse {
+  sent: Array<{ guardianId: string; email: string }>;
+  skipped: Array<{ guardianId: string; reason: string }>;
+  errors: Array<{ guardianId: string; email: string; error: string }>;
+}
+
+export interface StudentImportExecutionResult {
+  guardianInvites?: GuardianBulkInviteResponse;
+}
+
+export function guardianInviteImportResultMessages(
+  result: GuardianBulkInviteResponse | undefined
+): string[] {
+  if (!result) return [];
+  const messages: string[] = [];
+  if (result.sent.length > 0) {
+    messages.push(
+      result.sent.length === 1
+        ? "Parent invitation sent."
+        : `Parent invitations sent to ${result.sent.length} parents.`
+    );
+  }
+  if (result.skipped.length > 0) {
+    messages.push(
+      `${result.skipped.length} parent invitation${result.skipped.length === 1 ? " was" : "s were"} skipped because an account or active invitation already exists.`
+    );
+  }
+  if (result.errors.length > 0) {
+    messages.push(
+      `${result.errors.length} parent invitation${result.errors.length === 1 ? " could" : "s could"} not be sent. You can retry from the guardian record.`
+    );
+  }
+  return messages;
+}
+
 function profilePayload(profile: StudentImportPlan["newStudents"][number]["profile"]) {
   const value = (text: string) => text.trim() || undefined;
   return {
@@ -47,8 +82,10 @@ export async function executeStudentImportPlan(
   apiJson: ApiJson,
   plan: StudentImportPlan,
   nameMatchPicks: Record<string, "new" | string>,
-  schoolStudentsForImport: Array<{ id: string; firstName: string; lastName: string }>
-): Promise<void> {
+  schoolStudentsForImport: Array<{ id: string; firstName: string; lastName: string }>,
+  sendGuardianInvites = false
+): Promise<StudentImportExecutionResult> {
+  const guardianIdsToInvite = new Set<string>();
   for (const s of plan.newStudents) {
     const matches = listSchoolStudentsMatchingName(
       s.firstName,
@@ -117,6 +154,7 @@ export async function executeStudentImportPlan(
           preferred_contact_method: "either",
         }),
       });
+      if (email) guardianIdsToInvite.add(guardianRow.id);
       await apiJson("/api/admin/student-guardians", {
         method: "POST",
         body: JSON.stringify({
@@ -145,6 +183,7 @@ export async function executeStudentImportPlan(
         preferred_contact_method: "either",
       }),
     });
+    if (email) guardianIdsToInvite.add(guardianRow.id);
     await apiJson("/api/admin/student-guardians", {
       method: "POST",
       body: JSON.stringify({
@@ -155,5 +194,35 @@ export async function executeStudentImportPlan(
         receives_reports: true,
       }),
     });
+  }
+
+  if (!sendGuardianInvites || guardianIdsToInvite.size === 0) return {};
+
+  try {
+    const guardianInvites = await apiJson<GuardianBulkInviteResponse>(
+      "/api/admin/guardians/invite-bulk",
+      {
+        method: "POST",
+        body: JSON.stringify({ guardian_ids: [...guardianIdsToInvite] }),
+      }
+    );
+    return { guardianInvites };
+  } catch (error) {
+    // The child and guardian records have already been saved. An email outage
+    // should be visible to the admin but must not reclassify that import as a
+    // failed roster update.
+    return {
+      guardianInvites: {
+        sent: [],
+        skipped: [],
+        errors: [
+          {
+            guardianId: "",
+            email: "",
+            error: error instanceof Error ? error.message : "Could not send parent invitations",
+          },
+        ],
+      },
+    };
   }
 }

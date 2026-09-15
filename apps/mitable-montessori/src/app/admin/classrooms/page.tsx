@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { initialsFor, type Tone } from "@/components/montessori/data";
 import { PageHeader, cardStyle } from "@/components/montessori/page-header";
-import { Avatar } from "@/components/montessori/primitives";
+import { Avatar, ToastBus } from "@/components/montessori/primitives";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,7 +53,10 @@ import {
   type StudentImportPlan,
 } from "@/lib/admin/student-import";
 import type { StudentImportCandidate } from "@/lib/admin/student-import-candidates";
-import { executeStudentImportPlan } from "@/lib/admin/execute-student-import-plan";
+import {
+  executeStudentImportPlan,
+  guardianInviteImportResultMessages,
+} from "@/lib/admin/execute-student-import-plan";
 import {
   PROGRAM_LABEL,
   PROGRAM_ORDER,
@@ -456,12 +459,22 @@ export default function AdminClassroomsPage() {
 
   const applyImportPlan = async (
     plan: StudentImportPlan,
-    nameMatchPicks: Record<string, "new" | string> = {}
+    nameMatchPicks: Record<string, "new" | string> = {},
+    sendGuardianInvites = false
   ) => {
     setMutationError(null);
     try {
-      await executeStudentImportPlan(apiJson, plan, nameMatchPicks, schoolStudentsForImport);
+      const result = await executeStudentImportPlan(
+        apiJson,
+        plan,
+        nameMatchPicks,
+        schoolStudentsForImport,
+        sendGuardianInvites
+      );
       await reload();
+      guardianInviteImportResultMessages(result.guardianInvites).forEach((message) =>
+        ToastBus.push({ message })
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Import failed";
       setMutationError(msg);
@@ -3207,7 +3220,8 @@ export function StudentImportDialog({
   importTarget?: "classroom" | "school";
   onImport: (
     plan: StudentImportPlan,
-    nameMatchPicks: Record<string, "new" | string>
+    nameMatchPicks: Record<string, "new" | string>,
+    sendGuardianInvites: boolean
   ) => void | Promise<void>;
 }) {
   const [rawData, setRawData] = React.useState<RawImportData | null>(null);
@@ -3219,6 +3233,7 @@ export function StudentImportDialog({
   const [analysisError, setAnalysisError] = React.useState<string | null>(null);
   const [importBusy, setImportBusy] = React.useState(false);
   const [nameMatchPicks, setNameMatchPicks] = React.useState<Record<string, "new" | string>>({});
+  const [sendGuardianInvites, setSendGuardianInvites] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) {
@@ -3231,6 +3246,7 @@ export function StudentImportDialog({
       setAnalysisError(null);
       setImportBusy(false);
       setNameMatchPicks({});
+      setSendGuardianInvites(false);
     }
   }, [open]);
 
@@ -3348,6 +3364,22 @@ export function StudentImportDialog({
     !!planResult.plan &&
     (allowUnassignedClassroom || classrooms.length > 0) &&
     nameMatchBlockers === 0;
+  const guardianEmailsToInvite = React.useMemo(() => {
+    const emails = new Set<string>();
+    const plan = planResult.plan;
+    if (!plan) return 0;
+    for (const student of plan.newStudents) {
+      for (const guardian of student.guardians) {
+        const email = guardian.email.trim().toLowerCase();
+        if (email) emails.add(email);
+      }
+    }
+    for (const item of plan.guardiansForExisting) {
+      const email = item.guardian.email.trim().toLowerCase();
+      if (email) emails.add(email);
+    }
+    return emails.size;
+  }, [planResult.plan]);
 
   const updateDraft = (id: string, update: Partial<StudentImportDraft>) => {
     setDrafts((prev) => prev.map((draft) => (draft.id === id ? { ...draft, ...update } : draft)));
@@ -3557,6 +3589,24 @@ export function StudentImportDialog({
                   );
                 })}
               </div>
+              {guardianEmailsToInvite > 0 ? (
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-canvas p-4 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={sendGuardianInvites}
+                    onChange={(event) => setSendGuardianInvites(event.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block font-medium">Send parent invitations after import</span>
+                    <span className="mt-1 block text-xs text-ink-secondary">
+                      Email account-setup links to {guardianEmailsToInvite} parent
+                      {guardianEmailsToInvite === 1 ? "" : "s"} with email addresses. Parents with
+                      an account or an active invitation will be skipped.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
             </div>
           )}
         </div>
@@ -3571,7 +3621,7 @@ export function StudentImportDialog({
             onClick={() => {
               if (!planResult.plan || importBusy) return;
               setImportBusy(true);
-              void Promise.resolve(onImport(planResult.plan, nameMatchPicks))
+              void Promise.resolve(onImport(planResult.plan, nameMatchPicks, sendGuardianInvites))
                 .then(() => onOpenChange(false))
                 .finally(() => setImportBusy(false));
             }}
