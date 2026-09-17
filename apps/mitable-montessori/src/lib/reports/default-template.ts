@@ -244,15 +244,17 @@ async function loadPeriodProgressBySubtopic(
   supabase: SupabaseClient,
   studentId: string,
   periodStart: string,
-  periodEnd: string
+  periodEnd: string,
+  exactWindow?: { start: string; end: string }
 ): Promise<Map<string, { status: CurriculumStatus; comment: string | null }>> {
-  const periodEndDay = `${periodEnd}T23:59:59.999`;
+  const periodStartTime = exactWindow?.start ?? periodStart;
+  const periodEndTime = exactWindow?.end ?? `${periodEnd}T23:59:59.999`;
   const { data } = await supabase
     .from("student_progress_history")
     .select("curriculum_subtopic_id, new_status, comment, changed_at")
     .eq("student_id", studentId)
-    .gte("changed_at", periodStart)
-    .lte("changed_at", periodEndDay)
+    .gte("changed_at", periodStartTime)
+    .lte("changed_at", periodEndTime)
     .order("changed_at", { ascending: true });
 
   const out = new Map<string, { status: CurriculumStatus; comment: string | null }>();
@@ -327,6 +329,8 @@ export async function buildDefaultReportSections(
     periodStart: string;
     periodEnd: string;
     reportingPeriod?: ReportingPeriod;
+    /** Exact instants for date-based experiences whose day is not UTC. */
+    exactWindow?: { start: string; end: string };
   }
 ): Promise<DefaultTemplateBuildResult> {
   const reportingPeriod = args.reportingPeriod ?? "daily";
@@ -335,7 +339,8 @@ export async function buildDefaultReportSections(
     supabase,
     args.studentId,
     args.periodStart,
-    args.periodEnd
+    args.periodEnd,
+    args.exactWindow
   );
 
   const sections: ReportSection[] = [];
