@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { PageHeader } from "@/components/montessori/page-header";
@@ -35,6 +36,7 @@ import { classroomProgramsEnabled } from "@/lib/feature-flags";
 import type { MarkingSchema } from "@/lib/progress/marking-schemas";
 import { IepAdminTab } from "./iep-tab";
 import { SpeechAdminTab } from "./speech-tab";
+import { SchemeImportDialog } from "./scheme-import-dialog";
 
 type AdminSubtopic = { id: string; name: string };
 
@@ -126,6 +128,9 @@ export default function AdminCurriculumPage() {
   const [treeError, setTreeError] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [duplicateOpen, setDuplicateOpen] = React.useState(false);
+  const [schemeImportOpen, setSchemeImportOpen] = React.useState(false);
+  const [schemeImportNotice, setSchemeImportNotice] = React.useState("");
+  const [treeVersion, setTreeVersion] = React.useState(0);
 
   const [dbCurricula, setDbCurricula] = React.useState<DbSchoolCurriculum[] | null>(null);
   const [terms, setTerms] = React.useState<SchoolTerm[]>([]);
@@ -216,7 +221,7 @@ export default function AdminCurriculumPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedDbId]);
+  }, [selectedDbId, treeVersion]);
 
   React.useEffect(() => {
     if (activeTab === "curricula") void reloadDbCurricula();
@@ -1079,47 +1084,60 @@ export default function AdminCurriculumPage() {
                   {treeError}
                 </div>
               ) : selected ? (
-                <CurriculumDetail
-                  curriculum={selected}
-                  scrollRootRef={detailScrollRef}
-                  showFramework={programsEnabled}
-                  topicCount={topicCount(selected)}
-                  subtopicCount={subtopicCount(selected)}
-                  onAddSubject={(name) => addSubject(selected.id, name)}
-                  onRemoveSubject={(subjectId) => removeSubject(selected.id, subjectId)}
-                  onRenameSubject={(subjectId, name) => renameSubject(selected.id, subjectId, name)}
-                  onMoveSubject={(subjectId, direction) => moveSubject(subjectId, direction)}
-                  onAddTopic={(subjectId, name) => addTopic(selected.id, subjectId, name)}
-                  onRemoveTopic={(subjectId, topicId) =>
-                    removeTopic(selected.id, subjectId, topicId)
-                  }
-                  onRenameTopic={(subjectId, topicId, name) =>
-                    renameTopic(selected.id, subjectId, topicId, name)
-                  }
-                  onMoveTopic={(subjectId, topicId, direction) =>
-                    moveTopic(subjectId, topicId, direction)
-                  }
-                  onSetTopicMarkingSchema={(subjectId, topicId, markingSchema) =>
-                    setTopicMarkingSchema(selected.id, subjectId, topicId, markingSchema)
-                  }
-                  topicMarkingBusyId={topicMarkingBusyId}
-                  topicMarkingErrors={topicMarkingErrors}
-                  onAddSubtopic={(subjectId, topicId, name) =>
-                    addSubtopic(selected.id, subjectId, topicId, name)
-                  }
-                  onRemoveSubtopic={(subjectId, topicId, subtopicId) =>
-                    removeSubtopic(selected.id, subjectId, topicId, subtopicId)
-                  }
-                  onRenameSubtopic={(subjectId, topicId, subtopicId, name) =>
-                    renameSubtopic(selected.id, subjectId, topicId, subtopicId, name)
-                  }
-                  onMoveSubtopic={(subjectId, topicId, subtopicId, direction) =>
-                    moveSubtopic(subjectId, topicId, subtopicId, direction)
-                  }
-                  treeActionBusy={treeActionBusy}
-                  onDuplicate={() => setDuplicateOpen(true)}
-                  onRemoveCurriculum={() => removeCurriculum(selected.id)}
-                />
+                <>
+                  {schemeImportNotice ? (
+                    <p
+                      role="status"
+                      className="mx-5 mt-4 rounded-xl border border-border bg-muted px-4 py-2 text-sm"
+                    >
+                      {schemeImportNotice}
+                    </p>
+                  ) : null}
+                  <CurriculumDetail
+                    curriculum={selected}
+                    scrollRootRef={detailScrollRef}
+                    showFramework={programsEnabled}
+                    topicCount={topicCount(selected)}
+                    subtopicCount={subtopicCount(selected)}
+                    onAddSubject={(name) => addSubject(selected.id, name)}
+                    onRemoveSubject={(subjectId) => removeSubject(selected.id, subjectId)}
+                    onRenameSubject={(subjectId, name) =>
+                      renameSubject(selected.id, subjectId, name)
+                    }
+                    onMoveSubject={(subjectId, direction) => moveSubject(subjectId, direction)}
+                    onAddTopic={(subjectId, name) => addTopic(selected.id, subjectId, name)}
+                    onRemoveTopic={(subjectId, topicId) =>
+                      removeTopic(selected.id, subjectId, topicId)
+                    }
+                    onRenameTopic={(subjectId, topicId, name) =>
+                      renameTopic(selected.id, subjectId, topicId, name)
+                    }
+                    onMoveTopic={(subjectId, topicId, direction) =>
+                      moveTopic(subjectId, topicId, direction)
+                    }
+                    onSetTopicMarkingSchema={(subjectId, topicId, markingSchema) =>
+                      setTopicMarkingSchema(selected.id, subjectId, topicId, markingSchema)
+                    }
+                    topicMarkingBusyId={topicMarkingBusyId}
+                    topicMarkingErrors={topicMarkingErrors}
+                    onAddSubtopic={(subjectId, topicId, name) =>
+                      addSubtopic(selected.id, subjectId, topicId, name)
+                    }
+                    onRemoveSubtopic={(subjectId, topicId, subtopicId) =>
+                      removeSubtopic(selected.id, subjectId, topicId, subtopicId)
+                    }
+                    onRenameSubtopic={(subjectId, topicId, subtopicId, name) =>
+                      renameSubtopic(selected.id, subjectId, topicId, subtopicId, name)
+                    }
+                    onMoveSubtopic={(subjectId, topicId, subtopicId, direction) =>
+                      moveSubtopic(subjectId, topicId, subtopicId, direction)
+                    }
+                    treeActionBusy={treeActionBusy}
+                    onDuplicate={() => setDuplicateOpen(true)}
+                    onImportScheme={() => setSchemeImportOpen(true)}
+                    onRemoveCurriculum={() => removeCurriculum(selected.id)}
+                  />
+                </>
               ) : (
                 <div style={{ padding: 28, textAlign: "center", color: "var(--color-ink-muted)" }}>
                   Select a curriculum to view and edit.
@@ -1143,6 +1161,20 @@ export default function AdminCurriculumPage() {
         curriculum={selected}
         onDuplicate={duplicateCurriculum}
       />
+      {selected ? (
+        <SchemeImportDialog
+          open={schemeImportOpen}
+          onOpenChange={setSchemeImportOpen}
+          curriculumId={selected.id}
+          curriculumName={selected.name}
+          onImported={(result) => {
+            setSchemeImportNotice(
+              `Imported ${result.subjectsAdded} subjects, ${result.topicsAdded} topics, and ${result.lessonsAdded} lessons.`
+            );
+            setTreeVersion((current) => current + 1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1170,6 +1202,7 @@ function CurriculumDetail({
   onMoveSubtopic,
   treeActionBusy,
   onDuplicate,
+  onImportScheme,
   onRemoveCurriculum,
 }: {
   curriculum: AdminCurriculum;
@@ -1208,6 +1241,7 @@ function CurriculumDetail({
   ) => void;
   treeActionBusy: boolean;
   onDuplicate: () => void;
+  onImportScheme: () => void;
   onRemoveCurriculum: () => void;
 }) {
   const [showAddSubject, setShowAddSubject] = React.useState(false);
@@ -1278,6 +1312,9 @@ function CurriculumDetail({
         >
           <Button variant="default" onClick={() => setShowAddSubject(true)}>
             <Plus size={16} strokeWidth={1.7} /> Add subject
+          </Button>
+          <Button variant="secondary" onClick={onImportScheme}>
+            <Upload size={16} strokeWidth={1.7} /> Import scheme CSV
           </Button>
           <Button variant="secondary" onClick={onDuplicate}>
             <Copy size={16} strokeWidth={1.7} /> Duplicate

@@ -1018,6 +1018,20 @@ export async function createCurriculumSubject(
   ctx: AdminContext,
   input: { curriculum_id: string; name: string; sort_order: number }
 ) {
+  await getCurriculumInSchool(ctx, input.curriculum_id);
+  const { data: subjects, error } = await ctx.supabase
+    .from("curriculum_subjects")
+    .select("name")
+    .eq("curriculum_id", input.curriculum_id);
+  if (error) throw new AdminError(error.message, "db_error");
+  const normalized = input.name.trim().replace(/\s+/g, " ").toLowerCase();
+  if (
+    subjects?.some(
+      (subject) => (subject.name as string).trim().replace(/\s+/g, " ").toLowerCase() === normalized
+    )
+  ) {
+    throw new AdminError("This subject already exists in the curriculum.", "conflict");
+  }
   return insertReturningId(ctx, "curriculum_subjects", {
     curriculum_id: input.curriculum_id,
     name: input.name,
@@ -1030,6 +1044,23 @@ export async function createCurriculumTopic(
   ctx: AdminContext,
   input: { curriculum_id: string; subject_id: string; name: string; sort_order: number }
 ) {
+  const subject = await getSubjectInSchool(ctx, input.subject_id);
+  if (subject.curriculum_id !== input.curriculum_id) {
+    throw new AdminError("Subject does not belong to this curriculum.", "invalid");
+  }
+  const { data: topics, error } = await ctx.supabase
+    .from("curriculum_topics")
+    .select("name")
+    .eq("subject_id", input.subject_id);
+  if (error) throw new AdminError(error.message, "db_error");
+  const normalized = input.name.trim().replace(/\s+/g, " ").toLowerCase();
+  if (
+    topics?.some(
+      (topic) => (topic.name as string).trim().replace(/\s+/g, " ").toLowerCase() === normalized
+    )
+  ) {
+    throw new AdminError("This topic already exists under the subject.", "conflict");
+  }
   return insertReturningId(ctx, "curriculum_topics", {
     curriculum_id: input.curriculum_id,
     subject_id: input.subject_id,
@@ -1119,7 +1150,22 @@ export async function renameCurriculumSubject(
   subjectId: string,
   name: string
 ): Promise<void> {
-  await getSubjectInSchool(ctx, subjectId);
+  const subject = await getSubjectInSchool(ctx, subjectId);
+  const { data: siblings, error: readError } = await ctx.supabase
+    .from("curriculum_subjects")
+    .select("id, name")
+    .eq("curriculum_id", subject.curriculum_id);
+  if (readError) throw new AdminError(readError.message, "db_error");
+  const normalized = name.trim().replace(/\s+/g, " ").toLowerCase();
+  if (
+    siblings?.some(
+      (sibling) =>
+        sibling.id !== subjectId &&
+        (sibling.name as string).trim().replace(/\s+/g, " ").toLowerCase() === normalized
+    )
+  ) {
+    throw new AdminError("This subject already exists in the curriculum.", "conflict");
+  }
   const { error } = await ctx.supabase
     .from("curriculum_subjects")
     .update({ name: name.trim(), updated_at: new Date().toISOString() })
@@ -1162,7 +1208,22 @@ export async function renameCurriculumTopic(
   topicId: string,
   name: string
 ): Promise<void> {
-  await getTopicInSchool(ctx, topicId);
+  const topic = await getTopicInSchool(ctx, topicId);
+  const { data: siblings, error: readError } = await ctx.supabase
+    .from("curriculum_topics")
+    .select("id, name")
+    .eq("subject_id", topic.subject_id);
+  if (readError) throw new AdminError(readError.message, "db_error");
+  const normalized = name.trim().replace(/\s+/g, " ").toLowerCase();
+  if (
+    siblings?.some(
+      (sibling) =>
+        sibling.id !== topicId &&
+        (sibling.name as string).trim().replace(/\s+/g, " ").toLowerCase() === normalized
+    )
+  ) {
+    throw new AdminError("This topic already exists under the subject.", "conflict");
+  }
   const { error } = await ctx.supabase
     .from("curriculum_topics")
     .update({ name: name.trim() })
