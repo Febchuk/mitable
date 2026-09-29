@@ -11,9 +11,9 @@ const PatchSchema = z
     code: z.string().trim().max(20).nullable().optional(),
     curriculumId: z.string().uuid().nullable().optional(),
     programTypes: z
-      .array(z.enum(["montessori", "iep", "speech"]))
+      .array(z.enum(["montessori", "iep", "speech", "sen"]))
       .min(1)
-      .max(3)
+      .max(4)
       .optional(),
   })
   .refine(

@@ -3,14 +3,15 @@
  *  route can pull in the labels + type without dragging `next/headers` into
  *  a "use client" bundle. */
 
-export type ProgressProgram = "montessori" | "iep" | "speech";
+export type ProgressProgram = "montessori" | "iep" | "speech" | "sen";
 
 /** UI labels for the Progress mode switcher. */
 export const PROGRAM_LABEL: Record<ProgressProgram, string> = {
   montessori: "Montessori",
   iep: "IEP",
   speech: "Speech",
+  sen: "SEN reports",
 };
 
 /** Canonical UI order for tabs, regardless of how data was stored. */
-export const PROGRAM_ORDER: ProgressProgram[] = ["montessori", "iep", "speech"];
+export const PROGRAM_ORDER: ProgressProgram[] = ["montessori", "iep", "speech", "sen"];

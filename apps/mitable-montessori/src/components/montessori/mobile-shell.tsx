@@ -112,6 +112,7 @@ const ADMIN_TODAY: NavItem = {
 
 const ADMIN_NAV_CORE: NavItem[] = [
   { href: "/admin/classrooms", label: "Classrooms", icon: <Building2 {...lu} /> },
+  { href: "/admin/sen", label: "SEN reporting", icon: <ClipboardList {...lu} /> },
   { href: "/admin/roster", label: "Roster", icon: <Users {...lu} /> },
   { href: "/admin/curriculum", label: "Curriculum", icon: <Book {...lu} /> },
   { href: "/admin/routines", label: "Routines", icon: <ListChecks {...lu} /> },

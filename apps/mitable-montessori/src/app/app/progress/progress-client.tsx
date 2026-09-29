@@ -1,16 +1,18 @@
 "use client";
 
 import { ProgressFeature } from "@/components/montessori/progress";
+import { SenReportsFeature } from "@/components/montessori/sen";
 import { SpeechProgressFeature } from "@/components/montessori/speech";
 import { useMontessori } from "@/components/montessori/store";
 import * as React from "react";
 
-type ProgressMode = "class" | "speech";
+type ProgressMode = "class" | "speech" | "sen";
 
 export default function ProgressClient() {
   const { classroomProgress, selectedClassroomId, selectClassroom, showSpeechProgressTab } =
     useMontessori();
   const [mode, setMode] = React.useState<ProgressMode>("class");
+  const showSenReportsTab = classroomProgress?.programs.includes("sen") ?? false;
 
   React.useEffect(() => {
     if (!classroomProgress && selectedClassroomId) void selectClassroom(selectedClassroomId);
@@ -20,14 +22,29 @@ export default function ProgressClient() {
     if (!showSpeechProgressTab && mode === "speech") setMode("class");
   }, [showSpeechProgressTab, mode]);
 
-  if (!showSpeechProgressTab) {
+  React.useEffect(() => {
+    if (!showSenReportsTab && mode === "sen") setMode("class");
+  }, [showSenReportsTab, mode]);
+
+  if (!showSpeechProgressTab && !showSenReportsTab) {
     return <ProgressFeature />;
   }
 
   return (
     <>
-      <ProgressModeToggle mode={mode} onChange={setMode} />
-      {mode === "class" ? <ProgressFeature /> : <SpeechProgressFeature />}
+      <ProgressModeToggle
+        mode={mode}
+        onChange={setMode}
+        showSpeech={showSpeechProgressTab}
+        showSen={showSenReportsTab}
+      />
+      {mode === "class" ? (
+        <ProgressFeature />
+      ) : mode === "speech" ? (
+        <SpeechProgressFeature />
+      ) : (
+        <SenReportsFeature />
+      )}
     </>
   );
 }
@@ -35,9 +52,13 @@ export default function ProgressClient() {
 function ProgressModeToggle({
   mode,
   onChange,
+  showSpeech,
+  showSen,
 }: {
   mode: ProgressMode;
   onChange: (m: ProgressMode) => void;
+  showSpeech: boolean;
+  showSen: boolean;
 }) {
   return (
     <div
@@ -52,9 +73,16 @@ function ProgressModeToggle({
       <ModeTab active={mode === "class"} onClick={() => onChange("class")}>
         Class progress
       </ModeTab>
-      <ModeTab active={mode === "speech"} onClick={() => onChange("speech")}>
-        Speech
-      </ModeTab>
+      {showSpeech && (
+        <ModeTab active={mode === "speech"} onClick={() => onChange("speech")}>
+          Speech
+        </ModeTab>
+      )}
+      {showSen && (
+        <ModeTab active={mode === "sen"} onClick={() => onChange("sen")}>
+          SEN reports
+        </ModeTab>
+      )}
     </div>
   );
 }

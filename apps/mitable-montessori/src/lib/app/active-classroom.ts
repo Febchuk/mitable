@@ -40,7 +40,7 @@ export async function teacherShouldSeeProgress(): Promise<boolean> {
   );
 }
 
-type ClassroomProgram = "montessori" | "iep" | "speech";
+type ClassroomProgram = "montessori" | "iep" | "speech" | "sen";
 
 type AssignedTeacherClassroom = ActiveClassroom & {
   startDate: string;
@@ -126,7 +126,7 @@ function normalizePrograms(programTypes: string[] | null | undefined): Classroom
   if (!Array.isArray(programTypes) || programTypes.length === 0) return ["montessori"];
   return programTypes.filter(
     (program): program is ClassroomProgram =>
-      program === "montessori" || program === "iep" || program === "speech"
+      program === "montessori" || program === "iep" || program === "speech" || program === "sen"
   );
 }
 
@@ -237,5 +237,12 @@ export async function teacherShouldSeeIepProgressTab(): Promise<boolean> {
 export async function teacherShouldSeeSpeechProgressTab(): Promise<boolean> {
   return (await listAssignedTeacherClassrooms()).some((classroom) =>
     classroom.programs.includes("speech")
+  );
+}
+
+/** True when the teacher has an assigned classroom with an SEN report group. */
+export async function teacherShouldSeeSenProgressTab(): Promise<boolean> {
+  return (await listAssignedTeacherClassrooms()).some((classroom) =>
+    classroom.programs.includes("sen")
   );
 }
