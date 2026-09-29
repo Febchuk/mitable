@@ -311,7 +311,7 @@ export async function getClassroomProgress(
   const programs: ProgressProgram[] =
     Array.isArray(rawPrograms) && rawPrograms.length > 0
       ? rawPrograms.filter((p): p is ProgressProgram =>
-          (["montessori", "iep", "speech"] as const).includes(p as ProgressProgram)
+          (["montessori", "iep", "speech", "sen"] as const).includes(p as ProgressProgram)
         )
       : ["montessori"];
 

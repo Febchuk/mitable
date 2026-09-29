@@ -186,8 +186,8 @@ export async function GET(req: Request) {
     const rawPrograms = (r as { program_types?: string[] | null }).program_types;
     const programTypes =
       Array.isArray(rawPrograms) && rawPrograms.length > 0
-        ? (rawPrograms.filter((p) => ["montessori", "iep", "speech"].includes(p)) as Array<
-            "montessori" | "iep" | "speech"
+        ? (rawPrograms.filter((p) => ["montessori", "iep", "speech", "sen"].includes(p)) as Array<
+            "montessori" | "iep" | "speech" | "sen"
           >)
         : (["montessori"] as const);
 

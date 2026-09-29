@@ -125,14 +125,14 @@ export type CreateGuardianInput = z.infer<typeof CreateGuardianSchema>;
 export const UpdateGuardianSchema = CreateGuardianSchema;
 export type UpdateGuardianInput = z.infer<typeof UpdateGuardianSchema>;
 
-export const ProgressProgramSchema = z.enum(["montessori", "iep", "speech"]);
+export const ProgressProgramSchema = z.enum(["montessori", "iep", "speech", "sen"]);
 
 export const CreateClassroomSchema = z.object({
   name: z.string().min(1).max(200),
   code: z.string().max(20).optional(),
   curriculum_id: z.string().uuid().optional(),
   /** Programs the classroom unlocks. Defaults to ['montessori'] when omitted. */
-  program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
+  program_types: z.array(ProgressProgramSchema).min(1).max(5).optional(),
 });
 
 /** Patch name, program_types, curriculum_id, ui_hidden, or any combination. At least one field required. */
@@ -140,7 +140,7 @@ export const PatchClassroomSchema = z
   .object({
     classroom_id: z.string().uuid(),
     name: z.string().min(1).max(200).optional(),
-    program_types: z.array(ProgressProgramSchema).min(1).max(4).optional(),
+    program_types: z.array(ProgressProgramSchema).min(1).max(5).optional(),
     curriculum_id: z.union([z.string().uuid(), z.null()]).optional(),
     ui_hidden: z.boolean().optional(),
   })
