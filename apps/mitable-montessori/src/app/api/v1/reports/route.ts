@@ -292,12 +292,9 @@ export async function POST(req: Request) {
       ? `${attendanceRow.status}${attendanceRow.arrival_time ? ` · arrived ${String(attendanceRow.arrival_time).slice(0, 5)}` : ""}`
       : null;
     const heading = "Daily log";
-    // Keep the day's recorded progress alongside the activity log.
-    // Replacing sections here used to silently discard curriculum progress.
+    // Toddler reports come entirely from the Daily Log. Do not retain the
+    // regular curriculum/progress-grid sections built by the default template.
     sections = [
-      ...(sections ?? []).filter(
-        (section) => sectionMeta[section.heading]?.type === "progress_topic"
-      ),
       {
         id: `s-toddler-daily-log-${reportDate}`,
         heading,
@@ -309,9 +306,7 @@ export async function POST(req: Request) {
         ],
       },
     ];
-    sectionMeta = Object.fromEntries(
-      Object.entries(sectionMeta).filter(([, meta]) => meta.type === "progress_topic")
-    );
+    sectionMeta = {};
     sectionGuidance = {};
   }
 
