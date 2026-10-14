@@ -1,10 +1,11 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "RAILPACK"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "pnpm exec next start -p $PORT",
+    "startCommand": "/bin/sh -c 'exec pnpm exec next start -p ${PORT:-3000}'",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
