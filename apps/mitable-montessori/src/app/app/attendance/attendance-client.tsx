@@ -73,6 +73,9 @@ type RowState = {
   status: AttendanceDayStatus;
   comment: string | null;
   saving: boolean;
+  halfDay?: boolean;
+  arrivalTime?: string | null;
+  departureTime?: string | null;
 };
 
 const PRESENT_PRESETS = ["Tardy", "Early pickup"] as const;
@@ -114,6 +117,11 @@ function buildAttendanceCommand(
       student_id: studentId,
       status: row.status,
       date,
+      half_day: row.status === "present" && Boolean(row.halfDay),
+      ...(row.status === "present" && row.arrivalTime ? { arrival_time: row.arrivalTime } : {}),
+      ...(row.status === "present" && row.departureTime
+        ? { departure_time: row.departureTime }
+        : {}),
       ...(trimmedComment ? { comment: trimmedComment } : {}),
     },
     created_at: nowIso,
@@ -152,6 +160,9 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
       out[attendanceStudentRowKey(s)] = {
         status: s.status,
         comment: s.comment,
+        halfDay: s.halfDay,
+        arrivalTime: s.arrivalTime,
+        departureTime: s.departureTime,
         saving: false,
       };
     }
@@ -510,6 +521,9 @@ function StudentRow({
     }
 
     const nextRow = {
+      halfDay: target === "present" ? row.halfDay : false,
+      arrivalTime: target === "present" ? row.arrivalTime : null,
+      departureTime: target === "present" ? row.departureTime : null,
       status: target,
       comment: nextComment,
     };
@@ -580,6 +594,47 @@ function StudentRow({
         </div>
 
         <div className={styles.registerFields}>
+          {row.status === "present" && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12 }}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={Boolean(row.halfDay)}
+                  disabled={row.saving}
+                  onChange={(event) => {
+                    const next = { ...row, halfDay: event.target.checked };
+                    onChange(next);
+                    onCommit(next);
+                  }}
+                />{" "}
+                Half-day
+              </label>
+              <label>
+                Arrival{" "}
+                <input
+                  type="time"
+                  aria-label={`Arrival time for ${display}`}
+                  value={row.arrivalTime ?? ""}
+                  onChange={(event) =>
+                    onChange({ ...row, arrivalTime: event.target.value || null })
+                  }
+                  onBlur={() => onCommit(row)}
+                />
+              </label>
+              <label>
+                Pickup{" "}
+                <input
+                  type="time"
+                  aria-label={`Pickup time for ${display}`}
+                  value={row.departureTime ?? ""}
+                  onChange={(event) =>
+                    onChange({ ...row, departureTime: event.target.value || null })
+                  }
+                  onBlur={() => onCommit(row)}
+                />
+              </label>
+            </div>
+          )}
           <CommentField
             status={row.status}
             value={row.comment}
