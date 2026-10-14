@@ -13,6 +13,12 @@ export type ReportTypeOption = {
 
 export const REPORT_TYPE_OPTIONS: ReportTypeOption[] = [
   {
+    kind: "Project",
+    label: "Project letter",
+    description: "Write a separate letter for this child and send it to their family.",
+    iconTone: "major",
+  },
+  {
     kind: "SEN",
     label: "SEN",
     description: "Daily SEN scores and remarks, ready to send to parents.",
@@ -48,10 +54,12 @@ export function ReportTypePicker({
   selected,
   onPick,
   variant = "desktop",
+  kinds,
 }: {
   selected: ReportKind | null;
   onPick: (kind: ReportKind) => void;
   variant?: "desktop" | "mobile";
+  kinds?: ReportKind[];
 }) {
   const rowClass = variant === "mobile" ? "nr-m-type-card" : "nr-type-card";
   return (
@@ -60,7 +68,7 @@ export function ReportTypePicker({
       role="radiogroup"
       aria-label="Report type"
     >
-      {REPORT_TYPE_OPTIONS.map((opt) => {
+      {REPORT_TYPE_OPTIONS.filter((opt) => !kinds || kinds.includes(opt.kind)).map((opt) => {
         const Icon = iconFor(opt.iconTone);
         const isSelected = selected === opt.kind;
         return (

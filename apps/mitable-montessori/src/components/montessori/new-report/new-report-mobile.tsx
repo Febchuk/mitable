@@ -19,6 +19,7 @@ export function NewReportMobile({
   roster,
   capturedToday,
   submitting,
+  kinds,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function NewReportMobile({
   roster: PickerChild[];
   capturedToday: CapturedToday;
   submitting?: boolean;
+  kinds?: ReportKind[];
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
@@ -57,7 +59,12 @@ export function NewReportMobile({
     onSubmit({
       childId: child.id,
       kind,
-      templateId: kind === "SEN" ? "__sen__" : buildBuiltinReportTemplateId(kind),
+      templateId:
+        kind === "SEN"
+          ? "__sen__"
+          : kind === "Project"
+            ? "__project__"
+            : buildBuiltinReportTemplateId(kind),
       incidentTranscript,
     });
   };
@@ -88,6 +95,7 @@ export function NewReportMobile({
             else submitPayload(kind);
           }}
           submitting={submitting}
+          kinds={kinds}
           onBack={() => setStep(1)}
         />
       )}
@@ -204,6 +212,7 @@ function Step1Child({
 }
 
 function Step2Type({
+  kinds,
   child,
   reportKind,
   onPick,
@@ -211,6 +220,7 @@ function Step2Type({
   onBack,
 }: {
   child: PickerChild;
+  kinds?: ReportKind[];
   reportKind: ReportKind | null;
   onPick: (kind: ReportKind) => void;
   submitting?: boolean;
@@ -238,7 +248,7 @@ function Step2Type({
       </div>
 
       <div className="nr-m-body">
-        <ReportTypePicker selected={reportKind} onPick={onPick} variant="mobile" />
+        <ReportTypePicker selected={reportKind} onPick={onPick} variant="mobile" kinds={kinds} />
       </div>
 
       <div className="nr-m-foot">

@@ -24,7 +24,7 @@ export default async function ParentReportsPage({
     .limit(50);
   const reports = (data ?? []) as Array<{
     id: string;
-    report_type: "daily" | "major";
+    report_type: "daily" | "major" | "incident" | "sen" | "project";
     period_start: string | null;
     period_end: string | null;
     title: string | null;

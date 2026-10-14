@@ -57,6 +57,7 @@ const STATUS_TONE: Record<
 };
 
 function kindLabel(t: ReportListRow["reportType"]): string {
+  if (t === "project") return "Project letter";
   if (t === "sen") return "SEN";
   if (t === "daily") return "Daily";
   if (t === "major") return "Major";
@@ -131,6 +132,7 @@ export function ReportsListView({
         { value: "major", label: "Major" },
         { value: "incident", label: "Incident" },
         { value: "sen", label: "SEN" },
+        { value: "project", label: "Project letters" },
       ]
     : [
         { value: "all", label: "All reports" },
@@ -141,6 +143,7 @@ export function ReportsListView({
         { value: "major", label: "Major" },
         { value: "incident", label: "Incident" },
         { value: "sen", label: "SEN" },
+        { value: "project", label: "Project letters" },
       ];
 
   const filtered = reports.filter((r) => {
@@ -152,6 +155,7 @@ export function ReportsListView({
     if (filter === "approved") return r.status === "approved";
     if (filter === "sent")
       return isAdmin ? r.status === "sent" : r.status === "sent" || r.status === "approved";
+    if (filter === "project") return r.reportType === "project";
     if (filter === "sen") return r.reportType === "sen";
     if (filter === "daily") return r.reportType === "daily";
     if (filter === "major") return r.reportType === "major";

@@ -7,7 +7,7 @@ import { isDefaultReportTemplateId } from "@/lib/reports/default-template";
  * tokens (or no PII at all), the client de-tokenizes for display.
  */
 
-export const ReportType = z.enum(["daily", "major", "incident", "sen"]);
+export const ReportType = z.enum(["daily", "major", "incident", "sen", "project"]);
 export type ReportType = z.infer<typeof ReportType>;
 
 export const ReportKind = z.enum(["Daily", "Major", "Incident"]);
