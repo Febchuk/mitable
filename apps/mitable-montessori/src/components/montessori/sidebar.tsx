@@ -214,13 +214,20 @@ export function MontessoriSidebar({
           padding: "0 8px 18px",
           borderBottom: "1px solid var(--color-border)",
           marginBottom: 14,
+          textAlign: brand ? "center" : "left",
         }}
       >
         {brand ? (
           <img
             src={brand.logoPath}
             alt={brand.name}
-            style={{ width: 108, height: 54, objectFit: "contain", objectPosition: "left" }}
+            style={{
+              display: "block",
+              width: 128,
+              height: 64,
+              objectFit: "contain",
+              margin: "0 auto",
+            }}
           />
         ) : (
           <div
@@ -235,9 +242,11 @@ export function MontessoriSidebar({
             Mitable
           </div>
         )}
-        <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginTop: 2 }}>
-          Montessori
-        </div>
+        {!brand ? (
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginTop: 2 }}>
+            Montessori
+          </div>
+        ) : null}
       </div>
       <nav>
         {navItems.map((n) => {
