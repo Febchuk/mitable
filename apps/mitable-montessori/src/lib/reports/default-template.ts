@@ -334,14 +334,16 @@ export async function buildDefaultReportSections(
   }
 ): Promise<DefaultTemplateBuildResult> {
   const reportingPeriod = args.reportingPeriod ?? "daily";
-  const subjects = await loadClassroomSubjects(supabase, args.classroomId);
-  const bySubtopic = await loadPeriodProgressBySubtopic(
-    supabase,
-    args.studentId,
-    args.periodStart,
-    args.periodEnd,
-    args.exactWindow
-  );
+  const [subjects, bySubtopic] = await Promise.all([
+    loadClassroomSubjects(supabase, args.classroomId),
+    loadPeriodProgressBySubtopic(
+      supabase,
+      args.studentId,
+      args.periodStart,
+      args.periodEnd,
+      args.exactWindow
+    ),
+  ]);
 
   const sections: ReportSection[] = [];
   const sectionMeta: SectionMeta = {};
@@ -373,15 +375,19 @@ export async function buildDefaultReportSections(
       });
       idx++;
 
-      const commentsHeading = topicCommentsHeading(subject.name);
-      const commentsSlug = sectionSlug(commentsHeading, idx);
-      sectionGuidance[commentsHeading] = commentSectionGuidance(subject.name);
-      sections.push({
-        id: `s-${idx}-${commentsSlug}`,
-        heading: commentsHeading,
-        paragraphs: [{ id: `p-${idx}-1`, html: "" }],
-      });
-      idx++;
+      // Daily reports share the teacher's progress marks and notes directly.
+      // Narrative comments remain available for longer reporting periods.
+      if (reportingPeriod !== "daily") {
+        const commentsHeading = topicCommentsHeading(subject.name);
+        const commentsSlug = sectionSlug(commentsHeading, idx);
+        sectionGuidance[commentsHeading] = commentSectionGuidance(subject.name);
+        sections.push({
+          id: `s-${idx}-${commentsSlug}`,
+          heading: commentsHeading,
+          paragraphs: [{ id: `p-${idx}-1`, html: "" }],
+        });
+        idx++;
+      }
     }
   }
 
