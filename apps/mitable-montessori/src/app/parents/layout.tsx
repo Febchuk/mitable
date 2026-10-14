@@ -14,6 +14,7 @@ export default async function ParentsLayout({ children }: { children: React.Reac
         firstName={portal.firstName}
         email={portal.email}
         linkedChildren={portal.children}
+        schoolName={portal.schoolName}
       >
         {children}
       </ParentPortalShell>

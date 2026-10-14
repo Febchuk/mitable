@@ -11,6 +11,7 @@ export type ParentChild = {
 export type ParentPortalContext = {
   firstName: string;
   email: string;
+  schoolName: string | null;
   onboardingComplete: boolean;
   children: ParentChild[];
 };
@@ -25,7 +26,7 @@ export async function loadParentPortalContext(
 ): Promise<ParentPortalContext | null> {
   const { data: guardian } = await supabase
     .from("guardians")
-    .select("id, first_name, onboarding_completed_at")
+    .select("id, first_name, onboarding_completed_at, schools(name)")
     .eq("auth_user_id", userId)
     .maybeSingle();
   if (!guardian) return null;
@@ -72,6 +73,10 @@ export async function loadParentPortalContext(
   return {
     firstName: guardian.first_name,
     email,
+    schoolName: (() => {
+      const schools = guardian.schools as { name: string } | { name: string }[] | null;
+      return (Array.isArray(schools) ? schools[0] : schools)?.name ?? null;
+    })(),
     onboardingComplete: Boolean(guardian.onboarding_completed_at),
     children,
   };

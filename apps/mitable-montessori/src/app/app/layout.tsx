@@ -66,6 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <ActiveReportProvider>
         <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
           <MontessoriSidebar
+            schoolName={ctx.schoolName}
             variant={isAdmin ? "admin" : "teacher"}
             showTodayNav={showTodayAndAgent}
             reportFirstNav={showReportFirstNav}
@@ -104,6 +105,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               firstName={ctx.firstName}
               email={ctx.email}
               schoolName={isAdmin ? (ctx.schoolName ?? "School") : classroomName}
+              brandSchoolName={ctx.schoolName}
               schoolSubtitle={isAdmin ? "Admin workspace" : undefined}
               classroomId={isAdmin ? null : (classroom?.id ?? null)}
               classroomName={classroomName}
