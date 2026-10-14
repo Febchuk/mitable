@@ -220,16 +220,18 @@ describe("Phase 4 — admin agent + tokenization", () => {
             select() {
               return {
                 eq: () => ({
-                  eq: async () => ({
-                    data: [
-                      {
-                        id: CLASSROOM_ID,
-                        name: "Sunflower",
-                        code: "SUN",
-                        curriculum_id: null,
-                      },
-                    ],
-                    error: null,
+                  eq: () => ({
+                    eq: async () => ({
+                      data: [
+                        {
+                          id: CLASSROOM_ID,
+                          name: "Sunflower",
+                          code: "SUN",
+                          curriculum_id: null,
+                        },
+                      ],
+                      error: null,
+                    }),
                   }),
                 }),
               };
