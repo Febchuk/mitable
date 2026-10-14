@@ -23,6 +23,8 @@ export type ReportTemplate = {
 
 export type ReportKind = "Daily" | "Major" | "Incident";
 
+export type PickerReportKind = ReportKind | "SEN";
+
 /** Submitted to /api/v1/reports. Audio + handwritten notes are no longer part
  *  of the new-report flow — the assistant drafts from the empty template. The
  *  backend still accepts `transcripts/notes/tokenMap`, so the trigger sends
@@ -30,7 +32,7 @@ export type ReportKind = "Daily" | "Major" | "Incident";
 export type NewReportPayload = {
   childId: string;
   /** Mirrors the chosen report type. */
-  kind: ReportKind;
+  kind: PickerReportKind;
   /** Built-in sentinel or admin template uuid. */
   templateId: string;
   /** Incident flow — voice transcript for the "What happened" section. */
