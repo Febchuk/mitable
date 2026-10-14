@@ -1,3 +1,4 @@
+import { listTeacherClassroomsForCurrentUser } from "@/lib/app/active-classroom";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { listReportsV2 } from "@/lib/queries/reports";
@@ -16,7 +17,10 @@ export default async function AdminReportsPage({
   const openParam =
     typeof rawOpen === "string" ? rawOpen : Array.isArray(rawOpen) ? rawOpen[0] : undefined;
 
-  const reports = await listReportsV2();
+  const [reports, classrooms] = await Promise.all([
+    listReportsV2(),
+    listTeacherClassroomsForCurrentUser(),
+  ]);
 
   if (openParam && reports.some((r) => r.id === openParam)) {
     redirect(`/admin/reports/${openParam}`);
@@ -24,7 +28,7 @@ export default async function AdminReportsPage({
 
   return (
     <Suspense fallback={null}>
-      <ReportsListView reports={reports} variant="admin" />
+      <ReportsListView reports={reports} classrooms={classrooms} variant="admin" />
     </Suspense>
   );
 }

@@ -84,14 +84,17 @@ export function ReportsListView({
   reports,
   variant = "teacher",
   classroomName,
+  classrooms = [],
 }: {
   reports: ReportListRow[];
   variant?: "teacher" | "admin";
   classroomName?: string | null;
+  classrooms?: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const locale = useUiLocale();
   const isAdmin = variant === "admin";
+  const [classroomFilter, setClassroomFilter] = React.useState("all");
   const [filter, setFilter] = React.useState("all");
   const [pendingDelete, setPendingDelete] = React.useState<ReportListRow | null>(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
@@ -138,6 +141,7 @@ export function ReportsListView({
       ];
 
   const filtered = reports.filter((r) => {
+    if (classroomFilter !== "all" && r.classroomId !== classroomFilter) return false;
     if (filter === "all") return true;
     if (filter === "drafts") return r.status === "draft";
     if (filter === "awaiting")
@@ -164,6 +168,15 @@ export function ReportsListView({
       />
 
       <div style={{ padding: "16px 24px 0" }}>
+        <FilterSelect
+          label="Class"
+          value={classroomFilter}
+          onChange={setClassroomFilter}
+          options={[
+            { value: "all", label: "All classes" },
+            ...classrooms.map((room) => ({ value: room.id, label: room.name })),
+          ]}
+        />
         <FilterSelect label="Show" value={filter} onChange={setFilter} options={selectFilters} />
       </div>
 
@@ -187,12 +200,12 @@ export function ReportsListView({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 36px",
+                gridTemplateColumns: "1.4fr 1fr 0.7fr 0.8fr 0.7fr 1.2fr 36px",
                 padding: "12px 20px",
                 borderBottom: "1px solid var(--color-border)",
               }}
             >
-              {["Child", "Type", "Date", "Status", ""].map((h, i) => (
+              {["Child", "Class", "Type", "Date", "Time", "Status", ""].map((h, i) => (
                 <div key={i} className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
                   {h}
                 </div>
@@ -205,7 +218,7 @@ export function ReportsListView({
                   key={r.id}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1.4fr 0.7fr 0.8fr 1.2fr 36px",
+                    gridTemplateColumns: "1.4fr 1fr 0.7fr 0.8fr 0.7fr 1.2fr 36px",
                     alignItems: "center",
                     padding: "12px 20px",
                     borderTop: "1px solid var(--color-border)",
@@ -234,11 +247,18 @@ export function ReportsListView({
                         </div>
                       </div>
                     </div>
+                    <div style={{ fontSize: 13 }}>{r.classroomName ?? "—"}</div>
                     <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
                       {kindLabel(r.reportType)}
                     </div>
                     <div style={{ fontSize: 13, color: "var(--color-ink-secondary)" }}>
                       {formatWhen(r, locale)}
+                    </div>
+                    <div style={{ fontSize: 13 }} title="Time created">
+                      {new Date(r.createdAt).toLocaleTimeString(locale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </div>
                     <div>
                       <span
