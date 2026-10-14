@@ -57,6 +57,7 @@ const ADA_REPORT: ReportDetailRow = {
   templateId: null,
   templateSectionMeta: {},
   templateLogoUrl: null,
+  authorName: "Teacher",
   createdByUserId: "u1",
   approvedByUserId: null,
   approvedAt: null,
@@ -83,6 +84,7 @@ const EMPTY_REPORT: ReportDetailRow = {
 const EMPTY_DRAFT_FOR_AUTO: ReportDetailRow = {
   ...ADA_REPORT,
   id: "r-auto-draft",
+  reportType: "major",
   body: null,
   sections: null,
   status: "draft",
@@ -230,4 +232,10 @@ describe("ReportDetail", () => {
 
     expect(screen.queryByText("Drafting with assistant…")).toBeNull();
   });
+});
+
+it("opens an empty daily report without a blocking AI draft request", async () => {
+  render(<ReportDetail report={{ ...EMPTY_DRAFT_FOR_AUTO, reportType: "daily" }} />);
+  await act(async () => {});
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/draft"))).toBe(false);
 });

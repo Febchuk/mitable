@@ -30,6 +30,8 @@ describe("guardian search", () => {
           lastName: "Stone",
           email: "alex@example.com",
           phone: "+1 555 0100",
+          alternativePhone: "",
+          contactAddress: "",
           preferredContactMethod: "either",
           accountActive: false,
         },

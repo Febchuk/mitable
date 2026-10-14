@@ -129,6 +129,15 @@ export function DailyReportsPanel({ refreshKey }: { refreshKey: number }) {
     setSelected(allSelected ? new Set() : new Set(readyIds));
   };
 
+  const selectClassReady = (classroomId: string) => {
+    const ids =
+      summary?.classrooms
+        .find((room) => room.classroomId === classroomId)
+        ?.children.filter((child) => child.sendable)
+        .map((child) => child.studentId) ?? [];
+    setSelected(new Set(ids));
+  };
+
   const sendSelected = async () => {
     if (selectedCount === 0 || sending) return;
     setSending(true);
@@ -175,7 +184,7 @@ export function DailyReportsPanel({ refreshKey }: { refreshKey: number }) {
     <>
       <button type="button" className={styles.trigger} onClick={() => setOpen(true)}>
         <FileText size={15} strokeWidth={1.8} aria-hidden />
-        <span>Daily reports</span>
+        <span>Send progress to parents</span>
         {!loading && readyCount > 0 ? (
           <span className={styles.triggerBadge}>{readyCount}</span>
         ) : null}
@@ -185,9 +194,10 @@ export function DailyReportsPanel({ refreshKey }: { refreshKey: number }) {
         <SheetContent side="right" className={styles.sheet} aria-describedby="daily-reports-help">
           <SheetHeader className={styles.header}>
             <div className={styles.eyebrow}>Today · all assigned classes</div>
-            <SheetTitle className={styles.title}>Daily reports</SheetTitle>
+            <SheetTitle className={styles.title}>Send progress to parents</SheetTitle>
             <p id="daily-reports-help" className={styles.subtitle}>
-              Review the children with progress marked today, then send their reports together.
+              Choose a class or children below. Their saved progress and your notes go straight into
+              the parent report — no separate report writing needed.
             </p>
           </SheetHeader>
 
@@ -271,6 +281,15 @@ export function DailyReportsPanel({ refreshKey }: { refreshKey: number }) {
                   if (visible.length === 0 && noProgressCount === 0) return null;
                   return (
                     <section key={classroom.classroomId} className={styles.classroom}>
+                      {classroom.children.some((child) => child.sendable) && (
+                        <button
+                          type="button"
+                          disabled={sending}
+                          onClick={() => selectClassReady(classroom.classroomId)}
+                        >
+                          Select {classroom.classroomName} only
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={styles.classroomHeader}
@@ -367,7 +386,7 @@ export function DailyReportsPanel({ refreshKey }: { refreshKey: number }) {
                   )}
                   {sending
                     ? "Preparing reports…"
-                    : `Send ${selectedCount || ""} report${selectedCount === 1 ? "" : "s"}`}
+                    : `Send to ${selectedCount || ""} ${selectedCount === 1 ? "family" : "families"}`}
                 </button>
               </footer>
             </>

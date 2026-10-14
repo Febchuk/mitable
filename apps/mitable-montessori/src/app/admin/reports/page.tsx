@@ -17,6 +17,14 @@ export default async function AdminReportsPage({
     typeof rawOpen === "string" ? rawOpen : Array.isArray(rawOpen) ? rawOpen[0] : undefined;
 
   const reports = await listReportsV2();
+  const classrooms = [
+    ...new Map(
+      reports.map((report) => [
+        report.classroomId,
+        { id: report.classroomId, name: report.classroomName ?? "Classroom" },
+      ])
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   if (openParam && reports.some((r) => r.id === openParam)) {
     redirect(`/admin/reports/${openParam}`);
@@ -24,7 +32,7 @@ export default async function AdminReportsPage({
 
   return (
     <Suspense fallback={null}>
-      <ReportsListView reports={reports} variant="admin" />
+      <ReportsListView reports={reports} classrooms={classrooms} variant="admin" />
     </Suspense>
   );
 }

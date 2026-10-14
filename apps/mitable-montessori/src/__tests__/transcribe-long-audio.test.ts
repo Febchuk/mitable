@@ -13,7 +13,9 @@ describe("transcribe-long-audio", () => {
   });
 
   it("transcribeLongAudio uses a single pipeline call for short audio", async () => {
-    const pipeline = vi.fn(async () => ({ text: "short clip" }));
+    const pipeline = vi.fn(async (_audio: Float32Array, _opts?: Record<string, unknown>) => ({
+      text: "short clip",
+    }));
     const sampleRate = 16_000;
     const audio = new Float32Array(sampleRate * 10);
 

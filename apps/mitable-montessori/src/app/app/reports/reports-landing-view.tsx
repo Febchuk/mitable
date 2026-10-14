@@ -9,6 +9,7 @@ import { Avatar } from "@/components/montessori/primitives";
 import { NewReportTrigger } from "@/components/montessori/new-report";
 import { useUiLocale } from "@/lib/hooks/use-ui-locale";
 import { groupReportsByDateLabel } from "@/lib/reports/list-date-group";
+import { FilterSelect } from "@/components/montessori/page-header";
 import styles from "./reports-landing.module.css";
 
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
@@ -49,13 +50,16 @@ function kindLabel(t: ReportListRow["reportType"]): string {
 export function ReportsLandingView({
   reports,
   classroomName,
+  classrooms = [],
 }: {
   reports: ReportListRow[];
   classroomName?: string | null;
+  classrooms?: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const locale = useUiLocale();
+  const [classroomFilter, setClassroomFilter] = React.useState("all");
   const [newReportOpen, setNewReportOpen] = React.useState(false);
 
   const notice =
@@ -64,8 +68,14 @@ export function ReportsLandingView({
       : null;
 
   const groups = React.useMemo(
-    () => groupReportsByDateLabel(reports, { locale }),
-    [reports, locale]
+    () =>
+      groupReportsByDateLabel(
+        reports.filter(
+          (report) => classroomFilter === "all" || report.classroomId === classroomFilter
+        ),
+        { locale }
+      ),
+    [reports, locale, classroomFilter]
   );
 
   const openReport = (id: string) => {
@@ -97,6 +107,15 @@ export function ReportsLandingView({
         </span>
       </button>
 
+      <FilterSelect
+        label="Class"
+        value={classroomFilter}
+        onChange={setClassroomFilter}
+        options={[
+          { value: "all", label: "All classes" },
+          ...classrooms.map((room) => ({ value: room.id, label: room.name })),
+        ]}
+      />
       <NewReportTrigger open={newReportOpen} onOpenChange={setNewReportOpen} hideButton />
 
       {groups.length === 0 ? (
@@ -125,7 +144,11 @@ export function ReportsLandingView({
                     {r.title ? ` — ${r.title}` : ` — ${kindLabel(r.reportType)}`}
                   </span>
                   <span className={styles.rowMetaS}>
-                    {r.classroomName ?? "Classroom"} · {kindLabel(r.reportType)}
+                    {r.classroomName ?? "Classroom"} · {kindLabel(r.reportType)} ·{" "}
+                    {new Date(r.createdAt).toLocaleTimeString(locale, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </span>
                 </span>
                 <span className={`${styles.statusPill} ${statusClass(r.status)}`}>

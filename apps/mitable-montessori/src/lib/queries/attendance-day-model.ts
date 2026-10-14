@@ -18,6 +18,8 @@ export type AttendanceDayStudent = {
   comment: string | null;
   /** "HH:MM" (24h) or null. Only meaningful when status = "present". */
   arrivalTime: string | null;
+  departureTime?: string | null;
+  halfDay?: boolean;
 };
 
 export function attendanceStudentRowKey(student: Pick<AttendanceDayStudent, "id" | "classroomId">) {

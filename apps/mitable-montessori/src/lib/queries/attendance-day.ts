@@ -26,6 +26,8 @@ type RecordRow = {
   status: "present" | "absent";
   comment: string | null;
   arrival_time: string | null;
+  departure_time: string | null;
+  half_day: boolean;
 };
 
 /** Strip seconds off a Postgres `time` value: "08:30:00" → "08:30". */
@@ -72,7 +74,7 @@ async function loadAttendanceStudents(
 
   const { data: records } = await supabase
     .from("attendance_records")
-    .select("student_id, classroom_id, status, comment, arrival_time")
+    .select("student_id, classroom_id, status, comment, arrival_time, departure_time, half_day")
     .in("classroom_id", classroomIds)
     .eq("attendance_date", safeDate)
     .returns<Array<RecordRow & { classroom_id: string }>>();
@@ -94,6 +96,8 @@ async function loadAttendanceStudents(
         status: r?.status ?? null,
         comment: r?.comment ?? null,
         arrivalTime: trimSeconds(r?.arrival_time ?? null),
+        departureTime: trimSeconds(r?.departure_time ?? null),
+        halfDay: r?.half_day ?? false,
       };
     })
     .sort((a, b) => {
