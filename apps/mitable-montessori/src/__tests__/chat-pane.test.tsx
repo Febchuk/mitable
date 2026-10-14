@@ -480,7 +480,8 @@ describe("ChatPane (Phase 3)", () => {
   });
 
   it("applies multiple ghost-edit messages in one batch", async () => {
-    const props = defaultProps();
+    const onApplyGhostEdits = vi.fn();
+    const props = defaultProps({ onApplyGhostEdits });
     setupFetch({
       history: {
         messages: [
@@ -512,14 +513,14 @@ describe("ChatPane (Phase 3)", () => {
       },
     });
     render(<ChatPane {...props} />);
-    await waitFor(() => expect(props.onApplyGhostEdits).toHaveBeenCalled());
-    expect(props.onApplyGhostEdits).toHaveBeenCalledTimes(1);
-    expect(props.onApplyGhostEdits).toHaveBeenCalledWith(
+    await waitFor(() => expect(onApplyGhostEdits).toHaveBeenCalled());
+    expect(onApplyGhostEdits).toHaveBeenCalledTimes(1);
+    expect(onApplyGhostEdits).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ sectionId: "morning", messageId: "g-morning" }),
         expect.objectContaining({ sectionId: "afternoon", messageId: "g-afternoon" }),
       ])
     );
-    expect(props.onApplyGhostEdits.mock.calls[0]![0]).toHaveLength(2);
+    expect(onApplyGhostEdits.mock.calls[0]![0]).toHaveLength(2);
   });
 });

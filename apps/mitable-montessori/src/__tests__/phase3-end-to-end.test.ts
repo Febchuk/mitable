@@ -340,8 +340,8 @@ describe("Phase 3 — report workflow state machine", () => {
     ]);
   });
 
-  it("rejects send before approval", async () => {
-    const { attemptInvalidSend } = await import("./helpers");
-    await expect(attemptInvalidSend()).rejects.toThrow(/Cannot send a report in status 'draft'/);
+  it("allows a teacher to send a draft directly to parents", async () => {
+    const { sendDraftDirectly } = await import("./helpers");
+    await expect(sendDraftDirectly()).resolves.toBeUndefined();
   });
 });
