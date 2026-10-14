@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { TeacherEditor } from "./teacher-editor";
 import {
   CheckCircle2,
   Mail,
@@ -83,6 +84,7 @@ function mapApiTeachers(rows: ApiTeacher[]): Teacher[] {
 }
 
 export default function AdminTeachersPage() {
+  const [editing, setEditing] = React.useState<Teacher | null>(null);
   const [teachers, setTeachers] = React.useState<Teacher[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [inviteOpen, setInviteOpen] = React.useState(false);
@@ -358,6 +360,7 @@ export default function AdminTeachersPage() {
               teacher={teacher}
               onResend={() => resendInvite(teacher.id, teacher.invitationId)}
               onRevoke={() => revokeInvite(teacher.id, teacher.invitationId)}
+              onEdit={() => setEditing(teacher)}
               onToggleHidden={(next) => void setTeacherHidden(teacher, next)}
             />
           ))}
@@ -375,6 +378,7 @@ export default function AdminTeachersPage() {
               index={index}
               onResend={() => resendInvite(teacher.id, teacher.invitationId)}
               onRevoke={() => revokeInvite(teacher.id, teacher.invitationId)}
+              onEdit={() => setEditing(teacher)}
               onToggleHidden={(next) => void setTeacherHidden(teacher, next)}
             />
           ))}
@@ -384,6 +388,14 @@ export default function AdminTeachersPage() {
         </div>
       </div>
 
+      {editing && (
+        <TeacherEditor
+          key={editing.id}
+          teacher={editing}
+          onClose={() => setEditing(null)}
+          onChanged={() => void refresh()}
+        />
+      )}
       <InviteTeachersDialog
         open={inviteOpen}
         onOpenChange={setInviteOpen}
@@ -403,11 +415,13 @@ function TeacherRow({
   onResend,
   onRevoke,
   onToggleHidden,
+  onEdit,
 }: {
   teacher: Teacher;
   onResend: () => void;
   onRevoke: () => void;
   onToggleHidden: (uiHidden: boolean) => void;
+  onEdit: () => void;
 }) {
   const [hover, setHover] = React.useState(false);
   const displayName =
@@ -480,6 +494,11 @@ function TeacherRow({
           alignItems: "center",
         }}
       >
+        {teacher.status === "Active" && (
+          <button type="button" onClick={onEdit}>
+            Edit
+          </button>
+        )}
         {teacher.status === "Active" ? (
           <label
             title="Hidden in default view"
@@ -530,12 +549,14 @@ function TeacherMobileRow({
   onResend,
   onRevoke,
   onToggleHidden,
+  onEdit,
 }: {
   teacher: Teacher;
   index: number;
   onResend: () => void;
   onRevoke: () => void;
   onToggleHidden: (uiHidden: boolean) => void;
+  onEdit: () => void;
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const displayName =
@@ -599,6 +620,11 @@ function TeacherMobileRow({
           <span>· {subtitleFor(teacher)}</span>
         </div>
       </div>
+      {teacher.status === "Active" && (
+        <button type="button" onClick={onEdit}>
+          Edit
+        </button>
+      )}
       {teacher.status === "Active" ? (
         <label
           style={{
