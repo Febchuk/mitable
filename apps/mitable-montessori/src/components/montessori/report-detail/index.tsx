@@ -729,7 +729,13 @@ export function ReportDetail({
           : "review";
 
   const topbarKind =
-    report.reportType === "daily" ? "Daily" : report.reportType === "major" ? "Major" : "Incident";
+    report.reportType === "sen"
+      ? "SEN"
+      : report.reportType === "daily"
+        ? "Daily"
+        : report.reportType === "major"
+          ? "Major"
+          : "Incident";
 
   const handleApprove = React.useCallback(async () => {
     setActionBusy(true);

@@ -39,6 +39,7 @@ function statusClass(status: ReportListRow["status"]): string {
 }
 
 function kindLabel(t: ReportListRow["reportType"]): string {
+  if (t === "sen") return "SEN";
   if (t === "daily") return "Daily";
   if (t === "major") return "Major";
   return "Incident";

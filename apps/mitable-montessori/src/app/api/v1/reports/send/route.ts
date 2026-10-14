@@ -1,3 +1,4 @@
+import { getReport } from "@/lib/queries/reports";
 import { NextResponse } from "next/server";
 import { auditLog } from "@/lib/audit/log";
 import { requireUser } from "@/lib/api/auth";
@@ -14,6 +15,10 @@ export async function POST(req: Request) {
   const parsed = SendReportSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  if (!(await getReport(parsed.data.reportId))) {
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
 
   // Production must have a real mailer — stub would mark delivery "sent" with no email.

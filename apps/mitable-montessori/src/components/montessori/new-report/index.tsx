@@ -82,6 +82,11 @@ export function NewReportTrigger({
 
   const onSubmit = React.useCallback(
     async (payload: NewReportPayload) => {
+      if (payload.kind === "SEN") {
+        setOpen(false);
+        router.push(`/app/sen?child=${encodeURIComponent(payload.childId)}`);
+        return;
+      }
       if (submitting) return;
       setSubmitting(true);
       try {

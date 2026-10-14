@@ -7,7 +7,7 @@ import { isDefaultReportTemplateId } from "@/lib/reports/default-template";
  * tokens (or no PII at all), the client de-tokenizes for display.
  */
 
-export const ReportType = z.enum(["daily", "major", "incident"]);
+export const ReportType = z.enum(["daily", "major", "incident", "sen"]);
 export type ReportType = z.infer<typeof ReportType>;
 
 export const ReportKind = z.enum(["Daily", "Major", "Incident"]);
@@ -96,7 +96,7 @@ export const DraftReportRequestSchema = z.object({
   studentToken: z.string().regex(/^\[STUDENT_\d+\]$/),
   studentRef: z.string().uuid(),
   classroomId: z.string().uuid(),
-  reportType: ReportType,
+  reportType: z.enum(["daily", "major", "incident"]),
   periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });

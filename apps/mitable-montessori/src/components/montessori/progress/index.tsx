@@ -567,7 +567,7 @@ function ProgressFeatureLoaded({
 
   // Group ("team") filtering is gated by a feature flag; the Class picker owns
   // this slot by default and the Group filter only appears when enabled.
-  const groupsEnabled = classroomGroupsEnabled();
+  const groupsEnabled = classroomGroupsEnabled() || groups.length > 0;
 
   // Group ("team") filter. null = whole class. A group with no present children
   // still selectable; the grid simply shows an empty-roster message.

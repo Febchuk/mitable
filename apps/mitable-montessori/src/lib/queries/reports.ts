@@ -49,7 +49,7 @@ export type ReportListRow = {
   studentName: string;
   classroomId: string;
   classroomName: string | null;
-  reportType: "daily" | "major" | "incident";
+  reportType: "daily" | "major" | "incident" | "sen";
   reportDate: string | null;
   periodStart: string | null;
   periodEnd: string | null;
@@ -109,7 +109,7 @@ type ReportsRow = {
   id: string;
   student_id: string;
   classroom_id: string;
-  report_type: "daily" | "major" | "incident";
+  report_type: "daily" | "major" | "incident" | "sen";
   report_date: string | null;
   period_start: string | null;
   period_end: string | null;

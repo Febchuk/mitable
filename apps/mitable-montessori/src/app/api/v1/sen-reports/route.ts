@@ -29,7 +29,7 @@ type ScoreRow = { metric_id: string; score: number };
 
 function todayInIsoDate() {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
+    timeZone: "Africa/Lagos",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -55,21 +55,25 @@ export async function GET(req: Request) {
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  const { data: group, error: groupError } = await supabase
+  const { data: groups, error: groupError } = await supabase
     .from("sen_report_groups")
     .select("id, name, template_id")
     .eq("classroom_id", classroom.id)
     .eq("is_active", true)
-    .order("created_at")
-    .limit(1)
-    .maybeSingle();
+    .order("created_at");
   if (groupError) return NextResponse.json({ error: groupError.message }, { status: 500 });
+
+  const requestedGroup = url.searchParams.get("groupId");
+  const group = requestedGroup ? groups?.find((row) => row.id === requestedGroup) : groups?.[0];
+  if (requestedGroup && !group)
+    return NextResponse.json({ error: "SEN team not found in this class" }, { status: 404 });
 
   if (!group) {
     return NextResponse.json({
       classroom,
       date: requestedDate,
       group: null,
+      groups: [],
       metrics: [],
       students: [],
     });
@@ -140,6 +144,7 @@ export async function GET(req: Request) {
     classroom,
     date: requestedDate,
     group: { id: group.id, name: group.name },
+    groups: (groups ?? []).map(({ id, name }) => ({ id, name })),
     metrics: metrics ?? [],
     students,
   });
