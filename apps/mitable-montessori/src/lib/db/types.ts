@@ -113,6 +113,8 @@ export interface AttendancePayload {
   comment?: string;
   /** "HH:MM" — only meaningful when status = "present". */
   arrival_time?: string;
+  departure_time?: string;
+  half_day?: boolean;
 }
 
 export interface ProgressPayload {
