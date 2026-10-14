@@ -19,6 +19,7 @@ export function NewReportModal({
   roster,
   capturedToday,
   submitting,
+  kinds,
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function NewReportModal({
   roster: PickerChild[];
   capturedToday: CapturedToday;
   submitting?: boolean;
+  kinds?: ReportKind[];
 }) {
   const [step, setStep] = React.useState<Step>(1);
   const [child, setChild] = React.useState<PickerChild | null>(null);
@@ -44,7 +46,12 @@ export function NewReportModal({
     onSubmit({
       childId: child.id,
       kind: reportKind,
-      templateId: reportKind === "SEN" ? "__sen__" : buildBuiltinReportTemplateId(reportKind),
+      templateId:
+        reportKind === "SEN"
+          ? "__sen__"
+          : reportKind === "Project"
+            ? "__project__"
+            : buildBuiltinReportTemplateId(reportKind),
     });
   };
 
@@ -68,7 +75,12 @@ export function NewReportModal({
       onSubmit({
         childId: child.id,
         kind,
-        templateId: kind === "SEN" ? "__sen__" : buildBuiltinReportTemplateId(kind),
+        templateId:
+          kind === "SEN"
+            ? "__sen__"
+            : kind === "Project"
+              ? "__project__"
+              : buildBuiltinReportTemplateId(kind),
       });
     }
   };
@@ -145,7 +157,7 @@ export function NewReportModal({
                 </button>
               </header>
               <div className="nr-modal-body nr-modal-body--template scroll-quiet flex min-h-0 flex-1 flex-col overflow-y-auto">
-                <ReportTypePicker selected={reportKind} onPick={onTypePicked} />
+                <ReportTypePicker selected={reportKind} onPick={onTypePicked} kinds={kinds} />
               </div>
               <footer className="nr-modal-foot">
                 <button

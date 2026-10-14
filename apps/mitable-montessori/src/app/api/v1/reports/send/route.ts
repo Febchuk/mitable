@@ -1,3 +1,4 @@
+import { projectLetterHasContent } from "@/lib/reports/project-letter";
 import { getReport } from "@/lib/queries/reports";
 import { NextResponse } from "next/server";
 import { auditLog } from "@/lib/audit/log";
@@ -17,8 +18,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  if (!(await getReport(parsed.data.reportId))) {
+  const visibleReport = await getReport(parsed.data.reportId);
+  if (!visibleReport) {
     return NextResponse.json({ error: "Report not found" }, { status: 404 });
+  }
+
+  if (visibleReport.reportType === "project" && !projectLetterHasContent(visibleReport)) {
+    return NextResponse.json({ error: "Write the letter before sending it" }, { status: 400 });
   }
 
   // Production must have a real mailer — stub would mark delivery "sent" with no email.

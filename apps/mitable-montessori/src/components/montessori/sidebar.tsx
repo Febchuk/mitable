@@ -58,6 +58,12 @@ const TEACHER_PROGRESS: NavItem = {
   renderIcon: () => <SquaresFour {...phosphor} />,
 };
 
+const TEACHER_PROJECT_LETTERS: NavItem = {
+  href: "/app/project-letters",
+  label: "Project letters",
+  renderIcon: () => <PencilSimple {...phosphor} />,
+};
+
 const TEACHER_DAILY_LOG: NavItem = {
   href: "/app/daily-log",
   label: "Daily Log",
@@ -78,9 +84,23 @@ function teacherNavItems(options: {
   const dailyLog = options.showDailyLog ? [TEACHER_DAILY_LOG] : [];
   const progress = options.showProgress ? [TEACHER_PROGRESS] : [];
   if (options.reportFirst)
-    return [TEACHER_REPORTS, ...progress, ...dailyLog, ...TEACHER_NAV_CORE, ...grades];
+    return [
+      TEACHER_REPORTS,
+      TEACHER_PROJECT_LETTERS,
+      ...progress,
+      ...dailyLog,
+      ...TEACHER_NAV_CORE,
+      ...grades,
+    ];
   const head = options.showToday ? [TEACHER_NAV_LEGACY[0], ...progress] : progress;
-  return [...head, ...dailyLog, ...TEACHER_NAV_CORE, ...grades, TEACHER_REPORTS];
+  return [
+    ...head,
+    ...dailyLog,
+    ...TEACHER_NAV_CORE,
+    ...grades,
+    TEACHER_REPORTS,
+    TEACHER_PROJECT_LETTERS,
+  ];
 }
 
 const ADMIN_TODAY: NavItem = {

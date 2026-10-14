@@ -307,10 +307,16 @@ export function ReportDetail({
   // strict mode's second invocation, which is the only reason a flag was
   // needed in the first place.
   React.useEffect(() => {
-    if (!empty || draftKickedRef.current || report.status !== "draft") return;
+    if (
+      report.reportType === "project" ||
+      !empty ||
+      draftKickedRef.current ||
+      report.status !== "draft"
+    )
+      return;
     draftKickedRef.current = true;
     void runAutofill();
-  }, [empty, report.status, runAutofill]);
+  }, [empty, report.reportType, report.status, runAutofill]);
 
   const cancelDraftGeneration = React.useCallback(() => {
     draftAbortRef.current?.abort();

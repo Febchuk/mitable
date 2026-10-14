@@ -9,7 +9,7 @@ import type { Tone } from "../data";
 import { NewReportModal } from "./new-report-modal";
 import { NewReportMobile } from "./new-report-mobile";
 import type { PickerChild } from "./child-picker";
-import { type NewReportPayload } from "./mock-data";
+import { type NewReportPayload, type PickerReportKind } from "./mock-data";
 import "./new-report.css";
 
 const TONE_CYCLE: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
@@ -29,6 +29,7 @@ type NewReportTriggerProps = {
   hideButton?: boolean;
   /** After create, navigate here (`{id}` replaced). Default report-first path. */
   createdReportHref?: (reportId: string) => string;
+  kinds?: PickerReportKind[];
 };
 
 /** Opens new-report flow — desktop modal or mobile full-screen steps. */
@@ -36,6 +37,7 @@ export function NewReportTrigger({
   open: openProp,
   onOpenChange,
   hideButton = false,
+  kinds,
   createdReportHref = (id) => `/app/reports/${id}`,
 }: NewReportTriggerProps = {}) {
   const [openInternal, setOpenInternal] = React.useState(false);
@@ -82,6 +84,27 @@ export function NewReportTrigger({
 
   const onSubmit = React.useCallback(
     async (payload: NewReportPayload) => {
+      if (payload.kind === "Project") {
+        setSubmitting(true);
+        try {
+          const response = await fetch("/api/v1/project-letters", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ childId: payload.childId }),
+          });
+          const json = await response.json();
+          if (!response.ok) throw new Error(json.error ?? "Couldn't create project letter");
+          setOpen(false);
+          router.push(createdReportHref(json.reportId));
+        } catch (error) {
+          ToastBus.push({
+            message: error instanceof Error ? error.message : "Couldn't create project letter",
+          });
+        } finally {
+          setSubmitting(false);
+        }
+        return;
+      }
       if (payload.kind === "SEN") {
         setOpen(false);
         router.push(`/app/sen?child=${encodeURIComponent(payload.childId)}`);
@@ -149,6 +172,7 @@ export function NewReportTrigger({
           roster={roster}
           capturedToday={capturedToday}
           submitting={submitting}
+          kinds={kinds}
         />
       )}
       {mobile && (
@@ -159,6 +183,7 @@ export function NewReportTrigger({
           roster={roster}
           capturedToday={capturedToday}
           submitting={submitting}
+          kinds={kinds}
         />
       )}
     </>
