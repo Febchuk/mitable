@@ -7,7 +7,7 @@ import { type PickerChild } from "./child-picker";
 import { IncidentCaptureStep } from "./incident-capture-step";
 import { ReportTypePicker } from "./report-type-picker";
 import { buildBuiltinReportTemplateId } from "@/lib/reports/default-template";
-import { type NewReportPayload, type ReportKind } from "./mock-data";
+import { type NewReportPayload, type PickerReportKind as ReportKind } from "./mock-data";
 
 type Step = 1 | 2 | 3;
 type CapturedToday = Record<string, { voice: number; photos: number }>;
@@ -57,7 +57,7 @@ export function NewReportMobile({
     onSubmit({
       childId: child.id,
       kind,
-      templateId: buildBuiltinReportTemplateId(kind),
+      templateId: kind === "SEN" ? "__sen__" : buildBuiltinReportTemplateId(kind),
       incidentTranscript,
     });
   };

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AlertTriangle, Calendar, Star } from "lucide-react";
-import type { ReportKind } from "./mock-data";
+import type { PickerReportKind as ReportKind } from "./mock-data";
 
 export type ReportTypeOption = {
   kind: ReportKind;
@@ -12,6 +12,12 @@ export type ReportTypeOption = {
 };
 
 export const REPORT_TYPE_OPTIONS: ReportTypeOption[] = [
+  {
+    kind: "SEN",
+    label: "SEN",
+    description: "Daily SEN scores and remarks, ready to send to parents.",
+    iconTone: "major",
+  },
   {
     kind: "Daily",
     label: "Daily",

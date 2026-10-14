@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
 import { useMontessori } from "@/components/montessori/store";
@@ -29,6 +30,7 @@ type SenResponse = {
   classroom: { id: string; name: string };
   date: string;
   group: { id: string; name: string } | null;
+  groups: Array<{ id: string; name: string }>;
   metrics: SenMetric[];
   students: SenStudent[];
   error?: string;
@@ -36,7 +38,7 @@ type SenResponse = {
 
 function localDate() {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
+    timeZone: "Africa/Lagos",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -50,37 +52,53 @@ function sectionTitle(section: SenMetric["section"]) {
   return section === "skill" ? "Skills" : "Maladaptive behaviours";
 }
 
-export function SenReportsFeature() {
+export function SenReportsFeature({
+  initialStudentId,
+  initialClassroomId,
+  initialGroupId,
+}: { initialStudentId?: string; initialClassroomId?: string; initialGroupId?: string } = {}) {
+  const router = useRouter();
+  const [groupId, setGroupId] = React.useState(initialGroupId ?? "");
   const { classroomProgress, classrooms, selectedClassroomId, selectClassroom, classroomBusy } =
     useMontessori();
+  const [ready, setReady] = React.useState(!initialClassroomId);
+  React.useEffect(() => {
+    if (!initialClassroomId) return;
+    void Promise.resolve(selectClassroom(initialClassroomId)).then(() => setReady(true));
+  }, [initialClassroomId, selectClassroom]);
   const [date, setDate] = React.useState(localDate);
   const [data, setData] = React.useState<SenResponse | null>(null);
+  const requestSequence = React.useRef(0);
   const [loading, setLoading] = React.useState(false);
-  const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(
+    initialStudentId ?? null
+  );
   const [scores, setScores] = React.useState<Record<string, number>>({});
   const [remarks, setRemarks] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    if (!selectedClassroomId) return;
+    if (!selectedClassroomId || !ready) return;
+    const sequence = ++requestSequence.current;
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/v1/sen-reports?classroomId=${encodeURIComponent(selectedClassroomId)}&date=${encodeURIComponent(date)}`,
+        `/api/v1/sen-reports?classroomId=${encodeURIComponent(selectedClassroomId)}&date=${encodeURIComponent(date)}${groupId ? `&groupId=${encodeURIComponent(groupId)}` : ""}`,
         { credentials: "include", cache: "no-store" }
       );
       const next = (await response.json()) as SenResponse;
       if (!response.ok) throw new Error(next.error ?? "Couldn't load SEN reports");
-      setData(next);
+      if (sequence === requestSequence.current) setData(next);
     } catch (error) {
+      if (sequence !== requestSequence.current) return;
       setData(null);
       ToastBus.push({
         message: error instanceof Error ? error.message : "Couldn't load SEN reports",
       });
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
-  }, [date, selectedClassroomId]);
+  }, [date, selectedClassroomId, groupId, ready]);
 
   React.useEffect(() => {
     void load();
@@ -115,7 +133,7 @@ export function SenReportsFeature() {
     return [...bySection.entries()];
   }, [data?.metrics]);
 
-  const save = async () => {
+  const save = async (prepareToSend = false) => {
     if (!data?.group || !selectedStudent || !selectedClassroomId) return;
     if (Object.keys(scores).length !== data.metrics.length) {
       ToastBus.push({ message: "Choose a score for every item first" });
@@ -136,9 +154,16 @@ export function SenReportsFeature() {
           scores: data.metrics.map((metric) => ({ metricId: metric.id, score: scores[metric.id] })),
         }),
       });
-      const result = (await response.json()) as { ok?: boolean; error?: string };
+      const result = (await response.json()) as { ok?: boolean; id?: string; error?: string };
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Couldn't save SEN report");
-      ToastBus.push({ message: "SEN report saved" });
+      if (prepareToSend && result.id) {
+        const prepared = await fetch(`/api/v1/sen-reports/${result.id}/report`, { method: "POST" });
+        const payload = await prepared.json();
+        if (!prepared.ok) throw new Error(payload.error ?? "Couldn't prepare SEN report");
+        router.push(`/app/reports/${payload.reportId}`);
+      } else {
+        ToastBus.push({ message: "SEN report saved" });
+      }
       await load();
     } catch (error) {
       ToastBus.push({
@@ -185,7 +210,10 @@ export function SenReportsFeature() {
             <select
               value={selectedClassroomId ?? ""}
               disabled={classroomBusy}
-              onChange={(event) => void selectClassroom(event.target.value)}
+              onChange={(event) => {
+                setGroupId("");
+                void selectClassroom(event.target.value);
+              }}
               style={inputStyle}
             >
               {classrooms.map((classroom) => (
@@ -197,6 +225,23 @@ export function SenReportsFeature() {
           </label>
         )}
 
+        {(data?.groups?.length ?? 0) > 0 && (
+          <label style={{ display: "grid", gap: 6, maxWidth: 300, marginBottom: 18 }}>
+            Team
+            <select
+              aria-label="SEN team"
+              value={groupId || data?.group?.id || ""}
+              onChange={(event) => setGroupId(event.target.value)}
+              style={inputStyle}
+            >
+              {data?.groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {loading && <p style={mutedStyle}>Loading SEN reports…</p>}
 
         {!loading && data && !data.group && (
@@ -373,7 +418,15 @@ export function SenReportsFeature() {
                 />
               </label>
 
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="tap"
+                  disabled={saving}
+                  onClick={() => void save(true)}
+                >
+                  Save &amp; prepare to send
+                </button>
                 <button
                   type="button"
                   className="tap"
