@@ -18,6 +18,7 @@ import { CalendarBlank, HouseSimple, PencilSimple, SquaresFour } from "@phosphor
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
 import { adminExternalApiEnabled, adminReportTemplatesEnabled } from "@/lib/feature-flags";
+import { getSchoolBranding } from "@/lib/branding/school";
 
 type NavItem = {
   href: string;
@@ -128,6 +129,7 @@ function adminNavItems(options: { showToday: boolean }): NavItem[] {
 }
 
 export function MontessoriSidebar({
+  schoolName,
   variant = "teacher",
   showTodayNav = false,
   reportFirstNav = false,
@@ -136,6 +138,7 @@ export function MontessoriSidebar({
   showProgressNav = true,
   userMenuSlot,
 }: {
+  schoolName?: string | null;
   variant?: "teacher" | "admin";
   /** When true, includes the Today link before Progress. */
   showTodayNav?: boolean;
@@ -154,6 +157,7 @@ export function MontessoriSidebar({
    */
   userMenuSlot?: React.ReactNode;
 }) {
+  const brand = getSchoolBranding(schoolName);
   const pathname = usePathname();
   const store = useMontessori();
   const draftCount =
@@ -190,22 +194,39 @@ export function MontessoriSidebar({
           padding: "0 8px 18px",
           borderBottom: "1px solid var(--color-border)",
           marginBottom: 14,
+          textAlign: brand ? "center" : "left",
         }}
       >
-        <div
-          className="font-display"
-          style={{
-            fontSize: 28,
-            color: "var(--color-ink)",
-            lineHeight: 1,
-            letterSpacing: "-0.01em",
-          }}
-        >
-          Mitable
-        </div>
-        <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginTop: 2 }}>
-          Montessori
-        </div>
+        {brand ? (
+          <img
+            src={brand.logoPath}
+            alt={brand.name}
+            style={{
+              display: "block",
+              width: 128,
+              height: 64,
+              objectFit: "contain",
+              margin: "0 auto",
+            }}
+          />
+        ) : (
+          <div
+            className="font-display"
+            style={{
+              fontSize: 28,
+              color: "var(--color-ink)",
+              lineHeight: 1,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Mitable
+          </div>
+        )}
+        {!brand ? (
+          <div className="label-cap" style={{ color: "var(--color-ink-muted)", marginTop: 2 }}>
+            Montessori
+          </div>
+        ) : null}
       </div>
       <nav>
         {navItems.map((n) => {

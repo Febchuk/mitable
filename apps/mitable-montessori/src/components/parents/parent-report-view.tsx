@@ -2,6 +2,7 @@ import type { ReportPdfBlock } from "@/lib/pdf/report-template";
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
 import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
 import type { ReportMediaItem } from "@/lib/media/report-media";
+import { getSchoolBranding } from "@/lib/branding/school";
 
 const MARK_CLASS: Record<ProgressMark, string> = {
   m: "bg-sage-soft text-sage-deep",
@@ -24,6 +25,7 @@ export function ParentReportView({
   blocks,
   fallbackBody,
   media,
+  schoolName,
 }: {
   title: string;
   studentName: string;
@@ -32,7 +34,9 @@ export function ParentReportView({
   blocks: ReportPdfBlock[];
   fallbackBody: string;
   media: ReportMediaItem[];
+  schoolName?: string | null;
 }) {
+  const brand = getSchoolBranding(schoolName);
   return (
     <article className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
       <header className="border-b border-border px-6 py-8 sm:px-10 sm:py-10">
@@ -61,6 +65,15 @@ export function ParentReportView({
       </div>
       <footer className="border-t border-border px-6 py-4 text-center text-xs text-ink-muted sm:px-10">
         Prepared with Mitable
+        {brand ? (
+          <>
+            {" "}
+            · Questions?{" "}
+            <a href={`mailto:${brand.headOfSchoolEmail}`} className="underline">
+              {brand.headOfSchoolEmail}
+            </a>
+          </>
+        ) : null}
       </footer>
     </article>
   );

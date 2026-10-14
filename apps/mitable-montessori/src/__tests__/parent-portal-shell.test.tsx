@@ -70,4 +70,22 @@ describe("parent portal child switcher", () => {
 
     expect(navigation.push).toHaveBeenCalledWith("/parents/progress?child=student-2&view=timeline");
   });
+
+  it("shows The Learning Place logo when this parent belongs to the school", () => {
+    render(
+      <ParentPortalShell
+        firstName="Jordan"
+        email="jordan@example.com"
+        linkedChildren={children}
+        schoolName="The Learning Place"
+      >
+        <div>Selected child content</div>
+      </ParentPortalShell>
+    );
+
+    expect(screen.getAllByAltText("The Learning Place")).toHaveLength(2);
+    expect(
+      screen.getByRole("link", { name: "hos@thelearningplaceng.com" }).getAttribute("href")
+    ).toBe("mailto:hos@thelearningplaceng.com");
+  });
 });
