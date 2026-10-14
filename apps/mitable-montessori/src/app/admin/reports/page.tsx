@@ -1,4 +1,3 @@
-import { listTeacherClassroomsForCurrentUser } from "@/lib/app/active-classroom";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { listReportsV2 } from "@/lib/queries/reports";
@@ -17,10 +16,15 @@ export default async function AdminReportsPage({
   const openParam =
     typeof rawOpen === "string" ? rawOpen : Array.isArray(rawOpen) ? rawOpen[0] : undefined;
 
-  const [reports, classrooms] = await Promise.all([
-    listReportsV2(),
-    listTeacherClassroomsForCurrentUser(),
-  ]);
+  const reports = await listReportsV2();
+  const classrooms = [
+    ...new Map(
+      reports.map((report) => [
+        report.classroomId,
+        { id: report.classroomId, name: report.classroomName ?? "Classroom" },
+      ])
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   if (openParam && reports.some((r) => r.id === openParam)) {
     redirect(`/admin/reports/${openParam}`);

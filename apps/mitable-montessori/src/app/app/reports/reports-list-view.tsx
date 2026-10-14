@@ -349,7 +349,12 @@ export function ReportsListView({
                       {r.studentName}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--color-ink-muted)", marginTop: 1 }}>
-                      {kindLabel(r.reportType)} report · {formatWhen(r, locale)}
+                      {r.classroomName ?? "Classroom"} · {kindLabel(r.reportType)} report ·{" "}
+                      {formatWhen(r, locale)} ·{" "}
+                      {new Date(r.createdAt).toLocaleTimeString(locale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </div>
                     <div
                       style={{
