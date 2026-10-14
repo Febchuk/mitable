@@ -30,6 +30,7 @@ import { getRevealHidden, setRevealHidden } from "@/lib/visibility/reveal-hidden
 import { OnlineToggle } from "./online-toggle";
 import { useMontessori } from "./store";
 import { adminExternalApiEnabled, adminReportTemplatesEnabled } from "@/lib/feature-flags";
+import { getSchoolBranding } from "@/lib/branding/school";
 
 /**
  * Mobile shell for Mitable Montessori.
@@ -148,6 +149,7 @@ export interface MontessoriMobileShellProps {
   firstName?: string | null;
   email: string;
   schoolName: string;
+  brandSchoolName?: string | null;
   /** Optional context line under the school (e.g. "3 classrooms · 48 children"). */
   schoolSubtitle?: string;
   /** Used to title chat sheet on the teacher side. */
@@ -214,6 +216,7 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
     <>
       <MobileTopBar
         variant={props.variant}
+        schoolName={props.brandSchoolName ?? props.schoolName}
         firstName={props.firstName}
         email={props.email}
         onAvatarClick={() => setDrawerOpen(true)}
@@ -238,6 +241,7 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
         firstName={props.firstName}
         email={props.email}
         schoolName={props.schoolName}
+        brandSchoolName={props.brandSchoolName}
         schoolSubtitle={props.schoolSubtitle}
         onDismiss={() => setDrawerOpen(false)}
       />
@@ -264,16 +268,19 @@ export function MontessoriMobileShell(props: MontessoriMobileShellProps) {
 /* ────────────────────────────────────────────────────────────────────────── */
 
 function MobileTopBar({
+  schoolName,
   firstName,
   email,
   onAvatarClick,
 }: {
   variant: Variant;
+  schoolName: string;
   firstName?: string | null;
   email: string;
   onAvatarClick: () => void;
 }) {
   const initial = (firstName?.[0] || email[0] || "?").toUpperCase();
+  const brand = getSchoolBranding(schoolName);
 
   return (
     // lg:hidden so the bar never appears alongside the desktop sidebar.
@@ -318,6 +325,13 @@ function MobileTopBar({
       >
         {initial}
       </button>
+      {brand ? (
+        <img
+          src={brand.logoPath}
+          alt={brand.name}
+          style={{ width: 80, height: 40, objectFit: "contain" }}
+        />
+      ) : null}
       {/* Spacer — the page body's <PageHeader> carries the route title. */}
       <div style={{ flex: 1 }} />
       <OnlineToggle compact />
@@ -365,6 +379,7 @@ function MobileDrawer({
   firstName,
   email,
   schoolName,
+  brandSchoolName,
   schoolSubtitle,
   onDismiss,
 }: {
@@ -378,10 +393,12 @@ function MobileDrawer({
   firstName?: string | null;
   email: string;
   schoolName: string;
+  brandSchoolName?: string | null;
   schoolSubtitle?: string;
   onDismiss: () => void;
 }) {
   const pathname = usePathname() ?? "";
+  const brand = getSchoolBranding(brandSchoolName ?? schoolName);
   const router = useRouter();
   const store = useMontessori();
   const draftCount =
@@ -473,6 +490,13 @@ function MobileDrawer({
           borderBottom: "1px solid var(--color-border)",
         }}
       >
+        {brand ? (
+          <img
+            src={brand.logoPath}
+            alt={brand.name}
+            style={{ width: 108, height: 54, objectFit: "contain", objectPosition: "left" }}
+          />
+        ) : null}
         <div
           style={{
             display: "flex",

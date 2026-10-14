@@ -1,3 +1,5 @@
+import { getSchoolBranding } from "@/lib/branding/school";
+
 /**
  * Minimal Resend wrapper. Direct fetch — no SDK dependency.
  *
@@ -83,7 +85,9 @@ function renderInviteText({
   inviteUrl,
   inviterName,
   body,
+  schoolName,
 }: SendInviteInput & { body: string }): string {
+  const brand = getSchoolBranding(schoolName);
   return [
     `Hi,`,
     ``,
@@ -94,7 +98,7 @@ function renderInviteText({
     ``,
     `This link is good for 14 days. If it expires, ask ${inviterName} to send you a new one.`,
     ``,
-    `— The Mitable team`,
+    brand ? `Questions? Contact ${brand.headOfSchoolEmail}.` : `— The Mitable team`,
   ].join("\n");
 }
 
@@ -104,6 +108,7 @@ function renderInviteHtml({
   eyebrow,
   heading,
   body,
+  schoolName,
 }: SendInviteInput & {
   eyebrow: string;
   heading: string;
@@ -116,6 +121,13 @@ function renderInviteHtml({
   const safeBody = escapeHtml(body);
   const safeInviter = escapeHtml(inviterName);
   const safeUrl = escapeHtml(inviteUrl);
+  const brand = getSchoolBranding(schoolName);
+  const brandHeader = brand
+    ? `<p style="margin:0 0 22px;"><img src="${brand.emailLogoUrl}" alt="${brand.name}" width="144" height="72" style="display:block;width:144px;height:72px;object-fit:contain;" /></p>`
+    : "";
+  const contactFooter = brand
+    ? `Questions? Email <a href="mailto:${brand.headOfSchoolEmail}" style="color:#8A8275;">${brand.headOfSchoolEmail}</a>.`
+    : "Didn't expect this email? You can safely ignore it.";
 
   return `<!doctype html>
 <html lang="en">
@@ -125,6 +137,7 @@ function renderInviteHtml({
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E8DFD0;border-radius:18px;padding:36px 32px;">
             <tr><td>
+              ${brandHeader}
               <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8A8275;margin-bottom:14px;">${safeEyebrow}</div>
               <h1 style="font-size:22px;font-weight:600;line-height:1.25;margin:0 0 14px;color:#2A2723;letter-spacing:-0.005em;">
                 ${safeHeading}
@@ -147,7 +160,7 @@ function renderInviteHtml({
               <hr style="border:none;border-top:1px solid #E8DFD0;margin:22px 0 18px;" />
               <p style="font-size:12px;line-height:1.5;color:#8A8275;margin:0;">
                 This link works for 14 days. If it's expired, ask ${safeInviter} to send a new one.
-                Didn't expect this email? You can safely ignore it.
+                ${contactFooter}
               </p>
             </td></tr>
           </table>
@@ -186,6 +199,7 @@ export class ResendEmailSender implements EmailSender {
     const reportUrl = `${getAppUrl()}/parents/reports/${encodeURIComponent(job.reportId)}?child=${encodeURIComponent(job.studentId)}`;
 
     const html = renderReportEmailHtml({
+      schoolName,
       studentName,
       reportType,
       dateLabel,
@@ -193,6 +207,7 @@ export class ResendEmailSender implements EmailSender {
       reportUrl,
     });
     const text = renderReportEmailText({
+      schoolName,
       studentName,
       reportType,
       dateLabel,
@@ -244,6 +259,7 @@ function formatEmailDate(raw: string): string {
 }
 
 interface EmailRenderInput {
+  schoolName: string;
   studentName: string;
   reportType: string;
   dateLabel: string;
@@ -253,6 +269,7 @@ interface EmailRenderInput {
 
 function renderReportEmailText(input: EmailRenderInput): string {
   const { studentName, reportType, dateLabel, messageBody, reportUrl } = input;
+  const brand = getSchoolBranding(input.schoolName);
   const lines = [`${reportType} Report for ${studentName}`, dateLabel, ""];
   if (messageBody?.trim()) {
     lines.push(messageBody.trim(), "");
@@ -263,13 +280,22 @@ function renderReportEmailText(input: EmailRenderInput): string {
     "",
     "—",
     "Sent by your child's school via Mitable.",
-    "Questions? Please reach out to the school directly."
+    brand
+      ? `Questions? Contact ${brand.headOfSchoolEmail}.`
+      : "Questions? Please reach out to the school directly."
   );
   return lines.join("\n");
 }
 
 function renderReportEmailHtml(input: EmailRenderInput): string {
   const { studentName, reportType, dateLabel, messageBody, reportUrl } = input;
+  const brand = getSchoolBranding(input.schoolName);
+  const brandHeader = brand
+    ? `<tr><td style="padding:24px 36px 0;"><img src="${brand.emailLogoUrl}" alt="${brand.name}" width="144" height="72" style="display:block;width:144px;height:72px;object-fit:contain;" /></td></tr>`
+    : "";
+  const contactFooter = brand
+    ? `Questions? Email <a href="mailto:${brand.headOfSchoolEmail}" style="color:#A09A8E;">${brand.headOfSchoolEmail}</a>.`
+    : "Questions? Please reach out to the school directly.";
   const safeName = escapeHtml(studentName);
   const safeType = escapeHtml(reportType);
   const safeDate = escapeHtml(dateLabel);
@@ -299,6 +325,7 @@ function renderReportEmailHtml(input: EmailRenderInput): string {
 
         <!-- Accent stripe -->
         <tr><td style="height:4px;background:#82C0CC;font-size:0;line-height:0;">&nbsp;</td></tr>
+        ${brandHeader}
 
         <!-- Header -->
         <tr><td style="padding:32px 36px 0;">
@@ -348,7 +375,7 @@ function renderReportEmailHtml(input: EmailRenderInput): string {
         <tr><td style="padding:16px 36px 28px;">
           <p style="margin:0;font-size:12px;line-height:1.5;color:#A09A8E;">
             Sent by your child&rsquo;s school via Mitable.<br/>
-            Questions? Please reach out to the school directly.
+            ${contactFooter}
           </p>
         </td></tr>
 

@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <MontessoriProvider>
       <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
         <MontessoriSidebar
+          schoolName={ctx.schoolName}
           variant="admin"
           showTodayNav={adminTodayEnabled()}
           userMenuSlot={
@@ -48,6 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             firstName={ctx.firstName}
             email={ctx.email}
             schoolName={ctx.schoolName ?? "School"}
+            brandSchoolName={ctx.schoolName}
             schoolSubtitle="Admin workspace"
             classroomId={null}
             schoolId={ctx.schoolId}

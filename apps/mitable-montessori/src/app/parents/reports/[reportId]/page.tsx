@@ -70,6 +70,7 @@ export default async function ParentReportDetailPage({
           blocks={blocks}
           fallbackBody={report.body || "This report does not include written notes."}
           media={media}
+          schoolName={portal.schoolName}
         />
       </div>
     </div>

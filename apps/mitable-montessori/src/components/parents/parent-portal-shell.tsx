@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, CalendarDays, ChartNoAxesCombined, FileText, Home } from "lucide-react";
 import { UserMenu } from "@/components/app/UserMenu";
 import type { ParentChild } from "@/lib/parents/portal";
+import { getSchoolBranding } from "@/lib/branding/school";
 
 const NAV_ITEMS = [
   { href: "/parents/overview", label: "Overview", icon: Home },
@@ -19,12 +20,15 @@ export function ParentPortalShell({
   firstName,
   email,
   linkedChildren,
+  schoolName,
 }: {
   children: React.ReactNode;
   firstName: string;
   email: string;
   linkedChildren: ParentChild[];
+  schoolName?: string | null;
 }) {
+  const brand = getSchoolBranding(schoolName);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -80,7 +84,11 @@ export function ParentPortalShell({
           href={hrefFor("/parents/overview")}
           className="mb-4 border-b border-border px-2 pb-[18px] no-underline"
         >
-          <div className="font-display text-[28px] leading-none text-ink">Mitable</div>
+          {brand ? (
+            <img src={brand.logoPath} alt={brand.name} className="h-[54px] w-auto object-contain" />
+          ) : (
+            <div className="font-display text-[28px] leading-none text-ink">Mitable</div>
+          )}
           <div className="label-cap mt-0.5 text-ink-muted">Parents</div>
         </Link>
         <nav>
@@ -121,7 +129,11 @@ export function ParentPortalShell({
             href={hrefFor("/parents/overview")}
             className="font-display text-xl text-ink no-underline lg:hidden"
           >
-            Mitable
+            {brand ? (
+              <img src={brand.logoPath} alt={brand.name} className="h-11 w-auto object-contain" />
+            ) : (
+              "Mitable"
+            )}
           </Link>
           <div className="flex items-center gap-3">
             {selector}
@@ -131,6 +143,14 @@ export function ParentPortalShell({
           </div>
         </header>
         <main className="flex-1 px-4 py-6 pb-24 sm:px-7 lg:px-8 lg:py-8 lg:pb-8">{children}</main>
+        {brand ? (
+          <footer className="border-t border-border px-4 py-4 text-center text-xs text-ink-muted lg:px-8">
+            Questions? Contact the Head of School at{" "}
+            <a href={`mailto:${brand.headOfSchoolEmail}`} className="underline">
+              {brand.headOfSchoolEmail}
+            </a>
+          </footer>
+        ) : null}
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-surface px-1 py-2 lg:hidden">

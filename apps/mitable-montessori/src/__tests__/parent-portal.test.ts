@@ -9,6 +9,7 @@ describe("parent portal children", () => {
         id: "guardian-1",
         first_name: "Jordan",
         onboarding_completed_at: "2026-08-01T12:00:00Z",
+        schools: { name: "The Learning Place" },
       },
     });
     const guardianEq = vi.fn().mockReturnValue({ maybeSingle });
@@ -62,6 +63,7 @@ describe("parent portal children", () => {
     expect(from).toHaveBeenNthCalledWith(1, "guardians");
     expect(from).toHaveBeenNthCalledWith(2, "student_guardians");
     expect(linksEq).toHaveBeenCalledWith("guardian_id", "guardian-1");
+    expect(portal?.schoolName).toBe("The Learning Place");
     expect(portal?.children).toEqual([
       { id: "student-1", name: "Avery Stone", receivesReports: true },
       { id: "student-2", name: "Ben", receivesReports: false },
