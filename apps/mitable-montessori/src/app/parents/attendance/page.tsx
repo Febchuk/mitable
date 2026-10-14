@@ -27,7 +27,7 @@ export default async function ParentAttendancePage({
   const supabase = createClient(await cookies());
   const { data } = await supabase
     .from("attendance_records")
-    .select("attendance_date, status, comment")
+    .select("attendance_date, status, comment, half_day, arrival_time, departure_time")
     .eq("student_id", child.id)
     .order("attendance_date", { ascending: false })
     .limit(60);
@@ -35,6 +35,9 @@ export default async function ParentAttendancePage({
     attendance_date: string;
     status: "present" | "absent";
     comment: string | null;
+    half_day: boolean;
+    arrival_time: string | null;
+    departure_time: string | null;
   }>;
 
   return (
@@ -54,6 +57,16 @@ export default async function ParentAttendancePage({
                 <p className="text-sm font-medium text-ink">
                   {formatAttendanceDate(row.attendance_date)}
                 </p>
+                {(row.arrival_time || row.departure_time) && (
+                  <p className="mt-1 text-sm text-ink-secondary">
+                    {[
+                      row.arrival_time && `Arrived ${row.arrival_time.slice(0, 5)}`,
+                      row.departure_time && `Picked up ${row.departure_time.slice(0, 5)}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
                 {row.comment ? (
                   <p className="mt-1 text-sm text-ink-secondary">{row.comment}</p>
                 ) : null}
@@ -65,7 +78,7 @@ export default async function ParentAttendancePage({
                     : "rounded-full bg-terracotta-soft px-3 py-1 text-xs font-medium text-terracotta-deep"
                 }
               >
-                {row.status === "present" ? "Present" : "Absent"}
+                {row.status === "present" ? (row.half_day ? "Half-day" : "Present") : "Absent"}
               </span>
             </li>
           ))}

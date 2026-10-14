@@ -14,7 +14,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   // RLS gates the join — a guardian who isn't linked to this student gets [].
   const { data, error } = await supabase
     .from("attendance_records")
-    .select("attendance_date, status, comment")
+    .select("attendance_date, status, comment, half_day, arrival_time, departure_time")
     .eq("student_id", id)
     .order("attendance_date", { ascending: false })
     .limit(180);
