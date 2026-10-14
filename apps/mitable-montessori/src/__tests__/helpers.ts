@@ -87,7 +87,7 @@ export async function runWorkflowFixture(): Promise<string[]> {
   return trace;
 }
 
-export async function attemptInvalidSend() {
+export async function sendDraftDirectly() {
   const { sendReport } = await import("@/lib/reports/workflow");
   const { fake } = buildFakeSupabase({ id: REPORT_ID, status: "draft" });
   await sendReport({ supabase: fake, reportId: REPORT_ID, actorUserId: ACTOR }, ["g-1"], {
