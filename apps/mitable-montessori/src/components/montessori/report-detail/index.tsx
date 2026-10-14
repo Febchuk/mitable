@@ -307,9 +307,10 @@ export function ReportDetail({
   // strict mode's second invocation, which is the only reason a flag was
   // needed in the first place.
   React.useEffect(() => {
-    // Daily reports already contain recorded progress. Opening an empty day
-    // should not start a blocking AI request or invent commentary.
+    // Daily reports use recorded progress, and project letters are written by
+    // the teacher; neither should start an automatic AI draft.
     if (
+      report.reportType === "project" ||
       report.reportType === "daily" ||
       !empty ||
       draftKickedRef.current ||

@@ -514,15 +514,18 @@
   margin-bottom: 8px;
 }
 .nr-type-card .nr-type-name {
+  display: block;
   font-weight: 600;
   font-size: 14px;
   color: var(--color-ink);
+  line-height: 1.35;
 }
 .nr-type-card .nr-type-sub {
-  font-size: 11.5px;
+  display: block;
+  font-size: 12px;
   color: var(--color-ink-muted);
-  margin-top: 2px;
-  line-height: 1.4;
+  margin-top: 8px;
+  line-height: 1.5;
 }
 .nr-type-card.nr-type-daily .nr-type-ico {
   background: var(--color-clay-soft);
@@ -1293,6 +1296,19 @@
 .nr-m-type-card.nr-selected {
   border-color: var(--color-terracotta);
   box-shadow: 0 0 0 4px var(--color-terracotta-soft);
+}
+.nr-m-type-card .nr-type-name,
+.nr-m-type-card .nr-type-sub {
+  display: block;
+}
+.nr-m-type-card .nr-type-name {
+  font-weight: 600;
+  line-height: 1.35;
+}
+.nr-m-type-card .nr-type-sub {
+  margin-top: 8px;
+  color: var(--color-ink-muted);
+  line-height: 1.5;
 }
 .nr-m-type-card .nr-type-ico {
   width: 44px;

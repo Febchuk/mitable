@@ -23,7 +23,7 @@ export type ReportTemplate = {
 
 export type ReportKind = "Daily" | "Major" | "Incident";
 
-export type PickerReportKind = ReportKind | "SEN";
+export type PickerReportKind = ReportKind | "SEN" | "Project";
 
 /** Submitted to /api/v1/reports. Audio + handwritten notes are no longer part
  *  of the new-report flow — the assistant drafts from the empty template. The

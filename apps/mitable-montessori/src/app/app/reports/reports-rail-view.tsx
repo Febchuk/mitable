@@ -71,6 +71,7 @@ const STATUS_TONE: Record<
 };
 
 function kindLabel(t: ReportListRow["reportType"]): string {
+  if (t === "project") return "Project letter";
   if (t === "sen") return "SEN";
   if (t === "daily") return "Daily";
   if (t === "major") return "Major";
