@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReportReviewActionType, ReportStatus } from "@/lib/schemas/report";
+import { toddlerSendSnapshot, type DailyReportSnapshotSource } from "./toddler-send-snapshot";
 
 /**
  * Report workflow transitions. Each call must:
@@ -53,7 +54,9 @@ async function applyTransition(
 ) {
   const { data: report, error: readErr } = await ctx.supabase
     .from("reports")
-    .select("id, status")
+    .select(
+      "id, status, report_type, student_id, classroom_id, report_date, period_end, sections, section_meta, section_guidance"
+    )
     .eq("id", ctx.reportId)
     .maybeSingle();
   if (readErr || !report) {
@@ -86,6 +89,10 @@ async function applyTransition(
     update.sent_at = new Date().toISOString();
   }
   if (extras) Object.assign(update, extras);
+  if (action === "sent" && report.report_type === "daily") {
+    const snapshot = await toddlerSendSnapshot(ctx.supabase, report as DailyReportSnapshotSource);
+    if (snapshot) Object.assign(update, snapshot);
+  }
 
   const { error: updateErr } = await ctx.supabase
     .from("reports")
