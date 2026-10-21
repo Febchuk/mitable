@@ -902,9 +902,11 @@ function SectionBlock({
                 heading={section.heading}
                 html={p.html}
                 hint={
-                  fieldMeta?.type === "curriculum"
-                    ? "Filled from this child’s speech targets. Admins edit them under Curriculum → Speech."
-                    : undefined
+                  section.heading === "Daily overview"
+                    ? "Filled from this child’s saved Daily Log and Progress entries."
+                    : fieldMeta?.type === "curriculum"
+                      ? "Filled from this child’s speech targets. Admins edit them under Curriculum → Speech."
+                      : undefined
                 }
               />
             ) : (

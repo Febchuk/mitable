@@ -14,6 +14,7 @@ export type DailyProgressReportChild = {
   progressCount: number;
   noteCount: number;
   guardianCount: number;
+  dailyLogRecorded?: boolean;
   reportId: string | null;
   reportStatus: DailyProgressReportStatus | null;
   sendable: boolean;
@@ -43,6 +44,7 @@ export type DailyProgressBatchResult = {
 
 export function dailyProgressReason(args: {
   progressCount: number;
+  dailyLogRecorded?: boolean;
   guardianCount: number;
   reportStatus: DailyProgressReportStatus | null;
 }): Pick<DailyProgressReportChild, "sendable" | "reason"> {
@@ -50,7 +52,8 @@ export function dailyProgressReason(args: {
   if (args.reportStatus === "submitted_for_review" || args.reportStatus === "in_review") {
     return { sendable: false, reason: "in_review" };
   }
-  if (args.progressCount === 0) return { sendable: false, reason: "no_progress" };
+  if (args.progressCount === 0 && !args.dailyLogRecorded)
+    return { sendable: false, reason: "no_progress" };
   if (args.guardianCount === 0) return { sendable: false, reason: "no_guardian" };
   return { sendable: true, reason: "ready" };
 }
