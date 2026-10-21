@@ -135,7 +135,7 @@ export function SenReportsFeature({
 
   const save = async (prepareToSend = false) => {
     if (!data?.group || !selectedStudent || !selectedClassroomId) return;
-    if (Object.keys(scores).length !== data.metrics.length) {
+    if (data.metrics.some((metric) => !Number.isInteger(scores[metric.id]))) {
       ToastBus.push({ message: "Choose a score for every item first" });
       return;
     }
