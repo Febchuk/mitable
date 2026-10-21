@@ -19,6 +19,10 @@ import { buildDefaultReportSections } from "@/lib/reports/default-template";
 import { sendReport } from "@/lib/reports/workflow";
 import { REPORTABLE_PROGRESS_STATUSES } from "@/lib/progress/marking-schemas";
 import { createAdminClient } from "@/utils/supabase/admin";
+import {
+  buildToddlerDailyReportSections,
+  TODDLER_DAY_UTC_OFFSET_MINUTES,
+} from "@/lib/reports/toddler-daily-report";
 
 const DateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const UtcOffsetSchema = z.coerce.number().int().min(-840).max(840);
@@ -28,7 +32,7 @@ const SendBatchSchema = z.object({
   studentIds: z.array(z.string().uuid()).min(1).max(100),
 });
 
-type Classroom = { id: string; name: string };
+type Classroom = { id: string; name: string; code: string | null };
 type RosterStudent = {
   id: string;
   firstName: string;
@@ -64,10 +68,8 @@ async function loadScope(schoolId: string): Promise<{
   classrooms: Classroom[];
   students: RosterStudent[];
 }> {
-  const assigned = (await listTeacherClassroomsForCurrentUser()).filter(
-    (classroom) => !isToddlerClassroomCode(classroom.code)
-  );
-  const classrooms = assigned.map(({ id, name }) => ({ id, name }));
+  const assigned = await listTeacherClassroomsForCurrentUser();
+  const classrooms = assigned.map(({ id, name, code }) => ({ id, name, code }));
   if (classrooms.length === 0) return { classrooms: [], students: [] };
 
   const supabase = createAdminClient();
@@ -132,7 +134,6 @@ async function loadProgressCounts(
     .from("student_progress_history")
     .select("student_id, curriculum_subtopic_id, new_status, comment, changed_at")
     .in("student_id", studentIds)
-    .in("new_status", [...REPORTABLE_PROGRESS_STATUSES])
     .gte("changed_at", window.start)
     .lte("changed_at", window.end)
     .order("changed_at", { ascending: true });
@@ -144,8 +145,15 @@ async function loadProgressCounts(
       student_id: string;
       curriculum_subtopic_id: string;
       comment: string | null;
+      new_status: string | null;
     };
-    latestByCell.set(`${r.student_id}:${r.curriculum_subtopic_id}`, {
+    const key = `${r.student_id}:${r.curriculum_subtopic_id}`;
+    if (!r.new_status) continue;
+    if (!(REPORTABLE_PROGRESS_STATUSES as readonly string[]).includes(r.new_status)) {
+      latestByCell.delete(key);
+      continue;
+    }
+    latestByCell.set(key, {
       studentId: r.student_id,
       hasNote: Boolean(r.comment?.trim()),
     });
@@ -225,16 +233,41 @@ async function buildSummary(schoolId: string, reportDate: string, utcOffsetMinut
   const scope = await loadScope(schoolId);
   const studentIds = scope.students.map((student) => student.id);
   const classroomIds = scope.classrooms.map((classroom) => classroom.id);
-  const [progress, recipients, reports] = await Promise.all([
-    loadProgressCounts(studentIds, reportDate, utcOffsetMinutes),
+  const toddlerClassroomIds = scope.classrooms
+    .filter((room) => isToddlerClassroomCode(room.code))
+    .map((room) => room.id);
+  const toddlerStudentIds = scope.students
+    .filter((student) => toddlerClassroomIds.includes(student.classroomId))
+    .map((student) => student.id);
+  const [ordinaryProgress, toddlerProgress, logResult, recipients, reports] = await Promise.all([
+    loadProgressCounts(
+      studentIds.filter((id) => !toddlerStudentIds.includes(id)),
+      reportDate,
+      utcOffsetMinutes
+    ),
+    loadProgressCounts(toddlerStudentIds, reportDate, TODDLER_DAY_UTC_OFFSET_MINUTES),
+    toddlerStudentIds.length
+      ? createAdminClient()
+          .from("toddler_daily_logs")
+          .select("student_id, classroom_id")
+          .eq("school_id", schoolId)
+          .eq("log_date", reportDate)
+          .in("classroom_id", toddlerClassroomIds)
+          .in("student_id", toddlerStudentIds)
+      : { data: [], error: null },
     loadGuardianRecipients(studentIds),
     loadExistingReports(studentIds, classroomIds, reportDate),
   ]);
+  if (logResult.error) throw new Error(logResult.error.message);
+  const progress = new Map([...ordinaryProgress, ...toddlerProgress]);
   const classroomNameById = new Map(scope.classrooms.map((room) => [room.id, room.name] as const));
   const children: DailyProgressReportChild[] = scope.students.map((student) => {
     const activity = progress.get(student.id) ?? { progressCount: 0, noteCount: 0 };
     const report = reports.get(student.id) ?? null;
     const guardianCount = recipients.get(student.id)?.length ?? 0;
+    const dailyLogRecorded = (logResult.data ?? []).some(
+      (log) => log.student_id === student.id && log.classroom_id === student.classroomId
+    );
     return {
       studentId: student.id,
       studentName: studentName(student),
@@ -242,12 +275,14 @@ async function buildSummary(schoolId: string, reportDate: string, utcOffsetMinut
       classroomName: classroomNameById.get(student.classroomId) ?? "Classroom",
       ...activity,
       guardianCount,
+      dailyLogRecorded,
       reportId: report?.id ?? null,
       reportStatus: report?.status ?? null,
       ...dailyProgressReason({
         progressCount: activity.progressCount,
         guardianCount,
         reportStatus: report?.status ?? null,
+        dailyLogRecorded,
       }),
     };
   });
@@ -352,16 +387,27 @@ export async function POST(req: Request) {
         const existing = reports.get(studentId) ?? null;
         let reportId = existing?.id ?? null;
 
-        if (!existing || existing.status === "draft" || existing.status === "changes_requested") {
+        const room = scope.classrooms.find((room) => room.id === student.classroomId);
+        const toddler = isToddlerClassroomCode(room?.code);
+        // Existing Toddler drafts are refreshed by the shared send workflow,
+        // which also preserves any teacher-written additions from Reports.
+        if (!existing || (!toddler && ["draft", "changes_requested"].includes(existing.status))) {
           const exactWindow = reportWindow(parsed.data.reportDate, parsed.data.utcOffsetMinutes);
-          const built = await buildDefaultReportSections(supabase, {
-            classroomId: student.classroomId,
-            studentId,
-            periodStart: parsed.data.reportDate,
-            periodEnd: parsed.data.reportDate,
-            reportingPeriod: "daily",
-            exactWindow,
-          });
+          const built = toddler
+            ? await buildToddlerDailyReportSections(supabase, {
+                schoolId: auth.user.schoolId,
+                classroomId: student.classroomId,
+                studentId,
+                reportDate: parsed.data.reportDate,
+              })
+            : await buildDefaultReportSections(supabase, {
+                classroomId: student.classroomId,
+                studentId,
+                periodStart: parsed.data.reportDate,
+                periodEnd: parsed.data.reportDate,
+                reportingPeriod: "daily",
+                exactWindow,
+              });
           const noon = new Date(`${parsed.data.reportDate}T12:00:00Z`);
           const firstName = student.preferredName || student.firstName || "Student";
           const title = `${firstName} — ${noon.toLocaleDateString(undefined, {
@@ -377,6 +423,7 @@ export async function POST(req: Request) {
                 sections: built.sections,
                 section_meta: built.sectionMeta,
                 section_guidance: built.sectionGuidance,
+                toddler_daily_log_id: "toddlerDailyLogId" in built ? built.toddlerDailyLogId : null,
                 body: null,
                 title,
                 updated_at: new Date().toISOString(),
@@ -401,6 +448,7 @@ export async function POST(req: Request) {
                 template_id: null,
                 section_meta: built.sectionMeta,
                 section_guidance: built.sectionGuidance,
+                toddler_daily_log_id: "toddlerDailyLogId" in built ? built.toddlerDailyLogId : null,
                 created_by_user_id: auth.user.userId,
               })
               .select("id")

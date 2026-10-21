@@ -35,9 +35,7 @@ export async function teacherShouldSeeDailyLog(): Promise<boolean> {
 }
 
 export async function teacherShouldSeeProgress(): Promise<boolean> {
-  return (await listTeacherClassroomsForCurrentUser()).some(
-    (classroom) => !isToddlerClassroomCode(classroom.code)
-  );
+  return (await listTeacherClassroomsForCurrentUser()).length > 0;
 }
 
 type ClassroomProgram = "montessori" | "iep" | "speech" | "sen";

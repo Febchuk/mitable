@@ -337,6 +337,7 @@ export function DailyReportsPanel({ refreshKey }: { refreshKey: number }) {
                                   <small>
                                     {child.progressCount} progress mark
                                     {child.progressCount === 1 ? "" : "s"}
+                                    {child.dailyLogRecorded ? " · Daily Log saved" : ""}
                                     {child.noteCount > 0
                                       ? ` · ${child.noteCount} note${child.noteCount === 1 ? "" : "s"}`
                                       : ""}

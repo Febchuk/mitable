@@ -31,7 +31,10 @@ import {
   listStudentExamGradesForTerm,
 } from "@/lib/queries/elementary-grades";
 import { encodeExamGrades, summarizeExamGrades } from "@/lib/reports/exam-grades-payload";
-import { dbToddlerDailyLogToDto, toddlerDailyLogReportHtml } from "@/lib/toddler-routines";
+import {
+  buildToddlerDailyReportSections,
+  ToddlerReportNotReadyError,
+} from "@/lib/reports/toddler-daily-report";
 
 const KIND_TO_TYPE: Record<ReportKind, "daily" | "major" | "incident"> = {
   Daily: "daily",
@@ -165,7 +168,12 @@ export async function POST(req: Request) {
       sectionGuidance = built.sectionGuidance;
       resolvedTemplateId = built.templateId;
       reportingPeriod = "daily";
-    } else {
+    } else if (
+      defaultKind !== "Daily" ||
+      !isToddlerClassroomCode(
+        teacherClassrooms.find((classroom) => classroom.id === reportClassroomId)?.code
+      )
+    ) {
       const { periodStart, periodEnd } = await resolvePeriodBounds(
         supabase,
         auth.user.schoolId,
@@ -226,7 +234,7 @@ export async function POST(req: Request) {
   });
   const reportDate = input.reportDate ?? reportDay.toISOString().slice(0, 10);
 
-  const { periodStart, periodEnd, termId } = reportingPeriod
+  let { periodStart, periodEnd, termId } = reportingPeriod
     ? await resolvePeriodBounds(supabase, auth.user.schoolId, reportingPeriod, reportDay)
     : { periodStart: reportDate, periodEnd: reportDate, termId: null };
 
@@ -264,50 +272,28 @@ export async function POST(req: Request) {
   }
 
   if (input.kind === "Daily" && isToddlerClassroomCode(reportClassroom?.code)) {
-    const [{ data: logRow }, { data: attendanceRow }] = await Promise.all([
-      supabase
-        .from("toddler_daily_logs")
-        .select("*")
-        .eq("school_id", auth.user.schoolId)
-        .eq("classroom_id", reportClassroomId)
-        .eq("student_id", input.childId)
-        .eq("log_date", reportDate)
-        .maybeSingle(),
-      supabase
-        .from("attendance_records")
-        .select("status, arrival_time")
-        .eq("classroom_id", reportClassroomId)
-        .eq("student_id", input.childId)
-        .eq("attendance_date", reportDate)
-        .maybeSingle(),
-    ]);
-    if (!logRow) {
+    try {
+      const built = await buildToddlerDailyReportSections(supabase, {
+        schoolId: auth.user.schoolId,
+        classroomId: reportClassroomId,
+        studentId: input.childId,
+        reportDate,
+      });
+      sections = built.sections;
+      sectionMeta = built.sectionMeta;
+      sectionGuidance = built.sectionGuidance;
+      toddlerDailyLogId = built.toddlerDailyLogId;
+      reportingPeriod = "daily";
+      periodStart = periodEnd = reportDate;
+      termId = null;
+    } catch (error) {
       return NextResponse.json(
-        { error: "Save this child's Daily Log before creating the report" },
-        { status: 400 }
+        { error: (error as Error).message },
+        {
+          status: error instanceof ToddlerReportNotReadyError ? 400 : 500,
+        }
       );
     }
-    toddlerDailyLogId = logRow.id as string;
-    const attendance = attendanceRow?.status
-      ? `${attendanceRow.status}${attendanceRow.arrival_time ? ` · arrived ${String(attendanceRow.arrival_time).slice(0, 5)}` : ""}`
-      : null;
-    const heading = "Daily log";
-    // Toddler reports come entirely from the Daily Log. Do not retain the
-    // regular curriculum/progress-grid sections built by the default template.
-    sections = [
-      {
-        id: `s-toddler-daily-log-${reportDate}`,
-        heading,
-        paragraphs: [
-          {
-            id: `p-toddler-daily-log-${reportDate}`,
-            html: toddlerDailyLogReportHtml(dbToddlerDailyLogToDto(logRow), attendance),
-          },
-        ],
-      },
-    ];
-    sectionMeta = {};
-    sectionGuidance = {};
   }
 
   const { data: reusable } =
@@ -326,7 +312,7 @@ export async function POST(req: Request) {
       : { data: null };
 
   if (reusable) {
-    if (toddlerDailyLogId) {
+    if (input.kind === "Daily" && isToddlerClassroomCode(reportClassroom?.code)) {
       const { error: updateError } = await supabase
         .from("reports")
         .update({
