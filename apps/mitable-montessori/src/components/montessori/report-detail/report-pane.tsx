@@ -11,6 +11,7 @@ import {
   fieldPayloadToReadableText,
   inferChecklistSelections,
   inferSingleSelect,
+  plainTextToReportParagraphHtml,
 } from "@/lib/reports/template-field-payload";
 import { firstOpenParagraphIndex } from "@/lib/reports/section-paragraph-slots";
 import { decodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
@@ -27,6 +28,7 @@ const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
 type ReportPaneProps = {
   detail: ReportDetail;
   onChange: (next: ReportDetail) => void;
+  plainTextEditing?: boolean;
   /** True while POST /draft is filling the report from capture — blocks edits on this pane only. */
   isDrafting?: boolean;
   /** Aborts the in-flight /draft request (client-side); optional for tests. */
@@ -51,6 +53,7 @@ function newId(prefix: string) {
 export function ReportPane({
   detail,
   onChange,
+  plainTextEditing = false,
   isDrafting = false,
   onCancelDrafting,
   onDiscussParagraph,
@@ -173,6 +176,7 @@ export function ReportPane({
               <SectionBlock
                 key={group.section.id}
                 section={group.section}
+                plainTextEditing={plainTextEditing}
                 fieldMeta={sectionMeta[group.section.heading]}
                 pendingFocusParagraphId={pendingFocusParagraphId}
                 onParagraphFocused={clearPendingFocus}
@@ -706,6 +710,7 @@ function TemplateHardcodedField({
 
 function SectionBlock({
   section,
+  plainTextEditing = false,
   fieldMeta,
   pendingFocusParagraphId,
   onParagraphFocused,
@@ -717,6 +722,7 @@ function SectionBlock({
   onDismissGhostEdit,
 }: {
   section: ReportSection;
+  plainTextEditing?: boolean;
   fieldMeta?: SectionMetaEntry;
   pendingFocusParagraphId: string | null;
   onParagraphFocused: () => void;
@@ -905,6 +911,16 @@ function SectionBlock({
                   fieldMeta?.type === "curriculum"
                     ? "Filled from this child’s speech targets. Admins edit them under Curriculum → Speech."
                     : undefined
+                }
+              />
+            ) : plainTextEditing ? (
+              <textarea
+                className="rd-para-text rd-para-textarea"
+                aria-label={`${section.heading} paragraph`}
+                value={fieldPayloadToReadableText(p.html)}
+                rows={Math.max(4, fieldPayloadToReadableText(p.html).split("\n").length)}
+                onChange={(event) =>
+                  onParagraphCommit(p.id, plainTextToReportParagraphHtml(event.target.value))
                 }
               />
             ) : (

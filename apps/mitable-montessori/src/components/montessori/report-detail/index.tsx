@@ -132,7 +132,7 @@ function sectionsToBody(sections: LocalSection[]): string {
     .map((s) => {
       const heading = s.heading ? `# ${s.heading}\n\n` : "";
       const body = s.paragraphs
-        .map((p) => fieldPayloadToReadableText(p.html).trim())
+        .map((p) => fieldPayloadToReadableText(p.html))
         .filter((p) => p.length > 0)
         .join("\n\n");
       return heading + body;
@@ -873,6 +873,7 @@ export function ReportDetail({
           <div className="rd-split">
             <div className={viewMode === "editor" ? "rd-pane-wrap" : "rd-pane-wrap rd-pane-hidden"}>
               <ReportPane
+                plainTextEditing={report.reportType === "project"}
                 detail={detail}
                 onChange={onChange}
                 isDrafting={isDrafting}

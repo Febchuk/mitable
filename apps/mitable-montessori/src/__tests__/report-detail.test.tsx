@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ReportDetail } from "@/components/montessori/report-detail";
 import type { ReportDetail as ReportDetailRow } from "@/lib/queries/reports";
+import { ParentReportView } from "@/components/parents/parent-report-view";
+import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -239,3 +241,47 @@ it("opens an empty daily report without a blocking AI draft request", async () =
   await act(async () => {});
   expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/draft"))).toBe(false);
 });
+
+it.each(["  Leading", "Trailing  ", "\n  First  \n\n\tLast  \n"])(
+  "keeps project letter text through editing, save, reopen and the parent view: %j",
+  async (text) => {
+    const report = { ...ADA_REPORT, reportType: "project" as const };
+    render(<ReportDetail report={report} />);
+    const input = screen.getByRole("textbox", { name: "Morning paragraph" }) as HTMLTextAreaElement;
+    expect(input.tagName).toBe("TEXTAREA");
+    fireEvent.change(input, { target: { value: text } });
+    expect(input.value).toBe(text);
+
+    await waitFor(
+      () => {
+        expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(true);
+      },
+      { timeout: 3000 }
+    );
+    const [, request] = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PATCH")!;
+    const saved = JSON.parse(request!.body as string);
+    expect(saved.body).toContain(`# Morning\n\n${text}\n\n# Language`);
+
+    cleanup();
+    render(<ReportDetail report={{ ...report, sections: saved.sections, body: saved.body }} />);
+    expect(
+      (screen.getByRole("textbox", { name: "Morning paragraph" }) as HTMLTextAreaElement).value
+    ).toBe(text);
+
+    cleanup();
+    const { container } = render(
+      <ParentReportView
+        title="Project letter"
+        studentName="Ada"
+        reportType="project"
+        periodLabel="Today"
+        blocks={buildReportPdfBlocks(saved.sections, {})}
+        fallbackBody={saved.body}
+        media={[]}
+      />
+    );
+    const paragraph = [...container.querySelectorAll("p")].find((p) => p.textContent === text);
+    expect(paragraph).toBeTruthy();
+    expect(paragraph!.className).toContain("whitespace-pre-wrap");
+  }
+);
