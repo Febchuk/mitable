@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { toddlerReportFixture, ROOM, CHILD, GUARDIAN, DAY } from "./helpers/toddler-report-fixture";
 import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
 
-const mocks = vi.hoisted(() => ({ db: null as unknown, drain: vi.fn() }));
+const mocks = vi.hoisted(() => ({ db: null as unknown, drain: vi.fn(), classroomCode: "Toddler" }));
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => mocks.db }));
 vi.mock("@/lib/api/auth", () => ({
   requireUser: async () => ({
@@ -24,10 +24,10 @@ vi.mock("@/lib/app/active-classroom", async (original) => ({
   getActiveClassroomForCurrentUser: async () => ({
     id: ROOM,
     name: "Toddler's House",
-    code: "Toddler",
+    code: mocks.classroomCode,
   }),
   listTeacherClassroomsForCurrentUser: async () => [
-    { id: ROOM, name: "Toddler's House", code: "Toddler" },
+    { id: ROOM, name: "Toddler's House", code: mocks.classroomCode },
   ],
 }));
 import { POST as create } from "@/app/api/v1/reports/route";
@@ -38,6 +38,7 @@ let fixture: ReturnType<typeof toddlerReportFixture>;
 beforeEach(() => {
   fixture = toddlerReportFixture();
   mocks.db = fixture.db;
+  mocks.classroomCode = "Toddler";
   mocks.drain.mockResolvedValue({ sent: 1, failed: 0, failures: [] });
 });
 const request = (body: unknown) =>
@@ -151,3 +152,34 @@ it("reports the same school day from either entry point around midnight", async 
   expect(await (await batchSend(batchRequest())).json()).toMatchObject({ sentCount: 1 });
   expect(JSON.stringify(fixture.tables.reports[0].sections)).toBe(fromReports);
 });
+
+it("keeps notes added on Reports when the teacher sends from Progress", async () => {
+  await create(createRequest());
+  (fixture.tables.reports[0].sections as Array<unknown>).push({
+    id: "extra",
+    heading: "A note for home",
+    paragraphs: [{ id: "note", html: "Please bring spare clothes." }],
+  });
+  expect(await (await batchSend(batchRequest())).json()).toMatchObject({ sentCount: 1 });
+  expect(JSON.stringify(fixture.tables.reports[0].sections)).toContain(
+    "Please bring spare clothes."
+  );
+});
+
+it.each(["Reports", "Progress"])(
+  "keeps ordinary class reports unchanged when sent from %s",
+  async (entry) => {
+    mocks.classroomCode = "Primary";
+    fixture.tables.classrooms[0].code = "Primary";
+    if (entry === "Reports") {
+      const { reportId } = await (await create(createRequest())).json();
+      expect((await send(request({ reportId, guardianRefs: [GUARDIAN] }))).status).toBe(200);
+    } else {
+      expect(await (await batchSend(batchRequest())).json()).toMatchObject({ sentCount: 1 });
+    }
+    const sections = JSON.stringify(fixture.tables.reports[0].sections);
+    expect(sections).toContain("Stringing");
+    expect(sections).not.toContain("Daily log");
+    expect(sections).not.toContain("Daily overview");
+  }
+);

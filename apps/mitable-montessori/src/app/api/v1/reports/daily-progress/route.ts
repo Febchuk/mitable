@@ -387,10 +387,13 @@ export async function POST(req: Request) {
         const existing = reports.get(studentId) ?? null;
         let reportId = existing?.id ?? null;
 
-        if (!existing || existing.status === "draft" || existing.status === "changes_requested") {
+        const room = scope.classrooms.find((room) => room.id === student.classroomId);
+        const toddler = isToddlerClassroomCode(room?.code);
+        // Existing Toddler drafts are refreshed by the shared send workflow,
+        // which also preserves any teacher-written additions from Reports.
+        if (!existing || (!toddler && ["draft", "changes_requested"].includes(existing.status))) {
           const exactWindow = reportWindow(parsed.data.reportDate, parsed.data.utcOffsetMinutes);
-          const room = scope.classrooms.find((room) => room.id === student.classroomId);
-          const built = isToddlerClassroomCode(room?.code)
+          const built = toddler
             ? await buildToddlerDailyReportSections(supabase, {
                 schoolId: auth.user.schoolId,
                 classroomId: student.classroomId,
