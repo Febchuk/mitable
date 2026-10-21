@@ -1,3 +1,4 @@
+import * as React from "react";
 import type { ReportPdfBlock } from "@/lib/pdf/report-template";
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
 import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";

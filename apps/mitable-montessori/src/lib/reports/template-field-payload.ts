@@ -39,7 +39,7 @@ export function speechLabelsToReportHtml(labels: string[]): string {
 /** Escape plain text for one report paragraph (`innerHTML`); newlines → `<br>`. */
 export function plainTextToReportParagraphHtml(plain: string): string {
   const t = plain.replace(/\r\n/g, "\n");
-  if (!t.trim()) return "";
+  if (!t) return "";
   return t
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -98,19 +98,33 @@ export function decodeFieldPayload(html: string): DecodedFieldPayload {
       /* fall through */
     }
   }
-  if (!trimmed) return { kind: "none" };
+  if (!html) return { kind: "none" };
   return { kind: "legacy_prose", html };
 }
 
 function stripTags(html: string): string {
-  // Preserve <br> as a newline so bullet-list content (one `• label` per
-  // line, joined by <br>) stays on multiple lines once tags are stripped.
-  const withBreaks = html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ");
-  return withBreaks
-    .split("\n")
-    .map((line) => line.replace(/[^\S\n]+/g, " ").trim())
-    .filter((line) => line.length > 0)
-    .join("\n");
+  // Decode only after removing tags: escaped teacher text must remain text.
+  // Block boundaries from older contenteditable saves are line breaks too.
+  return html
+    .replace(/<(p|div)><br\s*\/?>\s*<\/\1>/gi, "<$1></$1>")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])>\s*(?=<(p|div|li|h[1-6])\b)/gi, "\n")
+    .replace(/([^>\n])<(?:div|p)\b[^>]*>/gi, "$1\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (entity, code: string) => {
+      const named: Record<string, string> = {
+        amp: "&",
+        lt: "<",
+        gt: ">",
+        quot: '"',
+        apos: "'",
+        nbsp: " ",
+      };
+      if (!code.startsWith("#")) return named[code.toLowerCase()] ?? entity;
+      const point =
+        code[1].toLowerCase() === "x" ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      return point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+    });
 }
 
 /** Guess which template options the drafted prose refers to (for migration + post-draft normalize). */
@@ -161,7 +175,7 @@ export function paragraphHasTeacherContent(html: string): boolean {
   if (d.kind === "checklist") return d.selected.length > 0;
   if (d.kind === "single_select") return (d.value?.trim().length ?? 0) > 0;
   if (d.kind === "none") return false;
-  return stripTags(d.html).length > 0;
+  return stripTags(d.html).trim().length > 0;
 }
 
 /**

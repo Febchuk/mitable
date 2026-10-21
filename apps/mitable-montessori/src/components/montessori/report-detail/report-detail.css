@@ -1370,6 +1370,15 @@ main:has(.rd-root) {
   margin: 0;
   caret-color: var(--color-terracotta);
 }
+.rd-para-textarea {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  white-space: pre-wrap;
+}
 .rd-para-text:focus {
   outline: 2px solid var(--color-terracotta-soft);
   outline-offset: 4px;
