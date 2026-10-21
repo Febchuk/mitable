@@ -207,20 +207,22 @@ async function loadClassroomSubjects(
   supabase: SupabaseClient,
   classroomId: string
 ): Promise<SubjectDbRow[]> {
-  const { data: classroom } = await supabase
+  const { data: classroom, error: classroomError } = await supabase
     .from("classrooms")
     .select("curriculum_id")
     .eq("id", classroomId)
     .maybeSingle();
+  if (classroomError) throw new Error(classroomError.message);
   const curriculumId = (classroom?.curriculum_id as string | null) ?? null;
   if (!curriculumId) return [];
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("curriculum_subjects")
     .select(
       "id, name, sort_order, curriculum_topics(id, name, sort_order, curriculum_subtopics(id, name, sort_order))"
     )
     .eq("curriculum_id", curriculumId);
+  if (error) throw new Error(error.message);
 
   return [...(data ?? [])]
     .sort((a, b) => ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0))
@@ -249,13 +251,14 @@ async function loadPeriodProgressBySubtopic(
 ): Promise<Map<string, { status: CurriculumStatus; comment: string | null }>> {
   const periodStartTime = exactWindow?.start ?? periodStart;
   const periodEndTime = exactWindow?.end ?? `${periodEnd}T23:59:59.999`;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("student_progress_history")
     .select("curriculum_subtopic_id, new_status, comment, changed_at")
     .eq("student_id", studentId)
     .gte("changed_at", periodStartTime)
     .lte("changed_at", periodEndTime)
     .order("changed_at", { ascending: true });
+  if (error) throw new Error(error.message);
 
   const out = new Map<string, { status: CurriculumStatus; comment: string | null }>();
   for (const row of (data ?? []) as HistoryRow[]) {

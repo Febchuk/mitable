@@ -135,7 +135,7 @@ function linesForEntries(title: string, entries: ToddlerTimedEntry[], includeDet
   ];
 }
 
-export function toddlerDailyLogReportHtml(log: ToddlerDailyLog, attendance: string | null): string {
+export function toddlerDailyLogReportText(log: ToddlerDailyLog, attendance: string | null): string {
   const lines = [
     `Attendance: ${attendance ?? "Not recorded"}`,
     `Mood: ${log.mood || "Not recorded"}`,
@@ -153,5 +153,9 @@ export function toddlerDailyLogReportHtml(log: ToddlerDailyLog, attendance: stri
     `Other notes: ${log.otherNotes.trim() || "None"}`,
     `Teacher comments: ${log.teacherComments.trim() || "None"}`,
   ];
-  return plainTextToReportParagraphHtml(lines.join("\n"));
+  return lines.join("\n");
+}
+
+export function toddlerDailyLogReportHtml(log: ToddlerDailyLog, attendance: string | null): string {
+  return plainTextToReportParagraphHtml(toddlerDailyLogReportText(log, attendance));
 }
