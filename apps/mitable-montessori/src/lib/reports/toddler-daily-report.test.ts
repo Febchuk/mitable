@@ -55,3 +55,14 @@ it("supports either recorded source and refuses an empty day", async () => {
     "Save a Daily Log or mark progress"
   );
 });
+
+it("does not report a mark cleared later that day", async () => {
+  const fixture = toddlerReportFixture();
+  fixture.tables.student_progress_history.push({
+    ...fixture.tables.student_progress_history[0],
+    new_status: "na",
+    changed_at: `${DAY}T10:00:00.000Z`,
+  });
+  const built = await buildToddlerDailyReportSections(fixture.db, args);
+  expect(JSON.stringify(built.sections)).not.toContain("Stringing");
+});

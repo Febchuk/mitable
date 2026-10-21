@@ -263,7 +263,11 @@ async function loadPeriodProgressBySubtopic(
   const out = new Map<string, { status: CurriculumStatus; comment: string | null }>();
   for (const row of (data ?? []) as HistoryRow[]) {
     const status = row.new_status;
-    if (!status || !REPORTABLE_STATUSES.has(status as CurriculumStatus)) continue;
+    if (!status) continue;
+    if (!REPORTABLE_STATUSES.has(status as CurriculumStatus)) {
+      out.delete(row.curriculum_subtopic_id);
+      continue;
+    }
     const comment = row.comment?.trim() || null;
     out.set(row.curriculum_subtopic_id, {
       status: status as CurriculumStatus,
