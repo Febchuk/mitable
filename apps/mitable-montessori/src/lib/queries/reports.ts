@@ -3,6 +3,7 @@ import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 import { reportAiScoringEnabled } from "@/lib/feature-flags";
 import { listToddlerReportMedia, type ReportMediaItem } from "@/lib/media/report-media";
+import { toddlerSendSnapshot } from "@/lib/reports/toddler-send-snapshot";
 
 type MontessoriSupabase = ReturnType<typeof createAdminClient>;
 
@@ -476,10 +477,16 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     return null;
   }
   if (!data) return null;
-  const row = data as unknown as ReportsRow;
+  let row = data as unknown as ReportsRow;
   if (ctx.role !== "admin") {
     const allowed = await teacherCanAccessReport(supabase, ctx.userId, id, row.created_by_user_id);
     if (!allowed) return null;
+  }
+  // Keep the editor's preview in sync with care and learning recorded after
+  // draft creation. Sent reports keep the exact snapshot parents received.
+  if (row.report_type === "daily" && row.status !== "sent") {
+    const snapshot = await toddlerSendSnapshot(supabase, { ...row, section_guidance: null });
+    if (snapshot) row = { ...row, ...snapshot };
   }
   const tplJoin = row.report_templates;
   const reportSectionMeta = (row.section_meta as SectionMeta | null) ?? {};
