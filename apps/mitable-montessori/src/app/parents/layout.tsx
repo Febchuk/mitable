@@ -3,10 +3,12 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { UserMenu } from "@/components/app/UserMenu";
 import { ParentPortalShell } from "@/components/parents/parent-portal-shell";
+import { getSchoolBranding } from "@/lib/branding/school";
 import { getParentPortalContext } from "@/lib/parents/portal";
 
 export default async function ParentsLayout({ children }: { children: React.ReactNode }) {
   const portal = await getParentPortalContext();
+  const brand = getSchoolBranding(portal?.schoolName);
 
   if (portal?.onboardingComplete) {
     return (
@@ -30,7 +32,15 @@ export default async function ParentsLayout({ children }: { children: React.Reac
     <div className="flex min-h-screen flex-col bg-canvas">
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ink/10 bg-canvas/80 px-4 py-3 backdrop-blur">
         <Link href="/parents" className="font-display text-lg">
-          Mitable
+          {brand ? (
+            <img
+              src={brand.logoPath}
+              alt={brand.name}
+              className="inline-block h-11 w-auto object-contain"
+            />
+          ) : (
+            "Mitable"
+          )}
           <span className="ml-2 text-xs uppercase tracking-wide text-ink/40">parents</span>
         </Link>
         {user?.email ? <UserMenu email={user.email} signOutHref="/parents/login" /> : null}

@@ -98,7 +98,7 @@ function renderInviteText({
     ``,
     `This link is good for 14 days. If it expires, ask ${inviterName} to send you a new one.`,
     ``,
-    brand ? `Questions? Contact ${brand.headOfSchoolEmail}.` : `— The Mitable team`,
+    brand ? `Questions? Contact ${brand.contactEmail}.` : `— The Mitable team`,
   ].join("\n");
 }
 
@@ -126,7 +126,7 @@ function renderInviteHtml({
     ? `<p style="margin:0 0 22px;"><img src="${brand.emailLogoUrl}" alt="${brand.name}" width="144" height="72" style="display:block;width:144px;height:72px;object-fit:contain;" /></p>`
     : "";
   const contactFooter = brand
-    ? `Questions? Email <a href="mailto:${brand.headOfSchoolEmail}" style="color:#8A8275;">${brand.headOfSchoolEmail}</a>.`
+    ? `Questions? Email <a href="mailto:${brand.contactEmail}" style="color:#8A8275;">${brand.contactEmail}</a>.`
     : "Didn't expect this email? You can safely ignore it.";
 
   return `<!doctype html>
@@ -281,7 +281,7 @@ function renderReportEmailText(input: EmailRenderInput): string {
     "—",
     "Sent by your child's school via Mitable.",
     brand
-      ? `Questions? Contact ${brand.headOfSchoolEmail}.`
+      ? `Questions? Contact ${brand.contactEmail}.`
       : "Questions? Please reach out to the school directly."
   );
   return lines.join("\n");
@@ -294,7 +294,7 @@ function renderReportEmailHtml(input: EmailRenderInput): string {
     ? `<tr><td style="padding:24px 36px 0;"><img src="${brand.emailLogoUrl}" alt="${brand.name}" width="144" height="72" style="display:block;width:144px;height:72px;object-fit:contain;" /></td></tr>`
     : "";
   const contactFooter = brand
-    ? `Questions? Email <a href="mailto:${brand.headOfSchoolEmail}" style="color:#A09A8E;">${brand.headOfSchoolEmail}</a>.`
+    ? `Questions? Email <a href="mailto:${brand.contactEmail}" style="color:#A09A8E;">${brand.contactEmail}</a>.`
     : "Questions? Please reach out to the school directly.";
   const safeName = escapeHtml(studentName);
   const safeType = escapeHtml(reportType);

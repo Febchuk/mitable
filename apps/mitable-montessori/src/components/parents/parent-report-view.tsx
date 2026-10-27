@@ -70,8 +70,8 @@ export function ParentReportView({
           <>
             {" "}
             · Questions?{" "}
-            <a href={`mailto:${brand.headOfSchoolEmail}`} className="underline">
-              {brand.headOfSchoolEmail}
+            <a href={`mailto:${brand.contactEmail}`} className="underline">
+              {brand.contactEmail}
             </a>
           </>
         ) : null}

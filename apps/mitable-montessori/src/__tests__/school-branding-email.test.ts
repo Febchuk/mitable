@@ -7,7 +7,7 @@ describe("The Learning Place email branding", () => {
     vi.unstubAllEnvs();
   });
 
-  it("adds the school logo and Head of School contact to parent invitations", async () => {
+  it("adds the school logo and Head of Learning contact to parent invitations", async () => {
     vi.stubEnv("RESEND_API_KEY", "test-key");
     const send = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "email-1" }) });
     vi.stubGlobal("fetch", send);
@@ -20,9 +20,9 @@ describe("The Learning Place email branding", () => {
     });
 
     const message = JSON.parse(send.mock.calls[0][1].body);
-    expect(message.html).toContain("cropped-TLP_logo.jpg");
-    expect(message.html).toContain("mailto:hos@thelearningplaceng.com");
-    expect(message.text).toContain("hos@thelearningplaceng.com");
+    expect(message.html).toContain("school-brands/the-learning-place.png");
+    expect(message.html).toContain("mailto:academics@thelearningplaceng.com");
+    expect(message.text).toContain("academics@thelearningplaceng.com");
   });
 
   it("keeps another school's report email free of The Learning Place identity", async () => {
@@ -44,11 +44,11 @@ describe("The Learning Place email branding", () => {
     });
 
     const message = JSON.parse(send.mock.calls[0][1].body);
-    expect(message.html).not.toContain("cropped-TLP_logo.jpg");
-    expect(message.html).not.toContain("hos@thelearningplaceng.com");
+    expect(message.html).not.toContain("school-brands/the-learning-place.png");
+    expect(message.html).not.toContain("academics@thelearningplaceng.com");
   });
 
-  it("adds the Head of School contact to this school's report emails", async () => {
+  it("adds the Head of Learning contact to this school's report emails", async () => {
     vi.stubEnv("RESEND_API_KEY", "test-key");
     const send = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "email-3" }) });
     vi.stubGlobal("fetch", send);
@@ -67,8 +67,8 @@ describe("The Learning Place email branding", () => {
     });
 
     const message = JSON.parse(send.mock.calls[0][1].body);
-    expect(message.html).toContain("cropped-TLP_logo.jpg");
-    expect(message.html).toContain("mailto:hos@thelearningplaceng.com");
-    expect(message.text).toContain("hos@thelearningplaceng.com");
+    expect(message.html).toContain("school-brands/the-learning-place.png");
+    expect(message.html).toContain("mailto:academics@thelearningplaceng.com");
+    expect(message.text).toContain("academics@thelearningplaceng.com");
   });
 });
