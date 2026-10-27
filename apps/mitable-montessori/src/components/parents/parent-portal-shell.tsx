@@ -145,9 +145,9 @@ export function ParentPortalShell({
         <main className="flex-1 px-4 py-6 pb-24 sm:px-7 lg:px-8 lg:py-8 lg:pb-8">{children}</main>
         {brand ? (
           <footer className="border-t border-border px-4 py-4 text-center text-xs text-ink-muted lg:px-8">
-            Questions? Contact the Head of School at{" "}
-            <a href={`mailto:${brand.headOfSchoolEmail}`} className="underline">
-              {brand.headOfSchoolEmail}
+            Questions? Contact the Head of Learning at{" "}
+            <a href={`mailto:${brand.contactEmail}`} className="underline">
+              {brand.contactEmail}
             </a>
           </footer>
         ) : null}

@@ -85,7 +85,7 @@ describe("parent portal child switcher", () => {
 
     expect(screen.getAllByAltText("The Learning Place")).toHaveLength(2);
     expect(
-      screen.getByRole("link", { name: "hos@thelearningplaceng.com" }).getAttribute("href")
-    ).toBe("mailto:hos@thelearningplaceng.com");
+      screen.getByRole("link", { name: "academics@thelearningplaceng.com" }).getAttribute("href")
+    ).toBe("mailto:academics@thelearningplaceng.com");
   });
 });
