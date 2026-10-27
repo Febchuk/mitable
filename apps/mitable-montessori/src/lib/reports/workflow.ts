@@ -1,3 +1,4 @@
+import { refreshBundledSenSections } from "./sen-bundle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReportReviewActionType, ReportStatus } from "@/lib/schemas/report";
 import { toddlerSendSnapshot, type DailyReportSnapshotSource } from "./toddler-send-snapshot";
@@ -55,7 +56,7 @@ async function applyTransition(
   const { data: report, error: readErr } = await ctx.supabase
     .from("reports")
     .select(
-      "id, status, report_type, student_id, classroom_id, report_date, period_end, sections, section_meta, section_guidance"
+      "id, status, report_type, student_id, classroom_id, report_date, period_end, sections, section_meta, section_guidance, sen_daily_report_id"
     )
     .eq("id", ctx.reportId)
     .maybeSingle();
@@ -92,6 +93,11 @@ async function applyTransition(
   if (action === "sent" && report.report_type === "daily") {
     const snapshot = await toddlerSendSnapshot(ctx.supabase, report as DailyReportSnapshotSource);
     if (snapshot) Object.assign(update, snapshot);
+    const bundled = await refreshBundledSenSections(ctx.supabase, {
+      ...report,
+      sections: snapshot?.sections ?? report.sections,
+    });
+    if (bundled) update.sections = bundled;
   }
 
   const { error: updateErr } = await ctx.supabase

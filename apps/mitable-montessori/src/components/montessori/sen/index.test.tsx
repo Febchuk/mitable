@@ -101,3 +101,16 @@ it("explains an incomplete assessment without trying to send it", async () => {
   expect(mocks.toast).toHaveBeenCalledWith({ message: "Choose a score for every item first" });
   expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 });
+
+it("selects daily and SEN together in a single preparation request", async () => {
+  render(<SenReportsFeature />);
+  fireEvent.click(await screen.findByRole("button", { name: "Communication: 5, Excellent" }));
+  const checkbox = screen.getByRole("checkbox", {
+    name: "Include daily activity and progress in the same report",
+  }) as HTMLInputElement;
+  expect(checkbox.checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Save & prepare to send" }));
+  await waitFor(() => expect(mocks.push).toHaveBeenCalled());
+  const call = fetchMock.mock.calls.find(([url]) => url.endsWith("/report"));
+  expect(JSON.parse(call![1]!.body as string)).toEqual({ includeDailyReport: true });
+});

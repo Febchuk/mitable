@@ -1,3 +1,6 @@
+import { mergeDailySections } from "@/lib/reports/sen-bundle";
+import type { SectionMeta } from "@/lib/report-templates/sections";
+import type { DefaultTemplateBuildResult } from "@/lib/reports/default-template";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auditLog } from "@/lib/audit/log";
@@ -47,6 +50,9 @@ type ExistingReport = {
   classroomId: string;
   status: DailyProgressReportStatus;
   updatedAt: string;
+  sections: DefaultTemplateBuildResult["sections"] | null;
+  sectionMeta: SectionMeta | null;
+  sectionGuidance: Record<string, string> | null;
 };
 
 function studentName(student: RosterStudent): string {
@@ -206,7 +212,9 @@ async function loadExistingReports(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("reports")
-    .select("id, student_id, classroom_id, status, updated_at")
+    .select(
+      "id, student_id, classroom_id, status, updated_at, sections, section_meta, section_guidance"
+    )
     .in("student_id", studentIds)
     .in("classroom_id", classroomIds)
     .eq("report_type", "daily")
@@ -221,6 +229,9 @@ async function loadExistingReports(
       classroomId: row.classroom_id as string,
       status: row.status as DailyProgressReportStatus,
       updatedAt: row.updated_at as string,
+      sections: row.sections as ExistingReport["sections"],
+      sectionMeta: row.section_meta as SectionMeta | null,
+      sectionGuidance: row.section_guidance as Record<string, string> | null,
     };
     const current = byStudent.get(report.studentId);
     // A sent report always wins so a later accidental draft cannot cause a duplicate send.
@@ -420,9 +431,13 @@ export async function POST(req: Request) {
             const { error } = await supabase
               .from("reports")
               .update({
-                sections: built.sections,
-                section_meta: built.sectionMeta,
-                section_guidance: built.sectionGuidance,
+                sections: mergeDailySections(
+                  built.sections,
+                  existing.sections ?? [],
+                  existing.sectionMeta ?? {}
+                ),
+                section_meta: { ...existing.sectionMeta, ...built.sectionMeta },
+                section_guidance: { ...existing.sectionGuidance, ...built.sectionGuidance },
                 toddler_daily_log_id: "toddlerDailyLogId" in built ? built.toddlerDailyLogId : null,
                 body: null,
                 title,
