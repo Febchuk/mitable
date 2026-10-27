@@ -27,6 +27,7 @@ import {
   type BulkScope,
 } from "./bulk-attendance-panel";
 import styles from "./attendance.module.css";
+import { AttendanceSendPanel } from "./attendance-send-panel";
 
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
 
@@ -174,6 +175,8 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
   const [bulkOpen, setBulkOpen] = React.useState(false);
   const [bulkApplying, setBulkApplying] = React.useState(false);
   const inflight = React.useRef(0);
+  const failedRows = React.useRef(new Set<string>());
+  const [sendBusy, setSendBusy] = React.useState(false);
 
   const unmarkedCount = React.useMemo(
     () =>
@@ -227,8 +230,10 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
         }
 
+        failedRows.current.delete(rowKey);
         setRows((prev) => ({ ...prev, [rowKey]: { ...next, saving: false } }));
       } catch {
+        failedRows.current.add(rowKey);
         setRows((prev) => ({ ...prev, [rowKey]: { ...next, saving: false } }));
         ToastBus.push({
           message: "Couldn't save attendance. Check your connection and try again.",
@@ -237,7 +242,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
       } finally {
         inflight.current = Math.max(0, inflight.current - 1);
         if (inflight.current === 0) {
-          setSaveStatus((s) => (s === "error" ? "error" : "saved"));
+          setSaveStatus(failedRows.current.size > 0 ? "error" : "saved");
         }
       }
     },
@@ -295,11 +300,13 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
           }
           return next;
         });
+        for (const rowKey of rowKeys) failedRows.current.delete(rowKey);
         setBulkOpen(false);
         ToastBus.push({
           message: `Marked ${targets.length} ${targets.length === 1 ? "child" : "children"} ${params.status}.`,
         });
       } catch {
+        for (const rowKey of rowKeys) failedRows.current.add(rowKey);
         setRows((prev) => {
           const next = { ...prev };
           for (let i = 0; i < rowKeys.length; i++) {
@@ -317,7 +324,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
         setBulkApplying(false);
         inflight.current = Math.max(0, inflight.current - 1);
         if (inflight.current === 0) {
-          setSaveStatus((s) => (s === "error" ? "error" : "saved"));
+          setSaveStatus(failedRows.current.size > 0 ? "error" : "saved");
         }
       }
     },
@@ -391,7 +398,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             <BulkAttendanceToolbar
               totalStudents={data.students.length}
               unmarkedCount={unmarkedCount}
-              applying={bulkApplying}
+              applying={bulkApplying || sendBusy}
               bulkOpen={bulkOpen}
               onToggleBulk={() => setBulkOpen((v) => !v)}
               onAllPresent={markAllPresent}
@@ -400,7 +407,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
               open={bulkOpen}
               totalStudents={data.students.length}
               unmarkedCount={unmarkedCount}
-              applying={bulkApplying}
+              applying={bulkApplying || sendBusy}
               onClose={() => setBulkOpen(false)}
               onApply={(params, scope) => void applyBulk(params, scope)}
             />
@@ -414,7 +421,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
                     student={student}
                     showClassroom={isAllClasses}
                     row={row}
-                    disabled={bulkApplying}
+                    disabled={bulkApplying || sendBusy}
                     onChange={(next) => {
                       setRows((prev) => ({
                         ...prev,
@@ -427,6 +434,16 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
               })}
             </div>
           </>
+        )}
+
+        {data.students.length > 0 && (
+          <AttendanceSendPanel
+            date={data.date}
+            classroomIds={[...new Set(data.students.map((student) => student.classroomId))]}
+            markedCount={data.students.length - unmarkedCount}
+            disabled={bulkApplying || saveStatus === "saving" || saveStatus === "error"}
+            onBusyChange={setSendBusy}
+          />
         )}
 
         <div
@@ -532,10 +549,13 @@ function StudentRow({
   };
 
   return (
-    <div
+    <fieldset
+      disabled={disabled}
       className={`${styles.registerCell} ${commentMenuOpen ? styles.registerCellMenuOpen : ""}`}
       style={{
         ...cardStyle,
+        margin: 0,
+        padding: 0,
         overflow: "visible",
         opacity: disabled ? 0.55 : 1,
         pointerEvents: disabled ? "none" : "auto",
@@ -636,6 +656,7 @@ function StudentRow({
             </div>
           )}
           <CommentField
+            disabled={disabled}
             status={row.status}
             value={row.comment}
             onMenuOpenChange={setCommentMenuOpen}
@@ -644,7 +665,7 @@ function StudentRow({
           />
         </div>
       </div>
-    </div>
+    </fieldset>
   );
 }
 
@@ -688,18 +709,20 @@ const FIELD_HEIGHT = 32;
 function CommentField({
   status,
   value,
+  disabled,
   onMenuOpenChange,
   onChange,
   onCommit,
 }: {
   status: AttendanceDayStatus;
+  disabled?: boolean;
   value: string | null;
   onMenuOpenChange?: (open: boolean) => void;
   onChange: (next: string | null) => void;
   onCommit: (next: string | null) => void;
 }) {
   const presets = presetsFor(status);
-  const enabled = presets !== null;
+  const enabled = presets !== null && !disabled;
 
   const [open, setOpen] = React.useState(false);
   // Custom mode = the user picked "Custom comment", so the trigger is showing
