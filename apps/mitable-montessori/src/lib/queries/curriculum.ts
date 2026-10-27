@@ -18,7 +18,7 @@ export type SubtopicProgress = {
   introducedAt: string | null;
   practicingAt: string | null;
   masteredAt: string | null;
-  updatedAt: string;
+  updatedAt: string | null;
 };
 
 export type CurriculumByTopic = {
@@ -54,12 +54,23 @@ type HistoryRow = {
   changed_at: string;
 };
 
+type SubjectRow = {
+  sort_order: number;
+  curriculum_topics: Array<{
+    id: string;
+    name: string;
+    sort_order: number;
+    marking_schema: string;
+    curriculum_subtopics: Array<{ id: string; name: string; sort_order: number }>;
+  }>;
+};
+
 /** Returns the curriculum tree (topic → subtopics) with the student's progress merged in. */
 export async function listCurriculumProgress(studentId: string): Promise<CurriculumByTopic[]> {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const [progressResp, historyResp] = await Promise.all([
+  const [progressResp, historyResp, enrollmentResp] = await Promise.all([
     supabase
       .from("student_progress")
       .select(
@@ -73,7 +84,19 @@ export async function listCurriculumProgress(studentId: string): Promise<Curricu
       .eq("student_id", studentId)
       .order("changed_at", { ascending: true })
       .returns<HistoryRow[]>(),
+    supabase
+      .from("student_classroom_enrollments")
+      .select("classrooms(curriculum_id)")
+      .eq("student_id", studentId)
+      .is("end_date", null)
+      .order("is_primary", { ascending: false })
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
   ]);
+  if (progressResp.error) throw new Error(progressResp.error.message);
+  if (historyResp.error) throw new Error(historyResp.error.message);
+  if (enrollmentResp.error) throw new Error(enrollmentResp.error.message);
 
   // Build a "first time we saw status X" map per subtopic.
   type FirstSeen = Partial<Record<CurriculumStatus, string>>;
@@ -87,7 +110,57 @@ export async function listCurriculumProgress(studentId: string): Promise<Curricu
     }
   }
 
-  // Group by topic.
+  const room = enrollmentResp.data?.classrooms as
+    | { curriculum_id: string | null }
+    | Array<{ curriculum_id: string | null }>
+    | null
+    | undefined;
+  const curriculumId = (Array.isArray(room) ? room[0] : room)?.curriculum_id;
+  if (curriculumId) {
+    const { data: subjects, error } = await supabase
+      .from("curriculum_subjects")
+      .select(
+        "sort_order, curriculum_topics(id, name, sort_order, marking_schema, curriculum_subtopics(id, name, sort_order))"
+      )
+      .eq("curriculum_id", curriculumId)
+      .returns<SubjectRow[]>();
+    if (error) throw new Error(error.message);
+    const progressBySubtopic = new Map(
+      (progressResp.data ?? []).map((row) => [row.curriculum_subtopic_id, row])
+    );
+    // Start with the assigned curriculum, not saved marks: an unmarked lesson
+    // still belongs in the child's Progress view.
+    return [...(subjects ?? [])]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .flatMap((subject) =>
+        [...(subject.curriculum_topics ?? [])]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((topic) => ({
+            topicId: topic.id,
+            topicName: topic.name,
+            markingSchema: normalizeMarkingSchema(topic.marking_schema),
+            subtopics: [...(topic.curriculum_subtopics ?? [])]
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map((sub): SubtopicProgress => {
+                const saved = progressBySubtopic.get(sub.id);
+                const seen = firstSeen.get(sub.id) ?? {};
+                return {
+                  subtopicId: sub.id,
+                  name: sub.name,
+                  topicName: topic.name,
+                  status: saved?.status ?? "na",
+                  comment: saved?.comment ?? null,
+                  introducedAt: seen.introduced ?? null,
+                  practicingAt: seen.practicing ?? null,
+                  masteredAt: seen.mastered ?? null,
+                  updatedAt: saved?.updated_at ?? null,
+                };
+              }),
+          }))
+      );
+  }
+
+  // Keep recorded history available when the child has no assigned curriculum.
   const byTopic = new Map<string, CurriculumByTopic>();
   for (const row of progressResp.data ?? []) {
     const sub = row.curriculum_subtopics;

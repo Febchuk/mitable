@@ -2,7 +2,11 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { teacherShouldSeeProgress } from "@/lib/app/active-classroom";
 import { getClassroomProgress } from "@/lib/queries/classroom-progress";
 
-const mocks = vi.hoisted(() => ({ curriculum: "curriculum", assigned: true }));
+const mocks = vi.hoisted(() => ({
+  curriculum: "curriculum",
+  assigned: true,
+  fullCurriculum: false,
+}));
 vi.mock("next/headers", () => ({
   cookies: async () => ({}),
   headers: async () => new Headers({ "x-mitable-auth-user-id": "teacher" }),
@@ -31,22 +35,44 @@ vi.mock("@/utils/supabase/server", () => ({
             student_classroom_enrollments: [{ classroom_id: "toddler", end_date: null }],
           },
         ],
-        curriculum_subjects: [
-          {
-            id: "subject",
-            name: "Practical Life",
-            sort_order: 0,
-            curriculum_topics: [
+        curriculum_subjects: mocks.fullCurriculum
+          ? [
               {
-                id: "topic",
-                name: "Fine motor",
+                id: "subject",
+                name: "Full Toddler curriculum",
                 sort_order: 0,
-                marking_schema: "ipm",
-                curriculum_subtopics: [{ id: "material", name: "Stringing", sort_order: 0 }],
+                curriculum_topics: Array.from({ length: 8 }, (_, index) => ({
+                  id: `topic-${index}`,
+                  name: `Topic ${index + 1}`,
+                  sort_order: index,
+                  marking_schema: "ipm",
+                  curriculum_subtopics: Array.from(
+                    { length: index === 0 ? 8 : 7 },
+                    (_, lesson) => ({
+                      id: `lesson-${index}-${lesson}`,
+                      name: `Lesson ${index + 1}.${lesson + 1}`,
+                      sort_order: lesson,
+                    })
+                  ),
+                })),
+              },
+            ]
+          : [
+              {
+                id: "subject",
+                name: "Practical Life",
+                sort_order: 0,
+                curriculum_topics: [
+                  {
+                    id: "topic",
+                    name: "Fine motor",
+                    sort_order: 0,
+                    marking_schema: "ipm",
+                    curriculum_subtopics: [{ id: "material", name: "Stringing", sort_order: 0 }],
+                  },
+                ],
               },
             ],
-          },
-        ],
         student_progress: [
           { student_id: "child", curriculum_subtopic_id: "material", status: "practicing" },
         ],
@@ -70,6 +96,16 @@ vi.mock("@/utils/supabase/server", () => ({
 beforeEach(() => {
   mocks.curriculum = "curriculum";
   mocks.assigned = true;
+  mocks.fullCurriculum = false;
+});
+it("loads every assigned lesson for the classroom grid even without saved marks", async () => {
+  mocks.fullCurriculum = true;
+  const progress = await getClassroomProgress("toddler");
+  expect(progress?.topics).toHaveLength(8);
+  expect(progress?.subtopics).toHaveLength(57);
+  expect(progress?.subtopics).toContainEqual(
+    expect.objectContaining({ id: "lesson-7-6", topicId: "topic-7" })
+  );
 });
 
 it("shows Progress and loads the Toddler curriculum, roster and saved marks", async () => {
